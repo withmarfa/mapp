@@ -55,16 +55,16 @@ struct ItemLibraryTests {
     @Test func anEraseConfirmedAfterTheLibraryCanNoLongerEraseLeavesTheItemsAndSaysSo() {
         let trashed = FakeItemLibrary.note("Old", modified: .now, state: .trashed)
         let library = FakeItemLibrary(items: [trashed])
-        library.canPurge = true
+        library.reachesServer = true
         Browser.delete([trashed.id], in: library, undoManager: nil)
         #expect(library.notesToPurge == [trashed.id], "the person is asked while the library can erase")
-        library.canPurge = false
+        library.reachesServer = false
         library.deletePermanentlyOnConfirm([trashed.id])
         #expect(library.item(trashed.id) != nil, "nothing is erased once the library cannot")
         #expect(library.notices.waiting.last?.title == "Can’t Delete Immediately")
         #expect(library.notices.waiting.last?.message == "Deleting for good needs the server, which can’t be reached right now. The items are still in Recently Deleted.")
         library.notices.answerAll()
-        library.canPurge = true
+        library.reachesServer = true
         library.deletePermanentlyOnConfirm([trashed.id])
         #expect(library.item(trashed.id) == nil)
         #expect(library.notices.waiting.last == nil)

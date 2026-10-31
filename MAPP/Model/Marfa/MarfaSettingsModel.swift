@@ -7,7 +7,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     var detail: String?
     var isProblem: Bool
 
-    init(_ state: MarfaHost.State) {
+    init(_ state: MarfaConnectionState) {
         switch state {
         case .disconnected:
             title = String(localized: "Not connected")

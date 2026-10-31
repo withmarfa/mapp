@@ -69,7 +69,7 @@ import os
     /// Which library the windows show. A server's copy is shown whenever it is open. Leaving a server forgets its
     /// address first, so the windows ask for another; a copy closed to open again, as when a key is replaced, is
     /// waited for.
-    nonisolated static func mode(hasSource: Bool, isConfigured: Bool, state: MarfaHost.State, isLaunching: Bool, isBusy: Bool) -> Mode {
+    nonisolated static func mode(hasSource: Bool, isConfigured: Bool, state: MarfaConnectionState, isLaunching: Bool, isBusy: Bool) -> Mode {
         if hasSource { return .marfa }
         guard isConfigured else { return .unconfigured }
         switch state {

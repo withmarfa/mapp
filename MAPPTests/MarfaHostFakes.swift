@@ -27,8 +27,14 @@ nonisolated final class FakeMarfaSource: ItemSource {
         asked.withLock { $0.append(call) }
     }
 
+    /// How many times anything has subscribed to the connection states.
+    let stateSubscriptions = Mutex(0)
+
     var connectionState: MarfaConnectionState { state.value }
-    func connectionStates() -> AsyncStream<MarfaConnectionState> { state.values() }
+    func connectionStates() -> AsyncStream<MarfaConnectionState> {
+        stateSubscriptions.withLock { $0 += 1 }
+        return state.values()
+    }
     func refresh() { record("refresh") }
 
     /// Keys the copy closes on, as one that cannot open its store again does.

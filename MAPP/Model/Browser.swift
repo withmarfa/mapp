@@ -607,7 +607,7 @@ final class Browser {
                 library.delete(moving, undoManager: undoManager)
             }
         } else if !binned.isEmpty {
-            if library.canPurge { library.notesToPurge = binned } else { library.tellCannotPurge() }
+            if library.reachesServer { library.notesToPurge = binned } else { library.tellCannotPurge() }
         }
     }
 

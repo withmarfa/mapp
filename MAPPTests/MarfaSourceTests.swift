@@ -482,7 +482,7 @@ struct MarfaSourceOfflineTests {
 
         source.hear(fault)
         _ = try #require(await log.wait { unavailable($0) == 1 })
-        #expect(await waitForConnection(source) { if case .stopped = $0 { true } else { false } })
+        #expect(await waitForConnection(source) { if case .unavailable = $0 { true } else { false } })
 
         source.hear(fault)
         source.hearResumed()

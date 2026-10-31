@@ -37,18 +37,30 @@ nonisolated enum CloseOutcome: Hashable, Sendable {
     case waiting(UnsentWrites?)
 }
 
-/// What the source knows of its server, for the app to show beside the library.
+/// How the library's server stands, for the app to show beside the library: the one record of it. An open copy
+/// reports `connecting`, `online`, `offline`, `keyRefused` and `unavailable` (`MarfaHub`), which `MarfaLibrary`
+/// holds; `MarfaHost` reports the rest, and any of these, only while no copy is open.
 nonisolated enum MarfaConnectionState: Hashable, Sendable {
+    /// No server is set.
+    case disconnected
     /// Showing what the copy holds, not yet heard from the server.
     case connecting
     case online
     /// The server cannot be reached; writes wait in the queue and go when it can.
     case offline(reason: String?)
     /// The server refused the key, or it lacks what reading the library needs. Writes wait until the person gives
-    /// another.
+    /// another in Settings.
     case keyRefused
-    /// Following the server stopped, and stays stopped until a refresh: one a failed follow waits for, and one the engine makes when the core ended the stream on a fault and a new one is taken. The copy still reads and queues.
-    case stopped(code: String, message: String)
+    /// The copy cannot be opened, or following the server stopped; the message is the package's. A stopped follow
+    /// stays stopped until a refresh: one a failed follow waits for, and one the engine makes when the core ended
+    /// the stream on a fault and a new one is taken. The copy still reads and queues.
+    case unavailable(message: String)
+    /// A different version of the app made the copy, so this one can't open it, and leaves it as it is. The
+    /// changes in it that the server has not taken (`unsent`, never 0, and nil where that can't be read) can
+    /// only be sent by that version.
+    case otherVersion(unsent: UInt64?)
+    /// Another copy of the app on this Mac holds the copy, so this one can't open it.
+    case inUse
 }
 
 /// A library read from a Marfa server through the package's working copy: the copy answers every read, so the
@@ -546,6 +558,20 @@ nonisolated final class MarfaHub: Sendable {
     }
 
     var catalogue: Catalogue { state.withLock { $0.held?.catalogue ?? Catalogue() } }
+
+    /// What readers were last told of each of `ids` that they hold: the item and its text. The engine tells only
+    /// what differs from this, so the library's mapped items are held here, once, and not again in the engine.
+    func told(_ ids: some Collection<ItemID>) -> [ItemID: (item: Item, text: String?)] {
+        state.withLock { state in
+            guard let held = state.held else { return [:] }
+            var told: [ItemID: (item: Item, text: String?)] = [:]
+            told.reserveCapacity(ids.count)
+            for id in ids {
+                if let item = held.items[id] { told[id] = (item, held.bodies[id]?.text) }
+            }
+            return told
+        }
+    }
 
     var itemsAndCatalogue: ([ItemID: Item], Catalogue) {
         state.withLock { ($0.held?.items ?? [:], $0.held?.catalogue ?? Catalogue()) }

@@ -122,8 +122,6 @@ actor MarfaEngine {
     var bodyLinks: [String: BodyLinks] = [:]
     var edges = MarfaEdgeTable()
     var queue: [Marfa.QueuedWrite] = []
-    var items: [ItemID: Item] = [:]
-    var bodies: [ItemID: Int] = [:]
     var syncStates: [ItemID: SyncState] = [:]
     var changedSync: Set<ItemID> = []
     /// Refusals and conflicts answered, which the queue forgets unless the write carried content, kept until a later

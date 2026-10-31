@@ -8,7 +8,7 @@ struct SyncFootLineTests {
     private let english = Locale(identifier: "en_US")
 
     private func line(
-        _ state: MarfaHost.State = .online, waiting: Int = 0, oldest: TimeInterval? = nil, phase: SyncReport.Phase = .current,
+        _ state: MarfaConnectionState = .online, waiting: Int = 0, oldest: TimeInterval? = nil, phase: SyncReport.Phase = .current,
         problems: [SyncProblemEntry] = [], synced: TimeInterval? = 120
     ) -> SyncFootLine? {
         let report = SyncReport(
@@ -114,7 +114,7 @@ struct SyncFootLineTests {
         #expect(unusable.text == "Couldn’t sync")
         #expect(unusable.help == "The store is damaged.")
 
-        for state in [MarfaHost.State.otherVersion(unsent: 2), .inUse] {
+        for state in [MarfaConnectionState.otherVersion(unsent: 2), .inUse] {
             let line = try #require(line(state))
             #expect(line.kind == .failed)
             #expect(line.help?.isEmpty == false)

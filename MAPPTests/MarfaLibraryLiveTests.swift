@@ -289,7 +289,7 @@ extension LiveMarfaTests {
                 #expect(library.items(in: .allNotes).contains { $0.id == kept })
 
                 // Delete Permanently needs the server and takes the item out of the bin and the copy.
-                try #require(library.canPurge)
+                try #require(library.reachesServer)
                 library.deletePermanentlyOnConfirm([purged])
                 try #require(await eventually { library.item(purged) == nil })
                 #expect(library.notices.waiting.last == nil, "\(String(describing: library.notices.waiting.last))")

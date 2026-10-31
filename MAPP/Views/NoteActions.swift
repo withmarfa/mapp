@@ -91,7 +91,7 @@ struct NoteRemoveActions: View {
             Button("Delete Immediately…", systemImage: "trash", role: .destructive) {
                 library.notesToPurge = ids
             }
-            .disabled(!library.canPurge)
+            .disabled(!library.reachesServer)
         } else {
             Button("Delete", systemImage: "trash", role: .destructive) {
                 library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)

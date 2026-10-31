@@ -59,7 +59,7 @@ nonisolated enum IconSet: String, CaseIterable, Identifiable, Sendable {
     var current: String? { library.catalogue.icon(for: type) }
     var results: [String] { IconNameSearch.matching(search, in: idsBySet[set] ?? []) }
     /// Whether the grid and Use Default take a click: with a server to keep the choice, and none being written.
-    var canChoose: Bool { library.canChooseTypeIcons && !isWorking }
+    var canChoose: Bool { library.reachesServer && !isWorking }
     /// Cancel waits for the write in flight, since closing the sheet would not stop it and the person would not see
     /// whether it was kept.
     var canCancel: Bool { !isWorking }

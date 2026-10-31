@@ -21,25 +21,6 @@ import Observation
     /// ask, as in the sample.
     typealias Configurer = @Sendable (MarfaConnection, any KeyStore) -> (any InstanceConfigSource)?
 
-    nonisolated enum State: Hashable, Sendable {
-        case disconnected
-        /// Showing the copy, not yet heard from the server.
-        case connecting
-        case online
-        /// Writes wait in the copy and go when the server can be reached.
-        case offline(reason: String?)
-        /// Settings takes another key.
-        case keyRefused
-        /// The copy cannot be opened or followed; the message is the package's.
-        case unavailable(message: String)
-        /// A different version of the app made the copy, so this one can't open it, and leaves it as it is. The
-        /// changes in it that the server has not taken (`unsent`, never 0, and nil where that can't be read) can
-        /// only be sent by that version.
-        case otherVersion(unsent: UInt64?)
-        /// Another copy of the app on this Mac holds the copy, so this one can't open it.
-        case inUse
-    }
-
     /// What becomes of the copy, and every write still in it, when it is left.
     nonisolated enum DisconnectChoice: Hashable, Sendable {
         /// Left on disk, so connecting the same address again goes on from it and sends what waits.
@@ -60,9 +41,9 @@ import Observation
         case changesWaiting(UnsentWrites?)
         /// The copy could not be opened or read.
         case unavailable(message: String)
-        /// The copy was made by a different version of the app; see `State.otherVersion`.
+        /// The copy was made by a different version of the app; see `MarfaConnectionState.otherVersion`.
         case otherVersion(unsent: UInt64?)
-        /// Another copy of the app holds the copy; see `State.inUse`.
+        /// Another copy of the app holds the copy; see `MarfaConnectionState.inUse`.
         case inUse
         /// The key store would not take or give the key.
         case keyStore(message: String)
@@ -120,14 +101,14 @@ import Observation
     /// The address connected to, kept while its copy cannot be opened, so Settings can offer a key for it.
     private(set) var connection: MarfaConnection?
     /// The library to show, once its copy is open. It holds how its server stands and what its copy last
-    /// reported, so the host keeps neither while a copy is open.
+    /// reported, and tells the host when the server comes back, so the host keeps neither and follows neither
+    /// while a copy is open.
     private(set) var library: MarfaLibrary?
     /// How the server stands while no copy is open: connecting to it, or why its copy could not be opened.
-    private var standing = State.disconnected
+    private var standing = MarfaConnectionState.disconnected
     /// What the person is told, from this host and from every library it opens.
     let notices = Notices()
     private(set) var isBusy = false
-    private var watching: [Task<Void, Never>] = []
     private var reading: Task<Void, Never>?
     private var instanceNames: [String: String]
     private var syncedDates: [String: Date]
@@ -137,7 +118,7 @@ import Observation
     @ObservationIgnored var handOverEdits: () async -> Bool = { true }
 
     var source: (any ItemSource)? { library?.source }
-    var state: State { library?.connection ?? standing }
+    var state: MarfaConnectionState { library?.connection ?? standing }
     var report: SyncReport { library?.syncReport ?? SyncReport() }
 
     init(
@@ -503,23 +484,16 @@ import Observation
         detach()
         let library = MarfaLibrary(
             source: source, notices: notices, history: historian(connection, keys), typeIcons: iconKeeper(connection, keys),
-            didSync: { [weak self] date in self?.recordSync(date, for: connection) })
+            didSync: { [weak self] date in self?.recordSync(date, for: connection) },
+            // Each return to the server may find it renamed. A library the host has left may still be told once more.
+            cameOnline: { [weak self] in
+                guard let self, self.connection == connection else { return }
+                readName(of: connection)
+            })
         self.library = library
         if let notice = connection.server(key: "").takePlainHTTPNotice() {
             notices.tell(Words.plainHTTPTitle, Words.plainHTTP(origin: notice.origin))
         }
-        let states = source.connectionStates()
-        var wasOnline = source.connectionState == .online
-        // A value already on its way from a source that has since been left is dropped.
-        watching = [
-            Task { [weak self] in
-                for await state in states where self?.source === source {
-                    // Each return to the server may find it renamed.
-                    if state == .online, !wasOnline { self?.readName(of: connection) }
-                    wasOnline = state == .online
-                }
-            }
-        ]
         source.refresh()
         readName(of: connection)
     }
@@ -565,8 +539,6 @@ import Observation
     }
 
     private func detach() {
-        for task in watching { task.cancel() }
-        watching = []
         reading?.cancel()
         reading = nil
         library = nil
@@ -684,16 +656,6 @@ import Observation
 
     private static func message(_ error: any Error) -> String {
         error.localizedDescription
-    }
-
-    static func state(_ state: MarfaConnectionState) -> State {
-        switch state {
-        case .connecting: .connecting
-        case .online: .online
-        case .offline(let reason): .offline(reason: reason)
-        case .keyRefused: .keyRefused
-        case .stopped(_, let message): .unavailable(message: message)
-        }
     }
 
     /// The keychain and the disk can each take a while, which the main actor never waits on.

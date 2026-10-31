@@ -30,8 +30,9 @@ import Observation
     private(set) var views: [LibraryView] = []
     private(set) var syncReport: SyncReport
     var downloadedFiles: (any DownloadedFiles)? { source.downloadedFiles }
-    /// How the server stands, for the app to show beside the library.
-    private(set) var connection: MarfaHost.State
+    /// How the server stands, for the app to show beside the library. The library is the one subscriber to the
+    /// source's states; the host reads this while the copy is open.
+    private(set) var connection: MarfaConnectionState
     let now: () -> Date
 
     /// Bumped when any item changes, for the lists and search.
@@ -174,14 +175,14 @@ import Observation
     init(
         source: any ItemSource, notices: Notices, history: (any ItemHistorySource)? = nil,
         typeIcons: (any TypeIconSource)? = nil, now: @escaping () -> Date = Date.init,
-        didSync: @escaping (Date) -> Void = { _ in }) {
+        didSync: @escaping (Date) -> Void = { _ in }, cameOnline: @escaping () -> Void = {}) {
         self.source = source
         self.history = history
         self.typeIcons = typeIcons
         self.notices = notices
         self.now = now
         syncReport = source.syncReport
-        connection = MarfaHost.state(source.connectionState)
+        connection = source.connectionState
         let changes = source.changes()
         let reports = source.syncReports()
         let states = source.connectionStates()
@@ -202,7 +203,12 @@ import Observation
                 }
             },
             Task { [weak self] in
-                for await state in states { self?.connection = MarfaHost.state(state) }
+                for await state in states {
+                    guard let self else { return }
+                    let wasOnline = connection == .online
+                    connection = state
+                    if state == .online, !wasOnline { cameOnline() }
+                }
             }
         ]
     }
@@ -211,14 +217,7 @@ import Observation
         for task in following { task.cancel() }
     }
 
-    /// Purge needs the server, so it is offered only while the server can be reached.
-    var canPurge: Bool { connection == .online }
-
-    /// A view is written through the server at once, so it can be only while the server can be reached.
-    var canEditViews: Bool { connection == .online }
-
-    /// Whether a type's icon can be chosen: it is kept on the server, so only while the server can be reached.
-    var canChooseTypeIcons: Bool { typeIcons != nil && connection == .online }
+    var reachesServer: Bool { connection == .online }
 
     func setIcon(_ icon: String?, ofType type: TypeID) async -> TypeIconFailure? {
         guard let typeIcons else { return .unsupported }

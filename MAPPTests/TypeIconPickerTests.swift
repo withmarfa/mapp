@@ -102,7 +102,7 @@ import Testing
 
     @Test func theGridIsOffWithoutAServer() {
         let library = FakeItemLibrary(items: [])
-        library.canChooseTypeIcons = false
+        library.reachesServer = false
         let model = TypeIconPickerModel(type: TypeID("core.task"), library: library, ids: [.lucide: ["lucide:zap"]])
         #expect(!model.canChoose)
         #expect(model.canCancel)
@@ -209,6 +209,6 @@ private struct FakeTypeIcons: TypeIconSource {
     @Test func aLibraryWithNoServerKeepsNoChoice() async {
         let library = MarfaLibrary(source: FakeItemSource(), notices: Notices())
         #expect(await library.setIcon("lucide:zap", ofType: TypeID("core.task")) == .unsupported)
-        #expect(!library.canChooseTypeIcons)
+        #expect(!library.reachesServer)
     }
 }

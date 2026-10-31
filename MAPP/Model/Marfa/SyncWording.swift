@@ -31,7 +31,7 @@ nonisolated struct SyncStatus: Hashable, Sendable {
 
     var primary: Note? { notes.first }
 
-    init(state: MarfaHost.State, report: SyncReport, now: Date) {
+    init(state: MarfaConnectionState, report: SyncReport, now: Date) {
         guard state != .disconnected else { return }
         let waiting = report.waiting
         switch state {

@@ -26,7 +26,7 @@ struct SyncStatusTests {
     }
 
     @Test func nothingIsSaidWhileEverythingIsInStep() {
-        for state in [MarfaHost.State.online, .connecting] {
+        for state in [MarfaConnectionState.online, .connecting] {
             #expect(SyncStatus(state: state, report: report(), now: now).notes.isEmpty)
         }
     }
@@ -90,7 +90,7 @@ struct SyncStatusTests {
     }
 
     @Test func noWordIsJargon() {
-        let all = [MarfaHost.State.online, .offline(reason: nil), .keyRefused, .unavailable(message: ""), .otherVersion(unsent: 2), .inUse].flatMap { state in
+        let all = [MarfaConnectionState.online, .offline(reason: nil), .keyRefused, .unavailable(message: ""), .otherVersion(unsent: 2), .inUse].flatMap { state in
             SyncStatus(state: state, report: report(waiting: 2, oldest: 60, phase: .catchingUp, problems: [entry()]), now: now)
                 .notes.flatMap { [$0.title, $0.detail] }
         }
@@ -269,8 +269,8 @@ struct ConnectionStatusTests {
         }
     }
 
-    @Test(arguments: [MarfaHost.State.otherVersion(unsent: 2), .otherVersion(unsent: nil), .inUse])
-    func theWindowSaysACopyThisVersionCantOpenIsUnavailable(state: MarfaHost.State) {
+    @Test(arguments: [MarfaConnectionState.otherVersion(unsent: 2), .otherVersion(unsent: nil), .inUse])
+    func theWindowSaysACopyThisVersionCantOpenIsUnavailable(state: MarfaConnectionState) {
         let status = SyncStatus(state: state, report: SyncReport(), now: Date())
         #expect(status.primary?.kind == .unavailable)
     }

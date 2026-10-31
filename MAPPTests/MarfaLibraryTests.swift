@@ -558,7 +558,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     @Test func deletingForGoodSendsEachItemInTheBinAtTheVersionShown() async throws {
         let (library, source) = try await loaded()
         source.state.set(.online)
-        #expect(await eventually { library.canPurge })
+        #expect(await eventually { library.reachesServer })
         var binned = try #require(library.item(F.n3))
         binned.version = ItemVersion(9)
         source.send(.upserted([binned]))
@@ -580,7 +580,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         source.state.set(.offline(reason: "network"))
         #expect(await eventually { library.connection == .offline(reason: "network") })
-        #expect(!library.canPurge)
+        #expect(!library.reachesServer)
         library.deletePermanentlyOnConfirm([F.n3])
         #expect(source.writes.isEmpty)
         #expect(library.notices.waiting.last?.title == String(localized: "Can’t Delete Immediately"))
@@ -850,19 +850,19 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
     @Test func purgeIsOfferedOnlyWhileTheServerCanBeReached() async throws {
         let (library, source) = try await loaded()
-        #expect(!library.canPurge)
+        #expect(!library.reachesServer)
         #expect(library.connection == .connecting)
-        let watched = observes { _ = library.canPurge }
+        let watched = observes { _ = library.reachesServer }
         source.state.set(.online)
         #expect(await eventually { library.connection == .online })
         #expect(watched.isSet)
-        #expect(library.canPurge)
+        #expect(library.reachesServer)
         source.state.set(.offline(reason: "network"))
         #expect(await eventually { library.connection == .offline(reason: "network") })
-        #expect(!library.canPurge)
+        #expect(!library.reachesServer)
         source.state.set(.keyRefused)
         #expect(await eventually { library.connection == .keyRefused })
-        source.state.set(.stopped(code: "x", message: "Stopped."))
+        source.state.set(.unavailable(message: "Stopped."))
         #expect(await eventually { library.connection == .unavailable(message: "Stopped.") })
     }
 

@@ -555,7 +555,7 @@ actor MarfaSync {
         guard !stopped, let error = error as? MarfaError else {
             if !stopped {
                 Telemetry.syncStoppedUnnamed(during: kind.operation)
-                hub.set(.stopped(code: "failed", message: error.localizedDescription))
+                hub.set(.unavailable(message: error.localizedDescription))
             }
             return
         }
@@ -583,7 +583,7 @@ actor MarfaSync {
             schedule(kind)
         default:
             Telemetry.syncStopped(error, during: kind.operation)
-            hub.set(.stopped(code: error.code(), message: error.message))
+            hub.set(.unavailable(message: error.message))
             guard !told else { return }
             told = true
             _ = tell(.failed(SourceFailure(kind: .failed, message: error.message)))

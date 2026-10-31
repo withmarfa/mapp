@@ -4,7 +4,8 @@ import Observation
 /// Everything the views, the commands and the editor use of a library, so none of them knows what holds the items:
 /// `MarfaLibrary`, over a Marfa server's working copy, in the app, and `FakeItemLibrary` in tests.
 ///
-/// Deleting for good needs the server, so a view dims it while `canPurge` is false rather than asking.
+/// Deleting for good, writing a view and choosing a type's icon need the server, so a view dims them while
+/// `reachesServer` is false rather than asking.
 @MainActor
 protocol ItemLibrary: AnyObject, Observable {
     // MARK: State
@@ -19,10 +20,9 @@ protocol ItemLibrary: AnyObject, Observable {
     /// The views saved on the server, by title, each a place of its own (`SidebarItem.view`). Empty where there are
     /// none or they cannot be read.
     var views: [LibraryView] { get }
-    /// Whether items in Recently Deleted can be deleted for good now.
-    var canPurge: Bool { get }
-    /// Whether views can be saved, changed and deleted now. A view is written to the server at once, never queued.
-    var canEditViews: Bool { get }
+    /// Whether the server can be reached now, which is what every write that is never queued needs: deleting items
+    /// in Recently Deleted for good, saving, changing and deleting a view, and choosing a type's icon.
+    var reachesServer: Bool { get }
     /// How many days an item stays in Recently Deleted, where the library sets it.
     var trashDays: Int? { get }
     /// What the library has yet to send, and each write that needs the person. An item's own state is its `sync`.
@@ -171,7 +171,7 @@ protocol ItemLibrary: AnyObject, Observable {
     /// To Recently Deleted, in one undoable change. An item already there has nothing to change.
     func delete(_ ids: Set<ItemID>, undoManager: UndoManager?)
     func recover(_ ids: Set<ItemID>, undoManager: UndoManager?)
-    /// Not undoable, so the views confirm it first, and only where `canPurge`.
+    /// Not undoable, so the views confirm it first, and only where `reachesServer`.
     func deletePermanently(_ ids: Set<ItemID>)
     /// Files the note points at, such as pasted images, with the links the page writes for them. A library that
     /// sends them elsewhere may have to wait. Each file is attached on its own, so one that fails leaves the
@@ -185,8 +185,6 @@ protocol ItemLibrary: AnyObject, Observable {
 
     // Each tells the person why a write failed, in the server's reason, and nothing else changes.
     /// The view as the server saved it, or nil.
-    /// Whether the owner can choose a type's icon now. It is kept on the server, so only while it can be reached.
-    var canChooseTypeIcons: Bool { get }
     /// Chooses the icon of `type` for every app, or the type's own default where `icon` is nil, and draws the answer at
     /// once. Nil on success; otherwise why not, in words for the person.
     func setIcon(_ icon: String?, ofType type: TypeID) async -> TypeIconFailure?
@@ -227,14 +225,14 @@ extension ItemLibrary {
     /// Erases what the person confirmed, if the library still can: a Marfa library cannot while its server is out
     /// of reach, which may have begun while the dialog was open. Otherwise nothing is erased, and the person is told.
     func deletePermanentlyOnConfirm(_ ids: Set<ItemID>) {
-        guard canPurge else {
+        guard reachesServer else {
             tellCannotPurge()
             return
         }
         deletePermanently(ids)
     }
 
-    /// Says why items in Recently Deleted can't be erased now, which is the one reason `canPurge` is false.
+    /// Says why items in Recently Deleted can't be erased now, which is that `reachesServer` is false.
     func tellCannotPurge() {
         notices.tell(
             String(localized: "Can’t Delete Immediately"),

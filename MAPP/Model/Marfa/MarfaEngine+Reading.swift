@@ -868,32 +868,28 @@ extension MarfaEngine {
         if catalogueChanged, painted, hub.catalogue != catalogue { hub.publish(.catalogue(catalogue)) }
         var changes = ItemChanges()
         var present: [(id: ItemID, row: Marfa.Item)] = []
+        let told = hub.told(ids)
         for id in ids {
             guard let row = rows[id.rawValue] ?? binned[id.rawValue] else {
-                if items.removeValue(forKey: id) != nil { changes.removed.append(id) }
-                bodies[id] = nil
+                if told[id] != nil { changes.removed.append(id) }
                 continue
             }
             present.append((id, row))
         }
         let mapped = Self.mapped(present, reading: Mapping(
             rows: rows, edges: edges, catalogue: catalogue, syncStates: syncStates, bodyLinks: bodyLinks))
-        for (item, text, hash) in mapped {
-            let id = item.id
-            let previous = items[id]
-            if let text, previous?.version != item.version || bodies[id] != hash {
-                changes.bodies.append(ItemBody(id: id, text: text, version: item.version))
+        for (item, text) in mapped {
+            let previous = told[item.id]
+            if let text, previous?.item.version != item.version || previous?.text != text {
+                changes.bodies.append(ItemBody(id: item.id, text: text, version: item.version))
             }
-            bodies[id] = hash
-            if previous != item {
-                items[id] = item
-                changes.upserted.append(item)
-            }
+            if previous?.item != item { changes.upserted.append(item) }
         }
         if !painted {
             painted = true
+            // Nothing was told before, so every item mapped here is new.
             hub.publish(.loaded(SourceSnapshot(
-                items: items.values.sorted(by: MarfaHub.newestFirst), catalogue: catalogue, views: views,
+                items: changes.upserted.sorted(by: MarfaHub.newestFirst), catalogue: catalogue, views: views,
                 bodies: Dictionary(changes.bodies.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last }))))
         } else if !changes.isEmpty {
             hub.publish(.changed(changes))
@@ -915,24 +911,23 @@ extension MarfaEngine {
     /// Below this many rows, spreading the work costs more than it saves.
     nonisolated static let serialMapping = 256
 
-    /// Each row as the library shows it, with its text and the text's hash, in the order given. A whole read maps
+    /// Each row as the library shows it, with its text, in the order given. A whole read maps
     /// every row, which is most of a launch's paint, and each row maps alone, so a large batch is spread over the
     /// processor's cores.
     nonisolated static func mapped(
         _ present: [(id: ItemID, row: Marfa.Item)], reading state: Mapping
-    ) -> [(item: Item, text: String?, hash: Int)] {
-        func map(_ row: Marfa.Item, id: ItemID) -> (item: Item, text: String?, hash: Int) {
+    ) -> [(item: Item, text: String?)] {
+        func map(_ row: Marfa.Item, id: ItemID) -> (item: Item, text: String?) {
             let held = state.edges.edges(touching: row.id).sorted { $0.createdAt < $1.createdAt }
             let item = MarfaMapping.item(
                 row, edges: held, catalogue: state.catalogue, sync: state.syncStates[id] ?? .settled,
                 bodyLinks: state.bodyLinks[row.id], isHeld: { state.rows[$0] != nil })
-            let text = MarfaMapping.body(of: row, catalogue: state.catalogue)
-            return (item, text, text?.hashValue ?? 0)
+            return (item, MarfaMapping.body(of: row, catalogue: state.catalogue))
         }
         guard present.count >= serialMapping else { return present.map { map($0.row, id: $0.id) } }
         let chunks = min(present.count / (serialMapping / 4), ProcessInfo.processInfo.activeProcessorCount * 4)
         // Each chunk fills its own slots, and the chunks together cover every slot once.
-        return Array<(item: Item, text: String?, hash: Int)>(unsafeUninitializedCapacity: present.count) { buffer, count in
+        return Array<(item: Item, text: String?)>(unsafeUninitializedCapacity: present.count) { buffer, count in
             nonisolated(unsafe) let slots = buffer
             DispatchQueue.concurrentPerform(iterations: chunks) { chunk in
                 let start = present.count * chunk / chunks, end = present.count * (chunk + 1) / chunks

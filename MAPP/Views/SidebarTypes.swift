@@ -84,7 +84,7 @@ struct SidebarTypesSection: View, Equatable {
     @ViewBuilder private func typeMenu(_ node: TypeNode) -> some View {
         if let type = node.type {
             Button("Choose Icon…") { choosingIcon = TypeIconRequest(type: type) }
-                .disabled(!library.canChooseTypeIcons)
+                .disabled(!library.reachesServer)
             Divider()
         }
         SidebarHideButtons(place: .type(node.id))
