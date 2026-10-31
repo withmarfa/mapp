@@ -17,7 +17,7 @@ enum GalleryKind: Equatable {
         let info = library.catalogue.itemTypes[item.type]
         if let field = info?.statusField, let value = ItemPageHeader.statusValue(of: item, in: field) {
             return .task(GalleryStatus(
-                label: ItemTypeInfo.Field.label(ofOption: value), mark: PageHeader.Mark(status: value)))
+                label: ItemTypeInfo.Field.label(ofOption: value), mark: PageHeader.Mark(group: field.statusGroup(of: value))))
         }
         if let date = startDate(of: item, info: info, in: library) { return .event(GalleryEventDate(date: date)) }
         return .note
@@ -95,7 +95,7 @@ struct GalleryCard: View, Equatable {
                     .lineLimit(2, reservesSpace: true)
                     .multilineTextAlignment(.leading)
                 HStack(spacing: 5) {
-                    TypeIcon(name: facts.icon)
+                    TypeIcon(id: facts.icon)
                     Text(NoteDate.listLabel(for: order.sort.date(of: item), now: library.now())).lineLimit(1)
                     if item.isFavorite { Image(systemName: "star.fill") }
                 }

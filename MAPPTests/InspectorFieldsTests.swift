@@ -10,13 +10,18 @@ struct InspectorFieldsTests {
         TypeField(name: name, type: type, description: description, declaredBy: "core.task", definition: definition)
     }
 
-    private static let recommended = "Recommended values: pending, in_progress, completed, canceled"
+    private static let words: JSONObject = [
+        "status_values": [
+            ["value": "pending", "group": "not_started"], ["value": "in_progress", "group": "in_progress"],
+            ["value": "completed", "group": "completed"], ["value": "canceled", "group": "canceled"],
+        ]
+    ]
 
     private static let task = MarfaMapping.itemType(ItemType(
         id: "aic.ticket.task", label: "Task",
         fields: [
             field("title"), field("body"), field("description"),
-            field("status", description: recommended),
+            field("status", "status", definition: words),
             field("priority", "enum", definition: ["enum_values": ["low", "high"]])
         ],
         titleField: "title", bodyField: "body"))
@@ -37,42 +42,36 @@ struct InspectorFieldsTests {
 
     // MARK: Status
 
-    @Test func aTextStatusThatRecommendsValuesIsAStatus() throws {
-        let status = try #require(Self.task.statusField)
+    @Test func aStatusFieldIsFoundByItsKindWhateverItsName() throws {
+        let type = MarfaMapping.itemType(ItemType(id: "core.media", label: "Media", fields: [Self.field("progress", "status", definition: Self.words)]))
+        let status = try #require(type.statusField)
+        #expect(status.key == "progress")
         #expect(status.options == ["pending", "in_progress", "completed", "canceled"])
         #expect(status.isPicked)
+        #expect(status.statusGroup(of: "completed") == .completed)
+        #expect(status.statusGroup(of: "mystery") == nil)
     }
 
-    @Test func aChoiceStatusIsAStatusWithItsOwnValues() throws {
-        let type = MarfaMapping.itemType(ItemType(
-            id: "aic.x", label: "X", fields: [Self.field("status", "enum", definition: ["enum_values": ["open", "done"]])]))
-        #expect(type.statusField?.options == ["open", "done"])
-    }
-
-    @Test func aStatusWithNothingToPickFromIsStillFound() throws {
-        let type = MarfaMapping.itemType(ItemType(id: "aic.x", label: "X", fields: [Self.field("status")]))
+    @Test func aStatusWithNoWordsIsStillFound() throws {
+        let type = MarfaMapping.itemType(ItemType(id: "aic.x", label: "X", fields: [Self.field("status", "status")]))
         let status = try #require(type.statusField)
         #expect(status.options.isEmpty)
         #expect(!status.isPicked)
     }
 
-    @Test func aStatusOfAnotherShapeOrNameIsNotAStatus() {
-        let number = MarfaMapping.itemType(ItemType(id: "aic.x", label: "X", fields: [Self.field("status", "integer")]))
-        let renamed = MarfaMapping.itemType(ItemType(id: "aic.y", label: "Y", fields: [Self.field("state")]))
+    @Test func aFieldIsNotAStatusByItsNameOrItsDescription() {
+        let named = MarfaMapping.itemType(ItemType(id: "aic.x", label: "X", fields: [Self.field("status")]))
+        let choice = MarfaMapping.itemType(ItemType(
+            id: "aic.y", label: "Y", fields: [Self.field("status", "enum", definition: ["enum_values": ["open", "done"]])]))
+        let described = MarfaMapping.itemType(ItemType(
+            id: "aic.z", label: "Z", fields: [Self.field("status", description: "Recommended values: open, done")]))
+        let number = MarfaMapping.itemType(ItemType(id: "aic.w", label: "W", fields: [Self.field("status", "integer")]))
+        #expect(named.statusField == nil)
+        #expect(choice.statusField == nil)
+        #expect(described.statusField == nil)
         #expect(number.statusField == nil)
-        #expect(renamed.statusField == nil)
-    }
-
-    @Test func recommendedValuesAreReadOnlyWhereTheyAreAList() {
-        func options(_ description: String?) -> [String] {
-            MarfaMapping.itemType(ItemType(id: "aic.x", label: "X", fields: [Self.field("status", description: description)]))
-                .fields[0].options
-        }
-        #expect(options("recommended VALUES: open, done.") == ["open", "done"])
-        #expect(options("Where the work stands. Recommended values: open, done") == [])
-        #expect(options("Recommended values: whatever fits the work, as you like") == [])
-        #expect(options("Recommended values:") == [])
-        #expect(options(nil) == [])
+        #expect(choice.fields[0].options == ["open", "done"], "still a choice, only not a status")
+        #expect(described.fields[0].options.isEmpty, "a description is never read for values")
     }
 
     @Test func optionsReadAsWords() {
@@ -112,7 +111,7 @@ struct InspectorFieldsTests {
         #expect(ItemPageHeader.header(of: library.items[1].id, in: library, drafts: DetailsPresentation())?.status == nil)
     }
 
-    @Test func aFieldThatOnlyRecommendsValuesKeepsAnyTypedValueInItsMenu() throws {
+    @Test func aStatusKeepsAnyTypedValueInItsMenu() throws {
         let status = try #require(Self.task.statusField)
         #expect(status.options(including: nil) == status.options)
         #expect(status.options(including: "") == status.options)

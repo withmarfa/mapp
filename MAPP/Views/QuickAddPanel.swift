@@ -207,7 +207,7 @@ struct QuickAddPanel: View {
         } label: {
             VStack(spacing: 6) {
                 if let file = draft.files.first {
-                    TypeIcon(name: catalogue.icon(for: .file))
+                    TypeIcon(id: catalogue.icon(for: .file))
                         .font(.title)
                     Text(verbatim: file.name)
                         .lineLimit(1)
@@ -240,7 +240,7 @@ struct QuickAddPanel: View {
         chipShell(remove: (String(localized: "Remove “\(file.name)”"), "QuickAddRemoveAttachment", { quickAdd.draft?.files.removeAll { $0 == file } })) {
             chipFace(hasRemove: true) {
                 HStack(spacing: 6) {
-                    TypeIcon(name: library.catalogue.icon(for: .file))
+                    TypeIcon(id: library.catalogue.icon(for: .file))
                         .foregroundStyle(.secondary)
                     Text(verbatim: file.name)
                         .truncationMode(.middle)
@@ -459,7 +459,7 @@ struct QuickAddPanel: View {
                         editing = nil
                     } label: {
                         HStack {
-                            Label { Text(candidate.displayTitle) } icon: { TypeIcon(name: library.catalogue.icon(for: candidate.type)) }
+                            Label { Text(candidate.displayTitle) } icon: { TypeIcon(id: library.catalogue.icon(for: candidate.type)) }
                                 .lineLimit(1)
                             Spacer(minLength: 8)
                             if candidate.id == draft.parentID {

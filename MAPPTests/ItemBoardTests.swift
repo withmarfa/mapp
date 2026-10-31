@@ -20,8 +20,8 @@ struct ItemBoardTests {
         Catalogue(itemTypes: [
             type(second, fields: [choice(["review", "done"], required: true)]),
             type(first, fields: [choice(["todo", "done"]), choice(["low", "high"], key: "priority")]),
-            type(text, fields: [.init(key: "status", label: "Status", kind: .text, declaredBy: text,
-                                     description: "Recommended values: waiting, done")]),
+            type(text, fields: [.init(key: "status", label: "Status", kind: .status([
+                StatusWord(value: "waiting", group: .notStarted), StatusWord(value: "done", group: .completed)]), declaredBy: text)]),
         ])
     }
 
@@ -68,12 +68,12 @@ struct ItemBoardTests {
         #expect(ItemBoardLayout.move(second, key: "status", to: .option("review"), catalogue: Self.catalogue) == .unchanged)
     }
 
-    @Test func textRecommendationsDoNotInvalidateOtherText() {
+    @Test func aWordTheTypeDoesNotDeclareIsInvalidAndCannotBeMovedTo() {
         let item = Self.item("Text", type: Self.text, value: .string("custom_value"))
         let lanes = ItemBoardLayout.lanes(items: [item], key: "status", catalogue: Self.catalogue)
-        #expect(lanes.map(\.id) == [.option("waiting"), .option("done"), .option("custom_value"), .missing])
+        #expect(lanes.map(\.id) == [.option("waiting"), .option("done"), .missing, .invalid])
         #expect(ItemBoardLayout.move(item, key: "status", to: .option("waiting"), catalogue: Self.catalogue) == .set(.string("waiting")))
-        #expect(ItemBoardLayout.move(item, key: "status", to: .option("new_value"), catalogue: Self.catalogue) == .set(.string("new_value")))
+        #expect(ItemBoardLayout.move(item, key: "status", to: .option("new_value"), catalogue: Self.catalogue) == .refused)
     }
 
     @Test func aMoveToALaneNamesTheTrueReasonForEachItemItLeavesAlone() {

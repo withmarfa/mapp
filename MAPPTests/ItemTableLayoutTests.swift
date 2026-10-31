@@ -3,15 +3,19 @@ import Testing
 @testable import MAPP
 
 struct ItemTableLayoutTests {
-    private static let statuses = ItemTypeInfo.Field(
-        key: "status", label: "Status", kind: .text, declaredBy: TypeID("core.task"),
-        description: "Recommended values: pending, in_progress, completed, canceled")
+    private static let words: [StatusWord] = [
+        .init(value: "pending", group: .notStarted), .init(value: "someday", group: .notStarted),
+        .init(value: "in_progress", group: .inProgress), .init(value: "blocked", group: .inProgress),
+        .init(value: "completed", group: .completed), .init(value: "canceled", group: .canceled),
+    ]
+    private static let statuses = ItemTypeInfo.Field(key: "status", label: "Status", kind: .status(words), declaredBy: TypeID("core.task"))
     private static let priorities = ItemTypeInfo.Field(
         key: "priority", label: "Priority", kind: .choice(["low", "medium", "high", "urgent"]), declaredBy: TypeID("core.task"))
 
     private static let catalogue = Catalogue(itemTypes: [
+        ItemTypeInfo(id: TypeID("core.task"), label: "Task", fields: [], titleField: "title", bodyField: "body", parent: nil),
         ItemTypeInfo(
-            id: TypeID("aic.ticket.task"), label: "Task",
+            id: TypeID("aic.ticket.task"), label: "Ticket Task",
             fields: [
                 .init(key: "title", label: "Title", kind: .text, declaredBy: TypeID("core.task")),
                 .init(key: "body", label: "Body", kind: .text, declaredBy: TypeID("core.task")),
@@ -19,7 +23,7 @@ struct ItemTableLayoutTests {
                 statuses, priorities,
                 .init(key: "notes", label: "Notes", kind: .text, declaredBy: TypeID("core.task")),
             ],
-            titleField: "title", bodyField: "body", parent: nil),
+            titleField: "title", bodyField: "body", parent: TypeID("core.task")),
         ItemTypeInfo(
             id: TypeID("core.note"), label: "Note",
             fields: [.init(key: "title", label: "Title", kind: .text, declaredBy: TypeID("core.note"))],
@@ -48,11 +52,13 @@ struct ItemTableLayoutTests {
     // MARK: Statuses
 
     @Test(arguments: [
-        ("in_progress", StatusTone.active), ("blocked", .waiting), ("pending", .planned), ("someday", .later),
-        ("completed", .done), ("canceled", .canceled), ("Done", .done), ("tentative", .other),
+        ("in_progress", StatusBucket.group(.inProgress)), ("blocked", .group(.inProgress)), ("pending", .group(.notStarted)),
+        ("someday", .group(.notStarted)), ("completed", .group(.completed)), ("canceled", .group(.canceled)),
+        ("Done", .other), ("tentative", .other),
     ])
-    func aStatusReadsByItsTone(status: String, tone: StatusTone) {
-        #expect(StatusTone(status) == tone)
+    func aStatusReadsByTheGroupItsTypeDeclares(status: String, bucket: StatusBucket) throws {
+        let column = try #require(Self.columns([Self.row("A", status: status)]).first { $0.id == "field.status" })
+        #expect(column.statusBucket(of: status) == bucket)
     }
 
     // MARK: Columns
@@ -127,13 +133,61 @@ struct ItemTableLayoutTests {
     @Test func statusGroupsRunFromWorkUnderWayToWorkFinishedWithTheEmptyLast() throws {
         let rows = [
             Self.row("A", status: "completed"), Self.row("B", status: "pending"), Self.row("C"),
-            Self.row("D", status: "in_progress"), Self.row("E", status: "someday"),
+            Self.row("D", status: "in_progress"), Self.row("E", status: "someday"), Self.row("F", status: "canceled"),
+            Self.row("G", status: "blocked"),
         ]
         let status = try #require(Self.columns(rows).first { $0.id == "field.status" })
         let groups = ItemTableLayout.groups(of: rows, by: status)
-        #expect(groups.map(\.id) == ["in_progress", "pending", "someday", "completed", ""])
-        #expect(groups.map(\.title) == ["In Progress", "Pending", "Someday", "Completed", "No Status"])
-        #expect(ItemTableLayout.collapsed(ItemTableOptions(), groups: groups, by: status) == ["completed"])
+        #expect(groups.map(\.id) == ["in_progress", "not_started", "completed", "canceled", ""])
+        #expect(groups.map(\.title) == ["In Progress", "Not Started", "Completed", "Canceled", "No Status"])
+        #expect(groups.first?.rows.map(\.item.title) == ["D", "G"])
+        #expect(ItemTableLayout.collapsed(ItemTableOptions(), groups: groups, by: status) == ["completed", "canceled"])
+    }
+
+    @Test func aWordTheTypeDoesNotDeclareFallsInOtherAfterTheGroups() throws {
+        let rows = [Self.row("A", status: "mystery"), Self.row("B", status: "completed"), Self.row("C", status: "pending")]
+        let status = try #require(Self.columns(rows).first { $0.id == "field.status" })
+        let groups = ItemTableLayout.groups(of: rows, by: status)
+        #expect(groups.map(\.id) == ["not_started", "completed", "other"])
+        #expect(groups.last?.title == "Other")
+        #expect(groups.last?.rows.map(\.item.title) == ["A"])
+        #expect(!ItemTableLayout.collapsed(ItemTableOptions(), groups: groups, by: status).contains("other"))
+    }
+
+    @Test func aTypeWithNoStatusFieldHasNoStatusColumn() {
+        let columns = Self.columns([Self.row("A", type: "core.note")])
+        #expect(!columns.contains { $0.style == .status })
+        #expect(ItemTableLayout.grouping(ItemTableOptions(), columns: columns) == nil)
+    }
+
+    @Test func anEventsStatusIsAPlainChoiceWithNoGroups() throws {
+        let words = ItemTypeInfo.Field(key: "status", label: "Status", kind: .choice(["tentative", "confirmed", "canceled"]), declaredBy: TypeID("core.event"))
+        let event = ItemTypeInfo(id: TypeID("core.event"), label: "Event", fields: [words], titleField: "title", bodyField: nil, parent: nil)
+        let catalogue = Catalogue(itemTypes: [event])
+        #expect(event.statusField == nil)
+        #expect(ItemTableLayout.style(of: words, in: event.id, catalogue: catalogue) == .choice)
+        let item = Item(
+            id: ItemID("e"), type: event.id, title: "e", titleRule: .property("title"),
+            properties: [Property(key: "status", value: .string("canceled"))], version: ItemVersion(1), created: .now, modified: .now)
+        #expect(catalogue.statusGroup(of: item) == nil, "a choice has no groups, so a canceled event is not folded away")
+        let row = ItemTableRow(item: item, typeLabel: "Event", typeIcon: nil, parent: nil)
+        let columns = ItemTableLayout.columns(for: [row], catalogue: catalogue, hidden: [])
+        let status = try #require(columns.first { $0.id == "field.status" })
+        #expect(ItemTableLayout.collapsed(ItemTableOptions(), groups: ItemTableLayout.groups(of: [row], by: status), by: status).isEmpty)
+    }
+
+    @Test func aFieldNamedStatusThatIsNotOfTheStatusKindIsNotOne() {
+        let plain = ItemTypeInfo.Field(key: "status", label: "Status", kind: .text, declaredBy: TypeID("test.thing"))
+        let type = ItemTypeInfo(id: TypeID("test.thing"), label: "Thing", fields: [plain], titleField: "title", bodyField: nil, parent: nil)
+        let catalogue = Catalogue(itemTypes: [type])
+        #expect(type.statusField == nil)
+        #expect(ItemTableLayout.style(of: plain, in: type.id, catalogue: catalogue) == .text)
+    }
+
+    @Test func aPriorityFieldIsPriorityOnlyOnATask() {
+        let choice = ItemTypeInfo.Field(key: "priority", label: "Priority", kind: .choice(["low", "high"]), declaredBy: TypeID("test.thing"))
+        #expect(ItemTableLayout.style(of: choice, in: TypeID("aic.ticket.task"), catalogue: Self.catalogue) == .priority)
+        #expect(ItemTableLayout.style(of: choice, in: TypeID("core.note"), catalogue: Self.catalogue) == .choice)
     }
 
     @Test func aPlaceIsGroupedByStatusOnlyWhereItsItemsHaveOne() {

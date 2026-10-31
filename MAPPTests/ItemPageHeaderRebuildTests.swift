@@ -129,11 +129,11 @@ import Testing
     // A picture drawn again has the same bytes, so only the tally of drawings can show one was kept. Each test runs
     // on the main actor without a suspension, so no other drawing reaches the tally meanwhile.
     @Test func theSamePicturesComeBackWithoutBeingDrawnAgain() throws {
-        let first = try #require(PageHeaderIcons(textSize: 13, typeIcons: ["folder"]))
+        let first = try #require(PageHeaderIcons(textSize: 13, typeIcons: ["lucide:folder"]))
         #if DEBUG
         Cost.resetTallies()
         #endif
-        let again = try #require(PageHeaderIcons(textSize: 13, typeIcons: ["folder"]))
+        let again = try #require(PageHeaderIcons(textSize: 13, typeIcons: ["lucide:folder"]))
         #if DEBUG
         #expect(Cost.tallies[.iconDraw] == nil)
         #endif
@@ -142,11 +142,11 @@ import Testing
     }
 
     @Test func aTypeIconThatAppearsLaterJoinsTheOnesAlreadyDrawn() throws {
-        let one = try #require(PageHeaderIcons(textSize: 13, typeIcons: ["folder"]))
+        let one = try #require(PageHeaderIcons(textSize: 13, typeIcons: ["lucide:folder"]))
         #if DEBUG
         Cost.resetTallies()
         #endif
-        let both = try #require(PageHeaderIcons(textSize: 13, typeIcons: ["folder", "bug"]))
+        let both = try #require(PageHeaderIcons(textSize: 13, typeIcons: ["lucide:folder", "lucide:bug"]))
         #if DEBUG
         #expect(Cost.tallies[.iconDraw]?.count == 1)
         #endif
@@ -155,10 +155,10 @@ import Testing
     }
 
     @Test func aNewTextSizeDrawsEverythingAtTheNewSize() throws {
-        let small = try #require(PageHeaderIcons(textSize: 11, typeIcons: ["folder"]))
-        let large = try #require(PageHeaderIcons(textSize: 24, typeIcons: ["folder"]))
+        let small = try #require(PageHeaderIcons(textSize: 11, typeIcons: ["lucide:folder"]))
+        let large = try #require(PageHeaderIcons(textSize: 24, typeIcons: ["lucide:folder"]))
         #expect(small.parent.width < large.parent.width)
-        let back = try #require(PageHeaderIcons(textSize: 11, typeIcons: ["folder"]))
+        let back = try #require(PageHeaderIcons(textSize: 11, typeIcons: ["lucide:folder"]))
         #expect(back.parent.url == small.parent.url)
     }
 }

@@ -41,7 +41,7 @@ struct ItemTableCell: View {
     @ViewBuilder private var content: some View {
         switch column.content {
         case .title: title
-        case .type: Label { Text(row.typeLabel) } icon: { TypeIcon(name: row.typeIcon) }
+        case .type: Label { Text(row.typeLabel) } icon: { TypeIcon(id: row.typeIcon) }
             .labelStyle(ItemTableLabelStyle())
             .foregroundStyle(.secondary)
         case .parent: link(row.parent)
@@ -62,7 +62,7 @@ struct ItemTableCell: View {
 
     private var title: some View {
         HStack(spacing: 8) {
-            TypeIcon(name: row.typeIcon)
+            TypeIcon(id: row.typeIcon)
                 .foregroundStyle(.secondary)
                 .frame(width: 16)
                 .accessibilityHidden(true)
@@ -115,8 +115,6 @@ struct ItemTableCell: View {
         switch column.style {
         case .status, .priority, .choice:
             picked(field, current: current, editable: editable)
-        case .person where field.isPicked:
-            picked(field, current: current, editable: editable)
         case .boolean:
             let isOn: Bool = if case .bool(let flag)? = row.item.value(of: field.key) { flag } else { false }
             if declares {
@@ -128,7 +126,7 @@ struct ItemTableCell: View {
         case .date:
             if let current {
                 if let day = ItemDate.parse(current)?.date {
-                    date(day, isDue: field.key == "due_at")
+                    date(day, isDue: library.catalogue.isDueDate(field, of: row.item.type))
                 } else {
                     Text(current).foregroundStyle(.secondary)
                 }
@@ -198,7 +196,7 @@ struct ItemTableCell: View {
             Button {
                 if let item = library.item(link.id) { browser.reveal(item, in: library, order: order) }
             } label: {
-                Label { Text(link.title).underline(isHovering) } icon: { TypeIcon(name: link.icon) }
+                Label { Text(link.title).underline(isHovering) } icon: { TypeIcon(id: link.icon) }
                     .labelStyle(ItemTableLabelStyle())
             }
             .buttonStyle(.plain)
@@ -211,7 +209,7 @@ struct ItemTableCell: View {
     private func date(_ date: Date, isDue: Bool) -> some View {
         let now = library.now()
         let isLate = isDue && date < Calendar.current.startOfDay(for: now)
-            && !(row.item.value(of: "status")?.string.map { StatusTone($0).isFinished } ?? false)
+            && library.catalogue.statusGroup(of: row.item)?.isFinished != true
         return Text(ItemTableDate.label(for: date, now: now))
             .foregroundStyle(isLate ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
             .monospacedDigit()
@@ -224,6 +222,8 @@ struct ItemTableCategory: View {
     let column: ItemTableColumn
     let value: String?
     let title: String
+    /// Whether `value` names a group of a status column, as a group's header does, and not a status word.
+    var isGroup = false
 
     var body: some View {
         switch column.style {
@@ -231,7 +231,7 @@ struct ItemTableCategory: View {
             Label {
                 Text(title)
             } icon: {
-                StatusMark(mark: PageHeader.Mark(status: value), size: 12)
+                StatusMark(mark: PageHeader.Mark(group: statusGroup), size: 12)
             }
             .labelStyle(ItemTableLabelStyle())
         case .priority:
@@ -252,6 +252,12 @@ struct ItemTableCategory: View {
             Text(title)
         }
     }
+
+    private var statusGroup: StatusGroup? {
+        guard let value else { return nil }
+        if isGroup { return StatusBucket(id: value).flatMap { if case .group(let group) = $0 { group } else { nil } } }
+        return column.field?.statusGroup(of: value)
+    }
 }
 
 /// A category as a menu item: a menu shows images but not views, so a status's ring is drawn into one.
@@ -262,14 +268,14 @@ struct ItemTableMenuLabel: View {
 
     var body: some View {
         if column.style == .status {
-            Label { Text(title) } icon: { Self.ring(for: value) }
+            Label { Text(title) } icon: { Self.ring(for: value.flatMap { column.field?.statusGroup(of: $0) }) }
         } else {
             ItemTableCategory(column: column, value: value, title: title)
         }
     }
 
-    private static func ring(for status: String?) -> Image {
-        let renderer = ImageRenderer(content: StatusMark(mark: PageHeader.Mark(status: status), size: 12).padding(1))
+    private static func ring(for group: StatusGroup?) -> Image {
+        let renderer = ImageRenderer(content: StatusMark(mark: PageHeader.Mark(group: group), size: 12).padding(1))
         renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
         return renderer.nsImage.map { Image(nsImage: $0) } ?? Image(systemName: "circle")
     }

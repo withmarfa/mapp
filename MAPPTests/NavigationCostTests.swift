@@ -22,6 +22,11 @@ nonisolated enum BigLibrary {
         ItemTypeInfo.Field(key: key, label: MarfaMapping.label(forField: key), kind: kind, declaredBy: type)
     }
 
+    /// A status field whose words sit in the groups their names suggest, the first being not started.
+    private static func status(_ words: [(String, StatusGroup)], in type: TypeID) -> ItemTypeInfo.Field {
+        field("status", .status(words.map { StatusWord(value: $0.0, group: $0.1) }), in: type)
+    }
+
     private static func info(_ id: TypeID, _ label: String, _ extra: [ItemTypeInfo.Field]) -> ItemTypeInfo {
         ItemTypeInfo(
             id: id, label: label, fields: [field("title", .text, in: id), field("body", .text, in: id)] + extra,
@@ -32,24 +37,24 @@ nonisolated enum BigLibrary {
         let day = ItemTypeInfo.Field.Kind.date(includesTime: false), time = ItemTypeInfo.Field.Kind.date(includesTime: true)
         func ticket(_ id: TypeID, _ label: String) -> ItemTypeInfo {
             info(id, label, [
-                field("status", .choice(["backlog", "todo", "in_progress", "in_review", "done", "canceled"]), in: id),
+                status([("backlog", .notStarted), ("todo", .notStarted), ("in_progress", .inProgress), ("in_review", .inProgress), ("done", .completed), ("canceled", .canceled)], in: id),
                 field("priority", .choice(["low", "medium", "high"]), in: id), field("due_at", day, in: id),
                 field("assignee", .text, in: id), field("estimate", .number, in: id), field("blocked", .boolean, in: id),
             ])
         }
         let catalogue = Catalogue(itemTypes: [
             info(session, "Session", [
-                field("status", .choice(["planned", "running", "closed"]), in: session), field("starts_at", time, in: session),
+                status([("planned", .notStarted), ("running", .inProgress), ("closed", .completed)], in: session), field("starts_at", time, in: session),
                 field("ends_at", time, in: session), field("number", .number, in: session),
             ]),
             info(decision, "Decision", [
-                field("status", .choice(["proposed", "accepted", "superseded"]), in: decision), field("decided_at", day, in: decision),
+                status([("proposed", .notStarted), ("accepted", .completed), ("superseded", .canceled)], in: decision), field("decided_at", day, in: decision),
                 field("area", .text, in: decision),
             ]),
             ticket(epic, "Epic"), ticket(task, "Task"), ticket(feature, "Feature"), ticket(spike, "Spike"),
             info(log, "Log", [field("occurred_at", time, in: log)]),
             info(note, "Note", []),
-            info(project, "Project", [field("status", .choice(["active", "paused", "done"]), in: project), field("due_at", day, in: project)]),
+            info(project, "Project", [status([("active", .inProgress), ("paused", .notStarted), ("done", .completed)], in: project), field("due_at", day, in: project)]),
         ], edgeTypes: LibraryFixture.catalogue.edgeTypes.values.map { $0 })
         return catalogue
     }()

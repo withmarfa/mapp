@@ -66,7 +66,7 @@ struct CollectionPickerSheet: View {
                 .accessibilityIdentifier("CollectionPickerFilter")
             List(collections, selection: $selected) { collection in
                 HStack {
-                    Label { Text(collection.displayTitle) } icon: { TypeIcon(name: library.catalogue.icon(for: collection.type)) }
+                    Label { Text(collection.displayTitle) } icon: { TypeIcon(id: library.catalogue.icon(for: collection.type)) }
                     Spacer()
                     if holdsAll(collection.id) { Image(systemName: "checkmark").foregroundStyle(.secondary) }
                 }

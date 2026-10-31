@@ -27,14 +27,21 @@ nonisolated enum ItemTimelineLayout {
         Cost.measure(.timelineFields) { fields(forTypes: Set(items.map(\.type)), catalogue: catalogue) }
     }
 
+    /// The date fields of `types`, a task's due date first (it is what a timeline of tasks is for), then an event's
+    /// start, then the rest by label.
     static func fields(forTypes types: Set<TypeID>, catalogue: Catalogue) -> [ItemTypeInfo.Field] {
         var fields: [String: ItemTypeInfo.Field] = [:]
+        var dueDates: Set<String> = []
         for type in types.sorted(by: { $0.rawValue < $1.rawValue }) {
             for field in catalogue.itemTypes[type]?.fields ?? [] where field.kind.isDate {
                 if fields[field.key] == nil { fields[field.key] = field }
+                if catalogue.isDueDate(field, of: type) { dueDates.insert(field.key) }
             }
         }
+        func lead(_ key: String) -> Int { dueDates.contains(key) ? 0 : key == "starts_at" ? 1 : 2 }
         return fields.values.sorted {
+            let (x, y) = (lead($0.key), lead($1.key))
+            if x != y { return x < y }
             let comparison = $0.displayLabel.localizedStandardCompare($1.displayLabel)
             return comparison == .orderedSame ? $0.key < $1.key : comparison == .orderedAscending
         }
@@ -42,7 +49,7 @@ nonisolated enum ItemTimelineLayout {
 
     static func selectedField(_ selected: String?, fields: [ItemTypeInfo.Field]) -> String? {
         if let selected, fields.contains(where: { $0.key == selected }) { return selected }
-        return ["due_at", "starts_at"].first { key in fields.contains { $0.key == key } } ?? fields.first?.key
+        return fields.first?.key
     }
 
     static func groups(

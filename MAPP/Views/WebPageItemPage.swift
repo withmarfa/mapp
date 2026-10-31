@@ -218,7 +218,7 @@ private struct WebPageHeader: View {
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("WebPageTitle")
             HStack(spacing: 4) {
-                TypeIcon(name: library.catalogue.icon(for: item.type))
+                TypeIcon(id: library.catalogue.icon(for: item.type))
                 if let type { Text(verbatim: ItemPageHeader.localized(type.label)) }
                 ForEach(Array([byline.source, byline.date].compactMap { $0 }.filter { !$0.isEmpty }.enumerated()), id: \.offset) { _, part in
                     Circle().fill(.secondary).opacity(0.7).frame(width: 2, height: 2).accessibilityHidden(true)

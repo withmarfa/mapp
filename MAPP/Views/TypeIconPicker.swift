@@ -7,8 +7,8 @@ struct TypeIconRequest: Identifiable, Hashable {
     var id: TypeID { type }
 }
 
-/// Chooses the icon of a type from the Lucide names Marfa accepts, each drawn as MAPP will draw it. The choice is kept
-/// on the server for every app, and the new icon shows at once. Use Default hands the choice back to the type.
+/// Chooses the icon of a type from the Lucide and Simple Icons sets, each drawn as MAPP will draw it. The choice is saved
+/// as a full ID, such as `simple-icons:github`, on the server for every app, and the new icon shows at once. Use Default hands the choice back to the type.
 struct TypeIconPicker: View {
     @Environment(\.dismiss) private var dismiss
     @State private var model: TypeIconPickerModel
@@ -27,25 +27,31 @@ struct TypeIconPicker: View {
             Text("The icon for \(model.typeLabel) shows in every app that uses your Marfa server.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            Picker("Icon Set", selection: $model.set) {
+                ForEach(IconSet.allCases) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .accessibilityIdentifier("TypeIconSet")
             TextField("Search Icons", text: $model.search)
                 .textFieldStyle(.roundedBorder)
                 .focused($searchFocused)
                 .accessibilityIdentifier("TypeIconSearch")
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 6) {
-                    ForEach(results, id: \.self) { name in
-                        Button { choose(name) } label: {
-                            TypeIcon(name: name)
+                    ForEach(results, id: \.self) { icon in
+                        Button { choose(icon) } label: {
+                            TypeIcon(id: icon)
                                 .font(.title3)
                                 .frame(width: 44, height: 44)
-                                .background(name == model.current ? Color.accentColor.opacity(0.25) : .clear, in: .rect(cornerRadius: 8))
+                                .background(icon == model.current ? Color.accentColor.opacity(0.25) : .clear, in: .rect(cornerRadius: 8))
                                 .contentShape(.rect(cornerRadius: 8))
                         }
                         .buttonStyle(.plain)
-                        .help(IconNameSearch.title(of: name))
-                        .accessibilityLabel(IconNameSearch.title(of: name))
-                        .accessibilityAddTraits(name == model.current ? .isSelected : [])
-                        .accessibilityIdentifier("TypeIcon.\(name)")
+                        .help(IconNameSearch.title(of: icon))
+                        .accessibilityLabel(IconNameSearch.title(of: icon))
+                        .accessibilityAddTraits(icon == model.current ? .isSelected : [])
+                        .accessibilityIdentifier("TypeIcon.\(icon)")
                     }
                 }
                 .disabled(!model.canChoose)
@@ -86,7 +92,7 @@ struct TypeIconPicker: View {
         .accessibilityIdentifier("TypeIconPicker")
     }
 
-    private func choose(_ name: String?) {
-        Task { if await model.choose(name) { dismiss() } }
+    private func choose(_ id: String?) {
+        Task { if await model.choose(id) { dismiss() } }
     }
 }

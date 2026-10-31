@@ -276,7 +276,7 @@ private struct ItemTableGroupHeader: View {
                     .foregroundStyle(.tertiary)
                     .rotationEffect(.degrees(isCollapsed ? 0 : 90))
                     .frame(width: 10)
-                ItemTableCategory(column: column, value: group.value, title: group.title)
+                ItemTableCategory(column: column, value: group.value, title: group.title, isGroup: true)
                     .fontWeight(.semibold)
                 Text(group.rows.count, format: .number)
                     .foregroundStyle(.secondary)

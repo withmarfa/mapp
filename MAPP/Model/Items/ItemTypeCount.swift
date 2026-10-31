@@ -5,7 +5,7 @@ nonisolated struct ItemTypeCount: Identifiable, Hashable, Sendable {
     let id: TypeID
     /// The type's label, with its parent's in parentheses where another shown type has the same label.
     let label: String
-    /// The type's icon, a Lucide name.
+    /// The type's icon, an Iconify ID.
     let icon: String?
     /// The items the type holds itself, never those of its subtypes, so the number is the length of the list the
     /// row opens.

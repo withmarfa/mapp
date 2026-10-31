@@ -278,10 +278,10 @@ private enum ListLine: Identifiable {
 #Preview("Rows") {
     let now = Date.now
     let rows: [(String, String, String, [ItemMeta.Piece], String)] = [
-        ("Review the findings", "Compare the field notes and photographs, then write up what the interviews changed about the plan.", "9:41 AM", [.init(icon: .type("circle-check"), label: "Task"), .init(icon: .type("folder"), label: "Field Research")], ""),
-        ("Field notes", "Start with what we observed in the kitchen: three quotes, two photos and the measurements.", "Yesterday", [.init(icon: .type("file-text"), label: "Note")], ""),
-        ("Decide on the sync wording", "Two names are in use. Pick one and update the docs and the app together.", "Wednesday", [.init(icon: .type("signpost"), label: "Decision"), .init(icon: .type("folder"), label: "Marfa")], ""),
-        ("Contract.pdf", "PDF Document, 1.2 MB", "23/09/2026", [.init(icon: .type("file"), label: "File")], ""),
+        ("Review the findings", "Compare the field notes and photographs, then write up what the interviews changed about the plan.", "9:41 AM", [.init(icon: .type("lucide:circle-check"), label: "Task"), .init(icon: .type("lucide:folder"), label: "Field Research")], ""),
+        ("Field notes", "Start with what we observed in the kitchen: three quotes, two photos and the measurements.", "Yesterday", [.init(icon: .type("lucide:file-text"), label: "Note")], ""),
+        ("Decide on the sync wording", "Two names are in use. Pick one and update the docs and the app together.", "Wednesday", [.init(icon: .type("lucide:signpost"), label: "Decision"), .init(icon: .type("lucide:folder"), label: "Marfa")], ""),
+        ("Contract.pdf", "PDF Document, 1.2 MB", "23/09/2026", [.init(icon: .type("lucide:file"), label: "File")], ""),
         ("Untitled", "", "04/09/2026", [], ""),
     ]
     List {

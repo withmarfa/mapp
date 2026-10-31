@@ -33,7 +33,7 @@ import Testing
         browser.tableOptions[tasks] = ItemTableOptions(grouping: .column("field.status"), filters: ["field.status": ["todo"]])
         let before = browser.tableContent(in: library)
         let edited = try #require(before.rows.first)
-        #expect(before.groups.map(\.id) == ["todo"])
+        #expect(before.groups.map(\.id) == ["not_started"])
 
         var changed = edited.item
         changed.properties = changed.properties.map { $0.key == "status" ? Property(key: "status", value: .string("done")) : $0 }

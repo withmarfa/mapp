@@ -35,7 +35,7 @@ struct ItemPageHeader: ViewModifier {
                 if old != id {
                     drafts.saveTitle(of: old, in: library, undoManager: undoManager)
                     // A refused status belongs to the visit, as the page showed it before.
-                    drafts.draft(for: old, key: "status").rejected = false
+                    if let key = Self.statusKey(of: old, in: library) { drafts.draft(for: old, key: key).rejected = false }
                     drafts.draft(for: old, key: Self.parentField).rejected = false
                     choosingParent = nil
                 }
@@ -104,7 +104,7 @@ struct ItemPageHeader: ViewModifier {
                 let value = Self.statusValue(of: item, in: field)
                 // With nothing to pick from, the pin only shows the status the item has.
                 return PageHeader.Pin(label: value.map { ItemTypeInfo.Field.label(ofOption: $0) } ?? String(localized: "Status"),
-                                      enabled: item.isEditable && field.isPicked, empty: value == nil, mark: .init(status: value))
+                                      enabled: item.isEditable && field.isPicked, empty: value == nil, mark: .init(group: value.flatMap(field.statusGroup(of:))))
             },
             parent: parent.map {
                 // An item with no parent can only gain one, so the pin is idle where it cannot be edited.
@@ -120,7 +120,7 @@ struct ItemPageHeader: ViewModifier {
             showMore: String(localized: "Show \(max(0, properties.count - PropertyRow.foldAfter)) More"),
             showMoreContents: String(localized: "Show \(max(0, contents.count - LinkedItem.foldAfter)) More"),
             showMoreLinked: String(localized: "Show \(max(0, linked.count - LinkedItem.foldAfter)) More"),
-            propertyRejected: drafts.draft(for: item.id, key: "status").rejected,
+            propertyRejected: status.map { drafts.draft(for: item.id, key: $0.key).rejected } ?? false,
             parentRejected: parent.map { drafts.draft(for: item.id, key: $0.field).rejected } ?? false,
             interfaceTextSize: UserDefaults.standard.object(forKey: InterfaceKey.textSize) as? Int ?? InterfaceStyle.defaultTextSize
         )
@@ -201,6 +201,11 @@ struct ItemPageHeader: ViewModifier {
         _ parent: ItemRelationship, of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation, undoManager: UndoManager?
     ) {
         drafts.draft(for: id, key: parent.field).rejected = !library.setItemRelationship(id, field: parent.field, targetIDs: [], undoManager: undoManager)
+    }
+
+    /// The key of the field the item's status is kept in, if its type has one.
+    private static func statusKey(of id: ItemID, in library: any ItemLibrary) -> String? {
+        library.item(id).flatMap { library.catalogue.itemTypes[$0.type]?.statusField?.key }
     }
 
     /// The status the item holds, if it holds one.

@@ -3,6 +3,8 @@ import Foundation
 nonisolated struct ItemBoardField: Identifiable, Hashable, Sendable {
     let key: String
     let label: String
+    /// Whether the field is a status field, which a board offers first.
+    var isStatus = false
     var id: String { key }
 }
 
@@ -29,7 +31,7 @@ nonisolated enum ItemBoardLayout {
 
     static func isCompatible(_ field: ItemTypeInfo.Field) -> Bool {
         switch field.kind {
-        case .choice, .text: !field.options.isEmpty
+        case .choice, .status: !field.options.isEmpty
         default: false
         }
     }
@@ -44,10 +46,10 @@ nonisolated enum ItemBoardLayout {
         for type in Set(items.map(\.type)).sorted(by: { $0.rawValue < $1.rawValue }) {
             for field in eligibleFields(of: type, catalogue: catalogue) {
                 guard seen.insert(field.key).inserted else { continue }
-                result.append(ItemBoardField(key: field.key, label: field.displayLabel))
+                result.append(ItemBoardField(key: field.key, label: field.displayLabel, isStatus: field.isStatus))
             }
         }
-        return result.filter { $0.key == "status" } + result.filter { $0.key != "status" }
+        return result.filter(\.isStatus) + result.filter { !$0.isStatus }
     }
 
     static func selectedField(_ preferred: String?, available: [ItemBoardField]) -> ItemBoardField? {
@@ -63,7 +65,7 @@ nonisolated enum ItemBoardLayout {
         guard let value = item.value(of: key), value != .null else { return .missing }
         guard case .string(let text) = value else { return .invalid }
         guard !text.isEmpty else { return .missing }
-        if case .choice = field.kind, !field.options.contains(text) { return .invalid }
+        if field.isClosed, !field.options.contains(text) { return .invalid }
         return .option(text)
     }
 
@@ -111,7 +113,7 @@ nonisolated enum ItemBoardLayout {
         switch destination {
         case .option(let option):
             guard !option.isEmpty else { return .refused }
-            if case .choice = field.kind, !field.options.contains(option) { return .refused }
+            if field.isClosed, !field.options.contains(option) { return .refused }
             value = .string(option)
         case .missing:
             guard !field.required else { return .refused }
