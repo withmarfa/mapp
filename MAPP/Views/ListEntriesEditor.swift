@@ -19,7 +19,7 @@ struct ListEntriesEditor: View {
     @Environment(\.library) private var library
 
     var body: some View {
-        let rows = editing.rows(of: value, writing: isWriting)
+        let rows = editing.rows(of: value, writing: isWriting, marks: marks)
         VStack(alignment: .leading, spacing: 8) {
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                 entryBlock(row, index: index, count: rows.count)
@@ -41,6 +41,12 @@ struct ListEntriesEditor: View {
         // gone, goes back to the person.
         .onChange(of: value, initial: true) { handBackOrphans() }
         .onChange(of: isWriting) { handBackOrphans() }
+    }
+
+    private var marks: ListEditing.Marks {
+        guard let library else { return ListEditing.Marks() }
+        return ListEditing.Marks(
+            last: { [weak library] in library?.lastPropertyWrite }, took: { [weak library] in library?.tookPropertyWrite($0) ?? false })
     }
 
     private func handBackOrphans() {

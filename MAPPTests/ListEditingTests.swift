@@ -32,28 +32,41 @@ import Testing
     private static func member(_ shape: ListShape, _ key: String) throws -> ListShape.Member { try #require(shape.member(key)) }
 
     /// Stands in for the library: holds the list and records each write. A store that `delays` takes a write as
-    /// `MarfaLibrary` does, later: the list shows it only once it `land`s, and never where it is `refuse`d.
+    /// `MarfaLibrary` does, later: the list shows it only once it `land`s, and never where it is `refuse`d. Like
+    /// `MarfaLibrary`, it marks each write it makes, and makes none for a list equal to the stored one unless a write
+    /// is on its way.
     final class Store {
         var value: PropertyValue?
         var writes: [PropertyValue?] = []
         var refuses = false
         var delays = false
-        private var queued: [PropertyValue?] = []
+        private var queued: [(value: PropertyValue?, mark: Int)] = []
+        private var lastMark = 0
+        private var taken: Set<Int> = []
         init(_ value: PropertyValue?) { self.value = value }
         var isWriting: Bool { !queued.isEmpty }
+        var marks: ListEditing.Marks {
+            ListEditing.Marks(last: { self.lastMark }, took: { self.taken.contains($0) })
+        }
         func write(_ new: PropertyValue?) -> Bool {
             guard !refuses else { return false }
+            guard new != value || isWriting else { return true }
             writes.append(new)
-            if delays { queued.append(new) } else { value = new }
+            lastMark += 1
+            if delays { queued.append((new, lastMark)) } else { value = new; taken.insert(lastMark) }
             return true
         }
-        func land() { value = queued.removeFirst() }
+        func land() {
+            let write = queued.removeFirst()
+            value = write.value
+            taken.insert(write.mark)
+        }
         func refuse() { queued.removeFirst() }
     }
 
     /// The identities the editor draws for the store's list as it stands.
     private static func drawn(_ editing: ListEditing, _ store: Store) -> [UUID] {
-        editing.rows(of: store.value, writing: store.isWriting).map(\.id)
+        editing.rows(of: store.value, writing: store.isWriting, marks: store.marks).map(\.id)
     }
 
     // MARK: The entry being added
@@ -280,6 +293,56 @@ import Testing
         #expect(editing.pending == ["value": .string("a@example.com")])
         #expect(editing.notice == "The list could not be saved.")
         #expect(editing.holdsUnsavedWork)
+    }
+
+    /// The second write reverses the first, so it is sent though the stored list already equals it; otherwise the
+    /// first would land, the editor would wait for a write never made, and take it for a refusal.
+    @Test func removingTheEntryJustAddedBeforeItsWriteLandsKeepsTheListWithoutIt() throws {
+        let shape = try Self.shape(Self.emailsField)
+        let a = Self.email("a@example.com")
+        let store = Store(.array([a]))
+        store.delays = true
+        let editing = ListEditing()
+        let first = try #require(Self.drawn(editing, store).first)
+        editing.startEntry()
+        let added = editing.pendingID
+        editing.type("b@example.com", into: ListEditing.Slot(entry: added, member: "value"), in: store.value)
+        #expect(editing.commit(try Self.member(shape, "value"), of: added, in: shape, value: store.value, write: store.write))
+        #expect(Self.drawn(editing, store) == [first, added])
+
+        editing.remove(added, in: shape, value: store.value, write: store.write)
+        #expect(store.writes.count == 2)
+        #expect(Self.drawn(editing, store) == [first])
+        store.land()
+        #expect(Self.drawn(editing, store) == [first])
+        store.land()
+        #expect(store.value == .array([a]))
+        #expect(Self.drawn(editing, store) == [first])
+        #expect(editing.notice == nil)
+        #expect(editing.pending == nil)
+        #expect(!editing.holdsUnsavedWork)
+    }
+
+    /// An Undo can put the list back within one round trip of the write it undoes, so no draw sees the write land;
+    /// the library's mark says it did, so the list is not taken for a refusal.
+    @Test func aWriteUndoneBeforeAnyDrawSawItLandIsNoRefusal() throws {
+        let shape = try Self.shape(Self.emailsField)
+        let a = Self.email("a@example.com")
+        let store = Store(.array([a]))
+        store.delays = true
+        let editing = ListEditing()
+        let first = try #require(Self.drawn(editing, store).first)
+        editing.startEntry()
+        let added = editing.pendingID
+        editing.type("b@example.com", into: ListEditing.Slot(entry: added, member: "value"), in: store.value)
+        #expect(editing.commit(try Self.member(shape, "value"), of: added, in: shape, value: store.value, write: store.write))
+
+        store.land()
+        store.value = .array([a])
+        #expect(Self.drawn(editing, store) == [first])
+        #expect(editing.notice == nil)
+        #expect(editing.pending == nil)
+        #expect(!editing.holdsUnsavedWork)
     }
 
     @Test func aWriteOvertakenElsewhereKeepsEachEntrysIdentity() throws {

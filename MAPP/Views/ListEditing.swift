@@ -31,10 +31,18 @@ final class ListEditing {
         let entry: PropertyValue
     }
 
+    /// How the editor asks the library about its writes (`ItemLibrary.lastPropertyWrite`, `tookPropertyWrite(_:)`).
+    struct Marks {
+        var last: () -> Int? = { nil }
+        var took: (Int) -> Bool = { _ in false }
+    }
+
     /// A list the editor wrote that the stored list may not show yet.
     private struct Flight {
         let entries: [PropertyValue]
         let ids: [UUID]
+        /// The library's mark for the write, nil where it made none or keeps no marks.
+        let mark: Int?
         /// What the person gave the write, which goes back to them if it is refused.
         let given: Given?
     }
@@ -55,6 +63,7 @@ final class ListEditing {
     @ObservationIgnored private var settled: (entries: [PropertyValue], ids: [UUID]) = ([], [])
     /// Whether the library still had a write of the item on its way when the view last drew.
     @ObservationIgnored private var writing = false
+    @ObservationIgnored private var marks = Marks()
     /// Typed text whose entry went from the list elsewhere, waiting to go back to the person. Observed, as `drafts`
     /// is, so a view that tells of unsaved work follows it.
     private var orphans: [String] = []
@@ -73,20 +82,30 @@ final class ListEditing {
 
     /// The entries of `value`, each with its identity in this editor. `writing` says whether the library still has a
     /// write of the item on its way (`ItemLibrary.isWritingProperties(of:)`), so a stored list that does not yet show
-    /// the editor's last write is waited for while it is true and taken as a refusal once it is false.
-    func rows(of value: PropertyValue?, writing: Bool = false) -> [Row] {
+    /// the editor's last write is waited for while it is true and taken as a refusal once it is false, unless `marks`
+    /// says the library took it.
+    func rows(of value: PropertyValue?, writing: Bool = false, marks: Marks = Marks()) -> [Row] {
         self.writing = writing
+        self.marks = marks
         sync(ListEntries.entries(of: value))
         return zip(ids, known).map { Row(id: $0, entry: $1) }
     }
 
-    /// Follows the stored list. While writes are in flight: a stored list that shows one of them settles it and those
-    /// before it; one that still shows the list from before them, or an earlier write, waits while the library is
-    /// writing and is a refusal of the rest once it is not; any other list was changed elsewhere and is matched
-    /// against the list the editor wrote, then the one from before its writes.
+    /// Follows the stored list. While writes are in flight: one the library says it took is settled with those before
+    /// it, even where no draw saw it land, as when an Undo puts the list back within one round trip; a stored list
+    /// that shows one of them settles it and those before it, except a marked write of the list from before, which
+    /// only its mark settles; one that still shows the list from before them, or an
+    /// earlier write, waits while the library is writing and is a refusal of the rest once it is not; any other list
+    /// was changed elsewhere and is matched against the list the editor wrote, then the one from before its writes.
     private func sync(_ entries: [PropertyValue]) {
+        if let taken = flights.lastIndex(where: { $0.mark.map(marks.took) == true }) {
+            settled = (flights[taken].entries, flights[taken].ids)
+            flights.removeFirst(taken + 1)
+        }
         if !flights.isEmpty {
-            if let landed = flights.lastIndex(where: { $0.entries == entries }) {
+            // A write that puts back the list from before, as removing an entry just added does, looks landed before
+            // it is; where the library marks it, only the mark settles it.
+            if let landed = flights.lastIndex(where: { $0.entries == entries && ($0.mark == nil || entries != settled.entries) }) {
                 settled = (flights[landed].entries, flights[landed].ids)
                 flights.removeFirst(landed + 1)
                 if !flights.isEmpty, !writing { fallBack() }
@@ -399,14 +418,16 @@ final class ListEditing {
             notice = String(localized: "The list can’t be saved while it holds an entry it doesn’t take. Correct or remove the entries marked in this list.")
             return false
         }
+        let before = marks.last()
         guard write(new) else {
             notice = String(localized: "The list could not be saved.")
             return false
         }
+        let mark = marks.last()
         if flights.isEmpty { settled = (known, ids) }
         known = ListEntries.entries(of: new)
         ids = newIDs
-        flights.append(Flight(entries: known, ids: newIDs, given: given))
+        flights.append(Flight(entries: known, ids: newIDs, mark: mark != before ? mark : nil, given: given))
         // Until the view draws again with the library's own word, a stored list without the write is not a refusal.
         writing = true
         return true
