@@ -1,6 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// Equatable by browser and order so a window change does not re-run its body. Row traits are set in the `ForEach`, not in the row view.
 struct NoteList: View, Equatable {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager

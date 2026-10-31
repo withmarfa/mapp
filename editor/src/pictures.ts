@@ -34,7 +34,30 @@ type PictureState =
 /** Where the page asks the app about a picture. */
 export type Ask = typeof askPicture
 
-/** The pictures at web addresses in the note on the page, and what each card shows. */
+/**
+ * The pictures at web addresses (`![alt](https://…)`, as a feed's text holds) in the note on the page, and what each
+ * card shows. The page decides nothing of the Remote Pictures setting, nor of which items Always applies to: the app
+ * answers `waiting` for one it does not load without asking. The alt text, the host and the address are all the page
+ * has of a picture. An `http` address is asked for too, and the app refuses it with a reason the card shows.
+ *
+ * Each picture is in one state: not loaded (`waiting`, or `off` where Settings says Never), loading, loaded or
+ * refused. Only a waiting picture's card differs from Inkkit's default card: it is a `file` card, since the facade
+ * draws no quieter placeholder and has no per-card button text, whose label says what activating it does. It is
+ * presented with `layout: 'fill'`, so every one takes the column's width, and `activation: 'card'`, so the whole card
+ * is one button with no Open arrow. The page styles none of Inkkit's own card classes.
+ *
+ * Activating a waiting card (a click, or Return or Space with it focused) fires the adapter's `open`, which loads
+ * every picture that waits, as the callout's button does; a refused picture whose `retry` is set is tried alone. Any
+ * other card's Open arrow opens the address in the browser (`opensInBrowser`).
+ *
+ * The callout above the text (`#picture-bar`) counts the distinct addresses still waiting among the cards drawn.
+ * The asks mean: `chosen` when the person chose, `drawing` when a card is drawn, and `cached` for printing and
+ * export, which show only what the app already holds and fetch nothing (`NoteEditor.printable` sets `cacheOnly`).
+ *
+ * Asking again (`changed`, `savedChanged`) keeps what a card and the callout's count showed until the new answer
+ * arrives, and draws the card again only if the answer differs. A picture being chosen is left alone by both, so its
+ * card ends with its own answer. An embed of a note is not a picture and never reaches this class.
+ */
 export class WebPictures {
   private states = new Map<string, PictureState>()
   private asking = new Map<string, Promise<PictureState>>()

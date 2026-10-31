@@ -37,10 +37,30 @@ export interface HeaderLinked {
   date: string
 }
 
-/** Which header the page draws, chosen by the app from the core type the item's type builds on. */
+/**
+ * Which header the page draws, chosen by the app from the core type the item's type builds on
+ * (`PageHeaderKind`). The page draws the shared parts and never decides a kind or names a type.
+ *
+ * - `general`: the title, byline, properties and Linked From.
+ * - `event`: adds a calendar tile of one fixed height (month band over the day) with two lines beside it, centered
+ *   against it: the time or range, then the weekday, zone and a relative phrase, which wraps as a whole line where
+ *   the page is narrow.
+ * - `person`: adds an avatar, a subtitle and rows whose email and phone values open `mailto:` and `tel:` links, and
+ *   calls Linked From "Timeline", open by default.
+ * - `reading` (`core.bookmark`, `core.media`): puts the source, published date and reading time above the title
+ *   (`byline.detail`), the description under it as a dek, and the text in a larger serif face set through
+ *   `body[data-header]`, at the page width the person chose like any other page.
+ *
+ * A fifth kind, `webpage` (`core.file.webpage`), never reaches this page: a file has no text to edit, so SwiftUI
+ * draws a Web Page's title and byline natively (`WebPageItemPage`) above the sealed HTML view.
+ *
+ * A kind never loads anything, because the page fetches nothing from the network: a bookmark's `image_url` is not
+ * drawn as a hero and leaves the property block (the inspector still shows it), and an event has no map. The fields
+ * a kind draws leave the property block (`PageHeaderLead.consumed`).
+ */
 export type HeaderKind = 'general' | 'event' | 'person' | 'reading'
 
-/** An event's when, worked out by the app in the event's own time zone. */
+/** An event's when, worked out by the app (`EventHeader`) in the event's own time zone, never the viewer's. */
 export interface HeaderEvent {
   month: string
   day: string
@@ -67,7 +87,10 @@ export interface HeaderModel {
   /** Why the title was refused, in the words of the library the item is in. */
   titleRefusal: string
   editable: boolean
-  /** False where the item is titled by the first line of its text, which the page already shows as its text. */
+  /** False where the item is titled by the first line of its text (`Item.titleRule` is `.firstLine`), which the page
+   *  already shows as its text, so the page draws no title and the byline leads. The toolbar and the list still show
+   *  the derived title, and `bottom` and the scrolled-away report do not change. Decided from the title rule, never
+   *  from a type. */
   showsTitle?: boolean
   type: string | null
   /** The key of the type's icon in `HeaderIcons.symbols`, drawn before the type's name. */
@@ -84,11 +107,15 @@ export interface HeaderModel {
   properties: HeaderRow[]
   /** How many rows show before the rest wait behind a button. */
   foldAfter: number
-  /** The items a collection holds, listed under its text. Empty for any other item. */
+  /** The items a collection (a type playing the `container` role) holds, listed in a Contents section of its own,
+   *  open, under its text. Empty for any other item, and Linked From then holds only the other links. */
   contents: HeaderLinked[]
   linked: HeaderLinked[]
   linkedFoldAfter: number
-  /** False where the page has no text to write, so the page draws no empty editor. */
+  /** False where the page has no text to write, so the page draws no empty editor (`body[data-text='none']`): a
+   *  collection with no text sends it. An empty editor only invites typing that a connector holding the item puts
+   *  back, and MAPP cannot tell a connector's item from the person's until Marfa marks them read only (marfa issue
+   *  2415). */
   showsText: boolean
   /** "Show N More", worded by the app for the rows and for the items that are folded away. */
   showMore: string
@@ -250,7 +277,17 @@ class LinkedSection {
 
 /** The item's title and pinned properties, drawn in the page above the note so they scroll with it as one
  *  surface. What they do is the app's: the title is saved as the item's property, and each pin opens a native
- *  menu. */
+ *  menu. The header belongs to MAPP's page, not to Inkkit; do not move it back into a native overlay that follows
+ *  WebKit's scrolling.
+ *
+ *  Under the title the header draws a byline (the type pin, which starts with the type's own icon, the source and
+ *  the day), then the property block: the rows Swift sends (`HeaderRow`, one model for every item), folded after
+ *  `foldAfter` rows with "Show N More" expanding in place, and "Show Less" once expanded. The status and parent pins
+ *  are the values of their rows, moved into them with their menus unchanged. A link value posts `openItem` or
+ *  `openLink`; nothing else in the block is edited here.
+ *
+ *  Linked From (a folded section of the items that link to this one) and a collection's Contents are drawn in the
+ *  footer, under the text. */
 export class ItemHeader {
   private model?: HeaderModel
   private readonly labels: HeaderLabels
@@ -435,7 +472,9 @@ export class ItemHeader {
     return document.activeElement === this.title
   }
 
-  /** Whether the footer holds anything, so the text above it can end where the text does. */
+  /** Whether the footer holds anything, so the text above it can end where the text does. While it does, Linked
+   *  From follows the text directly (`main.ts` sets `--inkkit-min-height` to zero); the text fills the window only
+   *  when it holds nothing. */
   get hasFooterItems(): boolean {
     return !!this.model && (this.model.contents.length > 0 || this.model.linked.length > 0)
   }
@@ -506,8 +545,8 @@ export class ItemHeader {
     )
   }
 
-  /** Gives the title of `item` the keyboard with its text selected, so typing replaces it. Held until the header
-   *  shows that item and can be edited. */
+  /** Gives the title of `item` the keyboard with its text selected, so typing replaces it, for a new item. Held until
+   *  the header shows that item and can be edited; `focus`, `focusText` and `load` cancel the wait. Used once. */
   focusTitle(item: string) {
     this.wantedTitle = item
     this.takeWantedTitle()
@@ -807,7 +846,10 @@ export class ItemHeader {
   }
 
   /** The row of the property block, or Linked From, that an event's target is in, for the app to add Hide from
-   *  Page to the menu WebKit is opening there; the inspector still lists it. */
+   *  Page to the menu WebKit is opening there; the inspector still lists it. The page leaves WebKit's own menu alone
+   *  and posts `rowMenu` just before it, with the row's identifier (a field key, a relationship's field, `#tags` or
+   *  `#linked`) and the item, or null over anything else. The app keeps each person's choice for a type
+   *  (`PagePlacements`), and a hidden row is simply not sent. */
   rowAt(target: EventTarget | null): { item: string; row: string } | null {
     const row = (target as Element | null)?.closest?.<HTMLElement>('[data-row]')?.dataset.row
     return this.model && row ? { item: this.model.item, row } : null

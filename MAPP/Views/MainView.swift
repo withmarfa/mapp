@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// Mounts one split view at a time: the workspace identity changes to switch. Settings is a place in the three-column split so macOS releases the outgoing toolbar, and the column count of a mounted split view is never changed. Browser, editor, undo, columns and sidebar scroll live above that boundary so they survive a switch.
 struct MainView: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries

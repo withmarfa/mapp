@@ -69,6 +69,12 @@ extension Knob.Value {
 final class Tuning {
     /// Add a knob here to show it in the panel; remove it here when it is settled. Empty until a design value needs
     /// comparing.
+    ///
+    /// To add one: declare it with `Knob.slider`, `.toggle` or `.picker`, with the code's own constant as its
+    /// default, and list it here. Read it in the view with `number(_:)`, `choice(_:as:)` or, for a toggle,
+    /// `tuning[knob] == .flag(true)`, behind `#if DEBUG` with the constant in the `#else`, so Release keeps the
+    /// constant. The `Copy` button turns the values into text to paste into a chat. Settle a knob by deleting its
+    /// declaration, its use and this entry in one change; none stays as a setting. Panel text is not localized.
     static let shared = Tuning(knobs: [])
 
     static let prefix = "tuning."

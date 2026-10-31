@@ -280,6 +280,8 @@ export class NoteEditor {
             const embed = request(reference, context.documentId)
             host.noteTarget(embed.text, reference.target)
             const file = await host.answer(embed)
+            // An embed of a note (`![[A note]]`, `![](Other.md)`) is not a file, so it is File Not Found here: the
+            // page never transcludes a note.
             if (!file || context.signal.aborted)
               return { kind: 'missing', label: reference.label ?? reference.reference }
             if ('unavailable' in file)
@@ -290,6 +292,8 @@ export class NoteEditor {
               }
             described.set(JSON.stringify(embed), file)
             if (file.kind === 'file') return { kind: 'file', label: file.name }
+            // A card with Open, because WebKit does not paint local PDFs in Inkkit's sandboxed frame. Keep the
+            // frame sandbox; do not loosen it to show PDFs.
             if (file.kind === 'pdf')
               return {
                 kind: 'file',
@@ -338,6 +342,10 @@ export class NoteEditor {
             })
           },
         },
+        // `textInput.smartPunctuation` stays unset, so the page makes no curly quotes or dashes of its own. The
+        // system's Substitutions setting still applies, as in any Mac text field, and is not the page's to change.
+        // Because the adapter below is set, a link typed in full, such as `[[Note]]`, becomes a link and is saved
+        // as typed.
         wikiLinks: {
           // The app matches names against its library; a request the person has typed past is not sent.
           suggest: wikiSuggest,
@@ -345,7 +353,8 @@ export class NoteEditor {
           resolve: (reference, context) =>
             host.links.status(linkRef(reference), context.documentId),
           // A link to this note's own heading is the page's to follow. Any other names a note, which only the
-          // app can find, so the app opens it and scrolls to the heading once it is shown.
+          // app can find, so the app opens it and scrolls to the heading once it is shown. Command-click, or
+          // Enter or Space on the focused link, reaches here with the link's authored `raw` (see `LinkRef`).
           open(reference, context) {
             if (!reference.target) {
               if (reference.fragment) host.revealHeading(reference.fragment)
@@ -400,7 +409,8 @@ export class NoteEditor {
     this.pictures.chooseAll()
   }
   /** What the app answered for each embed of the note, by its text, so two embeds of one file, and one drawn
-   *  again, ask it once. Only a file is kept: an embed the app could not show is asked again. */
+   *  again, ask it once. Only a file is kept: an embed the app could not show (`{unavailable: reason}`, or no file)
+   *  is asked again. */
   private answers = new Map<
     string,
     { text: string; answer: Promise<EmbeddedFile | UnavailableFile | null> }
@@ -426,7 +436,9 @@ export class NoteEditor {
     answer.then((file) => (file && !('unavailable' in file) ? undefined : forget()), forget)
     return answer
   }
-  /** The app's library changed what these embeds show: they are asked and drawn again. */
+  /** The app's library changed what these embeds show (a file arrived, was renamed or binned, or an embed was
+   *  bound): the answers for those texts are forgotten and just those embeds are drawn again with Inkkit's
+   *  `refreshReferences`, which changes no document. */
   embedsChanged(texts: string[]) {
     const changed = new Set(texts)
     for (const [key, held] of this.answers) if (changed.has(held.text)) this.answers.delete(key)
@@ -445,7 +457,11 @@ export class NoteEditor {
     this.links.refresh()
   }
   /** Draws the links to these notes again, after the app's answer for them changed. A page with no document yet,
-   *  or one that has ended, draws nothing, and each link it draws later is drawn from the answers held. */
+   *  or one that has ended, draws nothing, and each link it draws later is drawn from the answers held.
+   *  `refreshReferences` changes no text, so this works in a read-only note and during composition. In source
+   *  editing Inkkit draws no link, so there is nothing to redraw. Inkkit styles wiki links itself (the link color,
+   *  and a dashed underline for one that names no note); the page adds no rule for them. Loaded pictures are also
+   *  redrawn through here, by their address. */
   private drawLinksAgain(targets: string[]) {
     try {
       this.engine.refreshReferences(targets)
@@ -469,7 +485,8 @@ export class NoteEditor {
     if (pending.generation === this.generation) this.reported = pending.text
     this.events.changed(pending.text, pending.generation)
   }
-  /** The second frame callback runs after the frame that drew the document has been handed over. */
+  /** The second frame callback runs after the frame that drew the document has been handed over. A later `load` or
+   *  `reload` gives the page another generation, and then nothing is said. A `reload` posts nothing of its own. */
   private reportPainted(generation: number) {
     if (!this.events.painted) return
     requestAnimationFrame(() =>
@@ -546,7 +563,8 @@ export class NoteEditor {
     this.engine.focus()
   }
   /** Gives the text the keyboard with the caret after `prefix`, the source typed before it in quick add, or at the
-   *  end of the text when `prefix` is null. */
+   *  end of the text when `prefix` is null. The app sends null when the prefix would be too long for one message
+   *  (`PageCaret.limit`). */
   focusText(prefix: string | null) {
     const snapshot = this.engine.textSnapshot(this.generation)
     const end = snapshot.text.replace(/\n+$/, '').length
@@ -556,6 +574,9 @@ export class NoteEditor {
   blur(expected = this.generation) {
     this.engine.blur(expected)
   }
+  /** Native window activation, forwarded to Inkkit, which paints the selection from `--inkkit-selection-background`
+   *  and `--inkkit-inactive-selection-background` (set on `:root` in `style.css`; override no `::selection` or
+   *  `::highlight` rule). This changes no focus, text or history. */
   setHostActive(active: boolean) {
     this.engine.setHostActive(active)
   }
@@ -583,6 +604,8 @@ export class NoteEditor {
       expected,
     )
   }
+  /** The `openLink` binding (Command-Shift-O) is Inkkit's own: it opens a Markdown link or a selected wiki link
+   *  through the `openLink` event. */
   setKeymap(bindings: Keymap) {
     const keys: Partial<Record<ShortcutName, string[]>> = {}
     for (const [key, [command, arg]] of Object.entries(bindings)) {
@@ -714,8 +737,11 @@ export class NoteEditor {
    *  leaves them for the app to send again. A note that ends in a code fence left open refuses them (`preservation`),
    *  and the app tells the person the files are attached but not in the text.
    *
-   *  Keep the defensive source check after Inkkit's append: anything but trailing whitespace gone is taken back
-   *  in the same step, before the change is reported, and refused as `preservation`. */
+   *  Keep the defensive source check after Inkkit's append, even though Inkkit preserves lone rules, empty code
+   *  fences, images and definitions: anything but trailing whitespace gone is taken back in the same step, before
+   *  the change is reported, and refused as `preservation`. Redo stays available after that refusal, because
+   *  Inkkit has no operation to discard the undone step. The images are one undo step, saved like typing, and do
+   *  nothing to a note loaded since (`expected`). Never write them into the source here. */
   appendImages(images: { src: string; alt: string }[], expected = this.generation) {
     const before = this.snapshot(expected).text
     const reportedBefore = this.pendingChanged

@@ -5,7 +5,11 @@
 #   TEST_RUNNER_MARFA_API_URL=<address> TEST_RUNNER_MARFA_API_KEY=<key> Scripts/measure-ui.sh <derived data> [xcodebuild arguments]
 #
 # Further arguments go to xcodebuild, such as `-only-testing:MAPPUITests/SpeedMeasureTests/testLaunchWarm` or build
-# settings. The test takes over the screen, so run it with no other UI test running.
+# settings. Add `SWIFT_OPTIMIZATION_LEVEL=-O SWIFT_COMPILATION_MODE=wholemodule` for numbers close to a release's.
+# The test takes over the screen and keyboard, so run it with no other UI test running, and against a test instance
+# only, never a server that holds a person's data. The Debug-only `-MAPPKeepTestStore` flag keeps the copy the last
+# launch left, which is how a warm launch is timed. UI testing's own queries of a library this size take seconds, so
+# the tests click by coordinate and use shortcuts, and the signposts are the finer number.
 set -u
 derived=${1:?usage: measure-ui.sh <derived data path> [xcodebuild arguments]}
 shift

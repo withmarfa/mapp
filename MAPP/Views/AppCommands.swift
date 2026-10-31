@@ -147,6 +147,7 @@ extension AppCommands {
             editor: editor, bindsShortcut: true)
     }
 
+    /// The page keeps Command-[ and Command-] while it has the keyboard (outdent and indent a list item, move between table cells), so Back and Forward give those keys up then.
     private var pageKeepsHistoryKeys: Bool { editor?.isFocused == true }
 
     private var canGoBack: Bool {

@@ -2,8 +2,9 @@ import os
 import XCTest
 
 /// Times what a person feels in the window, on a library held by a real Marfa test instance: launching to a usable
-/// window, choosing a place, opening an item, New and Search answering, and typing. It gates nothing: every
-/// iteration that completes passes, and the numbers are for a person to read.
+/// window (cold and warm), choosing a place, moving between the table's places, selecting in the table and the
+/// gallery, opening an item, New and Search answering, and typing. It gates nothing: every iteration that completes
+/// passes, and the numbers are for a person to read. It takes over the screen, so it is left out of the `UI` plan.
 ///
 /// It runs only in the `Measure UI` plan with `MAPP_MEASURE_UI` set and the instance's address and key given as
 /// `MARFA_API_URL` and `MARFA_API_KEY` (xcodebuild's `TEST_RUNNER_` prefix hands them over); otherwise each test is
