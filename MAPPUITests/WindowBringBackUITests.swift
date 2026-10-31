@@ -27,9 +27,9 @@ final class WindowBringBackUITests: XCTestCase {
         XCTAssertTrue(gallery(app).waitForNonExistence(timeout: 3), "the item is open, not the grid")
         app.toolbars.buttons["Hide Sidebar"].click()
         XCTAssertTrue(window.outlines["Sidebar"].waitForNonExistence(timeout: 3))
-        // The window's state is saved shortly after a change.
-        Thread.sleep(forTimeInterval: 2)
-        app.terminate()
+        // A normal quit writes the window's state; a terminate would not wait for it.
+        app.typeKey("q", modifierFlags: .command)
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 10), "the app quit")
 
         app = launch()
         addTeardownBlock { app.terminate() }

@@ -38,6 +38,19 @@ final class KeyboardNavigationTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(areas.count, 3, "Tab goes on past the list and sidebar, to the page: \(seen)")
     }
 
+    /// Under Full Keyboard Access Tab steps through the list, the sidebar and its rows only; the toolbar is reached with
+    /// Control-F5, which a synthesized key does not trigger, so what can be checked here is that every toolbar control
+    /// is a labeled, enabled button that keyboard users and VoiceOver can name.
+    func testEveryToolbarControlIsALabeledButton() {
+        let toolbar = app.toolbars.firstMatch
+        XCTAssertTrue(toolbar.waitForExistence(timeout: 3))
+        let buttons = toolbar.buttons.allElementsBoundByIndex.filter(\.isHittable)
+        XCTAssertFalse(buttons.isEmpty, "the toolbar has controls")
+        for button in buttons {
+            XCTAssertFalse(button.label.isEmpty, "a toolbar button has no label: \(button.debugDescription)")
+        }
+    }
+
     func testNewWindowInThePaletteOpensAWindow() {
         app.typeKey("k", modifierFlags: .command)
         let field = window.textFields["CommandPaletteField"]
