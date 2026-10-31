@@ -14,9 +14,11 @@ final class QuickAdd {
         let contentType: UTType?
         private let access: FileAccess
 
-        /// Nil for a folder, a package or anything else that is not one file that can be read.
-        init?(_ url: URL) {
-            access = FileAccess(url)
+        /// Nil for a folder, a package or anything else that is not one file that can be read. A symbolic link is
+        /// taken as the file it points to.
+        init?(_ link: URL) {
+            access = FileAccess(link)
+            let url = link.resolvingSymlinksInPath()
             guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey, .contentTypeKey]),
                   values.isRegularFile == true, FileManager.default.isReadableFile(atPath: url.path(percentEncoded: false))
             else { return nil }

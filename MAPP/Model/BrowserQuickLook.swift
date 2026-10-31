@@ -4,50 +4,73 @@ import UniformTypeIdentifiers
 /// What Quick Look is showing for a window: the files it was given, in the order the arrow keys move through them,
 /// and the copies made for it, which are removed once it closes.
 struct QuickLookRequest {
-    let urls: [URL]
+    var urls: [URL]
     var current: URL?
-    fileprivate let staged: [QuickLookFile]
+    fileprivate(set) var staged: [QuickLookFile]
+}
+
+extension Notification.Name {
+    /// Posted, with the browser as its object, when a window shows Quick Look. The panel is shared by every window,
+    /// so the others give up theirs and remove their copies.
+    static let quickLookTaken = Notification.Name("com.withmarfa.mapp.quickLookTaken")
 }
 
 extension Browser {
-    /// Shows the selected items in Quick Look: a file item as its file, fetched first, and any other item as its
-    /// text in a markdown file. Quick Look picks a previewer from the file's name, so each is shown a copy named after
-    /// the item. An item that has neither, or whose file cannot be fetched, is left out and the person is told when
-    /// that leaves nothing to show.
+    /// How many of the selected items Quick Look is given, in the order they are on screen. Each file is fetched
+    /// before it is shown, so a large selection is not fetched whole.
+    static let quickLookLimit = 10
+
+    /// Shows the selected items in Quick Look, in the order they are on screen: a file item as its file, fetched
+    /// first, and any other item as its text in a markdown file. Quick Look picks a previewer from the file's name,
+    /// so each is shown a copy named after the item. The first is shown as soon as it is ready and the rest join
+    /// it as they are fetched, up to `quickLookLimit`. An item that has neither, or whose file cannot be fetched, is
+    /// left out and the person is told when that leaves nothing to show. A request that is replaced or closed
+    /// meanwhile stops and removes what it made.
     func quickLookSelection(in library: any ItemLibrary) async {
         dismissQuickLook()
-        let chosen = selectedItems(in: library).sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
-        var urls: [URL] = []
-        var staged: [QuickLookFile] = []
+        let generation = quickLookGeneration
+        let selected = Dictionary(selectedItems(in: library).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var seen: Set<ItemID> = []
+        let chosen = onScreenOrder(in: library).compactMap { id in seen.insert(id).inserted ? selected[id] : nil }.prefix(Self.quickLookLimit)
+        var made: [QuickLookFile] = []
         var failure: String?
+        func isCurrent() -> Bool { generation == quickLookGeneration && isShowing(library) }
+        func show(_ url: URL, staged file: QuickLookFile?) {
+            file.map { made.append($0) }
+            if quickLook == nil {
+                quickLook = QuickLookRequest(urls: [url], current: url, staged: made)
+                NotificationCenter.default.post(name: .quickLookTaken, object: self)
+            } else {
+                quickLook?.urls.append(url)
+                quickLook?.staged = made
+            }
+        }
         for item in chosen {
             if item.isFile {
                 do {
-                    guard let url = try await library.fileURL(of: item.id) else { continue }
-                    let copy = QuickLookFile.copy(of: url, titled: item.title, as: item.fileType ?? .data, key: item.id.rawValue)
-                    copy.map { staged.append($0) }
-                    urls.append(copy?.url ?? url)
+                    let fetched = try await library.fileURL(of: item.id)
+                    guard isCurrent() else { return made.forEach { $0.remove() } }
+                    guard let fetched else { continue }
+                    let copy = QuickLookFile.copy(of: fetched, titled: item.title, as: item.fileType ?? .data)
+                    show(copy?.url ?? fetched, staged: copy)
                 } catch {
+                    guard isCurrent() else { return made.forEach { $0.remove() } }
                     failure = (error as? SourceFailure)?.message ?? error.localizedDescription
                 }
             } else if let body = library.body(of: item.id),
-                      let file = QuickLookFile.write(body.text, titled: item.title, as: .markdown, key: item.id.rawValue) {
-                staged.append(file)
-                urls.append(file.url)
+                      let file = QuickLookFile.write(body.text, titled: item.title, as: .markdown) {
+                show(file.url, staged: file)
             }
         }
-        guard !urls.isEmpty else {
-            if !chosen.isEmpty {
-                library.notices.tell(
-                    String(localized: "Can’t Quick Look"), failure ?? String(localized: "Nothing selected has a file or text to show."))
-            }
-            return
+        if quickLook == nil, !chosen.isEmpty {
+            library.notices.tell(
+                String(localized: "Can’t Quick Look"), failure ?? String(localized: "Nothing selected has a file or text to show."))
         }
-        quickLook = QuickLookRequest(urls: urls, current: urls[0], staged: staged)
     }
 
-    /// Closes Quick Look's request and removes the copies made for it.
+    /// Closes Quick Look's request, stops one still fetching, and removes the copies made for it.
     func dismissQuickLook() {
+        quickLookGeneration += 1
         quickLook?.staged.forEach { $0.remove() }
         quickLook = nil
     }

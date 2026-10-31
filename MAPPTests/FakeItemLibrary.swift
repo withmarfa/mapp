@@ -482,6 +482,8 @@ final class FakeItemLibrary: ItemLibrary {
 
     /// Every file added, and whether adding one is refused.
     private(set) var addedFiles: [(name: String, data: Data, title: String?, parent: ItemID?)] = []
+    /// The place each file was added from, in step with `addedFiles`.
+    private(set) var addedPlaces: [SidebarItem] = []
     var refusesFiles = false
     /// Awaited before a file is added, so a test can act while it is being sent.
     var sendingFile: (() async -> Void)?
@@ -498,6 +500,7 @@ final class FakeItemLibrary: ItemLibrary {
             return nil
         }
         addedFiles.append((name, data, title, parentID))
+        addedPlaces.append(place)
         let id = ItemID.mint()
         let parent = parentID.map { Edge(id: EdgeID("child-of-\(id.rawValue)"), type: "child-of", source: id, target: .item($0), origin: .property("child-of")) }
         items.append(Item(

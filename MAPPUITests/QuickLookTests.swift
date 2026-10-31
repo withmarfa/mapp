@@ -19,13 +19,14 @@ final class QuickLookTests: XCTestCase {
         let row = list.cells.firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         row.click()
-        let before = app.windows.count
         list.typeKey(" ", modifierFlags: [])
-        // Quick Look is a panel of its own, the app's second window while it shows; its service starts cold, so it can be slow.
-        let shown = NSPredicate { _, _ in self.app.windows.count > before }
-        wait(for: [expectation(for: shown, evaluatedWith: nil)], timeout: 40)
+        // The panel is titled Quick Look and shows the note as a markdown file named after it. Its service starts cold, so it can be slow.
+        let panel = app.windows["Quick Look"]
+        XCTAssertTrue(panel.waitForExistence(timeout: 40))
+        let preview = panel.webViews.firstMatch
+        XCTAssertTrue(preview.waitForExistence(timeout: 10))
+        XCTAssertTrue(preview.label.hasSuffix(".md"), "Quick Look shows \(preview.label)")
         app.typeKey(" ", modifierFlags: [])
-        let closed = NSPredicate { _, _ in self.app.windows.count == before }
-        wait(for: [expectation(for: closed, evaluatedWith: nil)], timeout: 5)
+        XCTAssertTrue(panel.waitForNonExistence(timeout: 5))
     }
 }

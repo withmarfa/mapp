@@ -167,6 +167,8 @@ final class Browser {
     var newItem: NewItem?
     /// What Quick Look shows for the window, while it is open.
     var quickLook: QuickLookRequest?
+    /// Counts Quick Look requests, so a slow one the person has since replaced or closed knows to stop.
+    @ObservationIgnored var quickLookGeneration = 0
     /// Where the page puts the caret when it next takes the keyboard for a new item.
     var focusCaret: PageCaret?
     /// What the page writes for the files quick add attached to a new item, which it puts at the end of the text
@@ -329,6 +331,13 @@ final class Browser {
     func placeItems(in library: any ItemLibrary) -> [Item] {
         guard stacksSubtypes(in: library), case .itemType(let type) = item else { return library.items(in: item) }
         return library.items(inTypeAndSubtypes: type)
+    }
+
+    /// The items in the order the window last drew them: the table's rows in the table, else the list's or gallery's
+    /// sections, with whatever the place lists after them (a board, a timeline) in its own order.
+    func onScreenOrder(in library: any ItemLibrary) -> [ItemID] {
+        let drawn = viewMode == .table ? tableMemo?.content.rows.map(\.item.id) : sectionsMemo?.sections.flatMap { $0.items.map(\.id) }
+        return (drawn ?? []) + placeItems(in: library).map(\.id)
     }
 
     /// The selected items that still exist.
@@ -511,6 +520,10 @@ final class Browser {
 
     /// The list a search that has not yet answered replaced, for the answer to be compared with.
     @ObservationIgnored private var listBeforePendingSearch: [ItemID]?
+
+    /// Whether the window still shows `library`, which a long task checks after each wait, since the person may have
+    /// changed library meanwhile.
+    func isShowing(_ library: any ItemLibrary) -> Bool { libraryID == ObjectIdentifier(library) }
 
     /// Starts the window afresh for a library other than the one it showed, the first time it is shown one: what
     /// it selected or searched named items the new library may not have, and the window's undo

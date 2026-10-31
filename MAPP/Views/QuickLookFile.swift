@@ -7,16 +7,33 @@ nonisolated struct QuickLookFile {
     let folder: URL
     let url: URL
 
-    /// The item's title, made safe as a file name and ending in an extension that fits `type`.
+    /// The longest a file name can be, in UTF-8 bytes.
+    static let longestName = 255
+
+    /// The item's title, made safe as a file name, ending in an extension that fits `type`, and cut to fit the
+    /// longest name a file can have without splitting a character.
     static func name(for title: String, type: UTType) -> String {
         let unsafe = CharacterSet(charactersIn: "/:").union(.controlCharacters)
         var name = title.components(separatedBy: unsafe).joined(separator: "-").trimmingCharacters(in: .whitespaces)
         while name.hasPrefix(".") { name.removeFirst() }
         if name.isEmpty { name = String(localized: "File") }
-        guard type != .data, let preferred = type.preferredFilenameExtension else { return name }
-        let held = (name as NSString).pathExtension
-        if !held.isEmpty, UTType(filenameExtension: held)?.conforms(to: type) == true { return name }
-        return name + "." + preferred
+        var ending = ""
+        if type != .data, let preferred = type.preferredFilenameExtension {
+            let held = (name as NSString).pathExtension
+            if !held.isEmpty, UTType(filenameExtension: held)?.conforms(to: type) == true {
+                ending = "." + held
+                name = String(name.dropLast(ending.count))
+            } else {
+                ending = "." + preferred
+            }
+        }
+        var size = ending.utf8.count
+        var kept = name.prefix { character in
+            size += String(character).utf8.count
+            return size <= longestName
+        }
+        while kept.last?.isWhitespace == true { kept.removeLast() }
+        return String(kept) + ending
     }
 
     /// A copy of `file` in a folder of its own under `folderName`, or nil where it cannot be made and the file is better shown as it is.
@@ -51,6 +68,14 @@ nonisolated struct QuickLookFile {
         } catch {
             try? FileManager.default.removeItem(at: folder)
             return nil
+        }
+    }
+
+    /// Removes the folders earlier runs left in the temporary folder: copies shown, dragged out or opened elsewhere,
+    /// which the receiving app may read for as long as it likes, so nothing else can say when they are done with.
+    static func removeLeftovers() {
+        for folder in ["Quick Look", ItemReference.folder, "Web Pages", "Device Import"] {
+            try? FileManager.default.removeItem(at: URL.temporaryDirectory.appending(path: folder, directoryHint: .isDirectory))
         }
     }
 

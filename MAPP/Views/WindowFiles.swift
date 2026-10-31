@@ -16,9 +16,14 @@ extension View {
     }
 
     /// Makes the view take files and items dropped on it as the collection `id`'s: items join it, and files are
-    /// added to the library and join it. A nil `id` takes nothing, so a row that is not a collection can carry it.
+    /// added to the library and join it. A nil `id` leaves the view as it is, so a row that is not a collection can carry it.
+    @ViewBuilder
     func dropsInto(collection id: ItemID?, browser: Browser, order: NoteOrder) -> some View {
-        modifier(CollectionDrop(collection: id, browser: browser, order: order))
+        if let id {
+            modifier(CollectionDrop(collection: id, browser: browser, order: order))
+        } else {
+            self
+        }
     }
 }
 
@@ -50,7 +55,11 @@ private struct WindowFiles: ViewModifier {
                 } set: { url in
                     if url == nil { browser.dismissQuickLook() } else { browser.quickLook?.current = url }
                 },
-                in: browser.quickLook?.urls ?? [])
+                in: browser.quickLook?.urls ?? []
+            )
+            .onReceive(NotificationCenter.default.publisher(for: .quickLookTaken)) { note in
+                if (note.object as? Browser) !== browser { browser.dismissQuickLook() }
+            }
     }
 
     private func take(_ providers: [NSItemProvider]) -> Bool {
@@ -76,27 +85,23 @@ private struct QuickLookOnSpace: ViewModifier {
 private struct CollectionDrop: ViewModifier {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
-    let collection: ItemID?
+    let collection: ItemID
     let browser: Browser
     let order: NoteOrder
     @State private var isTargeted = false
 
     func body(content: Content) -> some View {
-        if let collection {
-            content
-                .dropDestination(for: ItemReference.self) { references, _ in
-                    library.addToCollection(Set(references.map(\.id)), collection, undoManager: undoManager)
-                } isTargeted: { isTargeted = $0 }
-                .onDrop(of: [.fileURL], isTargeted: $isTargeted) { providers in
-                    guard !providers.isEmpty else { return false }
-                    browser.importProviders(providers, into: collection, in: library, order: order, undoManager: undoManager)
-                    return true
-                }
-                .background {
-                    if isTargeted { RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.25)) }
-                }
-        } else {
-            content
-        }
+        content
+            .dropDestination(for: ItemReference.self) { references, _ in
+                library.addToCollection(Set(references.map(\.id)), collection, undoManager: undoManager)
+            } isTargeted: { isTargeted = $0 }
+            .onDrop(of: [.fileURL], isTargeted: $isTargeted) { providers in
+                guard !providers.isEmpty else { return false }
+                browser.importProviders(providers, into: collection, in: library, order: order, undoManager: undoManager)
+                return true
+            }
+            .background {
+                if isTargeted { RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.25)) }
+            }
     }
 }
