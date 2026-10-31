@@ -727,17 +727,17 @@ import Observation
         items.sorted { $0.created != $1.created ? $0.created > $1.created : $0.id.rawValue < $1.id.rawValue }
     }
 
-    /// The Inbox is the feed tier. All Items is every active item in either tier. Both and a type's place leave out a
-    /// file attached to another item, which shows on that item's page instead; a file with no parent still shows,
-    /// whoever added it (Marfa holds no other mark of one the person added), and Files, Sources and search list every
-    /// file. A type's place holds that type's own items and no subtype's, so the sidebar's count is the list's length.
+    /// The Inbox is the feed tier. All Items is every active item in either tier. Both, a source's place and a type's
+    /// place leave out a file attached to another item the library holds, which shows on that item's page instead; a
+    /// file with no parent, or whose parent is not held, still shows, whoever added it (Marfa holds no other mark of
+    /// one the person added), and Files and search list every file. Favorites stay unfiltered. A type's place holds that type's own items and no subtype's, so the sidebar's count is the list's length.
     private func members(of place: SidebarItem) -> Set<ItemID> {
         switch place {
         case .inbox: return index.standalone(index.feed)
         case .allNotes: return index.standalone(index.ids(in: .active))
         case .sources, .collections: return []
         case .source(let name):
-            return Set(index.ids(in: .active).filter { records[$0]?.item.source == name })
+            return index.standalone(Set(index.ids(in: .active).filter { records[$0]?.item.source == name }))
         // Listed in its own order by `items(in:)` and counted by its limit, so never read here.
         case .recents: return []
         // Read from the copy by `items(inView:)`, so never read here.

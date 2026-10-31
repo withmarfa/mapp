@@ -30,10 +30,16 @@ nonisolated struct MarfaItemIndex {
 
     func ids(in state: ItemState) -> Set<ItemID> { byState[state] ?? [] }
 
-    /// `ids` without the files that are attached to another item, whatever state that item is in: a binned parent
-    /// keeps its files out of the lists with it, as Marfa's bin does (`withmarfa/marfa#2498`).
+    /// `ids` without the files that are attached to an item the index holds, whatever state that item is in: a
+    /// binned parent keeps its files out of the lists with it, as Marfa's bin does (`withmarfa/marfa#2498`). A file
+    /// whose parent is not held (purged, or outside the slice) has nowhere to show, so it stays listed. Resolved here,
+    /// at read time, so a parent arriving or leaving changes the answer without touching the file.
     func standalone(_ ids: Set<ItemID>) -> Set<ItemID> {
-        attachments.isEmpty ? ids : ids.filter { attachments[$0] == nil }
+        attachments.isEmpty ? ids : ids.filter { !isAttachedToHeldItem($0) }
+    }
+
+    private func isAttachedToHeldItem(_ id: ItemID) -> Bool {
+        attachments[id]?.contains { edge in links[edge].map { held[$0.target] != nil } ?? false } ?? false
     }
 
     mutating func insert(_ item: Item, catalogue: Catalogue) {

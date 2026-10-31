@@ -105,4 +105,54 @@ import UniformTypeIdentifiers
             if case .items(_, let filter) = target { filter == nil } else { true }
         })
     }
+
+    @Test func aFileWhoseParentIsNotHeldShowsUntilTheParentArrives() async throws {
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source, notices: Notices())
+        let orphan = Self.attachment(ItemID("orphan"), to: ItemID("purged"), tier: .feed)
+        source.send(.loaded(SourceSnapshot(items: F.items + [orphan], catalogue: F.catalogue)))
+        try #require(await eventually { library.isLoaded })
+        #expect(ids(.inbox, in: library).contains(orphan.id))
+        #expect(ids(.allNotes, in: library).contains(orphan.id))
+        #expect(library.count(in: .inbox) == library.items(in: .inbox).count)
+
+        source.send(.upserted([F.item(ItemID("purged"), F.note, "Arrived", age: 30)]))
+        #expect(await eventually { !ids(.allNotes, in: library).contains(orphan.id) })
+        #expect(!ids(.inbox, in: library).contains(orphan.id))
+    }
+
+    @Test func anEdgeHeldAtTheParentsEndHidesTheFileToo() async throws {
+        var catalogue = F.catalogue
+        catalogue.edgeTypes["attached-to"] = EdgeTypeInfo(
+            id: "attached-to", label: "Attached to", reverseLabel: "Attachments", reverseName: "has-attachment", cardinality: .many,
+            writtenAt: .source, sourceTypes: [MarfaMapping.fileType], targetTypes: [])
+        let file = F.item(ItemID("held-at-parent"), F.image, "held", age: 20, tier: .feed, titleRule: .firstLine, content: .file(.png, byteCount: 0))
+        var parent = try #require(F.items.first { $0.id == F.n2 })
+        parent.edgesOut = [Edge(id: EdgeID("hap"), type: "has-attachment", source: F.n2, target: .item(file.id), origin: .property("attached-to"))]
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source, notices: Notices())
+        source.send(.loaded(SourceSnapshot(items: F.items.filter { $0.id != F.n2 } + [parent, file], catalogue: catalogue)))
+        try #require(await eventually { library.isLoaded })
+        #expect(!ids(.inbox, in: library).contains(file.id))
+
+        source.send(.removed([F.n2]))
+        #expect(await eventually { ids(.inbox, in: library).contains(file.id) })
+    }
+
+    @Test func aSourcesPlaceHidesAttachedFilesAndItsIndexCountAgrees() async throws {
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source, notices: Notices())
+        func from(_ item: Item) -> Item { var item = item; item.source = "reader"; return item }
+        let items = Self.items.filter { Self.attached.contains($0.id) || $0.id == Self.alone || $0.id == F.n1 }.map(from)
+        source.send(.loaded(SourceSnapshot(items: F.items + items.filter { $0.id != F.n1 }, catalogue: F.catalogue)))
+        try #require(await eventually { library.isLoaded })
+        let place = SidebarItem.source("reader")
+        let counted = try #require(library.sourceCounts.first { $0.name == "reader" })
+        #expect(counted.count == library.items(in: place).count)
+        #expect(counted.count == library.count(in: place))
+        #expect(ids(place, in: library).isDisjoint(with: Self.attached.subtracting([Self.onBinned])))
+        #expect(ids(place, in: library).contains(Self.alone))
+        // The files stay in Files, and a favorite is never filtered.
+        #expect(ids(.files, in: library).isSuperset(of: Self.attached))
+    }
 }
