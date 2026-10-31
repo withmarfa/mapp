@@ -125,11 +125,11 @@ private struct BandsFoot<Foot: View>: ViewModifier {
         _hiddenBelow = State(initialValue: memory?.hiddenBelow ?? 0)
     }
 
-    /// Rows are under the foot once the content's end lies below the top of the foot, that is, when it reaches more
-    /// than the foot's height above the scroll view's bottom edge. Content that ends just above the foot is not under it.
     /// How much of the blur shows while rows pass under the foot and the pointer is elsewhere.
     private static var underFootStrength: Double { 0.6 }
 
+    /// Rows are under the foot once the content's end lies below the top of the foot, that is, when it reaches more
+    /// than the foot's height above the scroll view's bottom edge. Content that ends just above the foot is not under it.
     private var isUnderFoot: Bool { ToolbarBand.isUnderFoot(hiddenBelow: hiddenBelow, footHeight: footHeight) }
 
     func body(content: Content) -> some View {
