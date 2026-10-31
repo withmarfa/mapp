@@ -71,6 +71,25 @@ import UniformTypeIdentifiers
         #expect(library.pageLayout(of: article) == .webPage(document: untyped.id, runsScripts: false))
     }
 
+    @Test func anItemToReadWithTextOfItsOwnKeepsTheEditor() {
+        let article = article()
+        file("article.html", type: .html, attachedTo: article.id)
+        library.bodies[article.id] = "My own notes on this."
+
+        #expect(library.pageLayout(of: article) == .text, "an attached document never hides the item's own text")
+
+        library.bodies[article.id] = " \n\t "
+        if case .webPage = library.pageLayout(of: article) {} else { Issue.record("a blank body opens the document") }
+    }
+
+    @Test func anItemToReadWithAnEmptyBodyOpensToTheDocument() {
+        let article = article()
+        let document = file("article.html", type: .html, attachedTo: article.id)
+        library.bodies[article.id] = ""
+
+        #expect(library.pageLayout(of: article) == .webPage(document: document.id, runsScripts: false))
+    }
+
     @Test func anyOtherItemKeepsItsTextWhateverIsAttached() {
         let note = library.add("A note\n")
         file("page.html", type: .html, attachedTo: note.id)

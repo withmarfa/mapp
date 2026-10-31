@@ -140,7 +140,7 @@ nonisolated enum PropertyNumber {
     /// field takes no decimal part, and neither takes an exponent.
     static func parse(_ text: String, integer: Bool, locale: Locale = .current) -> Decimal? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let separator = Character(locale.decimalSeparator ?? ".")
+        let separator = locale.decimalSeparator?.first ?? "."
         var digits = 0
         var sawSeparator = false
         var normalized = ""

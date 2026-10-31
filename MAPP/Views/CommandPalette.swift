@@ -296,29 +296,21 @@ struct CommandPalette: View {
 
         if let one, one.isWritable {
             if hasVisibleEditor {
-                add(editor.caret.sourceMode ? String(localized: "Show Formatted Text") : String(localized: "Show Markdown Source"), "doc.plaintext") {
-                    editor.setSourceMode(!editor.caret.sourceMode)
-                }
                 for format in [Format.title, .heading, .subheading, .body, .bold, .italic, .strikethrough, .code,
                                .codeBlock, .quote, .bulletList, .orderedList, .checklist, .table]
                 where format != .table || !editor.caret.inTable {
                     let shortcut = format.shortcut.map { Self.symbols($0.modifiers) + String($0.key).uppercased() }
                     add(String(localized: format.title), "textformat", shortcut) { editor.apply(format) }
                 }
-                add(String(localized: "Add Attachment…"), "paperclip", "⇧⌘A") { editor.isChoosingImages = true }
             }
         }
-        if !browser.selection.isEmpty {
-            add(String(localized: "Open in New Window"), "macwindow", "⌘O") {
-                ItemWindows.open(library.idsForWindows(browser.selection)) { openWindow(value: $0) }
+        // The same commands, titles and rules as the menu bar and the More menu (`ItemCommand`).
+        let itemContext = ItemCommandContext(library: library, ids: browser.selection, browser: browser, editor: editor)
+        for command in ItemCommand.allCases where command.isEnabled(in: itemContext) {
+            let shortcut = command.shortcut.map { Self.symbols($0.modifiers) + String($0.key.character).uppercased() }
+            add(String(localized: command.title(in: itemContext)), command.systemImage, shortcut) {
+                command.perform(in: itemContext, editor: editor) { openWindow(value: $0) }
             }
-        }
-        if browser.selection.count == 1, let original = browser.selectedItems(in: library).first.flatMap({ library.originalAddress(of: $0) }) {
-            add(String(localized: "Open Original"), "safari") { NSWorkspace.shared.open(original) }
-        }
-        if browser.selection.count == 1, let page = browser.selectedItems(in: library).first,
-           let target = library.browserTarget(of: page, fetchedFile: browser.fileURL(of: page.id)) {
-            add(String(localized: "Open in Browser"), "safari") { BrowserOpening.open(target, for: page) }
         }
         let single = browser.selection.count == 1 ? browser.selectedItems(in: library).first?.id : nil
         let share = NoteShare(note: one, fileURL: single.flatMap { browser.fileURL(of: $0) }, in: library)
@@ -390,10 +382,6 @@ struct CommandPalette: View {
             add(String(localized: "Standard Width"), "arrow.left.and.right") { fullWidth = false }
         } else {
             add(String(localized: "Full Width"), "arrow.left.and.right") { fullWidth = true }
-        }
-        if hasVisibleEditor {
-            add(String(localized: "Print…"), "printer", "⌘P") { editor.printNote() }
-            add(String(localized: "Export as PDF…"), "doc.richtext") { editor.exportPDF() }
         }
         let settingsTitle = String(localized: "Settings…")
         entries.append(Entry(id: "command:" + settingsTitle, title: settingsTitle, icon: .symbol("gearshape"), shortcut: "⌘,", takesFocus: true) {

@@ -38,6 +38,11 @@ struct TypeChangeSheet: View {
                                 values[field.key] = value
                                 return true
                             }, retainedDraft: draft(for: field.key), handsOffOnLeave: false)
+                            if field.kind == .number, isNotANumber(field) {
+                                Text(PropertyLoss.notANumber.reason)
+                                    .interfaceFont(.caption).foregroundStyle(.orange)
+                                    .accessibilityIdentifier("TypeChangeNotANumber.\(field.key)")
+                            }
                         }
                     }
                 }
@@ -104,6 +109,14 @@ struct TypeChangeSheet: View {
             filling[key] = value
         }
         return filling
+    }
+
+    /// Whether the number typed in `field` is text that is not a number, which keeps Change Type off.
+    private func isNotANumber(_ field: ItemTypeInfo.Field) -> Bool {
+        let draft = draft(for: field.key)
+        guard draft.isDirty else { return false }
+        let text = draft.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return !text.isEmpty && PropertyNumber.parse(text, integer: field.isInteger) == nil
     }
 
     private func canChange(_ preview: TypeChangePreview?) -> Bool {
