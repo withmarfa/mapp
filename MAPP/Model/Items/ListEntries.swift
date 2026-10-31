@@ -19,11 +19,15 @@ nonisolated struct NumberRule: Hashable, Sendable {
 
     /// Why `allows` refuses a number, in the words the person is told.
     var requirement: String? {
-        switch (minimum, maximum) {
-        case (let low?, let high?): String(localized: "Enter a number from \(PropertyNumber.editing(low)) to \(PropertyNumber.editing(high)).")
-        case (let low?, nil): String(localized: "Enter a number of \(PropertyNumber.editing(low)) or more.")
-        case (nil, let high?): String(localized: "Enter a number of \(PropertyNumber.editing(high)) or less.")
-        case (nil, nil): integer ? String(localized: "Enter a whole number.") : nil
+        switch (minimum, maximum, integer) {
+        case (let low?, let high?, false): String(localized: "Enter a number from \(PropertyNumber.editing(low)) to \(PropertyNumber.editing(high)).")
+        case (let low?, let high?, true): String(localized: "Enter a whole number from \(PropertyNumber.editing(low)) to \(PropertyNumber.editing(high)).")
+        case (let low?, nil, false): String(localized: "Enter a number of \(PropertyNumber.editing(low)) or more.")
+        case (let low?, nil, true): String(localized: "Enter a whole number of \(PropertyNumber.editing(low)) or more.")
+        case (nil, let high?, false): String(localized: "Enter a number of \(PropertyNumber.editing(high)) or less.")
+        case (nil, let high?, true): String(localized: "Enter a whole number of \(PropertyNumber.editing(high)) or less.")
+        case (nil, nil, true): String(localized: "Enter a whole number.")
+        case (nil, nil, false): nil
         }
     }
 }
