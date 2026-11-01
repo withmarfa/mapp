@@ -30,8 +30,6 @@ actor MarfaEngine {
         /// Closes, as `close` does, only if every write not sent, read from the queue in the same step, is one
         /// of those agreed to; nil agrees to whatever the copy holds.
         case closeAgreeing(UnsentWrites?, CheckedContinuation<CloseOutcome, Never>)
-        /// The server's bin as `MarfaSync` read it, which the copy never holds; `complete` where every page was read.
-        case binned([Marfa.Item], complete: Bool)
         /// The verdict on a write made at the server at once rather than queued, such as a purge.
         case answer(WriteID, WriteOutcome)
         /// Attaches a file, which the package queues as an upload, a file item and an edge.
@@ -112,11 +110,6 @@ actor MarfaEngine {
     var rows: [String: Marfa.Item] = [:]
     /// The views saved on the server, as the copy last held them.
     var views: [LibraryView] = []
-    /// Rows the server holds in its bin that the copy does not: Recently Deleted's items once their delete is
-    /// answered, which the copy lets go of. Read from the server, kept as it last said and as the copy last held.
-    var binned: [String: Marfa.Item] = [:]
-    /// Binned rows whose restore is queued: shown nowhere until the server answers, then in the copy or back in the bin.
-    var restoring: [String: Marfa.Item] = [:]
     /// What each item's text names, read by the package from the copy, for the items whose text can name anything.
     var bodyLinks: [String: BodyLinks] = [:]
     var edges = MarfaEdgeTable()
@@ -273,7 +266,6 @@ actor MarfaEngine {
         case .answers(let done):
             await takeAnswers()
             done.resume()
-        case .binned(let found, let complete): take(bin: found, complete: complete)
         case .answer(let write, let outcome): hub.publish(.answered(write, outcome))
         case .attach(let file, let item, let done): attach(file, to: item, answering: done)
         case .addFile(let file, let title, let tier, let parent, let done):

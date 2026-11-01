@@ -7,7 +7,6 @@ extension MarfaEngine {
     /// An item's text goes with it where the item is new, its version moved or its text changed, so a page never
     /// shows a version with older text. Failures gathered on the way follow as `.unavailable`.
     func publish(_ ids: some Sequence<ItemID>, catalogueChanged: Bool = false) {
-        hub.setBinned(binned)
         let copies = conflictedCopies()
         settleConflicts(copies)
         let ids = Set(ids).union(changedSync)
@@ -17,7 +16,7 @@ extension MarfaEngine {
         var present: [(id: ItemID, row: Marfa.Item)] = []
         let told = hub.told(ids)
         for id in ids {
-            guard let row = rows[id.rawValue] ?? binned[id.rawValue] else {
+            guard let row = rows[id.rawValue] else {
                 if told[id] != nil { changes.removed.append(id) }
                 continue
             }

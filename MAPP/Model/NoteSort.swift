@@ -23,7 +23,8 @@ nonisolated enum NoteSort: String, CaseIterable {
     func date(of item: Item) -> Date {
         switch self {
         case .dateCreated: item.created
-        case .dateEdited, .title: item.modified
+        case .dateEdited: item.trashed ?? item.modified
+        case .title: item.modified
         }
     }
 

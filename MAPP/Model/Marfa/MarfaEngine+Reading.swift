@@ -162,7 +162,6 @@ extension MarfaEngine {
         }
         let previousRows = self.rows
         let previousEdges = self.edges
-        let previousBinned = binned
         let previousLinks = bodyLinks
         let everything = !painted || catalogue != self.catalogue
         self.catalogue = catalogue
@@ -170,13 +169,8 @@ extension MarfaEngine {
         await sync.unreadable(Set(rows.values.filter { $0.unreadableProperties != nil }.map(\.id)))
         self.edges.removeAll()
         for edge in edges { self.edges.insert(edge) }
-        binned = binned.filter { rows[$0.key] == nil }
         let gone = Set(previousRows.keys).subtracting(rows.keys)
-        var binChanged = false
-        for id in gone {
-            if let row = previousRows[id], left(row) { binChanged = true }
-        }
-        if binChanged { await sync.binChanged() }
+        for id in gone { bodyLinks[id] = nil }
 
         // The rows whose item may map differently: changed, come or gone, at either end of an edge that changed,
         // or at the other end of an edge whose row came or went, since an edge shows only where both ends are held.
@@ -230,7 +224,6 @@ extension MarfaEngine {
         for (id, row) in rows where bodyLinks[id] != nil && !Self.mayName(row, catalogue: catalogue) { bodyLinks[id] = nil }
         linking.end(("read", linkReads), ("kept", bodyLinks.count))
         touched.formUnion(Set(previousLinks.keys).union(bodyLinks.keys).filter { previousLinks[$0] != bodyLinks[$0] })
-        touched.formUnion(Set(previousBinned.keys).union(binned.keys).filter { previousBinned[$0] != binned[$0] })
 
         let conflicts = Telemetry.begin(.engine, "reload.conflicts")
         await readConflictLinks(Set(rows.keys).union(linkedOriginals.keys))
@@ -242,7 +235,7 @@ extension MarfaEngine {
         await readViews()
         viewing.end()
         let publishing = Telemetry.begin(.engine, "reload.publish")
-        let ids = everything ? Set(rows.keys).union(gone).union(binned.keys) : touched
+        let ids = everything ? Set(rows.keys).union(gone) : touched
         published = ids.count
         publish(ids.map { ItemID($0) }, catalogueChanged: true)
         publishing.end(("ids", published))
@@ -279,17 +272,6 @@ extension MarfaEngine {
         if painted { hub.publish(.views(views)) }
     }
 
-    /// A row that left the copy: one in the bin went there with its delete answered, so Recently Deleted keeps it,
-    /// as the copy last held it, until the server's bin is read; any other was deleted elsewhere or fell out of the
-    /// slice, which may have put it in the bin, so the bin is read again: true where it should be. The caller
-    /// asks once for all the rows it read.
-    func left(_ row: Marfa.Item) -> Bool {
-        bodyLinks[row.id] = nil
-        guard restoring[row.id] == nil else { return false }
-        if row.state == .trashed { binned[row.id] = row }
-        return true
-    }
-
     /// Whether an item's text can hold a link or an embed: a `[[link]]` or an `![](embed)`. The package reads each
     /// body from the copy one at a time, so the items that cannot are not asked.
     static func mayName(_ row: Marfa.Item, catalogue: Catalogue) -> Bool {
@@ -301,20 +283,6 @@ extension MarfaEngine {
             previous = byte
         }
         return false
-    }
-
-    /// The server's bin, as the copy last said it: what it holds is the copy's to say, so only the rest is kept,
-    /// and a restore waiting for its answer keeps its row hidden.
-    func take(bin found: [Marfa.Item], complete: Bool) {
-        var next: [String: Marfa.Item] = complete ? [:] : binned
-        for row in found where rows[row.id] == nil && restoring[row.id] == nil && row.state == .trashed
-            && MarfaMapping.isLibraryItem(row) {
-            next[row.id] = row
-        }
-        let changed = Set(binned.keys).union(next.keys).filter { binned[$0] != next[$0] }
-        guard !changed.isEmpty else { return }
-        binned = next
-        publish(changed.map { ItemID($0) })
     }
 
     /// A queue that cannot be read leaves each item's sync as it was, rather than settling it.

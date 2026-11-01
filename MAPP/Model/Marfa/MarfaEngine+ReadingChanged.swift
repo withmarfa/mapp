@@ -69,7 +69,6 @@ extension MarfaEngine {
     ) async -> (affected: Set<String>, links: LinksRead) {
         var affected: Set<String> = []
         var viewsChanged = false
-        var binChanged = false
         var present: [Marfa.Item] = []
         var moved: Set<String> = []
         var came: Set<String> = []
@@ -118,13 +117,11 @@ extension MarfaEngine {
         var hosts = Self.hosts(of: moved, in: edges)
         for row in present {
             rows[row.id] = row
-            binned[row.id] = nil
             affected.insert(row.id)
         }
         for id in gone {
             affected.insert(id)
-            guard let previous = rows.removeValue(forKey: id) else { continue }
-            if left(previous) { binChanged = true }
+            if rows.removeValue(forKey: id) != nil { bodyLinks[id] = nil }
         }
         for id in named.edges + named.removedEdges {
             if let edge = edges.remove(id) { affected.formUnion([edge.sourceId, edge.targetId]) }
@@ -140,7 +137,6 @@ extension MarfaEngine {
         affected.formUnion(ends)
 
         await sync.unreadable(Set(present.filter { $0.unreadableProperties != nil }.map(\.id)))
-        if binChanged { await sync.binChanged() }
         let linking = linkers(of: moved, arrived: arrived, files: files, hosts: hosts).subtracting(present.map(\.id))
         let before = linking.reduce(into: [String: BodyLinks]()) { before, id in before[id] = bodyLinks[id] }
         let links = await readLinks(of: present + linking.compactMap { rows[$0] })
@@ -288,21 +284,13 @@ extension MarfaEngine {
             if isFile(previous) || isFile(row) { files = true }
         }
         var hosts = Self.hosts(of: moved, in: edges)
-        var binChanged = false
         for (row, id, _) in read {
-            let previous = rows[id]
             rows[id] = row
-            if row != nil {
-                binned[id] = nil
-            } else {
-                bodyLinks[id] = nil
-                if let previous, left(previous) { binChanged = true }
-            }
+            if row == nil { bodyLinks[id] = nil }
             for edgeID in edges.ids(touching: id) {
                 if let edge = remove(edgeID) { affected.formUnion([edge.sourceId, edge.targetId]) }
             }
         }
-        if binChanged { await sync.binChanged() }
         for (_, _, held) in read {
             for edge in held {
                 insert(edge)

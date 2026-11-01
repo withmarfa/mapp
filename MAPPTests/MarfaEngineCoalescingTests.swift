@@ -137,7 +137,6 @@ import Testing
         var copy: WorkingCopy { fake.copy }
         var wholeReads: Int { reads.wholeReads.withLock { $0 } }
         var rowReads: Int { reads.rowReads.withLock { $0 } }
-        var binReads: Int { get async { await source.engine.sync.hooks.binReads } }
         var shown: SourceSnapshot? { log.current.snapshot }
 
         /// Holds the engine in a reread of `id`, so everything heard until `letGo` is taken as one batch.
@@ -589,50 +588,6 @@ import Testing
         await step(.complete, listed: 4000)
         #expect(scene.source.syncReport.fill == LibraryFill(state: .complete, listed: 4000, expected: 4000))
         #expect(scene.wholeReads == filling + 1)
-        await scene.close()
-    }
-
-    // MARK: The bin
-
-    @Test func rowsDeletedElsewhereInSeparateBatchesReadTheBinOnceTheChangesPause() async throws {
-        let fake = Self.fake([Self.row("kept", title: "Kept")])
-        let doomed = try await Self.makeDoomed(5, in: fake)
-        let scene = try await Self.open(fake)
-        await scene.source.engineTook()
-        let quiet = Duration.milliseconds(500)
-        await scene.source.engine.sync.hooks.binWait.set(.init(quiet: quiet, longest: .seconds(30)))
-        let before = await scene.binReads
-
-        for id in doomed { try await scene.deleteElsewhere(id) }
-        try #require(try await eventuallyAsking { await scene.binReads > before }, "the bin was never read")
-        // Waits past another pause, to see that no deletion of the five reads the bin again.
-        try await Task.sleep(for: quiet * 2)
-        let read = await scene.binReads - before
-        #expect(read == 1, "five deletions read the bin \(read) times")
-        await scene.close()
-    }
-
-    @Test func aFloodOfDeletionsThatNeverPausesReadsTheBinWithinTheLongestWait() async throws {
-        let fake = Self.fake([Self.row("kept", title: "Kept")])
-        let doomed = try await Self.makeDoomed(400, in: fake)
-        let scene = try await Self.open(fake)
-        await scene.source.engineTook()
-        let quiet = Duration.milliseconds(400)
-        let longest = Duration.milliseconds(1500)
-        await scene.source.engine.sync.hooks.binWait.set(.init(quiet: quiet, longest: longest))
-        let before = await scene.binReads
-
-        // One deletion after another for twice the longest wait, so the changes never pause for `quiet`.
-        let start = ContinuousClock.now
-        var index = 0
-        while ContinuousClock.now - start < longest * 2 {
-            try #require(index < doomed.count, "\(index) deletions took less than \(longest * 2)")
-            try await scene.deleteElsewhere(doomed[index])
-            index += 1
-        }
-        let read = await scene.binReads - before
-        #expect(read >= 1, "a flood of \(index) deletions over \(ContinuousClock.now - start) never read the bin")
-        #expect(read <= 3, "a flood of \(index) deletions read the bin \(read) times")
         await scene.close()
     }
 

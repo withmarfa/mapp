@@ -298,44 +298,6 @@ extension LiveMarfaTests {
             }
         }
 
-        /// A copy that never held the item reads it from the server's bin, with its text, and restores it from there.
-        @Test(.timeLimit(.minutes(3)))
-        func aFreshCopyListsTheServersBinAndRestoresFromIt() async throws {
-            try await withLibrary { library, source, made in
-                let note = try #require(library.createItem(
-                    typeID: "core.note", title: "MAPPTEST fresh bin \(UUID().uuidString.prefix(8))", body: "In the bin.",
-                    parentID: nil, in: .allNotes, undoManager: nil))
-                made.add(note)
-                try #require(await eventually { library.item(note) != nil })
-                await source.flush()
-                library.delete([note], undoManager: nil)
-                await source.flush()
-                try #require(await eventually { library.item(note)?.state == .trashed })
-
-                let root = URL.temporaryDirectory.appending(path: "MarfaLibraryLiveTests-fresh-\(UUID().uuidString)", directoryHint: .isDirectory)
-                defer { try? FileManager.default.removeItem(at: root) }
-                let connection = try MarfaConnection(address: try LiveMarfa.address())
-                let second = try await MarfaSource.open(
-                    connection, keys: MemoryKeyStore([connection.address: try LiveMarfa.key()]),
-                    location: MarfaStoreLocation(root: root))
-                let fresh = MarfaLibrary(source: second, notices: Notices())
-                second.refresh()
-                try #require(await eventually {
-                    fresh.isLoaded && fresh.connection == .online && LiveMarfa.isWhole(fresh.syncReport)
-                })
-                try #require(await eventually { fresh.items(in: .recentlyDeleted).contains { $0.id == note } })
-                #expect(await eventually { fresh.body(of: note)?.text == "In the bin." })
-
-                // The copy never held the item, so it is restored once the server has taken it.
-                fresh.recover([note], undoManager: nil)
-                try #require(await eventually { fresh.item(note)?.state == .active })
-                #expect(!fresh.items(in: .recentlyDeleted).contains { $0.id == note })
-                #expect(fresh.notices.waiting.last == nil, "\(String(describing: fresh.notices.waiting.last))")
-                await second.flush()
-                await second.close()
-            }
-        }
-
         /// A link in the text is an edge the package writes as the text is saved, seen from both ends; an embedded
         /// file is attached by the package and shows its size once the server has stamped it.
         @Test(.timeLimit(.minutes(3)))

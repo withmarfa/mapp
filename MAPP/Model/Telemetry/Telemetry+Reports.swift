@@ -24,12 +24,6 @@ nonisolated extension Telemetry {
             during: operation)
     }
 
-    /// The server's bin could not be read for a reason the lane does not retry.
-    static func binUnreadable(_ error: MarfaError, reporting: Reporting = .shared) {
-        logger(.sync).error("sync could not read the bin")
-        reporting.sink.report(error, during: "bin")
-    }
-
     /// A server's copy could not be opened or read. `error` is nil where the source failed with its own words.
     static func libraryNotOpened(_ error: MarfaError?, reporting: Reporting = .shared) {
         logger(.library).error("the library's copy could not be opened or read")

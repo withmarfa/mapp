@@ -315,7 +315,7 @@ nonisolated enum MarfaMapping {
             id: ItemID(row.id), type: type, title: title, titleRule: titleRule, properties: properties,
             preview: damaged ? MarfaProblems.unreadableMessage : preview, content: content, state: state,
             tier: row.tier.map(tier) ?? .library, tags: Set(row.tags), version: ItemVersion(row.version),
-            created: created, modified: modified, trashed: state == .trashed ? modified : nil, edgesOut: edgesOut,
+            created: created, modified: modified, trashed: state == .trashed ? row.trashedDate : nil, edgesOut: edgesOut,
             sync: sync, problem: damaged ? ItemProblem(message: MarfaProblems.unreadableMessage, withholdsText: true) : nil, boundLinks: bound,
             boundEmbeds: embeds, source: row.source.isEmpty ? nil : row.source)
     }
