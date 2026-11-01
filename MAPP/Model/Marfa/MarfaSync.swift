@@ -133,7 +133,8 @@ actor MarfaSync {
     nonisolated let hooks = TestHooks()
     #endif
 
-    /// Returns once a drain begun after this call has ended, or at once when the source is closing.
+    /// Returns once a drain begun after this call has ended, which waits for a hydration of the app's under way, or
+    /// at once when the source is closing.
     func flush() async {
         guard !stopped else { return }
         await withCheckedContinuation { continuation in
@@ -289,10 +290,13 @@ actor MarfaSync {
 
     // MARK: Refreshing
 
+    /// Nothing is sent while the app's own hydration runs: the package reports following before that call returns,
+    /// and a drain then meets the copy changing under its pull (`streamIncomplete`, `local_copy_changed`) or not yet
+    /// whole (`hydrationIncomplete`). A drain asked meanwhile, and its flushers, wait for the hydration to end.
     private func work() {
         startFetch()
         startLane()
-        guard started, !stopped, working == nil, wantsDrain else { return }
+        guard started, !stopped, working == nil, wantsDrain, !hydrationUnderway else { return }
         working = Task { await self.loop() }
     }
 
@@ -319,6 +323,7 @@ actor MarfaSync {
             publishPhase()
         }
         lane = nil
+        work()
     }
 
     /// Catches the copy up, or hydrates it where it needs that or `hydrating` says the package asked for one, and
@@ -411,7 +416,7 @@ actor MarfaSync {
 
     private func loop() async {
         while !stopped, !Task.isCancelled {
-            if wantsDrain {
+            if wantsDrain, !hydrationUnderway {
                 wantsDrain = false
                 draining = flushers
                 flushers = []

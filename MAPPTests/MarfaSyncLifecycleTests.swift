@@ -158,6 +158,36 @@ struct MarfaSyncLifecycleTests {
         await source.close()
     }
 
+    /// The package reports following before the app's hydration call returns. A drain then would meet the copy
+    /// changing under its pull (`streamIncomplete`, `local_copy_changed`) or not yet whole (`hydrationIncomplete`),
+    /// shown as a stop or answered with a second hydration that empties the lists again, so it waits for the
+    /// hydration and a flush returns after it.
+    @Test func nothingIsSentWhileTheAppsHydrationIsUnderWay() async throws {
+        let refresh = ScriptedRefresh(status: ScriptedRefresh.complete(), holding: true)
+        let (fake, source, log) = try await scriptedSource(refreshing: refresh)
+        let sync = await source.engine.sync
+
+        fake.sendUpdate(update(.needsHydration(nil)))
+        try #require(await eventually { refresh.hydrations == 1 })
+        fake.sendUpdate(update(.following))
+        let flushed = TestTally(false)
+        let flush = Task {
+            await sync.flush()
+            flushed.update { $0 = true }
+        }
+        // Long enough for the following update to be taken and a drain to start, were one allowed.
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(sync.hooks.drains == 0)
+        #expect(!flushed.current)
+
+        refresh.letGo()
+        await flush.value
+        #expect(sync.hooks.drains >= 1)
+        #expect(refresh.hydrations == 1)
+        #expect(unavailable(log.current) == 0)
+        await source.close()
+    }
+
     /// A first fill that fails transiently shows the copy offline; when the package's wait ends it says the copy needs
     /// hydration again, which is a new turn, so the copy is hydrated again and is not shown following meanwhile.
     @Test func aFirstFillThatFailedTransientlyShowsOfflineAndHydratesAgainWhenAsked() async throws {
