@@ -3,13 +3,13 @@ import Marfa
 
 /// The calls that ask the Marfa server itself instead of the working copy: an item's snapshots (Version History),
 /// the server's own settings (This Marfa) and the owner's icon for a type. They need a connection, so they fail while
-/// the server cannot be reached. Every call goes through the package's `Server`, with the address and the key read
-/// from the key store on each call, so a key the person has since replaced is the one used. `Server` calls go over
+/// the server cannot be reached. Every call goes through the package's `Server`, with the address and the sign-in read
+/// from the Keychain on each call, so a sign-in the person has since made again is the one used. `Server` calls go over
 /// `URLSession`, so App Transport Security applies to a plain http address, unlike the copy, which goes through the
 /// package's core.
 nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, TypeIconSource {
     let connection: MarfaConnection
-    let keys: any KeyStore
+    let signIns: any SignIns
     /// How long a call waits for the server before it fails, so an unreachable server never leaves a page waiting.
     var timeout = Server.defaultTimeout
 
@@ -25,13 +25,13 @@ nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, Ty
         case failed(String)
     }
 
-    /// The server with the key kept for its address. A key the store cannot read is told as that, never as missing or
-    /// refused, and nothing is sent.
+    /// The server with the sign-in kept for its address. A sign-in the Keychain cannot give is told as that, never as
+    /// missing or ended, and nothing is sent.
     func server() throws(Ending) -> Server {
-        let stored: String?
-        do { stored = try keys.key(for: connection.address) } catch { throw .failed(Words.keyUnreadable) }
-        guard let key = stored, !key.isEmpty else { throw .keyRefused }
-        return connection.server(key: key)
+        let server: Server?
+        do { server = try signIns.server(for: connection) } catch { throw .failed(Words.signInUnreadable) }
+        guard let server else { throw .keyRefused }
+        return server
     }
 
     /// What the package's error stands for, by its own classes: away, a refused key, or what the server said.

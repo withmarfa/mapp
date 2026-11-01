@@ -9,25 +9,7 @@ extension LiveMarfaTests {
     @MainActor @Suite(.serialized)
     struct MarfaHostLiveTests {
         private func host(_ bench: HostBench) -> MarfaHost {
-            bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
-        }
-
-        /// A mistyped key never replaces the key that works.
-        @Test(.timeLimit(.minutes(2)))
-        func aWrongKeyGivenForAWorkingCopyKeepsTheOldKey() async throws {
-            let bench = try HostBench()
-            let host = host(bench)
-            let address = try LiveMarfa.address()
-            let key = try LiveMarfa.key()
-            try await host.connect(address: address, key: key)
-            #expect(await eventually { host.state == .online })
-            do {
-                try await host.replaceKey("mapptest-not-a-key-\(UUID().uuidString)")
-                Issue.record("took a key the server refuses")
-            } catch {}
-            #expect(try bench.keys.key(for: (try MarfaConnection(address: address)).address) == key)
-            #expect(await eventually { host.state == .online }, "\(host.state)")
-            try await discardEverything(host)
+            bench.host(opener: { try await MarfaSource.open($0, signIns: $1, location: $2) })
         }
 
         /// Writes made to an item another device purged meanwhile are refused by the server. Each refusal is a
@@ -48,10 +30,10 @@ extension LiveMarfaTests {
 
         private func refuseEditsToAPurgedItem(_ root: URL, _ made: LiveMarfa.Made) async throws {
             let connection = try MarfaConnection(address: try LiveMarfa.address())
-            let keys = MemoryKeyStore([connection.address: try LiveMarfa.key()])
+            let keys = MemorySignIns([connection.address: try LiveMarfa.key()])
             let location = MarfaStoreLocation(root: root)
             let id = made.mint()
-            let first = try await MarfaSource.open(connection, keys: keys, location: location)
+            let first = try await MarfaSource.open(connection, signIns: keys, location: location)
             let version = try await closing(first) {
                 let log = ChangeLog(first)
                 first.refresh()
@@ -68,7 +50,7 @@ extension LiveMarfaTests {
             // Another device bins and purges the item while this copy is closed.
             await LiveMarfa.purge([id])
 
-            let source = try await MarfaSource.open(connection, keys: keys, location: location)
+            let source = try await MarfaSource.open(connection, signIns: keys, location: location)
             try await closing(source) {
                 let log = ChangeLog(source)
                 _ = try #require(await log.wait { $0.snapshot?.items.contains { $0.id == id } == true })
@@ -110,7 +92,7 @@ extension LiveMarfaTests {
             let host = host(bench)
             try await host.connect(address: try LiveMarfa.address(), key: "mapptest-not-a-key-\(UUID().uuidString)")
             #expect(await eventually { host.state == .keyRefused }, "\(host.state)")
-            try await host.replaceKey(try LiveMarfa.key())
+            try await host.signInAgain(via: host.scripted(try LiveMarfa.key()))
             #expect(await eventually { host.state == .online }, "\(host.state)")
             try await discardEverything(host)
         }

@@ -33,12 +33,12 @@ nonisolated enum ItemHistoryFailure: Error, Hashable, Sendable {
     /// The server could not be reached. The package reports a refused plain-http address the same way as a network
     /// that is down, so the wording does not say which.
     case unreachable
-    /// The key MAPP uses may not read this item's history.
+    /// MAPP’s sign-in may not read this item's history.
     case notPermitted
-    /// The server holds no readable history for the item: it is deleted, of a type the key cannot read, or not sent
+    /// The server holds no readable history for the item: it is deleted, of a type the sign-in cannot read, or not sent
     /// to the server yet.
     case unavailable
-    /// The server did not accept the key.
+    /// The server has ended MAPP’s sign-in.
     case keyRefused
     /// This library keeps no history to read.
     case unsupported
@@ -49,11 +49,11 @@ nonisolated enum ItemHistoryFailure: Error, Hashable, Sendable {
         case .unreachable:
             String(localized: "MAPP can’t reach the server. Version history comes from the server. If its address starts with http://, macOS may be refusing it. Your notes and changes aren’t affected.")
         case .notPermitted:
-            String(localized: "The key MAPP uses isn’t allowed to read this item’s history. Ask whoever runs the server to allow it.")
+            String(localized: "MAPP’s sign-in isn’t allowed to read this item’s history. Ask whoever runs the server to allow it.")
         case .unavailable:
-            String(localized: "The server has no history to show for this item. It may be new and not sent yet, deleted, or of a kind your key can’t read.")
+            String(localized: "The server has no history to show for this item. It may be new and not sent yet, deleted, or of a kind MAPP isn’t approved to read.")
         case .keyRefused:
-            String(localized: "The server didn’t accept MAPP’s key. Choose a new key in Settings.")
+            String(localized: "The server has ended MAPP’s sign-in. Sign in again in Settings.")
         case .unsupported:
             String(localized: "This library doesn’t keep version history.")
         case .failed(let message):

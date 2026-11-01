@@ -35,7 +35,7 @@ struct MarfaDrainAnswersTests {
         let root = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
         let location = MarfaStoreLocation(root: root)
-        let source = try await MarfaSource.open(connection, keys: MemoryKeyStore([connection.address: "unused"]), location: location)
+        let source = try await MarfaSource.open(connection, signIns: MemorySignIns([connection.address: "unused"]), location: location)
         let log = ChangeLog(source)
         _ = try #require(await log.wait { $0.snapshot != nil })
         return (source, log, location.store(for: connection))

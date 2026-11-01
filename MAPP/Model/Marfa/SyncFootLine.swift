@@ -13,7 +13,7 @@ nonisolated struct SyncFootLine: Hashable, Sendable {
         case offline
         /// The server refused changes for good, which the person has to look at.
         case needsAttention
-        /// The key is refused or the copy cannot be used, so nothing syncs until the person acts.
+        /// The sign-in has ended or the copy cannot be used, so nothing syncs until the person acts.
         case failed
     }
 

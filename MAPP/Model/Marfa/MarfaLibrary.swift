@@ -416,10 +416,10 @@ import Observation
         case .views(let views):
             take(views)
         case .unavailable(let failure):
-            // The window keeps showing the library while its copy is open, so a refused key is told with the way
-            // to Settings, where the key is replaced or the library disconnected.
+            // The window keeps showing the library while its copy is open, so an ended sign-in is told with the way
+            // to Settings, where the person signs in again or disconnects the library.
             if failure.kind == .denied {
-                notices.tell(String(localized: "Marfa Server Doesn’t Accept Your Key"), failure.message, action: .openSettings(.library))
+                notices.tell(String(localized: "Signed Out of Your Marfa Server"), failure.message, action: .openSettings(.library))
             } else {
                 notices.tell(String(localized: "Can’t Read This Library"), failure.message)
             }

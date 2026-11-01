@@ -1,5 +1,4 @@
 import Foundation
-import Marfa
 import Testing
 @testable import MAPP
 
@@ -10,7 +9,9 @@ struct AppConfigurationTests {
         #expect(Bundle.main.bundleIdentifier == "com.withmarfa.mapp.debug")
     }
 
-    @Test func keysAreKeptUnderTheBundleIdentifier() {
-        #expect(KeychainKeyStore.defaultService == "com.withmarfa.mapp.debug.marfa-key")
+    @Test func signInsAreKeptAndReturnedUnderTheBundleIdentifier() {
+        let signIns = SystemSignIns(anchor: { nil })
+        #expect(signIns.service == "com.withmarfa.mapp.debug.marfa-sign-in")
+        #expect(signIns.scheme == "com.withmarfa.mapp.debug")
     }
 }

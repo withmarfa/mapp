@@ -32,8 +32,6 @@ actor MarfaSync {
     private let tell: @Sendable (MarfaEngine.Event) -> Bool
     private var started = false
     private var stopped = false
-    /// Set while the copy changes key, when every call on it is refused.
-    private var paused = false
     private var consuming: Task<Void, Never>?
     /// What the copy last said it was doing, so a change of it is told once.
     private var connection: CopyConnection?
@@ -157,43 +155,9 @@ actor MarfaSync {
         draining = []
     }
 
-    /// The person gives a new key in Settings; nothing is sent until then.
+    /// The person signs in again in Settings; nothing is sent until then.
     nonisolated static var keyRefused: String {
-        String(localized: "The Marfa server no longer accepts this library’s key. Enter a new key in Settings, or disconnect the library there and start again.")
-    }
-
-    /// What the server made of a key the copy was given.
-    nonisolated enum KeyCheck: Hashable, Sendable {
-        case accepted
-        case refused
-        /// The server could not be asked; the copy goes on with the key and asks again later.
-        case unanswered(String?)
-    }
-
-    /// Gives the copy `key` between server calls and refreshes with it at once, so the caller learns whether the
-    /// server takes it. Writes made meanwhile wait for the copy rather than fail. Writes a refused key parked
-    /// clear on their own at the next drain, which follows an accepted key, so nothing is released here.
-    func tryKey(_ key: String) async throws -> KeyCheck {
-        paused = true
-        lane?.cancel()
-        working?.cancel()
-        fetching?.cancel()
-        defer {
-            paused = false
-            work()
-        }
-        try await downloads.useKey(key)
-        do {
-            try await refreshNow()
-            wantsDrain = true
-            return .accepted
-        } catch let error as MarfaError where error.isKeyRefusal {
-            Self.log.error("sync stopped: the server refused the key")
-            return .refused
-        } catch {
-            failed(error)
-            return .unanswered((error as? MarfaError)?.message ?? error.localizedDescription)
-        }
+        String(localized: "The Marfa server no longer accepts this library’s sign-in. Sign in again in Settings, or disconnect the library there and start again.")
     }
 
     // MARK: Updates
@@ -272,7 +236,7 @@ actor MarfaSync {
         case .stopped(let error):
             if changed { stop(for: error) }
         case .keyRefused:
-            Self.log.error("sync stopped: the server refused the key")
+            Self.log.error("sync stopped: the server ended the sign-in")
             hub.set(.keyRefused)
             tellOnce(SourceFailure(kind: .denied, message: Self.keyRefused))
         }
@@ -327,17 +291,17 @@ actor MarfaSync {
     private func work() {
         startFetch()
         startLane()
-        guard started, !stopped, !paused, working == nil, wantsDrain else { return }
+        guard started, !stopped, working == nil, wantsDrain else { return }
         working = Task { await self.loop() }
     }
 
     private func startLane() {
-        guard started, !stopped, !paused, lane == nil, wantsRefresh || wantsHydration else { return }
+        guard started, !stopped, lane == nil, wantsRefresh || wantsHydration else { return }
         lane = Task { await self.laneLoop() }
     }
 
     private func laneLoop() async {
-        while !stopped, !paused, !Task.isCancelled, wantsRefresh || wantsHydration {
+        while !stopped, !Task.isCancelled, wantsRefresh || wantsHydration {
             let hydrating = wantsHydration
             wantsRefresh = false
             wantsHydration = false
@@ -413,12 +377,12 @@ actor MarfaSync {
     }
 
     private func startFetch() {
-        guard wantsFetch, fetching == nil, !stopped, !paused else { return }
+        guard wantsFetch, fetching == nil, !stopped else { return }
         fetching = Task { await self.fetchLoop() }
     }
 
     private func fetchLoop() async {
-        while wantsFetch, !stopped, !paused, !Task.isCancelled {
+        while wantsFetch, !stopped, !Task.isCancelled {
             wantsFetch = false
             do {
                 let report = try await refreshing.fetchKept()
@@ -441,7 +405,7 @@ actor MarfaSync {
     // MARK: Draining
 
     private func loop() async {
-        while !stopped, !paused, !Task.isCancelled {
+        while !stopped, !Task.isCancelled {
             if wantsDrain {
                 wantsDrain = false
                 draining = flushers
@@ -454,7 +418,7 @@ actor MarfaSync {
             }
         }
         working = nil
-        // A loop canceled for a change of key leaves what it was asked for to the next one.
+        // A loop canceled by a stop leaves what it was asked for to the next one.
         if Task.isCancelled { work() }
     }
 

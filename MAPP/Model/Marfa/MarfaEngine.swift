@@ -323,7 +323,7 @@ actor MarfaEngine {
         await copy.close()
     }
 
-    /// The package refuses every call while the copy changes its key (`keyChanging`) and asks for it again; that
+    /// The package refuses a call while the copy changes its key (`keyChanging`) and asks for it again; that
     /// is a wait, never a refusal or a failure to show.
     nonisolated static func asking<T>(_ work: () async throws -> T) async throws -> T {
         while true {

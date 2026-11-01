@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The Library page of Settings, as plain grouped rows: the server in use and how it stands, each change that needs
-/// the person, the key and the other server, the downloaded files.
+/// the person, the sign-in and the other server, the downloaded files.
 struct LibrarySettings: View {
     @Environment(Libraries.self) private var libraries
     @Environment(\.library) private var library
@@ -40,7 +40,7 @@ struct LibrarySettings: View {
         .confirmationDialog("Disconnect from this server?", isPresented: Bindable(libraries.marfaSettings).isConfirmingDisconnect) {
             Button("Disconnect", role: .destructive) { Task { await libraries.marfaSettings.disconnect() } }
         } message: {
-            Text("MAPP removes its copy of your library and the key from this Mac. Nothing on the server changes.")
+            Text("MAPP removes its copy of your library from this Mac and ends its sign-in, also on the server. Your items on the server don’t change.")
         }
     }
 }

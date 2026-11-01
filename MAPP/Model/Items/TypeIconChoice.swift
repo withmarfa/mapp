@@ -3,7 +3,7 @@ import Foundation
 /// Why the server did not take an icon for a type, in terms the picker can word for a person.
 nonisolated enum TypeIconFailure: Error, Hashable, Sendable {
     case unreachable
-    /// The key MAPP uses does not have `schema.write`, or no write on the type.
+    /// MAPP’s sign-in does not have `schema.write`, or no write on the type.
     case notPermitted
     case keyRefused
     /// The server refused the name or the type, with its own sentence.
@@ -17,9 +17,9 @@ nonisolated enum TypeIconFailure: Error, Hashable, Sendable {
         case .unreachable:
             String(localized: "MAPP can’t reach the server. Your icon choice needs the server, so try again once it’s back.")
         case .notPermitted:
-            String(localized: "This connection can’t change the icon of a type. Ask whoever runs the server to allow it, or use a key that can.")
+            String(localized: "This connection can’t change the icon of a type. Ask whoever runs the server to allow it, or sign in again and approve it.")
         case .keyRefused:
-            String(localized: "The server didn’t accept MAPP’s key. Choose a new key in Settings.")
+            String(localized: "The server has ended MAPP’s sign-in. Sign in again in Settings.")
         case .refused(let reason):
             reason
         case .unsupported:

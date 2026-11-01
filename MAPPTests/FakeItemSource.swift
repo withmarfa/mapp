@@ -253,7 +253,6 @@ nonisolated final class FakeItemSource: ItemSource {
 
     let refreshes = Mutex(0)
     func refresh() { refreshes.withLock { $0 += 1 } }
-    func tryKey(_ key: String) async throws -> MarfaSync.KeyCheck { .accepted }
     func unsentWrites() async -> UnsentWrites? { nil }
 
     func close(agreeing agreed: UnsentWrites?) async -> CloseOutcome {

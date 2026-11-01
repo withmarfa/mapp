@@ -64,10 +64,10 @@ struct SyncStatusTests {
         let status = SyncStatus(state: .keyRefused, report: report(waiting: 2, oldest: 60), now: now)
         let note = try #require(status.primary)
         #expect(note.kind == .keyRefused)
-        #expect(note.title == "Key refused")
+        #expect(note.title == "Signed out")
         #expect(note.detail.contains("Settings") && note.detail.contains("2 changes"))
         #expect(note.isWarning)
-        #expect(note.line == "Key refused, 2 changes waiting")
+        #expect(note.line == "Signed out, 2 changes waiting")
         #expect(!status.notes.contains { $0.kind == .sending }, "the server is not being asked, so nothing is being sent")
     }
 
@@ -139,7 +139,7 @@ struct ProblemWordingTests {
     @Test func aMissingPermissionSaysWhoToAsk() {
         let grant = SyncProblem.Grant(kind: .type, name: "core.task", level: .write)
         let wording = wording(entry(.refused, reason: SyncProblem(code: "forbidden", grant: grant)))
-        #expect(wording.explanation.hasPrefix("Your key doesn’t have permission for “core.task”. Ask whoever runs the server to allow it"))
+        #expect(wording.explanation.hasPrefix("MAPP doesn’t have permission for “core.task”. Ask whoever runs the server to allow it"))
     }
 
     @Test func anItemInTheServersBinSaysToRestoreItFirst() {
@@ -241,7 +241,7 @@ struct ConnectionStatusTests {
         #expect(ConnectionStatus(.online).title == "Connected")
         #expect(ConnectionStatus(.online).detail == nil)
         #expect(ConnectionStatus(.offline(reason: "network: refused")).title == "Offline")
-        #expect(ConnectionStatus(.keyRefused).title == "Key refused")
+        #expect(ConnectionStatus(.keyRefused).title == "Signed out")
         #expect(ConnectionStatus(.keyRefused).isProblem)
         #expect(ConnectionStatus(.unavailable(message: "The store is damaged.")).detail?.hasSuffix("The store is damaged.") == true)
     }
@@ -262,7 +262,7 @@ struct ConnectionStatusTests {
         #expect(inUse.title == "Library unavailable")
         #expect(inUse.isProblem)
 
-        for text in [some.detail, unknown, inUse.detail, Words.otherServer(unsent: 2), Words.otherServer(unsent: nil), Words.keyUnreadable].compactMap({ $0 }) {
+        for text in [some.detail, unknown, inUse.detail, Words.otherServer(unsent: 2), Words.otherServer(unsent: nil), Words.signInUnreadable].compactMap({ $0 }) {
             for raw in ["core", "schema", "hydrat", "queue", "drain", ".sqlite", "/"] {
                 #expect(!text.localizedCaseInsensitiveContains(raw), "“\(text)” says “\(raw)”")
             }

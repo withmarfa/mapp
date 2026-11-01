@@ -144,16 +144,16 @@ struct MarfaSyncFailureTests {
 
     @Test func aKeyTheKeychainWouldNotGiveIsNeitherMissingNorRefused() async throws {
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let keys = MemoryKeyStore([connection.address: "unused"])
-        keys.makeUnreadable(connection.address)
+        let keys = MemorySignIns([connection.address: "unused"])
+        keys.makeUnreadable(connection)
         let root = URL.temporaryDirectory.appending(path: "MarfaSyncFailureTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: root) }
         do {
-            _ = try await MarfaSource.open(connection, keys: keys, location: MarfaStoreLocation(root: root))
+            _ = try await MarfaSource.open(connection, signIns: keys, location: MarfaStoreLocation(root: root))
             Issue.record("opened a copy without its key")
         } catch let failure as SourceFailure {
             #expect(failure.kind == .failed)
-            #expect(failure.message == Words.keyUnreadable)
+            #expect(failure.message == Words.signInUnreadable)
         }
     }
 }

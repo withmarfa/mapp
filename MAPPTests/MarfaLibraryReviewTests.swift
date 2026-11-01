@@ -211,7 +211,6 @@ nonisolated final class FailingSearchSource: ItemSource {
     func queueSubmitted() async {}
     func close() async {}
     func refresh() {}
-    func tryKey(_ key: String) async throws -> MarfaSync.KeyCheck { .accepted }
     func unsentWrites() async -> UnsentWrites? { nil }
     func close(agreeing agreed: UnsentWrites?) async -> CloseOutcome { .closed }
 }
@@ -226,7 +225,7 @@ extension LiveMarfaTests {
             let made = LiveMarfa.Made()
             let connection = try MarfaConnection(address: try LiveMarfa.address())
             let source = try await MarfaSource.open(
-                connection, keys: MemoryKeyStore([connection.address: try LiveMarfa.key()]),
+                connection, signIns: MemorySignIns([connection.address: try LiveMarfa.key()]),
                 location: MarfaStoreLocation(root: root))
             let library = MarfaLibrary(source: source, notices: Notices())
             func end() async {

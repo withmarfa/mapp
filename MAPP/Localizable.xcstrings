@@ -10,10 +10,154 @@
     "%@ isn’t a valid value." : {
       "extractionState" : "manual"
     },
+    "Approve MAPP With This Code" : {
+      "extractionState" : "manual"
+    },
+    "Can’t Keep the Sign-In" : {
+      "extractionState" : "manual"
+    },
+    "Connect to a Marfa server to read and edit its items here. MAPP opens the server’s own page to sign in and never sees your password." : {
+      "extractionState" : "manual"
+    },
+    "Copy Code" : {
+      "extractionState" : "manual"
+    },
+    "Disconnected, but MAPP Is Still Approved" : {
+      "extractionState" : "manual"
+    },
+    "It will be sent once you sign in again. Do that in Settings." : {
+      "extractionState" : "manual"
+    },
     "MAPP can’t tell whether this copy holds changes that haven’t reached a server." : {
       "extractionState" : "manual"
     },
-    "MAPP couldn’t read this library’s key from the Keychain. Unlock the Keychain and quit and reopen MAPP, or enter the key again in Settings." : {
+    "MAPP couldn’t finish signing in. Check the address and your connection, then try again, or use a code if the browser won’t open." : {
+      "extractionState" : "manual"
+    },
+    "MAPP couldn’t read this library’s sign-in from the Keychain. Unlock the Keychain and quit and reopen MAPP, or sign in again in Settings." : {
+      "extractionState" : "manual"
+    },
+    "MAPP doesn’t have permission for “%@”. Ask whoever runs the server to allow it, then make the change again." : {
+      "extractionState" : "manual"
+    },
+    "MAPP forgot its sign-in on this Mac, but couldn’t reach the server to end it there. To end it, open Connected apps from Home on the server, choose MAPP and select Disconnect." : {
+      "extractionState" : "manual"
+    },
+    "MAPP isn’t signed in to this Marfa server." : {
+      "extractionState" : "manual"
+    },
+    "MAPP isn’t signed in to this server. Sign in again in Settings." : {
+      "extractionState" : "manual"
+    },
+    "MAPP isn’t signed in to this server. Sign in below." : {
+      "extractionState" : "manual"
+    },
+    "MAPP keeps its sign-in in your Keychain and renews it itself. Sign in again only to change the account or permissions." : {
+      "extractionState" : "manual"
+    },
+    "MAPP reads and writes your library on a Marfa server. Enter its address and sign in from Settings." : {
+      "extractionState" : "manual"
+    },
+    "MAPP removes its copy of your library from this Mac and ends its sign-in, also on the server. Your items on the server don’t change." : {
+      "extractionState" : "manual"
+    },
+    "MAPP Wasn’t Approved" : {
+      "extractionState" : "manual"
+    },
+    "MAPP’s sign-in can’t change views on your Marfa server." : {
+      "extractionState" : "manual"
+    },
+    "MAPP’s sign-in isn’t allowed to change this server’s settings. Ask whoever runs the server to allow it, or use the server’s console." : {
+      "extractionState" : "manual"
+    },
+    "MAPP’s sign-in isn’t allowed to read this item’s history. Ask whoever runs the server to allow it." : {
+      "extractionState" : "manual"
+    },
+    "Nothing changed." : {
+      "extractionState" : "manual"
+    },
+    "Open %@ on any device, sign in and type the code. It stops working at %@." : {
+      "extractionState" : "manual"
+    },
+    "Open Page" : {
+      "extractionState" : "manual"
+    },
+    "Sign In" : {
+      "extractionState" : "manual"
+    },
+    "Sign In Again" : {
+      "extractionState" : "manual"
+    },
+    "Sign In and Switch" : {
+      "extractionState" : "manual"
+    },
+    "Sign In First" : {
+      "extractionState" : "manual"
+    },
+    "Sign in to this server again to see them." : {
+      "extractionState" : "manual"
+    },
+    "Your Sign-In" : {
+      "extractionState" : "manual"
+    },
+    "Signed out" : {
+      "extractionState" : "manual"
+    },
+    "Signed Out of Your Marfa Server" : {
+      "extractionState" : "manual"
+    },
+    "Signed out, %lld changes waiting" : {
+      "extractionState" : "manual"
+    },
+    "The Code Expired" : {
+      "extractionState" : "manual"
+    },
+    "The code stopped working before it was approved. Ask for a new code and approve it sooner." : {
+      "extractionState" : "manual"
+    },
+    "Another copy of MAPP or another app is using the sign-in on this Mac, so nothing changed. Wait a moment, then try again." : {
+      "extractionState" : "manual"
+    },
+    "The Sign-In Is in Use" : {
+      "extractionState" : "manual"
+    },
+    "The Keychain wouldn’t keep or give the sign-in. Check that MAPP can use the Keychain, then try again." : {
+      "extractionState" : "manual"
+    },
+    "The Marfa server no longer accepts this library’s sign-in. Sign in again in Settings, or disconnect the library there and start again." : {
+      "extractionState" : "manual"
+    },
+    "The previous server’s sign-in is still in your Keychain, and its copy is still on this Mac. Remove the sign-in in Keychain Access. MAPP removes the copy before it connects to that server again." : {
+      "extractionState" : "manual"
+    },
+    "The previous server’s sign-in is still in your Keychain. Remove it in Keychain Access." : {
+      "extractionState" : "manual"
+    },
+    "The server has ended MAPP’s sign-in. Sign in again below." : {
+      "extractionState" : "manual"
+    },
+    "The server has ended MAPP’s sign-in. Sign in again in Library." : {
+      "extractionState" : "manual"
+    },
+    "The server has ended MAPP’s sign-in. Sign in again in Settings." : {
+      "extractionState" : "manual"
+    },
+    "The server has ended MAPP’s sign-in. Sign in again, or disconnect to start again. Changes not yet sent stay on this Mac until you are signed in or choose what to do with them." : {
+      "extractionState" : "manual"
+    },
+    "The server has no history to show for this item. It may be new and not sent yet, deleted, or of a kind MAPP isn’t approved to read." : {
+      "extractionState" : "manual"
+    },
+    "The Server Refused the Sign-In" : {
+      "extractionState" : "manual"
+    },
+    "The server was told not to approve MAPP, so nothing changed. Sign in again to try again." : {
+      "extractionState" : "manual"
+    },
+    "The sign-in is still in your Keychain, and the copy is still on this Mac. Remove the sign-in in Keychain Access. MAPP removes the copy before it connects to that server again." : {
+      "extractionState" : "manual"
+    },
+    "The sign-in is still in your Keychain. Remove it in Keychain Access." : {
       "extractionState" : "manual"
     },
     "This address now reaches a different Marfa server from the one this copy of your library was made for, so MAPP has stopped syncing it." : {
@@ -22,7 +166,19 @@
     "This change was made for a library the server no longer holds as it was. Try again to send it to the library as it is now, or undo it to put the item back as the server has it." : {
       "extractionState" : "manual"
     },
+    "This connection can’t change the icon of a type. Ask whoever runs the server to allow it, or sign in again and approve it." : {
+      "extractionState" : "manual"
+    },
     "To start a new copy from this server, choose Disconnect in Settings, then connect again." : {
+      "extractionState" : "manual"
+    },
+    "Use a Code Instead…" : {
+      "extractionState" : "manual"
+    },
+    "You are signed in again, but the copy of your library on this Mac can’t be opened." : {
+      "extractionState" : "manual"
+    },
+    "Your sign-in is sent to %@ without encryption, so anyone on the network can read it. Use an https address unless this network is private." : {
       "extractionState" : "manual"
     },
     "“%@” isn’t part of this list. Remove it to save the list." : {
@@ -448,8 +604,6 @@
 "Remove control and text-direction characters." : { "extractionState" : "manual" },
 "Can’t be shorter than “%@”." : { "extractionState" : "manual" },
 "MAPP can’t reach the server. If its address starts with http://, macOS may be refusing it. Your notes and changes aren’t affected." : { "extractionState" : "manual" },
-"The key MAPP uses isn’t allowed to change this server’s settings. Ask whoever runs the server to allow it, or use the server’s console." : { "extractionState" : "manual" },
-"The server didn’t accept MAPP’s key. Choose a new key in Library." : { "extractionState" : "manual" },
 "Marfa (default)" : { "extractionState" : "manual" },
 "default, %lld" : { "extractionState" : "manual" },
 "no limit" : { "extractionState" : "manual" },
@@ -509,9 +663,6 @@
 "This item can’t be changed right now." : { "extractionState" : "manual" },
 "“%@” has changed since, so that can’t be put back here. Earlier versions are in Version History." : { "extractionState" : "manual" },
 "MAPP can’t reach the server. Version history comes from the server. If its address starts with http://, macOS may be refusing it. Your notes and changes aren’t affected." : { "extractionState" : "manual" },
-"The key MAPP uses isn’t allowed to read this item’s history. Ask whoever runs the server to allow it." : { "extractionState" : "manual" },
-"The server has no history to show for this item. It may be new and not sent yet, deleted, or of a kind your key can’t read." : { "extractionState" : "manual" },
-"The server didn’t accept MAPP’s key. Choose a new key in Settings." : { "extractionState" : "manual" },
 "This library doesn’t keep version history." : { "extractionState" : "manual" },
 "Can’t Show This Page" : { "extractionState" : "manual" },
 "Choose an Icon" : { "extractionState" : "manual" },
@@ -520,7 +671,6 @@
 "Search Icons" : { "extractionState" : "manual" },
 "Use Default" : { "extractionState" : "manual" },
 "MAPP can’t reach the server. Your icon choice needs the server, so try again once it’s back." : { "extractionState" : "manual" },
-"This connection can’t change the icon of a type. Ask whoever runs the server to allow it, or use a key that can." : { "extractionState" : "manual" },
 "This library doesn’t keep icon choices." : { "extractionState" : "manual" },
 "This item is in Recently Deleted. Recover it to restore a version." : { "extractionState" : "manual" },
 "A file’s versions can be read here, but not restored." : { "extractionState" : "manual" },
@@ -645,7 +795,6 @@
 "MAPP can’t reach your Marfa server, so nothing was saved. Try again when it’s back." : { "extractionState" : "manual" },
 "This view was changed elsewhere since this window read it, so nothing was saved. The window now shows the view as it is; make your changes again." : { "extractionState" : "manual" },
 "Your Marfa server no longer has this view." : { "extractionState" : "manual" },
-"The key MAPP uses can’t change views on your Marfa server." : { "extractionState" : "manual" },
     "%@ The change is also listed in Settings." : {
 
     },
@@ -702,9 +851,6 @@
     },
     "Compact Cards" : {
 
-    },
-    "Connect to this server again with its key to see them." : {
-      "extractionState" : "manual"
     },
     "Couldn’t Quit" : {
 
@@ -766,9 +912,6 @@
     "Show %lld Rows at a Time" : {
 
     },
-    "Key not accepted" : {
-
-    },
     "License" : {
 
     },
@@ -789,9 +932,6 @@
     },
     "MAPP kept the previous server’s copy, because it now holds a different number of changes than you saw." : {
       "extractionState" : "manual"
-    },
-    "New key" : {
-
     },
     "Open in Browser" : {
 
@@ -833,9 +973,6 @@
 
     },
     "The item goes back to how the server has it. What you wrote is copied to the clipboard, so you can paste it back." : {
-
-    },
-    "The server doesn’t accept your key. Enter a new one, or disconnect to start again. Changes not yet sent stay on this Mac until a key works or you choose what to do with them." : {
 
     },
     "To send any changes it holds, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. MAPP can’t remove a copy it can’t count, so when that build has sent everything, update MAPP, choose Disconnect, then Keep Copy and Disconnect, and move the copy’s folder to the Trash. After that, connect to the server again." : {
@@ -1291,9 +1428,6 @@
     "Can’t Change This Relationship" : {
       "extractionState" : "manual"
     },
-    "Can’t Check the Key" : {
-      "extractionState" : "manual"
-    },
     "Can’t Create Item" : {
       "extractionState" : "manual"
     },
@@ -1304,9 +1438,6 @@
       "extractionState" : "manual"
     },
     "Can’t Get This File" : {
-      "extractionState" : "manual"
-    },
-    "Can’t Keep the Key" : {
       "extractionState" : "manual"
     },
     "Can’t Open the Library" : {
@@ -1340,9 +1471,6 @@
       "extractionState" : "manual"
     },
     "Can’t Show This View" : {
-      "extractionState" : "manual"
-    },
-    "Can’t Use the New Key" : {
       "extractionState" : "manual"
     },
     "Cancel" : {
@@ -1433,9 +1561,6 @@
 
     },
     "Completed" : {
-      "extractionState" : "manual"
-    },
-    "Connect" : {
       "extractionState" : "manual"
     },
     "Connect to a server first." : {
@@ -1589,9 +1714,6 @@
 
     },
     "Ends" : {
-      "extractionState" : "manual"
-    },
-    "Enter a Key" : {
       "extractionState" : "manual"
     },
     "Expand" : {
@@ -1769,9 +1891,6 @@
     "It depends on an item that isn’t available any more. Undoing it puts the item back as the server has it." : {
       "extractionState" : "manual"
     },
-    "It will be sent once the server accepts a key. Enter a new one in Settings." : {
-      "extractionState" : "manual"
-    },
     "Italic" : {
 
     },
@@ -1810,31 +1929,6 @@
     },
     "Key" : {
       "extractionState" : "manual"
-    },
-    "Key refused" : {
-      "extractionState" : "manual"
-    },
-    "Key refused, %lld changes waiting" : {
-      "localizations" : {
-        "en" : {
-          "variations" : {
-            "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Key refused, %lld change waiting"
-                }
-              },
-              "other" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Key refused, %lld changes waiting"
-                }
-              }
-            }
-          }
-        }
-      }
     },
     "Kind" : {
       "extractionState" : "manual"
@@ -1905,9 +1999,6 @@
     "MAPP closed the library before it could keep your change. Make the change again." : {
       "extractionState" : "manual"
     },
-    "MAPP couldn’t ask the server about the key. Check the address and your connection, then try again. The key you had is kept." : {
-      "extractionState" : "manual"
-    },
     "MAPP couldn’t get the file from the server. Check your connection, then try again." : {
       "extractionState" : "manual"
     },
@@ -1915,18 +2006,6 @@
       "extractionState" : "manual"
     },
     "MAPP couldn’t keep some of your changes. Make them again." : {
-      "extractionState" : "manual"
-    },
-    "MAPP couldn’t try the new key, so your library opened again with the key you had. Try again." : {
-      "extractionState" : "manual"
-    },
-    "MAPP keeps the key in your Keychain and doesn’t show it again." : {
-      "extractionState" : "manual"
-    },
-    "MAPP kept the new key and opened your library again, but couldn’t check the key with the server." : {
-      "extractionState" : "manual"
-    },
-    "MAPP kept the new key, but the copy of your library on this Mac can’t be opened." : {
       "extractionState" : "manual"
     },
     "MAPP tried again and again, and the server never took it. Try again, or copy what you wrote first if you want to keep it." : {
@@ -2120,18 +2199,6 @@
     "Page Width" : {
 
     },
-    "Paste a new key" : {
-      "extractionState" : "manual"
-    },
-    "Paste its key" : {
-      "extractionState" : "manual"
-    },
-    "Paste the key for this server." : {
-      "extractionState" : "manual"
-    },
-    "Paste your key" : {
-      "extractionState" : "manual"
-    },
     "PDF" : {
       "extractionState" : "manual"
     },
@@ -2209,9 +2276,6 @@
     },
     "Rendering diagram…" : {
 
-    },
-    "Replace Key" : {
-      "extractionState" : "manual"
     },
     "Replace…" : {
 
@@ -2388,9 +2452,6 @@
     "Suggestions" : {
 
     },
-    "Switch Server" : {
-      "extractionState" : "manual"
-    },
     "Switched Servers, but Not Everything Was Removed" : {
       "extractionState" : "manual"
     },
@@ -2454,25 +2515,10 @@
     "The item's title and path cannot be represented as an unambiguous file link." : {
       "extractionState" : "manual"
     },
-    "The key is still in your Keychain, and the copy is still on this Mac. Remove the key in Keychain Access. MAPP removes the copy before it connects to that server again." : {
-      "extractionState" : "manual"
-    },
-    "The key is still in your Keychain. Remove it in Keychain Access." : {
-      "extractionState" : "manual"
-    },
-    "The Keychain wouldn’t take the key. Check that MAPP can use the Keychain, then try again." : {
-      "extractionState" : "manual"
-    },
     "The Marfa server can’t be reached. The items are still in Recently Deleted." : {
       "extractionState" : "manual"
     },
     "The Marfa server refused this change." : {
-      "extractionState" : "manual"
-    },
-    "The Marfa server no longer accepts this library’s key. Enter a new key in Settings, or disconnect the library there and start again." : {
-      "extractionState" : "manual"
-    },
-    "Marfa Server Doesn’t Accept Your Key" : {
       "extractionState" : "manual"
     },
     "Not Now" : {
@@ -2484,23 +2530,8 @@
     "The previous server’s copy is still on this Mac. MAPP removes it before it connects to that server again." : {
       "extractionState" : "manual"
     },
-    "The previous server’s key is still in your Keychain, and its copy is still on this Mac. Remove the key in Keychain Access. MAPP removes the copy before it connects to that server again." : {
-      "extractionState" : "manual"
-    },
-    "The previous server’s key is still in your Keychain. Remove it in Keychain Access." : {
-      "extractionState" : "manual"
-    },
     "The printable note could not finish loading." : {
 
-    },
-    "The server doesn’t accept that key. Check it and try again. The key you had is kept." : {
-      "extractionState" : "manual"
-    },
-    "The server doesn’t accept the key. Enter a new one below." : {
-      "extractionState" : "manual"
-    },
-    "The server doesn’t accept your key. Enter a new one in Settings." : {
-      "extractionState" : "manual"
     },
     "The server refused it: %@" : {
       "extractionState" : "manual"
@@ -2530,9 +2561,6 @@
       "extractionState" : "manual"
     },
     "The value does not match this property's type." : {
-      "extractionState" : "manual"
-    },
-    "There’s no key for this Marfa server." : {
       "extractionState" : "manual"
     },
     "They’re still in that copy. To send them, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent them, and you’ve resolved any it can’t send, update MAPP again." : {
@@ -2641,9 +2669,6 @@
     "Untitled" : {
 
     },
-    "Use New Key" : {
-      "extractionState" : "manual"
-    },
     "Use Selection for Find" : {
 
     },
@@ -2699,12 +2724,6 @@
       "extractionState" : "manual"
     },
     "Your changes were saved as a copy" : {
-      "extractionState" : "manual"
-    },
-    "Your key doesn’t have permission for “%@”. Ask whoever runs the server to allow it, then make the change again." : {
-      "extractionState" : "manual"
-    },
-    "Your key is sent to %@ without encryption, so anyone on the network can read it. Use an https address unless this network is private." : {
       "extractionState" : "manual"
     },
     "Z to A" : {
