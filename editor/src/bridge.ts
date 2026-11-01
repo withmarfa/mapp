@@ -60,7 +60,7 @@ export type EditorMessage =
 
 /** The authored spelling identifies the binding; decoded parts serve navigation and display. Forward `raw` unchanged
  *  through opening, resolution and cache identity: Marfa binds each spelling separately, including an alias that
- *  repeats the name and escaped separators. The page never guesses which note a name means. */
+ *  repeats the name and one with a backslash. The page never guesses which note a name means. */
 export interface LinkRef {
   raw: string
   target: string
