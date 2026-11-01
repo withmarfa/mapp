@@ -53,7 +53,7 @@ final class FakeItemLibrary: ItemLibrary {
         id: ItemID = .mint()
     ) -> Item {
         Item(
-            id: id, type: TypeID("core.note"), title: title, titleRule: .firstLine, state: state, tier: tier,
+            id: id, type: TypeID("core.note"), title: title, name: title.isEmpty ? nil : title, titleRule: .firstLine, state: state, tier: tier,
             tags: isFavorite ? [ItemTag.favorite] : [], version: ItemVersion(1), created: modified, modified: modified)
     }
 
@@ -141,7 +141,11 @@ final class FakeItemLibrary: ItemLibrary {
     func search(_ query: String, in scope: SearchScope) -> SearchResults {
         let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return .none }
-        let place = if case .place(let place) = scope { Set(items(in: place).map(\.id)) } else { nil as Set<ItemID>? }
+        let place: Set<ItemID>? = switch scope {
+        case .everywhere: nil
+        case .place(let place): Set(items(in: place).map(\.id))
+        case .typeWithSubtypes(let type): Set(items(inTypeAndSubtypes: type.rawValue).map(\.id))
+        }
         return SearchResults(items: items.filter {
             $0.state == .active && place?.contains($0.id) != false && ($0.title.localizedCaseInsensitiveContains(query)
                 || bodies[$0.id]?.localizedCaseInsensitiveContains(query) == true)

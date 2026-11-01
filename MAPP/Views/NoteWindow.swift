@@ -61,7 +61,7 @@ struct NoteWindow: View {
         Group {
             if let item, let editor {
                 NotePage(item: item, editor: editor, headerDrafts: details, backsToolbar: false)
-                    .navigationTitle(item.title)
+                    .navigationTitle(item.displayTitle)
                     .toolbar(removing: .title)
                     .focusedSceneValue(\.editor, editor)
                     .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: [item.id], undoManager: undoManager))
@@ -70,7 +70,7 @@ struct NoteWindow: View {
                     }
             } else if let item {
                 FileItemPage(item: item) { fileURL = $0 }
-                    .navigationTitle(item.title)
+                    .navigationTitle(item.displayTitle)
                     .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: [item.id], undoManager: undoManager))
                     .toolbar(id: "note") {
                         NoteToolbar(browser: nil, items: [item], editor: nil, details: details, fileURL: fileURL)

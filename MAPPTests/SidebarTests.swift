@@ -24,7 +24,7 @@ struct SidebarTests {
         let counts = library.itemTypeCounts
         // Note and Project hold two. Ticket and Album hold none themselves, the trashed note counts for nothing and
         // the file types are reached through All Items.
-        #expect(counts.map(\.label) == ["Note", "Project", "Bug", "Entity", "Task"])
+        #expect(counts.map(\.label) == ["Notes", "Projects", "Bugs", "Entities", "Tasks"])
         #expect(counts.map(\.count) == [2, 2, 1, 1, 1])
         // Each type answers the icon the catalogue gives it; Entity has none.
         #expect(counts.map(\.icon) == ["lucide:file-text", "lucide:folder", "lucide:bug", nil, "lucide:list-checks"])
@@ -44,7 +44,7 @@ struct SidebarTests {
     @Test func twoShownTypesWithOneLabelNameTheirParents() async throws {
         var catalogue = LibraryFixture.catalogue
         catalogue.itemTypes[TypeID("core.task")] = ItemTypeInfo(
-            id: TypeID("core.task"), label: "Task", fields: [], titleField: nil, bodyField: nil, parent: nil)
+            id: TypeID("core.task"), label: "Task", plural: "Tasks", fields: [], titleField: nil, bodyField: nil, parent: nil)
         let items = LibraryFixture.items + [
             LibraryFixture.item(ItemID("ct1"), TypeID("core.task"), "Core task", age: 20),
             LibraryFixture.item(ItemID("ct2"), TypeID("core.task"), "Another core task", age: 21),
@@ -52,14 +52,14 @@ struct SidebarTests {
         ]
         let library = try await marfaLibrary(items, catalogue: catalogue)
         let labels = Dictionary(uniqueKeysWithValues: library.itemTypeCounts.map { ($0.id.rawValue, $0.label) })
-        #expect(labels["aic.ticket.task"] == "Task (Ticket)")
-        // A type with no parent has nothing to add, and the rest keep their own labels.
-        #expect(labels["core.task"] == "Task")
-        #expect(labels["aic.ticket.bug"] == "Bug")
+        #expect(labels["aic.ticket.task"] == "Tasks (Tickets)")
+        // A type with no parent has nothing to add, and the rest keep their own plurals.
+        #expect(labels["core.task"] == "Tasks")
+        #expect(labels["aic.ticket.bug"] == "Bugs")
         #expect(library.itemTypeCounts.first?.id == TypeID("core.task"))
         // Nested under Ticket, the ticket's task needs no parent's name.
         let ticket = try #require(library.typeTree.first { $0.id == "aic.ticket" })
-        #expect(ticket.children.map(\.label) == ["Bug", "Task"])
+        #expect(ticket.children.map(\.label) == ["Bugs", "Tasks"])
     }
 
     // MARK: Nesting
@@ -171,6 +171,19 @@ struct SidebarTests {
         #expect(types.map(\.label) == ["Album", "Bug", "Entity", "Note", "Project", "Task", "Ticket"])
         #expect(types.first { $0.id == LibraryFixture.project }?.icon == "lucide:folder")
         #expect(types.first { $0.id == LibraryFixture.entity }?.icon == nil)
+    }
+
+    /// Quick Add and Change Type offer `creatableTypes`: a menu that picks one item's kind names the kind, "Task", where a list of them is "Tasks". Two kinds that share
+    /// a label are told apart by their parents' labels.
+    @Test func aKindToPickIsNamedInTheSingularEvenWhereItsListIsPlural() async throws {
+        var catalogue = LibraryFixture.catalogue
+        catalogue.itemTypes[TypeID("core.task")] = ItemTypeInfo(
+            id: TypeID("core.task"), label: "Task", plural: "Tasks", fields: [], titleField: nil, bodyField: nil, parent: nil)
+        let library = try await marfaLibrary(LibraryFixture.items, catalogue: catalogue)
+        let labels = Dictionary(uniqueKeysWithValues: library.creatableTypes.map { ($0.id.rawValue, $0.label) })
+        #expect(labels["aic.ticket.task"] == "Task (Ticket)")
+        #expect(labels["core.task"] == "Task")
+        #expect(labels["aic.ticket.bug"] == "Bug")
     }
 
     @Test func aLibraryShowsItsTypesWithoutFiles() async throws {

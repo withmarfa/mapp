@@ -21,7 +21,7 @@ nonisolated enum LibraryFixture {
     static let n1 = ItemID("n1"), n2 = ItemID("n2"), n3 = ItemID("n3"), en1 = ItemID("en1"), f1 = ItemID("f1")
 
     static func field(_ key: String, _ kind: ItemTypeInfo.Field.Kind, in type: TypeID = note) -> ItemTypeInfo.Field {
-        ItemTypeInfo.Field(key: key, label: MarfaMapping.label(forField: key), kind: kind, declaredBy: type)
+        ItemTypeInfo.Field(key: key, label: key, kind: kind, declaredBy: type)
     }
 
     static let ticketFields = [
@@ -32,21 +32,21 @@ nonisolated enum LibraryFixture {
     static let catalogue = Catalogue(
         itemTypes: [
             ItemTypeInfo(
-                id: note, label: "Note", fields: [field("title", .text), field("body", .text)], titleField: "title",
+                id: note, label: "Note", plural: "Notes", fields: [field("title", .text), field("body", .text)], titleField: "title",
                 bodyField: "body", parent: nil, icon: "lucide:file-text"),
-            ItemTypeInfo(id: ticket, label: "Ticket", fields: ticketFields, titleField: "title", bodyField: "body", parent: note, icon: "lucide:ticket"),
-            ItemTypeInfo(id: task, label: "Task", fields: ticketFields, titleField: "title", bodyField: "body", parent: ticket, icon: "lucide:list-checks"),
-            ItemTypeInfo(id: bug, label: "Bug", fields: ticketFields, titleField: "title", bodyField: "body", parent: ticket, icon: "lucide:bug"),
+            ItemTypeInfo(id: ticket, label: "Ticket", plural: "Tickets", fields: ticketFields, titleField: "title", bodyField: "body", parent: note, icon: "lucide:ticket"),
+            ItemTypeInfo(id: task, label: "Task", plural: "Tasks", fields: ticketFields, titleField: "title", bodyField: "body", parent: ticket, icon: "lucide:list-checks"),
+            ItemTypeInfo(id: bug, label: "Bug", plural: "Bugs", fields: ticketFields, titleField: "title", bodyField: "body", parent: ticket, icon: "lucide:bug"),
             ItemTypeInfo(
-                id: project, label: "Project", fields: [field("title", .text), field("body", .text)],
+                id: project, label: "Project", plural: "Projects", fields: [field("title", .text), field("body", .text)],
                 titleField: "title", bodyField: "body", parent: note, icon: "lucide:folder"),
             ItemTypeInfo(
-                id: entity, label: "Entity", fields: [field("name", .text, in: entity)], titleField: "name",
+                id: entity, label: "Entity", plural: "Entities", fields: [field("name", .text, in: entity)], titleField: "name",
                 bodyField: nil, parent: nil),
-            ItemTypeInfo(id: MarfaMapping.fileType, label: "File", fields: [], titleField: nil, bodyField: nil, parent: nil, icon: "lucide:file"),
-            ItemTypeInfo(id: image, label: "Image", fields: [], titleField: nil, bodyField: nil, parent: MarfaMapping.fileType, icon: "lucide:image"),
+            ItemTypeInfo(id: MarfaMapping.fileType, label: "File", plural: "Files", fields: [], titleField: nil, bodyField: nil, parent: nil, icon: "lucide:file"),
+            ItemTypeInfo(id: image, label: "Image", plural: "Images", fields: [], titleField: nil, bodyField: nil, parent: MarfaMapping.fileType, icon: "lucide:image"),
             ItemTypeInfo(
-                id: album, label: "Album", fields: [field("title", .text, in: album)], titleField: "title", bodyField: nil,
+                id: album, label: "Album", plural: "Albums", fields: [field("title", .text, in: album)], titleField: "title", bodyField: nil,
                 parent: nil, roles: ["container"]),
         ],
         edgeTypes: [
@@ -81,7 +81,7 @@ nonisolated enum LibraryFixture {
     ) -> Item {
         let date = Date(timeIntervalSince1970: 1_000_000 - Double(age))
         return Item(
-            id: id, type: type, title: title, titleRule: titleRule, properties: properties, content: content,
+            id: id, type: type, title: title, name: title.isEmpty ? nil : title, titleRule: titleRule, properties: properties, content: content,
             state: state, tier: tier, tags: tags, version: ItemVersion(1), created: date, modified: date,
             trashed: state == .trashed ? date : nil, edgesOut: edges)
     }
@@ -177,8 +177,8 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, _) = try await loaded()
         #expect(library.name(of: .inbox) == String(localized: "Inbox"))
         #expect(library.name(of: .allNotes) == String(localized: "Items"))
-        #expect(library.name(of: .itemType("aic.project")) == "Project")
-        #expect(library.name(of: .itemType("aic.ticket.bug")) == "Bug")
+        #expect(library.name(of: .itemType("aic.project")) == "Projects")
+        #expect(library.name(of: .itemType("aic.ticket.bug")) == "Bugs")
         #expect(library.name(of: .collection(F.p1)) == "Alpha")
         #expect(library.name(of: .favoriteItem(F.n1)) == "Plain note")
     }
@@ -224,9 +224,9 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(await eventually { library.body(of: F.p1)?.text == "Changed in place" })
     }
 
-    @Test func searchAsksTheCopyAndLeavesOutTheBin() async throws {
+    @Test func searchListsWhatTheCopyFound() async throws {
         let (library, source) = try await loaded()
-        source.hits.withLock { $0["body"] = [F.n1, F.n3, F.p1] }
+        source.hits.withLock { $0["body"] = [F.n1, F.p1] }
         #expect(library.search("  ", in: .everywhere).items.isEmpty)
         #expect(await eventually { library.search("body", in: .everywhere).items.map(\.id) == [F.n1, F.p1] })
         let searches = source.searches.withLock { $0 }
@@ -1318,7 +1318,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
     /// A list of entries refused before it was queued is in no queue either, so the text in its entries is given back.
     @Test func aListRefusedBeforeItWasQueuedGivesItsTextBack() async throws {
-        let shape = ListShape(members: [.init(key: "value", kind: .text(nil)), .init(key: "label", kind: .text(nil))])
+        let shape = ListShape(members: [.init(key: "value", label: "Value", kind: .text(nil)), .init(key: "label", label: "Label", kind: .text(nil))])
         let person = TypeID("t")
         let type = ItemTypeInfo(
             id: person, label: "T", fields: [LibraryFixture.field("title", .text, in: person), LibraryFixture.field("emails", .list(shape), in: person)],

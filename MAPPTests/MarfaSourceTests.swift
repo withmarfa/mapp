@@ -448,9 +448,9 @@ struct MarfaSourceOfflineTests {
     }
 
     /// The package takes properties as values: a text edit names the body alone, which the server merges, and a
-    /// property taken away is the item's whole properties without it. Both are read back from the queue.
+    /// property taken away is named alone in `clear_properties`. Both are read back from the queue.
     @Test
-    func aTextEditMergesTheBodyAndAPropertyTakenAwayReplacesTheWhole() async throws {
+    func aTextEditMergesTheBodyAndAPropertyTakenAwayIsNamedAlone() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
         let source = try await open(root)
@@ -471,11 +471,13 @@ struct MarfaSourceOfflineTests {
 
         source.submit(.editProperties(id, ["description": nil], base: version, undoing: nil), as: WriteID())
         _ = try #require(await log.wait { $0.item(titled: "MAPPTEST edits")?.sync == .waiting(writes: 3) })
-        let replace = try #require(try await source.copy.queue.all().last { $0.kind == .updateItem })
-        #expect(replace.body["properties_mode"]?.string == "replace")
-        let whole = try #require(replace.body["properties"]?.object)
-        #expect(whole["description"] == nil, "the property taken away is not in the whole")
-        #expect(whole["body"]?.string == "Second" && whole["title"]?.string == "MAPPTEST edits", "every other keeps its value")
+        let clearing = try #require(try await source.copy.queue.all().last { $0.kind == .updateItem })
+        #expect(clearing.body["properties_mode"] == nil, "nothing is replaced: the edit names only what it clears")
+        #expect(clearing.body["properties"]?.object?.isEmpty ?? true, "and sends no value it does not change")
+        #expect(clearing.body["clear_properties"]?.array?.compactMap(\.string) == ["description"])
+        let held = try #require(try await source.copy.items.get(id.rawValue))
+        #expect(held.properties["description"] == nil, "the property taken away is gone")
+        #expect(held.properties["body"]?.string == "Second" && held.properties["title"]?.string == "MAPPTEST edits", "every other keeps its value")
         await source.close()
     }
 
@@ -947,9 +949,7 @@ extension LiveMarfaTests {
 
                 var state = try await apply(.tag(item.id, ItemTag.favorite, on: true))
                 #expect(state.item(titled: title)?.isFavorite == true)
-                let favorites = ItemQuery(tags: [ItemTag.favorite])
                 let favorite = try #require(state.item(titled: title))
-                #expect(favorites.matches(favorite, catalogue: try #require(state.snapshot?.catalogue)))
 
                 state = try await apply(.editBody(item.id, "Edited by the MAPP tests.", base: favorite.version, merge: .ifUnchanged))
                 #expect(try await source.body(of: item.id).text == "Edited by the MAPP tests.")

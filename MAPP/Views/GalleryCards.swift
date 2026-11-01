@@ -1,4 +1,5 @@
 import AppKit
+import Marfa
 import MarfaIcons
 import SwiftUI
 import UniformTypeIdentifiers

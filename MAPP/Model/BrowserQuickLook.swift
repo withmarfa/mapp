@@ -59,14 +59,14 @@ extension Browser {
                     let fetched = try await library.fileURL(of: item.id)
                     guard isCurrent() else { return made.forEach { $0.remove() } }
                     guard let fetched else { continue }
-                    let copy = QuickLookFile.copy(of: fetched, titled: item.title, as: item.fileType ?? .data)
+                    let copy = QuickLookFile.copy(of: fetched, titled: item.displayTitle, as: item.fileType ?? .data)
                     show(copy?.url ?? fetched, staged: copy)
                 } catch {
                     guard isCurrent() else { return made.forEach { $0.remove() } }
                     failure = (error as? SourceFailure)?.message ?? error.localizedDescription
                 }
             } else if let body = library.body(of: item.id),
-                      let file = QuickLookFile.write(body.text, titled: item.title, as: .markdown) {
+                      let file = QuickLookFile.write(body.text, titled: item.displayTitle, as: .markdown) {
                 show(file.url, staged: file)
             }
         }

@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 
 /// One row of the property block an item's page draws under its title: the label and a value drawn by the
 /// kind of field it came from. The block is for reading at a glance; every value is edited in the inspector, except
@@ -83,10 +84,10 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         let status = type?.statusField
         for field in type?.fields ?? [] where !hidden.contains(field.key) {
             if field.key == status?.key {
-                if placement.showsOnPage(field.key) { rows.append(PropertyRow(id: field.key, label: field.displayLabel, value: .status)) }
+                if placement.showsOnPage(field.key) { rows.append(PropertyRow(id: field.key, label: field.label, value: .status)) }
                 if parent, placement.showsOnPage(parentField) { rows.append(parentRow(relationships, parentField)) }
             } else if placement.showsOnPage(field.key), let value = value(of: field, in: item) {
-                rows.append(PropertyRow(id: field.key, label: field.displayLabel, value: value, numberToCall: numberToCall(of: field, in: item)))
+                rows.append(PropertyRow(id: field.key, label: field.label, value: value, numberToCall: numberToCall(of: field, in: item)))
             }
         }
         if parent, placement.showsOnPage(parentField), !rows.contains(where: { $0.value == .parent }) {
@@ -99,7 +100,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
                 return Target(title: target.title, item: id, icon: icon(id))
             }
             if !targets.isEmpty {
-                rows.append(PropertyRow(id: relationship.field, label: ItemTypeInfo.Field.displayLabel(relationship.label), value: .items(targets)))
+                rows.append(PropertyRow(id: relationship.field, label: relationship.label, value: .items(targets)))
             }
         }
         if !tags.isEmpty, placement.showsOnPage(PagePlacement.tags) {
@@ -110,7 +111,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
 
     private static func parentRow(_ relationships: [ItemRelationship], _ field: String) -> PropertyRow {
         let label = relationships.first { $0.field == field }?.label ?? String(localized: "Parent")
-        return PropertyRow(id: field, label: ItemTypeInfo.Field.displayLabel(label), value: .parent)
+        return PropertyRow(id: field, label: label, value: .parent)
     }
 
     /// The number to call a list field's main entry holds, or nil.

@@ -64,7 +64,7 @@ extension MarfaEngine {
             remembered[item] = nil
         }
         await readQueue()
-        publish(entry.itemID.map { [$0] } ?? [])
+        await publish(entry.itemID.map { [$0] } ?? [])
         return .success(refusals[id] == nil)
     }
 
@@ -77,7 +77,7 @@ extension MarfaEngine {
             return .failure(Self.failure(error))
         }
         await readQueue()
-        publish(entry.itemID.map { [$0] } ?? [])
+        await publish(entry.itemID.map { [$0] } ?? [])
         if released { await sync.drain() }
         return .success(released)
     }

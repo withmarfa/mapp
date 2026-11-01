@@ -41,30 +41,14 @@ extension MarfaEngine {
         return properties
     }
 
-    /// A property is given a value or taken away. A merge keeps a property it names no value for, and a null clears
-    /// nothing, so taking one away replaces the item's properties with those it holds less that one.
-    /// A replacement is built from the row's own properties, so a row whose stored properties could not be read,
-    /// and so shows none, is never the base of one: it would clear everything the copy cannot show.
-    nonisolated static func propertyEdit(
-        _ changes: [String: PropertyValue?], of row: Marfa.Item?
-    ) throws -> (properties: JSONObject, replacing: Bool) {
-        func clears(_ value: PropertyValue?) -> Bool {
-            guard let value else { return true }
-            return value == .null
+    /// A property is given a value or taken away. The edit names what it gives and what it clears, so the server keeps
+    /// every property the edit does not name, including those the copy could not read.
+    nonisolated static func propertyEdit(_ changes: [String: PropertyValue?]) -> (properties: JSONObject, clearing: Set<String>) {
+        var given: [(String, JSONValue)] = []
+        var clearing = Set<String>()
+        for (key, value) in changes.sorted(by: { $0.key < $1.key }) {
+            if let value, value != .null { given.append((key, MarfaMapping.json(value))) } else { clearing.insert(key) }
         }
-        let given = changes.sorted { $0.key < $1.key }.compactMap { key, value -> (String, JSONValue)? in
-            guard let value, !clears(value) else { return nil }
-            return (key, MarfaMapping.json(value))
-        }
-        let cleared = changes.filter { clears($0.value) }.keys
-        guard !cleared.isEmpty else { return (JSONObject(given), false) }
-        guard let row else {
-            throw MarfaError.notFound(code: "item_not_found", message: String(localized: "This item isn’t in the library."))
-        }
-        guard row.unreadableProperties == nil else { throw Refused(problem: MarfaProblems.unreadable) }
-        var whole = row.properties
-        for key in cleared { whole.removeValue(forKey: key) }
-        for (key, value) in given { whole[key] = value }
-        return (whole, true)
+        return (JSONObject(given), clearing)
     }
 }

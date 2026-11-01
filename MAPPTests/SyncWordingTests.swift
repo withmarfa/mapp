@@ -149,7 +149,12 @@ struct ProblemWordingTests {
 
     @Test func eachFieldTheServerRefusedIsGivenItsReason() {
         let reason = SyncProblem(code: "validation_error", fields: ["status": "not one of open, closed", "due_at": "not a date"])
-        #expect(wording(entry(.refused, reason: reason)).details == ["Due at: not a date", "Status: not one of open, closed"])
+        var refused = entry(.refused, reason: reason)
+        refused.fieldLabels = ["due_at": "Due at", "status": "Status"]
+        #expect(wording(refused).details == ["Due at: not a date", "Status: not one of open, closed"])
+        // A field the type no longer holds is named by its key.
+        refused.fieldLabels = ["status": "Status"]
+        #expect(wording(refused).details == ["due_at: not a date", "Status: not one of open, closed"])
     }
 
     @Test func aRefusalWithNoReasonStillSaysSomething() {

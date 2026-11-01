@@ -64,7 +64,7 @@ nonisolated enum IndexRows {
             let members = membersOf(collection)
             let breakdown = breakdown(of: members, catalogue: catalogue)
             return IndexRow(
-                place: .collection(collection.id), title: collection.title,
+                place: .collection(collection.id), title: collection.displayTitle,
                 icon: .type(catalogue.icon(for: collection.type)),
                 secondary: catalogue.label(for: collection.type), types: summary(of: breakdown),
                 count: members.count, latest: members.map(\.modified).max(), breakdown: breakdown)

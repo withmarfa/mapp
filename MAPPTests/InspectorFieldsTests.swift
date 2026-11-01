@@ -260,18 +260,11 @@ struct InspectorFieldsTests {
         #expect(InspectorFields.hasValue(.number(0)))
     }
 
-    // MARK: Display labels
+    // MARK: Labels
 
-    @Test func aCatalogueLabelReadsInTitleCase() {
-        #expect(ItemTypeInfo.Field.displayLabel("Completed at") == "Completed At")
-        #expect(ItemTypeInfo.Field.displayLabel("Starts at") == "Starts At")
-        #expect(ItemTypeInfo.Field.displayLabel("Linked from") == "Linked From")
-        #expect(ItemTypeInfo.Field.displayLabel("URL") == "URL")
-        #expect(ItemTypeInfo.Field.displayLabel("Due") == "Due")
-        #expect(ItemTypeInfo.Field.displayLabel("") == "")
+    @Test func aTypeAuthorsLabelIsShownAsWritten() {
         let field = ItemTypeInfo.Field(key: "completed_at", label: "Completed at", kind: .date(includesTime: false), declaredBy: TypeID("aic.x"))
-        #expect(field.displayLabel == "Completed At")
-        #expect(field.label == "Completed at")
+        #expect(field.label == "Completed at", "the page does not set the author's words in title case")
     }
 
     @MainActor @Test func aTitleFromTheFirstLineHidesNothingElse() {

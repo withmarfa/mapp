@@ -100,7 +100,7 @@ extension MarfaLibrary {
     private func target(_ id: ItemID) -> ItemRelationshipTarget {
         guard let item = item(id) else { return ItemRelationshipTarget(title: "", itemID: id, resolution: .missing) }
         return ItemRelationshipTarget(
-            title: item.title, itemID: id, resolution: .resolved(id), isDeleted: item.state == .trashed)
+            title: item.name ?? "", itemID: id, resolution: .resolved(id), isDeleted: item.state == .trashed)
     }
 
     /// By title, and by ID among equal titles, so the same links come first each time a group is drawn.

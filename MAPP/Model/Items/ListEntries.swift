@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 
 /// What a number field takes: whole numbers or any, and within its declared bounds. Marfa refuses a value outside them
 /// (`types/range-refused`), so the app refuses it at input.
@@ -45,10 +46,11 @@ nonisolated struct ListShape: Hashable, Sendable {
         }
 
         let key: String
+        /// The core's name for the member.
+        let label: String
         let kind: Kind
         var required = false
         var id: String { key }
-        var label: String { ItemTypeInfo.Field.displayLabel(MarfaMapping.label(forField: key)) }
 
         /// Whether the value is a value of this member.
         func accepts(_ value: PropertyValue) -> Bool {

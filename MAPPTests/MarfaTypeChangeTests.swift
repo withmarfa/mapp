@@ -205,7 +205,7 @@ import Testing
             id: "n1", type: "core.note", properties: ["title": "Launch", "body": "Agenda\n\n- [ ] book a room", "status": "draft"],
             state: .active, tier: .library, version: 1, schemaVersion: 1, source: "test", sourceId: nil, occurredAt: stamp,
             createdAt: stamp, updatedAt: stamp, tags: [])
-        let fake = WorkingCopy.fake(items: [row], itemTypes: itemTypes)
+        let fake = WorkingCopy.fake(items: [row], itemTypes: itemTypes, displays: SampleLibrary.display)
         let read = MarfaRead(copy: fake.copy)
         let source = MarfaSource(copy: fake.copy, connection: SampleLibrary.connection, reading: read, refreshing: Whole(copy: fake.copy))
         source.events.yield(.paint)

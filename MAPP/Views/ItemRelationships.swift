@@ -24,11 +24,11 @@ struct ItemRelationshipGroup: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 4) {
-                InspectorSubheading(title: ItemTypeInfo.Field.displayLabel(relationship.label))
+                InspectorSubheading(title: relationship.label)
                 Spacer(minLength: 0)
                 if relationship.isEditable && relationship.allowsMultiple {
                     InspectorPlusButton(
-                        accessibilityLabel: "Add to \(ItemTypeInfo.Field.displayLabel(relationship.label))",
+                        accessibilityLabel: "Add to \(relationship.label)",
                         identifier: "RelationshipAddRow.\(relationship.field)", isRowHovered: hovering, action: onEdit)
                         .inspectorTrailingColumn()
                 }
@@ -238,7 +238,7 @@ struct ItemRelationshipPicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(LocalizedStringKey(ItemTypeInfo.Field.displayLabel(relationship.label))).interfaceFont(.title2.bold())
+            Text(LocalizedStringKey(relationship.label)).interfaceFont(.title2.bold())
             TextField("Search Items", text: $query)
                 .textFieldStyle(.roundedBorder)
                 .accessibilityIdentifier("RelationshipSearch")

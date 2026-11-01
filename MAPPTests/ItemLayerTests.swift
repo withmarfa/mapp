@@ -76,47 +76,6 @@ struct ItemLayerTests {
         #expect(Self.catalogue.edgeType(named: "about") == nil)
     }
 
-    // MARK: Queries
-
-    @Test func aTypeMatchesItsSubtypesUnlessAskedNotTo() {
-        var query = ItemQuery(types: [Self.person])
-        #expect(query.matches(Self.item(Self.person), catalogue: Self.catalogue))
-        #expect(query.matches(Self.item(Self.author), catalogue: Self.catalogue))
-        #expect(!query.matches(Self.item(Self.entity), catalogue: Self.catalogue))
-        #expect(!query.matches(Self.item(Self.note), catalogue: Self.catalogue))
-        query.includesSubtypes = false
-        #expect(query.matches(Self.item(Self.person), catalogue: Self.catalogue))
-        #expect(!query.matches(Self.item(Self.author), catalogue: Self.catalogue))
-    }
-
-    @Test func aQueryShowsActiveItemsUnlessItNamesOtherStates() {
-        let trashed = Self.item(state: .trashed)
-        #expect(ItemQuery().matches(Self.item(), catalogue: Self.catalogue))
-        #expect(!ItemQuery().matches(trashed, catalogue: Self.catalogue))
-        #expect(ItemQuery(states: [.trashed]).matches(trashed, catalogue: Self.catalogue))
-        #expect(ItemQuery(states: []).matches(Self.item(state: .archived), catalogue: Self.catalogue))
-    }
-
-    @Test func everyTagNamedMustBePresent() {
-        let query = ItemQuery(tags: [ItemTag.favorite, "work"])
-        #expect(query.matches(Self.item(tags: [ItemTag.favorite, "work", "extra"]), catalogue: Self.catalogue))
-        #expect(!query.matches(Self.item(tags: [ItemTag.favorite]), catalogue: Self.catalogue))
-    }
-
-    @Test func theInboxTakesFeedItems() {
-        let inbox = ItemQuery(tier: .feed)
-        #expect(inbox.matches(Self.item(tier: .feed), catalogue: Self.catalogue))
-        #expect(!inbox.matches(Self.item(), catalogue: Self.catalogue))
-    }
-
-    @Test func beneathTakesTheItemAndTheDescendantsGiven() {
-        let project = Self.item(), child = Self.item(), other = Self.item()
-        let query = ItemQuery(beneath: project.id)
-        #expect(query.matches(project, catalogue: Self.catalogue))
-        #expect(query.matches(child, catalogue: Self.catalogue, descendants: [child.id]))
-        #expect(!query.matches(other, catalogue: Self.catalogue, descendants: [child.id]))
-    }
-
     // MARK: Items and places
 
     @Test func aFavoriteIsAnItemTaggedFavorite() {

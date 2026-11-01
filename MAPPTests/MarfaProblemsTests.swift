@@ -118,9 +118,9 @@ struct MarfaProblemsTests {
         #expect(entry.change == .edit)
         #expect(entry.content.title == nil)
         #expect(entry.content.properties == [
-            SyncContent.Line(label: "Status", value: "open"), SyncContent.Line(label: "Due at", value: "2026-10-07")
+            SyncContent.Line(label: "Status", value: "open"), SyncContent.Line(label: "Due At", value: "2026-10-07")
         ])
-        #expect(entry.copyText == "Status: open\nDue at: 2026-10-07")
+        #expect(entry.copyText == "Status: open\nDue At: 2026-10-07")
     }
 
     @Test func titleAndBodyFollowTheType() {
@@ -129,7 +129,7 @@ struct MarfaProblemsTests {
             catalogue: Self.catalogue)
         #expect(entity.title == "Ada")
         #expect(entity.body == nil)
-        #expect(entity.properties == [SyncContent.Line(label: "Role", value: "Engineer")])
+        #expect(entity.properties == [SyncContent.Line(label: "role", value: "Engineer")])
         // A type with neither hint is read under the `title` it declares.
         let folder = MarfaProblems.content(
             of: ["properties": ["title": "Archive"]], type: TypeID("system.folder"), catalogue: Self.catalogue)
@@ -137,7 +137,7 @@ struct MarfaProblemsTests {
         let unknown = MarfaProblems.content(
             of: ["properties": ["title": "T", "body": "B", "flag": true, "count": 2, "list": ["a", "b"]]], type: nil,
             catalogue: Self.catalogue)
-        #expect(unknown.plainText == "T\n\nB\n\nCount: 2\nFlag: true\nList: a, b")
+        #expect(unknown.plainText == "T\n\nB\n\ncount: 2\nflag: true\nlist: a, b")
     }
 
     @Test func aTagWriteShowsItsTags() throws {

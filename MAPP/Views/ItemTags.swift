@@ -120,7 +120,7 @@ struct TagSheet: View {
 
     private var subtitle: String {
         if items.count == 1, let item = items.first {
-            String(localized: "Add a tag to “\(item.title)”.")
+            String(localized: "Add a tag to “\(item.displayTitle)”.")
         } else {
             String(localized: "Add a tag to \(items.count) items.")
         }

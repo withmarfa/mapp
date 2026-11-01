@@ -15,10 +15,6 @@ nonisolated enum MarfaProblems {
         String(localized: "This item couldn’t be read from the copy of the library on this Mac, so it can’t be shown or changed. MAPP reads it again from the server when it can. If it stays like this, disconnect the library in Settings and connect it again. The copy on the server isn’t affected.")
     }
 
-    static var unreadable: SyncProblem {
-        SyncProblem(code: "unreadable_properties", message: unreadableMessage)
-    }
-
     nonisolated struct ConflictedCopy: Hashable, Sendable {
         var row: Marfa.Item
         var original: ItemID?
@@ -170,10 +166,12 @@ nonisolated enum MarfaProblems {
         case nil, .accepted, .merged, .conflicted:
             return nil
         }
-        return SyncProblemEntry(
+        var entry = SyncProblemEntry(
             id: .write(write.id), itemID: write.itemId.map { ItemID($0) }, kind: kind, change: change(write.kind),
             reason: reason, content: content(of: body ?? write.body, type: type, catalogue: catalogue),
             actions: actions(for: kind), date: MarfaMapping.date(write.queuedAt))
+        entry.fieldLabels = fieldLabels(of: type, catalogue: catalogue)
+        return entry
     }
 
     static func entry(for copy: ConflictedCopy, catalogue: Catalogue) -> SyncProblemEntry {
@@ -219,6 +217,11 @@ nonisolated enum MarfaProblems {
         }
     }
 
+    static func fieldLabels(of type: TypeID?, catalogue: Catalogue) -> [String: String] {
+        let fields = type.flatMap { catalogue.itemTypes[$0] }?.fields ?? []
+        return Dictionary(fields.map { ($0.key, $0.label) }, uniquingKeysWith: { first, _ in first })
+    }
+
     /// The title and body by the type's fields, then every other value written, in the catalogue's order. A
     /// cleared value is not content.
     static func content(of body: JSONObject, type: TypeID?, catalogue: Catalogue) -> SyncContent {
@@ -239,7 +242,7 @@ nonisolated enum MarfaProblems {
             for: type ?? TypeID(""))
         content.properties = ordered.compactMap { property in
             guard let value = text(property.value) else { return nil }
-            let label = fields.first { $0.key == property.key }?.label ?? MarfaMapping.label(forField: property.key)
+            let label = fields.first { $0.key == property.key }?.label ?? property.key
             return SyncContent.Line(label: label, value: value)
         }
         if case .array(let tags) = body["tags"] { content.tags = tags.compactMap(\.string) }

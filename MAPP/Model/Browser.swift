@@ -289,11 +289,16 @@ final class Browser {
         focusRequest = .list
     }
 
-    var searchScope: SearchScope { searchesPlace && SearchScope.narrows(item) ? .place(item) : .everywhere }
+    func searchScope(in library: any ItemLibrary) -> SearchScope {
+        guard searchesPlace, SearchScope.narrows(item) else { return .everywhere }
+        // A type's place lists its subtypes' items too while it includes them, and the search follows the list.
+        if case .itemType(let type) = item, stacksSubtypes(in: library) { return .typeWithSubtypes(TypeID(type)) }
+        return .place(item)
+    }
 
     /// What the search finds, or nil while the window is not searching.
     func searchResults(in library: any ItemLibrary) -> SearchResults? {
-        isSearching ? library.search(searchText, in: searchScope) : nil
+        isSearching ? library.search(searchText, in: searchScope(in: library)) : nil
     }
 
     /// The items the list shows: the search results while searching, the sidebar item's items otherwise.

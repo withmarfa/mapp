@@ -92,7 +92,11 @@ nonisolated struct Item: Identifiable, Hashable, Sendable {
 
     let id: ItemID
     var type: TypeID
+    /// What MAPP edits and writes as the item's title; never shown as the item's name (`displayTitle`).
     var title: String
+    /// The name the core gives the item, by its type's display hints and fallback fields, or nil where the server
+    /// would say "Untitled". Only shown, never written.
+    var name: String? = nil
     var titleRule: TitleRule
     /// The catalogue's fields in its order, then the rest.
     var properties: [Property] = []
@@ -117,11 +121,12 @@ nonisolated struct Item: Identifiable, Hashable, Sendable {
 
     var isFavorite: Bool { tags.contains(ItemTag.favorite) }
 
-    /// The title as a person reads it: "Untitled" for an item with no title. Only shown, never written into the item.
-    var displayTitle: String { title.isEmpty ? String(localized: "Untitled") : title }
+    /// The name as a person reads it: the core's, or MAPP's own "Untitled" where the core gives none. Only shown,
+    /// never written into the item.
+    var displayTitle: String { name ?? String(localized: "Untitled") }
 
-    /// Whether the item has no title of its own, so its row can set the placeholder apart.
-    var isUntitled: Bool { title.isEmpty }
+    /// Whether the core names the item, so its row can set the placeholder apart.
+    var isUntitled: Bool { name == nil }
 
     func value(of key: String) -> PropertyValue? {
         properties.first { $0.key == key }?.value

@@ -1,4 +1,5 @@
 import Foundation
+import struct Marfa.ItemDate
 import Testing
 @testable import MAPP
 
@@ -30,7 +31,7 @@ struct ItemTimelineTests {
     private static func item(
         _ id: String, title: String? = nil, type: TypeID = event, date: PropertyValue? = nil
     ) -> Item {
-        Item(id: ItemID(id), type: type, title: title ?? id, titleRule: .property("title"),
+        Item(id: ItemID(id), type: type, title: title ?? id, name: title ?? id, titleRule: .property("title"),
              properties: date.map { [Property(key: "due_at", value: $0)] } ?? [],
              version: ItemVersion(1), created: .distantPast, modified: .distantPast)
     }

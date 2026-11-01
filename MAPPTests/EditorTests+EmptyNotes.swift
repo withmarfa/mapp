@@ -29,7 +29,7 @@ extension EditorTests {
         ]
         let fake = WorkingCopy.fake(
             items: [Self.row("kitchen", title: "Kitchen quotes", body: kitchen), Self.row("empty", title: "Plain check", body: nil)],
-            itemTypes: itemTypes)
+            itemTypes: itemTypes, displays: SampleLibrary.display)
         let source = MarfaSource(
             copy: fake.copy, connection: SampleLibrary.connection, reading: MarfaRead(copy: fake.copy), refreshing: Whole(copy: fake.copy))
         source.events.yield(.paint)

@@ -19,7 +19,7 @@ nonisolated enum BigLibrary {
     static let log = TypeID("aic.log"), note = TypeID("core.note"), project = TypeID("aic.project")
 
     private static func field(_ key: String, _ kind: ItemTypeInfo.Field.Kind, in type: TypeID) -> ItemTypeInfo.Field {
-        ItemTypeInfo.Field(key: key, label: MarfaMapping.label(forField: key), kind: kind, declaredBy: type)
+        ItemTypeInfo.Field(key: key, label: key, kind: kind, declaredBy: type)
     }
 
     /// A status field whose words sit in the groups their names suggest, the first being not started.

@@ -67,6 +67,8 @@ final class ListEditing {
     /// Typed text whose entry went from the list elsewhere, waiting to go back to the person. Observed, as `drafts`
     /// is, so a view that tells of unsaved work follows it.
     private var orphans: [String] = []
+    /// The core's names for the list's members, as the last draw saw them; a member not there is named by its key.
+    @ObservationIgnored private var labels: [String: String] = [:]
     /// The text typed into each member and not yet written.
     private var drafts: [Slot: ItemPropertyDraft] = [:]
     /// The entry each member's text began from, to tell whether the entry changed under it.
@@ -84,7 +86,8 @@ final class ListEditing {
     /// write of the item on its way (`ItemLibrary.isWritingProperties(of:)`), so a stored list that does not yet show
     /// the editor's last write is waited for while it is true and taken as a refusal once it is false, unless `marks`
     /// says the library took it.
-    func rows(of value: PropertyValue?, writing: Bool = false, marks: Marks = Marks()) -> [Row] {
+    func rows(of value: PropertyValue?, shape: ListShape? = nil, writing: Bool = false, marks: Marks = Marks()) -> [Row] {
+        if let shape { labels = Dictionary(shape.members.map { ($0.key, $0.label) }, uniquingKeysWith: { first, _ in first }) }
         self.writing = writing
         self.marks = marks
         sync(ListEntries.entries(of: value))
@@ -158,7 +161,7 @@ final class ListEditing {
         known = entries
         for slot in drafts.keys.sorted(by: { $0.member < $1.member }) where gone.contains(slot.entry) {
             if let draft = drafts[slot], draft.isDirty, draft.text != draft.base {
-                orphans.append("\(Self.label(of: slot.member)): \(draft.text)")
+                orphans.append("\(label(of: slot.member)): \(draft.text)")
             }
             drafts[slot] = nil
             entryBases[slot] = nil
@@ -206,12 +209,12 @@ final class ListEditing {
                     pendingID = id
                     pending = entry
                 } else {
-                    orphans.append(String(localized: "New entry: \(Self.text(of: entry))"))
+                    orphans.append(String(localized: "New entry: \(text(of: entry))"))
                 }
             case .text(let slot, let base, let text):
                 if let draft = drafts[slot], draft.isDirty { continue }
                 guard slot.entry == pendingID || ids.contains(slot.entry) else {
-                    orphans.append("\(Self.label(of: slot.member)): \(text)")
+                    orphans.append("\(label(of: slot.member)): \(text)")
                     continue
                 }
                 let draft = draft(slot)
@@ -226,18 +229,18 @@ final class ListEditing {
         }
         // Text typed into an entry that only a refused write held has no field to show it in.
         for slot in drafts.keys.sorted(by: { $0.member < $1.member }) where slot.entry != pendingID && !ids.contains(slot.entry) {
-            if let draft = drafts[slot], draft.isDirty, draft.text != draft.base { orphans.append("\(Self.label(of: slot.member)): \(draft.text)") }
+            if let draft = drafts[slot], draft.isDirty, draft.text != draft.base { orphans.append("\(label(of: slot.member)): \(draft.text)") }
             drafts[slot] = nil
             entryBases[slot] = nil
         }
         notice = String(localized: "The list could not be saved.")
     }
 
-    private static func label(of member: String) -> String {
-        ItemTypeInfo.Field.displayLabel(MarfaMapping.label(forField: member))
+    private func label(of member: String) -> String {
+        labels[member] ?? member
     }
 
-    private static func text(of entry: Entry) -> String {
+    private func text(of entry: Entry) -> String {
         entry.sorted { $0.key < $1.key }.map { "\(label(of: $0.key)): \(ListShape.editing($0.value))" }.joined(separator: ", ")
     }
 

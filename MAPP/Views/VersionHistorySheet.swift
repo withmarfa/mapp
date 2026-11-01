@@ -33,7 +33,7 @@ struct VersionHistorySheet: View {
 
     private var subtitle: String {
         if let item = library.item(request.item) {
-            String(localized: "Earlier versions of “\(item.title)”.")
+            String(localized: "Earlier versions of “\(item.displayTitle)”.")
         } else {
             String(localized: "This item is no longer in the library.")
         }

@@ -44,7 +44,7 @@ extension Browser {
             .init(item: .source($0.name), icon: .symbol("antenna.radiowaves.left.and.right"), title: $0.name)
         }
         places += library.collections.map {
-            .init(item: .collection($0.id), icon: .type(library.catalogue.icon(for: $0.type)), title: $0.title)
+            .init(item: .collection($0.id), icon: .type(library.catalogue.icon(for: $0.type)), title: $0.displayTitle)
         }
         // The types the sidebar shows, under the names it gives them.
         places += library.itemTypeCounts.map { .init(item: .itemType($0.id.rawValue), icon: .type($0.icon), title: $0.label) }

@@ -54,7 +54,7 @@ struct QuickAddPanel: View {
                         .accessibilityIdentifier("QuickAddFilesNotKept")
                 }
                 if let list = quickAdd.unfinishedLists.first {
-                    Text("\(list.displayLabel) has an entry that isn’t finished. Finish it, or cancel it, to add the item.")
+                    Text("\(list.label) has an entry that isn’t finished. Finish it, or cancel it, to add the item.")
                         .interfaceFont(.callout)
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("QuickAddListUnfinished")
@@ -372,7 +372,7 @@ struct QuickAddPanel: View {
         let isRemovable = QuickAdd.isRemovable(.field(field.key), typeID: typeID, in: library.catalogue)
         let hasValue = value.map { $0 != .null } ?? false
         let shownValue = value.flatMap { hasValue ? QuickAdd.valueText($0, in: field) : nil }
-        let name = field.displayLabel
+        let name = field.label
         let remove: () -> Void = {
             if editing == field.key { editing = nil }
             quickAdd.draft?.remove(.field(field.key), in: library.catalogue)
@@ -526,7 +526,7 @@ struct QuickAddPanel: View {
                         .accessibilityIdentifier("QuickAddMoreParent")
                 case .field(let key):
                     if let field = fields.first(where: { $0.key == key }) {
-                        Button(field.displayLabel) {
+                        Button(field.label) {
                             quickAdd.draft?.add(.field(key))
                             if field.kind.isList { _ = quickAdd.listDraft(for: key) }
                             open(key)

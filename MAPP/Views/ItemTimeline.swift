@@ -129,7 +129,7 @@ private struct ItemTimelineEntry: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(verbatim: row.item.title)
+            Text(verbatim: row.item.displayTitle)
                 .interfaceFont(.body)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .firstTextBaseline, spacing: 12) {

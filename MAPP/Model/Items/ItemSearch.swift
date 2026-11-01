@@ -1,7 +1,7 @@
 import Foundation
 
 /// The words around what a search found, as the copy cut them from one item. The copy marks each match, so the app
-/// never matches anything itself; it only reads the marks.
+/// never matches anything itself; it only keeps the runs to their lines and their reach.
 nonisolated struct SearchExcerpt: Hashable, Sendable {
     nonisolated struct Run: Hashable, Sendable {
         var text: String
@@ -23,81 +23,40 @@ nonisolated struct SearchExcerpt: Hashable, Sendable {
     /// Whether the excerpt was cut from this very state of `item`.
     func describes(_ item: Item) -> Bool { item.version == version && item.modified == modified }
 
-    /// Reads the copy's excerpt: HTML in which the text is escaped and each match sits in `<mark>` tags. Nil where
-    /// it holds no text.
-    init?(html: String, version: ItemVersion, modified: Date) {
+    /// Takes the runs the copy cut (`SearchHit.excerpt`), with each stretch of white space, a line break among
+    /// them, read as one space so an excerpt keeps to its lines, and no space at either end. Nil where they hold
+    /// no text.
+    init?(runs given: [Run], version: ItemVersion, modified: Date) {
         self.version = version
         self.modified = modified
         var runs: [Run] = []
-        var text = ""
-        var isMatch = false
-        // Runs of white space, a line break among them, read as one space, so an excerpt keeps to its lines.
+        // No space opens an excerpt.
         var endsInSpace = true
-
-        func flush() {
-            guard !text.isEmpty else { return }
-            if let last = runs.last, last.isMatch == isMatch {
+        for run in given {
+            var text = ""
+            for character in run.text {
+                if character.isWhitespace {
+                    guard !endsInSpace else { continue }
+                    text.append(" ")
+                    endsInSpace = true
+                } else {
+                    text.append(character)
+                    endsInSpace = false
+                }
+            }
+            guard !text.isEmpty else { continue }
+            if let last = runs.last, last.isMatch == run.isMatch {
                 runs[runs.count - 1].text += text
             } else {
-                runs.append(Run(text: text, isMatch: isMatch))
-            }
-            text = ""
-        }
-        func append(_ character: Character) {
-            if character.isWhitespace {
-                guard !endsInSpace else { return }
-                text.append(" ")
-                endsInSpace = true
-            } else {
-                text.append(character)
-                endsInSpace = false
+                runs.append(Run(text: text, isMatch: run.isMatch))
             }
         }
-
-        var index = html.startIndex
-        while index < html.endIndex {
-            let character = html[index]
-            if character == "<", let close = html[index...].firstIndex(of: ">") {
-                let name = html[html.index(after: index)..<close].trimmingCharacters(in: .whitespaces).lowercased()
-                if name == "mark" || name == "/mark" {
-                    flush()
-                    isMatch = name == "mark"
-                }
-                index = html.index(after: close)
-            } else if character == "&", let end = html[index...].prefix(12).firstIndex(of: ";"),
-                      let decoded = Self.entity(html[html.index(after: index)..<end]) {
-                decoded.forEach(append)
-                index = html.index(after: end)
-            } else {
-                append(character)
-                index = html.index(after: index)
-            }
-        }
-        flush()
-        // No space opens an excerpt, so only the end can hold one.
         if let last = runs.last, last.text.hasSuffix(" ") {
             runs[runs.count - 1].text.removeLast()
             if runs[runs.count - 1].text.isEmpty { runs.removeLast() }
         }
         guard !runs.isEmpty else { return nil }
         self.runs = Self.bounded(runs)
-    }
-
-    /// The escapes the copy writes, and any other numeric reference.
-    private static func entity(_ name: Substring) -> String? {
-        switch name {
-        case "amp": return "&"
-        case "lt": return "<"
-        case "gt": return ">"
-        case "quot": return "\""
-        case "apos": return "'"
-        default:
-            guard name.hasPrefix("#") else { return nil }
-            let digits = name.dropFirst()
-            let value = digits.hasPrefix("x") || digits.hasPrefix("X")
-                ? UInt32(digits.dropFirst(), radix: 16) : UInt32(digits)
-            return value.flatMap(Unicode.Scalar.init).map { String(Character($0)) }
-        }
     }
 
     /// Shortens what runs past `reach`, keeping the words nearest each match: the end of the text before the first
@@ -128,6 +87,8 @@ nonisolated enum SearchScope: Hashable, Sendable {
     case everywhere
     /// What the place lists, matched by the copy itself.
     case place(SidebarItem)
+    /// What a type's place lists while it includes its subtypes: the type's items and theirs.
+    case typeWithSubtypes(TypeID)
 
     /// Whether searching `place` alone finds anything different from searching everywhere: the places that stand
     /// for a query. Recents is a count of the latest edits, Recently Deleted is outside every search, the indexes
@@ -178,8 +139,6 @@ nonisolated struct SearchResults: Sendable {
     /// says nothing.
     var isPending = false
 
-    /// How many results the list shows where the copy found more than it listed, for the notice that says so. The
-    /// copy cuts its list before the items in the bin are dropped from it, so this counts what is shown, not the
-    /// most the copy lists.
+    /// How many results the list shows where the copy found more than it listed, for the notice that says so.
     var cappedCount: Int? { isCapped && !items.isEmpty ? items.count : nil }
 }

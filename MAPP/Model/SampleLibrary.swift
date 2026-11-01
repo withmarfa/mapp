@@ -36,11 +36,24 @@ nonisolated enum SampleLibrary {
         let fake = WorkingCopy.fake(
             items: given ?? items(now: now, tasksAndEvents: withCollections),
             edges: edges ?? (given == nil ? memberships(now: now) : []), itemTypes: itemTypes,
-            edgeTypes: edgeTypes, views: views)
+            edgeTypes: edgeTypes, views: views, displays: display)
         let server = SampleServer(copy: fake.copy)
-        let source = MarfaSource(copy: fake.copy, connection: connection, reading: server, refreshing: server)
+        let source = MarfaSource(
+            copy: fake.copy, connection: connection, reading: server, refreshing: server)
         source.events.yield(.paint)
         return source
+    }
+
+    /// What the fake copy answers `items.displays` with, shaped like the core's: the title, else the first line of the
+    /// body, as the name, and the body (at most 240 characters) as the preview. It strips no Markdown.
+    @Sendable nonisolated static func display(_ input: ItemDisplayInput) -> ItemDisplay {
+        let title = input.properties["title"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let body = input.properties["body"]?.string ?? ""
+        let firstLine = body.split(whereSeparator: \.isNewline)
+            .lazy.map { $0.trimmingCharacters(in: .whitespaces) }.first { !$0.isEmpty } ?? ""
+        let name = title.isEmpty ? firstLine : title
+        let preview = String(body.trimmingCharacters(in: .whitespacesAndNewlines).prefix(240))
+        return ItemDisplay(name: name.isEmpty ? nil : name, preview: preview.isEmpty ? nil : preview)
     }
 
     // MARK: Catalogue

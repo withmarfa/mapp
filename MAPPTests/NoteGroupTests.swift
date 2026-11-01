@@ -18,7 +18,7 @@ struct NoteGroupTests {
 
     func item(_ title: String, created: Date, modified: Date? = nil, isFavorite: Bool = false) -> Item {
         Item(
-            id: .mint(), type: TypeID("core.note"), title: title, titleRule: .firstLine,
+            id: .mint(), type: TypeID("core.note"), title: title, name: title, titleRule: .firstLine,
             tags: isFavorite ? [ItemTag.favorite] : [], version: ItemVersion(1), created: created, modified: modified ?? created)
     }
 

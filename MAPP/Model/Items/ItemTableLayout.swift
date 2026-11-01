@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 
 /// One row of the table: an item, with what its cells show that the item alone does not say.
 nonisolated struct ItemTableRow: Identifiable, Hashable, Sendable {
@@ -26,7 +27,7 @@ extension ItemTableRow {
                 item: item,
                 typeLabel: catalogue.label(for: item.type),
                 typeIcon: catalogue.icon(for: item.type),
-                parent: parent.map { Link(id: $0.id, title: $0.title, icon: catalogue.icon(for: $0.type)) })
+                parent: parent.map { Link(id: $0.id, title: $0.displayTitle, icon: catalogue.icon(for: $0.type)) })
         }
     }
 }
@@ -163,7 +164,7 @@ nonisolated extension ItemTableColumn {
 
     func sortValue(of row: ItemTableRow) -> ItemTableValue.Sort? {
         switch content {
-        case .title: return .text(row.item.title)
+        case .title: return .text(row.item.displayTitle)
         case .type: return .text(row.typeLabel)
         case .parent: return row.parent.map { .text($0.title) }
         case .created: return .date(row.item.created)
@@ -347,7 +348,7 @@ nonisolated enum ItemTableLayout {
     }
 
     private static func column(for field: ItemTypeInfo.Field, style: ItemTableColumn.Style, filled: Int, threshold: Int) -> ItemTableColumn {
-        var column = ItemTableColumn(id: "field." + field.key, label: field.displayLabel, content: .field(field), style: style)
+        var column = ItemTableColumn(id: "field." + field.key, label: field.label, content: .field(field), style: style)
         column.isShownByDefault = !quiet.contains(field.key) && filled >= threshold
         return column
     }
@@ -410,7 +411,7 @@ nonisolated enum ItemTableLayout {
         // date or works out a status's group. The row's place is the last tie-break, which keeps rows that compare
         // equal in the order given, as a stable sort does.
         let values = sort.map { comparator in rows.map { comparator.column.sortValue(of: $0) } }
-        let titles = rows.map(\.item.title)
+        let titles = rows.map(\.item.displayTitle)
         let order = rows.indices.sorted { a, b in
             for (position, comparator) in sort.enumerated() {
                 switch comparator.compareValues(values[position][a], values[position][b]) {

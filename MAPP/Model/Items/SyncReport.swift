@@ -79,6 +79,8 @@ nonisolated struct SyncProblemEntry: Identifiable, Hashable, Sendable {
     var date: Date?
     /// Writes refused only because this one was, which go when it is discarded.
     var dependents: [String] = []
+    /// The core's names for the fields of the item's type, for the parts of a refusal that name a field.
+    var fieldLabels: [String: String] = [:]
 
     var copyText: String { content.plainText }
 }

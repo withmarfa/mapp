@@ -31,7 +31,7 @@ struct MarfaViewsTests {
                 row("n2", "core.note", ["title": "Groceries", "body": "Planning dinner"]),
                 row("view-planning", "system.view", ["title": "Planning", "query": ["types": ["core.note"]]]),
             ],
-            itemTypes: SampleLibrary.itemTypes, edgeTypes: SampleLibrary.edgeTypes)
+            itemTypes: SampleLibrary.itemTypes, edgeTypes: SampleLibrary.edgeTypes, displays: SampleLibrary.display)
         let reading = ViewReads(read: MarfaRead(copy: fake.copy), views: views)
         let source = MarfaSource(copy: fake.copy, connection: SampleLibrary.connection, reading: reading, refreshing: reading)
         source.events.yield(.paint)

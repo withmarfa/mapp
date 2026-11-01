@@ -47,7 +47,7 @@ extension LiveMarfaTests {
             case .text: .string("MAPPTEST value")
             case .number: .number(field.minimum ?? 1)
             case .boolean: .bool(true)
-            case .date: .string(MAPP.ItemDate.day(Date()))
+            case .date: .string(Marfa.ItemDate.day(Date()))
             case .choice, .status: field.options.first.map(PropertyValue.string)
             case .other, .list: nil
             }

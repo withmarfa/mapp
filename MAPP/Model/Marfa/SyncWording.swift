@@ -267,7 +267,7 @@ nonisolated struct ProblemWording: Hashable, Sendable {
             } else {
                 explanation = String(localized: "The server refused it.")
             }
-            details = (reason?.fields ?? [:]).sorted { $0.key < $1.key }.map { "\(MarfaMapping.label(forField: $0.key)): \($0.value)" }
+            details = (reason?.fields ?? [:]).sorted { $0.key < $1.key }.map { "\(entry.fieldLabels[$0.key] ?? $0.key): \($0.value)" }
             if canCopyText { explanation += " " + String(localized: "To keep what you wrote, copy it before you discard this change.") }
         case .blocked(let reason):
             headline = Self.stoppedHeadline(name: name)

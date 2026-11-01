@@ -83,9 +83,9 @@ extension ItemLibrary {
     func dragReference(of id: ItemID) -> ItemReference {
         guard let item = item(id) else { return ItemReference(id: id) }
         if item.isFile {
-            return ItemReference(id: id, title: item.title, type: item.fileType ?? .data, content: .file { [self] in try await fileURL(of: id) })
+            return ItemReference(id: id, title: item.displayTitle, type: item.fileType ?? .data, content: .file { [self] in try await fileURL(of: id) })
         }
-        guard let body = body(of: id) else { return ItemReference(id: id, title: item.title) }
-        return ItemReference(id: id, title: item.title, type: .markdown, content: .text(body.text))
+        guard let body = body(of: id) else { return ItemReference(id: id, title: item.displayTitle) }
+        return ItemReference(id: id, title: item.displayTitle, type: .markdown, content: .text(body.text))
     }
 }

@@ -65,7 +65,7 @@ struct CustomizePageSheet: View {
         if !fields.isEmpty {
             Section("Properties") {
                 ForEach(fields, id: \.key) { field in
-                    row(field.key, title: field.displayLabel, of: item.type, placement: placement)
+                    row(field.key, title: field.label, of: item.type, placement: placement)
                 }
             }
         }
@@ -77,7 +77,7 @@ struct CustomizePageSheet: View {
         if !relationships.isEmpty {
             Section("Relationships") {
                 ForEach(relationships, id: \.field) { relationship in
-                    row(relationship.field, title: ItemTypeInfo.Field.displayLabel(relationship.label), of: item.type, placement: placement)
+                    row(relationship.field, title: relationship.label, of: item.type, placement: placement)
                 }
             }
         }

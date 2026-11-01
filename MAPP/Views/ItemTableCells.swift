@@ -1,4 +1,5 @@
 import AppKit
+import Marfa
 import MarfaIcons
 import SwiftUI
 
@@ -118,7 +119,7 @@ struct ItemTableCell: View {
         case .boolean:
             let isOn: Bool = if case .bool(let flag)? = row.item.value(of: field.key) { flag } else { false }
             if declares {
-                Toggle(field.displayLabel, isOn: Binding { isOn } set: { set(field, .bool($0)) })
+                Toggle(field.label, isOn: Binding { isOn } set: { set(field, .bool($0)) })
                     .toggleStyle(.checkbox)
                     .labelsHidden()
                     .disabled(!editable)
@@ -156,7 +157,7 @@ struct ItemTableCell: View {
     /// A value picked from the field's options, as the cell shows it, opening a menu of the others.
     private func picker(_ field: ItemTypeInfo.Field, current: String?) -> some View {
         Menu {
-            Picker(field.displayLabel, selection: Binding { current ?? "" } set: { set(field, $0.isEmpty ? nil : .string($0)) }) {
+            Picker(field.label, selection: Binding { current ?? "" } set: { set(field, $0.isEmpty ? nil : .string($0)) }) {
                 ForEach(field.options(including: current), id: \.self) { option in
                     ItemTableMenuLabel(column: column, value: option, title: ItemTypeInfo.Field.label(ofOption: option))
                         .tag(option)
@@ -184,7 +185,7 @@ struct ItemTableCell: View {
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
         .padding(.horizontal, -5)
-        .accessibilityLabel(Text(field.displayLabel))
+        .accessibilityLabel(Text(field.label))
         .accessibilityValue(Text(current.map(ItemTypeInfo.Field.label(ofOption:)) ?? String(localized: "Not Set")))
     }
 
