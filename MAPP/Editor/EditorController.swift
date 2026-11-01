@@ -644,9 +644,8 @@ final class EditorController: NSObject {
         case .headerMenu(let menu, let item, let rect, let viewportHeight):
             onHeaderEvent(.menu(menu, item, containerRect(rect, viewportHeight: viewportHeight)))
         case .openLink(let href):
-            if let url = URL(string: href), let scheme = url.scheme?.lowercased(), ["http", "https", "mailto", "tel"].contains(scheme) {
-                NSWorkspace.shared.open(url)
-            }
+            // The page has already refused what Inkkit's `canOpenLink` does not allow.
+            if let url = URL(string: href) { NSWorkspace.shared.open(url) }
         case .openItem(let id):
             onOpenNote(id)
         case .copy(let text):

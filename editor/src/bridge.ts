@@ -1,3 +1,4 @@
+import { canOpenLink } from '@aicayzer/inkkit'
 import type { CaretState, FindState } from './editor'
 import type { HeaderMenu } from './header'
 
@@ -123,6 +124,12 @@ export function postToHost(message: EditorMessage): void {
   const host = window.webkit?.messageHandlers?.host
   if (host) host.postMessage(message)
   else console.debug('host', message)
+}
+
+/** Asks the app to open a web, mail or phone address in the system's own app. Inkkit's `canOpenLink` decides what
+ *  may be opened, so any other address, such as a `file:` or `javascript:` one in a note, is dropped here. */
+export function openLink(href: string): void {
+  if (canOpenLink(href)) postToHost({ type: 'openLink', href })
 }
 
 /** Note names that answer what was typed after `[[`, in the order to show them. */

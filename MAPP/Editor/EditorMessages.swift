@@ -20,6 +20,9 @@ nonisolated struct CaretState: Equatable, Sendable {
     var block: Block = .paragraph
     /// One quote holds the whole selection; `block` is what sits inside it.
     var quoted = false
+    /// The address of the link under the caret, or of the first link in a selection; present exactly when `marks`
+    /// holds `.link`.
+    var href: String?
     var sourceMode = false
     var inTable = false
     var canUndo = false
@@ -82,6 +85,7 @@ nonisolated enum EditorMessage: Sendable {
                 marks: Set(marks),
                 block: block,
                 quoted: dict["quoted"] as? Bool ?? false,
+                href: dict["href"] as? String,
                 sourceMode: dict["sourceMode"] as? Bool ?? false,
                 inTable: dict["inTable"] as? Bool ?? false,
                 canUndo: dict["canUndo"] as? Bool ?? false,

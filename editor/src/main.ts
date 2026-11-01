@@ -1,4 +1,4 @@
-import { postToHost } from './bridge'
+import { openLink, postToHost } from './bridge'
 import {
   NoteEditor,
   guardedCommand,
@@ -8,10 +8,9 @@ import {
   type Keymap,
 } from './editor'
 import { ItemHeader, type HeaderIcons, type HeaderModel } from './header'
-import { InkKitError } from '@aicayzer/inkkit'
+import { InkKitError, normalizeLinkAddress } from '@aicayzer/inkkit'
 import '@aicayzer/inkkit/style.css'
 import './style.css'
-import { linkAddressAtSelection } from './linkAddress'
 
 declare global {
   interface Window {
@@ -26,7 +25,7 @@ declare global {
       focusText(prefix: string | null): void
       blurText(expected: number): void
       setHostActive(active: boolean): void
-      linkAddress(): string | null
+      normalizeLinkAddress(input: string): string | null
       setEditingMode(mode: 'source' | 'formatted', expected?: number): void
       undo(expected?: number): void
       redo(expected?: number): void
@@ -99,9 +98,7 @@ const editor = await NoteEditor.mount(
     stateChanged(state) {
       postToHost({ type: 'state', ...state })
     },
-    openLink(href) {
-      postToHost({ type: 'openLink', href })
-    },
+    openLink,
     copy(text) {
       postToHost({ type: 'copy', text })
     },
@@ -247,7 +244,7 @@ window.editor = {
   },
   focusTitle: (item) => header.focusTitle(item),
   setHostActive: (active) => editor.setHostActive(active),
-  linkAddress: () => linkAddressAtSelection(root),
+  normalizeLinkAddress: (input) => normalizeLinkAddress(input) ?? null,
   focusText: (prefix) => {
     header.cancelTitleFocus()
     guardedCommand(() => editor.focusText(prefix))

@@ -48,9 +48,9 @@ extension EditorTests {
         let request = try #require(page.editor.webLinkRequest)
         #expect(!request.removable)
         #expect(request.address.isEmpty)
-        #expect(!page.editor.finishWebLink("not an address"), "an address Inkkit would refuse keeps the request open")
+        #expect(await !page.editor.setWebLink("not an address"), "an address Inkkit would refuse keeps the request open")
         #expect(page.editor.webLinkRequest != nil)
-        #expect(page.editor.finishWebLink("example.com/docs"))
+        #expect(await page.editor.setWebLink("example.com/docs"))
         #expect(page.editor.webLinkRequest == nil)
         try await page.wait { page.changes.last == "Read the [docs](https://example.com/docs)\n" }
     }
@@ -65,7 +65,7 @@ extension EditorTests {
         let request = try #require(page.editor.webLinkRequest)
         #expect(request.removable)
         #expect(request.address == "https://example.com", "the sheet starts from the link's own address")
-        #expect(page.editor.finishWebLink(nil))
+        page.editor.removeWebLink()
         try await page.wait { page.changes.last == "Read the docs\n" }
     }
 
@@ -76,7 +76,7 @@ extension EditorTests {
         try await page.wait { Format.link.isActive(in: page.editor.caret) }
         page.editor.format(.link)
         try await page.wait { page.editor.webLinkRequest != nil }
-        #expect(page.editor.finishWebLink("example.org:8080/docs"))
+        #expect(await page.editor.setWebLink("example.org:8080/docs"))
         try await page.wait { page.changes.last == "Read the [docs](https://example.org:8080/docs)\n" }
     }
 
@@ -89,30 +89,5 @@ extension EditorTests {
         page.editor.cancelWebLink()
         #expect(page.editor.webLinkRequest == nil)
         #expect(page.changes.isEmpty)
-    }
-}
-
-struct WebLinkAddressTests {
-    @Test(arguments: [
-        ("https://example.com/a?b=1", "https://example.com/a?b=1"),
-        ("http://example.com", "http://example.com"),
-        ("  example.com  ", "https://example.com"),
-        ("www.example.com/path", "https://www.example.com/path"),
-        ("me@example.com", "mailto:me@example.com"),
-        ("mailto:me@example.com", "mailto:me@example.com"),
-        ("tel:+441234567890", "tel:+441234567890"),
-        ("example.com:8080", "https://example.com:8080"),
-        ("localhost:3000/a", "https://localhost:3000/a"),
-        ("HTTPS://Example.com/Path", "https://Example.com/Path"),
-        ("MAILTO:me@example.com", "mailto:me@example.com"),
-        ("Tel:+441234567890", "tel:+441234567890"),
-    ])
-    func anAddressIsKeptOrGivenItsScheme(typed: String, written: String) {
-        #expect(WebLinkAddress.normalized(typed) == written)
-    }
-
-    @Test(arguments: ["", "   ", "two words", "javascript:alert(1)", "file:///etc/passwd", "https://", "mailto:", "ftp://example.com", "JavaScript:alert(1)", "data:text/html,x", "FILE:///etc/passwd"])
-    func anythingElseIsRefused(typed: String) {
-        #expect(WebLinkAddress.normalized(typed) == nil)
     }
 }

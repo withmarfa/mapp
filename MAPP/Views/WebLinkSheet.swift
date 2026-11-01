@@ -29,7 +29,7 @@ struct WebLinkSheet: View {
             }
             HStack {
                 if request.removable {
-                    Button("Remove Link") { editor.finishWebLink(nil) }
+                    Button("Remove Link", action: editor.removeWebLink)
                         .accessibilityIdentifier("WebLinkRemove")
                 }
                 Spacer()
@@ -50,6 +50,6 @@ struct WebLinkSheet: View {
     }
 
     private func add() {
-        refused = !editor.finishWebLink(address)
+        Task { refused = !(await editor.setWebLink(address)) }
     }
 }

@@ -746,9 +746,9 @@ export class NoteEditor {
    *
    *  Keep the defensive source check after Inkkit's append, even though Inkkit preserves lone rules, empty code
    *  fences, images and definitions: anything but trailing whitespace gone is taken back in the same step, before
-   *  the change is reported, and refused as `preservation`. Redo stays available after that refusal, because
-   *  Inkkit has no operation to discard the undone step. The images are one undo step, saved like typing, and do
-   *  nothing to a note loaded since (`expected`). Never write them into the source here. */
+   *  the change is reported, and refused as `preservation`, and the undone step is discarded so Redo cannot bring
+   *  it back. The images are one undo step, saved like typing, and do nothing to a note loaded since
+   *  (`expected`). Never write them into the source here. */
   appendImages(images: { src: string; alt: string }[], expected = this.generation) {
     const before = this.snapshot(expected).text
     const reportedBefore = this.pendingChanged
@@ -759,6 +759,7 @@ export class NoteEditor {
     if (!appended) return false
     if (this.snapshot(expected).text.startsWith(before.trimEnd())) return true
     this.engine.undo(expected)
+    this.engine.discardUndone(expected)
     if (this.snapshot(expected).text !== before)
       throw new InkKitError(
         'preservation',

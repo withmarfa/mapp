@@ -1,4 +1,4 @@
-import { postToHost } from './bridge'
+import { openLink, postToHost } from './bridge'
 
 /** How a status pin draws its mark: the color the status carries and how much of the ring it fills. */
 export type HeaderTone = 'neutral' | 'orange' | 'red' | 'green' | 'grey'
@@ -814,15 +814,14 @@ export class ItemHeader {
         break
       case 'url': {
         const href = row.text ?? ''
-        if (/^https?:\/\//i.test(href))
-          this.link(value, href, () => postToHost({ type: 'openLink', href }), href)
+        if (/^https?:\/\//i.test(href)) this.link(value, href, () => openLink(href), href)
         else element('span', '', value).textContent = href
         break
       }
       case 'email': {
         const address = row.text ?? ''
         const href = `mailto:${address}`
-        this.link(value, address, () => postToHost({ type: 'openLink', href }), href)
+        this.link(value, address, () => openLink(href), href)
         break
       }
       case 'phone': {
@@ -830,13 +829,7 @@ export class ItemHeader {
         // A number is dialed as its digits and a leading plus, whatever spacing it is written with.
         const dialed = number.replace(/(?!^\+)[^\d]/g, '')
         if (dialed.replace('+', '') === '') element('span', '', value).textContent = number
-        else
-          this.link(
-            value,
-            number,
-            () => postToHost({ type: 'openLink', href: `tel:${dialed}` }),
-            `tel:${dialed}`,
-          )
+        else this.link(value, number, () => openLink(`tel:${dialed}`), `tel:${dialed}`)
         break
       }
       default:

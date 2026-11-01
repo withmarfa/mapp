@@ -802,6 +802,9 @@ test('the defensive append guard restores a lossy engine edit before reporting i
       })
       expect(() => editor.appendImages([{ src: 'a.png', alt: 'a' }])).toThrow(InkKitError)
       expect(editor.snapshot().text).toBe('Original\n')
+      expect(engine.commandState().commands.redo, 'Redo must not bring the refused edit back').toBe(
+        false,
+      )
       await Promise.resolve()
       expect(reported).toEqual([])
     },
@@ -981,11 +984,10 @@ test("the page asks the app's notes and falls back to nothing when it cannot", a
   }
 })
 
-test('a link by identity with an escaped title shows the title and is not rewritten', async () => {
+test('a link by identity shows its title, where a backslash is text and nothing is escaped', async () => {
   const identity = '22222222-2222-4222-8222-222222222222'
-  const labels = ['A|B', 'A#B', 'A]B', '[Draft]', 'back\\slash', 'Café 日本語']
-  const escape = (label: string) => label.replace(/[\\[\]|#]/g, (c) => '\\' + c)
-  const source = labels.map((label) => `See [[${identity}|${escape(label)}]]\n`).join('\n')
+  const labels = ['back\\slash', 'A#B', 'Café 日本語']
+  const source = labels.map((label) => `See [[${identity}|${label}]]\n`).join('\n')
   await withEditor(source, async (editor) => {
     expect(editor.markdown()).toBeNull()
     expect(editor.snapshot().text).toBe(source)
