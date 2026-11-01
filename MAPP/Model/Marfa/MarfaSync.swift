@@ -547,8 +547,9 @@ actor MarfaSync {
     }
 
     /// Whether a failed drain left the writes queued for a reason asking again may not clear, which the package
-    /// neither retries nor shows. A copy with no server has nothing to send to, so that is no fault. An unreachable server, a transient error and a refused key are shown through the
-    /// connection, and a copy that needs hydrating is hydrated.
+    /// neither retries nor shows. A copy with no server has nothing to send to, so that is no fault. An unreachable
+    /// server, a transient error and a refused key are shown through the connection, and a copy that needs hydrating
+    /// is hydrated.
     private static func isDrainFault(_ error: any Error) -> Bool {
         guard let error = error as? MarfaError else { return !(error is CancellationError) }
         if error.isOffline || error.isTransient || error.isKeyRefusal || error.isHydrationNeeded { return false }
