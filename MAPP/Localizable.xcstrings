@@ -639,7 +639,7 @@
 "The search for “%@”" : { "extractionState" : "manual" },
 "The filter on %@" : { "extractionState" : "manual" },
 "Filters that would join conditions with both “and” and “or”" : { "extractionState" : "manual" },
-"Filters beyond the 10 conditions a view can hold" : { "extractionState" : "manual" },
+"A filter Marfa refuses: %@" : { "extractionState" : "manual" },
 "Sorting by %@" : { "extractionState" : "manual" },
 "Grouping by %@" : { "extractionState" : "manual" },
 "MAPP can’t reach your Marfa server, so nothing was saved. Try again when it’s back." : { "extractionState" : "manual" },
