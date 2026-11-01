@@ -597,8 +597,9 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         // A new parent replaces the one link a child holds: one move of the edge's source, which keeps its id.
         undo.beginUndoGrouping()
         #expect(library.setItemRelationship(F.t1, field: "child-of", targetIDs: [F.p1], undoManager: undo))
+        // The core is asked first, so the write follows; it joins the open group.
+        #expect(await eventually { source.writes == [.moveEdge(EdgeID("c2"), end: .source, to: F.p1)] }, "sent \(source.writes)")
         undo.endUndoGrouping()
-        #expect(source.writes == [.moveEdge(EdgeID("c2"), end: .source, to: F.p1)])
         #expect(library.notices.waiting.last == nil)
         // The undo moves it back, to the parent it had.
         source.clearWrites()
@@ -611,8 +612,8 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.clearWrites()
         undo.beginUndoGrouping()
         #expect(library.setItemRelationship(F.p2, field: "inverse:parent-of", targetIDs: [F.e1], undoManager: undo))
+        #expect(await eventually { source.writes == [.moveEdge(EdgeID("c1"), end: .source, to: F.p2)] }, "sent \(source.writes)")
         undo.endUndoGrouping()
-        #expect(source.writes == [.moveEdge(EdgeID("c1"), end: .source, to: F.p2)])
         source.clearWrites()
         undo.undo()
         #expect(source.writes == [.moveEdge(EdgeID("c1"), end: .source, to: F.p1)])
@@ -629,9 +630,9 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.clearWrites()
         undo.beginUndoGrouping()
         #expect(library.setItemRelationship(F.t1, field: "child-of", targetIDs: [F.p1], undoManager: undo))
-        undo.endUndoGrouping()
         let toProject = EdgeDraft(type: "parent-of", source: F.p1, target: F.t1)
-        #expect(source.writes == [.link(toProject, undoing: nil)])
+        #expect(await eventually { source.writes == [.link(toProject, undoing: nil)] }, "sent \(source.writes)")
+        undo.endUndoGrouping()
 
         // The source says what it made; the undo takes that edge away, and the next puts the old parent back.
         source.send(.upserted([F.item(F.t1, F.bug, "Bug one", age: 3, tags: [ItemTag.favorite], edges: [F.child("c7", F.t1, of: F.p1)])]))
@@ -645,7 +646,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         // A field that holds many adds and removes in one change.
         source.clearWrites()
         #expect(library.setItemRelationship(F.n1, field: "about", targetIDs: [F.p2], undoManager: nil))
-        #expect(source.writes == [.link(EdgeDraft(type: "about", source: F.n1, target: F.p2), undoing: nil)])
+        #expect(await eventually { source.writes == [.link(EdgeDraft(type: "about", source: F.n1, target: F.p2), undoing: nil)] })
         // The old link goes once the source has taken the new one.
         source.send(.answered(try #require(source.submitted.last?.id), .accepted))
         #expect(await eventually { source.writes.last == .unlink(EdgeID("a1")) })
@@ -673,7 +674,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         // target moves.
         library.notices.answerAll()
         #expect(library.setItemRelationship(F.e1, field: "inverse:supersedes", targetIDs: [bug2.id], undoManager: nil))
-        #expect(source.writes == [.moveEdge(EdgeID("s1"), end: .target, to: F.e1)])
+        #expect(await eventually { source.writes == [.moveEdge(EdgeID("s1"), end: .target, to: F.e1)] }, "sent \(source.writes)")
         #expect(library.notices.waiting.last == nil)
     }
 
@@ -700,7 +701,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         // Replacing its own link for an item that holds none is one move of the end that goes.
         library.notices.answerAll()
         #expect(library.setItemRelationship(ItemID("c"), field: "supersedes", targetIDs: [F.t1], undoManager: nil))
-        #expect(source.writes == [.moveEdge(EdgeID("s1"), end: .target, to: F.t1)])
+        #expect(await eventually { source.writes == [.moveEdge(EdgeID("s1"), end: .target, to: F.t1)] }, "sent \(source.writes)")
     }
 
     /// A refusal the copy could not foresee, such as a cycle through rows outside it, is the server's: it is told in the
@@ -708,6 +709,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     @Test func aMoveTheServerRefusesIsToldAndLeavesTheOldLink() async throws {
         let (library, source) = try await loaded()
         library.setItemRelationship(F.t1, field: "child-of", targetIDs: [F.p1], undoManager: nil)
+        try #require(await eventually { source.submitted.last != nil })
         let move = try #require(source.submitted.last?.id)
         source.send(.answered(move, .refused(SyncProblem(code: "edge_cycle", message: "That would close a cycle."))))
         #expect(await eventually { library.notices.waiting.last != nil })
@@ -1311,7 +1313,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.send(.loaded(SourceSnapshot(items: items, catalogue: catalogue)))
         try #require(await eventually { library.isLoaded })
         #expect(library.setItemRelationship(F.n1, field: "partner", targetIDs: [F.p1], undoManager: nil))
-        #expect(source.writes == [.moveEdge(EdgeID("pt1"), end: .source, to: F.p1)], "sent \(source.writes)")
+        #expect(await eventually { source.writes == [.moveEdge(EdgeID("pt1"), end: .source, to: F.p1)] }, "sent \(source.writes)")
         #expect(library.notices.waiting.last == nil)
     }
 }
