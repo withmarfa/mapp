@@ -146,7 +146,7 @@ nonisolated enum MarfaMapping {
 
     static func itemType(_ type: Marfa.ItemType) -> ItemTypeInfo {
         ItemTypeInfo(
-            id: TypeID(type.id), label: type.label ?? type.id,
+            id: TypeID(type.id), label: type.label ?? type.id, plural: type.plural,
             fields: type.fields.map { field($0, statusWords: $0.name == type.statusField ? type.statusWords : []) },
             titleField: type.titleField, bodyField: type.bodyField, parent: type.parent.map { TypeID($0) }, icon: type.icon,
             description: type.description, version: type.version, roles: type.roles,
@@ -155,7 +155,7 @@ nonisolated enum MarfaMapping {
 
     private static func field(_ field: Marfa.TypeField, statusWords: [Marfa.StatusWord] = []) -> ItemTypeInfo.Field {
         ItemTypeInfo.Field(
-            key: field.name, label: label(forField: field.name), kind: kind(of: field, statusWords: statusWords),
+            key: field.name, label: field.label, kind: kind(of: field, statusWords: statusWords),
             declaredBy: TypeID(field.declaredBy), required: field.required, description: field.description,
             format: format(of: field), isInteger: field.type == "integer",
             minimum: bound("minimum", in: field.definition), maximum: bound("maximum", in: field.definition))
@@ -191,7 +191,9 @@ nonisolated enum MarfaMapping {
             case "datetime": kind = .date(includesTime: true)
             default: return nil
             }
-            return ListShape.Member(key: key, kind: kind, required: definition["required"]?.bool == true)
+            // The core labels every member; the key stands only if a catalog came without one.
+            return ListShape.Member(
+                key: key, label: definition["label"]?.string ?? key, kind: kind, required: definition["required"]?.bool == true)
         }
         // A member the app cannot read would be dropped from an entry it edits, so such a list is shown but not edited.
         return members.count == declared.keys.count ? ListShape(members: members) : nil
@@ -263,19 +265,16 @@ nonisolated enum MarfaMapping {
         }
     }
 
-    /// The catalogue names fields only by key, such as `due_at`, which reads as "Due at".
-    static func label(forField key: String) -> String {
-        let words = key.replacingOccurrences(of: "_", with: " ")
-        return words.prefix(1).uppercased() + words.dropFirst()
-    }
-
     // MARK: Items
 
     /// `bodyLinks` are what the item's text names, read by the package: the links and embeds that name no item,
     /// or none yet, are shown as such beside the edges the copy holds for those that do.
+    ///
+    /// `display` is what the core answers for the row's name and preview. Without it the item has no name and no
+    /// preview, as a row the core could not name has none.
     static func item(
         _ row: Marfa.Item, edges: [Marfa.Edge], catalogue: Catalogue, sync: SyncState = .settled,
-        bodyLinks: BodyLinks? = nil, isHeld: (String) -> Bool
+        bodyLinks: BodyLinks? = nil, display: ItemDisplay? = nil, isHeld: (String) -> Bool
     ) -> Item {
         let type = TypeID(row.type)
         let info = catalogue.itemTypes[type]
@@ -292,8 +291,8 @@ nonisolated enum MarfaMapping {
         let bodyField = bodyField(of: info)
         // The server answers the properties in the order it keeps them, which is the order shown.
         let properties = row.properties.filter { $0.key != bodyField }.map { Property(key: $0.key, value: value($0.value)) }
-        let created = date(row.createdAt)
-        let modified = date(row.updatedAt)
+        let created = timestamp(row.createdDate)
+        let modified = timestamp(row.updatedDate)
         let state = self.state(row.state)
         var edgesOut = edgesOut(of: row.id, among: edges, catalogue: catalogue, isHeld: isHeld)
         edgesOut += unresolvedLinks(of: row.id, in: bodyLinks)
@@ -306,13 +305,14 @@ nonisolated enum MarfaMapping {
         if case .file(let fileType, let byteCount) = content {
             preview = ItemPreview.file(fileType, byteCount: byteCount)
         } else {
-            preview = ItemPreview.text(of: body, title: title, fallback: row.properties["description"]?.string)
+            preview = display?.preview ?? ""
         }
         return Item(
-            id: ItemID(row.id), type: type, title: title, titleRule: titleRule, properties: properties,
+            id: ItemID(row.id), type: type, title: title, name: display?.name, titleRule: titleRule, properties: properties,
             preview: damaged ? MarfaProblems.unreadableMessage : preview, content: content, state: state,
             tier: row.tier.map(tier) ?? .library, tags: Set(row.tags), version: ItemVersion(row.version),
-            created: created, modified: modified, trashed: state == .trashed ? row.trashedDate : nil, edgesOut: edgesOut,
+            created: created, modified: modified, trashed: state == .trashed ? row.trashedDate ?? modified : nil,
+            edgesOut: edgesOut,
             sync: sync, problem: damaged ? ItemProblem(message: MarfaProblems.unreadableMessage, withholdsText: true) : nil,
             boundEmbeds: embeds, source: row.source.isEmpty ? nil : row.source)
     }
@@ -473,12 +473,19 @@ nonisolated enum MarfaMapping {
         return .file(mimeType.flatMap { UTType(mimeType: $0) } ?? .data, byteCount: size ?? 0)
     }
 
-    static func date(_ text: String, reporting: Reporting = .shared) -> Date {
-        guard let date = ItemDate.parse(text)?.date else {
+    /// A time the package read from a row, or the oldest moment, reported once a run, where the row's time is not one
+    /// the contract allows.
+    static func timestamp(_ read: Date?, reporting: Reporting = .shared) -> Date {
+        guard let read else {
             Telemetry.timestampUnreadable(reporting: reporting)
             return .distantPast
         }
-        return date
+        return read
+    }
+
+    /// A time the package gives as text, such as when a write was queued.
+    static func date(_ text: String, reporting: Reporting = .shared) -> Date {
+        timestamp(ItemDate.parse(text)?.date, reporting: reporting)
     }
 
     // MARK: Verdicts and sync

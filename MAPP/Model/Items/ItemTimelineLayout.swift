@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 
 nonisolated struct ItemTimelineRow: Identifiable, Hashable, Sendable {
     enum Value: Hashable, Sendable {
@@ -42,7 +43,7 @@ nonisolated enum ItemTimelineLayout {
         return fields.values.sorted {
             let (x, y) = (lead($0.key), lead($1.key))
             if x != y { return x < y }
-            let comparison = $0.displayLabel.localizedStandardCompare($1.displayLabel)
+            let comparison = $0.label.localizedStandardCompare($1.label)
             return comparison == .orderedSame ? $0.key < $1.key : comparison == .orderedAscending
         }
     }
@@ -91,7 +92,7 @@ nonisolated enum ItemTimelineLayout {
         if case .dated(let left, _, _) = lhs.value, case .dated(let right, _, _) = rhs.value, left != right {
             return left < right
         }
-        let title = lhs.item.title.localizedStandardCompare(rhs.item.title)
+        let title = lhs.item.displayTitle.localizedStandardCompare(rhs.item.displayTitle)
         return title == .orderedSame ? lhs.id.rawValue < rhs.id.rawValue : title == .orderedAscending
     }
 }

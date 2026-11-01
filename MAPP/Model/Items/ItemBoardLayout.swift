@@ -46,7 +46,7 @@ nonisolated enum ItemBoardLayout {
         for type in Set(items.map(\.type)).sorted(by: { $0.rawValue < $1.rawValue }) {
             for field in eligibleFields(of: type, catalogue: catalogue) {
                 guard seen.insert(field.key).inserted else { continue }
-                result.append(ItemBoardField(key: field.key, label: field.displayLabel, isStatus: field.isStatus))
+                result.append(ItemBoardField(key: field.key, label: field.label, isStatus: field.isStatus))
             }
         }
         return result.filter(\.isStatus) + result.filter { !$0.isStatus }
@@ -98,7 +98,7 @@ nonisolated enum ItemBoardLayout {
         return lanes.map { lane in
             var lane = lane
             lane.items = (groups[lane.id] ?? []).sorted {
-                let order = $0.title.localizedStandardCompare($1.title)
+                let order = $0.displayTitle.localizedStandardCompare($1.displayTitle)
                 return order == .orderedSame ? $0.id.rawValue < $1.id.rawValue : order == .orderedAscending
             }
             return lane

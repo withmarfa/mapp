@@ -213,7 +213,7 @@ private struct WebPageHeader: View {
         let byline = PageByline(item: item, now: library.now())
         let type = library.catalogue.itemTypes[item.type]
         VStack(alignment: .leading, spacing: 8) {
-            Text(verbatim: item.title)
+            Text(verbatim: item.displayTitle)
                 .font(.system(size: CGFloat(style.textSize) * 1.9, weight: .semibold))
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("WebPageTitle")

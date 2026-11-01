@@ -113,7 +113,7 @@ struct CollectionPickerSheet: View {
     private var shown: [Item] {
         let query = filter.trimmingCharacters(in: .whitespacesAndNewlines)
         let collections = library.collections
-        return query.isEmpty ? collections : collections.filter { $0.title.localizedStandardContains(query) }
+        return query.isEmpty ? collections : collections.filter { $0.displayTitle.localizedStandardContains(query) }
     }
 
     private var canAdd: Bool {

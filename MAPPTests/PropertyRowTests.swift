@@ -4,8 +4,8 @@ import Testing
 @testable import MAPP
 
 struct PropertyRowTests {
-    private static func field(_ name: String, _ type: String = "string", description: String? = nil, definition: JSONObject = [:]) -> TypeField {
-        TypeField(name: name, type: type, description: description, declaredBy: "aic.ticket", definition: definition)
+    private static func field(_ name: String, _ type: String = "string", label: String? = nil, description: String? = nil, definition: JSONObject = [:]) -> TypeField {
+        TypeField(name: name, label: label, type: type, description: description, declaredBy: "aic.ticket", definition: definition)
     }
 
     private static let ticket = MarfaMapping.itemType(ItemType(
@@ -14,7 +14,7 @@ struct PropertyRowTests {
             field("title"), field("body"),
             field("status", "status", definition: ["status_values": [["value": "pending", "group": "not_started"], ["value": "in_progress", "group": "in_progress"]]]),
             field("priority", "enum", definition: ["enum_values": ["low", "high"]]),
-            field("due_at", "datetime"), field("done", "boolean"), field("estimate", "integer"),
+            field("due_at", "datetime", label: "Deadline"), field("done", "boolean"), field("estimate", "integer"),
             field("link", "url"), field("contact", "email"), field("summary"), field("empty")
         ],
         titleField: "title", bodyField: "body"))
@@ -67,7 +67,7 @@ struct PropertyRowTests {
 
     @Test func labelsComeFromTheCatalogue() {
         let rows = Self.rows(["due_at": .string("2026-10-27")])
-        #expect(rows.first { $0.id == "due_at" }?.label == "Due At")
+        #expect(rows.first { $0.id == "due_at" }?.label == "Deadline", "the core's label, not one made from the key")
     }
 
     @Test func aLongTextFieldIsLeftOut() {
@@ -117,7 +117,7 @@ struct PropertyRowTests {
     }
 
     @Test func otherRelationshipsShowAsLinksAndIncomingOnesDoNot() {
-        let blocks = Self.relationship("blocks", "blocks", [("Ship it", "a"), ("Test it", "b")])
+        let blocks = Self.relationship("blocks", "Blocks", [("Ship it", "a"), ("Test it", "b")])
         let incoming = Self.relationship("inverse:references", "Linked from", [("Elsewhere", "c")])
         let none = Self.relationship("supersedes", "Supersedes", [])
         let rows = Self.rows([:], relationships: [blocks, incoming, none])
@@ -127,7 +127,7 @@ struct PropertyRowTests {
     }
 
     @Test func aLinkCarriesTheIconOfTheItemItOpens() {
-        let blocks = Self.relationship("blocks", "blocks", [("Ship it", "a"), ("Test it", "b")])
+        let blocks = Self.relationship("blocks", "Blocks", [("Ship it", "a"), ("Test it", "b")])
         let rows = PropertyRow.rows(
             of: Self.item([:]), type: Self.ticket, hidden: ["title", "body"], relationships: [blocks], parentField: "child-of", tags: [],
             icon: { $0 == ItemID("a") ? "lucide:rocket" : nil })

@@ -116,6 +116,10 @@ actor MarfaEngine {
     var queue: [Marfa.QueuedWrite] = []
     var syncStates: [ItemID: SyncState] = [:]
     var changedSync: Set<ItemID> = []
+    /// Items whose name and preview the core could not be asked for, asked again with the next change whose own items the core answers for.
+    var unnamed: Set<ItemID> = []
+    /// Whether the last name lookup failed, so a lookup that keeps failing is told once.
+    var namesFailing = false
     /// Refusals and conflicts answered, which the copy clears when it hands the answers over (`Queue.takeAnswered`)
     /// unless the write carried content, kept until a later write of the same kind, or an edit, is accepted or
     /// merged. Answers recorded before this launch are taken in at the first update.
@@ -276,7 +280,7 @@ actor MarfaEngine {
             done.resume(returning: await take(added: result, under: parent, token: token))
         case .failed(let failure):
             failures.append(failure)
-            publish([])
+            await publish([])
         case .flush(let done):
             Task { [sync] in
                 await sync.flush()

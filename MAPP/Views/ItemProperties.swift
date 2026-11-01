@@ -1,3 +1,4 @@
+import Marfa
 import SwiftUI
 
 /// One property of an item as a row of the inspector, drawn with the system's own controls so they behave as they do
@@ -37,7 +38,7 @@ struct ItemPropertyRow: View {
     private var input: ItemPropertyDraft { retainedDraft ?? localDraft }
 
     var body: some View {
-        InspectorRow(fieldLabel: definition.displayLabel) {
+        InspectorRow(fieldLabel: definition.label) {
             VStack(alignment: .leading, spacing: 4) {
                 core
                 if let invalidValue {
@@ -70,7 +71,7 @@ struct ItemPropertyRow: View {
         if case .list(let shape) = definition.kind {
             // The list tells its own refusals, beside the entry they are about.
             ListEntriesEditor(
-                shape: shape, label: definition.displayLabel, key: definition.key, value: value, isEditable: isEditable,
+                shape: shape, label: definition.label, key: definition.key, value: value, isEditable: isEditable,
                 editing: input.list, isWriting: isWriting, onChange: onChange)
         } else if definition.kind == .boolean {
             checkbox
@@ -101,7 +102,7 @@ struct ItemPropertyRow: View {
             }
             .buttonStyle(.plain)
             .pointerStyle(.link)
-            .accessibilityLabel(LocalizedStringKey(definition.displayLabel))
+            .accessibilityLabel(LocalizedStringKey(definition.label))
             .accessibilityValue(shownText)
             .accessibilityHint(hint)
             .accessibilityIdentifier("ItemProperty.\(definition.key)")
@@ -160,13 +161,13 @@ struct ItemPropertyRow: View {
     /// A yes or no is the system's checkbox; a value that is not set reads as unchecked, and Clear in the menu unsets it.
     private var checkbox: some View {
         Toggle(isOn: Binding { InspectorFields.isYes(value) } set: { input.rejected = !onChange(.bool($0)) }) {
-            Text(LocalizedStringKey(definition.displayLabel))
+            Text(LocalizedStringKey(definition.label))
         }
         .labelsHidden()
         .toggleStyle(.checkbox)
         .disabled(!isEditable)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityLabel(LocalizedStringKey(definition.displayLabel))
+        .accessibilityLabel(LocalizedStringKey(definition.label))
         .accessibilityIdentifier("ItemProperty.\(definition.key)")
     }
 
@@ -288,7 +289,7 @@ struct ItemPropertyRow: View {
         let current = value?.string
         let text = current.map { Text(verbatim: ItemTypeInfo.Field.label(ofOption: $0)) }
         return Menu {
-            Picker(LocalizedStringKey(definition.displayLabel), selection: Binding {
+            Picker(LocalizedStringKey(definition.label), selection: Binding {
                 current ?? ""
             } set: { selected in
                 input.rejected = !onChange(selected.isEmpty ? nil : .string(selected))
@@ -308,7 +309,7 @@ struct ItemPropertyRow: View {
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityLabel(LocalizedStringKey(definition.displayLabel))
+        .accessibilityLabel(LocalizedStringKey(definition.label))
         .accessibilityValue(text ?? Text("Not Set"))
         .accessibilityIdentifier("ItemProperty.\(definition.key)")
     }
@@ -323,7 +324,7 @@ struct ItemPropertyRow: View {
         }
         .buttonStyle(.plain)
         .popover(isPresented: $choosingDate, arrowEdge: .bottom) { datePicker }
-        .accessibilityLabel(LocalizedStringKey(definition.displayLabel))
+        .accessibilityLabel(LocalizedStringKey(definition.label))
         .accessibilityValue(dateText.map { Text(verbatim: $0) } ?? Text("Not Set"))
         .accessibilityHint("Opens a calendar")
         .accessibilityIdentifier("ItemProperty.\(definition.key)")
@@ -379,7 +380,7 @@ struct ItemPropertyRow: View {
     }
 
     private func setDate(_ selected: Date, includingTime: Bool) {
-        let text = includingTime ? ItemDate.moment(selected) : ItemDate.day(selected)
+        let text = includingTime ? ItemDate.instant(selected) : ItemDate.day(selected)
         input.rejected = !onChange(.string(text))
         if !input.rejected { input.text = text; input.isDirty = false }
     }
@@ -396,7 +397,7 @@ struct ItemPropertyRow: View {
         let isNumber = definition.kind == .number
         let text = input.isDirty ? input.text : currentText
         let token = InspectorText.isToken(text)
-        return TextField(LocalizedStringKey(definition.displayLabel), text: Binding {
+        return TextField(LocalizedStringKey(definition.label), text: Binding {
             input.isDirty ? input.text : currentText
         } set: { typed in
             guard typed != (input.isDirty ? input.text : currentText) else { return }
@@ -447,11 +448,11 @@ struct ItemPropertyRow: View {
             return
         }
         if case .list(let shape) = definition.kind {
-            input.list.leave(shape, label: definition.displayLabel, value: value, isEditable: isEditable, write: onChange, to: library.notices)
+            input.list.leave(shape, label: definition.label, value: value, isEditable: isEditable, write: onChange, to: library.notices)
             return
         }
         input.handOff(
-            label: definition.displayLabel, as: definition.kind, rule: definition.numberRule, current: currentText,
+            label: definition.label, as: definition.kind, rule: definition.numberRule, current: currentText,
             isEditable: isEditable, write: onChange, to: library.notices)
         editing = false
     }

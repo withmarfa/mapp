@@ -36,7 +36,10 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
     }
 
     let id: TypeID
+    /// The core's name for one item of the type, such as `Recipe`.
     let label: String
+    /// The core's name for a list of the type's items, such as `Recipes`.
+    let plural: String
     /// Inherited fields included, in the order they are shown.
     let fields: [Field]
     /// The display hints the type declares or inherits, taken whole; where they name none, Marfa reads `title` and
@@ -56,6 +59,27 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
     /// The field that holds each item's own identity at the connector that writes the type, such as a GitHub issue's
     /// node ID. It is a fact for the connector, not something to read, so the page leaves it out until asked.
     var linkField: String?
+
+    /// `plural` is the core's, which the catalogue always carries; where a preview or a test gives none, it is the label.
+    init(
+        id: TypeID, label: String, plural: String? = nil, fields: [Field], titleField: String?, bodyField: String?,
+        parent: TypeID?, icon: String? = nil, description: String? = nil, version: Int64? = nil, roles: [String] = [],
+        compatibleWith: [TypeID] = [], linkField: String? = nil
+    ) {
+        self.id = id
+        self.label = label
+        self.plural = plural ?? label
+        self.fields = fields
+        self.titleField = titleField
+        self.bodyField = bodyField
+        self.parent = parent
+        self.icon = icon
+        self.description = description
+        self.version = version
+        self.roles = roles
+        self.compatibleWith = compatibleWith
+        self.linkField = linkField
+    }
 
     func declares(_ key: String) -> Bool { fields.contains { $0.key == key } }
 
@@ -145,18 +169,6 @@ nonisolated extension ItemTypeInfo.Field {
             .joined(separator: " ")
         return Bundle.main.localizedString(forKey: words, value: words, table: nil)
     }
-
-    /// A label the catalogue wrote for people, set in title case for the interface: "Completed at" reads as
-    /// "Completed At". Only each word's first letter changes, so an acronym or a name keeps its capitals. This is
-    /// the one place a catalogue label becomes a display label, for properties and relationships alike.
-    static func displayLabel(_ label: String) -> String {
-        label.split(separator: " ", omittingEmptySubsequences: false)
-            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
-            .joined(separator: " ")
-    }
-
-    /// The field's label as the interface shows it.
-    var displayLabel: String { Self.displayLabel(label) }
 }
 
 nonisolated struct EdgeTypeInfo: Identifiable, Hashable, Sendable {
@@ -234,12 +246,12 @@ nonisolated struct Catalogue: Hashable, Sendable {
     /// not hold.
     func icon(for type: TypeID) -> String? { itemTypes[type]?.icon }
 
-    /// The type's name as people read it: the catalogue's label, else its last segment capitalized.
-    func label(for type: TypeID) -> String {
-        if let label = itemTypes[type]?.label, !label.isEmpty { return label }
-        let segment = type.rawValue.split(whereSeparator: { $0 == "." || $0 == "/" }).last.map(String.init)?.lowercased() ?? ""
-        return segment.capitalized
-    }
+    /// The core's name for one item of `type`. A type the catalogue lacks is named by its identifier, as it is.
+    func label(for type: TypeID) -> String { itemTypes[type]?.label ?? type.rawValue }
+
+    /// The core's name for a list of the items of `type`, such as `Recipes`; the identifier for a type the catalogue
+    /// lacks.
+    func plural(for type: TypeID) -> String { itemTypes[type]?.plural ?? type.rawValue }
 
     /// The label for a property key: the item's own type's, else the one the catalogue gives it for any type. Nil
     /// for a key no type defines.

@@ -31,7 +31,7 @@ nonisolated enum NoteSort: String, CaseIterable {
     func sorted(_ items: [Item]) -> [Item] {
         switch self {
         case .title:
-            items.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+            items.sorted { $0.displayTitle.localizedStandardCompare($1.displayTitle) == .orderedAscending }
         case .dateEdited, .dateCreated:
             items.sorted { date(of: $0) > date(of: $1) }
         }

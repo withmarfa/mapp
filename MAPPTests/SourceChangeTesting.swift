@@ -89,7 +89,7 @@ extension MarfaSource {
 /// with `fake.sendUpdate` and the sync, the hub and the engine take it as they take the package's own. Returns once
 /// the first update has been taken, which `sendUpdate` needs: it is delivered to the sequences held when it is sent.
 nonisolated func scriptedSource(
-    _ fake: FakeCopy = WorkingCopy.fake(), refreshing: any MarfaRefreshing, reading: (any MarfaReading)? = nil
+    _ fake: FakeCopy = WorkingCopy.fake(displays: SampleLibrary.display), refreshing: any MarfaRefreshing, reading: (any MarfaReading)? = nil
 ) async throws -> (FakeCopy, MarfaSource, ChangeLog) {
     let source = MarfaSource(
         copy: fake.copy, connection: SampleLibrary.connection, reading: reading ?? MarfaRead(copy: fake.copy), refreshing: refreshing)

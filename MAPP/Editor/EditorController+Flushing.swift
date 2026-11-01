@@ -122,7 +122,7 @@ extension EditorController {
 
     /// The page reports each change as it is made, so what it never reported is not on the page to give back.
     private func tellNotSaved(_ noteID: ItemID, reason: String) {
-        let title = library?.item(noteID).map { String(localized: "Couldn’t Save “\($0.title)”") }
+        let title = library?.item(noteID).map { String(localized: "Couldn’t Save “\($0.displayTitle)”") }
         library?.notices.notKept(title ?? String(localized: "Couldn’t Save Note"), text: nil, reason: reason)
     }
 

@@ -86,7 +86,7 @@ struct TypeChangeSheet: View {
 
     private var subtitle: String {
         if request.ids.count == 1, let item = request.ids.first.flatMap({ library.item($0) }) {
-            String(localized: "Choose a new type for “\(item.title)”.")
+            String(localized: "Choose a new type for “\(item.displayTitle)”.")
         } else {
             String(localized: "Choose a new type for \(request.ids.count) items.")
         }

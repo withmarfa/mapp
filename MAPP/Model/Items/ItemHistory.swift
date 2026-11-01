@@ -95,7 +95,7 @@ nonisolated extension ItemSnapshot {
         return properties.filter { !hidden.contains($0.key) && $0.value != .null }
             .sorted { $0.key.localizedStandardCompare($1.key) == .orderedAscending }
             .map { key, value in
-                (info?.fields.first { $0.key == key }?.displayLabel ?? key, value.displayText)
+                (info?.fields.first { $0.key == key }?.label ?? key, value.displayText)
             }
     }
 }

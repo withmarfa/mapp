@@ -10,7 +10,7 @@ extension MarfaEngine {
     /// (`queue-and-verdicts/edit-on-answer`). The copy moves as answers and catch-ups land, so the version is
     /// decided against one reading of the copy, and again if the copy moved meanwhile.
     func send(
-        _ id: ItemID, _ properties: JSONObject, replacing: Bool = false, type: String? = nil, tier: Marfa.Tier? = nil,
+        _ id: ItemID, _ properties: JSONObject, clearing: Set<String> = [], type: String? = nil, tier: Marfa.Tier? = nil,
         typedOn: () async throws -> Int64
     ) async throws -> Marfa.QueuedWrite {
         var attempt = 0
@@ -20,7 +20,7 @@ extension MarfaEngine {
             let version = Self.version(read: try await typedOn(), holding: held)
             let steady = try await heldVersion(id) == held && version <= held
             let edit = Edit(
-                properties: properties, replaceProperties: replacing, baseVersion: version, type: type, tier: tier)
+                properties: properties, clearProperties: clearing, baseVersion: version, type: type, tier: tier)
             do {
                 if steady, version < held {
                     let queued = try await copy.items.updateAsRead(id.rawValue, edit)

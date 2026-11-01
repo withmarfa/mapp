@@ -41,7 +41,7 @@ extension MarfaLibrary {
         // A page can hand over text for an item another device purged meanwhile, which no queue takes.
         guard let item = item(id) else { return notices.notKept(String(localized: "Couldn’t Save Note"), text: body, reason: Self.cantChange) }
         guard self.body(of: id)?.text != body else { return }
-        let title = String(localized: "Couldn’t Save “\(item.title)”")
+        let title = String(localized: "Couldn’t Save “\(item.displayTitle)”")
         // A save that arrives after the row stopped being writable, such as a debounced edit over a row the copy
         // could not read, is kept nowhere, so the person gets the text back.
         guard item.isWritable else { return notices.notKept(title, text: body, reason: Self.cantChange) }
@@ -153,7 +153,7 @@ extension MarfaLibrary {
     ) -> [TypeChangePlan.Entry]? {
         let plan = typeChangePlan(ids, to: type, filling: filling)
         guard plan.missing.isEmpty else {
-            let fields = plan.missing.map(\.displayLabel).joined(separator: ", ")
+            let fields = plan.missing.map(\.label).joined(separator: ", ")
             notices.tell(Self.cantChangeType, String(localized: "Enter a value for: \(fields)."))
             return nil
         }
@@ -216,7 +216,7 @@ extension MarfaLibrary {
             } else if let plan = typeChange(of: undo.id, to: undo.from), plan.missing.isEmpty {
                 submit(.retype(undo.id, undo.from, plan.changes, base: item.version), failing: Self.cantChangeType)
             } else {
-                notices.tell(Self.cantChangeType, String(localized: "“\(item.title)” has changed since, and can’t go back to its type."))
+                notices.tell(Self.cantChangeType, String(localized: "“\(item.displayTitle)” has changed since, and can’t go back to its type."))
             }
         }
     }
@@ -282,7 +282,7 @@ extension MarfaLibrary {
         if changedSince {
             notices.tell(
                 Self.cantRestore,
-                String(localized: "“\(item.title)” has changed since, so that can’t be put back here. Earlier versions are in Version History."))
+                String(localized: "“\(item.displayTitle)” has changed since, so that can’t be put back here. Earlier versions are in Version History."))
         }
         return wrote
     }

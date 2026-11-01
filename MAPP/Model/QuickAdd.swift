@@ -107,10 +107,10 @@ final class QuickAdd {
             if let library {
                 for field in QuickAdd.fields(of: typeID, in: library.catalogue) {
                     guard let value = properties[field.key], value != .null else { continue }
-                    details.append("\(field.displayLabel): \(QuickAdd.valueText(value, in: field))")
+                    details.append("\(field.label): \(QuickAdd.valueText(value, in: field))")
                 }
                 if let parentID {
-                    details.append("\(String(localized: "Parent")): \(library.item(parentID)?.title ?? String(localized: "Item not found"))")
+                    details.append("\(String(localized: "Parent")): \(library.item(parentID)?.displayTitle ?? String(localized: "Item not found"))")
                 }
             } else {
                 for (key, value) in properties.sorted(by: { $0.key < $1.key }) where value != .null {
@@ -177,7 +177,7 @@ final class QuickAdd {
     private var unfinishedListText: [String] {
         listDrafts.sorted { $0.key < $1.key }.compactMap { _, draft in
             guard let field = draft.field, case .list(let shape) = field.kind, let text = draft.list.unsavedText(in: shape) else { return nil }
-            return "\(field.displayLabel): \(text)"
+            return "\(field.label): \(text)"
         }
     }
 
@@ -443,7 +443,7 @@ extension Browser {
         for (key, list) in quickAdd.listDrafts where !keys.contains(key) {
             if let field = list.field, case .list(let shape) = field.kind, let text = list.list.unsavedText(in: shape) {
                 library.notices.notKept(
-                    String(localized: "Property Not Saved"), text: "\(field.displayLabel): \(text)",
+                    String(localized: "Property Not Saved"), text: "\(field.label): \(text)",
                     reason: String(localized: "The new kind of item doesn’t have this property."))
             }
             quickAdd.listDrafts[key] = nil

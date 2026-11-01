@@ -52,8 +52,8 @@ nonisolated struct TypeNode: Identifiable, Hashable, Sendable {
         func node(_ id: String, under parentLabel: String?) -> TypeNode {
             let known = catalogue.itemTypes[TypeID(id)] != nil
             let own = held[id]
-            let label = own.map { catalogue.label(for: $0.id) }
-                ?? (known ? catalogue.label(for: TypeID(id)) : segment(of: id).capitalized)
+            let label = own.map { catalogue.plural(for: $0.id) }
+                ?? (known ? catalogue.plural(for: TypeID(id)) : segment(of: id).capitalized)
             let shown = trimmed(label, under: parentLabel)
             let below = (children[id] ?? []).map { node($0, under: label) }
             let count = own?.count ?? 0
@@ -116,15 +116,19 @@ nonisolated extension Catalogue {
         !isFileType(type) && !type.rawValue.hasPrefix("system.")
     }
 
-    /// The label each of `types` goes by. A label two of them share gets its parent's label in parentheses,
-    /// "Task (Ticket)", so the rows can be told apart.
-    func displayLabels(for types: some Collection<TypeID>) -> [TypeID: String] {
-        let labels = Dictionary(uniqueKeysWithValues: types.map { ($0, self.label(for: $0)) })
+    /// Whether a name is for one item of a type or for a list of them.
+    enum Number: Sendable { case one, many }
+
+    /// The core's label (`.one`) or plural (`.many`) each of `types` goes by. A name two of them share gets its
+    /// parent's in parentheses, "Tasks (Tickets)", so the rows can be told apart.
+    func displayLabels(for types: some Collection<TypeID>, as number: Number) -> [TypeID: String] {
+        func name(_ type: TypeID) -> String { number == .one ? label(for: type) : plural(for: type) }
+        let labels = Dictionary(uniqueKeysWithValues: types.map { ($0, name($0)) })
         let shared = Dictionary(grouping: types, by: { labels[$0] ?? "" }).filter { $0.value.count > 1 }
         return labels.reduce(into: [:]) { result, entry in
             let (type, label) = entry
             if shared[label] != nil, let parent = itemTypes[type]?.parent, itemTypes[parent] != nil {
-                result[type] = "\(label) (\(self.label(for: parent)))"
+                result[type] = "\(label) (\(name(parent)))"
             } else {
                 result[type] = label
             }
@@ -157,7 +161,7 @@ extension ItemLibrary {
             let count = count(in: .itemType(type.rawValue))
             return count > 0 ? (type, count) : nil
         }
-        let labels = catalogue.displayLabels(for: held.map(\.0))
+        let labels = catalogue.displayLabels(for: held.map(\.0), as: .many)
         return held.map { type, count in
             ItemTypeCount(id: type, label: labels[type] ?? type.rawValue, icon: catalogue.icon(for: type), count: count)
         }
@@ -171,12 +175,12 @@ extension ItemLibrary {
     /// `itemTypeCounts` as the sidebar's Types section nests them (`TypeNode.tree`).
     var typeTree: [TypeNode] { TypeNode.tree(of: itemTypeCounts, in: catalogue) }
 
-    /// The types a new item can be, by label: every type in the catalogue except the file types, which are made by
-    /// adding a file.
+    /// The types a new item can be, by the label of one item (the singular): every type in the catalogue except the
+    /// file types, which are made by adding a file.
     var creatableTypes: [ItemTypeOption] {
         let catalogue = catalogue
         let types = catalogue.itemTypes.keys.filter(catalogue.isCreatable)
-        let labels = catalogue.displayLabels(for: types)
+        let labels = catalogue.displayLabels(for: types, as: .one)
         return types.map { type in
             ItemTypeOption(id: type, label: labels[type] ?? type.rawValue, icon: catalogue.icon(for: type))
         }

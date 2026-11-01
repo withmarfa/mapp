@@ -77,7 +77,7 @@ extension MarfaEngine {
         pruneAnswers()
         if !leaving.isEmpty { await reread(leaving) }
         await readQueue()
-        publish([])
+        await publish([])
     }
 
     /// Lets go of an answer once its item's text has been counted past it, or the item has no text of the person's

@@ -61,8 +61,13 @@ struct MarfaMappingTests {
             createdAt: "2026-10-06T00:00:00Z", updatedAt: "2026-10-06T00:00:00Z")
     }
 
-    private static func item(_ row: Marfa.Item, edges: [Marfa.Edge] = [], held: Set<String> = []) -> MAPP.Item {
-        MarfaMapping.item(row, edges: edges, catalogue: catalogue, isHeld: { held.contains($0) })
+    /// `display` stands for what the core answers for the row's name and preview.
+    private static func item(
+        _ row: Marfa.Item, edges: [Marfa.Edge] = [], held: Set<String> = [], display: ItemDisplay? = nil
+    ) -> MAPP.Item {
+        MarfaMapping.item(
+            row, edges: edges, catalogue: catalogue, display: display ?? SampleLibrary.display(ItemDisplayInput(type: row.type, properties: row.properties)),
+            isHeld: { held.contains($0) })
     }
 
     // MARK: Who made an item
@@ -96,6 +101,25 @@ struct MarfaMappingTests {
         #expect(shown.isEditable && shown.isWritable)
     }
 
+    // MARK: The core's name and preview
+
+    @Test func anItemIsNamedAndPreviewedAsTheCoreSays() {
+        let row = Self.row("n", properties: ["title": "Stored", "body": "Stored body"])
+        let shown = Self.item(row, display: ItemDisplay(name: "From the core", preview: "A line from the core"))
+        #expect(shown.displayTitle == "From the core")
+        #expect(shown.preview == "A line from the core")
+        #expect(shown.title == "Stored", "the stored title is what an edit starts from and is untouched")
+        #expect(!shown.isUntitled)
+    }
+
+    @Test func onlyAnItemTheCoreCannotNameIsUntitled() {
+        let row = Self.row("u", properties: ["title": "Has a title but the core gave no name"])
+        let shown = Self.item(row, display: ItemDisplay(name: nil, preview: nil))
+        #expect(shown.isUntitled)
+        #expect(shown.displayTitle == String(localized: "Untitled"))
+        #expect(shown.preview.isEmpty)
+    }
+
     // MARK: Catalogue
 
     @Test func typesKeepTheirInheritedFieldsAndHints() throws {
@@ -107,7 +131,7 @@ struct MarfaMappingTests {
         #expect(ticket.fields.map(\.declaredBy) == [TypeID("aic.ticket"), TypeID("core.task"), TypeID("core.task")])
         let task = try #require(Self.catalogue.itemTypes[TypeID("core.task")])
         #expect(task.fields.map(\.kind) == [.text, .date(includesTime: true), .choice(["open", "done"]), .text])
-        #expect(task.fields.map(\.label) == ["Body", "Due at", "Status", "Title"])
+        #expect(task.fields.map(\.label) == ["Body", "Due At", "Status", "Title"])
     }
 
     @Test func anEdgeIsHeldAsManyTimesAsTheOtherEndAllows() throws {
@@ -201,7 +225,8 @@ struct MarfaMappingTests {
             itemTypes: [ItemType(id: "system.folder", fields: [Self.field("title", by: "system.folder"), Self.field("body", by: "system.folder")])],
             edgeTypes: [])
         let row = Self.row("f1", type: "system.folder", properties: ["title": "Inbox", "body": "Everything unsorted."])
-        let item = MarfaMapping.item(row, edges: [], catalogue: catalogue, isHeld: { _ in false })
+        let item = MarfaMapping.item(
+            row, edges: [], catalogue: catalogue, display: SampleLibrary.display(ItemDisplayInput(type: row.type, properties: row.properties)), isHeld: { _ in false })
         #expect(item.title == "Inbox")
         #expect(item.titleRule == .property("title"))
         #expect(item.preview == "Everything unsorted.")

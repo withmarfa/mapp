@@ -244,9 +244,9 @@ struct CommandPalette: View {
         let items = results.map(Self.listed) ?? Array(browser.paletteIndex(in: library).recent.prefix(12))
         return items.map { item in
             // An excerpt that is the title says nothing the title does not, so the preview stands.
-            let excerpt = results?.excerpts[item.id].flatMap { $0.plainText == item.title ? nil : $0 }
+            let excerpt = results?.excerpts[item.id].flatMap { $0.plainText == item.name ? nil : $0 }
             return Entry(
-                id: "note:\(item.id)", title: item.title, detail: library.placeLabel(of: item),
+                id: "note:\(item.id)", title: item.displayTitle, detail: library.placeLabel(of: item),
                 snippet: item.preview.isEmpty ? nil : item.preview, excerpt: excerpt,
                 icon: .type(library.catalogue.icon(for: item.type)), takesFocus: true
             ) {
@@ -424,7 +424,7 @@ struct CommandPalette: View {
                 }
             }
             for collection in library.collections(holding: members) {
-                add(String(localized: "Remove from “\(collection.title)”"), "rectangle.stack.badge.minus") {
+                add(String(localized: "Remove from “\(collection.displayTitle)”"), "rectangle.stack.badge.minus") {
                     library.removeFromCollection(browser.selection, collection.id, undoManager: undoManager)
                 }
             }
@@ -467,7 +467,7 @@ struct CommandPalette: View {
 
     /// An item by title, with its type, or the Inbox for one waiting there.
     private func note(_ item: Item) -> Entry {
-        Entry(id: "note:\(item.id)", title: item.title, detail: library.placeLabel(of: item), icon: .type(library.catalogue.icon(for: item.type)), takesFocus: true) {
+        Entry(id: "note:\(item.id)", title: item.displayTitle, detail: library.placeLabel(of: item), icon: .type(library.catalogue.icon(for: item.type)), takesFocus: true) {
             reveal(item)
         }
     }

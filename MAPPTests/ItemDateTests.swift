@@ -1,4 +1,5 @@
 import Foundation
+import struct Marfa.ItemDate
 import Testing
 @testable import MAPP
 
@@ -13,68 +14,20 @@ struct ItemDateTests {
         calendar("UTC").date(from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute, second: second))!
     }
 
-    @Test func aDayIsItsStartInThePersonsTimeZone() throws {
-        for zone in ["America/Los_Angeles", "Pacific/Auckland", "Europe/London"] {
-            let calendar = Self.calendar(zone)
-            let parsed = try #require(ItemDate.parse("2026-10-24", calendar: calendar))
-            #expect(!parsed.hasTime)
-            let parts = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: parsed.date)
-            #expect(parts.year == 2026 && parts.month == 10 && parts.day == 24 && parts.hour == 0 && parts.minute == 0)
-        }
+    @Test(arguments: ["America/Los_Angeles", "Pacific/Auckland", "Europe/London", "Pacific/Kiritimati", "Etc/GMT+12"])
+    func aDayOnlyValueIsTheSameDayInEveryTimeZoneAndWritesBackAsItWasRead(zone: String) throws {
+        let calendar = Self.calendar(zone)
+        let parsed = try #require(ItemDate.parse("2026-10-24", calendar: calendar))
+        #expect(!parsed.hasTime)
+        #expect(parsed.text(locale: Locale(identifier: "en_GB"), calendar: calendar) == "24 Oct 2026")
+        #expect(ItemDate.day(parsed.date, calendar: calendar) == "2026-10-24")
     }
 
-    @Test(arguments: [
-        ("2026-10-27T14:00:00.000Z", utc(2026, 10, 27, 14, 0)),
-        ("2026-10-27T14:00:00Z", utc(2026, 10, 27, 14, 0)),
-        ("2026-10-27T14:00Z", utc(2026, 10, 27, 14, 0)),
-        ("2026-10-27T15:30:00+01:30", utc(2026, 10, 27, 14, 0)),
-        ("2026-10-27T09:00:00-05:00", utc(2026, 10, 27, 14, 0)),
-        ("2026-10-28T00:15:00+10:15", utc(2026, 10, 27, 14, 0)),
-        ("2024-02-29T23:59:59Z", utc(2024, 2, 29, 23, 59, 59)),
-        ("2026-10-27T15:30+01:30", utc(2026, 10, 27, 14, 0)),
-    ])
-    func everyMomentFormTheContractTakesIsRead(text: String, expected: Date) throws {
-        let parsed = try #require(ItemDate.parse(text))
+    @Test func aMomentRoundTripsThroughTheInstantForm() throws {
+        let parsed = try #require(ItemDate.parse("2026-10-27T15:30:00+01:30"))
         #expect(parsed.hasTime)
-        #expect(parsed.date == expected)
-    }
-
-    @Test func aFractionKeepsItsPlace() throws {
-        let parsed = try #require(ItemDate.parse("2026-10-24T01:30:45.125Z"))
-        #expect(abs(parsed.date.timeIntervalSince(Self.utc(2026, 10, 24, 1, 30, 45)) - 0.125) < 0.000_001)
-        let long = try #require(ItemDate.parse("2026-10-24T01:30:45.123456789Z"))
-        #expect(abs(long.date.timeIntervalSince(Self.utc(2026, 10, 24, 1, 30, 45)) - 0.123456789) < 0.000_001)
-    }
-
-    @Test(arguments: [
-        "2026-02-30", "2025-02-29", "2026-13-01", "2026-00-02", "2026-10-00", "2026-10-32", "1900-02-29", "0001-02-29",
-        "2026-02-30T12:30:00Z", "2026-10-24T24:00:00Z", "2026-10-24T12:60:00Z", "2026-10-24T12:30:60Z",
-        "2026-10-24T12:30:00+24:00", "2026-10-24T12:30:00+00:60", "2026-10-24T12:30:00+0100",
-        "2026-10-24T12:30:00", "2026-10-24T12Z", "2026-10-24T12:30:00.Z", "2026-10-24 12:30:00Z",
-        "2026-10-24t12:30:00z", "tomorrow", "2026-1-01", " ", "", " 2026-10-24",
-        "2026-10-24T", "2026-10-24T12:30:00Z ", "2026-10-24T12:30:00.5", "2026-10-24T12:30:00Z+01:00", "2026-10-24T12:3Z",
-        "2026-10-24T12:30:00.5.5Z", "２０２６-10-24", "2026-10-24\n", "20261024",
-    ])
-    func whatTheContractRefusesIsNotADate(text: String) {
-        #expect(ItemDate.parse(text) == nil)
-    }
-
-    @Test(arguments: [
-        ("0000-01-01", false), ("0000-02-29", false), ("0000-02-29T00:00-23:59", true),
-        ("2000-02-29", false), ("1600-02-29", false), ("9999-12-31", false),
-    ])
-    func theContractsWholeYearRangeIsAccepted(text: String, hasTime: Bool) throws {
-        let parsed = try #require(ItemDate.parse(text, calendar: Self.calendar("UTC")))
-        #expect(parsed.hasTime == hasTime)
-    }
-
-    @Test func yearZeroIsTheProlepticGregorianYearBeforeOne() throws {
-        let leapDay = try #require(ItemDate.parse("0000-02-29", calendar: Self.calendar("UTC")))
-        #expect(leapDay.date.timeIntervalSince1970 == -62_162_121_600)
-        let shifted = try #require(ItemDate.parse("0000-02-29T00:00-23:59"))
-        #expect(shifted.date.timeIntervalSince1970 == -62_162_121_600 + 23 * 3600 + 59 * 60)
-        let reformGap = try #require(ItemDate.parse("1582-10-10", calendar: Self.calendar("UTC")))
-        #expect(reformGap.date.timeIntervalSince1970 == -12_219_292_800 - 5 * 86_400)
+        #expect(parsed.date == Self.utc(2026, 10, 27, 14, 0))
+        #expect(ItemDate.parse(ItemDate.instant(parsed.date))?.date == parsed.date)
     }
 
     @Test func aStatusFieldTakesAWordAndNothingElse() {
@@ -99,8 +52,8 @@ struct ItemDateTests {
         let london = Self.calendar("Europe/London")
         let lateEvening = try #require(london.date(from: DateComponents(year: 2026, month: 10, day: 27, hour: 23, minute: 30)))
         #expect(ItemDate.day(lateEvening, calendar: london) == "2026-10-27")
-        let moment = ItemDate.moment(Self.utc(2026, 10, 27, 14, 0))
-        #expect(moment == "2026-10-27T14:00:00Z")
+        let moment = ItemDate.instant(Self.utc(2026, 10, 27, 14, 0))
+        #expect(moment == "2026-10-27T14:00:00.000Z")
         #expect(ItemDate.parse(moment)?.date == Self.utc(2026, 10, 27, 14, 0))
     }
 

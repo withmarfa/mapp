@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 
 /// What a page to read shows above its title: where it came from, when it was published and how long it takes,
 /// and a description to stand under the title.
@@ -25,7 +26,7 @@ nonisolated struct ReadingHeader: Equatable, Sendable {
         original = Self.webAddress(text("url"))
         let host = original?.host(percentEncoded: false).map { $0.hasPrefix("www.") ? String($0.dropFirst(4)) : $0 }
         let published = text("published_at").flatMap { ItemDate.parse($0, calendar: calendar) }
-            .map { ItemDate(date: $0.date, hasTime: false).text(locale: locale, calendar: calendar) }
+            .map { ItemDate.text(of: $0.date, hasTime: false, locale: locale, calendar: calendar) }
         let words = body.map { Self.words(in: $0) } ?? 0
         let minutes = words >= Self.shortestRead ? Self.minutes(words: words) : nil
         byline = PageByline(

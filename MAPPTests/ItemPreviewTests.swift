@@ -6,69 +6,6 @@ import UniformTypeIdentifiers
 @testable import MAPP
 
 struct ItemPreviewTests {
-    func text(_ body: String, title: String = "Title") -> String { ItemPreview.text(of: body, title: title) }
-
-    @Test func markdownMarksAreStripped() {
-        let body = """
-        This has **strong** and *light* words, `code`, a [link](https://example.com), and ~~gone~~.
-        > A quoted line
-        - a list item
-        1. a numbered item
-        """
-        #expect(text(body) == "This has strong and light words, code, a link, and gone. A quoted line. A list item. A numbered item")
-    }
-
-    @Test func eachLineEndsAsASentenceSoItemsReadApart() {
-        #expect(text("- own type\n- Share the log\n- Done!\n- see notes:\n- (aside)") == "own type. Share the log. Done! See notes: (aside)")
-        #expect(text("One line with no stop") == "One line with no stop")
-        #expect(text("Steps\n- iPhone first\n- macOS next", title: "none") == "Steps. iPhone first. macOS next")
-    }
-
-    @Test func headingLinesAreSkipped() {
-        let body = "## Why\n\n- **Two names are in use.**\n- Pick one.\n\n### Next\n\nDo it."
-        #expect(text(body) == "Two names are in use. Pick one. Do it.")
-    }
-
-    @Test func aBodyThatIsOnlyHeadingsHasNoPreview() {
-        #expect(text("# One\n\n## Two\n") == "")
-    }
-
-    @Test func wikiLinksReadAsTheirNames() {
-        #expect(text("See [[Field notes]] and [[Plan|the plan]] and ![[Dusk.png]].") == "See Field notes and the plan and Dusk.png.")
-    }
-
-    @Test func imagesAreTheirDescriptions() {
-        #expect(text("![A diagram](image.png) shows it") == "A diagram shows it")
-    }
-
-    @Test func htmlCommentsAreRemovedWhateverTheirLength() {
-        #expect(text("<!-- hidden -->Shown <!-- also\nhidden --> text") == "Shown text")
-        #expect(text("Kept <!-- never closed\nand long") == "Kept")
-    }
-
-    @Test func whitespaceCollapsesToSingleSpaces() {
-        #expect(text("First   line\n\n\n\tsecond\t\tline\r\nthird") == "First line. Second line. Third")
-    }
-
-    @Test func aFirstLineThatRepeatsTheTitleIsDropped() {
-        #expect(text("Groceries\n\nMilk and eggs", title: "groceries") == "Milk and eggs")
-    }
-
-    @Test func theLimitCapsAVeryLongBody() {
-        let body = "Title\n" + String(repeating: "word ", count: 5_000)
-        #expect(text(body).count == ItemPreview.limit)
-    }
-
-    @Test func aLongBodyIsOnlyReadAsFarAsAPreviewNeeds() {
-        let body = String(repeating: "Line of words in a long note.\n", count: 100_000)
-        #expect(text(body).count == ItemPreview.limit)
-    }
-
-    @Test func theFallbackStandsInForAnEmptyBody() {
-        #expect(ItemPreview.text(of: "", title: "Task", fallback: "A **short** description") == "A short description")
-        #expect(ItemPreview.text(of: "Body", title: "Task", fallback: "Description") == "Body")
-    }
-
     @Test func aFileReadsAsItsKindAndSize() throws {
         let described = ItemPreview.file(.plainText, byteCount: 76)
         let kind = try #require(UTType.plainText.localizedDescription)
@@ -126,12 +63,12 @@ struct TypeIconTests {
         #expect(TypeIconKey.value(for: "link") != "link")
     }
 
-    @Test func theLabelComesFromTheCatalogueElseTheLastSegment() {
+    @Test func theLabelComesFromTheCatalogueElseTheIdentifier() {
         let catalogue = Catalogue(itemTypes: [
             ItemTypeInfo(id: TypeID("aic.ticket.spike"), label: "Question", fields: [], titleField: nil, bodyField: nil, parent: nil)
         ])
         #expect(catalogue.label(for: TypeID("aic.ticket.spike")) == "Question")
-        #expect(catalogue.label(for: TypeID("acme.widget")) == "Widget")
+        #expect(catalogue.label(for: TypeID("acme.widget")) == "acme.widget")
     }
 }
 

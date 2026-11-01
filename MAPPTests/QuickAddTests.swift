@@ -462,7 +462,7 @@ struct QuickAddTests {
 
     @Test func aFileIsAddedAsAnItemOfItsOwnAndOpens() async throws {
         let project = Item(
-            id: .mint(), type: TypeID("test.project"), title: "Launch", titleRule: .property("title"),
+            id: .mint(), type: TypeID("test.project"), title: "Launch", name: "Launch", titleRule: .property("title"),
             version: ItemVersion(1), created: start, modified: start)
         let library = FakeItemLibrary(items: [project], now: start)
         let browser = Browser()
@@ -483,7 +483,7 @@ struct QuickAddTests {
 
     private func holdingProject() -> (FakeItemLibrary, Item, release: AsyncStream<Void>.Continuation) {
         let project = Item(
-            id: .mint(), type: TypeID("test.project"), title: "Launch", titleRule: .property("title"),
+            id: .mint(), type: TypeID("test.project"), title: "Launch", name: "Launch", titleRule: .property("title"),
             version: ItemVersion(1), created: start, modified: start)
         let library = FakeItemLibrary(items: [project], now: start)
         let (hold, release) = AsyncStream<Void>.makeStream()
@@ -546,7 +546,7 @@ struct QuickAddTests {
 
     @Test func aParentTheCoreRefusesIsToldBeforeAnythingIsMade() async throws {
         let project = Item(
-            id: .mint(), type: TypeID("test.project"), title: "Launch", titleRule: .property("title"),
+            id: .mint(), type: TypeID("test.project"), title: "Launch", name: "Launch", titleRule: .property("title"),
             version: ItemVersion(1), created: start, modified: start)
         let library = FakeItemLibrary(items: [project], now: start)
         library.childRefusals[project.id] = "That item is in the bin."
@@ -729,7 +729,7 @@ struct QuickAddTests {
     @Test func changingTheKindDropsTheChipsTheNewKindCannotShow() {
         let library = FakeItemLibrary(now: start)
         let project = Item(
-            id: .mint(), type: TypeID("test.project"), title: "Launch", titleRule: .property("title"),
+            id: .mint(), type: TypeID("test.project"), title: "Launch", name: "Launch", titleRule: .property("title"),
             version: ItemVersion(1), created: start, modified: start)
         library.items.append(project)
         library.parentCandidates["core.task"] = [project.id]
@@ -751,7 +751,7 @@ struct QuickAddTests {
     @Test func anItemIsMadeWithTheValuesAndParentOfItsChips() async throws {
         let library = FakeItemLibrary(now: start)
         let project = Item(
-            id: .mint(), type: TypeID("test.project"), title: "Launch", titleRule: .property("title"),
+            id: .mint(), type: TypeID("test.project"), title: "Launch", name: "Launch", titleRule: .property("title"),
             version: ItemVersion(1), created: start, modified: start)
         library.items.append(project)
         library.parentCandidates["core.task"] = [project.id]
@@ -775,7 +775,7 @@ struct QuickAddTests {
 
     private func project(in library: FakeItemLibrary) -> Item {
         let project = Item(
-            id: .mint(), type: TypeID("test.project"), title: "Launch", titleRule: .property("title"),
+            id: .mint(), type: TypeID("test.project"), title: "Launch", name: "Launch", titleRule: .property("title"),
             version: ItemVersion(1), created: start, modified: start)
         library.items.append(project)
         return project

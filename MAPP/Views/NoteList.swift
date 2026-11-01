@@ -140,7 +140,7 @@ struct ItemRow: View {
 
     /// A match in the title is shown in the title itself, since the excerpt would only say it again.
     private var titleExcerpt: SearchExcerpt? {
-        guard let excerpt, !item.title.isEmpty, excerpt.plainText.trimmingCharacters(in: .whitespaces) == item.title else { return nil }
+        guard let excerpt, let name = item.name, !name.isEmpty, excerpt.plainText.trimmingCharacters(in: .whitespaces) == name else { return nil }
         return excerpt
     }
 

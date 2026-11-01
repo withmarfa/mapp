@@ -42,6 +42,10 @@ extension MarfaEngine {
         let holdLimit = TestHook<Duration>()
         /// Replaces the copy's attach, which the fake copy refuses, so a test can hold it as a large file's would be.
         let attaching = TestHook<@Sendable (_ item: String, _ title: String) async throws -> Marfa.Attached>()
+        /// Chooses an error a name lookup fails with, given the ids in its batch, since a fake copy answers them all.
+        let naming = TestHook<@Sendable ([String]) -> MarfaError?>()
+        /// The ids of each name lookup asked, in order.
+        let namesAsked = TestTally<[[String]]>([])
     }
 }
 

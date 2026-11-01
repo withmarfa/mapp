@@ -4,25 +4,32 @@ import Testing
 @testable import MAPP
 
 @Suite struct SearchExcerptTests {
-    private func excerpt(_ html: String) -> SearchExcerpt? {
-        SearchExcerpt(html: html, version: ItemVersion(1), modified: Date(timeIntervalSince1970: 0))
+    private func excerpt(_ runs: SearchExcerpt.Run...) -> SearchExcerpt? {
+        SearchExcerpt(runs: runs, version: ItemVersion(1), modified: Date(timeIntervalSince1970: 0))
     }
 
-    @Test func marksBecomeMatchesAndEscapesBecomeText() throws {
-        let found = try #require(excerpt("...the <mark>R&amp;D</mark> plan &quot;now&quot;\n  here &#39;ok&#39;..."))
+    private func text(_ text: String, match: Bool = false) -> SearchExcerpt.Run { .init(text: text, isMatch: match) }
+
+    @Test func theCoresRunsKeepTheirMarksAndLinesFoldToSpaces() throws {
+        let found = try #require(excerpt(text("...the "), text("R&D", match: true), text(" plan\n  here...")))
         #expect(found.runs.map(\.isMatch) == [false, true, false])
         #expect(found.runs[1].text == "R&D")
-        #expect(found.plainText == "...the R&D plan \"now\" here 'ok'...")
+        #expect(found.plainText == "...the R&D plan here...")
     }
 
     @Test func anExcerptWithNoTextIsNone() {
-        #expect(excerpt("") == nil)
-        #expect(excerpt(" <mark></mark> \n ") == nil)
+        #expect(excerpt() == nil)
+        #expect(excerpt(text(" "), text("", match: true), text(" \n ")) == nil)
+    }
+
+    @Test func aTrailingSpaceIsDropped() throws {
+        let found = try #require(excerpt(text("a "), text("b", match: true), text("  ")))
+        #expect(found.plainText == "a b")
     }
 
     @Test func aVeryLongStretchIsCutNearTheMatch() throws {
         let long = String(repeating: "word ", count: 200)
-        let found = try #require(excerpt("\(long)<mark>hit</mark>\(long)"))
+        let found = try #require(excerpt(text(long), text("hit", match: true), text(long)))
         #expect(found.runs.count == 3)
         #expect(found.runs[0].text.count <= SearchExcerpt.reach + 1)
         #expect(found.runs[0].text.hasPrefix("…"))
@@ -34,7 +41,7 @@ import Testing
         let date = Date(timeIntervalSince1970: 5)
         var item = LibraryFixture.item(LibraryFixture.n1, LibraryFixture.note, "Note", age: 1)
         item.modified = date
-        let found = SearchExcerpt(html: "x", version: item.version, modified: date)
+        let found = SearchExcerpt(runs: [.init(text: "x", isMatch: false)], version: item.version, modified: date)
         #expect(found?.describes(item) == true)
         item.version = ItemVersion(2)
         #expect(found?.describes(item) == false)
@@ -89,7 +96,8 @@ import Testing
         let (library, source) = try await loaded()
         let item = try #require(library.item(F.n1))
         source.hits.withLock { $0["body"] = [F.n1] }
-        let excerpt = try #require(SearchExcerpt(html: "a <mark>body</mark>", version: item.version, modified: item.modified))
+        let excerpt = try #require(SearchExcerpt(
+            runs: [.init(text: "a ", isMatch: false), .init(text: "body", isMatch: true)], version: item.version, modified: item.modified))
         source.excerpts.withLock { $0["body"] = [F.n1: excerpt] }
         #expect(await eventually { library.search("body", in: .everywhere).excerpts[F.n1] != nil })
 
@@ -108,6 +116,16 @@ import Testing
         source.hits.withLock { $0["body"] = [F.n1, F.p1] }
         #expect(await eventually { library.search("body", in: .everywhere).items.map(\.id) == [F.n1, F.p1] })
         source.send(.removed([F.n1]))
+        #expect(await eventually { library.search("body", in: .everywhere).items.map(\.id) == [F.p1] })
+    }
+
+    @Test func anItemSentToTheBinWhileShownLeavesTheResultsAtOnce() async throws {
+        let (library, source) = try await loaded()
+        source.hits.withLock { $0["body"] = [F.n1, F.p1] }
+        #expect(await eventually { library.search("body", in: .everywhere).items.map(\.id) == [F.n1, F.p1] })
+        var binned = try #require(library.item(F.n1))
+        binned.state = .trashed
+        source.send(.changed(ItemChanges(upserted: [binned])))
         #expect(await eventually { library.search("body", in: .everywhere).items.map(\.id) == [F.p1] })
     }
 
@@ -138,8 +156,7 @@ import Testing
 
     @Test func aCapNoticeCountsTheRowsShownNotTheLimit() async throws {
         let (library, source) = try await loaded()
-        // The copy cuts its list at the limit before the bin's items are dropped from it, so fewer rows can show.
-        source.hits.withLock { $0["body"] = [F.n1, F.n3, F.p1] }
+        source.hits.withLock { $0["body"] = [F.n1, F.p1] }
         source.searchCapped.withLock { $0 = true }
         #expect(await eventually { library.search("body", in: .everywhere).cappedCount != nil })
         let found = library.search("body", in: .everywhere)

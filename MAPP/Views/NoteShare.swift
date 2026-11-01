@@ -13,7 +13,7 @@ struct NoteShare {
     init() {}
 
     init(note: Item?, fileURL: URL?, in library: any ItemLibrary) {
-        title = note?.title ?? ""
+        title = note?.displayTitle ?? ""
         text = note.flatMap { library.body(of: $0.id)?.text }
         self.fileURL = fileURL
     }

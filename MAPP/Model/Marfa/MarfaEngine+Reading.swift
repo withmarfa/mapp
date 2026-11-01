@@ -82,7 +82,7 @@ extension MarfaEngine {
             if viewsChanged { await readViews() }
             if queueChanged {
                 await readQueue()
-                publish([])
+                await publish([])
             }
         }
         if everything || queueChanged { await takeAnswers() }
@@ -157,7 +157,7 @@ extension MarfaEngine {
             }
         } catch {
             readFailed(error)
-            publish([])
+            await publish([])
             return
         }
         let previousRows = self.rows
@@ -237,7 +237,7 @@ extension MarfaEngine {
         let publishing = Telemetry.begin(.engine, "reload.publish")
         let ids = everything ? Set(rows.keys).union(gone) : touched
         published = ids.count
-        publish(ids.map { ItemID($0) }, catalogueChanged: true)
+        await publish(ids.map { ItemID($0) }, catalogueChanged: true)
         publishing.end(("ids", published))
         // Held undos are judged on what this read found, so they wait until it found the copy whole.
         guard whole else { return }

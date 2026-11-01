@@ -9,7 +9,7 @@ import Testing
 @MainActor struct ListEditingTests {
     private static let emailsField = TypeField(
         name: "emails", type: "array", declaredBy: "core.entity",
-        definition: ["items_type": "object", "items_fields": ["value": ["type": "email", "required": true], "label": ["type": "string"]]])
+        definition: ["items_type": "object", "items_fields": ["value": ["type": "email", "required": true, "label": "Address"], "label": ["type": "string", "label": "Tag"]]])
     private static let scoresField = TypeField(
         name: "scores", type: "array", declaredBy: "t",
         definition: ["items_type": "object", "items_fields": ["points": ["type": "integer", "minimum": 1, "maximum": 5, "required": true]]])
@@ -67,6 +67,19 @@ import Testing
     /// The identities the editor draws for the store's list as it stands.
     private static func drawn(_ editing: ListEditing, _ store: Store) -> [UUID] {
         editing.rows(of: store.value, writing: store.isWriting, marks: store.marks).map(\.id)
+    }
+
+    @Test func aMemberNamedInWhatIsGivenBackIsNamedAsTheCoreNamesIt() throws {
+        let editing = ListEditing()
+        let shape = try Self.shape(Self.emailsField)
+        #expect(try Self.member(shape, "label").label == "Tag")
+        let a = Self.email("a@example.com", "work")
+        let ids = editing.rows(of: .array([a]), shape: shape).map(\.id)
+        editing.type("home", into: ListEditing.Slot(entry: ids[0], member: "label"), in: .array([a]))
+        #expect(editing.rows(of: .array([]), shape: shape).isEmpty)
+        let notices = Notices()
+        editing.handBackOrphans(label: "Emails", to: notices)
+        #expect(notices.waiting.first?.text == "Emails: Tag: home")
     }
 
     // MARK: The entry being added
@@ -140,7 +153,7 @@ import Testing
         let notices = Notices()
         editing.handBackOrphans(label: "Emails", to: notices)
         let notice = try #require(notices.waiting.first)
-        #expect(notice.text == "Emails: Label: home")
+        #expect(notice.text == "Emails: label: home")
         #expect(!editing.holdsUnsavedWork)
     }
 
@@ -446,7 +459,7 @@ import Testing
         editing.leave(shape, label: "Emails", value: store.value, isEditable: true, write: store.write, to: notices)
         #expect(store.value == .array([Self.email("a@example.com", "work")]))
         let notice = try #require(notices.waiting.first)
-        #expect(notice.text == "Emails: New entry: Label: home")
+        #expect(notice.text == "Emails: New entry: Tag: home")
         #expect(notice.message.hasPrefix("The new entry wasn’t finished"))
         #expect(!editing.holdsUnsavedWork)
     }
@@ -460,7 +473,7 @@ import Testing
         let notices = Notices()
         editing.leave(shape, label: "Emails", value: store.value, isEditable: false, write: store.write, to: notices)
         #expect(store.writes.isEmpty)
-        #expect(notices.waiting.first?.text == "Emails: Label: work")
+        #expect(notices.waiting.first?.text == "Emails: Tag: work")
     }
 
     @Test func theInspectorGivesBackAListLeftUnfinishedWhenTheSelectionMoves() throws {
@@ -493,7 +506,7 @@ import Testing
 
         let notices = Notices()
         quickAdd.handOff(to: notices, because: .closed, in: nil)
-        #expect(notices.waiting.first?.text == "Emails: New entry: Label: work")
+        #expect(notices.waiting.first?.text == "Emails: New entry: Tag: work")
         #expect(quickAdd.listDrafts.isEmpty)
     }
 }

@@ -19,7 +19,7 @@ struct ListEntriesEditor: View {
     @Environment(\.library) private var library
 
     var body: some View {
-        let rows = editing.rows(of: value, writing: isWriting, marks: marks)
+        let rows = editing.rows(of: value, shape: shape, writing: isWriting, marks: marks)
         VStack(alignment: .leading, spacing: 8) {
             ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                 entryBlock(row, index: index, count: rows.count)

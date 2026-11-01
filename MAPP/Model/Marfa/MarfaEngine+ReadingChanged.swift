@@ -53,7 +53,7 @@ extension MarfaEngine {
         }
         let (affected, links) = await take(named, rows: found, edges: held)
         hub.report.update { $0.fill = LibraryFill(status, completeness: .complete) }
-        publish(affected.map { ItemID($0) })
+        await publish(affected.map { ItemID($0) })
         if links == .read { cursor = next }
         interval.end(("whole", links == .failed ? 1 : 0), ("items", named.items.count + named.removedItems.count),
                      ("edges", named.edges.count + named.removedEdges.count), ("published", affected.count))
@@ -305,7 +305,7 @@ extension MarfaEngine {
         affected.formUnion(linking.filter { before[$0] != bodyLinks[$0] })
         await readConflictLinks(affected)
         await readQueue()
-        publish(affected.map { ItemID($0) })
+        await publish(affected.map { ItemID($0) })
         if links == .failed { await reload() }
     }
 }

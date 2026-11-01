@@ -212,7 +212,8 @@ import Testing
     }
 
     private static func fake(_ rows: [Marfa.Item]) -> FakeCopy {
-        WorkingCopy.fake(items: rows, itemTypes: SampleLibrary.itemTypes, edgeTypes: SampleLibrary.edgeTypes)
+        WorkingCopy.fake(
+            items: rows, itemTypes: SampleLibrary.itemTypes, edgeTypes: SampleLibrary.edgeTypes, displays: SampleLibrary.display)
     }
 
     private static func open(_ fake: FakeCopy, readingWith set: (Reads) -> Void = { _ in }) async throws -> Scene {
@@ -327,7 +328,7 @@ import Testing
             let id = "kept-\(index)"
             let item = try #require(scene.item(id), "\(id) was not shown")
             #expect(item.title == (index == 5 ? "Waiting 5" : "Kept \(index)"))
-            #expect(item.preview == "Body \(index)")
+            #expect(item.preview == "Body *\(index)*", "the stand-in for the core strips no Markdown")
             #expect(shown.bodies[item.id]?.text == "Body *\(index)*")
             #expect((item.sync == .settled) == (index != 5), "\(id) is \(item.sync)")
         }
@@ -589,6 +590,74 @@ import Testing
         await step(.complete, listed: 4000)
         #expect(scene.source.syncReport.fill == LibraryFill(state: .complete, listed: 4000, expected: 4000))
         #expect(scene.wholeReads == filling + 1)
+        await scene.close()
+    }
+
+    // MARK: Names and previews
+
+    @Test func aFailedNameQuestionKeepsWhatEachItemWasToldAndAsksAgainWithTheNextChange() async throws {
+        let scene = try await Self.open(Self.fake([Self.row("one", title: "One", body: "First body"), Self.row("two", title: "Two")]))
+        await scene.source.engineTook()
+        #expect(scene.item("one")?.name == "One")
+        #expect(scene.item("one")?.preview == "First body")
+
+        // The copy cannot be asked: the item keeps the name it was told, and a row never told shows the placeholder.
+        let answer = scene.fake.displays
+        scene.fake.displays = nil
+        _ = try await scene.copy.items.update("one", Edit(properties: ["title": .string("One again")], baseVersion: 1))
+        let made = ItemID.mint().rawValue
+        _ = try await scene.copy.items.create(Draft(type: "core.note", properties: ["title": .string("Made")], id: made))
+        try await scene.drainAccepting()
+        await scene.hearBatch(["one", made])
+        await scene.source.engineTook()
+        let kept = try #require(scene.item("one"))
+        #expect(kept.title == "One again")
+        #expect(kept.name == "One", "a failed question took the name of an item that had one")
+        #expect(kept.preview == "First body")
+        let fresh = try #require(scene.item(made))
+        #expect(fresh.isUntitled)
+
+        // The next change asks again for both, not only for the item that changed.
+        scene.fake.displays = answer
+        await scene.hearServer("two")
+        await scene.source.engineTook()
+        #expect(scene.item("one")?.name == "One again")
+        #expect(scene.item(made)?.name == "Made", "an item never named was not asked about again")
+        await scene.close()
+    }
+
+    @Test func aNameQuestionThatKeepsFailingAsksOnlyEachChangesOwnItemsAndTellsOnce() async throws {
+        let scene = try await Self.open(Self.fake([
+            Self.row("one", title: "One"), Self.row("two", title: "Two"), Self.row("three", title: "Three")]))
+        await scene.source.engineTook()
+        let hooks = scene.source.engine.hooks
+        func unavailable() -> Int {
+            scene.log.current.changes.count { if case .unavailable = $0 { true } else { false } }
+        }
+        let before = unavailable()
+
+        let failing = Mutex(true)
+        hooks.naming.set { _ in failing.withLock { $0 } ? MarfaError.server(status: 500, code: "internal", message: "No names.") : nil }
+        let made = ItemID.mint().rawValue
+        _ = try await scene.copy.items.create(Draft(type: "core.note", properties: ["title": .string("Made")], id: made))
+        try await scene.drainAccepting()
+        await scene.hearServer(made)
+        await scene.source.engineTook()
+        await scene.hearServer("one")
+        await scene.source.engineTook()
+        await scene.hearServer("two")
+        await scene.source.engineTook()
+
+        let asked = hooks.namesAsked.current
+        #expect(asked.suffix(2) == [["one"], ["two"]], "a later change asked about earlier unnamed items: \(asked)")
+        #expect(unavailable() == before + 1, "a failing name lookup was told again")
+
+        // Once a lookup succeeds, the items never named are asked about and named.
+        failing.withLock { $0 = false }
+        await scene.hearServer("three")
+        await scene.source.engineTook()
+        #expect(Set(hooks.namesAsked.current.last ?? []).isSuperset(of: ["one", "two", made]))
+        #expect(scene.item(made)?.name == "Made")
         await scene.close()
     }
 

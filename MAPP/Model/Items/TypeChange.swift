@@ -223,7 +223,7 @@ extension ItemLibrary {
             guard let item = item(id), let plan = typeChange(of: id, to: type) else { continue }
             for field in plan.missing where !missing.contains(where: { $0.key == field.key }) { missing.append(field) }
             for key in plan.unused {
-                let label = ItemTypeInfo.Field.displayLabel(catalogue.label(ofField: key, for: item.type) ?? key)
+                let label = catalogue.label(ofField: key, for: item.type) ?? key
                 if !unused.contains(label) { unused.append(label) }
             }
         }

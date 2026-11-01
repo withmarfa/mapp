@@ -847,8 +847,8 @@ import Observation
         case .collections: String(localized: "Collections")
         case .source(let name): name
         case .favorites: String(localized: "Favorites")
-        case .favoriteItem(let id), .collection(let id): item(id)?.title ?? ""
-        case .itemType(let type): catalogue.itemTypes[TypeID(type)]?.label ?? type
+        case .favoriteItem(let id), .collection(let id): item(id)?.displayTitle ?? ""
+        case .itemType(let type): catalogue.plural(for: TypeID(type))
         case .files: String(localized: "Files")
         case .view(let id): views.first { $0.id == id }?.title ?? ""
         case .recentlyDeleted: String(localized: "Recently Deleted")
@@ -916,11 +916,26 @@ import Observation
     /// The copy's way of narrowing to a place or a view, or nil where the place stands for no query: the search
     /// then covers everything, as `SearchScope.narrows` says.
     private func target(for scope: SearchScope) -> SearchTarget {
-        guard case .place(let place) = scope, SearchScope.narrows(place) else { return .items(Self.searchScope) }
-        if case .view(let id) = place, views.contains(where: { $0.id == id }) { return .view(id) }
-        guard let query = ViewDraft.query(for: place, catalogue: catalogue, views: views) else { return .items(Self.searchScope) }
-        let narrowed = ItemQuery(
-            types: Set(query.types), beneath: query.beneath, states: query.states ?? [], tier: query.tier)
+        switch scope {
+        case .everywhere:
+            return .items(Self.searchScope)
+        case .typeWithSubtypes(let type):
+            // The copy takes a type with its subtypes, so the place's own-items-only condition is left off.
+            guard var query = ViewDraft.query(for: .itemType(type.rawValue), catalogue: catalogue, views: views) else {
+                return .items(Self.searchScope)
+            }
+            query.filter = nil
+            return Self.target(of: query)
+        case .place(let place):
+            guard SearchScope.narrows(place) else { return .items(Self.searchScope) }
+            if case .view(let id) = place, views.contains(where: { $0.id == id }) { return .view(id) }
+            guard let query = ViewDraft.query(for: place, catalogue: catalogue, views: views) else { return .items(Self.searchScope) }
+            return Self.target(of: query)
+        }
+    }
+
+    private static func target(of query: LibraryViewQuery) -> SearchTarget {
+        let narrowed = ItemQuery(types: Set(query.types), beneath: query.beneath, states: query.states ?? [], tier: query.tier)
         return .items(narrowed, filter: query.filter)
     }
 

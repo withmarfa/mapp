@@ -42,7 +42,7 @@ enum SavedViews {
         case .timeline:
             let fields = browser.timelineFieldChoices(in: library)
             let key = ItemTimelineLayout.selectedField(browser.timelineFields[browser.item], fields: fields)
-            window.layout = .timeline(key: key, label: fields.first { $0.key == key }?.displayLabel ?? "")
+            window.layout = .timeline(key: key, label: fields.first { $0.key == key }?.label ?? "")
         }
         return window
     }

@@ -1,3 +1,4 @@
+import Marfa
 import MarfaIcons
 import SwiftUI
 import UniformTypeIdentifiers
@@ -171,7 +172,7 @@ struct ItemInspector: View {
             if !emptyFields.isEmpty {
                 InspectorPlusMenu(accessibilityLabel: "Add Property", identifier: "ItemInspectorAddProperty", isRowHovered: hovering) {
                     ForEach(emptyFields) { field in
-                        Button(field.displayLabel) { add(field) }
+                        Button(field.label) { add(field) }
                             .accessibilityIdentifier("ItemInspectorAdd.\(field.key)")
                     }
                 }
@@ -198,7 +199,7 @@ struct ItemInspector: View {
             if !addable.isEmpty {
                 InspectorPlusMenu(accessibilityLabel: "Add Relationship", identifier: "RelationshipAddMenu", isRowHovered: hovering) {
                     ForEach(addable) { option in
-                        Button(ItemTypeInfo.Field.displayLabel(option.label)) { onEdit(option) }
+                        Button(option.label) { onEdit(option) }
                             .accessibilityIdentifier("RelationshipAdd.\(option.field)")
                     }
                 }
@@ -273,8 +274,8 @@ struct ItemInspector: View {
 
     @ViewBuilder private var details: some View {
         VStack(alignment: .leading, spacing: 0) {
-            detail("Created", ItemDate(date: item.created, hasTime: true).text(), isDate: true)
-            detail("Edited", ItemDate(date: item.modified, hasTime: true).text(), isDate: true)
+            detail("Created", ItemDate.text(of: item.created, hasTime: true), isDate: true)
+            detail("Edited", ItemDate.text(of: item.modified, hasTime: true), isDate: true)
             if let source = item.source { detail("Made by", source) }
             if let place { detail("Place", place) }
             detail("Version", item.version.rawValue.formatted())
@@ -342,9 +343,9 @@ struct ItemInspector: View {
 
     /// The catalogue's label for a key, else the key written for reading.
     private static func name(of key: String, label: String?) -> String {
-        if let label { return ItemTypeInfo.Field.displayLabel(label) }
+        if let label { return label }
         let words = key.split { $0 == "_" || $0 == "-" || $0 == "." }.joined(separator: " ")
-        return ItemTypeInfo.Field.displayLabel(words)
+        return words
     }
 
     /// Every property the type does not name or show elsewhere, in the order the item holds them.

@@ -84,7 +84,7 @@ extension MarfaLibrary {
     }
 
     nonisolated private static func titleOrder(_ a: Item, _ b: Item) -> Bool {
-        let order = a.title.localizedStandardCompare(b.title)
+        let order = a.displayTitle.localizedStandardCompare(b.displayTitle)
         return order == .orderedSame ? a.id.rawValue < b.id.rawValue : order == .orderedAscending
     }
 }

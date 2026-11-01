@@ -144,11 +144,11 @@ extension MarfaEngine {
             counted.formUnion(answeredBefore)
             return [queued]
         case .editProperties(let id, let changes, let base, _):
-            let (properties, replacing) = try Self.propertyEdit(changes, of: rows[id.rawValue])
-            return [try await send(id, properties, replacing: replacing) { base.rawValue }]
+            let (properties, clearing) = Self.propertyEdit(changes)
+            return [try await send(id, properties, clearing: clearing) { base.rawValue }]
         case .retype(let id, let type, let changes, let base):
-            let (properties, replacing) = try Self.propertyEdit(changes, of: rows[id.rawValue])
-            return [try await send(id, properties, replacing: replacing, type: type.rawValue) { base.rawValue }]
+            let (properties, clearing) = Self.propertyEdit(changes)
+            return [try await send(id, properties, clearing: clearing, type: type.rawValue) { base.rawValue }]
         case .retier(let id, let tier, let base):
             return [try await send(id, JSONObject(), tier: MarfaMapping.marfaTier(tier)) { base.rawValue }]
         case .tag(let id, let tag, let on):

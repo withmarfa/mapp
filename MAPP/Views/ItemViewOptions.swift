@@ -143,7 +143,7 @@ struct ItemTimelineOptions: View {
         Picker("Date Field", systemImage: "calendar", selection: Binding { field ?? "" } set: {
             browser.timelineFields[browser.item] = $0
         }) {
-            ForEach(fields) { Text(verbatim: $0.displayLabel).tag($0.key) }
+            ForEach(fields) { Text(verbatim: $0.label).tag($0.key) }
         }
         .pickerStyle(.menu)
         .disabled(fields.isEmpty)
