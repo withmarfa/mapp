@@ -29,6 +29,8 @@ import Testing
         await source.queueSubmitted()
         #expect(try await copy.items.get(try #require(write.itemId))?.body == "Saved during fill")
         #expect(reads.edgeReads.withLock { $0 } > 0)
+        // The drain after the submit has ended, so nothing it tells lands after the check below.
+        await source.engine.sync.flush()
         #expect(!log.current.changes.contains { if case .unavailable = $0 { true } else { false } })
         await source.close()
     }
@@ -79,9 +81,10 @@ import Testing
         fake.sendUpdate(CopyUpdate(
             reread: .everything, connection: .offline(.network(message: "offline")),
             fill: FillProgress(listed: 1, expected: 4)))
+        // The copy's own update for the new item may paint the row first, so the offline update is awaited too.
+        try #require(await eventually { source.connectionState == .offline(reason: "offline") })
         let painted = try #require(await log.wait { $0.item(titled: "Arrived") != nil })
         let item = try #require(painted.item(titled: "Arrived"))
-        #expect(source.connectionState == .offline(reason: "offline"))
         source.submit(.editBody(item.id, "Kept", base: item.version, merge: .asRead), as: WriteID())
         await source.engineTook()
         #expect(try await copy.items.get(try #require(created.itemId))?.body == "Kept")
