@@ -62,8 +62,21 @@ extension LiveMarfaTests {
             return try #require(id)
         }
 
+        /// The row as the copy holds it. The server expires every copy when it takes a retype (`reach/moves-retype`),
+        /// and the write is answered before the copy has hydrated again, so a read by id waits until the copy holds the
+        /// row or is whole.
         private func row(_ id: ItemID, in source: MarfaSource) async throws -> Marfa.Item? {
-            try await source.copy.items.get(id.rawValue)
+            var found: Marfa.Item?
+            let read = try await eventuallyAsking {
+                do {
+                    found = try await source.copy.items.get(id.rawValue)
+                    return true
+                } catch MarfaError.hydrationIncomplete {
+                    return false
+                }
+            }
+            try #require(read, "the copy never held the row or became whole")
+            return found
         }
 
         @Test(.timeLimit(.minutes(2)))

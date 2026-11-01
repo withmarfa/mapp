@@ -128,6 +128,36 @@ struct MarfaDrainAnswersTests {
         await source.close()
     }
 
+    /// The copy clears a refused write that carried no content, such as a favorite, as it hands the answer over, so
+    /// the engine keeps it before the person until they discard it.
+    @Test
+    func aRefusedWriteThatCarriedNoContentStaysAProblemUntilDiscarded() async throws {
+        let (source, log, store) = try await open()
+        defer { try? FileManager.default.removeItem(at: store.deletingLastPathComponent()) }
+        let created = try await submit(source, ["Favorite"])
+        try Self.recordAccepted(created[0].1.id, at: store)
+        await source.tellAnswers()
+        _ = try #require(await log.wait { $0.answer(to: created[0].0) == .accepted })
+        let item = try #require(log.current.item(titled: "Favorite")).id
+
+        let tag = WriteID()
+        source.submit(.tag(item, ItemTag.favorite, on: true), as: tag)
+        await source.queueSubmitted()
+        let queued = try #require(try await source.copy.queue.all().first)
+        try Self.record(queued.id, "UPDATE queue SET verdict = 'refused', reason = 'item_not_found', sent = 1 WHERE id = ?", at: store)
+        await source.tellAnswers()
+        _ = try #require(await log.wait { $0.answer(to: tag) != nil })
+        #expect(try await source.copy.queue.all().isEmpty, "the copy keeps only refused writes that carried content")
+
+        #expect(await eventually { source.syncReport.problems.contains { $0.id == .write(queued.id) } }, "\(source.syncReport.problems)")
+        let entry = try #require(source.syncReport.problems.first { $0.id == .write(queued.id) })
+        #expect(entry.kind == .refused && entry.itemID == item)
+        #expect(entry.actions.contains(.discard))
+        #expect(try await source.resolve(entry.id, by: .discard))
+        #expect(await eventually { !source.syncReport.problems.contains { $0.id == entry.id } })
+        await source.close()
+    }
+
     /// A blocked answer is one the copy keeps, since the write may be released, and a released write keeps its queue
     /// id. Its next answer is taken like any other, and a second refusal of it is told again.
     @Test

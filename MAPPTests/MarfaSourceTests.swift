@@ -1399,8 +1399,8 @@ nonisolated enum LiveMarfa {
     }
 
     /// Whether a copy holds the whole library. A large library is listed in pages, with its relationships and the
-    /// feed after its first rows, and a move of an edge's source hydrates it again, so a test that reads what the
-    /// server holds, or writes a relationship, waits for this.
+    /// feed after its first rows, and a move of an edge's source or a retype hydrates it again, so a test that reads
+    /// what the server holds, or writes a relationship, waits for this.
     static func isWhole(_ report: SyncReport) -> Bool {
         report.fill?.state == .complete && report.phase == .current
     }
