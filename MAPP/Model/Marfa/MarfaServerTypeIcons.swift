@@ -1,6 +1,5 @@
 import Foundation
 import Marfa
-import MarfaAPI
 
 /// Sets and clears the owner's icon for a type on the Marfa server (`PUT` and `DELETE /types/{id}/icon`), which need
 /// `schema.write` and write on the type. It uses the same address and key as the working copy, read from the key
@@ -12,16 +11,9 @@ nonisolated struct MarfaServerTypeIcons: TypeIconSource {
     var timeout = Duration.seconds(20)
 
     @concurrent func setIcon(_ icon: String?, ofType type: TypeID) async throws(TypeIconFailure) -> String? {
-        guard let key = try? keys.key(for: connection), !key.isEmpty else { throw .keyRefused }
-        let client = Client(connection.server(key: key), timeout: timeout)
+        guard let key = try? keys.key(for: connection.address), !key.isEmpty else { throw .keyRefused }
         do {
-            let answer: Components.Schemas.RegisteredType
-            if let icon {
-                answer = try await client.set(icon: icon, forType: type.rawValue)
-            } else {
-                answer = try await client.clearIcon(ofType: type.rawValue)
-            }
-            return answer.value1.displayHints?.icon
+            return try await connection.server(key: key).setTypeIcon(icon, ofType: type.rawValue, timeout: timeout)
         } catch {
             throw Self.failure(error)
         }
@@ -29,10 +21,10 @@ nonisolated struct MarfaServerTypeIcons: TypeIconSource {
 
     static func failure(_ error: any Error) -> TypeIconFailure {
         guard let error = error as? MarfaError else { return .failed(error.localizedDescription) }
+        if error.isOffline { return .unreachable }
+        if error.isKeyRefusal { return .keyRefused }
         switch error {
-        case .noConnection, .network: return .unreachable
         case .forbidden: return .notPermitted
-        case .unauthorized, .signedOut: return .keyRefused
         case .validation(_, let message): return .refused(reason(message))
         default: return .failed(error.message)
         }

@@ -113,7 +113,7 @@ import Testing
         let bench = try HostBench()
         let connection = try MarfaConnection(address: address)
         bench.defaults.set(address, forKey: "MarfaAddress")
-        bench.keys.save("key", for: connection)
+        try bench.keys.save("key", for: connection.address)
         let libraries = try libraries(bench)
         #expect(libraries.mode == .opening)
         #expect(libraries.current == nil)

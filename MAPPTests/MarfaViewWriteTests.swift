@@ -1,4 +1,5 @@
 import Foundation
+import MarfaTesting
 import Synchronization
 import Testing
 @testable import MAPP
@@ -109,7 +110,7 @@ extension LiveMarfaTests {
             let root = URL.temporaryDirectory.appending(path: "MarfaViewWrites-\(UUID().uuidString)", directoryHint: .isDirectory)
             let connection = try MarfaConnection(address: try LiveMarfa.address())
             let source = try await MarfaSource.open(
-                connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]), location: MarfaStoreLocation(root: root))
+                connection, keys: MemoryKeyStore([connection.address: try LiveMarfa.key()]), location: MarfaStoreLocation(root: root))
             let library = MarfaLibrary(source: source, notices: Notices())
             defer { try? FileManager.default.removeItem(at: root) }
             source.refresh()

@@ -51,7 +51,7 @@ extension MarfaEngine {
         do {
             for write in entry.dependents + [id] {
                 if held.contains(write) {
-                    guard try await Self.asking(hub, { try await copy.queue.discard(write) }) else { continue }
+                    guard try await Self.asking({ try await copy.queue.discard(write) }) else { continue }
                 }
                 refusals[write] = nil
             }
@@ -72,7 +72,7 @@ extension MarfaEngine {
         guard let entry = entry(id), entry.actions.contains(.tryAgain) else { return .success(false) }
         let released: Bool
         do {
-            released = try await Self.asking(hub) { try await copy.queue.release(id) }
+            released = try await Self.asking { try await copy.queue.release(id) }
         } catch {
             return .failure(Self.failure(error))
         }

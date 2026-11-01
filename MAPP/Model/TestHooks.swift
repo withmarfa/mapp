@@ -36,8 +36,6 @@ extension MarfaEngine {
     nonisolated struct TestHooks: Sendable {
         /// Runs before each drain's answers are taken.
         let answering = TestHook<@Sendable () async -> Void>()
-        /// Runs after the queue was last read and before the answers are forgotten.
-        let forgetting = TestHook<@Sendable () async -> Void>()
         /// Chooses the error the copy refuses a write with, since a copy made for the tests is never brought up to date.
         let refusing = TestHook<@Sendable (ItemWrite) -> MarfaError?>()
         /// Replaces how long a held undo waits for a copy that is not catching up.

@@ -2,19 +2,13 @@ import Foundation
 import Testing
 @testable import MAPP
 
-/// The date of the last sync is kept by the host for each server, and Refresh is offered only where it can do something.
+/// The date of the last sync is the copy's own (the open source reports it), and Refresh is offered only where it
+/// can do something.
 @Suite(.hangLimit)
 @MainActor struct MarfaHostSyncedTests {
-    private let first = try! MarfaConnection(address: "http://first.test:8210")
-    private let second = try! MarfaConnection(address: "http://second.test:8210")
     private let day = Date(timeIntervalSinceReferenceDate: 800_000_000)
-    private static let key = "MarfaLastSynced"
 
-    private func kept(_ bench: HostBench) -> [String: Date] {
-        bench.defaults.dictionary(forKey: Self.key) as? [String: Date] ?? [:]
-    }
-
-    @Test func aSyncIsKeptForItsServer() async throws {
+    @Test func theLastSyncIsWhatTheOpenSourceReports() async throws {
         let bench = try HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
@@ -22,60 +16,19 @@ import Testing
         let source = try #require(bench.servers.last)
         source.report.update { $0.lastSynced = day }
         #expect(await eventually { host.lastSynced == day })
-        #expect(kept(bench) == ["http://first.test:8210": day])
+        // The host keeps nothing of it: the copy does, so a launch shows it before the server answers.
+        #expect(bench.defaults.dictionary(forKey: "MarfaLastSynced") == nil)
     }
 
-    @Test func theDateSurvivesALaunchAndAThisRunSyncReplacesIt() async throws {
-        let bench = try HostBench()
-        let host = bench.host()
-        try await host.connect(address: "http://first.test:8210", key: "k")
-        bench.servers.last?.report.update { $0.lastSynced = day }
-        #expect(await eventually { kept(bench)["http://first.test:8210"] == day })
-
-        let relaunched = bench.host()
-        #expect(relaunched.lastSynced == nil, "no server is set until the host launches")
-        await relaunched.launch()
-        #expect(relaunched.connection == first)
-        #expect(relaunched.lastSynced == day, "painted from what the launch before kept")
-
-        let later = day + 3600
-        bench.servers.last?.report.update { $0.lastSynced = later }
-        #expect(await eventually { relaunched.lastSynced == later })
-        #expect(kept(bench)["http://first.test:8210"] == later)
-    }
-
-    @Test func anotherServerHasItsOwnDateAndTheOneLeftIsForgotten() async throws {
-        let bench = try HostBench()
-        let host = bench.host()
-        try await host.connect(address: "http://first.test:8210", key: "k")
-        bench.servers.last?.report.update { $0.lastSynced = day }
-        #expect(await eventually { host.lastSynced == day })
-
-        try await host.changeAddress(to: "http://second.test:8210", key: "k", choice: .discardNothing)
-        #expect(host.connection == second)
-        #expect(host.lastSynced == nil, "the first server's sync says nothing of the second's copy")
-        #expect(kept(bench).isEmpty)
-
-        let later = day + 60
-        bench.servers.last?.report.update { $0.lastSynced = later }
-        #expect(await eventually { host.lastSynced == later })
-        #expect(kept(bench) == ["http://second.test:8210": later])
-
-        try await host.disconnect(.discardNothing)
-        #expect(kept(bench).isEmpty)
-        #expect(host.lastSynced == nil)
-    }
-
-    @Test func aSyncReportedAfterLeavingIsNotKept() async throws {
+    @Test func noLibraryHasNoLastSync() async throws {
         let bench = try HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
         let source = try #require(bench.servers.last)
-        try await host.disconnect(.discardNothing)
         source.report.update { $0.lastSynced = day }
-        // A report for a library that is gone has nowhere to arrive; the wait gives one time to, if it could.
-        try await Task.sleep(for: .milliseconds(100))
-        #expect(kept(bench).isEmpty)
+        #expect(await eventually { host.lastSynced == day })
+        try await discardEverything(host)
+        #expect(host.lastSynced == nil)
     }
 
     // MARK: Refresh
@@ -95,6 +48,10 @@ import Testing
         #expect(await eventually { host.state == .offline(reason: "network") })
         #expect(host.canRefresh, "a server out of reach is tried again at once")
 
+        source.state.set(.unavailable(message: "stopped"))
+        #expect(await eventually { host.state == .unavailable(message: "stopped") })
+        #expect(host.canRefresh, "a stopped follow is tried again by a refresh")
+
         source.state.set(.keyRefused)
         #expect(await eventually { host.state == .keyRefused })
         #expect(!host.canRefresh, "a key the server refuses needs a new one first")
@@ -113,14 +70,14 @@ import Testing
         host.refresh()
         try await host.connect(address: "http://first.test:8210", key: "k")
         let source = try #require(bench.servers.last)
-        #expect(source.calls == ["refresh"], "the connect's own")
+        #expect(source.calls.isEmpty, "the copy follows its server itself; connecting asks for nothing")
         host.refresh()
-        #expect(source.calls == ["refresh", "refresh"])
+        #expect(source.calls == ["refresh"])
 
         source.state.set(.keyRefused)
         #expect(await eventually { host.state == .keyRefused })
         host.refresh()
-        #expect(source.calls == ["refresh", "refresh"])
+        #expect(source.calls == ["refresh"])
     }
 
     @Test func theSampleLibraryHasNoServerToRefresh() async throws {

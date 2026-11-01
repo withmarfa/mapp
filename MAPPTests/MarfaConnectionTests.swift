@@ -1,4 +1,6 @@
 import Foundation
+import Marfa
+import MarfaTesting
 import Testing
 @testable import MAPP
 
@@ -31,11 +33,11 @@ struct MarfaConnectionTests {
         let one = try MarfaConnection(address: "http://one.example")
         let two = try MarfaConnection(address: "http://two.example")
         let keys = MemoryKeyStore()
-        keys.save("first", for: one)
-        #expect(keys.key(for: one) == "first")
-        #expect(keys.key(for: two) == nil)
-        keys.delete(for: one)
-        #expect(keys.key(for: one) == nil)
-        #expect(KeychainKeyStore.account(for: one) == "http://one.example")
+        keys.save("first", for: one.address)
+        #expect(try keys.key(for: one.address) == "first")
+        #expect(try keys.key(for: two.address) == nil)
+        keys.delete(for: one.address)
+        #expect(try keys.key(for: one.address) == nil)
+        #expect(KeychainKeyStore.account(for: one.address) == "http://one.example")
     }
 }

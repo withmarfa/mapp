@@ -1,25 +1,28 @@
 import Foundation
 import Marfa
+import MarfaTesting
 import SQLite3
 import Testing
 @testable import MAPP
 
-/// A drain the copy runs itself ends in a report or an error, and every answer the queue holds is taken before any is
-/// forgotten. The queue is made to hold the answers the server would have recorded.
+/// The engine takes the answers the copy recorded with `Queue.takeAnswered`, whether a drain ended in a report or an
+/// error. The queue is made to hold the answers the server would have recorded.
 @Suite(.serialized, .hangLimit)
 struct MarfaDrainAnswersTests {
-    private nonisolated static func recordAccepted(_ id: String, at url: URL) throws {
+    nonisolated static func recordAccepted(_ id: String, at url: URL) throws {
         try record(id, "UPDATE queue SET verdict = 'accepted', sent = 1 WHERE id = ?", at: url)
     }
 
-    private nonisolated static func recordBlocked(_ id: String, at url: URL) throws {
+    nonisolated static func recordBlocked(_ id: String, at url: URL) throws {
         try record(id, "UPDATE queue SET verdict = 'blocked', reason = 'key_spent', sent = 1 WHERE id = ?", at: url)
     }
 
-    private nonisolated static func record(_ id: String, _ sql: String, at url: URL) throws {
+    nonisolated static func record(_ id: String, _ sql: String, at url: URL) throws {
         var db: OpaquePointer?
         #expect(sqlite3_open(url.path, &db) == SQLITE_OK)
         defer { sqlite3_close(db) }
+        // The copy's own lifecycle may hold the file for a moment.
+        sqlite3_busy_timeout(db, 5000)
         var statement: OpaquePointer?
         #expect(sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK)
         defer { sqlite3_finalize(statement) }
@@ -28,94 +31,74 @@ struct MarfaDrainAnswersTests {
         #expect(sqlite3_changes(db) == 1)
     }
 
-    @Test
-    func aDrainThatStopsOnAnErrorLeavesItsRecordedAnswersToBeTaken() async throws {
+    private func open() async throws -> (MarfaSource, ChangeLog, URL) {
         let root = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
-        defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
         let location = MarfaStoreLocation(root: root)
-        let source = try await MarfaSource.open(connection, keys: MemoryKeyStore([connection: "unused"]), location: location)
+        let source = try await MarfaSource.open(connection, keys: MemoryKeyStore([connection.address: "unused"]), location: location)
         let log = ChangeLog(source)
         _ = try #require(await log.wait { $0.snapshot != nil })
-        let first = WriteID()
-        let second = WriteID()
-        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "First", body: "First text")), as: first)
-        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "Second", body: "Second text")), as: second)
+        return (source, log, location.store(for: connection))
+    }
+
+    private func submit(_ source: MarfaSource, _ titles: [String]) async throws -> [(WriteID, Marfa.QueuedWrite)] {
+        let ids = titles.map { _ in WriteID() }
+        for (title, id) in zip(titles, ids) {
+            source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: title, body: title)), as: id)
+        }
         await source.queueSubmitted()
         let queued = try await source.copy.queue.all()
-        #expect(queued.count == 2)
-        let accepted = try #require(queued.first)
-        let remaining = try #require(queued.last)
+        #expect(queued.count == titles.count)
+        return Array(zip(ids, queued))
+    }
+
+    @Test
+    func theAnswersADrainRecordedBeforeItStoppedAreTakenAndTheRestWait() async throws {
+        let (source, log, store) = try await open()
+        defer { try? FileManager.default.removeItem(at: store.deletingLastPathComponent()) }
+        let writes = try await submit(source, ["First", "Second"])
+        let (first, accepted) = writes[0]
+        let (second, remaining) = writes[1]
         // The drain recorded the first answer, then stopped on a full store.
-        try Self.recordAccepted(accepted.id, at: location.store(for: connection))
-        source.hear(Change(origin: .queueNotDrained(.storageFull(message: "full")), itemId: nil, edgeId: nil))
-        await source.engineTook()
+        try Self.recordAccepted(accepted.id, at: store)
+        await source.tellAnswers()
         _ = try #require(await log.wait { $0.answer(to: first) == .accepted })
         #expect(log.current.answer(to: second) == nil)
+        #expect(try await source.copy.queue.all().map(\.id) == [remaining.id])
 
-        // A later drain reports only the write it answered.
-        try Self.recordAccepted(remaining.id, at: location.store(for: connection))
-        let report = MarfaSync.report(answeredIn: try await source.copy.queue.all().filter { $0.id == remaining.id })
-        source.hear(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil))
-        await source.engineTook()
+        // A later drain answers the other.
+        try Self.recordAccepted(remaining.id, at: store)
+        await source.tellAnswers()
         _ = try #require(await log.wait { $0.answer(to: second) == .accepted })
         #expect(try await source.copy.queue.all().isEmpty)
-        #expect(log.current.answer(to: first) == .accepted, "the first write was forgotten without being answered")
+        #expect(log.current.answer(to: first) == .accepted, "the first answer was lost")
         await source.close()
     }
 
     @Test
-    func anEarlierReportDoesNotForgetAnswersARunningDrainRecorded() async throws {
-        let root = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
-        defer { try? FileManager.default.removeItem(at: root) }
-        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let location = MarfaStoreLocation(root: root)
-        let source = try await MarfaSource.open(connection, keys: MemoryKeyStore([connection: "unused"]), location: location)
-        let log = ChangeLog(source)
-        _ = try #require(await log.wait { $0.snapshot != nil })
-        let first = WriteID()
-        let second = WriteID()
-        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "First", body: "First")), as: first)
-        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "Second", body: "Second")), as: second)
-        await source.queueSubmitted()
-        let queued = try await source.copy.queue.all()
-        let accepted = try #require(queued.first)
-        let remaining = try #require(queued.last)
-        try Self.recordAccepted(accepted.id, at: location.store(for: connection))
-        let firstReport = MarfaSync.report(answeredIn: try await source.copy.queue.all())
-        let holding = LiveMarfa.Flag()
-        source.engine.hooks.answering.set {
-            holding.set()
-            // Holds the engine while it takes the first report, as a slow one would be held.
-            try? await Task.sleep(for: .milliseconds(500))
-        }
-        source.hear(Change(origin: .queueDrained(firstReport), itemId: nil, edgeId: nil))
-        #expect(await LiveMarfa.until { holding.isSet })
-        // The copy's next drain can record answers while the engine is still taking the earlier report.
-        try Self.recordAccepted(remaining.id, at: location.store(for: connection))
-        source.hear(Change(origin: .queueNotDrained(.copyExpired(reason: "read_view_changed", message: "expired")), itemId: nil, edgeId: nil))
-        await source.engineTook()
-        _ = try #require(await log.wait { $0.answer(to: first) == .accepted })
-        #expect(log.current.answer(to: second) == nil)
-        #expect(try await source.copy.queue.all().contains { $0.id == remaining.id }, "the earlier report forgot the later answer before it could be taken")
+    func anAnswerIsToldOnceHoweverOftenTheEngineLooks() async throws {
+        let (source, log, store) = try await open()
+        defer { try? FileManager.default.removeItem(at: store.deletingLastPathComponent()) }
+        let writes = try await submit(source, ["First"])
+        try Self.recordBlocked(writes[0].1.id, at: store)
+        await source.tellAnswers()
+        _ = try #require(await log.wait { $0.answer(to: writes[0].0) != nil })
+        let told = log.current.changes.count { if case .answered = $0 { true } else { false } }
+        await source.tellAnswers()
+        await source.tellAnswers()
+        #expect(log.current.changes.count { if case .answered = $0 { true } else { false } } == told)
+        #expect(try await source.copy.queue.all().count == 1, "a blocked write is kept for release")
         await source.close()
     }
 
     @Test
     func theEngineNamesTheEventItIsTakingAndAQuitWaitsForWritesAlone() async throws {
-        let root = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
-        defer { try? FileManager.default.removeItem(at: root) }
-        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let location = MarfaStoreLocation(root: root)
-        let source = try await MarfaSource.open(connection, keys: MemoryKeyStore([connection: "unused"]), location: location)
-        let log = ChangeLog(source)
-        _ = try #require(await log.wait { $0.snapshot != nil })
+        let (source, log, store) = try await open()
+        defer { try? FileManager.default.removeItem(at: store.deletingLastPathComponent()) }
+        _ = log
         let activity = try #require(source.engineActivity)
-        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "First", body: "First")), as: WriteID())
-        await source.queueSubmitted()
-        let accepted = try #require(try await source.copy.queue.all().first)
-        try Self.recordAccepted(accepted.id, at: location.store(for: connection))
-        let report = MarfaSync.report(answeredIn: try await source.copy.queue.all())
+        let writes = try await submit(source, ["First"])
+        try Self.recordAccepted(writes[0].1.id, at: store)
 
         let holding = LiveMarfa.Flag()
         let (held, release) = AsyncStream<Void>.makeStream()
@@ -125,12 +108,12 @@ struct MarfaDrainAnswersTests {
             // Holds the engine in this event, as a slow one would be held, until the test has made its checks.
             for await _ in held {}
         }
-        source.hear(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil))
+        Task { await source.tellAnswers() }
         #expect(await LiveMarfa.until { holding.isSet })
-        #expect(activity.snapshot().step == "heard")
+        #expect(activity.snapshot().step == "answers")
         // With no write told, a quit does not wait behind the slow read.
         await source.queueSubmitted()
-        #expect(activity.snapshot().step == "heard", "the quit waited for a read of the copy")
+        #expect(activity.snapshot().step == "answers", "the quit waited for a read of the copy")
         let second = ItemID.mint()
         source.submit(.create(id: second, ItemDraft(type: TypeID("core.note"), title: "Second", body: "Second")), as: WriteID())
         #expect(activity.snapshot().waiting >= 1, "the write told behind the slow event is not counted as waiting")
@@ -145,87 +128,23 @@ struct MarfaDrainAnswersTests {
         await source.close()
     }
 
+    /// A blocked answer is one the copy keeps, since the write may be released, and a released write keeps its queue
+    /// id. Its next answer is taken like any other, and a second refusal of it is told again.
     @Test
-    func anAnswerRecordedAfterTheQueueWasReadSurvivesTheForgetting() async throws {
-        let root = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
-        defer { try? FileManager.default.removeItem(at: root) }
-        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let location = MarfaStoreLocation(root: root)
-        let source = try await MarfaSource.open(connection, keys: MemoryKeyStore([connection: "unused"]), location: location)
-        let log = ChangeLog(source)
-        _ = try #require(await log.wait { $0.snapshot != nil })
-        let first = WriteID()
-        let second = WriteID()
-        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "First", body: "First")), as: first)
-        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "Second", body: "Second")), as: second)
-        await source.queueSubmitted()
-        let queued = try await source.copy.queue.all()
-        let accepted = try #require(queued.first)
-        let remaining = try #require(queued.last)
-        try Self.recordAccepted(accepted.id, at: location.store(for: connection))
-        let report = MarfaSync.report(answeredIn: try await source.copy.queue.all())
+    func aReleasedWritesNewAnswerIsTakenAndARepeatedRefusalIsToldAgain() async throws {
+        let (source, log, store) = try await open()
+        defer { try? FileManager.default.removeItem(at: store.deletingLastPathComponent()) }
+        let writes = try await submit(source, ["Blocked"])
+        let (id, write) = writes[0]
+        try Self.recordBlocked(write.id, at: store)
+        await source.tellAnswers()
+        _ = try #require(await log.wait { $0.answer(to: id) != nil })
+        #expect(try await source.copy.queue.all().first?.verdict != nil)
 
-        // The copy's next drain records an answer after the engine read the queue and before it forgets.
-        source.engine.hooks.forgetting.set { try? Self.recordAccepted(remaining.id, at: location.store(for: connection)) }
-        source.hear(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil))
-        _ = try #require(await log.wait { $0.answer(to: first) == .accepted })
-        await source.engineTook()
-        let kept = try await source.copy.queue.all()
-        #expect(kept.map(\.id) == [remaining.id], "the answer recorded after the read was forgotten with the others")
-        #expect(kept.first?.verdict == .accepted)
-        source.engine.hooks.forgetting.set(nil)
-
-        // Its own report then takes it.
-        source.hear(Change(origin: .queueDrained(MarfaSync.report(answeredIn: kept)), itemId: nil, edgeId: nil))
-        _ = try #require(await log.wait { $0.answer(to: second) == .accepted })
-        #expect(try await source.copy.queue.all().isEmpty)
-        await source.close()
-    }
-
-    /// A blocked answer is one the copy never forgets, since the write may be released, and a released write keeps its
-    /// queue id. Its next answer, recorded while another report is cleaned up, is not one the engine has taken.
-    @Test
-    func aReleasedWritesNewAnswerSurvivesAnotherReportsCleanup() async throws {
-        let root = URL.temporaryDirectory.appending(path: "MarfaDrainAnswers-\(UUID())")
-        defer { try? FileManager.default.removeItem(at: root) }
-        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let location = MarfaStoreLocation(root: root)
-        let source = try await MarfaSource.open(connection, keys: MemoryKeyStore([connection: "unused"]), location: location)
-        let log = ChangeLog(source)
-        _ = try #require(await log.wait { $0.snapshot != nil })
-        let blockedWrite = WriteID()
-        let other = WriteID()
-        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "Blocked", body: "Blocked")), as: blockedWrite)
-        source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "Other", body: "Other")), as: other)
-        await source.queueSubmitted()
-        let queued = try await source.copy.queue.all()
-        let blocked = try #require(queued.first)
-        let remaining = try #require(queued.last)
-        let store = location.store(for: connection)
-
-        // The first report is of a write blocked on a spent key, which stays in the queue.
-        try Self.recordBlocked(blocked.id, at: store)
-        let blockedReport = MarfaSync.report(answeredIn: try await source.copy.queue.all().filter { $0.id == blocked.id })
-        source.hear(Change(origin: .queueDrained(blockedReport), itemId: nil, edgeId: nil))
-        await source.engineTook()
-        #expect(try await source.copy.queue.all().first { $0.id == blocked.id }?.verdict != nil)
-
-        // It is released and sent again, and its new answer is recorded while another report is cleaned up.
-        #expect(try await source.copy.queue.release(blocked.id))
-        try Self.recordAccepted(remaining.id, at: store)
-        let report = MarfaSync.report(answeredIn: try await source.copy.queue.all().filter { $0.id == remaining.id })
-        source.engine.hooks.forgetting.set { try? Self.recordAccepted(blocked.id, at: store) }
-        source.hear(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil))
-        _ = try #require(await log.wait { $0.answer(to: other) == .accepted })
-        await source.engineTook()
-        source.engine.hooks.forgetting.set(nil)
-        let kept = try await source.copy.queue.all()
-        #expect(kept.map(\.id) == [blocked.id], "the released write's new answer was forgotten before it was taken")
-        #expect(kept.first?.verdict == .accepted)
-
-        // Its own report then takes it.
-        source.hear(Change(origin: .queueDrained(MarfaSync.report(answeredIn: kept)), itemId: nil, edgeId: nil))
-        await source.engineTook()
+        #expect(try await source.copy.queue.release(write.id))
+        try Self.recordAccepted(write.id, at: store)
+        await source.tellAnswers()
+        // The app's write was answered once, as blocked; the new answer is taken from the queue all the same.
         #expect(try await source.copy.queue.all().isEmpty)
         await source.close()
     }

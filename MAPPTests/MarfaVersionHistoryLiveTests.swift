@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import MarfaTesting
 import Testing
 @testable import MAPP
 
@@ -16,7 +17,7 @@ extension LiveMarfaTests {
             let root = URL.temporaryDirectory.appending(path: "MarfaVersionHistoryLiveTests-\(UUID().uuidString)", directoryHint: .isDirectory)
             let made = LiveMarfa.Made()
             let connection = try MarfaConnection(address: try LiveMarfa.address())
-            let keys = MemoryKeyStore([connection: try LiveMarfa.key()])
+            let keys = MemoryKeyStore([connection.address: try LiveMarfa.key()])
             let source = try await MarfaSource.open(connection, keys: keys, location: MarfaStoreLocation(root: root))
             let library = MarfaLibrary(
                 source: source, notices: Notices(), history: MarfaServerVersions(connection: connection, keys: keys))

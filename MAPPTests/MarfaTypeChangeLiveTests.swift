@@ -1,6 +1,6 @@
 import Foundation
 import Marfa
-import struct MarfaCore.Item
+import MarfaTesting
 import Testing
 @testable import MAPP
 
@@ -19,7 +19,7 @@ extension LiveMarfaTests {
             let made = LiveMarfa.Made()
             let connection = try MarfaConnection(address: try LiveMarfa.address())
             let source = try await MarfaSource.open(
-                connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]),
+                connection, keys: MemoryKeyStore([connection.address: try LiveMarfa.key()]),
                 location: MarfaStoreLocation(root: root))
             let library = MarfaLibrary(source: source, notices: Notices())
             func end() async {
@@ -47,7 +47,7 @@ extension LiveMarfaTests {
             case .text: .string("MAPPTEST value")
             case .number: .number(field.minimum ?? 1)
             case .boolean: .bool(true)
-            case .date: .string(ItemDate.day(Date()))
+            case .date: .string(MAPP.ItemDate.day(Date()))
             case .choice, .status: field.options.first.map(PropertyValue.string)
             case .other, .list: nil
             }
@@ -62,7 +62,7 @@ extension LiveMarfaTests {
             return try #require(id)
         }
 
-        private func row(_ id: ItemID, in source: MarfaSource) async throws -> MarfaCore.Item? {
+        private func row(_ id: ItemID, in source: MarfaSource) async throws -> Marfa.Item? {
             try await source.copy.items.get(id.rawValue)
         }
 

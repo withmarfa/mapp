@@ -2,8 +2,6 @@ import Foundation
 import Marfa
 import MarfaTesting
 import Synchronization
-import struct MarfaCore.Item
-import struct MarfaCore.KeptFetch
 import Testing
 @testable import MAPP
 
@@ -63,7 +61,7 @@ struct MarfaViewsTests {
         // Another device changes what the view asks for, not its title, so only its version tells it apart.
         views.members.withLock { $0["view-planning"] = ["n2"] }
         views.list.withLock { $0 = [LibraryView(id: Self.planning.id, title: Self.planning.title, version: 2)] }
-        source.hear(Change(origin: .server(event: "item.updated", cursor: "2"), itemId: Self.planning.id.rawValue, edgeId: nil))
+        await source.hear(Change(origin: .server(event: "item.updated", cursor: "2"), itemId: Self.planning.id.rawValue, edgeId: nil))
         #expect(await eventually { library.items(in: .view(Self.planning.id)).map(\.id) == [ItemID("n2")] })
         await source.close()
     }
@@ -79,14 +77,14 @@ struct MarfaViewsTests {
 
         views.completeness.withLock { $0 = .partial }
         views.list.withLock { $0 = [Self.reading] }
-        source.hear(Change(origin: .refreshed(.unfinished), itemId: nil, edgeId: nil))
+        await source.hear(Change(origin: .refreshed(.unfinished), itemId: nil, edgeId: nil))
         #expect(await eventually { library.views == [Self.planning, Self.reading] })
         browser.placeRemoved(in: library, order: NoteOrder())
         #expect(browser.sidebarItem == .view(Self.planning.id))
 
         // Once whole, the answer is what the copy holds.
         views.completeness.withLock { $0 = .complete }
-        source.hear(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil))
+        await source.hear(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil))
         #expect(await eventually { library.views == [Self.reading] })
         await source.close()
     }
@@ -100,7 +98,7 @@ struct MarfaViewsTests {
         browser.show(.view(Self.planning.id), in: library, order: NoteOrder())
         views.list.withLock { $0 = [] }
         // As the copy tells of a view deleted through it; the engine reads the views again for the view's id.
-        source.hear(Change(origin: .refreshed(.purged), itemId: Self.planning.id.rawValue, edgeId: nil))
+        await source.hear(Change(origin: .refreshed(.purged), itemId: Self.planning.id.rawValue, edgeId: nil))
         #expect(await eventually { library.views.isEmpty })
         browser.placeRemoved(in: library, order: NoteOrder())
         #expect(browser.sidebarItem == .allNotes)

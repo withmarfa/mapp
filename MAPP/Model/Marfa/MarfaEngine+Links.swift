@@ -33,7 +33,7 @@ extension MarfaEngine {
             let ids = chunk.map(\.id)
             var read: [String: BodyLinks]?
             do {
-                read = try await Self.asking(hub) { try await reading.links(in: ids) }
+                read = try await Self.asking { try await reading.links(in: ids) }
             } catch MarfaError.hydrationIncomplete {
                 filling = true
             } catch {
@@ -59,7 +59,7 @@ extension MarfaEngine {
     /// Asks the package what one row's text names.
     func readLinks(of id: String) async -> (BodyLinks?, LinksRead) {
         do {
-            return (try await Self.asking(hub) { try await reading.links(in: id) }, .read)
+            return (try await Self.asking { try await reading.links(in: id) }, .read)
         } catch MarfaError.notFound {
             // The row left the copy, and the read that finds it gone lets it go.
             return (nil, .read)
@@ -98,7 +98,7 @@ extension MarfaEngine {
                 continue
             }
             do {
-                let original = try await Self.asking(hub) { try await copy.items.original(ofConflictedCopy: id) }
+                let original = try await Self.asking { try await copy.items.original(ofConflictedCopy: id) }
                 if let previous = linkedOriginals[id], previous != original { originalsToRead.insert(previous) }
                 linkedOriginals[id] = original
                 if let original { originalsToRead.insert(original) }
@@ -110,7 +110,7 @@ extension MarfaEngine {
         }
         for original in originalsToRead {
             do {
-                let copies = try await Self.asking(hub) { try await copy.items.conflictedCopies(of: original) }.map(\.id)
+                let copies = try await Self.asking { try await copy.items.conflictedCopies(of: original) }.map(\.id)
                 linkedCopies[original] = copies.isEmpty ? nil : copies
             } catch {
                 if !(error is CancellationError) { unread += 1 }

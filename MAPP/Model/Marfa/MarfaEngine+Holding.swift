@@ -1,7 +1,5 @@
 import Foundation
 import Marfa
-import struct MarfaCore.Item
-import struct MarfaCore.Edge
 
 /// What the engine holds of the rows and edges a write touches, apart from the numbers that move on their own (a
 /// version, a modified date), so two readings differ only where something the person could see changed.

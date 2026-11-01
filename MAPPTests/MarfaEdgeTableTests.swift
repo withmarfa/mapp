@@ -1,6 +1,5 @@
 import Foundation
 import Marfa
-import struct MarfaCore.Edge
 import Testing
 @testable import MAPP
 

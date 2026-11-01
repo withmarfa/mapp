@@ -1,6 +1,6 @@
 import Foundation
 import Marfa
-import struct MarfaCore.Draft
+import MarfaTesting
 import Synchronization
 import Testing
 @testable import MAPP
@@ -146,7 +146,7 @@ nonisolated final class FakeServers: Sendable {
             if let failure = self.failure.withLock({ $0 }) { throw failure }
             self.opening.withLock { $0 = true }
             while self.slow.withLock({ $0 }) { try await Task.sleep(for: .milliseconds(10)) }
-            guard try keys.key(for: connection) != nil else {
+            guard try keys.key(for: connection.address) != nil else {
                 throw SourceFailure(kind: .denied, message: "There’s no key for this Marfa server.")
             }
             try FileManager.default.createDirectory(at: location.directory(for: connection), withIntermediateDirectories: true)
@@ -166,25 +166,29 @@ nonisolated final class FakeServers: Sendable {
     }
 }
 
-/// Keys held in memory, whose delete can be made to fail as a keychain's can.
+/// Keys held in memory, whose delete can be made to fail as a keychain's can, and whose read can be made to throw.
 nonisolated final class TestKeyStore: KeyStore {
-    private let keys = Mutex<[MarfaConnection: String]>([:])
+    private let keys = MemoryKeyStore()
     let failsDelete = Mutex(false)
     /// Run as each delete begins.
     let onDelete = Mutex<(@Sendable () -> Void)?>(nil)
 
-    func save(_ key: String, for connection: MarfaConnection) {
-        keys.withLock { $0[connection] = key }
+    func save(_ key: String, for address: URL) throws {
+        try keys.save(key, for: address)
     }
 
-    func key(for connection: MarfaConnection) -> String? {
-        keys.withLock { $0[connection] }
+    func key(for address: URL) throws -> String? {
+        try keys.key(for: address)
     }
 
-    func delete(for connection: MarfaConnection) throws {
+    func makeUnreadable(_ address: URL) {
+        keys.makeUnreadable(address)
+    }
+
+    func delete(for address: URL) throws {
         onDelete.withLock { $0 }?()
         if failsDelete.withLock({ $0 }) { throw SourceFailure(kind: .denied, message: "The keychain refused.") }
-        _ = keys.withLock { $0.removeValue(forKey: connection) }
+        try keys.delete(for: address)
     }
 }
 

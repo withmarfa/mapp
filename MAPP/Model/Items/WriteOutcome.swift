@@ -33,6 +33,7 @@ nonisolated enum BlockedReason: String, Hashable, Sendable, CaseIterable {
     case ancestorUnavailable = "ancestor_unavailable"
     case conflictUnresolved = "conflict_unresolved"
     case failingAlone = "failing_alone"
+    case instanceChanged = "instance_changed"
 }
 
 /// One of the contract's six verdicts on a write.

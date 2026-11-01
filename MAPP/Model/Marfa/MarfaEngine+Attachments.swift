@@ -29,7 +29,7 @@ extension MarfaEngine {
         besideTheLane[token] = Task { [copy, hub, tell] in
             let result: Result<Marfa.Attached, SourceFailure>
             do {
-                result = .success(try await Self.asking(hub) {
+                result = .success(try await Self.asking {
                     #if DEBUG
                     if let replacement { return try await replacement(id.rawValue, title) }
                     #endif
@@ -75,7 +75,7 @@ extension MarfaEngine {
         besideTheLane[token] = Task { [copy, hub, tell] in
             let result: Result<Marfa.Added, SourceFailure>
             do {
-                result = .success(try await Self.asking(hub) { try await copy.items.addFile(file, attachment) })
+                result = .success(try await Self.asking { try await copy.items.addFile(file, attachment) })
             } catch {
                 result = .failure(Self.failure(error))
             }

@@ -1,10 +1,5 @@
 import Foundation
 import Marfa
-import struct MarfaCore.Item
-import struct MarfaCore.Edge
-import enum MarfaCore.ItemState
-import enum MarfaCore.Tier
-import enum MarfaCore.JsonValue
 import UniformTypeIdentifiers
 
 /// Reads the package's values into the item layer's. Pure, so the rules are tested on values made by hand.
@@ -126,10 +121,13 @@ nonisolated enum MarfaMapping {
         guard let error = error as? MarfaError else {
             return ViewWriteFailure(kind: .refused, message: error.localizedDescription)
         }
-        switch error {
-        case .noServer, .network:
+        if error.isOffline {
             return ViewWriteFailure(kind: .offline, message: String(localized: "MAPP can’t reach your Marfa server, so nothing was saved. Try again when it’s back."))
-        case .server(409, "version_conflict", _):
+        }
+        switch error {
+        case .noServer:
+            return ViewWriteFailure(kind: .offline, message: String(localized: "MAPP can’t reach your Marfa server, so nothing was saved. Try again when it’s back."))
+        case .versionConflict:
             return ViewWriteFailure(kind: .conflict, message: String(localized: "This view was changed elsewhere since this window read it, so nothing was saved. The window now shows the view as it is; make your changes again."))
         case .notFound:
             return ViewWriteFailure(kind: .gone, message: String(localized: "Your Marfa server no longer has this view."))
@@ -529,6 +527,7 @@ nonisolated enum MarfaMapping {
         case .ancestorUnavailable: .ancestorUnavailable
         case .conflictUnresolved: .conflictUnresolved
         case .failingAlone: .failingAlone
+        case .instanceChanged: .instanceChanged
         }
     }
 

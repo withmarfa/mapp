@@ -1,22 +1,50 @@
 import Foundation
 import Marfa
 
-/// Taking a drain's answers: telling each write its verdict, then forgetting the answers taken.
+/// Taking the answers the copy holds: telling each write its verdict, and the copy forgetting those taken.
 extension MarfaEngine {
-    /// Tells each verdict to the app's write and shows it on its item while the queue still holds it, and only
-    /// then forgets the answered writes. A refusal or conflict stays shown after that through `remembered`, and
-    /// refused writes that carried content stay queued until discarded.
-    func answer(_ report: DrainReport) async {
+    /// The queue as the engine counts the person's text against: what the copy holds, and the answers taken from
+    /// it that an item's text has not yet been counted past (`answeredHeld`).
+    func queueWithAnswers() async throws -> [Marfa.QueuedWrite] {
+        let queued = try await copy.queue.all()
+        let ids = Set(queued.map(\.id))
+        return queued + answeredHeld.values.filter { !ids.contains($0.id) }.sorted { $0.id < $1.id }
+    }
+
+    /// Takes the answers the copy recorded, from a drain of ours or one the copy ran itself, in the engine's own
+    /// step. The copy clears and returns the answered writes (`Queue.takeAnswered`); a refused write that carried
+    /// content, a blocked one and a dead one stay in the queue with their verdict, so each is told here once. An
+    /// expired copy refuses the take, and a later update takes them once it is hydrated again.
+    func takeAnswers() async {
+        let taken: [Marfa.QueuedWrite]
+        do {
+            taken = try await Self.asking { try await copy.queue.takeAnswered() }
+        } catch {
+            return
+        }
+        var answers = taken
+        if let queued = try? await copy.queue.all() {
+            answers += queued.filter { $0.verdict != nil && !told.contains($0.id) }
+            // A released write has no verdict, so a later refusal of it is told again.
+            told = Set(queued.filter { $0.verdict != nil }.map(\.id))
+        }
+        guard !answers.isEmpty else { return }
+        await answer(answers)
+    }
+
+    /// Tells each verdict to the app's write and shows it on its item. A refusal or conflict stays shown after
+    /// that through `remembered`, and refused writes that carried content stay queued until discarded.
+    func answer(_ writes: [Marfa.QueuedWrite]) async {
         #if DEBUG
         await hooks.answering.current?()
         #endif
         var ids: Set<String> = []
-        // The copy lets an item go once its delete is answered, which may be only as the answers are forgotten.
+        // The copy lets an item go once its delete is answered.
         var leaving: Set<String> = []
-        for answer in report.verdicts {
+        for answer in writes {
             if let itemID = answer.itemId, [.deleteItem, .restoreItem].contains(answer.kind) { leaving.insert(itemID) }
             guard let verdict = answer.verdict else { continue }
-            if Self.canForget(verdict) { takenAnswers.insert(answer.id) }
+            if [.createItem, .updateItem].contains(answer.kind), answer.itemId != nil { answeredHeld[answer.id] = answer }
             let outcome = MarfaMapping.outcome(verdict)
             ids.formUnion(movedEnds.removeValue(forKey: answer.id) ?? [])
             if let itemID = answer.itemId {
@@ -37,10 +65,9 @@ extension MarfaEngine {
             answered(answer.id, outcome)
         }
         await reread(ids.union(await settledLinks()))
-        // An answer the person's text cannot yet be moved past stays in the queue, to be counted by the next save
-        // or the next answer, since forgetting it would leave the text on a version it has passed.
-        var uncounted = false
-        if let queued = try? await copy.queue.all() {
+        // An answer the person's text cannot yet be moved past is held, to be counted by the next save or the next
+        // answer, since dropping it would leave the text on a version it has passed.
+        if let queued = try? await queueWithAnswers() {
             for raw in Set(queued.compactMap(\.itemId)) where ownText[ItemID(raw)] != nil {
                 do {
                     try await count(answers: queued, for: ItemID(raw))
@@ -50,28 +77,22 @@ extension MarfaEngine {
                     if await hasLeft(raw) {
                         ownText[ItemID(raw)] = nil
                         counted.formUnion(queued.filter { $0.itemId == raw }.map(\.id))
-                    } else {
-                        uncounted = true
                     }
                 }
             }
-        } else {
-            uncounted = true
         }
-        if !uncounted {
-            do {
-                let ids = Array(takenAnswers)
-                #if DEBUG
-                await hooks.forgetting.current?()
-                #endif
-                _ = try await Self.asking(hub) { try await copy.queue.forgetAnswered(ids: ids) }
-            } catch {
-                readFailed(error)
-            }
-        }
+        pruneAnswers()
         if !leaving.isEmpty { await reread(leaving) }
         await readQueue()
         publish([])
+    }
+
+    /// Lets go of an answer once its item's text has been counted past it, or the item has no text of the person's
+    /// to count.
+    private func pruneAnswers() {
+        for (id, write) in answeredHeld where counted.contains(id) || write.itemId.map({ ownText[ItemID($0)] == nil }) ?? true {
+            answeredHeld[id] = nil
+        }
     }
 
     func remember(_ outcome: WriteOutcome, of kind: WriteKind, for item: ItemID) {

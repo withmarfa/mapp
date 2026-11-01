@@ -262,7 +262,7 @@ struct ConnectionStatusTests {
         #expect(inUse.title == "Library unavailable")
         #expect(inUse.isProblem)
 
-        for text in [some.detail, unknown, inUse.detail, Words.notReplaced].compactMap({ $0 }) {
+        for text in [some.detail, unknown, inUse.detail, Words.otherServer(unsent: 2), Words.otherServer(unsent: nil), Words.keyUnreadable].compactMap({ $0 }) {
             for raw in ["core", "schema", "hydrat", "queue", "drain", ".sqlite", "/"] {
                 #expect(!text.localizedCaseInsensitiveContains(raw), "“\(text)” says “\(raw)”")
             }

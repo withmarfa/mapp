@@ -1,13 +1,6 @@
 import Foundation
 import Marfa
-import struct MarfaCore.BinPage
-import struct MarfaCore.Edge
-import struct MarfaCore.Edit
-import struct MarfaCore.Item
-import struct MarfaCore.KeptFetch
-import struct MarfaCore.ListFilters
-import enum MarfaCore.JsonValue
-import enum MarfaCore.Tier
+import MarfaTesting
 import SQLite3
 import Synchronization
 import Testing
@@ -112,6 +105,26 @@ private nonisolated final class HeldRefresh: MarfaRefreshing {
     func fetchKept() async throws -> KeptFetch { KeptFetch(fetched: 0, fetchedBytes: 0, attachments: nil) }
 }
 
+/// A complete copy that counts the hydrations it is asked for and says nothing by itself.
+private nonisolated final class CountingRefresh: MarfaRefreshing {
+    private let count = Mutex(0)
+    var hydrations: Int { count.withLock { $0 } }
+
+    func readStatus() async throws -> Status {
+        Status(sliceTypes: MarfaSync.slice, sliceTier: .all, sliceEdgeTypes: MarfaSync.sliceEdgeTypes, hydration: .complete)
+    }
+
+    func hydrate(types: [String], tier: SliceTier, edgeTypes: [String]) async throws -> HydrateReport {
+        count.withLock { $0 += 1 }
+        return HydrateReport(types: types, tier: tier, edgeTypes: edgeTypes, items: 0, edges: 0, pages: 1, pagesTotal: 1,
+                             resumed: false, restarted: nil, inPlace: false, cursor: "done")
+    }
+
+    func catchUp() async throws {}
+    func fetchKept() async throws -> KeptFetch { KeptFetch(fetched: 0, fetchedBytes: 0, attachments: nil) }
+    func updates() -> AsyncStream<CopyUpdate>? { quietUpdates() }
+}
+
 /// A server that refuses every connection, so a copy made for it never hears from it.
 @Suite(.serialized, .hangLimit)
 struct MarfaSourceOfflineTests {
@@ -120,7 +133,7 @@ struct MarfaSourceOfflineTests {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let keys = MemoryKeyStore([connection: "unused"])
+        let keys = MemoryKeyStore([connection.address: "unused"])
         let location = MarfaStoreLocation(root: root)
 
         let source = try await MarfaSource.open(connection, keys: keys, location: location)
@@ -129,7 +142,7 @@ struct MarfaSourceOfflineTests {
         guard case .loaded(let first) = painted.changes.first else { Issue.record("the first change is not loaded"); return }
         #expect(first.items.isEmpty)
         #expect(first.catalogue.itemTypes[TypeID("core.note")] != nil)
-        #expect(source.connectionState == .connecting)
+        #expect(source.connectionState != .online, "a copy is not online before the server has answered")
 
         source.refresh()
         #expect(await waitForConnection(source) { if case .offline = $0 { true } else { false } })
@@ -150,12 +163,12 @@ struct MarfaSourceOfflineTests {
         let kept = try #require(repainted.item(titled: "MAPPTEST offline"))
         #expect(kept.sync == .waiting(writes: 1))
         #expect(try await reopened.body(of: kept.id).text == "Kept")
-        #expect(reopened.connectionState == .connecting)
+        #expect(reopened.connectionState != .online, "a copy is not online before the server has answered")
         await reopened.close()
     }
 
-    /// The copy drains what waited when the server is back, and tells the report. The write is answered, as for a
-    /// drain `MarfaSync` ran.
+    /// The copy drains what waited when the server is back and records the answers. The engine takes them from the
+    /// queue, as for a drain `MarfaSync` ran.
     @Test
     func aDrainTheCopyRunsItselfAnswersTheWrite() async throws {
         let root = scratch()
@@ -169,11 +182,9 @@ struct MarfaSourceOfflineTests {
         _ = try #require(await log.wait { $0.item(titled: "MAPPTEST follow drain") != nil })
         let queued = try #require(try await source.copy.queue.all().first)
 
-        let answered = Marfa.QueuedWrite(
-            id: queued.id, kind: queued.kind, itemId: queued.itemId, idempotencyKey: queued.idempotencyKey,
-            verdict: .accepted, queuedAt: queued.queuedAt)
-        let report = MarfaSync.report(answeredIn: [answered])
-        source.hear(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil))
+        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
+        try MarfaDrainAnswersTests.recordAccepted(queued.id, at: MarfaStoreLocation(root: root).store(for: connection))
+        await source.tellAnswers()
         _ = try #require(await log.wait { $0.answer(to: write) == .accepted })
         await source.close()
     }
@@ -185,7 +196,7 @@ struct MarfaSourceOfflineTests {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let keys = MemoryKeyStore([connection: "unused"])
+        let keys = MemoryKeyStore([connection.address: "unused"])
         let location = MarfaStoreLocation(root: root)
         let source = try await MarfaSource.open(connection, keys: keys, location: location)
         let log = ChangeLog(source)
@@ -210,7 +221,7 @@ struct MarfaSourceOfflineTests {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let keys = MemoryKeyStore([connection: "unused"])
+        let keys = MemoryKeyStore([connection.address: "unused"])
         let location = MarfaStoreLocation(root: root)
         let source = try await MarfaSource.open(connection, keys: keys, location: location)
         let file = root.appending(path: "kept.txt")
@@ -239,7 +250,7 @@ struct MarfaSourceOfflineTests {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let keys = MemoryKeyStore([connection: "unused"])
+        let keys = MemoryKeyStore([connection.address: "unused"])
         let location = MarfaStoreLocation(root: root)
         try await MarfaSource.open(connection, keys: keys, location: location).close()
         let store = location.store(for: connection)
@@ -261,7 +272,7 @@ struct MarfaSourceOfflineTests {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let keys = MemoryKeyStore([connection: "unused"])
+        let keys = MemoryKeyStore([connection.address: "unused"])
         let location = MarfaStoreLocation(root: root)
         try await MarfaSource.open(connection, keys: keys, location: location).close()
         let store = location.store(for: connection)
@@ -334,7 +345,7 @@ struct MarfaSourceOfflineTests {
     private func open(_ root: URL, at address: String = "http://127.0.0.1:9") async throws -> MarfaSource {
         let connection = try MarfaConnection(address: address)
         return try await MarfaSource.open(
-            connection, keys: MemoryKeyStore([connection: "unused"]), location: MarfaStoreLocation(root: root))
+            connection, keys: MemoryKeyStore([connection.address: "unused"]), location: MarfaStoreLocation(root: root))
     }
 
     /// A refresh that waits on the server must not hold up a write: the write is queued and shown at once.
@@ -425,7 +436,7 @@ struct MarfaSourceOfflineTests {
         _ = try #require(await log.wait { $0.item(titled: "MAPPTEST kept") != nil })
 
         await source.copy.close()
-        source.hear(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
+        await source.hear(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
         let failed = try #require(await log.wait { state in
             state.changes.contains { if case .unavailable = $0 { true } else { false } }
         })
@@ -469,32 +480,31 @@ struct MarfaSourceOfflineTests {
         state.changes.count { if case .unavailable = $0 { true } else { false } }
     }
 
-    /// A stream the core ended on a fault is followed by `.resumed`, which refreshes the copy so the library leaves
-    /// "stopped" once the server answers, and the person is told of the fault once until it has.
+    /// A copy that stopped on a fault is told once, stays unavailable however often the package says it again, offers a
+    /// refresh meanwhile, and is never shown online until the server answers; the next fault after that is news.
     @Test
-    func aFaultTheCoreEndedAStreamOnIsToldOnceAndTheNextStreamRefreshes() async throws {
+    func aFaultTheCopyStoppedOnIsToldOnceAndNeverShownOnline() async throws {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
         let source = try await open(root)
         let log = ChangeLog(source)
         _ = try #require(await log.wait { $0.snapshot != nil })
-        let fault = Change(origin: .stopped(.store(message: "the store failed")), itemId: nil, edgeId: nil)
+        let sync = await source.engine.sync
+        let stopped = CopyUpdate(reread: .parts(Reread.Parts()), connection: .stopped(.store(message: "the store failed")))
 
-        source.hear(fault)
+        await sync.take(stopped)
         _ = try #require(await log.wait { unavailable($0) == 1 })
         #expect(await waitForConnection(source) { if case .unavailable = $0 { true } else { false } })
 
-        source.hear(fault)
-        source.hearResumed()
-        // The refresh is made against a server nothing answers, so it ends offline: the library left "stopped".
-        #expect(await waitForConnection(source) { if case .offline = $0 { true } else { false } })
+        // A server event after the stop changes nothing the person sees until the package says it follows again.
+        await sync.take(stopped)
+        await source.hear(Change(origin: .server(event: "item.updated", cursor: "c"), itemId: nil, edgeId: nil))
+        #expect(!(await waitForConnection(source) { $0 == .online }), "a stopped library was shown online")
         #expect(unavailable(log.current) == 1, "a fault told again before anything succeeded is not told again")
 
-        // Something succeeded: the next fault is news.
-        let report = DrainReport(answered: 1)
-        source.hear(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil))
+        await sync.take(CopyUpdate(reread: .parts(Reread.Parts()), connection: .following))
         #expect(await waitForConnection(source) { $0 == .online })
-        source.hear(fault)
+        await sync.take(stopped)
         _ = try #require(await log.wait { unavailable($0) == 2 })
         await source.close()
     }
@@ -502,23 +512,26 @@ struct MarfaSourceOfflineTests {
     /// A row the copy could not read is replaced only by a hydration, which the sync asks for once for each row.
     @Test
     func aRowTheCopyCouldNotReadIsHydratedForOnceAtMost() async throws {
-        let root = scratch()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let source = try await open(root)
+        let store = try TemporaryMarfaCopy()
+        defer { store.remove() }
+        let copy = try await store.open()
+        let server = CountingRefresh()
+        let source = MarfaSource(copy: copy, connection: SampleLibrary.connection, refreshing: server)
         let log = ChangeLog(source)
+        source.events.yield(.paint)
         _ = try #require(await log.wait { $0.snapshot != nil })
         let sync = await source.engine.sync
-        #expect(sync.hooks.hydrations == 0)
+        #expect(server.hydrations == 0)
 
         await sync.unreadable(["a"])
-        #expect(try await eventuallyAsking { sync.hooks.hydrations > 0 })
-        #expect(sync.hooks.hydrations == 1)
+        #expect(try await eventuallyAsking { server.hydrations > 0 })
+        #expect(server.hydrations == 1)
 
         // The same row again, as a read after the hydration finds it still unreadable, asks for nothing.
         await sync.unreadable(["a"])
         // Time for a second hydration, which nothing signals when none is asked for.
         try await Task.sleep(for: .milliseconds(500))
-        #expect(sync.hooks.hydrations == 1)
+        #expect(server.hydrations == 1)
         await source.close()
     }
 
@@ -548,19 +561,20 @@ struct MarfaSourceOfflineTests {
         #expect(asking.wanted, "until a hydration succeeds, a retry still hydrates")
     }
 
-    /// The follow stops when the copy expires, and only a new hydration starts it again.
+    /// The package reports a copy that expired as one that needs a hydration, and the sync hydrates it.
     @Test
     func anExpiredCopyIsHydratedAgain() async throws {
-        let root = scratch()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let source = try await open(root)
+        let store = try TemporaryMarfaCopy()
+        defer { store.remove() }
+        let copy = try await store.open()
+        let server = CountingRefresh()
+        let source = MarfaSource(copy: copy, connection: SampleLibrary.connection, refreshing: server)
         let log = ChangeLog(source)
+        source.events.yield(.paint)
         _ = try #require(await log.wait { $0.snapshot != nil })
-        #expect(source.connectionState == .connecting)
         let expired = MarfaError.copyExpired(reason: "read_view_changed", message: "the copy expired")
-        source.hear(Change(origin: .stopped(expired), itemId: nil, edgeId: nil))
-        // Hydrating again against a closed port fails at once, which shows the hydration was tried.
-        #expect(await waitForConnection(source) { if case .offline = $0 { true } else { false } })
+        await source.engine.sync.take(CopyUpdate(reread: .everything, connection: .needsHydration(expired)))
+        #expect(try await eventuallyAsking { server.hydrations == 1 })
         await source.close()
     }
 
@@ -759,39 +773,21 @@ struct MarfaSourceOfflineTests {
         let move = try #require(queued.first { $0.kind == .updateEdge })
 
         // The server's answer, as the queue records it before the drain throws.
-        let answered = Marfa.QueuedWrite(
-            id: move.id, kind: .updateEdge, itemId: move.itemId, edgeId: edge.id, idempotencyKey: move.idempotencyKey,
-            verdict: .accepted, queuedAt: move.queuedAt)
-        let report = MarfaSync.report(answeredIn: queued.filter { $0.id != move.id } + [answered])
-        #expect(report.verdicts.map(\.id) == [move.id])
-        #expect(report.answered == 1)
-        await withCheckedContinuation { taken in source.events.yield(.drained(report, taken)) }
+        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
+        try MarfaDrainAnswersTests.recordAccepted(move.id, at: MarfaStoreLocation(root: root).store(for: connection))
+        await source.tellAnswers()
         _ = try #require(await log.wait { $0.answer(to: write) == .accepted })
 
         // Then the copy hydrates again, which this closed port refuses; the queue and the view are as they were.
         let expired = MarfaError.copyExpired(reason: "read_view_changed", message: "the copy expired")
-        source.hear(Change(origin: .stopped(expired), itemId: nil, edgeId: nil))
-        #expect(await waitForConnection(source) { if case .offline = $0 { true } else { false } })
+        await source.engine.sync.take(CopyUpdate(reread: .everything, connection: .needsHydration(expired)))
+        await source.engineTook()
         let after = try await source.copy.queue.all()
-        #expect(Set(after.map(\.id)) == Set(queued.map(\.id)))
+        #expect(Set(after.map(\.id)) == Set(queued.filter { $0.id != move.id }.map(\.id)), "only the answered write left the queue")
         let shown = try #require(log.current.snapshot?.items.first { $0.id == child })
         #expect(shown.edgesOut.contains { $0.target == .item(second) })
         #expect(shown.sync != .settled)
         await source.close()
-    }
-
-    @Test func aDrainThatThrewAfterAnAnswerIsReportedFromTheQueue() {
-        func write(_ id: String, verdict: Marfa.Verdict?) -> Marfa.QueuedWrite {
-            Marfa.QueuedWrite(
-                id: id, kind: .updateEdge, itemId: "item", edgeId: "edge", idempotencyKey: id, verdict: verdict,
-                queuedAt: "2026-10-06T00:00:00Z")
-        }
-        let report = MarfaSync.report(answeredIn: [write("sent", verdict: .accepted), write("waiting", verdict: nil)])
-        #expect(report.verdicts.map(\.id) == ["sent"])
-        #expect(report.verdicts.first?.kind == .updateEdge)
-        #expect(report.verdicts.first?.edgeId == "edge")
-        #expect(report.answered == 1)
-        #expect(MarfaSync.report(answeredIn: []).verdicts.isEmpty)
     }
 
     /// The package names the item a conflicted copy was made from, from the copy alone, so the two know each other
@@ -850,23 +846,6 @@ struct MarfaSourceOfflineTests {
         let reserved = MarfaError.forbidden(code: "type_not_permitted", message: "system.folder is written only through its own operation")
         #expect(MarfaEngine.problem(for: reserved).code == "type_not_permitted")
     }
-
-    @Test func aDrainIsJudgedByWhatItCouldNotSend() {
-        #expect(MarfaSync.result(of: DrainReport()) == .idle)
-        #expect(MarfaSync.result(of: DrainReport(answered: 2)) == .online)
-        // The core answers a refused key `blocked`, which counts as answered, and then parks the queue.
-        #expect(MarfaSync.result(of: DrainReport(answered: 1, stopped: "credential_refused")) == .parked("credential_refused"))
-        #expect(MarfaSync.result(of: DrainReport(answered: 1, undelivered: 2, unavailable: "network: timeout")) ==
-            .offline("network: timeout"))
-        #expect(MarfaSync.result(of: DrainReport(undelivered: 1, unavailable: "io: refused")) == .offline("io: refused"))
-    }
-
-    @Test func aRetryWaitsLongerAfterEachFailureUpToFiveMinutes() {
-        #expect(MarfaSync.delay(after: 1) == .seconds(5))
-        #expect(MarfaSync.delay(after: 2) == .seconds(10))
-        #expect(MarfaSync.delay(after: 7) == .seconds(300))
-        #expect(MarfaSync.delay(after: 100) == .seconds(300))
-    }
 }
 
 extension LiveMarfaTests {
@@ -879,7 +858,7 @@ extension LiveMarfaTests {
         private func open(_ root: URL) async throws -> MarfaSource {
             let connection = try MarfaConnection(address: try LiveMarfa.address())
             return try await MarfaSource.open(
-                connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]),
+                connection, keys: MemoryKeyStore([connection.address: try LiveMarfa.key()]),
                 location: MarfaStoreLocation(root: root))
         }
 
@@ -973,7 +952,7 @@ extension LiveMarfaTests {
             let repainted = try #require(await again.wait { $0.snapshot != nil })
             #expect(repainted.snapshot?.items.count == count)
             #expect(repainted.snapshot?.items.first { $0.id == child }?.edgesOut.contains { $0.target == .item(parent) } == true)
-            #expect(reopened.connectionState == .connecting)
+            #expect(reopened.connectionState != .online, "a copy is not online before the server has answered")
             await reopened.close()
         }
 
@@ -1149,7 +1128,7 @@ extension LiveMarfaTests {
             let address = try LiveMarfa.address(), key = try LiveMarfa.key()
             let connection = try MarfaConnection(address: address)
             let location = MarfaStoreLocation(root: root)
-            let keys = MemoryKeyStore([connection: key])
+            let keys = MemoryKeyStore([connection.address: key])
             let a = made.mint(), b = made.mint()
             let tag = UUID().uuidString.prefix(8)
 
@@ -1490,7 +1469,7 @@ struct MarfaSourceClosingTests {
     private func open() async throws -> (MarfaSource, MarfaConnection, MemoryKeyStore, MarfaStoreLocation, URL) {
         let root = scratch()
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let keys = MemoryKeyStore([connection: "unused"])
+        let keys = MemoryKeyStore([connection.address: "unused"])
         let location = MarfaStoreLocation(root: root)
         let source = try await MarfaSource.open(connection, keys: keys, location: location)
         return (source, connection, keys, location, root)

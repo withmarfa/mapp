@@ -1,8 +1,6 @@
 import Foundation
 import Marfa
 import MarfaTesting
-import struct MarfaCore.Item
-import struct MarfaCore.KeptFetch
 import Testing
 @testable import MAPP
 

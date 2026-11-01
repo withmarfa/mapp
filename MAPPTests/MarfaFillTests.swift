@@ -1,10 +1,6 @@
 import Foundation
 import Marfa
 import Synchronization
-import struct MarfaCore.Draft
-import struct MarfaCore.Edit
-import struct MarfaCore.Edge
-import struct MarfaCore.Item
 import Testing
 @testable import MAPP
 
@@ -68,7 +64,8 @@ import Testing
         let store = try TemporaryMarfaCopy()
         defer { store.remove() }
         let copy = try await store.open()
-        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"))
+        let source = MarfaSource(
+            copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), refreshing: QuietRefresh(copy: copy))
         let log = ChangeLog(source)
         source.events.yield(.paint)
         _ = try #require(await log.wait { $0.snapshot != nil })
@@ -76,12 +73,15 @@ import Testing
             "id": "example.note", "label": "Note", "title_field": "title", "body_field": "body",
             "fields": ["title": ["type": "string"], "body": ["type": "string"]],
         ]])
+        await source.tell(CopyUpdate(reread: .parts(Reread.Parts(catalog: true)), connection: .local))
         // The declaration reloads the copy. A reload still running would paint the item made next, before the
         // changes under test are read.
         _ = try #require(await log.wait { $0.snapshot?.catalogue.itemTypes[TypeID("example.note")] != nil })
         let created = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Arrived", "body": "First"]))
-        source.hear(Change(origin: .serverUnreachable(.network(message: "offline")), itemId: nil, edgeId: nil))
-        source.hear(Change(origin: .refreshed(.unfinished), itemId: nil, edgeId: nil))
+        // A fill that did not finish, with the server unreachable: the rows are read and the unreachable word stays.
+        await source.engine.sync.take(CopyUpdate(
+            reread: .everything, connection: .offline(.network(message: "offline")),
+            fill: FillProgress(listed: 1, expected: 4)))
         let painted = try #require(await log.wait { $0.item(titled: "Arrived") != nil })
         let item = try #require(painted.item(titled: "Arrived"))
         #expect(source.connectionState == .offline(reason: "offline"))
@@ -113,7 +113,7 @@ import Testing
 
         reads.hydrating.withLock { $0 = true }
         let created = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Arrived", "body": "First"]))
-        source.hear(Change(origin: .server(event: "item.created", cursor: "arrived"),
+        await source.hear(Change(origin: .server(event: "item.created", cursor: "arrived"),
                            itemId: try #require(created.itemId), edgeId: nil))
         _ = try #require(await log.wait { $0.item(titled: "Arrived") != nil })
         #expect(reads.refused.withLock { $0 } > 0, "the change was read while the copy refused edge reads")

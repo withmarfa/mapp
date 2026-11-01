@@ -1,7 +1,5 @@
 import Foundation
 import Marfa
-import struct MarfaCore.Item
-import enum MarfaCore.JsonValue
 
 /// Reads the queue, and the conflicted copies the copy holds, into what waits and what needs the person. Pure, so
 /// the rules are tested on values made by hand.
@@ -198,7 +196,7 @@ nonisolated enum MarfaProblems {
         switch kind {
         case .refused: [.discard]
         case .blocked(.credentialRefused): []
-        case .blocked(.keySpent), .dead: [.tryAgain]
+        case .blocked(.keySpent), .blocked(.instanceChanged), .dead: [.tryAgain]
         case .blocked(.failingAlone): [.tryAgain, .withdraw]
         case .blocked(.ancestorUnavailable), .blocked(.conflictUnresolved): [.withdraw]
         case .conflicted: [.keep, .discard]

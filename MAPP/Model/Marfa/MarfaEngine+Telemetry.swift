@@ -42,12 +42,11 @@ extension MarfaEngine.Event {
     nonisolated var kind: StaticString {
         switch self {
         case .paint: "paint"
-        case .fillProgress: "fillProgress"
         case .write: "write"
         case .undo: "undo"
         case .holdExpired: "holdExpired"
-        case .heard: "heard"
-        case .drained: "drained"
+        case .update: "update"
+        case .answers: "answers"
         case .failed: "failed"
         case .flush: "flush"
         case .close: "close"

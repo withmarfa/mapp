@@ -1,5 +1,4 @@
 import Marfa
-import struct MarfaCore.KeptFetch
 
 /// The network steps of a refresh, separated so interruptions and recovery can be exercised without a server.
 nonisolated protocol MarfaRefreshing: Sendable {
@@ -7,6 +6,13 @@ nonisolated protocol MarfaRefreshing: Sendable {
     func hydrate(types: [String], tier: SliceTier, edgeTypes: [String]) async throws -> HydrateReport
     func catchUp() async throws
     func fetchKept() async throws -> KeptFetch
+    /// What the sync listens to in place of the copy's own updates, which a test sets to control exactly what the
+    /// engine is told. `nil` listens to the copy.
+    func updates() -> AsyncStream<CopyUpdate>?
+}
+
+nonisolated extension MarfaRefreshing {
+    func updates() -> AsyncStream<CopyUpdate>? { nil }
 }
 
 nonisolated struct MarfaRefresh: MarfaRefreshing {

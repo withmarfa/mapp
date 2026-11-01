@@ -1,9 +1,6 @@
 import Foundation
 import Marfa
 import Synchronization
-import struct MarfaCore.Edit
-import struct MarfaCore.Draft
-import struct MarfaCore.Item
 import Testing
 @testable import MAPP
 
@@ -136,10 +133,10 @@ import Testing
         /// The fill that follows an item's move has begun: edges can't be written until it ends.
         func beginFill() { reads.whole.withLock { $0 = false } }
 
-        func becomeWhole() {
+        func becomeWhole() async {
             reads.whole.withLock { $0 = true }
             reads.missing.withLock { $0 = [] }
-            source.hear(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil))
+            await source.hear(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil))
         }
 
         func held() async -> Int { await source.engine.held.count }
@@ -168,11 +165,12 @@ import Testing
         _ = try await copy.edges.create(from: folderID, to: childID, type: MarfaMapping.parentEdge)
         let edge = try #require(await copy.edges.from(folderID).first)
         let reads = Catchup(copy: copy)
-        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads)
+        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads, refreshing: QuietRefresh(copy: copy))
         source.engine.hooks.refusing.set { reads.refusal($0) }
         let log = ChangeLog(source)
         source.events.yield(.paint)
         let painted = try #require(await log.wait { $0.item(titled: "Second") != nil && $0.item(titled: "Folder") != nil })
+        try #require(await eventuallyAsking { await source.engine.tookFirstUpdate }, "the package's first update")
         let scene = Scene(
             store: store, copy: copy, reads: reads, source: source, log: log, item: try #require(painted.item(titled: "Second")),
             parent: try #require(painted.item(titled: "Folder")), edge: EdgeID(edge.id))
@@ -193,53 +191,37 @@ import Testing
         try #require(try await eventuallyAsking { await scene.held() == 1 })
         #expect(try await scene.links() == 1)
 
-        scene.becomeWhole()
+        await scene.becomeWhole()
         try #require(try await eventuallyAsking { try await scene.links() == 0 })
         #expect(await scene.held() == 0)
         #expect(scene.log.current.answer(to: id) == nil)
 
         // Time for a second reading to make the write again, which it must not.
-        scene.becomeWhole()
+        await scene.becomeWhole()
         try await Task.sleep(for: .milliseconds(300))
         #expect(scene.reads.attempts.withLock { $0 } == [.unlink(scene.edge), .unlink(scene.edge)], "refused once, made once")
         await finish(scene)
     }
 
-    @Test func aHeldUndoWaitsForAWholeReadNotARereadOfWhatItTouches() async throws {
+    @Test func aHeldUndoWaitsForTheCopyToBeWholeAndIsMadeByAReadOfWhatChanged() async throws {
         let scene = try await makeScene()
         scene.unlink(as: UndoGroup())
         try #require(try await eventuallyAsking { await scene.held() == 1 })
         await scene.engineSettled()
+        let change = Change(origin: .server(event: "item.updated", cursor: "1"), itemId: scene.item.id.rawValue, edgeId: nil)
 
-        // The copy is whole again, but a server change reads only the item: what the step touches may still be
-        // arriving elsewhere, so only a whole read or a read of what changed, which finds the copy whole, may make it.
-        scene.reads.whole.withLock { $0 = true }
-        scene.source.hear(Change(origin: .server(event: "item.updated", cursor: "1"), itemId: scene.item.id.rawValue, edgeId: nil))
+        // A copy still filling does not make it: what the step touches may still be arriving.
+        await scene.source.hear(change)
         await scene.source.engineTook()
         #expect(await scene.held() == 1)
         #expect(try await scene.links() == 1)
 
-        // A whole read of a copy still filling does not make it either.
-        scene.reads.whole.withLock { $0 = false }
-        scene.source.hear(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil))
-        await scene.source.engineTook()
-        #expect(await scene.held() == 1)
-
-        scene.becomeWhole()
-        try #require(try await eventuallyAsking { try await scene.links() == 0 })
-        #expect(await scene.held() == 0)
-        await finish(scene)
-    }
-
-    @Test func aReadOfWhatChangedOnceTheCopyIsWholeMakesTheUndoWithoutAWholeRead() async throws {
-        let scene = try await makeScene()
-        scene.unlink(as: UndoGroup())
-        try #require(try await eventuallyAsking { await scene.held() == 1 })
-        await scene.engineSettled()
+        // The copy names what changed since the engine's last whole read and finds itself whole, so the rows the
+        // engine holds are the copy's and the step is made without listing the copy again.
         let reads = scene.reads.fullReads.withLock { $0 }
-
-        // The copy names what changed since the engine's last whole read, so the rows it holds are the copy's.
-        scene.becomeWhole()
+        scene.reads.whole.withLock { $0 = true }
+        scene.reads.missing.withLock { $0 = [] }
+        await scene.source.hear(change)
         try #require(try await eventuallyAsking { try await scene.links() == 0 })
         #expect(await scene.held() == 0)
         #expect(scene.reads.fullReads.withLock { $0 } == reads, "no whole read")
@@ -253,7 +235,7 @@ import Testing
 
         // Another device trashes the item the link is under while the copy catches up.
         _ = try await scene.copy.items.delete(scene.parent.id.rawValue)
-        scene.becomeWhole()
+        await scene.becomeWhole()
         let state = try #require(await scene.log.wait { $0.answer(to: id) != nil })
         let problem = try #require(state.refusal(to: id))
         #expect(problem.code == MarfaEngine.heldChangedCode)
@@ -273,12 +255,12 @@ import Testing
         #expect(try await scene.links() == 1)
         #expect(scene.reads.attempts.withLock { $0 } == [.unlink(scene.edge)], "the edit waits unattempted behind the link")
 
-        scene.becomeWhole()
+        await scene.becomeWhole()
         try #require(try await eventuallyAsking { await scene.held() == 0 })
         // The held count falls when the edit is taken, not when the copy has it.
         try #require(try await eventuallyAsking { try await scene.title() == "First" })
         try #require(try await eventuallyAsking { try await scene.links() == 0 })
-        scene.becomeWhole()
+        await scene.becomeWhole()
         // Time for a second reading to make the writes again, which it must not.
         try await Task.sleep(for: .milliseconds(300))
         let attempts = scene.reads.attempts.withLock { $0 }
@@ -297,7 +279,7 @@ import Testing
         try #require(try await eventuallyAsking { await scene.held() == 2 })
 
         try await scene.rename(to: "Elsewhere")
-        scene.becomeWhole()
+        await scene.becomeWhole()
         let state = try #require(await scene.log.wait { $0.answer(to: unlink) != nil && $0.answer(to: edit) != nil })
         #expect(state.refusal(to: unlink)?.code == MarfaEngine.heldChangedCode)
         #expect(state.refusal(to: edit)?.code == MarfaEngine.heldChangedCode)
@@ -321,7 +303,7 @@ import Testing
         try #require(try await eventuallyAsking { await scene.held() == 1 })
         #expect(try await scene.title() == "Second")
 
-        scene.becomeWhole()
+        await scene.becomeWhole()
         try #require(try await eventuallyAsking { try await scene.title() == "First" })
         await finish(scene)
     }
@@ -334,7 +316,7 @@ import Testing
         try #require(try await eventuallyAsking { await scene.held() == 2 })
         #expect(scene.reads.attempts.withLock { $0.count } == 1, "the redo waits behind the undo")
 
-        scene.becomeWhole()
+        await scene.becomeWhole()
         try #require(try await eventuallyAsking { await scene.held() == 0 })
         // The held count falls when the writes are taken, not when they are made. The third attempt begins only once the
         // unlink is made, so the link is back only after it.

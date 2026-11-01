@@ -187,7 +187,7 @@ import Observation
         source: any ItemSource, notices: Notices, history: (any ItemHistorySource)? = nil,
         typeIcons: (any TypeIconSource)? = nil, config: (any InstanceConfigSource)? = nil,
         now: @escaping () -> Date = Date.init,
-        didSync: @escaping (Date) -> Void = { _ in }, cameOnline: @escaping () -> Void = {}) {
+        cameOnline: @escaping () -> Void = {}) {
         self.source = source
         self.history = history
         self.typeIcons = typeIcons
@@ -199,7 +199,6 @@ import Observation
         let changes = source.changes()
         let reports = source.syncReports()
         let states = source.connectionStates()
-        let first = syncReport.lastSynced
         following = [
             Task { [weak self] in
                 for await change in changes {
@@ -208,12 +207,7 @@ import Observation
                 }
             },
             Task { [weak self] in
-                var synced = first
-                for await report in reports {
-                    self?.syncReport = report
-                    if let date = report.lastSynced, date != synced { didSync(date) }
-                    synced = report.lastSynced
-                }
+                for await report in reports { self?.syncReport = report }
             },
             Task { [weak self] in
                 for await state in states {
