@@ -1,8 +1,8 @@
 import AppKit
 import SwiftUI
 
-/// The connection sections of the Library page: the key and the other server while connected, and the address and key
-/// to connect with otherwise. How the connection stands is told by the server section above. The sections go in the
+/// The connection sections of the Library page: the sign-in and the other server while connected, and the address to
+/// sign in to otherwise. How the connection stands is told by the server section above. The sections go in the
 /// page's grouped form.
 struct MarfaSettingsView: View {
     @Bindable var model: MarfaSettingsModel
@@ -26,20 +26,18 @@ struct MarfaSettingsView: View {
             Section {
                 TextField("Address", text: $model.address, prompt: Text("https://marfa.example.com"))
                     .autocorrectionDisabled()
+                    .disabled(model.isWorking)
                     .accessibilityIdentifier("MarfaAddress")
-                SecureField("Key", text: $model.key, prompt: Text("Paste your key"))
-                    .accessibilityIdentifier("MarfaKey")
-                HStack {
-                    Button("Connect") { Task { await model.connect() } }
-                        .disabled(!model.canConnect)
-                        .accessibilityIdentifier("MarfaConnect")
-                    if model.isWorking { ProgressView().controlSize(.small) }
-                }
+                signInButtons(
+                    title: "Sign In", canStart: model.canConnect,
+                    browser: .connect(usingCode: false), code: .connect(usingCode: true),
+                    identifier: "MarfaConnect")
             } header: {
                 Text("Server")
             } footer: {
-                Text("Connect to a Marfa server to read and edit its items here. MAPP keeps the key in your Keychain and doesn’t show it again.")
+                Text("Connect to a Marfa server to read and edit its items here. MAPP opens the server’s own page to sign in and never sees your password.")
             }
+            codeSection
             notice
         }
     }
@@ -48,38 +46,35 @@ struct MarfaSettingsView: View {
 
     private func connected(to connection: MarfaConnection) -> some View {
         Group {
-            // The server section above names the server and what waits, so only the key and the other server are here.
-            keySection
+            // The server section above names the server and what waits, so only the sign-in and the other server are here.
+            signInSection
+            codeSection
             notice
             otherServer
         }
     }
 
-    private var isKeyRefused: Bool { host.state == .keyRefused }
+    private var isSignedOut: Bool { host.state == .keyRefused }
 
-    private var keySection: some View {
+    private var signInSection: some View {
         Section {
-            SecureField("New key", text: $model.newKey, prompt: Text("Paste a new key"))
-                .accessibilityIdentifier("MarfaNewKey")
-            Button(isKeyRefused ? "Use New Key" : "Replace Key") { Task { await model.replaceKey() } }
-                .disabled(!model.canReplaceKey)
-                .accessibilityIdentifier("MarfaReplaceKey")
-            if isKeyRefused {
-                // The other way out: a key that will never work again needs the library disconnected to start over.
-                HStack {
-                    Button("Disconnect…") { model.requestDisconnect() }
-                        .disabled(model.isWorking)
-                        .accessibilityIdentifier("MarfaRefusedDisconnect")
-                    if model.isWorking { ProgressView().controlSize(.small) }
-                }
+            signInButtons(
+                title: "Sign In Again", canStart: !model.isWorking,
+                browser: .signInAgain(usingCode: false), code: .signInAgain(usingCode: true),
+                identifier: "MarfaSignInAgain")
+            if isSignedOut {
+                // The other way out: a sign-in the server will not renew needs the library disconnected to start over.
+                Button("Disconnect…") { model.requestDisconnect() }
+                    .disabled(model.isWorking)
+                    .accessibilityIdentifier("MarfaRefusedDisconnect")
             }
         } header: {
-            Text(isKeyRefused ? "Key not accepted" : "Key")
+            Text(isSignedOut ? "Signed out" : "Your Sign-In")
         } footer: {
-            if isKeyRefused {
-                Text("The server doesn’t accept your key. Enter a new one, or disconnect to start again. Changes not yet sent stay on this Mac until a key works or you choose what to do with them.")
+            if isSignedOut {
+                Text("The server has ended MAPP’s sign-in. Sign in again, or disconnect to start again. Changes not yet sent stay on this Mac until you are signed in or choose what to do with them.")
             } else {
-                Text("MAPP keeps the key in your Keychain and doesn’t show it again.")
+                Text("MAPP keeps its sign-in in your Keychain and renews it itself. Sign in again only to change the account or permissions.")
             }
         }
     }
@@ -89,15 +84,60 @@ struct MarfaSettingsView: View {
             DisclosureGroup("Use a different server") {
                 TextField("Address", text: $model.otherAddress, prompt: Text("https://marfa.example.com"))
                     .autocorrectionDisabled()
+                    .disabled(model.isWorking)
                     .accessibilityIdentifier("MarfaOtherAddress")
-                SecureField("Key", text: $model.otherKey, prompt: Text("Paste its key"))
-                    .accessibilityIdentifier("MarfaOtherKey")
-                Button("Switch Server") { Task { await model.switchServer() } }
-                    .disabled(!model.canSwitch)
-                    .accessibilityIdentifier("MarfaSwitch")
+                signInButtons(
+                    title: "Sign In and Switch", canStart: model.canSwitch,
+                    browser: .switchServer(usingCode: false), code: .switchServer(usingCode: true),
+                    identifier: "MarfaSwitch")
             }
         } footer: {
             Text("Each server has its own copy on this Mac.")
+        }
+    }
+
+    /// The two ways to sign in, side by side, and Cancel while one waits on the person.
+    private func signInButtons(
+        title: LocalizedStringKey, canStart: Bool,
+        browser: MarfaSettingsModel.SignInStep, code: MarfaSettingsModel.SignInStep, identifier: String
+    ) -> some View {
+        HStack {
+            Button(title) { model.start(browser) }
+                .disabled(!canStart)
+                .accessibilityIdentifier(identifier)
+            Button("Use a Code Instead…") { model.start(code) }
+                .disabled(!canStart)
+                .accessibilityIdentifier(identifier + "Code")
+            if model.isWorking {
+                ProgressView().controlSize(.small)
+                if model.canCancelSignIn {
+                    Button("Cancel", role: .cancel) { model.cancelSignIn() }
+                        .accessibilityIdentifier("MarfaSignInCancel")
+                }
+            }
+        }
+    }
+
+    /// The code to approve on another device, while a sign-in with a code waits for it.
+    @ViewBuilder private var codeSection: some View {
+        if let code = model.code {
+            Section {
+                Text(code.code)
+                    .font(.system(.title, design: .monospaced).bold())
+                    .textSelection(.enabled)
+                    .accessibilityIdentifier("MarfaSignInCode")
+                HStack {
+                    Button("Open Page") { NSWorkspace.shared.open(code.completeAddress ?? code.address) }
+                    Button("Copy Code") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(code.code, forType: .string)
+                    }
+                }
+            } header: {
+                Text("Approve MAPP With This Code")
+            } footer: {
+                Text("Open \(code.address.absoluteString) on any device, sign in and type the code. It stops working at \(code.expiresAt.formatted(date: .omitted, time: .shortened)).")
+            }
         }
     }
 

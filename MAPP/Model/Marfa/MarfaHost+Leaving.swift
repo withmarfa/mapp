@@ -1,7 +1,7 @@
 import Foundation
 import Marfa
 
-/// Leaving a copy: what the person agreed to lose with it, and removing its key and, where it was discarded, the
+/// Leaving a copy: what the person agreed to lose with it, and ending its sign-in and, where it was discarded, the
 /// copy itself.
 extension MarfaHost {
     /// The number of changes the person agreed to lose when they chose to discard the copy: the count they were
@@ -22,19 +22,20 @@ extension MarfaHost {
         }
     }
 
-    /// Removes the key, and the copy where it was discarded (`agreed` is the number of changes the person agreed
+    /// Ends the sign-in, and removes the copy where it was discarded (`agreed` is the number of changes the person agreed
     /// to lose with it), once the copy is closed. A discarded copy is marked before anything is removed and
     /// unmarked only once it is gone or the package has refused it, so neither a removal that fails nor a quit
     /// part way lets it be opened again as it was.
     func finishLeaving(_ connection: MarfaConnection, agreed: UInt64?) async -> Problem? {
         if let agreed { markDiscarded(connection, agreed: agreed) }
-        var key: String?
+        var signIn: String?
         var copy: String?
         var kept: CopyKept?
+        var revoked = true
         do {
-            try await Self.offMain { [keys] in try keys.delete(for: connection.address) }
+            revoked = try await signIns.signOut(of: connection)
         } catch {
-            key = Self.message(error)
+            signIn = Self.message(error)
         }
         if let agreed {
             switch await removeCopy(connection, agreed: agreed) {
@@ -47,8 +48,9 @@ extension MarfaHost {
                 kept = reason
             }
         }
-        if let kept { return .copyKept(kept, key: key) }
-        return key == nil && copy == nil ? nil : .notRemoved(key: key, copy: copy)
+        if let kept { return .copyKept(kept, signIn: signIn) }
+        if signIn != nil || copy != nil { return .notRemoved(signIn: signIn, copy: copy) }
+        return revoked ? nil : .notRevoked
     }
 
     private var discarded: [String: Int] {
@@ -68,10 +70,10 @@ extension MarfaHost {
         case .removed:
             markDiscarded(connection, agreed: nil)
         case .failed(let message):
-            throw .notRemoved(key: nil, copy: message)
+            throw .notRemoved(signIn: nil, copy: message)
         case .kept(let reason):
             markDiscarded(connection, agreed: nil)
-            throw .copyKept(reason, key: nil)
+            throw .copyKept(reason, signIn: nil)
         }
     }
 

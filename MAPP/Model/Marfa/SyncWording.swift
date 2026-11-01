@@ -55,10 +55,10 @@ nonisolated struct SyncStatus: Hashable, Sendable {
     // MARK: Words
 
     private static func keyRefused(waiting: Int) -> Note {
-        var detail = String(localized: "The server doesn’t accept your key. Enter a new one in Settings.")
+        var detail = String(localized: "The server has ended MAPP’s sign-in. Sign in again in Settings.")
         if waiting > 0 { detail += " " + Words.waiting(waiting) }
-        let line = waiting > 0 ? Words.keyRefusedLine(waiting) : String(localized: "Key refused")
-        return Note(kind: .keyRefused, title: String(localized: "Key refused"), line: line, detail: detail, symbol: "exclamationmark.triangle", isWarning: true)
+        let line = waiting > 0 ? Words.keyRefusedLine(waiting) : String(localized: "Signed out")
+        return Note(kind: .keyRefused, title: String(localized: "Signed out"), line: line, detail: detail, symbol: "exclamationmark.triangle", isWarning: true)
     }
 
     private static var unavailable: Note {
@@ -128,7 +128,7 @@ nonisolated enum Words {
     }
 
     static func keyRefusedLine(_ count: Int) -> String {
-        String(localized: "Key refused, \(count) changes waiting")
+        String(localized: "Signed out, \(count) changes waiting")
     }
 
     static func needAttention(_ count: Int) -> String {
@@ -180,12 +180,12 @@ nonisolated enum Words {
     }
 
     static func plainHTTP(origin: String) -> String {
-        String(localized: "Your key is sent to \(origin) without encryption, so anyone on the network can read it. Use an https address unless this network is private.")
+        String(localized: "Your sign-in is sent to \(origin) without encryption, so anyone on the network can read it. Use an https address unless this network is private.")
     }
 
-    /// The Keychain would not give the key, which is not the same as there being none or the server refusing it.
-    static var keyUnreadable: String {
-        String(localized: "MAPP couldn’t read this library’s key from the Keychain. Unlock the Keychain and quit and reopen MAPP, or enter the key again in Settings.")
+    /// The Keychain would not give the sign-in, which is not the same as there being none or the server ending it.
+    static var signInUnreadable: String {
+        String(localized: "MAPP couldn’t read this library’s sign-in from the Keychain. Unlock the Keychain and quit and reopen MAPP, or sign in again in Settings.")
     }
 
     /// The address now reaches another Marfa server than the one this copy was made for, so nothing in the copy is
@@ -259,7 +259,7 @@ nonisolated struct ProblemWording: Hashable, Sendable {
             headline = Self.refusedHeadline(entry.change, name: name)
             let reason = entry.reason
             if let grant = reason?.grant {
-                explanation = String(localized: "Your key doesn’t have permission for “\(grant.name)”. Ask whoever runs the server to allow it, then make the change again.")
+                explanation = String(localized: "MAPP doesn’t have permission for “\(grant.name)”. Ask whoever runs the server to allow it, then make the change again.")
             } else if reason?.isTrashed == true {
                 explanation = String(localized: "The item is in Recently Deleted on the server, so it can’t be changed. Restore it, then make the change again.")
             } else if let message = reason?.message, !message.isEmpty {
@@ -272,7 +272,7 @@ nonisolated struct ProblemWording: Hashable, Sendable {
         case .blocked(let reason):
             headline = Self.stoppedHeadline(name: name)
             explanation = switch reason {
-            case .credentialRefused: String(localized: "It will be sent once the server accepts a key. Enter a new one in Settings.")
+            case .credentialRefused: String(localized: "It will be sent once you sign in again. Do that in Settings.")
             case .keySpent: String(localized: "The server stopped this change from going through. Try again to send it.")
             case .ancestorUnavailable: String(localized: "It depends on an item that isn’t available any more. Undoing it puts the item back as the server has it.")
             case .conflictUnresolved: String(localized: "It can’t be applied until a conflict on the item is settled. Undoing it puts the item back as the server has it.")

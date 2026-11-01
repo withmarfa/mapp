@@ -34,8 +34,8 @@ import Testing
         #expect(host.connection == first)
         #expect(host.source === old)
         #expect(bench.hasCopy(first))
-        #expect(try bench.keys.key(for: first.address) == "one")
-        #expect(try bench.keys.key(for: second.address) == nil)
+        #expect(try bench.signIns.key(for: first.address) == "one")
+        #expect(try bench.signIns.key(for: second.address) == nil)
         #expect(!old.calls.contains("close"))
         #expect(bench.servers.opened.count == 2)
         #expect(bench.servers.last?.calls.last == "close")
@@ -45,12 +45,12 @@ import Testing
         let bench = try HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
-        bench.keys.failsDelete.withLock { $0 = true }
+        bench.signIns.script(signOut: .failure(SourceFailure(kind: .denied, message: "The keychain refused.")))
         do {
             try await host.disconnect(.keepCopy)
             Issue.record("said the key was removed")
         } catch {}
-        #expect(try bench.keys.key(for: first.address) == "k")
+        #expect(try bench.signIns.key(for: first.address) == "k")
     }
 
     /// A copy the person chose to discard, which could not be removed, is never opened again as it was.
@@ -96,25 +96,6 @@ import Testing
         }
     }
 
-    /// Giving the old key back can close the copy too, which is then opened again rather than kept attached.
-    @Test func aCopyThatClosesWhileTheOldKeyGoesBackIsOpenedAgain() async throws {
-        let bench = try HostBench()
-        let host = bench.host()
-        try await host.connect(address: "http://first.test:8210", key: "good")
-        let source = try #require(bench.servers.last)
-        source.state.set(.online)
-        source.verdicts.withLock { $0["typo"] = .refused }
-        source.closesOn.withLock { $0 = ["good"] }
-        do {
-            try await host.replaceKey("typo")
-            Issue.record("took a key the server refuses")
-        } catch {}
-        #expect(source.calls == ["tryKey typo", "tryKey good", "close"])
-        #expect(bench.servers.opened.count == 2)
-        #expect(host.source === bench.servers.last)
-        #expect(try bench.keys.key(for: first.address) == "good")
-    }
-
     /// The copy is marked discarded before anything is removed, so a launch after a crash part way never sends
     /// what the person chose to discard.
     @Test func aCopyIsMarkedDiscardedBeforeItIsRemoved() async throws {
@@ -123,7 +104,7 @@ import Testing
         try await host.connect(address: "http://first.test:8210", key: "k")
         let suite = bench.suite
         let seen = Mutex<[String: Int]?>(nil)
-        bench.keys.onDelete.withLock {
+        bench.signIns.onSignOut.withLock {
             $0 = { seen.withLock { $0 = UserDefaults(suiteName: suite)?.dictionary(forKey: "MarfaDiscardedCopies") as? [String: Int] ?? [:] } }
         }
         try await host.disconnect()
@@ -136,7 +117,7 @@ import Testing
         let bench = try HostBench()
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
-        bench.keys.failsDelete.withLock { $0 = true }
+        bench.signIns.script(signOut: .failure(SourceFailure(kind: .denied, message: "The keychain refused.")))
         try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: bench.root.path)
         defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: bench.root.path) }
         do {

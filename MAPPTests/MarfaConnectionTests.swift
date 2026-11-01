@@ -29,15 +29,30 @@ struct MarfaConnectionTests {
         #expect(MarfaStoreLocation.applicationSupport.path.hasPrefix(URL.applicationSupportDirectory.path))
     }
 
-    @Test func aKeyIsKeptForItsServerAlone() throws {
+    @Test func aSignInIsKeptForItsServerAlone() throws {
         let one = try MarfaConnection(address: "http://one.example")
         let two = try MarfaConnection(address: "http://two.example")
-        let keys = MemoryKeyStore()
-        keys.save("first", for: one.address)
-        #expect(try keys.key(for: one.address) == "first")
-        #expect(try keys.key(for: two.address) == nil)
-        keys.delete(for: one.address)
-        #expect(try keys.key(for: one.address) == nil)
-        #expect(KeychainKeyStore.account(for: one.address) == "http://one.example")
+        let signIns = MemorySignIns()
+        signIns.hold("first", for: one)
+        #expect(try signIns.key(for: one.address) == "first")
+        #expect(try signIns.key(for: two.address) == nil)
+    }
+
+    /// Building the real sign-in touches neither the Keychain nor a window; Debug and Release differ by their
+    /// bundle identifier, so they never share a sign-in or a return address.
+    @Test func theRealSignInKeepsItsOwnServiceAndReturnsToTheApp() throws {
+        let debug = SystemSignIns(bundleIdentifier: "com.withmarfa.mapp.debug", anchor: { nil })
+        let release = SystemSignIns(bundleIdentifier: "com.withmarfa.mapp", anchor: { nil })
+        #expect(debug.service == "com.withmarfa.mapp.debug.marfa-sign-in")
+        #expect(release.service == "com.withmarfa.mapp.marfa-sign-in")
+        #expect(debug.service != release.service)
+        #expect(debug.scheme == "com.withmarfa.mapp.debug")
+        #expect(SystemSignIns.scopes == ["*:read", "*:write", "edge.*:read", "edge.*:write", "items.purge", "config.manage", "schema.write"])
+    }
+
+    @Test func theAppClaimsTheSchemeTheBrowserReturnsTo() throws {
+        let types = try #require(Bundle.main.object(forInfoDictionaryKey: "CFBundleURLTypes") as? [[String: Any]])
+        let schemes = types.flatMap { $0["CFBundleURLSchemes"] as? [String] ?? [] }
+        #expect(schemes.contains(SystemSignIns().scheme), "\(schemes)")
     }
 }

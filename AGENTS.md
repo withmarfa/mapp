@@ -17,7 +17,7 @@ Keep each file under 200 lines and each chain from this file to a nested one und
 
 ## Conventions
 
-- Use American English in code, comments, commits, and repository files.
+- Use American English throughout.
 - Use scoped Conventional Commits in the present tense, lowercase and short: `feat(app):`, `fix(editor):`, `test(model):`.
 - Work on a branch and reach `main` through a pull request, squash-merged once the tests pass and a reviewer has read it.
 - Make worktrees in `.claude/worktrees/` (`git worktree add .claude/worktrees/<name> -b <branch> origin/main`). Once the work is merged, remove the worktree and its local branch (`git worktree remove`, then `git branch -D`: git sees a squash-merge as unmerged) and run `git pull --ff-only` on `main`. If git refuses a removal, report it rather than forcing it.
@@ -34,9 +34,9 @@ Keep each file under 200 lines and each chain from this file to a nested one und
 - Target macOS 27 and Xcode 27 only. Write no `#available` checks and no fallbacks for earlier systems.
 - Swift 6 language mode, main-actor isolation by default (`SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`). Unit tests use Swift Testing; UI tests use XCTest.
 - Use SwiftUI, and AppKit only where SwiftUI cannot express something.
-- Use native containers and controls (`NavigationSplitView`, `List`, toolbars, commands, system materials) so the system supplies the look. Custom chrome needs a reason. What the app adds is drawn to sit beside the system's own components, never as a web app's chrome.
-- Check API and design questions against Apple's documentation and the Human Interface Guidelines, not memory.
-- Every toolbar action is also a menu command, since a toolbar can be hidden or customized. The command palette (`MAPP/Views/CommandPalette.swift`) builds its own list, so add a new command there too. With the gallery or the table showing, the editor stays mounted but hidden, so offer an editor command in the palette only when `hasVisibleEditor`.
+- Use native containers and controls (`NavigationSplitView`, `List`, toolbars, commands, materials) so the system supplies the look. Custom chrome needs a reason; what the app adds sits beside the system's own components.
+- Check API and design questions against Apple's documentation and the HIG, not memory.
+- Every toolbar action is also a menu command, since a toolbar can be hidden. The command palette (`MAPP/Views/CommandPalette.swift`) builds its own list, so add a new command there too. With the gallery or the table showing, the editor stays mounted but hidden, so offer an editor command in the palette only when `hasVisibleEditor`.
 - Every user-facing string goes through the String Catalog. `MAPP/Localizable.xcstrings` is updated by building in Xcode; `xcodebuild` alone does not update it.
 - `MainView` mounts one `NavigationSplitView` at a time and changes the workspace's identity to switch between them. Never change the column count of a split view that is already mounted. Keep state a person would notice (browser, editor, undo, columns, sidebar scroll) above that boundary.
 - Large libraries: a view that lists items must not run every row's body for a change of selection or of one item. The types that keep this (`NoteList`, `SelectableList`, `GalleryCard`, `SoftSelection`, `Browser`'s cached content) say how in their doc comments; read them before changing a list, and measure with the `Measure` plan.
@@ -50,13 +50,13 @@ These hold across the app. The nested files say how the library keeps them.
 - Notes are held byte for byte. A note opened and left alone is never rewritten. An edit keeps the text of every block it did not reach.
 - Views, commands, and the editor reach a library only through `ItemLibrary` (`MAPP/Model/Items/ItemLibrary.swift`), read from the environment's `library` value. Never test for a concrete library type in a view.
 - Windows, selections, restoration, and drags name items by `ItemID`, never by path.
-- Tests never touch the person's data. Under the unit tests' background-only host, previews and the sample library, `Libraries.standard()` uses `MemoryKeyStore`, a temporary store location and defaults of its own, never the Keychain or the saved server. UI tests open the sample library through `XCUIApplication.sample()` (`-MAPPSampleLibrary`), a library held in memory by `marfa-swift`'s fake working copy (`WorkingCopy.fake`). A unit test drives `MarfaLibrary` through `FakeItemSource` or the sample's fake copy. Only the `Live` plan reaches a server, and only a test instance.
+- Tests never touch the person's data. Under the unit tests' background-only host, previews and the sample library, `Libraries.standard()` uses `MemorySignIns`, a temporary store location and defaults of its own, never the Keychain or the saved server. UI tests open the sample library through `XCUIApplication.sample()` (`-MAPPSampleLibrary`), a library held in memory by `marfa-swift`'s fake working copy (`WorkingCopy.fake`). A unit test drives `MarfaLibrary` through `FakeItemSource` or the sample's fake copy. Only the `Live` plan reaches a server, and only a test instance.
 
 ## Layout
 
 - `MAPP.xcodeproj` uses folder-synchronized groups for `MAPP/`, `MAPPTests/`, and `MAPPUITests/`. Add a source file by creating it on disk; do not edit `project.pbxproj` to add files.
 - Every file under `MAPP/` becomes an app resource unless the MAPP target's membership exceptions list it. The nested `AGENTS.md` and `CLAUDE.md` files are listed there; list any new one too, or two with one name fail the build as duplicate resources.
-- The bundle identifier, display name, and version are build settings. Debug is `com.withmarfa.mapp.debug`, so it never shares the installed app's data or keychain items; Release is `com.withmarfa.mapp`. Key anything that must differ on `Bundle.main.bundleIdentifier`, never a literal. `MAPP/Info.plist` holds only what build settings cannot express.
+- The bundle identifier, display name, and version are build settings. Debug is `com.withmarfa.mapp.debug`, so it never shares the installed app's data, sign-ins or return address (`Info.plist` claims the identifier as the sign-in's URL scheme); Release is `com.withmarfa.mapp`. Key anything that must differ on `Bundle.main.bundleIdentifier`, never a literal. `MAPP/Info.plist` holds only what build settings cannot express.
 - `MAPP/Model/`: the data model, free of SwiftUI (`Items/`, `Marfa/`, `Telemetry/`). `MAPP/Views/`: windows, panes, toolbars, commands, and Settings. `MAPP/Editor/`: the Swift host for the editor page. `editor/`: the page's TypeScript source. `Design/`: artwork not built into the app.
 - `MAPP/Tuning/`: the Debug-only tuning panel (`#if DEBUG` throughout). When August wants to compare design values, add a knob there instead of building variants (`Tuning.swift` says how), and remove it in the change that settles the value.
 - `MAPPTests/`: Swift Testing unit tests, hosted in the app's background-only `Debug Tests` build, which starts with no scene (`TestHost`). `FakeItemLibrary` holds items in memory for view models and the editor; `FakeItemSource` is a source the test drives, for `MarfaLibrary`.

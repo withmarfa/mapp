@@ -11,9 +11,9 @@ struct TestHostTests {
         #expect(!(NSApp.delegate is AppDelegate))
     }
 
-    @Test func standardLibrariesKeepKeysInMemoryAndAwayFromTheSavedServer() {
+    @Test func standardLibrariesKeepSignInsInMemoryAndAwayFromTheSavedServer() {
         let libraries = Libraries.standard()
-        #expect(libraries.host.keys is MemoryKeyStore)
+        #expect(libraries.host.signIns is MemorySignIns)
         #expect(libraries.host.location.root != MarfaStoreLocation.applicationSupport)
         #expect(libraries.host.connection == nil)
     }

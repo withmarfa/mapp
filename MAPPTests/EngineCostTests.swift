@@ -241,7 +241,7 @@ struct EngineCostTests {
     private func open(_ bench: Bench) async throws -> Open {
         let connection = try MarfaConnection(address: try LiveMarfa.address())
         let source = try await MarfaSource.open(
-            connection, keys: MemoryKeyStore([connection.address: try LiveMarfa.key()]), location: MarfaStoreLocation(root: bench.root))
+            connection, signIns: MemorySignIns([connection.address: try LiveMarfa.key()]), location: MarfaStoreLocation(root: bench.root))
         bench.sources.append(source)
         let library = MarfaLibrary(source: source, notices: Notices())
         source.refresh()

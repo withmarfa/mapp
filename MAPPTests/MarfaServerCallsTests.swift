@@ -7,20 +7,12 @@ import Testing
 // The package names the same things; these tests mean the package's.
 private typealias PackagePatch = Marfa.InstanceConfigPatch
 
-/// A key store that holds a key it cannot read, as a locked Keychain does.
-private nonisolated struct UnreadableKeys: KeyStore {
-    struct Locked: Error {}
-    func save(_ key: String, for address: URL) throws {}
-    func key(for address: URL) throws -> String? { throw Locked() }
-    func delete(for address: URL) throws {}
-}
-
 /// How the calls to the server itself are made and how their failures are told. None reaches a server: the package's
 /// `Server` takes no transport that a test can replace, so what goes over the wire (the `PATCH`, the instance header,
 /// the paging query) is the package's own tests' to show, and the live plan runs these calls against a test instance.
 @Suite struct MarfaServerCallsTests {
-    private func calls(_ keys: any KeyStore) throws -> MarfaServerCalls {
-        MarfaServerCalls(connection: try MarfaConnection(address: "https://marfa.test"), keys: keys)
+    private func calls(_ keys: any SignIns) throws -> MarfaServerCalls {
+        MarfaServerCalls(connection: try MarfaConnection(address: "https://marfa.test"), signIns: keys)
     }
 
     // MARK: What is sent
@@ -57,11 +49,13 @@ private nonisolated struct UnreadableKeys: KeyStore {
         #expect(config.values[.versionMaxVersions] == nil)
     }
 
-    // MARK: The key
+    // MARK: The sign-in
 
-    @Test func anUnreadableKeyIsToldAsUnreadableAndNothingIsSent() async throws {
-        let calls = try calls(UnreadableKeys())
-        let unreadable = Words.keyUnreadable
+    @Test func anUnreadableSignInIsToldAsUnreadableAndNothingIsSent() async throws {
+        let signIns = MemorySignIns()
+        signIns.makeUnreadable(try MarfaConnection(address: "https://marfa.test"))
+        let calls = try calls(signIns)
+        let unreadable = Words.signInUnreadable
         await #expect(throws: ItemHistoryFailure.failed(unreadable)) { _ = try await calls.page(of: ItemID("a"), after: nil, limit: 50) }
         await #expect(throws: InstanceConfigFailure.failed(unreadable)) { _ = try await calls.read() }
         await #expect(throws: InstanceConfigFailure.failed(unreadable)) {
@@ -70,8 +64,8 @@ private nonisolated struct UnreadableKeys: KeyStore {
         await #expect(throws: TypeIconFailure.failed(unreadable)) { _ = try await calls.setIcon("lucide:book", ofType: TypeID("core.note")) }
     }
 
-    @Test func noKeyIsToldAsARefusedKeyAndNothingIsSent() async throws {
-        let calls = try calls(MemoryKeyStore())
+    @Test func noSignInIsToldAsARefusedOneAndNothingIsSent() async throws {
+        let calls = try calls(MemorySignIns())
         await #expect(throws: ItemHistoryFailure.keyRefused) { _ = try await calls.page(of: ItemID("a"), after: nil, limit: 50) }
         await #expect(throws: InstanceConfigFailure.keyRefused) { _ = try await calls.read() }
         await #expect(throws: TypeIconFailure.keyRefused) { _ = try await calls.setIcon(nil, ofType: TypeID("core.note")) }

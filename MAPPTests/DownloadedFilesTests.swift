@@ -87,7 +87,6 @@ import Testing
         let removal = Task { try await files.removeDownloadedFiles() }
         for await _ in entered { }
         #expect(try await copy.blobs.cache().setting == .bytes(bytes: 0))
-        await #expect(throws: SourceFailure.self) { try await source.tryKey("unused") }
         let closing = Task {
             if agreeing { #expect(await source.close(agreeing: nil) == .closed) }
             else { await source.close() }

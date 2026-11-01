@@ -12,9 +12,6 @@ nonisolated final class FakeMarfaSource: ItemSource {
     let embeds: any EmbedResolver = FakeEmbeds()
     let state = Latest(MarfaConnectionState.connecting)
     let report = Latest(SyncReport(queueRead: true))
-    let refusesKeys = Mutex(false)
-    /// What the server makes of each key tried; any other is accepted.
-    let verdicts = Mutex<[String: MarfaSync.KeyCheck]>([:])
     private let asked = Mutex<[String]>([])
 
     init(connection: MarfaConnection) {
@@ -36,17 +33,6 @@ nonisolated final class FakeMarfaSource: ItemSource {
         return state.values()
     }
     func refresh() { record("refresh") }
-
-    /// Keys the copy closes on, as one that cannot open its store again does.
-    let closesOn = Mutex<Set<String>>([])
-
-    func tryKey(_ key: String) async throws -> MarfaSync.KeyCheck {
-        record("tryKey \(key)")
-        if refusesKeys.withLock({ $0 }) || closesOn.withLock({ $0.contains(key) }) {
-            throw SourceFailure(kind: .missing, message: "The copy closed.")
-        }
-        return verdicts.withLock { $0[key] } ?? .accepted
-    }
 
     /// The text of the first writes the report counts, as the copy reads it from its queue.
     let unsentTexts = Mutex<[SyncContent]>([])
@@ -144,11 +130,11 @@ nonisolated final class FakeServers: Sendable {
     var last: FakeMarfaSource? { opened.last }
 
     var opener: MarfaHost.Opener {
-        { connection, keys, location in
+        { connection, signIns, location in
             if let failure = self.failure.withLock({ $0 }) { throw failure }
             self.opening.withLock { $0 = true }
             while self.slow.withLock({ $0 }) { try await Task.sleep(for: .milliseconds(10)) }
-            guard try keys.key(for: connection.address) != nil else {
+            guard try signIns.server(for: connection) != nil else {
                 throw SourceFailure(kind: .denied, message: "There’s no key for this Marfa server.")
             }
             try FileManager.default.createDirectory(at: location.directory(for: connection), withIntermediateDirectories: true)
@@ -165,32 +151,6 @@ nonisolated final class FakeServers: Sendable {
             self.made.withLock { $0.append(source) }
             return source
         }
-    }
-}
-
-/// Keys held in memory, whose delete can be made to fail as a keychain's can, and whose read can be made to throw.
-nonisolated final class TestKeyStore: KeyStore {
-    private let keys = MemoryKeyStore()
-    let failsDelete = Mutex(false)
-    /// Run as each delete begins.
-    let onDelete = Mutex<(@Sendable () -> Void)?>(nil)
-
-    func save(_ key: String, for address: URL) throws {
-        try keys.save(key, for: address)
-    }
-
-    func key(for address: URL) throws -> String? {
-        try keys.key(for: address)
-    }
-
-    func makeUnreadable(_ address: URL) {
-        keys.makeUnreadable(address)
-    }
-
-    func delete(for address: URL) throws {
-        onDelete.withLock { $0 }?()
-        if failsDelete.withLock({ $0 }) { throw SourceFailure(kind: .denied, message: "The keychain refused.") }
-        try keys.delete(for: address)
     }
 }
 
@@ -214,7 +174,7 @@ nonisolated extension MarfaHost.DisconnectChoice {
     let root = URL.temporaryDirectory.appending(path: "MarfaHostTests-\(UUID().uuidString)", directoryHint: .isDirectory)
     let suite = "MarfaHostTests-\(UUID().uuidString)"
     let defaults: UserDefaults
-    let keys = TestKeyStore()
+    let signIns = MemorySignIns()
     let location: MarfaStoreLocation
     let servers = FakeServers()
 
@@ -231,7 +191,7 @@ nonisolated extension MarfaHost.DisconnectChoice {
 
     func host(opener: MarfaHost.Opener? = nil, remover: MarfaHost.Remover? = nil) -> MarfaHost {
         MarfaHost(
-            defaults: defaults, keys: keys, location: location, opener: opener ?? servers.opener, describer: servers.describer,
+            defaults: defaults, signIns: signIns, location: location, opener: opener ?? servers.opener, describer: servers.describer,
             remover: remover ?? { try await WorkingCopy.remove(store: $0, unsent: $1) })
     }
 
@@ -239,5 +199,22 @@ nonisolated extension MarfaHost.DisconnectChoice {
 
     func hasCopy(_ connection: MarfaConnection) -> Bool {
         FileManager.default.fileExists(atPath: location.directory(for: connection).path)
+    }
+}
+
+@MainActor extension MarfaHost {
+    /// Signs in by the browser, which the test's `MemorySignIns` answers by holding `key` for the address.
+    func connect(address: String, key: String) async throws(Problem) {
+        try await connect(address: address, via: scripted(key))
+    }
+
+    func changeAddress(to address: String, key: String, choice: DisconnectChoice? = nil) async throws(Problem) {
+        try await changeAddress(to: address, via: scripted(key), choice: choice)
+    }
+
+    /// A browser sign-in that leaves `key` held.
+    func scripted(_ key: String) -> SignInMethod {
+        (signIns as? MemorySignIns)?.script(browser: [.success(key)])
+        return .browser
     }
 }

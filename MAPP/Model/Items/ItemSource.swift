@@ -135,8 +135,6 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
 
     /// Hydrates or catches up, then sends what waits; never waited on.
     func refresh()
-    /// Goes on with `key` whatever the server answers, so a caller that keeps another key gives that one back.
-    func tryKey(_ key: String) async throws -> MarfaSync.KeyCheck
     /// The writes not sent once every write submitted before the call is in the queue; nil where the queue
     /// cannot be read.
     func unsentWrites() async -> UnsentWrites?

@@ -47,12 +47,12 @@ import Testing
         try await host.connect(address: "http://first.test:8210", key: "k")
         let suite = bench.suite
         let seen = Mutex<String?>("not asked")
-        bench.keys.onDelete.withLock {
+        bench.signIns.onSignOut.withLock {
             $0 = { seen.withLock { $0 = UserDefaults(suiteName: suite)?.string(forKey: "MarfaAddress") } }
         }
         try await host.disconnect(choice)
         #expect(seen.withLock { $0 } == nil, "the address was still saved when the key went")
-        #expect(try bench.keys.key(for: first.address) == nil)
+        #expect(try bench.signIns.key(for: first.address) == nil)
         #expect(bench.hasCopy(first) == (choice == .keepCopy), "a kept copy stays, a discarded one goes")
 
         let next = bench.host()
@@ -67,7 +67,7 @@ import Testing
         let bench = try HostBench()
         let libraries = try libraries(bench)
         try await libraries.host.connect(address: "http://first.test:8210", key: "k1")
-        bench.keys.onDelete.withLock { $0 = { Thread.sleep(forTimeInterval: 0.2) } }
+        bench.signIns.onSignOut.withLock { $0 = { Thread.sleep(forTimeInterval: 0.2) } }
 
         let watch = ModeWatch(libraries)
         try await libraries.host.changeAddress(to: "http://second.test:8210", key: "k2")
@@ -76,23 +76,23 @@ import Testing
         #expect(libraries.host.connection == second)
     }
 
-    /// A copy that closes as a key is replaced is waited for while it opens again, not shown as failed.
-    @Test func aCopyOpenedAgainForAKeyIsWaitedForNotShownAsFailed() async throws {
+    /// A copy closed to sign in again is waited for while it opens again, not shown as failed.
+    @Test func aCopyOpenedAgainForASignInIsWaitedForNotShownAsFailed() async throws {
         let bench = try HostBench()
         let libraries = try libraries(bench)
         try await libraries.host.connect(address: "http://first.test:8210", key: "good")
         let source = try #require(bench.servers.last)
         source.state.set(.online)
-        source.closesOn.withLock { $0 = ["new"] }
         source.closesSlowly.withLock { $0 = true }
 
         let watch = ModeWatch(libraries)
-        let replacing = Task { try await libraries.host.replaceKey("new") }
+        let method = libraries.host.scripted("new")
+        let signingIn = Task { try await libraries.host.signInAgain(via: method) }
         #expect(await eventually { source.calls.contains("close") })
         // Holds the close a little, as a slow one would be held.
         try await Task.sleep(for: .milliseconds(50))
         source.closesSlowly.withLock { $0 = false }
-        _ = await replacing.result
+        _ = await signingIn.result
         watch.stop()
         #expect(!watch.seen.contains(.failed), "\(watch.seen)")
         #expect(watch.seen.contains(.opening), "\(watch.seen)")

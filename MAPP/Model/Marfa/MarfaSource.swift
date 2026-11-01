@@ -43,7 +43,7 @@ nonisolated enum MarfaConnectionState: Hashable, Sendable {
     case online
     /// The server cannot be reached; writes wait in the queue and go when it can.
     case offline(reason: String?)
-    /// The server refused the key, or it lacks what reading the library needs. Writes wait until the person gives
+    /// The server ended the sign-in, or it lacks what reading the library needs. Writes wait until the person gives
     /// another in Settings.
     case keyRefused
     /// The copy cannot be opened, or the sync stopped on a fault that asking again may not clear, such as a copy made
@@ -86,26 +86,26 @@ nonisolated final class MarfaSource: ItemSource {
     }
 
     /// Opens the working copy for `connection` and paints from it, asking the server nothing; `refresh()` then
-    /// brings it up to date. `location` keeps each server's copy apart. It reads the keychain and makes the
+    /// brings it up to date. `location` keeps each server's copy apart. It reads the sign-in from the Keychain and makes the
     /// directory, so it never runs on the main actor.
     @concurrent static func open(
-        _ connection: MarfaConnection, keys: any KeyStore, location: MarfaStoreLocation
+        _ connection: MarfaConnection, signIns: any SignIns, location: MarfaStoreLocation
     ) async throws -> MarfaSource {
-        let key: String?
+        let server: Server?
         do {
-            key = try keys.key(for: connection.address)
+            server = try signIns.server(for: connection)
         } catch {
-            // A key the Keychain would not give is neither missing nor refused: the person is told that, and the
-            // key is left where it is.
-            throw SourceFailure(kind: .failed, message: Words.keyUnreadable)
+            // A sign-in the Keychain would not give is neither missing nor ended: the person is told that, and the
+            // sign-in is left where it is.
+            throw SourceFailure(kind: .failed, message: Words.signInUnreadable)
         }
-        guard let key else {
-            throw SourceFailure(kind: .denied, message: String(localized: "There’s no key for this Marfa server."))
+        guard let server else {
+            throw SourceFailure(kind: .denied, message: String(localized: "MAPP isn’t signed in to this Marfa server."))
         }
         try FileManager.default.createDirectory(at: location.directory(for: connection), withIntermediateDirectories: true)
         let copy: WorkingCopy
         do {
-            copy = try await openCopy(connection, key: key, location: location)
+            copy = try await openCopy(connection, server: server, location: location)
         } catch MarfaError.wrongSchema(_, _, let unsent, let message) {
             throw SourceFailure(kind: .otherVersion(unsent: unsent), message: message)
         } catch MarfaError.readingHandle {
@@ -128,10 +128,10 @@ nonisolated final class MarfaSource: ItemSource {
     /// an empty one, keeping the files it downloaded, and the new copy hydrates from the server. With any changes
     /// it refuses with that count (`wrongSchema`), and only that version can send them, so the person is told.
     private static func openCopy(
-        _ connection: MarfaConnection, key: String, location: MarfaStoreLocation
+        _ connection: MarfaConnection, server: Server, location: MarfaStoreLocation
     ) async throws -> WorkingCopy {
         try await WorkingCopy.open(
-            store: location.store(for: connection), server: connection.server(key: key), ifRefused: .replace)
+            store: location.store(for: connection), server: server, ifRefused: .replace)
     }
 
     func changes() -> AsyncStream<SourceChange> {
@@ -156,18 +156,6 @@ nonisolated final class MarfaSource: ItemSource {
         let event: MarfaEngine.Event = undoing.map { .undo(write, id, $0) } ?? .write(write, id)
         if case .terminated = events.yield(event) { return false }
         return true
-    }
-
-    /// Takes `key` between server calls and asks the server with it at once; the follow and the drain go on
-    /// with it whatever the answer, so a caller that keeps another key gives that one back.
-    func tryKey(_ key: String) async throws -> MarfaSync.KeyCheck {
-        do {
-            return try await engine.sync.tryKey(key)
-        } catch let error as MarfaError {
-            // A copy that could not open its store again is closed for good, and is opened again.
-            if case .closed = error { throw SourceFailure(kind: .missing, message: error.message) }
-            throw SourceFailure(kind: .failed, message: error.message)
-        }
     }
 
     // MARK: Sync problems

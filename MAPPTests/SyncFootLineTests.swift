@@ -108,7 +108,7 @@ struct SyncFootLineTests {
         let refused = try #require(line(.keyRefused))
         #expect(refused.kind == .failed)
         #expect(refused.text == "Couldn’t sync")
-        #expect(refused.help?.contains("key") == true)
+        #expect(refused.help?.contains("sign") == true)
 
         let unusable = try #require(line(.unavailable(message: "The store is damaged.")))
         #expect(unusable.text == "Couldn’t sync")

@@ -100,15 +100,6 @@ actor MarfaDownloads: DownloadedFiles {
         _ = try await Task { try await blobs.setBudget(setting) }.value
     }
 
-    /// Replacing the key also drops the core, so it cannot interrupt a budget restore.
-    func useKey(_ key: String) async throws {
-        guard !stopped else { throw MarfaError.closed(message: MarfaEngine.closedLibrary) }
-        guard !changing else { throw Self.busy }
-        changing = true
-        defer { finished() }
-        try await copy.useKey(key)
-    }
-
     /// The package has no trim-to-zero call that leaves the preference alone. Closing must wait for its restore.
     func stop() async {
         stopped = true

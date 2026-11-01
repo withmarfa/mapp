@@ -20,7 +20,7 @@ struct MarfaHostOfflineTests {
     @Test
     func aKeptCopyGoesOnWhereItWasLeft() async throws {
         let bench = try HostBench()
-        let host = bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
+        let host = bench.host(opener: { try await MarfaSource.open($0, signIns: $1, location: $2) })
         let connection = try MarfaConnection(address: address)
         try await host.connect(address: address, key: "unused")
         #expect(await eventually { host.report.queueRead })
@@ -47,30 +47,26 @@ struct MarfaHostOfflineTests {
         #expect(!bench.hasCopy(connection))
     }
 
-    /// A key the Keychain would not give is not a missing key: nothing is replaced, and the person is told why.
+    /// A sign-in the Keychain would not give is not a missing one: the library is shown unavailable for that reason.
     @Test
-    func anUnreadableKeyIsToldAndNothingIsReplaced() async throws {
+    func anUnreadableSignInIsToldAndNotShownAsSignedOut() async throws {
         let bench = try HostBench()
-        let host = bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
         let connection = try MarfaConnection(address: address)
-        try await host.connect(address: address, key: "first")
-        let source = try #require(host.source)
-        bench.keys.makeUnreadable(connection.address)
-        do {
-            try await host.replaceKey("second")
-            Issue.record("replaced a key it could not read")
-        } catch {
-            #expect(error == .unavailable(message: Words.keyUnreadable), "\(error)")
-        }
-        #expect(host.source === source)
-        try await discardEverything(host)
+        bench.defaults.set(address, forKey: "MarfaAddress")
+        bench.signIns.save("first", for: connection.address)
+        bench.signIns.makeUnreadable(connection)
+        let host = bench.host(opener: { try await MarfaSource.open($0, signIns: $1, location: $2) })
+        await host.launch()
+        #expect(host.state == .unavailable(message: Words.signInUnreadable), "\(host.state)")
+        #expect(host.source == nil)
+        #expect(bench.signIns.calls.isEmpty, "nothing was replaced or signed out")
     }
 
     /// The count comes from the copy once the write is queued, not from a report not yet passed on.
     @Test
     func aWriteMadeJustBeforeLeavingIsNotLost() async throws {
         let bench = try HostBench()
-        let host = bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
+        let host = bench.host(opener: { try await MarfaSource.open($0, signIns: $1, location: $2) })
         let connection = try MarfaConnection(address: address)
         try await host.connect(address: address, key: "unused")
         #expect(await eventually { host.report.queueRead })
@@ -92,7 +88,7 @@ struct MarfaHostOfflineTests {
     @Test
     func aWriteMadeAfterThePersonWasAskedIsNotDiscarded() async throws {
         let bench = try HostBench()
-        let host = bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
+        let host = bench.host(opener: { try await MarfaSource.open($0, signIns: $1, location: $2) })
         let connection = try MarfaConnection(address: address)
         try await host.connect(address: address, key: "unused")
         #expect(await eventually { host.report.queueRead })
@@ -120,7 +116,7 @@ struct MarfaHostOfflineTests {
     @Test
     func aWriteMadeWhileMovingAddressAfterThePersonWasAskedIsNotDiscarded() async throws {
         let bench = try HostBench()
-        let host = bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
+        let host = bench.host(opener: { try await MarfaSource.open($0, signIns: $1, location: $2) })
         let connection = try MarfaConnection(address: address)
         let other = "http://127.0.0.1:10"
         try await host.connect(address: address, key: "unused")
@@ -147,38 +143,10 @@ struct MarfaHostOfflineTests {
         try await host.disconnect(.keepCopy)
     }
 
-    /// The package refuses every call while the copy changes key, and asks for it again.
-    @Test
-    func writesMadeWhileTheKeyChangesAreQueued() async throws {
-        let bench = try HostBench()
-        let host = bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
-        try await host.connect(address: address, key: "first")
-        let source = try #require(host.source as? MarfaSource)
-        let log = ChangeLog(source)
-        _ = try #require(await log.wait { $0.snapshot != nil })
-        let count = 200
-        let change = Task { try? await host.replaceKey("second") }
-        for index in 0..<count {
-            source.submit(
-                .create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "MAPPTEST key \(index)", body: "Typed")),
-                as: WriteID())
-            if index % 5 == 0 { await Task.yield() }
-        }
-        await change.value
-        let all = await log.wait { ($0.snapshot?.items.count ?? 0) >= count }
-        let refused = log.current.changes.filter { if case .answered(_, .refused) = $0 { true } else { false } }
-        let unavailable = log.current.changes.filter { if case .unavailable = $0 { true } else { false } }
-        #expect(all != nil, "\(log.current.snapshot?.items.count ?? 0) of \(count) queued")
-        #expect(refused.isEmpty, "\(refused.count) refused, such as \(String(describing: refused.first))")
-        #expect(unavailable.isEmpty, "\(String(describing: unavailable.first))")
-        #expect(await eventually { host.report.waiting == count }, "\(host.report.waiting)")
-        try await discardEverything(host)
-    }
-
     @Test
     func aDamagedCopyIsAPlainProblem() async throws {
         let bench = try HostBench()
-        let host = bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
+        let host = bench.host(opener: { try await MarfaSource.open($0, signIns: $1, location: $2) })
         let connection = try MarfaConnection(address: address)
         try FileManager.default.createDirectory(at: bench.location.directory(for: connection), withIntermediateDirectories: true)
         try Data("not a store".utf8).write(to: bench.location.store(for: connection))

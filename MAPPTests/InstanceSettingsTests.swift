@@ -379,7 +379,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         // The sample library has no configurer, so the host has no source to ask.
         let bench = try HostBench()
         bench.defaults.set("https://marfa.test", forKey: "MarfaAddress")
-        let host = MarfaHost(defaults: bench.defaults, keys: bench.keys, location: bench.location, configurer: { _, _ in nil })
+        let host = MarfaHost(defaults: bench.defaults, signIns: bench.signIns, location: bench.location, configurer: { _, _ in nil })
         #expect(host.configuredConnection != nil)
         let model = InstanceSettingsModel { host.instanceConfigTarget() }
 

@@ -132,7 +132,7 @@ nonisolated enum MarfaMapping {
         case .notFound:
             return ViewWriteFailure(kind: .gone, message: String(localized: "Your Marfa server no longer has this view."))
         case .forbidden:
-            return ViewWriteFailure(kind: .notPermitted, message: String(localized: "The key MAPP uses can’t change views on your Marfa server."))
+            return ViewWriteFailure(kind: .notPermitted, message: String(localized: "MAPP’s sign-in can’t change views on your Marfa server."))
         default:
             return ViewWriteFailure(kind: .refused, message: error.message)
         }
