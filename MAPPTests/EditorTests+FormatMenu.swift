@@ -90,4 +90,37 @@ extension EditorTests {
         #expect(page.editor.webLinkRequest == nil)
         #expect(page.changes.isEmpty)
     }
+
+    /// Opens the Link sheet on "docs", then has the note changed elsewhere so the page reloads under a new generation.
+    private func reload(_ page: Page, whileAsking ask: (() async -> Bool)? = nil) async throws -> Bool? {
+        let note = page.library.add("Read the docs\n")
+        try await page.show(note.id)
+        try await select("docs", in: page)
+        try await page.wait { page.editor.canApply(.link) }
+        page.editor.format(.link)
+        try #require(page.editor.webLinkRequest != nil)
+        let asking = ask.map { ask in Task { await ask() } }
+        // The task runs as far as the page's question; the page answers only after the reload below.
+        await Task.yield()
+        page.library.updateBody(of: note.id, to: "Read the docs, changed elsewhere\n")
+        page.editor.noteChanged(try #require(page.library.item(note.id)))
+        return await asking?.value
+    }
+
+    @Test func aReloadClosesTheLinkSheetBeforeAnAddressIsAdded() async throws {
+        let page = try await Page()
+        _ = try await reload(page)
+        #expect(page.editor.webLinkRequest == nil, "the selection the sheet was opened for is gone")
+        #expect(await !page.editor.setWebLink("example.com"), "nothing is open to add to")
+        #expect(page.changes.isEmpty)
+    }
+
+    @Test func aReloadWhileTheAddressIsReadClosesTheSheetAndWritesNoLink() async throws {
+        let page = try await Page()
+        let answered = try await reload(page) { await page.editor.setWebLink("example.com") }
+        #expect(answered == true, "the sheet is not told the address was refused")
+        #expect(page.editor.webLinkRequest == nil)
+        _ = try await page.shownText(until: "Read the docs, changed elsewhere")
+        #expect(page.changes.isEmpty, "no link was written on the reloaded page")
+    }
 }

@@ -389,7 +389,7 @@ final class EditorController: NSObject {
     /// note. The note shown before is left and the page emptied, so nothing on the page acts for one out of sight.
     private func show(_ item: Item, as function: String) {
         // The request was typed into the text now being replaced, which the page would refuse an answer for.
-        cancelLinkRequest()
+        cancelRequests()
         // A rewrite held for the text now on the page is saved against the version it was made on.
         releaseHeldEdit()
         guard let body = library?.body(of: item.id) else { return hide() }
@@ -422,7 +422,7 @@ final class EditorController: NSObject {
     private func hide() {
         loading = nil
         opening = nil
-        cancelLinkRequest()
+        cancelRequests()
         wantsFocus = nil
         pendingHeading = nil
         isPresented = false
@@ -722,7 +722,7 @@ extension EditorController: WKNavigationDelegate {
         Telemetry.editorProcessEnded(wasReady: true)
         // The page's text is gone with its process; the reload brings back what was last reported.
         releaseHeldEdit()
-        cancelLinkRequest()
+        cancelRequests()
         isReady = false
         webView.loadFileURL(pageURL, allowingReadAccessTo: pageURL.deletingLastPathComponent())
     }
