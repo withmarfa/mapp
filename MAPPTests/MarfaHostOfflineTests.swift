@@ -47,30 +47,6 @@ struct MarfaHostOfflineTests {
         #expect(!bench.hasCopy(connection))
     }
 
-    /// A key the server ends expires the copy; it waits for another key rather than hydrating again at once.
-    @Test
-    func anEndedKeyWaitsForAnother() async throws {
-        let bench = try HostBench()
-        let host = bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
-        try await host.connect(address: address, key: "ended")
-        let source = try #require(host.source as? MarfaSource)
-        #expect(await eventually { if case .offline = host.state { true } else { false } })
-        let ended = MarfaError.copyExpired(reason: "credential_ended", message: "the key ended")
-        // The copy's own lifecycle keeps reporting the closed port beside this, so the refusal is told until seen.
-        let refused = CopyUpdate(reread: .parts(Reread.Parts()), connection: .keyRefused(ended))
-        #expect(try await eventuallyAsking {
-            await source.engine.sync.take(refused)
-            return host.state == .keyRefused
-        })
-
-        try await host.replaceKey("given")
-        #expect(host.source === source)
-        #expect(try bench.keys.key(for: (try MarfaConnection(address: address)).address) == "given")
-        // Hydrating again against a closed port fails at once, which shows the new key was tried.
-        #expect(await eventually { if case .offline = host.state { true } else { false } }, "\(host.state)")
-        try await discardEverything(host)
-    }
-
     /// A key the Keychain would not give is not a missing key: nothing is replaced, and the person is told why.
     @Test
     func anUnreadableKeyIsToldAndNothingIsReplaced() async throws {

@@ -1,5 +1,7 @@
 import Foundation
 import Marfa
+import MarfaTesting
+import Testing
 @testable import MAPP
 
 extension SourceChange {
@@ -83,24 +85,17 @@ extension MarfaSource {
     }
 }
 
-/// The update stream a test controls: the package's first update, which asks to read everything, and then only what
-/// the test sends. The fake copy's lifecycle would add updates of its own for the test's direct writes, and its
-/// reads name no cursor, so a count of the engine's whole reads would depend on timing.
-nonisolated func quietUpdates() -> AsyncStream<CopyUpdate>? {
-    let (stream, continuation) = AsyncStream<CopyUpdate>.makeStream()
-    continuation.yield(CopyUpdate(reread: .everything, connection: .local))
-    return stream
-}
-
-/// The ordinary refresh steps over a copy, with `quietUpdates`.
-nonisolated struct QuietRefresh: MarfaRefreshing {
-    let base: MarfaRefresh
-    init(copy: WorkingCopy) { base = MarfaRefresh(copy: copy) }
-    func readStatus() async throws -> Status { try await base.readStatus() }
-    func hydrate(types: [String], tier: SliceTier, edgeTypes: [String]) async throws -> HydrateReport {
-        try await base.hydrate(types: types, tier: tier, edgeTypes: edgeTypes)
-    }
-    func catchUp() async throws { try await base.catchUp() }
-    func fetchKept() async throws -> KeptFetch { try await base.fetchKept() }
-    func updates() -> AsyncStream<CopyUpdate>? { quietUpdates() }
+/// A source over a fake copy, painted and hearing the copy's updates, so a test scripts what the package tells
+/// with `fake.sendUpdate` and the sync, the hub and the engine take it as they take the package's own. Returns once
+/// the first update has been taken, which `sendUpdate` needs: it is delivered to the sequences held when it is sent.
+nonisolated func scriptedSource(
+    _ fake: FakeCopy = WorkingCopy.fake(), refreshing: any MarfaRefreshing, reading: (any MarfaReading)? = nil
+) async throws -> (FakeCopy, MarfaSource, ChangeLog) {
+    let source = MarfaSource(
+        copy: fake.copy, connection: SampleLibrary.connection, reading: reading ?? MarfaRead(copy: fake.copy), refreshing: refreshing)
+    let log = ChangeLog(source)
+    source.events.yield(.paint)
+    _ = try #require(await log.wait { $0.snapshot != nil })
+    try #require(await waitForConnection(source) { $0 == .online }, "the sync never took the copy's first update")
+    return (fake, source, log)
 }

@@ -31,29 +31,26 @@ private nonisolated final class FailingRefresh: MarfaRefreshing {
 
     func catchUp() async throws { try attempt() }
     func fetchKept() async throws -> KeptFetch { KeptFetch(fetched: 0, fetchedBytes: 0, attachments: nil) }
-    func updates() -> AsyncStream<CopyUpdate>? { quietUpdates() }
 }
 
-/// What the sync shows when the app's own refresh fails: the package retries what asking again may clear, so only
-/// a fault it cannot clear is shown, and a canceled call is not a fault.
+/// What the sync shows when the app's own refresh fails: what the package says of the connection, and nothing of its
+/// own. The fake copy has no server, so each test sends the update the package would send, as the copy's own stream
+/// delivers it.
 @Suite(.serialized, .hangLimit)
 struct MarfaSyncFailureTests {
-    private func open(failing errors: [MarfaError]) async throws -> (MarfaSource, FailingRefresh, ChangeLog, TemporaryMarfaCopy) {
-        let store = try TemporaryMarfaCopy()
-        // A server that refuses every connection, as the app's own copies have one to drain to.
-        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let copy = try await WorkingCopy.open(
-            store: store.root.appending(path: "store.sqlite"), server: connection.server(key: "unused"))
+    private func open(failing errors: [MarfaError]) async throws -> (FakeCopy, MarfaSource, FailingRefresh, ChangeLog) {
         let server = FailingRefresh(failing: errors)
-        let source = MarfaSource(copy: copy, connection: connection, refreshing: server)
-        let log = ChangeLog(source)
-        source.events.yield(.paint)
-        _ = try #require(await log.wait { $0.snapshot != nil })
-        return (source, server, log, store)
+        let fake = WorkingCopy.fake(itemTypes: SampleLibrary.itemTypes, edgeTypes: SampleLibrary.edgeTypes)
+        let (_, source, log) = try await scriptedSource(fake, refreshing: server)
+        return (fake, source, server, log)
     }
 
     private func unavailable(_ state: ChangeLog.State) -> Int {
         state.changes.count { if case .unavailable = $0 { true } else { false } }
+    }
+
+    private func update(_ connection: CopyConnection) -> CopyUpdate {
+        CopyUpdate(reread: .parts(Reread.Parts()), connection: connection)
     }
 
     @Test(arguments: [
@@ -64,8 +61,7 @@ struct MarfaSyncFailureTests {
         MarfaError.copyExpired(reason: "read_view_changed", message: "The copy expired."),
     ])
     func aFailureThePackageHandlesIsNeitherShownNorReported(_ error: MarfaError) async throws {
-        let (source, server, log, store) = try await open(failing: [error])
-        defer { store.remove() }
+        let (_, source, server, log) = try await open(failing: [error])
         source.refresh()
         try #require(await eventually { server.attempts >= 1 })
         await source.engine.sync.flush()
@@ -74,31 +70,75 @@ struct MarfaSyncFailureTests {
         await source.close()
     }
 
-    @Test func aFaultAskingAgainMayNotClearIsShownOnceAndStaysUntilARefreshSucceeds() async throws {
-        let (source, server, log, store) = try await open(failing: [.store(message: "the store failed")])
-        defer { store.remove() }
+    /// The package sets the connection for a fault of the app's own call, so the sync shows nothing of its own.
+    @Test func aFaultOfTheAppsCallIsShownWhenThePackageSaysSoAndNotBefore() async throws {
+        let (fake, source, server, log) = try await open(failing: [.store(message: "the store failed")])
         source.refresh()
+        try #require(await eventually { server.attempts >= 1 })
+        await source.engine.sync.flush()
+        #expect(unavailable(log.current) == 0, "the sync judged the call's error itself")
+        #expect(source.connectionState == .online)
+
+        fake.sendUpdate(update(.stopped(.store(message: "the store failed"))))
         _ = try #require(await log.wait { unavailable($0) == 1 })
         #expect(await waitForConnection(source) { if case .unavailable = $0 { true } else { false } })
-
-        // A refresh is offered while stopped, and its success is what clears the fault.
-        source.refresh()
-        try #require(await eventually { server.attempts >= 2 })
-        await source.engine.sync.take(CopyUpdate(reread: .parts(Reread.Parts()), connection: .following))
-        #expect(await waitForConnection(source) { $0 == .online })
-        #expect(unavailable(log.current) == 1)
         await source.close()
     }
 
-    @Test func aServerThatIsAnotherOneIsToldWithTheChangesThatWillNotBeSent() async throws {
-        let (source, _, log, store) = try await open(failing: [])
-        defer { store.remove() }
+    @Test func aStoppedLibraryStaysStoppedAcrossServerEventsUntilThePackageFollows() async throws {
+        let (fake, source, _, log) = try await open(failing: [])
+        let stopped = update(.stopped(.store(message: "the store failed")))
+        fake.sendUpdate(stopped)
+        _ = try #require(await log.wait { unavailable($0) == 1 })
+
+        // The package says it again and a server event arrives: neither shows the library online or tells again.
+        fake.sendUpdate(stopped)
+        await source.hear(Change(origin: .server(event: "item.updated", cursor: "c"), itemId: nil, edgeId: nil))
+        #expect(!(await waitForConnection(source) { $0 == .online }), "a stopped library was shown online")
+        #expect(unavailable(log.current) == 1)
+
+        fake.sendUpdate(update(.following))
+        #expect(await waitForConnection(source) { $0 == .online })
+        fake.sendUpdate(stopped)
+        _ = try #require(await log.wait { unavailable($0) == 2 })
+        await source.close()
+    }
+
+    /// A first fill that failed on a fault is the package's `.needsHydration(error)`: shown with the error, and
+    /// with nothing hydrating, so Refresh is offered.
+    @Test func aFailedFirstFillIsShownWithItsErrorAndOffersRefresh() async throws {
+        let (fake, source, _, log) = try await open(failing: [])
+        let refused = MarfaError.server(status: 400, code: "bad_request", message: "The server refused the fill.")
+        fake.sendUpdate(update(.needsHydration(nil)))
+        fake.sendUpdate(update(.needsHydration(refused)))
+        _ = try #require(await log.wait { unavailable($0) == 1 })
+        #expect(await waitForConnection(source) { $0 == .unavailable(message: refused.message) })
+        #expect(await eventually { source.syncReport.phase == .current }, "Refresh is not offered")
+        await source.close()
+    }
+
+    /// The package reports it as a stopped follow, or as a copy that needs hydration when its first fill met it.
+    @Test(arguments: [false, true])
+    func aServerThatIsAnotherOneIsToldWithTheChangesThatWillNotBeSent(duringTheFirstFill: Bool) async throws {
+        let (fake, source, _, log) = try await open(failing: [])
         source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "Unsent", body: "Text")), as: WriteID())
         _ = try #require(await log.wait { $0.item(titled: "Unsent") != nil })
         let other = MarfaError.wrongServer(expected: "one", got: "two", message: "Another server.")
-        await source.engine.sync.take(CopyUpdate(reread: .parts(Reread.Parts()), connection: .stopped(other)))
+        fake.sendUpdate(update(duringTheFirstFill ? .needsHydration(other) : .stopped(other)))
         #expect(await waitForConnection(source) { $0 == .unavailable(message: Words.otherServer(unsent: 1)) })
         #expect(Words.otherServer(unsent: 1).contains("1 change"))
+        await source.close()
+    }
+
+    /// A key the server ended is the package's `.keyRefused`: shown as that, told once, and waiting for another key.
+    @Test func aKeyTheServerEndedIsShownRefusedAndToldOnce() async throws {
+        let (fake, source, _, log) = try await open(failing: [])
+        let ended = MarfaError.copyExpired(reason: "credential_ended", message: "the key ended")
+        for _ in 0..<3 { fake.sendUpdate(update(.keyRefused(ended))) }
+        #expect(await waitForConnection(source) { $0 == .keyRefused })
+        try #require(await eventually { log.current.changes.contains { if case .unavailable = $0 { true } else { false } } })
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(unavailable(log.current) == 1)
         await source.close()
     }
 

@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import MarfaTesting
 import Synchronization
 import Testing
 @testable import MAPP
@@ -17,12 +18,9 @@ nonisolated final class ScriptedRefresh: MarfaRefreshing {
 
     private let state: Mutex<State>
     let status: Status
-    /// Whether the sync listens to the copy's own updates, in place of one quiet first update.
-    let listensToCopy: Bool
 
-    init(status: Status, holding: Bool = false, listensToCopy: Bool = false) {
+    init(status: Status, holding: Bool = false) {
         self.status = status
-        self.listensToCopy = listensToCopy
         state = Mutex(State(holding: holding))
     }
 
@@ -60,7 +58,6 @@ nonisolated final class ScriptedRefresh: MarfaRefreshing {
 
     func catchUp() async throws { state.withLock { $0.catchUps += 1 } }
     func fetchKept() async throws -> KeptFetch { KeptFetch(fetched: 0, fetchedBytes: 0, attachments: nil) }
-    func updates() -> AsyncStream<CopyUpdate>? { listensToCopy ? nil : quietUpdates() }
 }
 
 /// The copy's reads, counting how often its status is read.
@@ -91,41 +88,33 @@ private nonisolated final class StatusCounting: MarfaReading {
     }
 }
 
-/// How the sync follows the package's lifecycle: what it asks of the copy once, and what it tells once.
+/// How the sync follows the package's lifecycle: what it asks of the copy once, and what it tells once. Each test
+/// sends the updates the package would send through the fake copy's own stream.
 @Suite(.serialized, .hangLimit)
 struct MarfaSyncLifecycleTests {
-    private func open(
-        _ refresh: ScriptedRefresh, reading: (any MarfaReading)? = nil, store: TemporaryMarfaCopy
-    ) async throws -> (MarfaSource, ChangeLog) {
-        let copy = try await store.open()
-        let source = MarfaSource(
-            copy: copy, connection: SampleLibrary.connection, reading: reading ?? MarfaRead(copy: copy), refreshing: refresh)
-        let log = ChangeLog(source)
-        source.events.yield(.paint)
-        _ = try #require(await log.wait { $0.snapshot != nil })
-        return (source, log)
-    }
-
     private func unavailable(_ state: ChangeLog.State) -> Int {
         state.changes.count { if case .unavailable = $0 { true } else { false } }
     }
 
+    private func update(_ connection: CopyConnection, fill: FillProgress? = nil) -> CopyUpdate {
+        CopyUpdate(reread: .parts(Reread.Parts()), connection: connection, fill: fill)
+    }
+
     private func progress(_ listed: UInt64) -> CopyUpdate {
-        CopyUpdate(reread: .parts(Reread.Parts()), connection: .needsHydration(nil), fill: FillProgress(listed: listed, expected: 5000))
+        update(.needsHydration(nil), fill: FillProgress(listed: listed, expected: 5000))
     }
 
     // MARK: A hydration runs once
 
     @Test func progressUpdatesDuringAHydrationCauseExactlyOneHydration() async throws {
-        let store = try TemporaryMarfaCopy()
-        defer { store.remove() }
         let refresh = ScriptedRefresh(status: Status(hydration: .never), holding: true)
-        let (source, _) = try await open(refresh, store: store)
-        let sync = await source.engine.sync
+        let (fake, source, _) = try await scriptedSource(refreshing: refresh)
+        try #require(await eventually { refresh.hydrations == 1 }, "the fill the launch asks for")
 
-        await sync.take(progress(0))
-        try #require(await eventually { refresh.hydrations == 1 })
-        for listed in 1...4 { await sync.take(progress(UInt64(listed) * 500)) }
+        fake.sendUpdate(progress(0))
+        for listed in 1...4 { fake.sendUpdate(progress(UInt64(listed) * 500)) }
+        // The fill ends only after the sync has taken every progress update, as the package's does.
+        try #require(await eventually { source.syncReport.fill?.listed == 2000 })
         refresh.letGo()
         // Time for a second fill, which nothing signals when none is asked for.
         try await Task.sleep(for: .milliseconds(400))
@@ -134,37 +123,45 @@ struct MarfaSyncLifecycleTests {
     }
 
     @Test func aCopyThatNeedsHydrationAgainAfterFollowingHydratesAgain() async throws {
-        let store = try TemporaryMarfaCopy()
-        defer { store.remove() }
         let refresh = ScriptedRefresh(status: ScriptedRefresh.complete())
-        let (source, _) = try await open(refresh, store: store)
-        let sync = await source.engine.sync
+        let (fake, source, _) = try await scriptedSource(refreshing: refresh)
         let expired = MarfaError.copyExpired(reason: "read_view_changed", message: "the copy expired")
 
-        await sync.take(CopyUpdate(reread: .parts(Reread.Parts()), connection: .needsHydration(expired)))
+        fake.sendUpdate(update(.needsHydration(expired)))
         try #require(await eventually { refresh.hydrations == 1 })
-        await sync.take(CopyUpdate(reread: .parts(Reread.Parts()), connection: .following))
-        await sync.take(CopyUpdate(reread: .parts(Reread.Parts()), connection: .needsHydration(expired)))
+        fake.sendUpdate(update(.following))
+        fake.sendUpdate(update(.needsHydration(expired)))
         #expect(try await eventuallyAsking { refresh.hydrations == 2 })
+        await source.close()
+    }
+
+    /// The package waits for a person's Refresh after a fault in the first fill, rather than trying it again.
+    @Test func aFirstFillThatFailedOnAFaultIsNotFilledAgainByItself() async throws {
+        let refresh = ScriptedRefresh(status: ScriptedRefresh.complete())
+        let (fake, source, _) = try await scriptedSource(refreshing: refresh)
+        let refused = MarfaError.server(status: 400, code: "bad_request", message: "The server refused the fill.")
+
+        fake.sendUpdate(update(.needsHydration(nil)))
+        try #require(await eventually { refresh.hydrations == 1 })
+        fake.sendUpdate(update(.needsHydration(refused)))
+        fake.sendUpdate(update(.needsHydration(refused)))
+        try await Task.sleep(for: .milliseconds(400))
+        #expect(refresh.hydrations == 1)
         await source.close()
     }
 
     // MARK: Launch
 
     @Test func aCopyWhoseSliceThisBuildChangedIsFilledAtLaunch() async throws {
-        let store = try TemporaryMarfaCopy()
-        defer { store.remove() }
         let refresh = ScriptedRefresh(status: ScriptedRefresh.complete(slice: ["*"]))
-        let (source, _) = try await open(refresh, store: store)
+        let (_, source, _) = try await scriptedSource(refreshing: refresh)
         #expect(try await eventuallyAsking { refresh.hydrations == 1 })
         await source.close()
     }
 
     @Test func aCopyOfTheSliceThisBuildWantsIsNotFilledAtLaunch() async throws {
-        let store = try TemporaryMarfaCopy()
-        defer { store.remove() }
         let refresh = ScriptedRefresh(status: ScriptedRefresh.complete())
-        let (source, _) = try await open(refresh, store: store)
+        let (_, source, _) = try await scriptedSource(refreshing: refresh)
         await source.engine.sync.drain()
         try await Task.sleep(for: .milliseconds(300))
         #expect(refresh.hydrations == 0)
@@ -174,36 +171,38 @@ struct MarfaSyncLifecycleTests {
     // MARK: Told once
 
     @Test func repeatedIdenticalStoppedUpdatesAreReportedAndToldOnce() async throws {
-        let store = try TemporaryMarfaCopy()
-        defer { store.remove() }
-        let (source, log) = try await open(ScriptedRefresh(status: ScriptedRefresh.complete()), store: store)
+        let (fake, source, log) = try await scriptedSource(refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()))
         let sync = await source.engine.sync
-        let stopped = CopyUpdate(reread: .parts(Reread.Parts()), connection: .stopped(.store(message: "the store failed")))
+        let stopped = update(.stopped(.store(message: "the store failed")))
 
-        for _ in 0..<4 { await sync.take(stopped) }
+        for _ in 0..<4 { fake.sendUpdate(stopped) }
         _ = try #require(await log.wait { unavailable($0) == 1 })
         #expect(sync.hooks.stops == 1)
         #expect(unavailable(log.current) == 1)
 
         // Following again and stopping again is a new stop.
-        await sync.take(CopyUpdate(reread: .parts(Reread.Parts()), connection: .following))
-        await sync.take(stopped)
-        #expect(sync.hooks.stops == 2)
+        fake.sendUpdate(update(.following))
+        fake.sendUpdate(stopped)
+        #expect(try await eventuallyAsking { sync.hooks.stops == 2 })
+        await source.close()
+    }
+
+    /// A fault the app's call met on a copy that has not hydrated is told the same way, once.
+    @Test func aFaultOfTheFirstFillIsReportedAndToldOnceAsAStoppedLibraryIs() async throws {
+        let (fake, source, log) = try await scriptedSource(refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()))
+        let sync = await source.engine.sync
+        let fault = update(.needsHydration(.store(message: "the store failed")))
+
+        for _ in 0..<4 { fake.sendUpdate(fault) }
+        _ = try #require(await log.wait { unavailable($0) == 1 })
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(sync.hooks.stops == 1)
+        #expect(unavailable(log.current) == 1)
         await source.close()
     }
 
     @Test func aDrainThatFailsForAnUnclassifiedReasonIsToldOnceUntilADrainSucceeds() async throws {
-        let store = try TemporaryMarfaCopy()
-        defer { store.remove() }
-        // A copy with a server that refuses every connection, so a drain the test does not fail ends without a fault.
-        let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let copy = try await WorkingCopy.open(
-            store: store.root.appending(path: "store.sqlite"), server: connection.server(key: "unused"))
-        let source = MarfaSource(
-            copy: copy, connection: connection, refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()))
-        let log = ChangeLog(source)
-        source.events.yield(.paint)
-        _ = try #require(await log.wait { $0.snapshot != nil })
+        let (_, source, log) = try await scriptedSource(refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()))
         let sync = await source.engine.sync
         sync.hooks.faulting.set { step in step == .drain ? .store(message: "the store failed") : nil }
 
@@ -228,11 +227,11 @@ struct MarfaSyncLifecycleTests {
         MarfaError.network(message: "offline"),
         MarfaError.server(status: 503, code: "unavailable", message: "The server is busy."),
         MarfaError.canceled(message: "the call was canceled"),
+        MarfaError.keyChanging(message: "The key is changing."),
+        MarfaError.copyExpired(reason: "read_view_changed", message: "The copy expired."),
     ])
-    func aDrainThePackageRetriesIsNotTold(_ error: MarfaError) async throws {
-        let store = try TemporaryMarfaCopy()
-        defer { store.remove() }
-        let (source, log) = try await open(ScriptedRefresh(status: ScriptedRefresh.complete()), store: store)
+    func aDrainThePackageRetriesOrAnswersIsNotTold(_ error: MarfaError) async throws {
+        let (_, source, log) = try await scriptedSource(refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()))
         let sync = await source.engine.sync
         sync.hooks.faulting.set { step in step == .drain ? error : nil }
         await sync.flush()
@@ -244,9 +243,7 @@ struct MarfaSyncLifecycleTests {
     // MARK: The bin
 
     @Test func aBinReadTheServerRefusesAsInvalidIsToldButOneForAKeyChangeIsNot() async throws {
-        let store = try TemporaryMarfaCopy()
-        defer { store.remove() }
-        let (source, log) = try await open(ScriptedRefresh(status: ScriptedRefresh.complete()), store: store)
+        let (_, source, log) = try await scriptedSource(refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()))
         let sync = await source.engine.sync
 
         sync.hooks.faulting.set { step in step == .bin ? .keyChanging(message: "The key is changing.") : nil }
@@ -264,28 +261,26 @@ struct MarfaSyncLifecycleTests {
     // MARK: Reading the status
 
     @Test func theCopysStatusIsReadAgainOnlyWhenAFillEndsOrTheConnectionChanges() async throws {
-        let store = try TemporaryMarfaCopy()
-        defer { store.remove() }
-        let copy = try await store.open()
-        let reads = StatusCounting(copy: copy)
-        let refresh = ScriptedRefresh(status: ScriptedRefresh.complete())
-        let source = MarfaSource(copy: copy, connection: SampleLibrary.connection, reading: reads, refreshing: refresh)
-        let log = ChangeLog(source)
-        source.events.yield(.paint)
-        _ = try #require(await log.wait { $0.snapshot != nil })
+        let fake = WorkingCopy.fake()
+        let reads = StatusCounting(copy: fake.copy)
+        let (_, source, _) = try await scriptedSource(
+            fake, refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()), reading: reads)
         let sync = await source.engine.sync
         func update(_ connection: CopyConnection, fill: FillProgress? = nil) -> CopyUpdate {
             CopyUpdate(reread: .parts(Reread.Parts(queue: true)), connection: connection, fill: fill)
         }
 
-        await sync.take(update(.following))
+        fake.sendUpdate(update(.following))
+        // Following sends what waited, which is the first sign that the update has been taken.
+        try #require(await eventually { sync.hooks.drains >= 1 })
         let afterConnecting = reads.statusReads
-        for _ in 0..<5 { await sync.take(update(.following)) }
-        #expect(reads.statusReads == afterConnecting, "a local write's update read the status")
+        for _ in 0..<5 { fake.sendUpdate(update(.following)) }
 
-        await sync.take(update(.following, fill: FillProgress(listed: 1, expected: 9)))
-        await sync.take(update(.following))
-        #expect(reads.statusReads == afterConnecting + 1, "the end of a fill did not read the status once")
+        fake.sendUpdate(update(.following, fill: FillProgress(listed: 1, expected: 9)))
+        fake.sendUpdate(update(.following))
+        try #require(await eventually { reads.statusReads > afterConnecting })
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(reads.statusReads == afterConnecting + 1, "the end of a fill did not read the status once, or a local write's update did")
         await source.close()
     }
 }

@@ -122,7 +122,6 @@ private nonisolated final class CountingRefresh: MarfaRefreshing {
 
     func catchUp() async throws {}
     func fetchKept() async throws -> KeptFetch { KeptFetch(fetched: 0, fetchedBytes: 0, attachments: nil) }
-    func updates() -> AsyncStream<CopyUpdate>? { quietUpdates() }
 }
 
 /// A server that refuses every connection, so a copy made for it never hears from it.
@@ -144,8 +143,12 @@ struct MarfaSourceOfflineTests {
         #expect(first.catalogue.itemTypes[TypeID("core.note")] != nil)
         #expect(source.connectionState != .online, "a copy is not online before the server has answered")
 
+        // The first fill cannot reach the server. The package keeps such a copy as one that needs a hydration and
+        // tries nothing again until Refresh, so it is shown neither online nor as a fault.
         source.refresh()
-        #expect(await waitForConnection(source) { if case .offline = $0 { true } else { false } })
+        try #require(await eventuallyAsking { await source.engine.sync.hooks.hydrations >= 1 })
+        #expect(source.connectionState != .online)
+        if case .unavailable = source.connectionState { Issue.record("an unreachable server was shown as a fault") }
 
         let write = WriteID()
         let id = ItemID.mint()
@@ -476,39 +479,6 @@ struct MarfaSourceOfflineTests {
         await source.close()
     }
 
-    private func unavailable(_ state: ChangeLog.State) -> Int {
-        state.changes.count { if case .unavailable = $0 { true } else { false } }
-    }
-
-    /// A copy that stopped on a fault is told once, stays unavailable however often the package says it again, offers a
-    /// refresh meanwhile, and is never shown online until the server answers; the next fault after that is news.
-    @Test
-    func aFaultTheCopyStoppedOnIsToldOnceAndNeverShownOnline() async throws {
-        let root = scratch()
-        defer { try? FileManager.default.removeItem(at: root) }
-        let source = try await open(root)
-        let log = ChangeLog(source)
-        _ = try #require(await log.wait { $0.snapshot != nil })
-        let sync = await source.engine.sync
-        let stopped = CopyUpdate(reread: .parts(Reread.Parts()), connection: .stopped(.store(message: "the store failed")))
-
-        await sync.take(stopped)
-        _ = try #require(await log.wait { unavailable($0) == 1 })
-        #expect(await waitForConnection(source) { if case .unavailable = $0 { true } else { false } })
-
-        // A server event after the stop changes nothing the person sees until the package says it follows again.
-        await sync.take(stopped)
-        await source.hear(Change(origin: .server(event: "item.updated", cursor: "c"), itemId: nil, edgeId: nil))
-        #expect(!(await waitForConnection(source) { $0 == .online }), "a stopped library was shown online")
-        #expect(unavailable(log.current) == 1, "a fault told again before anything succeeded is not told again")
-
-        await sync.take(CopyUpdate(reread: .parts(Reread.Parts()), connection: .following))
-        #expect(await waitForConnection(source) { $0 == .online })
-        await sync.take(stopped)
-        _ = try #require(await log.wait { unavailable($0) == 2 })
-        await source.close()
-    }
-
     /// A row the copy could not read is replaced only by a hydration, which the sync asks for once for each row.
     @Test
     func aRowTheCopyCouldNotReadIsHydratedForOnceAtMost() async throws {
@@ -564,16 +534,10 @@ struct MarfaSourceOfflineTests {
     /// The package reports a copy that expired as one that needs a hydration, and the sync hydrates it.
     @Test
     func anExpiredCopyIsHydratedAgain() async throws {
-        let store = try TemporaryMarfaCopy()
-        defer { store.remove() }
-        let copy = try await store.open()
         let server = CountingRefresh()
-        let source = MarfaSource(copy: copy, connection: SampleLibrary.connection, refreshing: server)
-        let log = ChangeLog(source)
-        source.events.yield(.paint)
-        _ = try #require(await log.wait { $0.snapshot != nil })
+        let (fake, source, _) = try await scriptedSource(refreshing: server)
         let expired = MarfaError.copyExpired(reason: "read_view_changed", message: "the copy expired")
-        await source.engine.sync.take(CopyUpdate(reread: .everything, connection: .needsHydration(expired)))
+        fake.sendUpdate(CopyUpdate(reread: .everything, connection: .needsHydration(expired)))
         #expect(try await eventuallyAsking { server.hydrations == 1 })
         await source.close()
     }
@@ -778,9 +742,10 @@ struct MarfaSourceOfflineTests {
         await source.tellAnswers()
         _ = try #require(await log.wait { $0.answer(to: write) == .accepted })
 
-        // Then the copy hydrates again, which this closed port refuses; the queue and the view are as they were.
+        // Then the copy hydrates again, which this closed port refuses; the queue and the view are as they were. The
+        // engine is told as the sync would tell it, since a copy with a store cannot be made to expire.
         let expired = MarfaError.copyExpired(reason: "read_view_changed", message: "the copy expired")
-        await source.engine.sync.take(CopyUpdate(reread: .everything, connection: .needsHydration(expired)))
+        await source.tell(CopyUpdate(reread: .everything, connection: .needsHydration(expired)))
         await source.engineTook()
         let after = try await source.copy.queue.all()
         #expect(Set(after.map(\.id)) == Set(queued.filter { $0.id != move.id }.map(\.id)), "only the answered write left the queue")

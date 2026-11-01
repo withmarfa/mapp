@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import MarfaTesting
 import Synchronization
 import Testing
 @testable import MAPP
@@ -17,7 +18,7 @@ import Testing
         let write = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Arriving", "body": "First"]))
         let reads = FillingReads(copy: copy, completeness: completeness)
         let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads,
-                                  refreshing: ScriptedRefresh(status: ScriptedRefresh.complete(), listensToCopy: true))
+                                  refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()))
         let log = ChangeLog(source)
         source.events.yield(.paint)
         let painted = try #require(await log.wait { $0.item(titled: "Arriving") != nil })
@@ -62,14 +63,9 @@ import Testing
     }
 
     @Test func unfinishedRefreshReadsRowsWithoutClearingTheFollowFailure() async throws {
-        let store = try TemporaryMarfaCopy()
-        defer { store.remove() }
-        let copy = try await store.open()
-        let source = MarfaSource(
-            copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), refreshing: QuietRefresh(copy: copy))
-        let log = ChangeLog(source)
-        source.events.yield(.paint)
-        _ = try #require(await log.wait { $0.snapshot != nil })
+        let fake = WorkingCopy.fake()
+        let copy = fake.copy
+        let (_, source, log) = try await scriptedSource(fake, refreshing: Whole(copy: copy))
         try await copy.declareTypes([[
             "id": "example.note", "label": "Note", "title_field": "title", "body_field": "body",
             "fields": ["title": ["type": "string"], "body": ["type": "string"]],
@@ -80,7 +76,7 @@ import Testing
         _ = try #require(await log.wait { $0.snapshot?.catalogue.itemTypes[TypeID("example.note")] != nil })
         let created = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Arrived", "body": "First"]))
         // A fill that did not finish, with the server unreachable: the rows are read and the unreachable word stays.
-        await source.engine.sync.take(CopyUpdate(
+        fake.sendUpdate(CopyUpdate(
             reread: .everything, connection: .offline(.network(message: "offline")),
             fill: FillProgress(listed: 1, expected: 4)))
         let painted = try #require(await log.wait { $0.item(titled: "Arrived") != nil })
@@ -101,7 +97,7 @@ import Testing
         let copy = try await store.open()
         let reads = HydratingReads(copy: copy)
         let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads,
-                                  refreshing: ScriptedRefresh(status: ScriptedRefresh.complete(), listensToCopy: true))
+                                  refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()))
         let log = ChangeLog(source)
         source.events.yield(.paint)
         _ = try #require(await log.wait { $0.snapshot != nil })

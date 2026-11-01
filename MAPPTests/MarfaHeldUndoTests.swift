@@ -165,11 +165,14 @@ import Testing
         _ = try await copy.edges.create(from: folderID, to: childID, type: MarfaMapping.parentEdge)
         let edge = try #require(await copy.edges.from(folderID).first)
         let reads = Catchup(copy: copy)
-        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads, refreshing: QuietRefresh(copy: copy))
+        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads)
         source.engine.hooks.refusing.set { reads.refusal($0) }
+        // The engine is told what each test says, in place of what the copy's own server follow makes of it.
+        await source.engine.sync.hooks.ignoringCopy.set(true)
         let log = ChangeLog(source)
         source.events.yield(.paint)
         let painted = try #require(await log.wait { $0.item(titled: "Second") != nil && $0.item(titled: "Folder") != nil })
+        await source.tell(CopyUpdate(reread: .everything, connection: .local))
         try #require(await eventuallyAsking { await source.engine.tookFirstUpdate }, "the package's first update")
         let scene = Scene(
             store: store, copy: copy, reads: reads, source: source, log: log, item: try #require(painted.item(titled: "Second")),

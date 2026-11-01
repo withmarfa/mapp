@@ -215,10 +215,13 @@ import Testing
         let reads = Watched(copy: copy)
         let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads,
                                   refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()))
+        // The engine is told what each test says, in place of what the copy's own server follow makes of it.
+        await source.engine.sync.hooks.ignoringCopy.set(true)
         let log = ChangeLog(source)
         source.events.yield(.paint)
         let scene = Scene(store: store, copy: copy, reads: reads, source: source, log: log)
         try await scene.wait("the first paint") { $0.item(titled: "First") != nil }
+        await source.tell(CopyUpdate(reread: .everything, connection: .local))
         try #require(await eventuallyAsking { await source.engine.tookFirstUpdate }, "the package's first update")
         try #require(await source.engine.cursor != nil, "a whole read takes a cursor")
         // The package's first update read from the cursor too; the tests count what they make happen.

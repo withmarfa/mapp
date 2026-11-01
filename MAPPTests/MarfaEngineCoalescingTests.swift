@@ -91,7 +91,6 @@ import Testing
             return try await read.edges(touching: id)
         }
 
-        func updates() -> AsyncStream<CopyUpdate>? { quietUpdates() }
         func views() async throws -> Rows<LibraryView> { try await read.views() }
         func items(inView id: String) async throws -> [Marfa.Item] { try await read.items(inView: id) }
 
@@ -221,9 +220,12 @@ import Testing
         let reads = Reads(copy: fake.copy)
         set(reads)
         let source = MarfaSource(copy: fake.copy, connection: SampleLibrary.connection, reading: reads, refreshing: reads)
+        // The engine is told what each test says, in place of what the fake copy makes of the test's own writes.
+        await source.engine.sync.hooks.ignoringCopy.set(true)
         let log = ChangeLog(source)
         source.events.yield(.paint)
         _ = try #require(await log.wait { $0.snapshot != nil })
+        await source.tell(CopyUpdate(reread: .everything, connection: .local))
         try #require(await eventuallyAsking { await source.engine.tookFirstUpdate }, "the package's first update")
         return Scene(fake: fake, reads: reads, source: source, log: log)
     }
