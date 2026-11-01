@@ -1,7 +1,6 @@
 import Foundation
 import Marfa
-import struct MarfaCore.BinPage
-import struct MarfaCore.Item
+import MarfaTesting
 import Testing
 @testable import MAPP
 
@@ -16,7 +15,7 @@ extension LiveMarfaTests {
             let made = LiveMarfa.Made()
             let connection = try MarfaConnection(address: try LiveMarfa.address())
             let source = try await MarfaSource.open(
-                connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]),
+                connection, keys: MemoryKeyStore([connection.address: try LiveMarfa.key()]),
                 location: MarfaStoreLocation(root: root))
             let library = MarfaLibrary(source: source, notices: Notices())
             func end() async {
@@ -317,7 +316,7 @@ extension LiveMarfaTests {
                 defer { try? FileManager.default.removeItem(at: root) }
                 let connection = try MarfaConnection(address: try LiveMarfa.address())
                 let second = try await MarfaSource.open(
-                    connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]),
+                    connection, keys: MemoryKeyStore([connection.address: try LiveMarfa.key()]),
                     location: MarfaStoreLocation(root: root))
                 let fresh = MarfaLibrary(source: second, notices: Notices())
                 second.refresh()

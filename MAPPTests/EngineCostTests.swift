@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import MarfaTesting
 import Synchronization
 import Testing
 @testable import MAPP
@@ -240,7 +241,7 @@ struct EngineCostTests {
     private func open(_ bench: Bench) async throws -> Open {
         let connection = try MarfaConnection(address: try LiveMarfa.address())
         let source = try await MarfaSource.open(
-            connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]), location: MarfaStoreLocation(root: bench.root))
+            connection, keys: MemoryKeyStore([connection.address: try LiveMarfa.key()]), location: MarfaStoreLocation(root: bench.root))
         bench.sources.append(source)
         let library = MarfaLibrary(source: source, notices: Notices())
         source.refresh()
@@ -464,7 +465,7 @@ struct EngineCostTests {
                 try #require(await eventually(within: .seconds(60)) { made.allSatisfy { library.item($0) != nil } }, "round \(round)")
                 await source.engineTook()
                 let start = ContinuousClock.now
-                source.hear(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
+                await source.hear(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
                 await source.engineTook()
                 steps.append(Self.ms(ContinuousClock.now - start))
             }

@@ -1,4 +1,5 @@
 import Foundation
+import MarfaTesting
 import Testing
 @testable import MAPP
 
@@ -12,7 +13,7 @@ extension LiveMarfaTests {
     struct MarfaInstanceSettingsLiveTests {
         @Test(.timeLimit(.minutes(2))) func theNameIsReadChangedAndPutBack() async throws {
             let connection = try MarfaConnection(address: try LiveMarfa.address())
-            let source = MarfaServerConfig(connection: connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]))
+            let source = MarfaServerConfig(connection: connection, keys: MemoryKeyStore([connection.address: try LiveMarfa.key()]))
             let model = InstanceSettingsModel { .init(id: connection.address.absoluteString, source: source) }
 
             await model.load()

@@ -22,8 +22,8 @@ extension MarfaEngine {
     /// no longer does, so they are not kept. The copy is then read whole, from the cursor kept, which asks again for
     /// the links of every row that has none. A hydration begun since refuses every link read; the
     /// cursor is kept, and the hydration reads the copy whole once it ends.
-    func readChanged(purged: Purged = Purged()) async {
-        guard painted, let since = cursor else { return await reload(purged: purged) }
+    func readChanged() async {
+        guard painted, let since = cursor else { return await reload() }
         let interval = Telemetry.begin(.engine, "changed")
         let status: Status
         let named: ChangedRows
@@ -31,7 +31,7 @@ extension MarfaEngine {
         let found: [Marfa.Item]
         let held: [Marfa.Edge]
         do {
-            (status, named, next, found, held) = try await Self.asking(hub) {
+            (status, named, next, found, held) = try await Self.asking {
                 let status = try await reading.status()
                 guard status.hydration == .complete else { throw ReadWhole.unnamed }
                 let catalogue = try await MarfaMapping.catalogue(
@@ -48,10 +48,10 @@ extension MarfaEngine {
             }
         } catch {
             interval.end(("whole", 1))
-            await reload(purged: purged)
+            await reload()
             return
         }
-        let (affected, links) = await take(named, rows: found, edges: held, purged: purged)
+        let (affected, links) = await take(named, rows: found, edges: held)
         hub.report.update { $0.fill = LibraryFill(status, completeness: .complete) }
         publish(affected.map { ItemID($0) })
         if links == .read { cursor = next }
@@ -65,17 +65,16 @@ extension MarfaEngine {
     /// differently: each named, both ends of each edge named, before and after, the rows at the other end of an
     /// edge whose row came or went, and the rows whose links now read differently; and how the links were read.
     private func take(
-        _ named: ChangedRows, rows found: [Marfa.Item], edges held: [Marfa.Edge], purged: Purged
+        _ named: ChangedRows, rows found: [Marfa.Item], edges held: [Marfa.Edge]
     ) async -> (affected: Set<String>, links: LinksRead) {
-        var affected = purged.ids
+        var affected: Set<String> = []
         var viewsChanged = false
         var binChanged = false
         var present: [Marfa.Item] = []
-        // A purged row went. The engine let it go on hearing the purge, so `gone` below finds it no longer held.
-        var moved = purged.ids
+        var moved: Set<String> = []
         var came: Set<String> = []
         var arrived = false
-        var files = purged.rows.values.contains { isFile($0) }
+        var files = false
         var gone = Set(named.removedItems)
         let foundIDs = Set(found.map(\.id))
         // A row named but not found left the copy after it was named.
@@ -243,13 +242,13 @@ extension MarfaEngine {
     /// after putting it back. A hydration under way may not have brought a row back yet, so a row it does not find
     /// is left as it was rather than taken as gone. A row whose links cannot be read has the copy read whole, as
     /// `readChanged` does.
-    func reread(_ ids: Set<String>, purged: Purged = Purged()) async {
+    func reread(_ ids: Set<String>) async {
         var affected = Set(ids)
         let interval = Telemetry.begin(.engine, "reread", ("ids", ids.count))
         defer { interval.end(("ids", ids.count), ("affected", affected.count)) }
         var read: [(row: Marfa.Item?, id: String, held: [Marfa.Edge])] = []
         do {
-            let found = try await Self.asking(hub) { try await reading.items(Array(ids)) }
+            let found = try await Self.asking { try await reading.items(Array(ids)) }
             let byID = Dictionary(found.rows.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             for id in ids {
                 guard let row = byID[id] else {
@@ -257,7 +256,7 @@ extension MarfaEngine {
                     continue
                 }
                 let held: [Marfa.Edge]
-                do { held = try await Self.asking(hub) { try await reading.edges(touching: id) } }
+                do { held = try await Self.asking { try await reading.edges(touching: id) } }
                 catch MarfaError.hydrationIncomplete {
                     held = edges.edges(touching: id)
                 }
@@ -276,13 +275,11 @@ extension MarfaEngine {
             entry.row.map(MarfaMapping.isLibraryItem) == false ? (row: nil, id: entry.id, held: []) : entry
         }
         await sync.unreadable(Set(read.compactMap { $0.row }.filter { $0.unreadableProperties != nil }.map(\.id)))
-        // A purged row went, even where a hydration under way left it unread. The engine let it go on hearing the
-        // purge, so the row it held is taken from `purged`.
-        var moved = purged.ids
+        var moved: Set<String> = []
         var arrived = false
-        var files = purged.rows.values.contains { isFile($0) }
+        var files = false
         for (row, id, held) in read {
-            let previous = rows[id] ?? purged.rows[id]
+            let previous = rows[id]
             let placed = row != nil && Self.placements(of: id, in: edges.edges(touching: id))
                 != Self.placements(of: id, in: held)
             guard placed || Self.movesNames(previous, row, catalogue: catalogue) else { continue }

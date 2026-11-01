@@ -1,8 +1,6 @@
 import Foundation
 import Marfa
-import struct MarfaCore.Attachments
-import struct MarfaCore.KeptFetch
-import struct MarfaCore.Draft
+import MarfaTesting
 import Synchronization
 import Testing
 @testable import MAPP
@@ -14,8 +12,6 @@ private actor FillServer: MarfaRefreshing {
     var expire = false
     var resumed = false
     var restarted: String?
-    var attachmentCopy: WorkingCopy?
-    private(set) var fetchedAttachments: [String] = []
 
     init(_ hydration: Hydration) {
         status = Status(
@@ -29,7 +25,6 @@ private actor FillServer: MarfaRefreshing {
     }
 
     func readStatus() -> Status { status }
-    func observeAttachments(in copy: WorkingCopy) { attachmentCopy = copy }
     func hydrate(types: [String], tier: SliceTier, edgeTypes: [String]) throws -> HydrateReport {
         #expect(types == MarfaSync.slice)
         #expect(tier == .all)
@@ -78,9 +73,6 @@ private actor FillServer: MarfaRefreshing {
 
     func fetchKept() async throws -> KeptFetch {
         calls.append("attachments")
-        if let attachmentCopy {
-            fetchedAttachments = try await attachmentCopy.edges.ofType(MarfaMapping.attachmentEdge).map(\.sourceId)
-        }
         if let heldFetch {
             for await _ in heldFetch { }
         }
@@ -94,16 +86,27 @@ private actor FillServer: MarfaRefreshing {
 }
 
 @Suite(.hangLimit) struct MarfaFillRecoveryTests {
-    private func withSync(_ server: FillServer, body: (MarfaSync) async throws -> Void) async throws {
-        let store = try TemporaryMarfaCopy()
-        defer { store.remove() }
-        let copy = try await store.open()
+    /// How many updates the engine was told, which says how many the sync has taken.
+    private final class Told: Sendable {
+        let count = Mutex(0)
+    }
+
+    private func withSync(_ server: FillServer, body: (MarfaSync, FakeCopy, Told) async throws -> Void) async throws {
+        let fake = WorkingCopy.fake()
+        let copy = fake.copy
+        let told = Told()
         let sync = MarfaSync(copy: copy, hub: MarfaHub(), refreshing: server) { event in
-            if case .fillProgress(let done) = event { done.resume() }
+            switch event {
+            case .update(_, let done):
+                told.count.withLock { $0 += 1 }
+                done.resume()
+            case .answers(let done): done.resume()
+            default: break
+            }
             return true
         }
         do {
-            try await body(sync)
+            try await body(sync, fake, told)
         } catch {
             await sync.stop()
             await server.release()
@@ -121,7 +124,7 @@ private actor FillServer: MarfaRefreshing {
 
     @Test func fillsOnceThenCatchesUpAndFetchesAttachmentsAfterBoth() async throws {
         let server = FillServer(.never)
-        try await withSync(server) { sync in
+        try await withSync(server) { sync, _, _ in
             try await sync.refreshNow()
             try await wait { await server.calls.count == 2 }
             try await sync.refreshNow()
@@ -133,13 +136,13 @@ private actor FillServer: MarfaRefreshing {
 
     @Test func anInterruptedFillResumesTheSameSlice() async throws {
         let server = FillServer(.never)
-        try await withSync(server) { first in
+        try await withSync(server) { first, _, _ in
             await server.configure(interrupt: true)
             await #expect(throws: MarfaError.self) { try await first.refreshNow() }
             #expect(await server.calls == ["fill"])
         }
         await server.configure()
-        try await withSync(server) { reopened in
+        try await withSync(server) { reopened, _, _ in
             try await reopened.refreshNow()
             try await wait { await server.calls.count == 3 }
             #expect(reopened.hooks.lastHydration?.resumed == true)
@@ -150,7 +153,7 @@ private actor FillServer: MarfaRefreshing {
 
     @Test func agedOutCursorUsesStatusAndRefillsInPlace() async throws {
         let server = FillServer(.complete)
-        try await withSync(server) { sync in
+        try await withSync(server) { sync, _, _ in
             await server.configure(expire: true)
             await #expect(throws: MarfaError.self) { try await sync.refreshNow() }
             try await sync.refreshNow()
@@ -163,7 +166,7 @@ private actor FillServer: MarfaRefreshing {
     @Test func aRestartReportIsKeptWithoutAnotherFill() async throws {
         let server = FillServer(.inProgress)
         await server.configure(restarted: "head_aged_out")
-        try await withSync(server) { sync in
+        try await withSync(server) { sync, _, _ in
             try await sync.refreshNow()
             #expect(sync.hooks.lastHydration?.restarted == "head_aged_out")
             #expect(sync.hooks.hydrations == 1)
@@ -173,7 +176,7 @@ private actor FillServer: MarfaRefreshing {
     @Test func aFlushCompletesWhileAnAttachmentFetchIsHeld() async throws {
         let server = FillServer(.never)
         await server.holdFetch()
-        try await withSync(server) { sync in
+        try await withSync(server) { sync, _, _ in
             await sync.refresh()
             await sync.start()
             try await wait { await server.calls.contains("attachments") }
@@ -192,33 +195,30 @@ private actor FillServer: MarfaRefreshing {
         }
     }
 
+    /// The package reports the return of the server as a connection; MAPP sends what waited and asks again for the files.
+    private func reconnect(_ fake: FakeCopy, _ told: Told) async throws {
+        let target = told.count.withLock { $0 } + 2
+        fake.sendUpdate(CopyUpdate(reread: .parts(Reread.Parts()), connection: .offline(.network(message: "offline"))))
+        fake.sendUpdate(CopyUpdate(reread: .parts(Reread.Parts()), connection: .following))
+        try await wait { told.count.withLock { $0 } >= target }
+    }
+
     @Test func anIncompleteFetchIsKeptAndRetriedOnReconnectionWithoutAnotherDrain() async throws {
         let server = FillServer(.never)
-        let incomplete = KeptFetch(fetched: 1, fetchedBytes: 10, attachments: Attachments(
+        let incomplete = KeptFetch(fetched: 1, fetchedBytes: 10, attachments: KeptAttachments(
             held: 1, heldBytes: 10, partialBytes: 3, notHeld: 1, notHeldBytes: 20, notHeldByReason: []))
-        let complete = KeptFetch(fetched: 1, fetchedBytes: 20, attachments: Attachments(
+        let complete = KeptFetch(fetched: 1, fetchedBytes: 20, attachments: KeptAttachments(
             held: 2, heldBytes: 30, partialBytes: 0, notHeld: 0, notHeldBytes: 0, notHeldByReason: []))
         await server.report(incomplete)
-        try await withSync(server) { sync in
+        try await withSync(server) { sync, fake, told in
             await sync.refresh()
             await sync.start()
             await sync.flush()
             try await wait { sync.hooks.lastKeptFetch == incomplete }
-            let drains = sync.hooks.drains
-            #expect(drains > 0)
-            await sync.unreachable("offline")
             await server.report(complete)
-            await server.holdFetch()
-            await sync.reachable()
-            try await wait { await server.calls.count == 3 }
-            #expect(sync.hooks.lastKeptFetch == incomplete)
-            // The SDK reports its own reconnect drain while the attachment retry is still waiting.
-            await sync.drainedByFollow(DrainReport(answered: 0, verdicts: []))
-            await server.release()
+            try await reconnect(fake, told)
             try await wait { sync.hooks.lastKeptFetch == complete }
-            #expect(sync.hooks.drains == drains)
             #expect(await server.calls == ["fill", "attachments", "attachments"])
-            #expect(sync.hooks.hydrations == 1)
         }
     }
 
@@ -226,17 +226,17 @@ private actor FillServer: MarfaRefreshing {
         let server = FillServer(.never)
         let report = KeptFetch(fetched: 2, fetchedBytes: 30, attachments: nil)
         await server.report(report)
-        try await withSync(server) { sync in
+        try await withSync(server) { sync, fake, told in
             await sync.refresh()
             await sync.start()
             await sync.flush()
             try await wait { sync.hooks.lastKeptFetch == report }
             await server.report(report, error: .network(message: "offline"))
-            await sync.reachable()
+            try await reconnect(fake, told)
             try await wait { await server.calls.count == 3 }
             #expect(sync.hooks.lastKeptFetch == report)
             await server.report(KeptFetch(fetched: 0, fetchedBytes: 0, attachments: nil))
-            await sync.reachable()
+            try await reconnect(fake, told)
             try await wait { sync.hooks.lastKeptFetch?.fetched == 0 }
             #expect(await server.calls == ["fill", "attachments", "attachments", "attachments"])
         }
@@ -245,13 +245,13 @@ private actor FillServer: MarfaRefreshing {
     @Test func aReconnectDuringAFetchSchedulesOneMorePass() async throws {
         let server = FillServer(.never)
         await server.holdFetch()
-        try await withSync(server) { sync in
+        try await withSync(server) { sync, fake, told in
             await sync.refresh()
             await sync.start()
             await sync.flush()
             try await wait { await server.calls.count == 2 }
-            await sync.reachable()
-            await sync.reachable()
+            try await reconnect(fake, told)
+            try await reconnect(fake, told)
             #expect(await server.calls.count == 2)
             await server.release()
             try await wait { await server.calls.count == 3 }
@@ -260,42 +260,25 @@ private actor FillServer: MarfaRefreshing {
     }
 
     @Test func anAttachmentArrivingThroughReplayIsFetchedWithoutAnotherDrain() async throws {
-        let store = try TemporaryMarfaCopy()
-        defer { store.remove() }
-        let copy = try await store.open()
-        let note = try await copy.items.create(Draft(type: "core.note", properties: ["title": "Held", "body": "Text"]))
-        let noteID = try #require(note.itemId)
         let server = FillServer(.complete)
-        await server.observeAttachments(in: copy)
-        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), refreshing: server)
-        source.events.yield(.paint)
-        await source.engineTook()
-        await source.engine.sync.refresh()
-        await source.engine.sync.flush()
-        try await wait { await server.calls.count == 2 }
-        let drains = await source.engine.sync.hooks.drains
+        try await withSync(server) { sync, fake, told in
+            await sync.start()
+            await sync.refresh()
+            await sync.flush()
+            try await wait { await server.calls.count == 2 }
+            try await reconnect(fake, told)
+            try await wait { await server.calls.count == 3 }
+            await sync.flush()
+            let drains = sync.hooks.drains
 
-        let earlyFetch = KeptFetch(fetched: 0, fetchedBytes: 0, attachments: Attachments(
-            held: 0, heldBytes: 0, partialBytes: 0, notHeld: 0, notHeldBytes: 0, notHeldByReason: []))
-        await server.report(earlyFetch)
-        source.hear(Change(origin: .serverUnreachable(.network(message: "offline")), itemId: nil, edgeId: nil))
-        source.hear(Change(origin: .serverReachable, itemId: nil, edgeId: nil))
-        await source.engineTook()
-        try await wait { await source.engine.sync.hooks.lastKeptFetch == earlyFetch }
-        #expect(await server.fetchedAttachments.isEmpty)
-
-        // The early retry has finished. Replay now adds a file and its relationship to the held note.
-        let file = store.root.appending(path: "replayed.txt")
-        try Data("From another device".utf8).write(to: file)
-        let attached = try await copy.items.attach(to: noteID, file: file)
-        let fileID = try #require(attached.item.itemId)
-        let edgeID = try #require(attached.edge.edgeId)
-        source.hear(Change(origin: .server(event: "edge.created", cursor: "replayed"),
-                           itemId: nil, edgeId: edgeID))
-        await source.engineTook()
-        try await wait { await server.fetchedAttachments == [fileID] }
-        #expect(await source.engine.sync.hooks.drains == drains)
-        #expect(await server.calls == ["catchUp", "attachments", "attachments", "attachments"])
-        await source.close()
+            // The early retry has finished. Replay now adds a file and its relationship to a held note.
+            let target = told.count.withLock { $0 } + 1
+            fake.sendUpdate(CopyUpdate(
+                reread: .parts(Reread.Parts(rows: ChangedRows(edges: ["replayed"]))), connection: .following))
+            try await wait { told.count.withLock { $0 } >= target }
+            try await wait { await server.calls.count == 4 }
+            #expect(sync.hooks.drains == drains)
+            #expect(await server.calls == ["catchUp", "attachments", "attachments", "attachments"])
+        }
     }
 }

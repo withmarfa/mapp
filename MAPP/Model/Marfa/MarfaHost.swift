@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import Synchronization
 import Observation
 
 /// The Marfa library the app is connected to, from the address and key the person gives to the copy it opens.
@@ -84,9 +85,6 @@ import Observation
     static let discardedKey = "MarfaDiscardedCopies"
     /// The last name each server gave itself, by address, so a launch and an offline window show it.
     private static let namesKey = "MarfaInstanceNames"
-    /// When each server's copy last finished a sync without an error, by address, so a launch says how old what it
-    /// paints is before the server has been asked.
-    private static let syncedKey = "MarfaLastSynced"
 
     let defaults: UserDefaults
     let keys: any KeyStore
@@ -101,8 +99,7 @@ import Observation
     /// The address connected to, kept while its copy cannot be opened, so Settings can offer a key for it.
     private(set) var connection: MarfaConnection?
     /// The library to show, once its copy is open. It holds how its server stands and what its copy last
-    /// reported, and tells the host when the server comes back, so the host keeps neither and follows neither
-    /// while a copy is open.
+    /// reported, so the host keeps neither while a copy is open.
     private(set) var library: MarfaLibrary?
     /// How the server stands while no copy is open: connecting to it, or why its copy could not be opened.
     private var standing = MarfaConnectionState.disconnected
@@ -111,7 +108,6 @@ import Observation
     private(set) var isBusy = false
     private var reading: Task<Void, Never>?
     private var instanceNames: [String: String]
-    private var syncedDates: [String: Date]
     /// Hands every open page's last edit to the library it came from. The host runs it before the windows change
     /// library and again right before it reads or closes a copy, so text typed while a step waited on the network
     /// is in the copy when it closes. Set by the app; tests may set none.
@@ -140,7 +136,6 @@ import Observation
         self.configurer = configurer
         self.iconKeeper = iconKeeper
         instanceNames = defaults.dictionary(forKey: Self.namesKey) as? [String: String] ?? [:]
-        syncedDates = defaults.dictionary(forKey: Self.syncedKey) as? [String: Date] ?? [:]
     }
 
     /// The name the server at `connection` last gave itself, nil until one has been read.
@@ -148,12 +143,10 @@ import Observation
         instanceNames[connection.address.absoluteString]
     }
 
-    /// The last time the copy of the server connected to finished a sync with it without an error, which is more than
-    /// hearing from it: the copy was brought up to date, or a change the server made reached it. This launch's is
-    /// the copy's own report; until a sync finishes, the one kept by the launch before, for that address.
-    var lastSynced: Date? {
-        report.lastSynced ?? connection.flatMap { syncedDates[$0.address.absoluteString] }
-    }
+    /// The last time the copy of the server connected to finished a pull from it without an error, which is more
+    /// than hearing from it: the copy was brought up to date, or a change the server made reached it. The copy keeps
+    /// it, so a launch reports the one from the launch before until a pull finishes.
+    var lastSynced: Date? { report.lastSynced }
 
     /// Whether the connection is to a server, as against the sample library, which has none to sync with. Only a
     /// debug build holds the sample, so a release build's connection is always a server.
@@ -166,14 +159,15 @@ import Observation
         #endif
     }
 
-    /// Whether Refresh has anything to do: an open copy of a server's library, not already syncing, and a key the
-    /// server has not refused. A server that cannot be reached still counts, so the person can try again at once
-    /// rather than wait for the copy's next try.
+    /// Whether Refresh has anything to do: an open copy of a server's library, not already syncing or hydrating, and
+    /// a key the server has not refused. A server that cannot be reached, and a library the package reports stopped
+    /// or needing a hydration it is not running, still count, so the person can try again at once rather than wait
+    /// for the copy's next try.
     var canRefresh: Bool {
         guard hasServer, source != nil, report.phase == .current else { return false }
         switch state {
-        case .online, .connecting, .offline: return true
-        case .disconnected, .keyRefused, .unavailable, .otherVersion, .inUse: return false
+        case .online, .connecting, .offline, .unavailable: return true
+        case .disconnected, .keyRefused, .otherVersion, .inUse: return false
         }
     }
 
@@ -204,7 +198,9 @@ import Observation
     /// whatever became of the step that gave it.
     func holds(_ key: String, for connection: MarfaConnection) async -> Bool {
         let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !key.isEmpty, let kept = try? await Self.offMain({ [keys] in try keys.key(for: connection) }) else { return false }
+        guard !key.isEmpty else { return false }
+        // A key the Keychain will not give is not known to be the typed one, so Settings keeps what was typed.
+        let kept = try? await Self.offMain({ [keys] in try keys.key(for: connection.address) })
         return kept == key
     }
 
@@ -234,7 +230,7 @@ import Observation
         do {
             try await open(connection)
         } catch {
-            try? await Self.offMain { [keys] in try keys.delete(for: connection) }
+            try? await Self.offMain { [keys] in try keys.delete(for: connection.address) }
             standing = .disconnected
             throw error
         }
@@ -256,7 +252,6 @@ import Observation
         }
         detach()
         forgetName(of: connection)
-        forgetSync(of: connection)
         await MarfaSource.removeKeptCopies()
         await PictureCache.removeAll()
         // The address goes first, so a quit while the key and the copy are removed never opens this server again
@@ -278,7 +273,13 @@ import Observation
         guard !key.isEmpty else { throw .noKey }
         try begin()
         defer { isBusy = false }
-        let old = try? await Self.offMain { [keys] in try keys.key(for: connection) }
+        // A key the Keychain would not give is not a missing key: nothing is replaced while it can't be read.
+        let old: String?
+        do {
+            old = try await Self.offMain { [keys] in try keys.key(for: connection.address) }
+        } catch {
+            throw .unavailable(message: Words.keyUnreadable)
+        }
         guard let source else {
             // With no copy open there is no server to ask first; the copy opens with the new key or not at all.
             try await save(key, for: connection)
@@ -358,7 +359,7 @@ import Observation
             try await clearDiscarded(connection)
             opened = try await Self.open(connection, keys: keys, location: location, with: opener)
         } catch {
-            try? await Self.offMain { [keys] in try keys.delete(for: connection) }
+            try? await Self.offMain { [keys] in try keys.delete(for: connection.address) }
             throw error
         }
         if let current {
@@ -367,7 +368,7 @@ import Observation
             } catch {
                 // The move is abandoned, so the copy made for it goes too.
                 await opened.close()
-                try? await Self.offMain { [keys] in try keys.delete(for: connection) }
+                try? await Self.offMain { [keys] in try keys.delete(for: connection.address) }
                 if fresh { _ = await removeCopy(connection, agreed: 0) }
                 throw error
             }
@@ -377,7 +378,6 @@ import Observation
         remember(connection)
         attach(opened, for: connection)
         forgetName(of: old)
-        forgetSync(of: old)
         if let problem = await finishLeaving(old, agreed: agreed) { throw problem }
     }
 
@@ -418,7 +418,7 @@ import Observation
 
     private func save(_ key: String, for connection: MarfaConnection) async throws(Problem) {
         do {
-            try await Self.offMain { [keys] in try keys.save(key, for: connection) }
+            try await Self.offMain { [keys] in try keys.save(key, for: connection.address) }
         } catch {
             throw .keyStore(message: Self.message(error))
         }
@@ -485,17 +485,15 @@ import Observation
         let library = MarfaLibrary(
             source: source, notices: notices, history: historian(connection, keys), typeIcons: iconKeeper(connection, keys),
             config: configurer(connection, keys),
-            didSync: { [weak self] date in self?.recordSync(date, for: connection) },
             // Each return to the server may find it renamed. A library the host has left may still be told once more.
             cameOnline: { [weak self] in
                 guard let self, self.connection == connection else { return }
                 readName(of: connection)
             })
         self.library = library
-        if let notice = connection.server(key: "").takePlainHTTPNotice() {
-            notices.tell(Words.plainHTTPTitle, Words.plainHTTP(origin: notice.origin))
+        if let origin = connection.server(key: "").plainHTTPOrigin, Self.toldPlainHTTP.withLock({ $0.insert(origin).inserted }) {
+            notices.tell(Words.plainHTTPTitle, Words.plainHTTP(origin: origin))
         }
-        source.refresh()
         readName(of: connection)
     }
 
@@ -524,18 +522,6 @@ import Observation
         }
     }
 
-    private func recordSync(_ date: Date, for connection: MarfaConnection) {
-        // A library that has been left may still be told once more.
-        guard self.connection == connection else { return }
-        syncedDates[connection.address.absoluteString] = date
-        defaults.set(syncedDates, forKey: Self.syncedKey)
-    }
-
-    private func forgetSync(of connection: MarfaConnection) {
-        guard syncedDates.removeValue(forKey: connection.address.absoluteString) != nil else { return }
-        defaults.set(syncedDates, forKey: Self.syncedKey)
-    }
-
     private func forgetName(of connection: MarfaConnection) {
         instanceNames.removeValue(forKey: connection.address.absoluteString)
         defaults.set(instanceNames, forKey: Self.namesKey)
@@ -550,6 +536,9 @@ import Observation
     static func message(_ error: any Error) -> String {
         error.localizedDescription
     }
+
+    /// The plain http origins the person has been told of in this run, since the package keeps no state.
+    private nonisolated static let toldPlainHTTP = Mutex(Set<String>())
 
     /// The keychain and the disk can each take a while, which the main actor never waits on.
     @concurrent nonisolated static func offMain<T: Sendable>(_ work: @Sendable () throws -> T) async throws -> T {

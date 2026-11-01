@@ -1,7 +1,4 @@
 import Marfa
-import struct MarfaCore.Item
-import struct MarfaCore.Edge
-import struct MarfaCore.ListFilters
 
 /// Reads that can be incomplete during hydration, apart from the copy's queued writes.
 nonisolated protocol MarfaReading: Sendable {

@@ -1,7 +1,6 @@
 import Foundation
 import Marfa
-import struct MarfaCore.Item
-import enum MarfaCore.JsonValue
+import MarfaTesting
 import Observation
 import Synchronization
 import Testing
@@ -223,7 +222,7 @@ extension LiveMarfaTests {
             let made = LiveMarfa.Made()
             let connection = try MarfaConnection(address: try LiveMarfa.address())
             let source = try await MarfaSource.open(
-                connection, keys: MemoryKeyStore([connection: try LiveMarfa.key()]),
+                connection, keys: MemoryKeyStore([connection.address: try LiveMarfa.key()]),
                 location: MarfaStoreLocation(root: root))
             let library = MarfaLibrary(source: source, notices: Notices())
             func end() async {

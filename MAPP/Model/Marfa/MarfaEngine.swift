@@ -1,12 +1,5 @@
 import Foundation
 import Marfa
-import struct MarfaCore.Item
-import struct MarfaCore.Edge
-import struct MarfaCore.Edit
-import struct MarfaCore.Draft
-import struct MarfaCore.ListFilters
-import enum MarfaCore.ItemState
-import enum MarfaCore.JsonValue
 
 /// The one place the source changes what it holds. Writes, the copy's changes and the server's answers arrive on
 /// one stream and are taken one at a time, so a re-read never lands behind an older one. Each step reads or writes
@@ -14,16 +7,16 @@ import enum MarfaCore.JsonValue
 actor MarfaEngine {
     nonisolated enum Event: Sendable {
         case paint
-        case fillProgress(CheckedContinuation<Void, Never>)
         case write(ItemWrite, WriteID)
         /// A write of an undo or a redo, held where the copy refuses it for being brought up to date (`MarfaEngine+Holding`).
         case undo(ItemWrite, WriteID, UndoGroup)
         /// The time a held undo may wait has passed.
         case holdExpired(UndoGroup)
-        /// The follow heard changes of the copy, kept in `heard` until they are taken together.
-        case heard
-        /// Resumed once the answers are taken and forgotten.
-        case drained(DrainReport, CheckedContinuation<Void, Never>)
+        /// What the copy said changed (`WorkingCopy.updates()`); resumed once it is read, so the package coalesces
+        /// what arrives meanwhile.
+        case update(CopyUpdate, CheckedContinuation<Void, Never>)
+        /// A drain ended: the answers the copy recorded are taken, and this is resumed once they are told.
+        case answers(CheckedContinuation<Void, Never>)
         case failed(SourceFailure)
         case flush(CheckedContinuation<Void, Never>)
         case close(CheckedContinuation<Void, Never>)
@@ -114,8 +107,6 @@ actor MarfaEngine {
     let reading: any MarfaReading
     let hub: MarfaHub
     let tell: @Sendable (Event) -> Bool
-    /// What the follow heard and this engine has not yet taken.
-    nonisolated let heard = MarfaFollow.Heard()
     var catalogue = Catalogue()
     /// The library's rows: every row the copy holds but the `system.*` ones (`MarfaMapping.isLibraryItem`).
     var rows: [String: Marfa.Item] = [:]
@@ -132,14 +123,14 @@ actor MarfaEngine {
     var queue: [Marfa.QueuedWrite] = []
     var syncStates: [ItemID: SyncState] = [:]
     var changedSync: Set<ItemID> = []
-    /// Refusals and conflicts answered, which the queue forgets unless the write carried content, kept until a later
-    /// write of the same kind, or an edit, is accepted or merged. Answers already in the queue at launch, from a
-    /// launch that closed before forgetting them, are taken in at the first read of the queue.
+    /// Refusals and conflicts answered, which the copy clears when it hands the answers over (`Queue.takeAnswered`)
+    /// unless the write carried content, kept until a later write of the same kind, or an edit, is accepted or
+    /// merged. Answers recorded before this launch are taken in at the first update.
     var remembered: [ItemID: (state: SyncState, kind: WriteKind)] = [:]
     var readQueueOnce = false
     /// Until the queue is first read, nothing can be said of what waits.
     var queueRead = false
-    /// Refused writes as last read, kept once the queue forgets those that carried no content, so each stays
+    /// Refused writes as last read, kept once the copy clears those that carried no content, so each stays
     /// before the person until they discard it or a later write of its kind lands.
     var refusals: [String: Marfa.QueuedWrite] = [:]
     /// The item each conflicted copy was made from, as its verdict named it, which is known before the copy's link has reached the copy.
@@ -164,10 +155,12 @@ actor MarfaEngine {
     var ownText: [ItemID: OwnText] = [:]
     /// Answered writes already taken into `ownText`, so none is counted twice.
     var counted: Set<String> = []
-    /// Writes with an answer this engine has taken and the copy has not yet forgotten. Only these are forgotten: a
-    /// drain the copy runs itself may have recorded others since, which their own report brings here. Only a verdict
-    /// the copy can forget is kept here; a blocked or dead write stays in the queue to be released, and keeps its id.
-    var takenAnswers: Set<String> = []
+    /// Answers to the person's creates and updates that the copy has cleared (`Queue.takeAnswered`) and the text of
+    /// their item has not yet been counted past, so the queue is read with them (`queueWithAnswers`).
+    var answeredHeld: [String: Marfa.QueuedWrite] = [:]
+    /// Writes the copy keeps with a verdict (a refused write that carried content, a blocked or a dead one), whose
+    /// verdict the app's write has been told, so each is told once.
+    var told: Set<String> = []
     /// Writes of an undo or a redo that the copy refused while it was brought up to date, in the order they were
     /// made, until the copy is whole.
     var held: [Held] = []
@@ -179,20 +172,19 @@ actor MarfaEngine {
         return .seconds(30)
     }
 
-    nonisolated static func canForget(_ verdict: Marfa.Verdict) -> Bool {
-        switch verdict {
-        case .accepted, .merged, .conflicted, .refused: true
-        case .blocked, .dead: false
-        }
-    }
     /// Edits queued as read on a version older than the copy held, whose answer lands on whatever the server held.
     var sentAsRead: Set<String> = []
-    var following: Task<Void, Never>?
     var painted = false
+    /// Whether the package's first update, which always asks to read everything, has been taken.
+    var tookFirstUpdate = false
     /// Where the copy's changes are next read from (`readChanged`). The rows and edges held agree with the copy at
     /// this point for every row and edge the copy has not named as changed since; nil until a whole read takes one,
     /// and after a whole read that could not read every row's links.
     var cursor: ChangeCursor?
+    /// Whether the last update carried a fill, and what connection it named, so the copy's status is read again only
+    /// when a fill ended or the connection changed, not for each local write.
+    var lastUpdateFilled = false
+    var lastConnection: CopyConnection?
     /// When a hydration's progress may next read the copy whole (`takeFillProgress`).
     var fillReadAllowed = ContinuousClock.now
     private var closed = false
@@ -244,9 +236,9 @@ actor MarfaEngine {
                 hub.publish(.answered(id, .refused(SyncProblem(code: Self.closedCode, message: Self.notKept))))
             }
             if case .flush(let done) = event { done.resume() }
-            if case .fillProgress(let done) = event { done.resume() }
             if case .close(let done) = event { done.resume() }
-            if case .drained(_, let taken) = event { taken.resume() }
+            if case .update(_, let done) = event { done.resume() }
+            if case .answers(let done) = event { done.resume() }
             if case .discard(_, let done) = event { done.resume(returning: .success(false)) }
             if case .release(_, let done) = event { done.resume(returning: .success(false)) }
             if case .unsent(let done) = event { done.resume(returning: nil) }
@@ -272,13 +264,15 @@ actor MarfaEngine {
         }
         switch event {
         case .paint: await paint()
-        case .fillProgress(let done):
-            await takeFillProgress()
-            done.resume()
         case .write(let write, let id): await perform(write, as: id)
         case .undo(let write, let id, let group): await perform(write, as: id, holding: group)
         case .holdExpired(let group): expire(group)
-        case .heard: await takeHeard()
+        case .update(let update, let done):
+            await take(update: update)
+            done.resume()
+        case .answers(let done):
+            await takeAnswers()
+            done.resume()
         case .binned(let found, let complete): take(bin: found, complete: complete)
         case .answer(let write, let outcome): hub.publish(.answered(write, outcome))
         case .attach(let file, let item, let done): attach(file, to: item, answering: done)
@@ -288,9 +282,6 @@ actor MarfaEngine {
             done.resume(returning: await take(attached: result, to: item, title: title, token: token))
         case .addedFile(let result, let parent, let token, let done):
             done.resume(returning: await take(added: result, under: parent, token: token))
-        case .drained(let report, let taken):
-            await answer(report)
-            taken.resume()
         case .failed(let failure):
             failures.append(failure)
             publish([])
@@ -321,7 +312,7 @@ actor MarfaEngine {
     /// Read from the queue itself, since the last report can hold a count from before a read that failed.
     private func unsentWrites() async -> UnsentWrites? {
         await besideTheLaneQueued()
-        guard let queue = try? await Self.asking(hub, { try await copy.queue.all() }) else { return nil }
+        guard let queue = try? await Self.asking({ try await copy.queue.all() }) else { return nil }
         let named = Set(queue.compactMap(\.itemId))
         let types = Dictionary(uniqueKeysWithValues: named.compactMap { id in rows[id].map { (id, TypeID($0.type)) } })
         return UnsentWrites(
@@ -335,29 +326,26 @@ actor MarfaEngine {
             hub.publish(.answered(entry.id, .refused(SyncProblem(code: Self.closedCode, message: Self.notKept))))
         }
         held = []
-        following?.cancel()
         await sync.stop()
         await downloads.stop()
         await copy.close()
     }
 
-    /// The package refuses every call while the copy changes its key, as `invalid`, and asks for it again; that
-    /// is a wait, never a refusal or a failure to show. Any other `invalid` is passed on.
-    nonisolated static func asking<T>(_ hub: MarfaHub, _ work: () async throws -> T) async throws -> T {
+    /// The package refuses every call while the copy changes its key (`keyChanging`) and asks for it again; that
+    /// is a wait, never a refusal or a failure to show.
+    nonisolated static func asking<T>(_ work: () async throws -> T) async throws -> T {
         while true {
-            let mark = hub.keyChanges
             do {
                 return try await work()
-            } catch let error as MarfaError {
-                guard case .invalid = error, hub.keyChanged(since: mark) else { throw error }
+            } catch MarfaError.keyChanging {
                 // Throws once the task is cancelled, which ends the asking.
                 try await Task.sleep(for: .milliseconds(20))
             }
         }
     }
 
-    /// A read the copy refuses while a hydration is under way is no failure to tell: the copy says `.refreshed` when
-    /// the hydration ends, and the engine reads it all again then. A source move hydrates a large library again
+    /// A read the copy refuses while a hydration is under way is no failure to tell: the copy's next update
+    /// asks for everything when the hydration ends, and the engine reads it all again then. A source move hydrates a large library again
     /// after every move, so telling it would put up an alert after an ordinary change of parent.
     func readFailed(_ error: any Error) {
         if case MarfaError.hydrationIncomplete = error { return }

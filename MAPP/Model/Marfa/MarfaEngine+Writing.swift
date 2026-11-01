@@ -24,7 +24,7 @@ extension MarfaEngine {
             #endif
             var touched: Set<String>
             if case .create(let itemID, let draft) = write {
-                let created = try await Self.asking(hub) { try await create(itemID, draft) }
+                let created = try await Self.asking { try await create(itemID, draft) }
                 record(id, [created])
                 touched = [itemID.rawValue]
                 if let parent = draft.parent {
@@ -43,7 +43,7 @@ extension MarfaEngine {
                     if let edge = edges[edgeID.rawValue] { ends.formUnion([edge.sourceId, edge.targetId]) }
                 default: break
                 }
-                let queued = try await Self.asking(hub) { try await queue(write) }
+                let queued = try await Self.asking { try await queue(write) }
                 record(id, queued)
                 if case .moveEdge = write { for written in queued { movedEnds[written.id] = ends } }
                 touched = ends.union(queued.flatMap { [$0.itemId, $0.targetId].compactMap(\.self) })
@@ -213,7 +213,7 @@ extension MarfaEngine {
     /// trying the create again makes no second item.
     func place(_ child: ItemID, under parent: ItemID) async {
         do {
-            _ = try await Self.asking(hub) {
+            _ = try await Self.asking {
                 try await copy.edges.create(from: parent.rawValue, to: child.rawValue, type: MarfaMapping.parentEdge)
             }
         } catch {
@@ -232,8 +232,10 @@ extension MarfaEngine {
             await sync.flush()
             let outcome: WriteOutcome
             do {
-                try await Self.asking(hub) { try await copy.items.purge(id.rawValue, version: version.rawValue) }
+                try await Self.asking { try await copy.items.purge(id.rawValue, version: version.rawValue) }
                 outcome = .accepted
+                // The bin is the server's to say, and the copy never held the item.
+                await sync.binChanged()
             } catch let error as MarfaError {
                 outcome = .refused(Self.problem(for: error))
             } catch {

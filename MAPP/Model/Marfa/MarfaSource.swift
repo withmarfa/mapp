@@ -1,10 +1,5 @@
 import Foundation
 import Marfa
-import struct MarfaCore.Item
-import struct MarfaCore.ListFilters
-import struct MarfaCore.SearchFilters
-import struct MarfaCore.SearchHit
-import enum MarfaCore.ItemState
 import Synchronization
 import UniformTypeIdentifiers
 
@@ -51,9 +46,9 @@ nonisolated enum MarfaConnectionState: Hashable, Sendable {
     /// The server refused the key, or it lacks what reading the library needs. Writes wait until the person gives
     /// another in Settings.
     case keyRefused
-    /// The copy cannot be opened, or following the server stopped; the message is the package's. A stopped follow
-    /// stays stopped until a refresh: one a failed follow waits for, and one the engine makes when the core ended
-    /// the stream on a fault and a new one is taken. The copy still reads and queues.
+    /// The copy cannot be opened, or the sync stopped on a fault that asking again may not clear, such as a copy made
+    /// for another server; the message is the package's. It stays until the package follows the server again or a
+    /// refresh succeeds. The copy still reads and queues.
     case unavailable(message: String)
     /// A different version of the app made the copy, so this one can't open it, and leaves it as it is. The
     /// changes in it that the server has not taken (`unsent`, never 0, and nil where that can't be read) can
@@ -96,7 +91,15 @@ nonisolated final class MarfaSource: ItemSource {
     @concurrent static func open(
         _ connection: MarfaConnection, keys: any KeyStore, location: MarfaStoreLocation
     ) async throws -> MarfaSource {
-        guard let key = try keys.key(for: connection) else {
+        let key: String?
+        do {
+            key = try keys.key(for: connection.address)
+        } catch {
+            // A key the Keychain would not give is neither missing nor refused: the person is told that, and the
+            // key is left where it is.
+            throw SourceFailure(kind: .failed, message: Words.keyUnreadable)
+        }
+        guard let key else {
             throw SourceFailure(kind: .denied, message: String(localized: "There’s no key for this Marfa server."))
         }
         try FileManager.default.createDirectory(at: location.directory(for: connection), withIntermediateDirectories: true)
@@ -121,26 +124,14 @@ nonisolated final class MarfaSource: ItemSource {
     }
 
     /// The package refuses a copy a different version of the app made, removing nothing, with the count of changes
-    /// in it the server has not taken. With none, the copy holds only what the server holds, so the package
-    /// replaces it with an empty one, keeping the files it downloaded, and the new copy hydrates from the server.
-    /// The package refuses the replacement while another process writes the copy or a change arrives in it. With
-    /// any changes, or where the count can't be read, only that version can send them, and the person is told.
+    /// in it the server has not taken. With none, the copy holds only what the server holds, so `.replace` makes
+    /// an empty one, keeping the files it downloaded, and the new copy hydrates from the server. With any changes
+    /// it refuses with that count (`wrongSchema`), and only that version can send them, so the person is told.
     private static func openCopy(
         _ connection: MarfaConnection, key: String, location: MarfaStoreLocation
     ) async throws -> WorkingCopy {
-        let store = location.store(for: connection)
-        do {
-            return try await WorkingCopy.open(store: store, server: connection.server(key: key))
-        } catch MarfaError.wrongSchema(_, _, 0?, _) {
-            do {
-                return try await WorkingCopy.replaceRefused(store: store, server: connection.server(key: key))
-            } catch let error as MarfaError {
-                switch error {
-                case .wrongSchema, .readingHandle: throw error
-                default: throw SourceFailure(kind: .failed, message: Words.notReplaced)
-                }
-            }
-        }
+        try await WorkingCopy.open(
+            store: location.store(for: connection), server: connection.server(key: key), ifRefused: .replace)
     }
 
     func changes() -> AsyncStream<SourceChange> {
@@ -199,7 +190,7 @@ nonisolated final class MarfaSource: ItemSource {
             // It reads the server, so it runs beside the engine rather than holding up the writes behind it; the
             // copy announces the withdrawal, which the engine reads again.
             do {
-                return try await MarfaEngine.asking(hub) { try await copy.queue.withdraw(id) }
+                return try await MarfaEngine.asking { try await copy.queue.withdraw(id) }
             } catch let error as MarfaError {
                 throw SourceFailure(kind: .failed, message: error.message)
             }
@@ -236,7 +227,7 @@ nonisolated final class MarfaSource: ItemSource {
         }
         let name = Self.keptName(title: row.title, mimeType: row.properties[MarfaMapping.mimeTypeField]?.string)
         do {
-            return try await MarfaEngine.asking(hub) {
+            return try await MarfaEngine.asking {
                 try await copy.blobs.withFile(hash) { try await Self.keptCopy(of: $0, hash: hash, name: name) }
             }
         } catch let error as MarfaError {
@@ -248,8 +239,8 @@ nonisolated final class MarfaSource: ItemSource {
 
     /// Why a file couldn't be had, in the person's words where the package's would only be technical.
     static func fetchFailure(_ error: MarfaError) -> String {
-        switch error {
-        case .network, .noConnection: String(localized: "This file isn’t on this Mac, and the Marfa server can’t be reached.")
+        if error.isOffline { return String(localized: "This file isn’t on this Mac, and the Marfa server can’t be reached.") }
+        return switch error {
         case .noRoom, .storageFull: String(localized: "This Mac doesn’t have enough space to download this file.")
         case .bytesAbsent: String(localized: "The Marfa server doesn’t have this file’s contents.")
         default: error.message
@@ -301,7 +292,7 @@ nonisolated final class MarfaSource: ItemSource {
     /// Read from the copy alone, so a view lists only what the copy holds, which is every item the library holds.
     func items(inView view: ItemID) async throws -> [ItemID] {
         do {
-            return try await MarfaEngine.asking(hub) { try await engine.reading.items(inView: view.rawValue) }
+            return try await MarfaEngine.asking { try await engine.reading.items(inView: view.rawValue) }
                 .filter(MarfaMapping.isLibraryItem).map { ItemID($0.id) }
         } catch {
             throw MarfaEngine.failure(error)
@@ -325,7 +316,7 @@ nonisolated final class MarfaSource: ItemSource {
 
     func deleteView(_ view: ItemID, idempotencyKey: String) async throws {
         do {
-            try await MarfaEngine.asking(hub) { try await copy.deleteView(view.rawValue, idempotencyKey: idempotencyKey) }
+            try await MarfaEngine.asking { try await copy.deleteView(view.rawValue, idempotencyKey: idempotencyKey) }
         } catch {
             throw MarfaMapping.viewFailure(error)
         }
@@ -335,7 +326,7 @@ nonisolated final class MarfaSource: ItemSource {
     private func writingView(_ write: () async throws -> SavedView) async throws -> LibraryView {
         let saved: SavedView
         do {
-            saved = try await MarfaEngine.asking(hub, write)
+            saved = try await MarfaEngine.asking(write)
         } catch {
             throw MarfaMapping.viewFailure(error)
         }
@@ -346,8 +337,7 @@ nonisolated final class MarfaSource: ItemSource {
     }
 
     /// Narrowed to `target` by the copy, which matches and ranks as the server does and cuts each hit's excerpt.
-    /// The package filters one type at a time and one state at a time, so the rest is narrowed by what the copy
-    /// holds.
+    /// The package filters up to ten types and any states, so the rest is narrowed by what the copy holds.
     func search(_ text: String, in target: SearchTarget) async throws -> SourceSearch {
         let limit = SearchResults.limit
         let found: Rows<SearchHit>
@@ -358,16 +348,18 @@ nonisolated final class MarfaSource: ItemSource {
                 var filters = SearchFilters(
                     tier: itemQuery.tier.map(MarfaMapping.marfaTier), tags: itemQuery.tags.sorted(), filter: filter,
                     beneath: itemQuery.beneath?.rawValue)
-                if itemQuery.types.count == 1, itemQuery.includesSubtypes { filters.type = itemQuery.types.first?.rawValue }
-                if itemQuery.states.count == 1, let state = itemQuery.states.first {
-                    filters.state = MarfaMapping.marfaState(state)
-                } else {
+                if (1...10).contains(itemQuery.types.count), itemQuery.includesSubtypes {
+                    filters.types = Set(itemQuery.types.map(\.rawValue))
+                }
+                if itemQuery.states.isEmpty {
                     filters.allStates = true
+                } else {
+                    filters.states = Set(itemQuery.states.map(MarfaMapping.marfaState))
                 }
                 query = itemQuery
-                found = try await MarfaEngine.asking(hub) { try await copy.search(text, filters: filters, limit: limit) }
+                found = try await MarfaEngine.asking { try await copy.search(text, filters: filters, limit: limit) }
             case .view(let view):
-                found = try await MarfaEngine.asking(hub) { try await copy.search(text, inView: view.rawValue, limit: limit) }
+                found = try await MarfaEngine.asking { try await copy.search(text, inView: view.rawValue, limit: limit) }
             }
         } catch {
             throw MarfaEngine.failure(error)
@@ -437,9 +429,9 @@ nonisolated final class MarfaSource: ItemSource {
     /// the server's bin gave.
     private func row(_ id: ItemID) async throws -> Marfa.Item {
         do {
-            let row = try await MarfaEngine.asking(hub) { () async throws -> Marfa.Item? in
+            let row = try await MarfaEngine.asking { () async throws -> Marfa.Item? in
                 if let row = try await copy.items.get(id.rawValue) { return row }
-                return try await copy.items.list(ListFilters(state: .trashed)).first { $0.id == id.rawValue }
+                return try await copy.items.list(ListFilters(states: [.trashed])).first { $0.id == id.rawValue }
             }
             if let row = row ?? hub.binnedRow(id.rawValue) { return row }
         } catch let error as MarfaError {
@@ -527,7 +519,6 @@ nonisolated final class MarfaHub: Sendable {
     private let state = Mutex(State())
     /// What the engine is doing, readable without awaiting it.
     let activity = EngineActivity()
-    private let keyChange = Mutex((changing: false, count: 0))
     private let connectionState = Latest(MarfaConnectionState.connecting)
     let report = Latest(SyncReport())
     /// The rows of the server's bin that the copy does not hold, for the readers of their text.
@@ -535,20 +526,6 @@ nonisolated final class MarfaHub: Sendable {
 
     var connection: MarfaConnectionState { connectionState.value }
 
-    /// Counts each start and end of a change of key, so a call refused during one is told from one refused for
-    /// its own sake.
-    var keyChanges: Int { keyChange.withLock { $0.count } }
-
-    func keyChanged(since mark: Int) -> Bool {
-        keyChange.withLock { $0.changing || $0.count != mark }
-    }
-
-    func changingKey(_ changing: Bool) {
-        keyChange.withLock {
-            $0.changing = changing
-            $0.count += 1
-        }
-    }
     func setBinned(_ rows: [String: Marfa.Item]) {
         bin.withLock { $0 = rows }
     }

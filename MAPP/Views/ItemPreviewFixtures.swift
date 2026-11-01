@@ -1,5 +1,6 @@
 #if DEBUG
 import Marfa
+import MarfaTesting
 import SwiftUI
 
 /// Fixed values and a library held in memory by the sample's fake working copy, so canvas edits reach no server.

@@ -1,6 +1,5 @@
 import Foundation
 import Marfa
-import struct MarfaCore.Draft
 import Synchronization
 import Testing
 @testable import MAPP
@@ -35,8 +34,8 @@ import Testing
         #expect(host.connection == first)
         #expect(host.source === old)
         #expect(bench.hasCopy(first))
-        #expect(bench.keys.key(for: first) == "one")
-        #expect(bench.keys.key(for: second) == nil)
+        #expect(try bench.keys.key(for: first.address) == "one")
+        #expect(try bench.keys.key(for: second.address) == nil)
         #expect(!old.calls.contains("close"))
         #expect(bench.servers.opened.count == 2)
         #expect(bench.servers.last?.calls.last == "close")
@@ -51,7 +50,7 @@ import Testing
             try await host.disconnect(.keepCopy)
             Issue.record("said the key was removed")
         } catch {}
-        #expect(bench.keys.key(for: first) == "k")
+        #expect(try bench.keys.key(for: first.address) == "k")
     }
 
     /// A copy the person chose to discard, which could not be removed, is never opened again as it was.
@@ -77,18 +76,16 @@ import Testing
 
     @Test
     func aRetryInACancelledTaskStops() async throws {
-        let hub = MarfaHub()
-        hub.changingKey(true)
         let attempts = Mutex(0)
         let task = Task {
             withUnsafeCurrentTask { $0?.cancel() }
-            return try await MarfaEngine.asking(hub) { () async throws -> Int in
+            return try await MarfaEngine.asking { () async throws -> Int in
                 let count = attempts.withLock { count in
                     count += 1
                     return count
                 }
                 if count >= 10_000 { return count }
-                throw MarfaError.invalid(message: "this working copy is changing its key; ask again")
+                throw MarfaError.keyChanging(message: "this working copy is changing its key; ask again")
             }
         }
         let result = await task.result
@@ -112,10 +109,10 @@ import Testing
             try await host.replaceKey("typo")
             Issue.record("took a key the server refuses")
         } catch {}
-        #expect(source.calls == ["refresh", "tryKey typo", "tryKey good", "close"])
+        #expect(source.calls == ["tryKey typo", "tryKey good", "close"])
         #expect(bench.servers.opened.count == 2)
         #expect(host.source === bench.servers.last)
-        #expect(bench.keys.key(for: first) == "good")
+        #expect(try bench.keys.key(for: first.address) == "good")
     }
 
     /// The copy is marked discarded before anything is removed, so a launch after a crash part way never sends

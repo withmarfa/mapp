@@ -1,8 +1,5 @@
 import Foundation
 import Marfa
-import enum MarfaCore.ItemState
-import enum MarfaCore.Tier
-import struct MarfaCore.Item
 import Testing
 @testable import MAPP
 

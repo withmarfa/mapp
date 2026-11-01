@@ -1,7 +1,6 @@
 import Foundation
 import Marfa
 import Synchronization
-import struct MarfaCore.Edit
 import Testing
 @testable import MAPP
 

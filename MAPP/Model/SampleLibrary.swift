@@ -2,7 +2,6 @@
 import Foundation
 import Marfa
 import MarfaTesting
-import struct MarfaCore.KeptFetch
 
 /// A Marfa library to try the app with, held in memory by marfa-swift's fake working copy, for the UI tests and
 /// screenshots. A debug build launched with `-MAPPSampleLibrary` connects to it as if to a server. Nothing ships

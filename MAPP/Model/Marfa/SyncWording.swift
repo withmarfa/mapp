@@ -183,9 +183,25 @@ nonisolated enum Words {
         String(localized: "Your key is sent to \(origin) without encryption, so anyone on the network can read it. Use an https address unless this network is private.")
     }
 
-    /// A copy a different version made, holding nothing unsent, that the package couldn't replace.
-    static var notReplaced: String {
-        String(localized: "A different version of MAPP made it, and MAPP couldn’t replace it with a new one. Quit and reopen MAPP to try again.")
+    /// The Keychain would not give the key, which is not the same as there being none or the server refusing it.
+    static var keyUnreadable: String {
+        String(localized: "MAPP couldn’t read this library’s key from the Keychain. Unlock the Keychain and quit and reopen MAPP, or enter the key again in Settings.")
+    }
+
+    /// The address now reaches another Marfa server than the one this copy was made for, so nothing in the copy is
+    /// sent there. The count is of the changes the copy holds that no server has taken; `nil` where it can't be read.
+    static func otherServer(unsent: UInt64?) -> String {
+        let lead = String(localized: "This address now reaches a different Marfa server from the one this copy of your library was made for, so MAPP has stopped syncing it.")
+        let way = String(localized: "To start a new copy from this server, choose Disconnect in Settings, then connect again.")
+        switch unsent {
+        case let count? where count > 0:
+            return [lead, notSent(Int(clamping: count)), way].joined(separator: " ")
+        case 0?:
+            return [lead, way].joined(separator: " ")
+        default:
+            return [lead, String(localized: "MAPP can’t tell whether this copy holds changes that haven’t reached a server."), way]
+                .joined(separator: " ")
+        }
     }
 }
 
@@ -260,6 +276,7 @@ nonisolated struct ProblemWording: Hashable, Sendable {
             case .keySpent: String(localized: "The server stopped this change from going through. Try again to send it.")
             case .ancestorUnavailable: String(localized: "It depends on an item that isn’t available any more. Undoing it puts the item back as the server has it.")
             case .conflictUnresolved: String(localized: "It can’t be applied until a conflict on the item is settled. Undoing it puts the item back as the server has it.")
+            case .instanceChanged: String(localized: "This change was made for a library the server no longer holds as it was. Try again to send it to the library as it is now, or undo it to put the item back as the server has it.")
             case .failingAlone: String(localized: "This change couldn’t be sent on its own, although the server took other changes. Try again to send it, or undo it to put the item back as the server has it.")
             }
         case .dead:

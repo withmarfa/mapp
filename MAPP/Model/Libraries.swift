@@ -1,4 +1,6 @@
 import Foundation
+import Marfa
+import MarfaTesting
 import Observation
 import os
 
@@ -198,13 +200,13 @@ import os
             if let address = environment["MAPP_TEST_MARFA_URL"], let connection = try? MarfaConnection(address: address),
                 let key = environment["MAPP_TEST_MARFA_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty
             {
-                let host = MarfaHost(defaults: defaults, keys: MemoryKeyStore([connection: key]), location: location(root: root))
+                let host = MarfaHost(defaults: defaults, keys: MemoryKeyStore([connection.address: key]), location: location(root: root))
                 host.presetTestServer(connection)
                 return Libraries(host: host, defaults: defaults)
             }
             let sample = SampleLibrary.connection
             let host = MarfaHost(
-                defaults: defaults, keys: MemoryKeyStore([sample: "sample"]), location: location(root: root),
+                defaults: defaults, keys: MemoryKeyStore([sample.address: "sample"]), location: location(root: root),
                 opener: { connection, _, _ in SampleLibrary.open(connection) },
                 describer: { _ in SampleLibrary.name },
                 historian: { _, _ in nil }, configurer: { _, _ in nil })

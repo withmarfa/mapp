@@ -53,14 +53,14 @@ extension MarfaEngine {
         func waiting(_ queue: [Marfa.QueuedWrite]) -> Bool {
             queue.contains { $0.itemId == id.rawValue && [.createItem, .updateItem].contains($0.kind) && $0.verdict == nil }
         }
-        var queue = try await copy.queue.all()
+        var queue = try await queueWithAnswers()
         try await count(answers: queue, for: id)
         if let own = ownText[id], try await heldVersion(id) > own.on, waiting(queue) {
             let clock = ContinuousClock()
             let end = clock.now + .seconds(2)
             while waiting(queue), clock.now < end {
                 try await Task.sleep(for: .milliseconds(50))
-                queue = try await copy.queue.all()
+                queue = try await queueWithAnswers()
             }
             try await count(answers: queue, for: id)
         }
@@ -102,7 +102,7 @@ extension MarfaEngine {
     }
 
     func answeredWrites(of id: ItemID) async throws -> [String] {
-        try await copy.queue.all().filter { $0.itemId == id.rawValue && $0.verdict != nil }.map(\.id)
+        try await queueWithAnswers().filter { $0.itemId == id.rawValue && $0.verdict != nil }.map(\.id)
     }
 
     private func heldVersion(_ id: ItemID) async throws -> Int64 {

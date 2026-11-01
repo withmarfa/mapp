@@ -86,11 +86,18 @@ actor MarfaDownloads: DownloadedFiles {
             await hooks.removing.current?()
             #endif
         } catch {
-            _ = try await copy.blobs.setBudget(setting)
+            try await restore(setting)
             throw error
         }
-        _ = try await copy.blobs.setBudget(setting)
+        try await restore(setting)
         await MarfaSource.removeKeptCopies()
+    }
+
+    /// The package refuses a call made from a canceled task, so the saved budget is put back from a task of its own:
+    /// a removal that is canceled partway must not leave the temporary zero in the store.
+    private func restore(_ setting: FileBudget) async throws {
+        let blobs = copy.blobs
+        _ = try await Task { try await blobs.setBudget(setting) }.value
     }
 
     /// Replacing the key also drops the core, so it cannot interrupt a budget restore.

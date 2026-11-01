@@ -1,6 +1,5 @@
 import Foundation
 import Marfa
-import struct MarfaCore.Draft
 import Synchronization
 import Testing
 @testable import MAPP
@@ -46,7 +45,7 @@ import Testing
 
         await model.connect()
         #expect(model.host.connection == first)
-        #expect(bench.keys.key(for: first) == "key-1")
+        #expect(try bench.keys.key(for: first.address) == "key-1")
         #expect(model.key == "", "the key is never shown again")
         #expect(model.address == "")
         #expect(model.notice == nil)
@@ -76,7 +75,7 @@ import Testing
         #expect(notice.title == "Can’t Open the Library")
         #expect(notice.message == "The copy of your library on this Mac can’t be opened. The store is damaged.")
         #expect(!model.isConnected)
-        #expect(bench.keys.key(for: first) == nil, "a key for a server that did not open is not kept")
+        #expect(try bench.keys.key(for: first.address) == nil, "a key for a server that did not open is not kept")
     }
 
     @Test(arguments: [
@@ -114,8 +113,8 @@ import Testing
         model.host.handOverEdits = { seen.append(source.calls); return true }
         model.newKey = "key-2"
         await model.replaceKey()
-        #expect(seen == [["refresh", "tryKey key-2"]])
-        #expect(source.calls == ["refresh", "tryKey key-2", "close"])
+        #expect(seen == [["tryKey key-2"]])
+        #expect(source.calls == ["tryKey key-2", "close"])
     }
 
     // MARK: Forgetting a new key the host holds
@@ -132,7 +131,7 @@ import Testing
         model.newKey = "key-2"
         await model.replaceKey()
 
-        #expect(bench.keys.key(for: first) == "key-2")
+        #expect(try bench.keys.key(for: first.address) == "key-2")
         #expect(model.host.source != nil)
         #expect(model.newKey == "", "the host holds the key, so the form does not")
         #expect(model.notice?.title == "Can’t Check the Key")
@@ -149,7 +148,7 @@ import Testing
         model.newKey = "key-2"
         await model.replaceKey()
 
-        #expect(bench.keys.key(for: first) == "key-1")
+        #expect(try bench.keys.key(for: first.address) == "key-1")
         #expect(model.newKey == "key-2")
         #expect(model.notice?.title == "Can’t Use the New Key")
         #expect(model.notice?.message == "MAPP couldn’t try the new key, so your library opened again with the key you had. Try again. The copy closed.")
@@ -167,7 +166,7 @@ import Testing
 
         model.newKey = "key-2"
         await model.replaceKey()
-        #expect(bench.keys.key(for: first) == "key-2")
+        #expect(try bench.keys.key(for: first.address) == "key-2")
         #expect(model.newKey == "")
         #expect(model.notice?.title == "Can’t Open the Library")
         #expect(model.notice?.message == "MAPP kept the new key, but the copy of your library on this Mac can’t be opened. The store is damaged.")
@@ -217,7 +216,7 @@ import Testing
         await model.disconnect()
         #expect(!model.isConnected)
         #expect(!bench.hasCopy(first))
-        #expect(bench.keys.key(for: first) == nil)
+        #expect(try bench.keys.key(for: first.address) == nil)
         #expect(model.departure == nil)
         #expect(flushed.count == before + 1)
     }
@@ -258,7 +257,7 @@ import Testing
         #expect(model.departure == nil)
         #expect(!model.isConnected)
         #expect(bench.hasCopy(first))
-        #expect(bench.keys.key(for: first) == nil, "the key goes, the copy stays")
+        #expect(try bench.keys.key(for: first.address) == nil, "the key goes, the copy stays")
     }
 
     @Test func discardingPassesTheChangesThePersonWasShownAndRemovesTheCopy() async throws {
@@ -333,7 +332,7 @@ import Testing
         #expect(model.departure == nil)
         #expect(model.isConnected)
         #expect(model.host.source != nil)
-        #expect(bench.keys.key(for: first) == "key-1")
+        #expect(try bench.keys.key(for: first.address) == "key-1")
         #expect(bench.hasCopy(first))
     }
 
@@ -378,7 +377,7 @@ import Testing
         await model.replaceKey()
         #expect(model.notice == nil)
         #expect(model.newKey == "")
-        #expect(bench.keys.key(for: first) == "key-2")
+        #expect(try bench.keys.key(for: first.address) == "key-2")
     }
 
     @Test func aRefusedKeyCanBeLeftByDisconnectingAndStartingAgain() async throws {
@@ -393,7 +392,7 @@ import Testing
         #expect(model.isConfirmingDisconnect)
         await model.disconnect()
         #expect(model.host.configuredConnection == nil, "the connect page is back")
-        #expect(bench.keys.key(for: first) == nil)
+        #expect(try bench.keys.key(for: first.address) == nil)
         #expect(bench.savedAddress == nil)
     }
 
@@ -406,7 +405,7 @@ import Testing
         model.newKey = "bad"
         await model.replaceKey()
         #expect(model.notice?.title == "Key refused")
-        #expect(bench.keys.key(for: first) == "key-1")
+        #expect(try bench.keys.key(for: first.address) == "key-1")
         #expect(model.newKey == "bad", "what was typed is kept for another try")
     }
 

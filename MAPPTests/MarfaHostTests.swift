@@ -1,6 +1,5 @@
 import Foundation
 import Marfa
-import struct MarfaCore.Draft
 import Synchronization
 import Testing
 @testable import MAPP
@@ -25,11 +24,11 @@ import Testing
         try await host.connect(address: " HTTP://First.test:8210/ ", key: " key-1 ")
         #expect(host.connection == first)
         #expect(bench.savedAddress == "http://first.test:8210")
-        #expect(bench.keys.key(for: first) == "key-1")
+        #expect(try bench.keys.key(for: first.address) == "key-1")
         let source = try #require(bench.servers.last)
         #expect(host.source === source)
         #expect(host.state == .connecting)
-        #expect(source.calls == ["refresh"])
+        #expect(source.calls == [])
         source.state.set(.online)
         #expect(await eventually { host.state == .online })
         source.state.set(.offline(reason: "network: refused"))
@@ -65,7 +64,7 @@ import Testing
     }
 
     /// A key sent over plain http to another machine can be read on the way, so the person is told, once in a run
-    /// for each address, including one switched to. The package remembers each address for the whole test run, so
+    /// for each address, including one switched to. The host remembers each address for the whole process, so
     /// these are made up for this test.
     @Test func aPlainHTTPAddressOnAnotherMachineIsToldOnce() async throws {
         let address = "http://plain-\(UUID().uuidString.lowercased()).test:8210"
@@ -123,7 +122,7 @@ import Testing
         #expect(host.state == .disconnected)
         #expect(host.connection == nil)
         #expect(bench.savedAddress == nil)
-        #expect(bench.keys.key(for: first) == nil)
+        #expect(try bench.keys.key(for: first.address) == nil)
     }
 
     /// The copy stays on disk and the person decides: keeping it loses nothing, and a discard needs the answer to
@@ -131,7 +130,7 @@ import Testing
     @Test func aCopyADifferentVersionMadeKeepsItsChangesUntilThePersonChooses() async throws {
         let bench = try HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
-        bench.keys.save("k", for: first)
+        try bench.keys.save("k", for: first.address)
         try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
         bench.servers.failure.withLock { $0 = SourceFailure(kind: .otherVersion(unsent: 3), message: "The package’s words.") }
         let host = bench.host()
@@ -145,18 +144,18 @@ import Testing
         await expect(.changesWaiting(nil)) { () throws(MarfaHost.Problem) in try await host.disconnect() }
         #expect(host.connection == first)
         #expect(bench.hasCopy(first))
-        #expect(bench.keys.key(for: first) == "k")
+        #expect(try bench.keys.key(for: first.address) == "k")
 
         try await host.disconnect(.keepCopy)
         #expect(host.connection == nil)
         #expect(bench.hasCopy(first), "keeping the copy leaves it for the version that can send what it holds")
-        #expect(bench.keys.key(for: first) == nil)
+        #expect(try bench.keys.key(for: first.address) == nil)
     }
 
     @Test func aCopyAnotherCopyOfTheAppHoldsIsLeftForThePersonToQuitIt() async throws {
         let bench = try HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
-        bench.keys.save("k", for: first)
+        try bench.keys.save("k", for: first.address)
         try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
         bench.servers.failure.withLock { $0 = SourceFailure(kind: .inUse, message: "The package’s words.") }
         let host = bench.host()
@@ -173,7 +172,7 @@ import Testing
     func discardingACopyAnotherProcessWritesLeavesIt() async throws {
         let bench = try HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
-        bench.keys.save("k", for: first)
+        try bench.keys.save("k", for: first.address)
         let store = bench.location.store(for: first)
         try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
         await (try await WorkingCopy.open(store: store)).close()
@@ -202,7 +201,7 @@ import Testing
     func aCopyThatCannotBeOpenedIsNotDiscardedAndThePersonIsToldWhereItIs() async throws {
         let bench = try HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
-        bench.keys.save("k", for: first)
+        try bench.keys.save("k", for: first.address)
         let store = bench.location.store(for: first)
         try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
         try Data(repeating: 0x5A, count: 8192).write(to: store)
@@ -215,7 +214,7 @@ import Testing
         }
         #expect(FileManager.default.fileExists(atPath: store.path))
         #expect(host.connection == first, "nothing was left")
-        #expect(bench.keys.key(for: first) == "k")
+        #expect(try bench.keys.key(for: first.address) == "k")
         #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies") == nil)
     }
 
@@ -225,7 +224,7 @@ import Testing
     func aCopyThePackageCannotCountIsKeptWhateverTheCountShown() async throws {
         let bench = try HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
-        bench.keys.save("k", for: first)
+        try bench.keys.save("k", for: first.address)
         let store = bench.location.store(for: first)
         try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
         try Data(repeating: 0x5A, count: 8192).write(to: store)
@@ -246,7 +245,7 @@ import Testing
     func aCopyHoldingOtherChangesThanThePersonWasShownIsKept() async throws {
         let bench = try HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
-        bench.keys.save("k", for: first)
+        try bench.keys.save("k", for: first.address)
         let store = bench.location.store(for: first)
         try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
         let copy = try await WorkingCopy.open(store: store)
@@ -365,7 +364,7 @@ import Testing
     func discardingACopyADifferentVersionWritesLeavesIt() async throws {
         let bench = try HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
-        bench.keys.save("k", for: first)
+        try bench.keys.save("k", for: first.address)
         let store = bench.location.store(for: first)
         try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
         let copy = try await WorkingCopy.open(store: store)
@@ -408,7 +407,7 @@ import Testing
         #expect(host.state == .disconnected)
         #expect(host.connection == nil)
         #expect(bench.hasCopy(first))
-        #expect(bench.keys.key(for: first) == nil)
+        #expect(try bench.keys.key(for: first.address) == nil)
     }
 
     @Test func aRefusedKeyIsReplacedInPlace() async throws {
@@ -420,8 +419,8 @@ import Testing
         #expect(await eventually { host.state == .keyRefused })
 
         try await host.replaceKey("right")
-        #expect(bench.keys.key(for: first) == "right")
-        #expect(source.calls == ["refresh", "tryKey right"])
+        #expect(try bench.keys.key(for: first.address) == "right")
+        #expect(source.calls == ["tryKey right"])
         #expect(bench.servers.opened.count == 1)
         source.state.set(.online)
         #expect(await eventually { host.state == .online })
@@ -440,10 +439,10 @@ import Testing
         let source = try #require(bench.servers.last)
         source.refusesKeys.withLock { $0 = true }
         await expect(.unavailable(message: "The copy closed.")) { () throws(MarfaHost.Problem) in try await host.replaceKey("new") }
-        #expect(source.calls == ["refresh", "tryKey new", "close"])
+        #expect(source.calls == ["tryKey new", "close"])
         #expect(bench.servers.opened.count == 2)
         #expect(host.source === bench.servers.last)
-        #expect(bench.keys.key(for: first) == "old")
+        #expect(try bench.keys.key(for: first.address) == "old")
     }
 
     @Test func aKeyTheServerRefusesIsNotKept() async throws {
@@ -454,8 +453,8 @@ import Testing
         source.state.set(.online)
         source.verdicts.withLock { $0["typo"] = .refused }
         await expect(.keyRefused) { () throws(MarfaHost.Problem) in try await host.replaceKey("typo") }
-        #expect(bench.keys.key(for: first) == "good")
-        #expect(source.calls == ["refresh", "tryKey typo", "tryKey good"])
+        #expect(try bench.keys.key(for: first.address) == "good")
+        #expect(source.calls == ["tryKey typo", "tryKey good"])
     }
 
     @Test func aKeyTheServerCannotBeAskedAboutIsKeptOnlyInPlaceOfARefusedOne() async throws {
@@ -468,12 +467,12 @@ import Testing
         await expect(.serverUnreachable(reason: "network: down")) { () throws(MarfaHost.Problem) in
             try await host.replaceKey("later")
         }
-        #expect(bench.keys.key(for: first) == "good")
+        #expect(try bench.keys.key(for: first.address) == "good")
         #expect(source.calls.last == "tryKey good")
 
         source.state.set(.keyRefused)
         try await host.replaceKey("later")
-        #expect(bench.keys.key(for: first) == "later")
+        #expect(try bench.keys.key(for: first.address) == "later")
         #expect(source.calls.last == "tryKey later")
     }
 
@@ -498,7 +497,7 @@ import Testing
         #expect(host.report == SyncReport())
         #expect(source.calls.last == "close")
         #expect(bench.savedAddress == nil)
-        #expect(bench.keys.key(for: first) == nil)
+        #expect(try bench.keys.key(for: first.address) == nil)
         #expect(bench.hasCopy(first))
 
         try await host.connect(address: "http://first.test:8210", key: "k")
@@ -560,7 +559,7 @@ import Testing
         #expect(host.waitingChanges == 0)
         try await host.disconnect()
         #expect(!bench.hasCopy(first))
-        #expect(bench.keys.key(for: first) == nil)
+        #expect(try bench.keys.key(for: first.address) == nil)
     }
 
     /// Until the copy's queue is read, nothing is known of what waits in it.
@@ -593,23 +592,23 @@ import Testing
         }
         #expect(host.connection == first)
         #expect(host.source === old)
-        #expect(bench.keys.key(for: first) == "one")
-        #expect(bench.keys.key(for: second) == nil)
+        #expect(try bench.keys.key(for: first.address) == "one")
+        #expect(try bench.keys.key(for: second.address) == nil)
 
         bench.servers.failure.withLock { $0 = nil }
         try await host.changeAddress(to: "http://second.test:8210", key: "two", choice: .keepCopy)
         #expect(host.connection == second)
         #expect(host.source === bench.servers.last)
         #expect(bench.savedAddress == "http://second.test:8210")
-        #expect(bench.keys.key(for: first) == nil)
-        #expect(bench.keys.key(for: second) == "two")
+        #expect(try bench.keys.key(for: first.address) == nil)
+        #expect(try bench.keys.key(for: second.address) == "two")
         #expect(old.calls.last == "close")
         #expect(bench.hasCopy(first))
     }
 
     @Test func aDebugTestServerIsOpenedByTheNextLaunchWithItsKeyHeldInMemory() async throws {
         let bench = try HostBench()
-        bench.keys.save("test-key", for: first)
+        try bench.keys.save("test-key", for: first.address)
         let host = bench.host()
         host.presetTestServer(first)
         #expect(host.configuredConnection == first)
@@ -622,7 +621,7 @@ import Testing
     @Test func aLaunchReconnectsFromTheCopyWithoutWaitingOnTheServer() async throws {
         let bench = try HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
-        bench.keys.save("k", for: first)
+        try bench.keys.save("k", for: first.address)
         let host = bench.host()
         await host.launch()
         let source = try #require(bench.servers.last)
@@ -630,7 +629,7 @@ import Testing
         #expect(host.connection == first)
         // The fake never answers, so a launch that waited on the server would not have returned.
         #expect(host.state == .connecting)
-        #expect(source.calls == ["refresh"])
+        #expect(source.calls == [])
         await host.launch()
         #expect(bench.servers.opened.count == 1)
     }

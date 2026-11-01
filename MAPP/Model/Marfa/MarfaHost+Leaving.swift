@@ -32,7 +32,7 @@ extension MarfaHost {
         var copy: String?
         var kept: CopyKept?
         do {
-            try await Self.offMain { [keys] in try keys.delete(for: connection) }
+            try await Self.offMain { [keys] in try keys.delete(for: connection.address) }
         } catch {
             key = Self.message(error)
         }

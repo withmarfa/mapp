@@ -1,5 +1,4 @@
 import Marfa
-import struct MarfaCore.KeptFetch
 
 /// The network steps of a refresh, separated so interruptions and recovery can be exercised without a server.
 nonisolated protocol MarfaRefreshing: Sendable {

@@ -47,26 +47,22 @@ struct MarfaHostOfflineTests {
         #expect(!bench.hasCopy(connection))
     }
 
-    /// A key the server ends expires the copy; it waits for another key rather than hydrating again at once.
+    /// A key the Keychain would not give is not a missing key: nothing is replaced, and the person is told why.
     @Test
-    func anEndedKeyWaitsForAnother() async throws {
+    func anUnreadableKeyIsToldAndNothingIsReplaced() async throws {
         let bench = try HostBench()
         let host = bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
-        try await host.connect(address: address, key: "ended")
-        let source = try #require(host.source as? MarfaSource)
-        #expect(await eventually { if case .offline = host.state { true } else { false } })
-        let ended = MarfaError.copyExpired(reason: "credential_ended", message: "the key ended")
-        source.hear(Change(origin: .stopped(ended), itemId: nil, edgeId: nil))
-        #expect(await eventually { host.state == .keyRefused })
-        // Time for a reconnection the refused key should not set off.
-        try await Task.sleep(for: .seconds(1))
-        #expect(host.state == .keyRefused)
-
-        try await host.replaceKey("given")
+        let connection = try MarfaConnection(address: address)
+        try await host.connect(address: address, key: "first")
+        let source = try #require(host.source)
+        bench.keys.makeUnreadable(connection.address)
+        do {
+            try await host.replaceKey("second")
+            Issue.record("replaced a key it could not read")
+        } catch {
+            #expect(error == .unavailable(message: Words.keyUnreadable), "\(error)")
+        }
         #expect(host.source === source)
-        #expect(bench.keys.key(for: try MarfaConnection(address: address)) == "given")
-        // Hydrating again against a closed port fails at once, which shows the new key was tried.
-        #expect(await eventually { if case .offline = host.state { true } else { false } }, "\(host.state)")
         try await discardEverything(host)
     }
 

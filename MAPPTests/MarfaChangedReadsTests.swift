@@ -1,10 +1,6 @@
 import Foundation
 import Marfa
 import Synchronization
-import struct MarfaCore.Draft
-import struct MarfaCore.Edge
-import struct MarfaCore.Edit
-import struct MarfaCore.Item
 import Testing
 @testable import MAPP
 
@@ -150,8 +146,8 @@ import Testing
         let log: ChangeLog
 
         /// Tells the engine the copy caught up with the server, which may have changed anything.
-        func caughtUp() {
-            source.hear(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
+        func caughtUp() async {
+            await source.hear(Change(origin: .refreshed(.caughtUp), itemId: nil, edgeId: nil))
         }
 
         func note(_ title: String, body: String = "Text") async throws -> String {
@@ -172,7 +168,7 @@ import Testing
             for edge in try await copy.edges.from(host) where edge.edgeType == MarfaMapping.bodyLinkEdge {
                 _ = try await copy.edges.delete(edge.id)
             }
-            caughtUp()
+            await caughtUp()
             try await wait("the link bound") {
                 $0.item(titled: "Host")?.boundLinks.first?.resolution == .resolved(ItemID(target))
             }
@@ -184,7 +180,7 @@ import Testing
         func purge(_ id: String) async throws {
             _ = try await copy.items.delete(id)
             reads.gone.withLock { _ = $0.insert(id) }
-            source.hear(Change(origin: .refreshed(.purged), itemId: id, edgeId: nil))
+            await source.hear(Change(origin: .refreshed(.purged), itemId: id, edgeId: nil))
         }
 
         /// A placement of `id` in a folder at `path`, which the copy answers as though it held it in place of any
@@ -217,12 +213,19 @@ import Testing
         ]])
         _ = try await copy.items.create(Draft(type: "example.note", properties: ["title": "First", "body": "Text"]))
         let reads = Watched(copy: copy)
-        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads)
+        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads,
+                                  refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()))
+        // The engine is told what each test says, in place of what the copy's own server follow makes of it.
+        await source.engine.sync.hooks.ignoringCopy.set(true)
         let log = ChangeLog(source)
         source.events.yield(.paint)
         let scene = Scene(store: store, copy: copy, reads: reads, source: source, log: log)
         try await scene.wait("the first paint") { $0.item(titled: "First") != nil }
+        await source.tell(CopyUpdate(reread: .everything, connection: .local))
+        try #require(await eventuallyAsking { await source.engine.tookFirstUpdate }, "the package's first update")
         try #require(await source.engine.cursor != nil, "a whole read takes a cursor")
+        // The package's first update read from the cursor too; the tests count what they make happen.
+        reads.answers.withLock { $0 = [] }
         return scene
     }
 
@@ -240,7 +243,7 @@ import Testing
         let first = try #require(scene.shown("First")).id.rawValue
         try await scene.rename(first, to: "Renamed")
 
-        scene.caughtUp()
+        await scene.caughtUp()
         // A `parent-of` is held by the child.
         try await scene.wait("what changed") { state in
             state.item(titled: "Renamed") != nil && state.item(titled: "First") == nil
@@ -250,7 +253,7 @@ import Testing
         #expect(scene.reads.named == 1)
 
         // The next catch-up starts where this one ended, so it names nothing already read.
-        scene.caughtUp()
+        await scene.caughtUp()
         await scene.source.engineTook()
         guard case .named(let rows, _)? = scene.reads.answers.withLock({ $0.last }) else {
             Issue.record("the copy named no changes")
@@ -266,7 +269,7 @@ import Testing
         let whole = scene.reads.whole
         scene.reads.rewrite.withLock { $0 = { .everything(next: $0.next) } }
         _ = try await scene.note("Second")
-        scene.caughtUp()
+        await scene.caughtUp()
         try await scene.wait("the new note") { $0.item(titled: "Second") != nil }
         #expect(scene.reads.whole == whole + 1)
         await finish(scene)
@@ -277,7 +280,7 @@ import Testing
         let whole = scene.reads.whole
         let limit = await scene.source.engine.changeLimit
         for index in 0...limit { _ = try await scene.note("Note \(index)") }
-        scene.caughtUp()
+        await scene.caughtUp()
         try await scene.wait("every new note") { $0.item(titled: "Note \(limit)") != nil && $0.item(titled: "Note 0") != nil }
         #expect(scene.reads.everything == 1)
         #expect(scene.reads.whole == whole + 1)
@@ -292,14 +295,14 @@ import Testing
         scene.reads.foreign.withLock { $0 = foreign }
         let whole = scene.reads.whole
         _ = try await scene.note("Second")
-        scene.caughtUp()
+        await scene.caughtUp()
         try await scene.wait("the new note") { $0.item(titled: "Second") != nil }
         #expect(scene.reads.everything == 1)
         #expect(scene.reads.whole == whole + 1)
 
         // The whole read took this store's cursor again.
         _ = try await scene.note("Third")
-        scene.caughtUp()
+        await scene.caughtUp()
         try await scene.wait("the next note") { $0.item(titled: "Third") != nil }
         #expect(scene.reads.whole == whole + 1)
         other.remove()
@@ -311,7 +314,7 @@ import Testing
         let whole = scene.reads.whole
         _ = try await scene.note("Second")
         scene.reads.failures.withLock { $0 = 1 }
-        scene.caughtUp()
+        await scene.caughtUp()
         try await scene.wait("the new note") { $0.item(titled: "Second") != nil }
         #expect(scene.reads.whole == whole + 1)
         #expect(scene.log.current.changes.allSatisfy { if case .unavailable = $0 { false } else { true } }, "nothing to tell")
@@ -324,7 +327,7 @@ import Testing
         try await scene.rename(first.rawValue, to: "Renamed")
         // Binned after it was renamed: the reread finds it in the bin, where the library shows it.
         _ = try await scene.copy.items.delete(first.rawValue)
-        scene.caughtUp()
+        await scene.caughtUp()
         try await scene.wait("the note in the bin") { $0.item(titled: "Renamed")?.state == .trashed }
         await finish(scene)
     }
@@ -334,7 +337,7 @@ import Testing
         let first = try #require(scene.shown("First")).id
         try await scene.rename(first.rawValue, to: "Renamed")
         scene.reads.gone.withLock { $0 = [first.rawValue] }
-        scene.caughtUp()
+        await scene.caughtUp()
         try await scene.wait("the note gone") { $0.snapshot?.items.contains { $0.id == first } == false }
         await finish(scene)
     }
@@ -344,7 +347,7 @@ import Testing
         let parent = try await scene.note("Parent")
         let child = try await scene.note("Child")
         _ = try await scene.copy.edges.create(from: parent, to: child, type: MarfaMapping.parentEdge)
-        scene.caughtUp()
+        await scene.caughtUp()
         // A `parent-of` is held by the child.
         try await scene.wait("the link") { $0.item(titled: "Child")?.edgesOut.isEmpty == false }
         let edge = try #require(await scene.copy.edges.from(parent).first).id
@@ -354,7 +357,7 @@ import Testing
         scene.reads.rewrite.withLock { rewrite in
             rewrite = { answer in .named(ChangedRows(removedItems: [child], removedEdges: [edge]), next: answer.next) }
         }
-        scene.caughtUp()
+        await scene.caughtUp()
         try await scene.wait("the child gone") { $0.item(titled: "Child") == nil }
         #expect(await scene.source.engine.edges.edges(touching: parent).isEmpty, "the edge left with its item")
         await finish(scene)
@@ -365,14 +368,14 @@ import Testing
         let cursor = await scene.source.engine.cursor
         scene.reads.filling.withLock { $0 = true }
         _ = try await scene.note("Second")
-        scene.caughtUp()
+        await scene.caughtUp()
         await scene.source.engineTook()
         #expect(await scene.source.engine.cursor == cursor, "a read of a copy still filling is not whole")
 
         let whole = scene.reads.whole
         scene.reads.filling.withLock { $0 = false }
         _ = try await scene.note("Third")
-        scene.source.hear(Change(origin: .refreshed(.hydrated), itemId: nil, edgeId: nil))
+        await scene.caughtUp()
         try await scene.wait("both notes") { $0.item(titled: "Second") != nil && $0.item(titled: "Third") != nil }
         #expect(scene.reads.whole == whole, "named from the cursor kept through the fill")
         #expect(await scene.source.engine.cursor != cursor)
@@ -384,12 +387,12 @@ import Testing
         let whole = scene.reads.whole
         _ = try await scene.note("Second")
         scene.reads.hold()
-        scene.caughtUp()
+        await scene.caughtUp()
         try #require(await eventually { scene.reads.holding > 0 }, "the engine never reached the held read")
+        // The package coalesces what changes while the engine reads into the one update it sends next.
         _ = try await scene.note("Third")
-        scene.caughtUp()
         _ = try await scene.note("Fourth")
-        scene.caughtUp()
+        await scene.caughtUp()
         scene.reads.letGo()
         try await scene.wait("every note") {
             $0.item(titled: "Second") != nil && $0.item(titled: "Third") != nil && $0.item(titled: "Fourth") != nil
@@ -405,13 +408,13 @@ import Testing
         let target = try await scene.note("Other")
         let host = try await scene.note("Host", body: "See [[Bee]]")
         _ = try await scene.copy.edges.create(from: host, to: target, type: MarfaMapping.bodyLinkEdge)
-        scene.caughtUp()
+        await scene.caughtUp()
         try await scene.wait("the host") { $0.item(titled: "Host")?.boundLinks.isEmpty == false }
         #expect(scene.shown("Host")?.boundLinks.first?.resolution != .resolved(ItemID(target)))
 
         // Only the target is named: its new title is what the host's link names.
         try await scene.rename(target, to: "Bee")
-        scene.caughtUp()
+        await scene.caughtUp()
         try await scene.wait("the link bound") {
             $0.item(titled: "Host")?.boundLinks.first?.resolution == .resolved(ItemID(target))
         }
@@ -423,13 +426,13 @@ import Testing
     @Test func aRetitledItemDoesNotReadAnUnrelatedLinkAgain() async throws {
         let scene = try await makeScene()
         let host = try await scene.note("Host", body: "See [[Nowhere]]")
-        scene.caughtUp()
+        await scene.caughtUp()
         try await scene.wait("the host") { $0.item(titled: "Host")?.boundLinks.isEmpty == false }
         scene.reads.linksAsked.withLock { $0 = [] }
 
         let first = try #require(scene.shown("First")).id.rawValue
         try await scene.rename(first, to: "Nowhere")
-        scene.caughtUp()
+        await scene.caughtUp()
         try await scene.wait("the new title") { $0.item(titled: "Nowhere") != nil }
         #expect(!scene.reads.linksAsked.withLock { $0 }.contains(host))
         await finish(scene)
@@ -455,10 +458,10 @@ import Testing
         // Held inside a reread, so the purge and the catch-up are taken together, by a read of what changed.
         scene.reads.hold()
         _ = try await scene.note("Second")
-        scene.caughtUp()
+        await scene.caughtUp()
         try #require(await eventually { scene.reads.holding > 0 }, "the engine never reached the held read")
         try await scene.purge(target)
-        scene.caughtUp()
+        await scene.caughtUp()
         scene.reads.letGo()
         try await scene.wait("the link let go") {
             $0.item(titled: "Host")?.boundLinks.first.map { $0.resolution != .resolved(ItemID(target)) } == true
@@ -481,7 +484,7 @@ import Testing
             files.append(try #require(try await scene.copy.items.addFile(file, Attachment(title: "pic.png")).item.itemId))
         }
         let host = try await scene.note("Host", body: "![[pic.png]]")
-        scene.caughtUp()
+        await scene.caughtUp()
         try await scene.wait("the embed") { $0.item(titled: "Host")?.boundEmbeds.first?.resolution == .ambiguous([]) }
         await scene.source.engineTook()
 
@@ -506,7 +509,7 @@ import Testing
         let page = try #require(made.itemId)
         let host = try await scene.note("Host", body: "See [[Bee]]")
         _ = try await scene.copy.edges.create(from: host, to: page, type: MarfaMapping.bodyLinkEdge)
-        scene.caughtUp()
+        await scene.caughtUp()
         try await scene.wait("the host") { $0.item(titled: "Host")?.boundLinks.isEmpty == false }
         await scene.source.engineTook()
         scene.reads.linksAsked.withLock { $0 = [] }
@@ -514,7 +517,7 @@ import Testing
         let version = try #require(await scene.copy.items.get(page)?.version)
         _ = try await scene.copy.items.update(
             page, Edit(properties: JSONObject([("body", .string("Bee\nSee [[Nowhere]]"))]), baseVersion: version))
-        scene.caughtUp()
+        await scene.caughtUp()
         try #require(await eventually { scene.asked(page) }, "the page was never read again")
         await scene.source.engineTook()
         #expect(!scene.asked(host))
@@ -528,7 +531,7 @@ import Testing
         let target = try await scene.note("Other")
         let host = try await scene.note("Host", body: "See [[bee]]")
         _ = try await scene.copy.edges.create(from: host, to: target, type: MarfaMapping.bodyLinkEdge)
-        scene.caughtUp()
+        await scene.caughtUp()
         try await scene.wait("the host") { $0.item(titled: "Host")?.boundLinks.isEmpty == false }
         await scene.source.engineTook()
 
@@ -538,19 +541,23 @@ import Testing
         scene.reads.rewrite.withLock { rewrite in
             rewrite = { answer in .named(ChangedRows(edges: [placement.id]), next: answer.next) }
         }
-        scene.caughtUp()
+        await scene.caughtUp()
         try #require(try await eventuallyAsking { await scene.source.engine.edges[placement.id] != nil }, "the placement was never taken")
         await scene.source.engineTook()
         #expect(scene.asked(host))
         scene.reads.rewrite.withLock { $0 = nil }
 
-        // Named by a change the server made, read row by row.
+        // Moved: the copy names the edge again.
         scene.reads.linksAsked.withLock { $0 = [] }
         _ = scene.place(target, at: "notes/sea.md", version: 2)
-        scene.source.hear(Change(origin: .server(event: "edge.updated", cursor: "placed"), itemId: target, edgeId: nil))
+        scene.reads.rewrite.withLock { rewrite in
+            rewrite = { answer in .named(ChangedRows(edges: [placement.id]), next: answer.next) }
+        }
+        await scene.caughtUp()
         try #require(try await eventuallyAsking { await scene.source.engine.edges[placement.id]?.version == 2 }, "the move was never taken")
         await scene.source.engineTook()
         #expect(scene.asked(host))
+        scene.reads.rewrite.withLock { $0 = nil }
         await finish(scene)
     }
 
@@ -561,7 +568,7 @@ import Testing
         let parent = try await scene.note("Parent")
         let child = try await scene.note("Child", body: "See [[Nowhere]]")
         _ = try await scene.copy.edges.create(from: parent, to: child, type: MarfaMapping.parentEdge)
-        scene.caughtUp()
+        await scene.caughtUp()
         try await scene.wait("the child") { state in
             guard let child = state.item(titled: "Child") else { return false }
             return !child.boundLinks.isEmpty && !child.edgesOut.isEmpty
@@ -570,7 +577,7 @@ import Testing
         scene.reads.linksAsked.withLock { $0 = [] }
 
         try await scene.rename(parent, to: "Renamed")
-        scene.caughtUp()
+        await scene.caughtUp()
         try await scene.wait("the new title") { $0.item(titled: "Renamed") != nil }
         await scene.source.engineTook()
         #expect(!scene.asked(child))
@@ -584,7 +591,7 @@ import Testing
         let whole = scene.reads.whole
         scene.reads.linkFailures.withLock { $0 = 1 }
         _ = try await scene.note("Host", body: "See [[Nowhere]]")
-        scene.caughtUp()
+        await scene.caughtUp()
         try await scene.wait("the host's links") { $0.item(titled: "Host")?.boundLinks.isEmpty == false }
         await scene.source.engineTook()
         #expect(scene.reads.linksAskedAlone.withLock { $0 }.isEmpty, "no row asked alone")
@@ -600,14 +607,14 @@ import Testing
         let whole = scene.reads.whole
         scene.reads.linkFailures.withLock { $0 = 2 }
         _ = try await scene.note("Host", body: "See [[Nowhere]]")
-        scene.caughtUp()
+        await scene.caughtUp()
         try await scene.wait("the host") { $0.item(titled: "Host") != nil }
         await scene.source.engineTook()
         #expect(scene.reads.whole == whole + 1)
         #expect(scene.shown("Host")?.boundLinks.isEmpty == true, "no links read")
         #expect(await scene.source.engine.cursor == nil, "the whole read took no cursor")
 
-        scene.caughtUp()
+        await scene.caughtUp()
         try await scene.wait("the host's links") { $0.item(titled: "Host")?.boundLinks.isEmpty == false }
         await scene.source.engineTook()
         #expect(scene.reads.whole == whole + 2)
@@ -628,21 +635,21 @@ import Testing
         let target = try await scene.note("Target")
         _ = try await scene.host(naming: target)
         if path == .whole { scene.reads.rewrite.withLock { $0 = { .everything(next: $0.next) } } }
-        func take(_ step: String) {
+        func take(_ step: String) async {
             switch path {
-            case .changed, .whole: scene.caughtUp()
+            case .changed, .whole: await scene.caughtUp()
             case .named:
-                scene.source.hear(Change(origin: .server(event: "item.updated", cursor: step), itemId: target, edgeId: nil))
+                await scene.source.hear(Change(origin: .server(event: "item.updated", cursor: step), itemId: target, edgeId: nil))
             }
         }
 
         _ = try await scene.copy.items.delete(target)
-        take("binned")
+        await take("binned")
         try await scene.wait("the link pending") {
             $0.item(titled: "Host")?.boundLinks.first.map { $0.resolution != .resolved(ItemID(target)) } == true
         }
         _ = try await scene.copy.items.restore(target)
-        take("restored")
+        await take("restored")
         try await scene.wait("the link bound again") {
             $0.item(titled: "Host")?.boundLinks.first?.resolution == .resolved(ItemID(target))
         }

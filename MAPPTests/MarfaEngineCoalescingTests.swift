@@ -2,9 +2,6 @@ import Foundation
 import Marfa
 import MarfaTesting
 import Synchronization
-import struct MarfaCore.Draft
-import struct MarfaCore.Edit
-import struct MarfaCore.Item
 import Testing
 @testable import MAPP
 
@@ -66,8 +63,26 @@ import Testing
         func items(_ ids: [String]) async throws -> Rows<Marfa.Item> { try await read.items(ids) }
         func edges(ofTypes types: [String]) async throws -> [Marfa.Edge] { try await read.edges(ofTypes: types) }
         func edges(_ ids: [String]) async throws -> [Marfa.Edge] { try await read.edges(ids) }
+        /// What the fake copy cannot say: the rows the test said changed, handed over by the next read of what changed.
+        private let pending = Mutex(ChangedRows())
+
+        func tell(_ rows: ChangedRows) {
+            pending.withLock { pending in
+                pending.items += rows.items
+                pending.removedItems += rows.removedItems
+                pending.edges += rows.edges
+                pending.removedEdges += rows.removedEdges
+            }
+        }
+
         func changes(since cursor: ChangeCursor?, most: Int) async throws -> CopyChanges {
-            try await read.changes(since: cursor, most: most)
+            // The engine asks the copy what changed on every update, so this is where a held engine waits.
+            await pass()
+            let next = ChangeCursor(rawValue: "fake")
+            guard cursor != nil else { return .everything(next: next) }
+            let rows = pending.withLock { pending in defer { pending = ChangedRows() }; return pending }
+            // As the copy does for more than it will name.
+            return rows.items.count + rows.edges.count > most ? .everything(next: next) : .named(rows, next: next)
         }
 
         func edges(touching id: String) async throws -> [Marfa.Edge] {
@@ -128,18 +143,36 @@ import Testing
         /// Holds the engine in a reread of `id`, so everything heard until `letGo` is taken as one batch.
         func holdEngine(reading id: String) async throws {
             reads.hold()
-            hearServer(id)
+            await hearServer(id)
             try #require(await eventually { reads.holding > 0 }, "the engine never reached the held read")
         }
 
         func letGo() { reads.letGo() }
 
-        func hearServer(_ id: String, event: String = "item.updated") {
-            source.hear(Change(origin: .server(event: event, cursor: "1"), itemId: id, edgeId: nil))
+        func hearServer(_ id: String, event: String = "item.updated") async {
+            await hear(Change(origin: .server(event: event, cursor: "1"), itemId: id, edgeId: nil))
         }
 
-        func hear(_ refresh: Change.Refresh, item id: String? = nil) {
-            source.hear(Change(origin: .refreshed(refresh), itemId: id, edgeId: nil))
+        /// Tells the engine `change`, and the copy's reads name the rows it carries.
+        func hear(_ change: Marfa.Change) async {
+            reads.tell(ChangedRows(items: change.itemId.map { [$0] } ?? [], edges: change.edgeId.map { [$0] } ?? []))
+            await source.hear(change)
+        }
+
+        /// Tells the engine `update`, and the copy's reads name the rows it carries.
+        func say(_ update: CopyUpdate) async {
+            if case .parts(let parts) = update.reread { reads.tell(parts.rows) }
+            await source.send(update)
+        }
+
+        /// What the package would say after these rows changed meanwhile: one update naming them all.
+        func hearBatch(_ ids: [String]) async {
+            await say(CopyUpdate(
+                reread: .parts(Reread.Parts(rows: ChangedRows(items: ids))), connection: .local))
+        }
+
+        func hear(_ refresh: Change.Refresh, item id: String? = nil) async {
+            await source.hear(Change(origin: .refreshed(refresh), itemId: id, edgeId: nil))
         }
 
         /// How many `.changed` the source told after the first `marked` changes.
@@ -161,7 +194,7 @@ import Testing
             _ = try await copy.queue.drain()
             for write in try await copy.queue.all() where write.itemId == id { _ = try await copy.queue.discard(write.id) }
             #expect(try await copy.items.get(id) == nil, "a row deleted elsewhere stayed in the copy")
-            hearServer(id, event: "item.deleted")
+            await hearServer(id, event: "item.deleted")
             await source.engineTook()
         }
 
@@ -187,9 +220,13 @@ import Testing
         let reads = Reads(copy: fake.copy)
         set(reads)
         let source = MarfaSource(copy: fake.copy, connection: SampleLibrary.connection, reading: reads, refreshing: reads)
+        // The engine is told what each test says, in place of what the fake copy makes of the test's own writes.
+        await source.engine.sync.hooks.ignoringCopy.set(true)
         let log = ChangeLog(source)
         source.events.yield(.paint)
         _ = try #require(await log.wait { $0.snapshot != nil })
+        await source.tell(CopyUpdate(reread: .everything, connection: .local))
+        try #require(await eventuallyAsking { await source.engine.tookFirstUpdate }, "the package's first update")
         return Scene(fake: fake, reads: reads, source: source, log: log)
     }
 
@@ -259,10 +296,8 @@ import Testing
         }
         try await scene.drainAccepting()
 
-        for id in created { scene.hearServer(id, event: "item.created") }
-        for index in edits { scene.hearServer("kept-\(index)") }
-        for index in deletes { scene.hearServer("kept-\(index)", event: "item.deleted") }
-        for id in doomed { scene.hear(.purged, item: id) }
+        // The package coalesces all of it into one update.
+        await scene.hearBatch(created + edits.map { "kept-\($0)" } + deletes.map { "kept-\($0)" } + doomed)
         return created
     }
 
@@ -378,7 +413,7 @@ import Testing
         #expect(scene.wholeReads <= painted + 2, "the flood read the copy whole \(scene.wholeReads - painted) times")
 
         let report = try await scene.copy.queue.drain()
-        scene.source.hear(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil))
+        await scene.source.hear(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil))
         let answered = try #require(await scene.log.wait { $0.answer(to: write) != nil })
         #expect(answered.answer(to: write) == .accepted)
         #expect(scene.shown?.bodies[typed]?.text == "Kept text")
@@ -438,20 +473,22 @@ import Testing
             let edge = try #require(try await scene.copy.edges.to("child").first { $0.id == edgeID })
             _ = try await scene.copy.edges.update(edgeID, EdgeEdit(baseVersion: edge.version, move: .source(parent)))
             try await scene.drainAccepting()
-            scene.source.hear(Change(origin: .server(event: "edge.updated", cursor: "1"), itemId: nil, edgeId: edgeID))
         }
+        // The package coalesces the three moves into one update.
+        await scene.say(CopyUpdate(
+            reread: .parts(Reread.Parts(rows: ChangedRows(edges: [edgeID]))), connection: .local))
         scene.letGo()
         await scene.source.engineTook()
         #expect(scene.item("child")?.parentID == ItemID("second"))
         #expect(scene.wholeReads == painted, "an edge the engine holds was read by a whole read")
 
-        // An edge the engine has never held names no row it knows, so the copy is read whole, once.
+        // A new edge arrives with the copy's answer, which names the rows at its ends, so no whole read is needed.
         let added = try await scene.copy.edges.create(from: "first", to: "other", type: MarfaMapping.parentEdge)
         try await scene.drainAccepting()
-        scene.source.hear(Change(origin: .server(event: "edge.created", cursor: "2"), itemId: nil, edgeId: try #require(added.edgeId)))
+        await scene.hear(Change(origin: .server(event: "edge.created", cursor: "2"), itemId: nil, edgeId: try #require(added.edgeId)))
         try #require(await eventually { scene.item("other")?.parentID == ItemID("first") })
         await scene.source.engineTook()
-        #expect(scene.wholeReads == painted + 1)
+        #expect(scene.wholeReads == painted, "a new edge was read by a whole read")
 
         let differences = try await Self.differencesFromAFreshRead(scene)
         #expect(differences.isEmpty, "\(differences)")
@@ -469,17 +506,17 @@ import Testing
         #expect(scene.item("kept")?.sync == .waiting(writes: 1))
         let painted = scene.wholeReads
 
-        // Answered by a drain the engine is not told of, so only the forgetting tells it.
+        // Answered by a drain the engine did not run, so only the update naming the queue tells it.
         scene.fake.verdict = { write in
             write.itemId == "refused" ? .refused(Refusal(reason: "not taken", code: "validation_failed", message: "Not taken")) : .accepted
         }
         _ = try await scene.copy.queue.drain()
-        _ = try await scene.copy.queue.forgetAnswered()
+        await scene.hear(.forgotten)
         try #require(await eventually { scene.item("kept")?.sync == .settled })
         try #require(await eventually { if case .refused = scene.item("refused")?.sync { true } else { false } })
         #expect(scene.wholeReads == painted)
 
-        scene.hear(.forgotten)
+        await scene.hear(.forgotten)
         await scene.source.engineTook()
         if case .refused = scene.item("refused")?.sync {} else { Issue.record("a refusal went with a later forgetting") }
 
@@ -504,7 +541,9 @@ import Testing
             _ = try await scene.copy.items.update("kept-\(index)", Edit(properties: ["title": .string("Edited \(index)")], baseVersion: 1))
         }
         try await scene.drainAccepting()
-        for index in 0..<150 { scene.hearServer("kept-\(index)") }
+        // The package coalesces what changed meanwhile into one update.
+        await scene.say(CopyUpdate(
+            reread: .parts(Reread.Parts(rows: ChangedRows(items: (0..<150).map { "kept-\($0)" }))), connection: .local))
         scene.letGo()
         await scene.source.engineTook()
         #expect(scene.wholeReads == painted + 1, "the batch read the copy whole \(scene.wholeReads - painted) times")
@@ -516,17 +555,13 @@ import Testing
         await scene.close()
     }
 
-    @Test func aHydrationHeardInABatchReadsTheCopyWholeOnce() async throws {
+    @Test func anUpdateToReadEverythingReadsTheCopyWholeOnce() async throws {
         let scene = try await Self.open(Self.fake([Self.row("one", title: "One"), Self.row("two", title: "Two")]))
         let painted = scene.wholeReads
         try await scene.holdEngine(reading: "two")
         _ = try await scene.copy.items.update("one", Edit(properties: ["title": .string("One again")], baseVersion: 1))
         try await scene.drainAccepting()
-        scene.hearServer("one")
-        scene.hear(.hydrated)
-        scene.hearServer("two")
-        scene.hear(.unfinished)
-        scene.hear(.caughtUp)
+        await scene.say(CopyUpdate(reread: .everything, connection: .local))
         scene.letGo()
         await scene.source.engineTook()
         #expect(scene.wholeReads == painted + 1)
@@ -540,7 +575,9 @@ import Testing
         let painted = scene.wholeReads
         func step(_ hydration: Hydration, listed: UInt64) async {
             scene.reads.fill.withLock { $0 = (hydration: hydration, listed: listed, expected: 4000) }
-            await withCheckedContinuation { done in _ = scene.source.events.yield(.fillProgress(done)) }
+            await scene.source.tell(CopyUpdate(
+                reread: .everything, connection: .connecting,
+                fill: hydration == .complete ? nil : FillProgress(listed: listed, expected: 4000)))
         }
         for listed in stride(from: UInt64(100), through: 4000, by: 100) {
             await step(.inProgress, listed: listed)
@@ -610,7 +647,7 @@ import Testing
         try await scene.holdEngine(reading: "other")
         _ = try await scene.copy.items.update("note", Edit(properties: ["body": .string("Theirs")], baseVersion: 1))
         try await scene.drainAccepting()
-        scene.hearServer("note")
+        await scene.hearServer("note")
         library.saveText("Mine", of: id, readAt: ItemVersion(1), failing: "Note")
         scene.letGo()
         try #require(await eventually { library.item(id)?.version == ItemVersion(2) })
@@ -621,7 +658,7 @@ import Testing
 
         scene.fake.verdict = { _ in .merged(fields: ["body"]) }
         let report = try await scene.copy.queue.drain()
-        scene.source.hear(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil))
+        await scene.source.hear(Change(origin: .queueDrained(report), itemId: nil, edgeId: nil))
         try #require(await eventually { library.body(of: id)?.version == ItemVersion(3) })
         #expect(library.body(of: id)?.text == "Mine")
         await scene.close()
@@ -768,7 +805,7 @@ import Testing
         try #require(await eventually { activity.snapshot().waiting >= 2 })
         let after = WriteID()
         scene.source.submit(.create(id: .mint(), ItemDraft(type: TypeID("core.note"), title: "After", body: "Second")), as: after)
-        scene.hearServer("one")
+        await scene.hearServer("one")
         scene.letGo()
 
         #expect(await closing.value == .closed)

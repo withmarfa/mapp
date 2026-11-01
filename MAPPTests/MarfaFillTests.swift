@@ -1,10 +1,7 @@
 import Foundation
 import Marfa
+import MarfaTesting
 import Synchronization
-import struct MarfaCore.Draft
-import struct MarfaCore.Edit
-import struct MarfaCore.Edge
-import struct MarfaCore.Item
 import Testing
 @testable import MAPP
 
@@ -20,7 +17,8 @@ import Testing
         ]])
         let write = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Arriving", "body": "First"]))
         let reads = FillingReads(copy: copy, completeness: completeness)
-        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads)
+        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads,
+                                  refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()))
         let log = ChangeLog(source)
         source.events.yield(.paint)
         let painted = try #require(await log.wait { $0.item(titled: "Arriving") != nil })
@@ -31,6 +29,8 @@ import Testing
         await source.queueSubmitted()
         #expect(try await copy.items.get(try #require(write.itemId))?.body == "Saved during fill")
         #expect(reads.edgeReads.withLock { $0 } > 0)
+        // The drain after the submit has ended, so nothing it tells lands after the check below.
+        await source.engine.sync.flush()
         #expect(!log.current.changes.contains { if case .unavailable = $0 { true } else { false } })
         await source.close()
     }
@@ -65,26 +65,26 @@ import Testing
     }
 
     @Test func unfinishedRefreshReadsRowsWithoutClearingTheFollowFailure() async throws {
-        let store = try TemporaryMarfaCopy()
-        defer { store.remove() }
-        let copy = try await store.open()
-        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"))
-        let log = ChangeLog(source)
-        source.events.yield(.paint)
-        _ = try #require(await log.wait { $0.snapshot != nil })
+        let fake = WorkingCopy.fake()
+        let copy = fake.copy
+        let (_, source, log) = try await scriptedSource(fake, refreshing: Whole(copy: copy))
         try await copy.declareTypes([[
             "id": "example.note", "label": "Note", "title_field": "title", "body_field": "body",
             "fields": ["title": ["type": "string"], "body": ["type": "string"]],
         ]])
+        await source.tell(CopyUpdate(reread: .parts(Reread.Parts(catalog: true)), connection: .local))
         // The declaration reloads the copy. A reload still running would paint the item made next, before the
         // changes under test are read.
         _ = try #require(await log.wait { $0.snapshot?.catalogue.itemTypes[TypeID("example.note")] != nil })
         let created = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Arrived", "body": "First"]))
-        source.hear(Change(origin: .serverUnreachable(.network(message: "offline")), itemId: nil, edgeId: nil))
-        source.hear(Change(origin: .refreshed(.unfinished), itemId: nil, edgeId: nil))
+        // A fill that did not finish, with the server unreachable: the rows are read and the unreachable word stays.
+        fake.sendUpdate(CopyUpdate(
+            reread: .everything, connection: .offline(.network(message: "offline")),
+            fill: FillProgress(listed: 1, expected: 4)))
+        // The copy's own update for the new item may paint the row first, so the offline update is awaited too.
+        try #require(await eventually { source.connectionState == .offline(reason: "offline") })
         let painted = try #require(await log.wait { $0.item(titled: "Arrived") != nil })
         let item = try #require(painted.item(titled: "Arrived"))
-        #expect(source.connectionState == .offline(reason: "offline"))
         source.submit(.editBody(item.id, "Kept", base: item.version, merge: .asRead), as: WriteID())
         await source.engineTook()
         #expect(try await copy.items.get(try #require(created.itemId))?.body == "Kept")
@@ -99,7 +99,8 @@ import Testing
         defer { store.remove() }
         let copy = try await store.open()
         let reads = HydratingReads(copy: copy)
-        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads)
+        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads,
+                                  refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()))
         let log = ChangeLog(source)
         source.events.yield(.paint)
         _ = try #require(await log.wait { $0.snapshot != nil })
@@ -113,7 +114,7 @@ import Testing
 
         reads.hydrating.withLock { $0 = true }
         let created = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Arrived", "body": "First"]))
-        source.hear(Change(origin: .server(event: "item.created", cursor: "arrived"),
+        await source.hear(Change(origin: .server(event: "item.created", cursor: "arrived"),
                            itemId: try #require(created.itemId), edgeId: nil))
         _ = try #require(await log.wait { $0.item(titled: "Arrived") != nil })
         #expect(reads.refused.withLock { $0 } > 0, "the change was read while the copy refused edge reads")

@@ -5,6 +5,10 @@ import Synchronization
 import Testing
 @testable import MAPP
 
+// The package names the same things; these tests mean the app's.
+typealias InstanceConfig = MAPP.InstanceConfig
+typealias InstanceConfigPatch = MAPP.InstanceConfigPatch
+
 /// A server's settings held in memory: it answers as the real one does, taking a patch field by field, and keeps
 /// what it was sent.
 nonisolated final class FakeInstanceConfig: InstanceConfigSource {
@@ -416,25 +420,20 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
 
 /// What goes on the wire, and how the server's refusals are told.
 @Suite struct MarfaServerConfigTests {
-    @Test func theBodyNamesOnlyTheChangedSettingsAndNullRemovesOne() throws {
+    @Test func theChangeNamesOnlyTheChangedSettingsAndClearRemovesOne() {
         let patch = InstanceConfigPatch(values: [.name: .text("Home"), .versionMaxVersions: .number(200)], clear: [.trashRetentionDays])
-        let data = try JSONEncoder().encode(MarfaServerConfig.payload(patch))
-        let json = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        #expect(Set(json.keys) == ["name", "version_max_versions", "trash_retention_days"])
-        #expect(json["name"] as? String == "Home")
-        #expect(json["version_max_versions"] as? Int == 200)
-        #expect(json["trash_retention_days"] is NSNull)
-    }
-
-    @Test func theChangeNamesTheInstanceItExpects() {
-        let patch = InstanceConfigPatch(values: [.name: .text("Home")])
-        #expect(MarfaServerConfig.input(patch, expecting: "0197a7d6-0000-7000-8000-000000000000").headers.xMarfaInstanceId == "0197a7d6-0000-7000-8000-000000000000")
-        #expect(MarfaServerConfig.input(patch, expecting: nil).headers.xMarfaInstanceId == nil)
+        let change = MarfaServerConfig.patch(patch)
+        #expect(change.name == .set("Home"))
+        #expect(change.versionMaxVersions == .set(200))
+        #expect(change.trashRetentionDays == .clear)
+        #expect(change.versionRecentDays == nil)
+        #expect(change.versionDailySnapshotDays == nil)
+        #expect(change.versionWeeklySnapshotDays == nil)
     }
 
     @Test func aRefusalForAnotherInstanceIsTold() {
-        #expect(MarfaServerConfig.failure(MarfaError.server(status: 409, code: "instance_changed", message: "other")) == .instanceChanged)
-        #expect(MarfaServerConfig.failure(MarfaError.server(status: 409, code: "version_conflict", message: "stale")) == .failed("stale"))
+        #expect(MarfaServerConfig.failure(MarfaError.instanceChanged(message: "other")) == .instanceChanged)
+        #expect(MarfaServerConfig.failure(MarfaError.versionConflict(message: "stale")) == .failed("stale"))
     }
 
     @Test func aRefusalGivesTheServersReasonWithoutItsDetails() {

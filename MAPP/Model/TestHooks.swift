@@ -36,8 +36,6 @@ extension MarfaEngine {
     nonisolated struct TestHooks: Sendable {
         /// Runs before each drain's answers are taken.
         let answering = TestHook<@Sendable () async -> Void>()
-        /// Runs after the queue was last read and before the answers are forgotten.
-        let forgetting = TestHook<@Sendable () async -> Void>()
         /// Chooses the error the copy refuses a write with, since a copy made for the tests is never brought up to date.
         let refusing = TestHook<@Sendable (ItemWrite) -> MarfaError?>()
         /// Replaces how long a held undo waits for a copy that is not catching up.
@@ -51,8 +49,18 @@ extension MarfaSync {
     nonisolated struct TestHooks: Sendable {
         /// Replaces how long the bin's changes settle before it is read, and the longest a read waits for them.
         let binWait = TestHook<BinWait>()
+        /// Chooses an error a step of the sync fails with before it asks the copy, since a test copy never fails them.
+        let faulting = TestHook<@Sendable (Step) -> MarfaError?>()
+        /// While true, the sync does not listen to the copy's updates, so a test that tells the engine its updates
+        /// itself is not also told those a fake copy makes of the test's own writes. Set before the first paint.
+        let ignoringCopy = TestHook<Bool>()
         /// What the lane has done.
         let seen = TestTally(Seen())
+
+        nonisolated enum Step: Sendable {
+            case drain
+            case bin
+        }
 
         nonisolated struct Seen: Sendable {
             /// The drains sent.
@@ -61,6 +69,8 @@ extension MarfaSync {
             var hydrations = 0
             /// The reads of the bin begun.
             var binReads = 0
+            /// The stops reported and told.
+            var stops = 0
             /// The report of the last fetch of kept files that succeeded.
             var lastKeptFetch: KeptFetch?
             /// The report of the last hydration that finished.
@@ -70,6 +80,7 @@ extension MarfaSync {
         var drains: Int { seen.current.drains }
         var hydrations: Int { seen.current.hydrations }
         var binReads: Int { seen.current.binReads }
+        var stops: Int { seen.current.stops }
         var lastKeptFetch: KeptFetch? { seen.current.lastKeptFetch }
         var lastHydration: HydrateReport? { seen.current.lastHydration }
     }

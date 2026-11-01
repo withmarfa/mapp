@@ -1,38 +1,40 @@
 # Marfa library
 
-`MarfaLibrary` is the `ItemLibrary` over a Marfa server, read through the `marfa-swift` package's working copy. The contract it follows is `conformance/spec/` in `withmarfa/marfa`; check a Marfa rule there and in the package, not from memory. The rules in `MAPP/Model/AGENTS.md` apply here too. The engine's types say in their doc comments how they read, coalesce and hold.
+`MarfaLibrary` is the `ItemLibrary` over a Marfa server, read through the `marfa-swift` package's working copy. The contract it follows is `conformance/spec/` in `withmarfa/marfa`; check a Marfa rule there and in the package, not from memory. The rules in `MAPP/Model/AGENTS.md` apply here too.
 
 ## Structure
 
-- `MarfaSource` is the `ItemSource` over the copy. The copy answers every read, so the app paints before and without the network, and writes go to the copy's queue at once. `MarfaLibrary` changes nothing itself; every write goes to the source.
-- `MarfaEngine` (one actor, split by file) is the one place the source changes what it holds. `MarfaSync` does all the server work beside it: hydrate, catch up, drain, read the bin, change the key. `MarfaFollow` keeps the engine hearing the copy's `changes()`.
-- The copy is the record. The engine holds the raw rows and edges, `MarfaHub` what readers were told, and `MarfaLibrary.records` the main actor's observable copy, from which `MarfaItemIndex` is derived. Add no other copy.
-- Do not use the package's `LiveQuery`: the engine reads again only what a change names, on one ordered stream. MAPP's views read through `ItemLibrary`, never the package.
+- `MarfaSource` is the `ItemSource` over the copy. The copy answers every read, so the app paints without the network, and writes go to the copy's queue at once. `MarfaLibrary` changes nothing itself; every write goes to the source.
+- `MarfaEngine` (one actor, split by file) is the one place the source changes what it holds. `MarfaSync` does the server work the package does not: it consumes `WorkingCopy.updates()`, shows the connection the package reports and the fill, hands each update to the engine and waits for it to be read, and sends what waits, reads the bin, fetches kept files and changes the key. MAPP keeps no retry timer, progress poll, last-synced stamp or connection state of its own: a stop shows until the package reports following. Each turn of the connection to `.needsHydration`, also after an `.offline` wait, hydrates the copy; a fault shows stopped with Refresh offered.
+- The copy is the record. The engine holds the raw rows and edges, `MarfaHub` what readers were told, and `MarfaLibrary.records` the main actor's observable copy, from which `MarfaItemIndex` is derived.
+- Do not use the package's `LiveQuery`: the engine reads again only what the copy names as changed since its own cursor (`readChanged`), on one ordered stream. An update only says what kind of read is wanted; the first of a stream asks for everything, which the engine takes as a read from the cursor, having just painted. Views read through `ItemLibrary`, never the package.
 - The engine keeps every `system.*` row out of the items, Recents, counts, search and the bin (`MarfaMapping.isLibraryItem`).
-- Properties, bodies and answers cross the package as values, never as JSON text; the app parses none. Never `import MarfaCore` whole: import each core type by name (`import struct MarfaCore.Item`), since `MemberImportVisibility` is on and a whole import makes the package's own names ambiguous.
-- Tests step into the engine, `MarfaSync`, `MarfaDownloads` and `PictureCache` only through their `hooks` and count through `TestTally` (`MAPP/Model/TestHooks.swift`, Debug only). Never add a setter for tests to a shipping type.
-- `MarfaHost` owns the connection: the address in defaults and the key in the Keychain (`KeychainKeyStore`); the key is never shown again once entered. Each address has its own copy (`MarfaStoreLocation`). The library is the one subscriber to the source's states and reports and tells the host through callbacks; never subscribe a second time.
-- An address that sends the key over plain http to another machine is told once a run. Only Version History (`MarfaServerVersions`) and This Marfa (`MarfaServerConfig`) go over `URLSession`, so App Transport Security applies to them alone; `Info.plist` has no exception.
+- Properties, bodies and answers cross the package as values, never JSON text. The package owns its types (`Item`, `Edge`, `Draft`, `Edit`, `JSONValue` and the rest); `import Marfa` is the only import of it, not the glue module.
+- Tests step into the engine, `MarfaSync`, `MarfaDownloads` and `PictureCache` only through their `hooks`, counting through `TestTally` (`MAPP/Model/TestHooks.swift`, Debug only). Never add a setter or an override for tests to a shipping type.
+- `MarfaHost` owns the connection: the address in defaults, the key in the Keychain, never shown again once entered. Each address has its own copy (`MarfaStoreLocation`). The library is the one subscriber to the source's states and reports and tells the host through callbacks; never subscribe a second time.
+- An address that sends the key over plain http to another machine is told once a run. Only Version History and This Marfa use `URLSession`; `Info.plist` has no App Transport Security exception.
 
 ## Never lose a person's write
 
-- A write that reaches a source after it closed, or that the package refuses before queueing it, is in no queue: what the person typed into it goes back through `Notices.notKept` (`MarfaLibrary.unqueuedText`). A refused text save is given back the same way.
-- Leaving a copy, by disconnecting or switching server, reads the copy's own queue in the same step as it closes. While any writes wait, the person chooses to keep the copy or discard it, and a discard names exactly the writes the person was shown; a write that lands after keeps the copy.
-- A copy is removed only by the package's `WorkingCopy.remove(store:unsent:)` (`MarfaHost.removeCopy`), with the count of changes the person was shown. A copy whose changes could not be counted is never discarded. A copy another version made (`MarfaError.wrongSchema`) is replaced only when the package counts no unsent changes. Never pass a `fileBudget` to `open` or `replaceRefused`.
-- Disconnecting forgets the address before it removes the key and the copy, so a quit partway through never reopens that server.
+- A write that reaches a closed source, or that the package refuses before queueing it, is in no queue: what the person typed goes back through `Notices.notKept` (`MarfaLibrary.unqueuedText`). A refused text save is given back the same way.
+- Leaving a copy (disconnecting or switching server) reads its queue in the same step as it closes. While any writes wait, the person chooses to keep the copy or discard it, and a discard names exactly the writes the person was shown; a write that lands after keeps the copy.
+- A copy is removed only by `WorkingCopy.remove(store:unsent:)` (`MarfaHost.removeCopy`), with the count of changes the person was shown; one that could not be counted is never discarded. A copy another version made is opened with `ifRefused: .replace`, replaced only when it counts no unsent changes; with any, it refuses (`MarfaError.wrongSchema`) and the person is told the count. A copy whose server is another one (`MarfaError.wrongServer`) is told with its unsent count (`Words.otherServer`). Never pass a `fileBudget` to `open`.
+- Disconnecting forgets the address before removing the key and the copy, so a quit partway never reopens that server.
 - A refused key parks the queue until Settings gives another key. A key that works is kept until the server has taken the new one.
-- The copy drains its queue itself when the server is back; never start a second drain on `serverReachable`. The engine forgets only the answers it has taken, never all at once, and reads answers from the queue before anything forgets them.
-- Never clear the queue to recover from an expired copy (`copyExpired`): hydrate again, which keeps it.
-- A refused write that carried content stays listed until the person discards it; discarding one that carried text, or Undo Change on it, is confirmed.
+- An error the package classifies (`isOffline`, `isTransient`, `isKeyRefusal`) is never a fault to show: the package reports it through the connection and tries again. A canceled call is not shown. What is left (another kind of error, or `invalid`, `unknownType`, `validation`, which the package ignores for an app's call) shows the library unavailable, told once, with a refresh offered. Hydration errors are `isHydrationNeeded`. While the key changes the package answers `keyChanging`, which `MarfaEngine.asking` waits out. A stop is told once per change of connection and a drain failure until one succeeds, and the library stays stopped until then (not `.noServer`); a failed bin read other than a transient one is told. One hydration runs however many progress updates it sends.
+- The package's `KeyStore` keeps the key (`KeychainKeyStore`; `MemoryKeyStore` in tests). A key it cannot read (a throw) is shown as that (`Words.keyUnreadable`), never as missing or refused, and nothing is replaced meanwhile. The `URLSession` calls say the same.
+- The copy drains its queue itself when the server is back; the sync drains once more when the connection returns to following, never on its own timer. The engine takes answers only with `Queue.takeAnswered()`, which clears the answered writes and leaves a refused write that carried content, a blocked one and a dead one listed with their verdict, each told once.
+- Never clear the queue to recover from `copyExpired`: hydrate again, which keeps it.
+- A refused write that carried content stays listed until the person discards it; discarding it, if it carried text, or Undo Change on it, is confirmed.
 - A row the copy could not read (`Item.unreadableProperties`) is shown as damaged and never as an item the person emptied, and no edit is built from it (`MarfaEngine.propertyEdit`).
 
 ## Text and versions
 
 - Every save names the version of the text it was typed on. Only the first save typed on a version is merged against it (`BodyMerge.asRead`); later saves follow the person's own (`.following`). So a person's saves never conflict with each other and never overwrite text they did not see. Do not replace this with last-writer-wins.
 - Text read before the server answered this device's own create is at version 0; an edit typed on it is sent on version 1 (`MarfaEngine.version(read:holding:)`), never on the version the copy holds.
-- `MarfaLibrary` holds the text the person typed until the source answers it, since a read that raced the write would be older.
-- An Undo or Redo the copy refuses while it is brought up to date is held (`MarfaEngine+Holding`) and made only if what it touches is as it was when it was pressed; otherwise none of the step is made and the person is told. A held write never overwrites newer text and never waits without end.
-- Where the server keeps its own text over the person's, the page shows the server's text and says the person's changes went to a copy.
+- `MarfaLibrary` holds the text the person typed until the source answers it, as a read that raced the write would be older.
+- An Undo or Redo the copy refuses while catching up is held (`MarfaEngine+Holding`) and made only if what it touches is as it was when it was pressed; otherwise none of the step is made and the person is told. A held write never overwrites newer text and never waits without end.
+- Where the server keeps its text over the person's, the page shows the server's and says the person's changes went to a copy.
 - A restore writes only the title and the text, through the ordinary edit path on the version the library holds.
 
 ## Server calls
@@ -45,14 +47,14 @@
 ## Edges and files
 
 - A relationship is an edge written by the end that holds it. Check links against the catalogue's types, roles, how many each end may hold, and the contract's cycle rule (`conformance/spec/edges.md`) before sending.
-- An end that holds one link of its type has it replaced by moving the edge's other end (one `edges.update` with an `EdgeEdit`). Never remove and add, which leaves the end holding none or two and loses the link on a refusal.
+- An end that holds one link of its type has it replaced by moving the edge's other end (one `edges.update` with an `EdgeEdit`). Never remove and add: that can leave the end holding none or two.
 - Never take a link that a third item holds as its own; tell the person which item holds it. Where a field that holds many swaps one item for another, add the new links first and remove the old ones only once the source has taken them.
 - What an item's text links or embeds is written as edges by the package when the text is saved: change a link in the text, never as a relationship. Answer a link only from the copy's binding (`Item.boundLinks`), never from the titles held.
 - Attachments go through the package's `attach(to:file:)`, with a name unique among the item's attachments. Never use `embed(file:in:_:)`, which edits the body outside the editor's versioned saves.
 
 ## Wording
 
-- `SyncWording.swift` turns the model's states and counts into words. Show a `MarfaHost.Problem` as what happened and what to do, never as the error, with only the actions the contract allows (`MarfaProblems`).
+- `SyncWording.swift` words the model's states and counts. Show a `MarfaHost.Problem` as what happened and what to do, never as the error, with only the contract's actions (`MarfaProblems`).
 
 ## Code Review Rules
 

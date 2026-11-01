@@ -1,6 +1,5 @@
 import Foundation
 import Marfa
-import struct MarfaCore.Draft
 import Synchronization
 import Testing
 @testable import MAPP
@@ -53,7 +52,7 @@ import Testing
         }
         try await host.disconnect(choice)
         #expect(seen.withLock { $0 } == nil, "the address was still saved when the key went")
-        #expect(bench.keys.key(for: first) == nil)
+        #expect(try bench.keys.key(for: first.address) == nil)
         #expect(bench.hasCopy(first) == (choice == .keepCopy), "a kept copy stays, a discarded one goes")
 
         let next = bench.host()

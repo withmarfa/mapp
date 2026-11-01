@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import MarfaTesting
 import Testing
 @testable import MAPP
 
@@ -24,7 +25,7 @@ extension LiveMarfaTests {
                 try await host.replaceKey("mapptest-not-a-key-\(UUID().uuidString)")
                 Issue.record("took a key the server refuses")
             } catch {}
-            #expect(bench.keys.key(for: try MarfaConnection(address: address)) == key)
+            #expect(try bench.keys.key(for: (try MarfaConnection(address: address)).address) == key)
             #expect(await eventually { host.state == .online }, "\(host.state)")
             try await discardEverything(host)
         }
@@ -47,7 +48,7 @@ extension LiveMarfaTests {
 
         private func refuseEditsToAPurgedItem(_ root: URL, _ made: LiveMarfa.Made) async throws {
             let connection = try MarfaConnection(address: try LiveMarfa.address())
-            let keys = MemoryKeyStore([connection: try LiveMarfa.key()])
+            let keys = MemoryKeyStore([connection.address: try LiveMarfa.key()])
             let location = MarfaStoreLocation(root: root)
             let id = made.mint()
             let first = try await MarfaSource.open(connection, keys: keys, location: location)
