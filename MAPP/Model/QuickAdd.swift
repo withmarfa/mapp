@@ -192,7 +192,10 @@ final class QuickAdd {
     /// The draft as it was when its file was sent, while the file is being added, so the panel does not add it
     /// twice and a closing window does not hand off what is already on its way.
     private var sending: Draft?
-    var isSaving: Bool { sending != nil }
+    /// While the core is asked about the parent, before anything is sent. The draft is still the window's to hand
+    /// off, since nothing is on its way, so this only stops a second Add.
+    private var checkingParent = false
+    var isSaving: Bool { sending != nil || checkingParent }
 
     /// Why a draft leaves the window before it is added.
     enum Departure {
@@ -245,6 +248,7 @@ final class QuickAdd {
     }
 
     fileprivate func saving(_ draft: Draft?) { sending = draft }
+    fileprivate func checking(parent: Bool) { checkingParent = parent }
 
     // MARK: What is remembered
 
@@ -468,8 +472,9 @@ extension Browser {
     /// Adds the draft as an item of its kind, with its properties and under its place, in one create. Then the
     /// panel closes and the window opens the item, adds it to the collection being shown, and attaches the draft's
     /// files to it (`finishNewItem`). Where the library cannot make it, everything stays as typed and the library tells
-    /// the person why. The core is asked about the parent first, with the draft held as being sent: a second Add does
-    /// nothing meanwhile, and a draft changed meanwhile stays as typed and is not added until the person adds again. A
+    /// the person why. The core is asked about the parent first: a second Add does nothing
+    /// meanwhile, a window that closes meanwhile hands the whole draft over, and a draft changed meanwhile stays as
+    /// typed and is not added, and the person is told to add it again. A
     /// file no longer where it was is taken out of the draft and named, and nothing is added until the person has seen
     /// that. Nothing empty is ever written.
     @discardableResult
@@ -491,14 +496,23 @@ extension Browser {
             }
             return nil
         }
-        // Before anything is made, so a parent the core refuses leaves no item behind. The draft is held as being sent
-        // meanwhile, so a second Add does nothing and the window does not hand off what is on its way.
+        // Before anything is made, so a parent the core refuses leaves no item behind. A second Add does nothing
+        // meanwhile. Nothing is on its way yet, so a window that closes or changes library meanwhile still hands the
+        // whole draft over, and the draft no longer matching below stops the create.
         if let parent = draft.parentID {
-            quickAdd.saving(draft)
+            quickAdd.checking(parent: true)
             let verdict = await library.newChildVerdict(under: parent)
-            quickAdd.saving(nil)
-            // Text typed while the core was asked stays as typed; nothing is made from the draft as it was.
-            guard quickAdd.draft == draft else { return nil }
+            quickAdd.checking(parent: false)
+            // Text typed while the core was asked stays as typed; nothing is made from the draft as it was. A draft
+            // handed off has been told already.
+            guard quickAdd.draft == draft else {
+                if quickAdd.draft != nil {
+                    library.notices.tell(
+                        String(localized: "Item Not Added"),
+                        String(localized: "The new item changed while its parent was being checked, so nothing was added. Add it again."))
+                }
+                return nil
+            }
             if case .refused(let reason) = verdict {
                 library.notices.tell(String(localized: "Can’t Create Item"), reason)
                 return nil

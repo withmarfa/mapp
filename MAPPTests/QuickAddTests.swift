@@ -520,6 +520,28 @@ struct QuickAddTests {
         #expect(browser.quickAdd.draft?.title == "Plan the launch", "the text typed meanwhile stays")
         #expect(!browser.quickAdd.isSaving)
         #expect(browser.quickAdd.isPresented)
+        #expect(library.notices.waiting.last?.title == "Item Not Added", "the person is told the Add did nothing")
+    }
+
+    @Test func aWindowClosedWhileTheParentIsCheckedHandsTheWholeDraftOver() async throws {
+        let (library, project, release) = holdingProject()
+        let browser = Browser()
+        browser.openQuickAdd(in: library)
+        browser.quickAdd.draft?.parentID = project.id
+        browser.quickAdd.draft?.title = "Plan"
+        browser.quickAdd.draft?.body = "The first steps"
+        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
+        #expect(await eventually { browser.quickAdd.isSaving })
+        browser.putAwayQuickAdd()
+        browser.quickAdd.handOff(to: library.notices, because: .closed, in: library)
+        release.yield()
+        #expect(await saving.value == nil)
+        #expect(library.items == [project], "nothing is made from a draft handed off")
+        var clipboard: [String] = []
+        let notice = library.notices.show(in: UUID()) { clipboard.append($0) }
+        #expect(notice?.isNotKept == true)
+        #expect(clipboard == ["Plan\n\nThe first steps\n\nParent: Launch"], "the title, text and parent are on the clipboard")
+        #expect(library.notices.waiting.count == 1, "a handed-off draft is told once")
     }
 
     @Test func aParentTheCoreRefusesIsToldBeforeAnythingIsMade() async throws {
