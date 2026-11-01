@@ -206,11 +206,11 @@ extension EditorTests {
             #expect(await bound(link, in: page.library) == note.id, "\(link)")
         }
         let tricky = try #require(page.library.items.first { $0.title == "A]B" })
-        #expect(await page.library.bodyLink(to: tricky.id, in: nil) == "[[A]B]]", "a single bracket is part of a name")
+        #expect(await page.library.bodyLink(to: tricky.id, in: nil) == "[[\(tricky.id.rawValue)|A B]]", "Inkkit draws no link around a bracket, so the identity names it")
         let slash = try #require(page.library.items.first { $0.title == "back\\slash" })
         #expect(await page.library.bodyLink(to: slash.id, in: nil) == "[[back\\slash]]", "a backslash is part of the name")
         let bar = try #require(page.library.items.first { $0.title == "A|B" })
-        #expect(await page.library.bodyLink(to: bar.id, in: nil) == "[[\(bar.id.rawValue)|A|B]]")
+        #expect(await page.library.bodyLink(to: bar.id, in: nil) == "[[\(bar.id.rawValue)|A B]]")
     }
 
     @Test func aLinkRequestAfterTheWindowWentIsAnsweredWithNothing() async throws {

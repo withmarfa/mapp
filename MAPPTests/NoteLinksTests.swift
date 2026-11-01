@@ -13,13 +13,15 @@ struct NoteLinksTests {
     }
 
     @Test func aTitleIsSpelledAsALinkOnlyIfTheCoreReadsItBackWhole() {
-        for title in ["Garden ideas", "Café", "Q3: plan", "日本語のノート", "A \"quoted\" title", "back\\slash", "A]B", "😀 plans"] {
+        for title in ["Garden ideas", "Café", "Q3: plan", "日本語のノート", "A \"quoted\" title", "back\\slash", "😀 plans", "Plan\\", "a\\b"] {
             #expect(NoteLinks.spells(title, as: title), "\(title)")
+            #expect(NoteLinks.isPlainName(title), "\(title)")
         }
-        // Inkkit reads a backslash before a delimiter as an escape, which the core does not, so the two would read
-        // these as different links.
-        for title in ["", " leading", "trailing ", "A|B", "A#B", "A [x]]", "two\nlines", "two\r\nlines", "Plan\\", "A\\]", "A\\|B", "A\\#B"] {
-            #expect(!NoteLinks.spells(title, as: title), "\(title.debugDescription)")
+        for title in ["", " leading", "trailing ", "A|B", "A#B", "A [x]]", "two\nlines", "two\r\nlines"] {
+            #expect(!(NoteLinks.isPlainName(title) && NoteLinks.spells(title, as: title)), "\(title.debugDescription)")
+        }
+        for title in ["A]B", "a[b]", "a[b", "A|B", "A#B"] {
+            #expect(!NoteLinks.isPlainName(title), "Inkkit draws no link for \(title.debugDescription)")
         }
     }
 
@@ -122,7 +124,7 @@ struct NoteLinksTests {
         let odd = note("A|B", minutes: 3)
         let library = FakeItemLibrary(items: [alone, twin, odd, note("Old", minutes: 4)])
         #expect(await library.bodyLink(to: alone.id, in: nil) == "[[\(alone.id.rawValue)|Garden ideas]]", "a twin goes by the same name, so its identity names it")
-        #expect(await library.bodyLink(to: odd.id, in: nil) == "[[\(odd.id.rawValue)|A|B]]", "a link cannot spell this title, so its identity names it")
+        #expect(await library.bodyLink(to: odd.id, in: nil) == "[[\(odd.id.rawValue)|A B]]", "a link cannot spell this title, so its identity names it")
         #expect(await library.bodyLink(to: library.items[3].id, in: nil) == "[[Old]]")
         #expect(library.notesToLink(excluding: library.items[3].id).map(\.title) == ["A|B", "garden IDEAS", "Garden ideas"])
     }
@@ -145,30 +147,36 @@ struct NoteLinksTests {
         #expect(await library.noteNames(matching: "gard", using: index).isEmpty)
     }
 
-    @Test func aBackslashBeforeAnEndOfAPartIsRefusedInEverySpelling() {
-        #expect(!NoteLinks.spells("id|Plan\\", as: "id", alias: "Plan\\"))
-        #expect(!NoteLinks.spells("id|Plan\\#x", as: "id", alias: "Plan\\#x"))
-        #expect(NoteLinks.spells("id|Plan", as: "id", alias: "Plan"))
-        #expect(NoteLinks.spells("id|C:\\dir", as: "id", alias: "C:\\dir"), "a backslash inside a label is its text")
+    @Test func aBackslashIsLiteralInEverySpelling() {
+        #expect(NoteLinks.spells("id|Plan\\", as: "id", alias: "Plan\\"))
+        #expect(NoteLinks.spells("id|C:\\dir", as: "id", alias: "C:\\dir"))
+        #expect(NoteLinks.spells("Plan\\", as: "Plan\\"))
+        #expect(NoteLinks.spells("a\\b", as: "a\\b"))
     }
 
-    @Test func aTitleEndingInABackslashIsLinkedByIdentityWithTheBackslashLeftOutOfTheLabel() async {
-        let plan = note("Plan\\")
-        let hash = note("Plan\\#2")
-        let library = FakeItemLibrary(items: [plan, hash])
-        // The label is only what the link shows; the identity names the note, and both readings agree on it.
-        #expect(await library.bodyLink(to: plan.id, in: nil) == "[[\(plan.id.rawValue)|Plan]]")
-        #expect(await library.bodyLink(to: hash.id, in: nil) == "[[\(hash.id.rawValue)|Plan#2]]", "a backslash before a delimiter is left out")
-        let path = note("C:\\dir")
-        library.items.append(path)
-        #expect(await library.bodyLink(to: path.id, in: nil) == "[[C:\\dir]]", "a backslash before a letter is text, in the title itself")
-        let only = note("\\")
-        library.items.append(only)
-        #expect(await library.bodyLink(to: only.id, in: nil) == "[[\(only.id.rawValue)]]")
+    @Test func eachAwkwardTitleIsLinkedWithoutAnAddedBackslash() async {
+        let titles = ["Plan\\", "a|b", "a#b", "a[b]", "a\\b"]
+        let notes = titles.map { note($0) }
+        let library = FakeItemLibrary(items: notes)
+        for (title, item) in zip(titles, notes) {
+            let link = await library.bodyLink(to: item.id, in: nil)
+            let text = link
+            #expect(text?.filter { $0 == "\\" }.count == title.filter { $0 == "\\" }.count, "\(title): \(link ?? "nil")")
+            let parts = linkParts(in: text ?? "")
+            #expect(parts.count == 1 && parts.first?.text == text, "\(title): \(link ?? "nil")")
+            let name = parts.first?.name.text
+            #expect(name == item.id.rawValue || name == title, "\(title) names \(name ?? "nil")")
+            #expect(parts.first?.heading == nil, "\(title)")
+        }
+        #expect(await library.bodyLink(to: notes[0].id, in: nil) == "[[Plan\\]]", "both readers take the trailing backslash literally")
+        #expect(await library.bodyLink(to: notes[1].id, in: nil) == "[[\(notes[1].id.rawValue)|a b]]")
+        #expect(await library.bodyLink(to: notes[2].id, in: nil) == "[[\(notes[2].id.rawValue)|a b]]")
+        #expect(await library.bodyLink(to: notes[3].id, in: nil) == "[[\(notes[3].id.rawValue)|a b]]")
+        #expect(await library.bodyLink(to: notes[4].id, in: nil) == "[[a\\b]]")
     }
 
     @Test func aLabelIsOneLineAndNothingIsEscaped() {
-        let cases = [("Plan", "Plan"), ("A|B", "A|B"), ("back\\slash", "back\\slash"), ("Plan\\", "Plan"), ("A\\|B", "A|B"), ("A\\\\", "A"), ("two\nlines", "two lines"), (" padded ", "padded"), ("\n\u{0}", "")]
+        let cases = [("Plan", "Plan"), ("A|B", "A B"), ("a#b", "a b"), ("a[b]", "a b"), ("back\\slash", "back\\slash"), ("Plan\\", "Plan\\"), ("A\\|B", "A\\ B"), ("two\nlines", "two lines"), (" padded ", "padded"), ("\n\u{0}", ""), ("[]|#", "")]
         for (title, label) in cases { #expect(NoteLinks.label(title) == label, "\(title.debugDescription)") }
     }
 }
