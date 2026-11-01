@@ -143,11 +143,11 @@ struct MarfaSourceOfflineTests {
         #expect(first.catalogue.itemTypes[TypeID("core.note")] != nil)
         #expect(source.connectionState != .online, "a copy is not online before the server has answered")
 
-        // The first fill cannot reach the server. The package keeps such a copy as one that needs a hydration and
-        // tries nothing again until Refresh, so it is shown neither online nor as a fault.
+        // The first fill cannot reach the server. The package shows the copy offline and asks for a hydration again
+        // when its wait ends, so it is shown neither online nor as a fault.
         source.refresh()
         try #require(await eventuallyAsking { await source.engine.sync.hooks.hydrations >= 1 })
-        #expect(source.connectionState != .online)
+        #expect(await waitForConnection(source) { if case .offline = $0 { true } else { false } })
         if case .unavailable = source.connectionState { Issue.record("an unreachable server was shown as a fault") }
 
         let write = WriteID()

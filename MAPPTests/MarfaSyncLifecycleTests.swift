@@ -135,6 +135,25 @@ struct MarfaSyncLifecycleTests {
         await source.close()
     }
 
+    /// A first fill that fails transiently shows the copy offline; when the package's wait ends it says the copy needs
+    /// hydration again, which is a new turn, so the copy is hydrated again and is not shown following meanwhile.
+    @Test func aFirstFillThatFailedTransientlyShowsOfflineAndHydratesAgainWhenAsked() async throws {
+        let refresh = ScriptedRefresh(status: ScriptedRefresh.complete())
+        let (fake, source, _) = try await scriptedSource(refreshing: refresh)
+
+        fake.sendUpdate(update(.needsHydration(nil)))
+        try #require(await eventually { refresh.hydrations == 1 })
+        fake.sendUpdate(update(.offline(.network(message: "the network is down"))))
+        #expect(await waitForConnection(source) { if case .offline = $0 { true } else { false } })
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(refresh.hydrations == 1, "nothing is asked again while the package waits")
+
+        fake.sendUpdate(update(.needsHydration(nil)))
+        #expect(try await eventuallyAsking { refresh.hydrations == 2 })
+        #expect(source.connectionState != .online)
+        await source.close()
+    }
+
     /// The package waits for a person's Refresh after a fault in the first fill, rather than trying it again.
     @Test func aFirstFillThatFailedOnAFaultIsNotFilledAgainByItself() async throws {
         let refresh = ScriptedRefresh(status: ScriptedRefresh.complete())
