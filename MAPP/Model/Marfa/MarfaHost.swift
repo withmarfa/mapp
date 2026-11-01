@@ -159,9 +159,10 @@ import Observation
         #endif
     }
 
-    /// Whether Refresh has anything to do: an open copy of a server's library, not already syncing, and a key the
-    /// server has not refused. A server that cannot be reached, and a library the sync stopped on a fault, still count, so the
-    /// person can try again at once rather than wait for the copy's next try.
+    /// Whether Refresh has anything to do: an open copy of a server's library, not already syncing or hydrating, and
+    /// a key the server has not refused. A server that cannot be reached, and a library the package reports stopped
+    /// or needing a hydration it is not running, still count, so the person can try again at once rather than wait
+    /// for the copy's next try.
     var canRefresh: Bool {
         guard hasServer, source != nil, report.phase == .current else { return false }
         switch state {

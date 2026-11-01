@@ -51,6 +51,9 @@ extension MarfaSync {
         let binWait = TestHook<BinWait>()
         /// Chooses an error a step of the sync fails with before it asks the copy, since a test copy never fails them.
         let faulting = TestHook<@Sendable (Step) -> MarfaError?>()
+        /// While true, the sync does not listen to the copy's updates, so a test that tells the engine its updates
+        /// itself is not also told those a fake copy makes of the test's own writes. Set before the first paint.
+        let ignoringCopy = TestHook<Bool>()
         /// What the lane has done.
         let seen = TestTally(Seen())
 

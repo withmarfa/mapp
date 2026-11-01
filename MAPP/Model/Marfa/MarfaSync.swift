@@ -98,9 +98,12 @@ actor MarfaSync {
     func start() {
         guard !started else { return }
         started = true
-        if let own = refreshing.updates() {
-            consuming = Task { await self.consume(own) }
-        } else {
+        #if DEBUG
+        let deaf = hooks.ignoringCopy.current ?? false
+        #else
+        let deaf = false
+        #endif
+        if !deaf {
             let updates = copy.updates()
             consuming = Task { await self.consume(updates) }
         }
@@ -231,7 +234,7 @@ actor MarfaSync {
             Self.log.error("sync stopped: the server refused the key")
             return .refused
         } catch {
-            await failed(error)
+            failed(error)
             return .unanswered((error as? MarfaError)?.message ?? error.localizedDescription)
         }
     }
@@ -247,7 +250,7 @@ actor MarfaSync {
 
     /// Shows what the update says of the connection, hands the engine what to read again, and acts on a change of
     /// connection. The engine acknowledges each update, so the package coalesces what arrives while it reads.
-    func take(_ update: CopyUpdate) async {
+    private func take(_ update: CopyUpdate) async {
         let before = connection
         connection = update.connection
         fill = update.fill
@@ -262,9 +265,10 @@ actor MarfaSync {
             }
         }
         switch update.connection {
-        case .needsHydration:
-            // The package sends progress updates all through a hydration, each still `.needsHydration`.
-            if !(before?.needsHydration ?? false), !hydrationUnderway { wantsHydration = true }
+        case .needsHydration where update.connection.fault == nil:
+            // The package sends progress updates all through a hydration, each still `.needsHydration`. A copy
+            // that stopped on a fault waits for the person's Refresh instead.
+            if before != update.connection, !hydrationUnderway { wantsHydration = true }
         case .following where before != .following:
             // The server answered: what waited is sent, and the bin and the kept files are asked again.
             wantsDrain = true
@@ -276,6 +280,7 @@ actor MarfaSync {
         default:
             break
         }
+        publishPhase()
         startFetch()
         work()
     }
@@ -289,7 +294,15 @@ actor MarfaSync {
         case .local:
             // No server to follow, as with the sample library: nothing is waited for.
             hub.set(.online)
-        case .needsHydration, .connecting:
+        case .needsHydration:
+            // A copy that stopped on a fault of the app's own first fill or hydration is shown as stopped, as a
+            // stopped follow is; any other reason is cleared by the hydration this starts.
+            if let fault = connection.fault {
+                if changed { stop(for: fault) }
+            } else {
+                hub.set(.connecting)
+            }
+        case .connecting:
             hub.set(.connecting)
         case .following:
             told = false
@@ -324,7 +337,7 @@ actor MarfaSync {
     /// person, who can start a new copy and lose them, or keep this one.
     private func otherServer() async {
         let unsent = (try? await copy.queue.all()).map { UInt64(MarfaProblems.unsent($0).count) }
-        guard !stopped, connection.map({ if case .stopped = $0 { true } else { false } }) ?? false else { return }
+        guard !stopped, connection?.fault != nil else { return }
         hub.set(.unavailable(message: Words.otherServer(unsent: unsent)))
         tellOnce(SourceFailure(kind: .failed, message: Words.otherServer(unsent: unsent)))
     }
@@ -340,7 +353,9 @@ actor MarfaSync {
     private func publishPhase() {
         let asking: Bool
         switch connection {
-        case .needsHydration?, .connecting?: asking = true
+        case .connecting?: asking = true
+        // The hydration this connection asks for, started or about to be; with none, Refresh is offered.
+        case .needsHydration?: asking = hydrationUnderway || wantsHydration
         default: asking = false
         }
         let phase: SyncReport.Phase = fill != nil ? .catchingUp : (asking || refreshes > 0 ? .updating : .current)
@@ -372,7 +387,7 @@ actor MarfaSync {
             do {
                 try await refreshNow(hydrating: hydrating)
             } catch {
-                await failed(error)
+                failed(error)
             }
             refreshes -= 1
             hydrationUnderway = false
@@ -413,30 +428,13 @@ actor MarfaSync {
         rehydration.finished()
     }
 
-    /// What a call the app made itself says of the copy. The package shows an unreachable server, a refused key
-    /// and a copy that needs a hydration through the connection it reports, and tries again by itself; what is left
-    /// is a fault that asking again may not clear, which stays stopped until a refresh succeeds.
-    private func failed(_ error: any Error) async {
-        guard !stopped, !Task.isCancelled else { return }
-        guard let error = error as? MarfaError else {
-            Telemetry.syncStoppedUnnamed(during: "refresh")
-            hub.set(.unavailable(message: error.localizedDescription))
-            return
-        }
-        if Self.isFault(error) { stop(for: error) }
-    }
-
-    /// Whether `error` is a fault asking again may not clear, which the package neither shows nor retries. An
-    /// unreachable server, a transient error and a refused key are shown through the connection; a canceled call, a
-    /// closed copy and a key being changed are no fault; a copy that needs hydrating is reported as `.needsHydration`.
-    private static func isFault(_ error: any Error) -> Bool {
-        guard let error = error as? MarfaError else { return !(error is CancellationError) }
-        if error.isOffline || error.isTransient || error.isKeyRefusal { return false }
-        switch error {
-        case .canceled, .closed, .keyChanging: return false
-        case .copyExpired, .instanceChanged, .noCursor, .hydrationIncomplete, .firstSyncWaiting: return false
-        default: return true
-        }
+    /// What an app call that failed with an error the package does not name says of the copy. The package sets the
+    /// connection for every `MarfaError` itself (`stopped`, `needsHydration`, `offline`, `keyRefused`, or none for
+    /// a canceled call), and `show` shows it, so only an error of another kind is shown here.
+    private func failed(_ error: any Error) {
+        guard !stopped, !Task.isCancelled, !(error is MarfaError), !(error is CancellationError) else { return }
+        Telemetry.syncStoppedUnnamed(during: "refresh")
+        hub.set(.unavailable(message: error.localizedDescription))
     }
 
     // MARK: Attachments
@@ -511,19 +509,16 @@ actor MarfaSync {
             if report.verdicts.contains(where: { [.deleteItem, .restoreItem].contains($0.kind) }) { wantsBin = true }
         } catch {
             // A drain that throws loses its report, and the writes it answered first are recorded, so the engine
-            // takes them from the queue below. An expired copy hydrates again. The package retries a drain only
-            // for a key refusal or a transient error; any other fault leaves the writes queued, so it is told, once
-            // until a drain succeeds.
-            switch error as? MarfaError {
-            case .copyExpired?, .instanceChanged?, .hydrationIncomplete?:
+            // takes them from the queue below. A copy that needs it hydrates again. The package retries a drain only
+            // for a key refusal or a transient error and does not set the connection for a drain, so any other fault
+            // leaves the writes queued, and is told once until a drain succeeds.
+            if (error as? MarfaError)?.isHydrationNeeded ?? false {
                 wantsHydration = true
-            default:
-                if Self.isFault(error) {
-                    faulted = true
-                    if !drainFailureTold {
-                        drainFailureTold = true
-                        await failed(error)
-                    }
+            } else if Self.isDrainFault(error) {
+                faulted = true
+                if !drainFailureTold {
+                    drainFailureTold = true
+                    if let error = error as? MarfaError { stop(for: error) } else { failed(error) }
                 }
             }
         }
@@ -534,6 +529,18 @@ actor MarfaSync {
         // The drain ends once the engine has taken the answers, so a flush returns with them taken.
         await withCheckedContinuation { taken in
             if !tell(.answers(taken)) { taken.resume() }
+        }
+    }
+
+    /// Whether a failed drain left the writes queued for a reason asking again may not clear, which the package
+    /// neither retries nor shows. An unreachable server, a transient error and a refused key are shown through the
+    /// connection, and a copy that needs hydrating is hydrated.
+    private static func isDrainFault(_ error: any Error) -> Bool {
+        guard let error = error as? MarfaError else { return !(error is CancellationError) }
+        if error.isOffline || error.isTransient || error.isKeyRefusal || error.isHydrationNeeded { return false }
+        switch error {
+        case .canceled, .closed: return false
+        default: return true
         }
     }
 
@@ -560,11 +567,10 @@ actor MarfaSync {
                 cursor = next
             }
         } catch let error as MarfaError {
+            // Including a key being changed: the read is asked for again once the new key is in.
             if error.isOffline || error.isTransient { return }
             if case .canceled = error { return }
             if case .closed = error { return }
-            // The key is changing: the read is asked for again once the new key is in.
-            if case .keyChanging = error { return }
             Telemetry.binUnreadable(error)
             _ = tell(.failed(SourceFailure(kind: .failed, message: error.message)))
             return
@@ -580,7 +586,13 @@ actor MarfaSync {
 }
 
 private nonisolated extension CopyConnection {
-    var needsHydration: Bool {
-        if case .needsHydration = self { true } else { false }
+    /// The error the copy stopped on, where asking again may not clear it: the follow's or the app's own call's.
+    /// A `needsHydration` for a reason a hydration clears is no fault.
+    var fault: MarfaError? {
+        switch self {
+        case .stopped(let error): error
+        case .needsHydration(let error?) where !error.isHydrationNeeded: error
+        default: nil
+        }
     }
 }
