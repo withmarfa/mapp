@@ -4,7 +4,7 @@ import Testing
 @testable import MAPP
 
 extension LiveMarfaTests {
-    /// This Marfa over a real test instance: the settings `MarfaServerConfig` reads, and a rename sent as a patch
+    /// This Marfa over a real test instance: the settings `MarfaServerCalls` reads, and a rename sent as a patch
     /// of the name alone. It never touches a retention, which a live instance would apply. The name is put back as
     /// it was, or removed if it was unset, whether the test passes or not. The key must hold `config.manage`, which an
     /// app's key usually lacks; with one that doesn't, the test fails on the server's 403.
@@ -13,7 +13,7 @@ extension LiveMarfaTests {
     struct MarfaInstanceSettingsLiveTests {
         @Test(.timeLimit(.minutes(2))) func theNameIsReadChangedAndPutBack() async throws {
             let connection = try MarfaConnection(address: try LiveMarfa.address())
-            let source = MarfaServerConfig(connection: connection, keys: MemoryKeyStore([connection.address: try LiveMarfa.key()]))
+            let source = MarfaServerCalls(connection: connection, keys: MemoryKeyStore([connection.address: try LiveMarfa.key()]))
             let model = InstanceSettingsModel { .init(id: connection.address.absoluteString, source: source) }
 
             await model.load()

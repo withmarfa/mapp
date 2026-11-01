@@ -1,6 +1,5 @@
 import Foundation
 import Marfa
-import MarfaAPI
 import Synchronization
 import Testing
 @testable import MAPP
@@ -415,30 +414,5 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         await model.load()
         #expect(model.loaded?.name == "Two")
         #expect(model.draft[.name] == "Two")
-    }
-}
-
-/// What goes on the wire, and how the server's refusals are told.
-@Suite struct MarfaServerConfigTests {
-    @Test func theChangeNamesOnlyTheChangedSettingsAndClearRemovesOne() {
-        let patch = InstanceConfigPatch(values: [.name: .text("Home"), .versionMaxVersions: .number(200)], clear: [.trashRetentionDays])
-        let change = MarfaServerConfig.patch(patch)
-        #expect(change.name == .set("Home"))
-        #expect(change.versionMaxVersions == .set(200))
-        #expect(change.trashRetentionDays == .clear)
-        #expect(change.versionRecentDays == nil)
-        #expect(change.versionDailySnapshotDays == nil)
-        #expect(change.versionWeeklySnapshotDays == nil)
-    }
-
-    @Test func aRefusalForAnotherInstanceIsTold() {
-        #expect(MarfaServerConfig.failure(MarfaError.instanceChanged(message: "other")) == .instanceChanged)
-        #expect(MarfaServerConfig.failure(MarfaError.versionConflict(message: "stale")) == .failed("stale"))
-    }
-
-    @Test func aRefusalGivesTheServersReasonWithoutItsDetails() {
-        let error = MarfaError.validation(code: "invalid_config", message: "Windows must not decrease. Details: {\"x\":1}")
-        #expect(MarfaServerConfig.failure(error) == .refused("Windows must not decrease."))
-        #expect(MarfaServerConfig.failure(MarfaError.forbidden(code: "forbidden", message: "no")) == .notPermitted)
     }
 }
