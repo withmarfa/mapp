@@ -13,6 +13,7 @@ nonisolated final class ScriptedRefresh: MarfaRefreshing {
         var hydrations = 0
         var catchUps = 0
         var holding: Bool
+        var failure: MarfaError?
         var waiting: [CheckedContinuation<Void, Never>] = []
     }
 
@@ -31,6 +32,9 @@ nonisolated final class ScriptedRefresh: MarfaRefreshing {
     var hydrations: Int { state.withLock { $0.hydrations } }
     var catchUps: Int { state.withLock { $0.catchUps } }
 
+    /// Makes the next catch-ups and hydrations throw this error, or none.
+    func fail(with error: MarfaError?) { state.withLock { $0.failure = error } }
+
     func letGo() {
         let waiting = state.withLock { state in
             state.holding = false
@@ -44,6 +48,7 @@ nonisolated final class ScriptedRefresh: MarfaRefreshing {
 
     func hydrate(types: [String], tier: SliceTier, edgeTypes: [String]) async throws -> HydrateReport {
         state.withLock { $0.hydrations += 1 }
+        if let failure = state.withLock({ $0.failure }) { throw failure }
         await withCheckedContinuation { continuation in
             let resume = state.withLock { state in
                 if !state.holding { return true }
@@ -56,7 +61,10 @@ nonisolated final class ScriptedRefresh: MarfaRefreshing {
                              resumed: false, restarted: nil, inPlace: false, cursor: "done")
     }
 
-    func catchUp() async throws { state.withLock { $0.catchUps += 1 } }
+    func catchUp() async throws {
+        state.withLock { $0.catchUps += 1 }
+        if let failure = state.withLock({ $0.failure }) { throw failure }
+    }
     func fetchKept() async throws -> KeptFetch { KeptFetch(fetched: 0, fetchedBytes: 0, attachments: nil) }
 }
 
@@ -239,6 +247,50 @@ struct MarfaSyncLifecycleTests {
         sync.hooks.faulting.set { step in step == .drain ? .store(message: "the store failed") : nil }
         await sync.flush()
         _ = try #require(await log.wait { unavailable($0) == 2 })
+        await source.close()
+    }
+
+    /// The package leaves the connection following when a drain fails on a fault, so the updates that follow must
+    /// not show the library online while writes wait.
+    @Test func aDrainFaultStaysShownThroughFollowingUpdatesUntilADrainSucceeds() async throws {
+        let (fake, source, log) = try await scriptedSource(refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()))
+        let sync = await source.engine.sync
+        sync.hooks.faulting.set { step in step == .drain ? .store(message: "the store failed") : nil }
+        fake.sendUpdate(update(.following))
+        try #require(await eventually { sync.hooks.drains >= 1 })
+        await sync.flush()
+        _ = try #require(await log.wait { unavailable($0) == 1 })
+        let drains = sync.hooks.drains
+
+        fake.sendUpdate(update(.following))
+        fake.sendUpdate(update(.following))
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(source.connectionState != .online, "a following update showed a library with queued writes online")
+        #expect(unavailable(log.current) == 1)
+
+        sync.hooks.faulting.set(nil)
+        await sync.flush()
+        #expect(sync.hooks.drains > drains)
+        #expect(source.connectionState == .online)
+        await source.close()
+    }
+
+    @Test(arguments: [
+        MarfaError.unknownType(message: "No such type."),
+        MarfaError.invalid(message: "The request is invalid."),
+    ])
+    func aRefreshRefusedForTheAppsOwnRequestIsShownUnavailableAndToldOnce(_ error: MarfaError) async throws {
+        let refresh = ScriptedRefresh(status: ScriptedRefresh.complete())
+        refresh.fail(with: error)
+        let (_, source, log) = try await scriptedSource(refreshing: refresh)
+        let sync = await source.engine.sync
+
+        await sync.refresh()
+        _ = try #require(await log.wait { unavailable($0) == 1 })
+        await sync.refresh()
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(unavailable(log.current) == 1)
+        #expect(source.connectionState == .unavailable(message: error.message))
         await source.close()
     }
 

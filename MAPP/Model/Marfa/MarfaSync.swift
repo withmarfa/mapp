@@ -305,8 +305,12 @@ actor MarfaSync {
         case .connecting:
             hub.set(.connecting)
         case .following:
-            told = false
-            hub.set(.online)
+            // A drain that failed on a fault leaves the connection following, so the copy stays shown as stopped
+            // until a drain succeeds.
+            if !drainFailureTold {
+                told = false
+                hub.set(.online)
+            }
         case .offline(let error):
             hub.set(.offline(reason: error.message))
         case .stopped(let error):
@@ -428,13 +432,22 @@ actor MarfaSync {
         rehydration.finished()
     }
 
-    /// What an app call that failed with an error the package does not name says of the copy. The package sets the
-    /// connection for every `MarfaError` itself (`stopped`, `needsHydration`, `offline`, `keyRefused`, or none for
-    /// a canceled call), and `show` shows it, so only an error of another kind is shown here.
+    /// What an app call that failed says of the copy. The package sets the connection for a `MarfaError` itself
+    /// (`stopped`, `needsHydration`, `offline`, `keyRefused`, or none for a canceled call), and `show` shows it. It
+    /// ignores `invalid`, `unknownType` and `validation` for an app's call, as proof of nothing about the server, so
+    /// those are shown here with the errors of another kind. Either is shown as unavailable, told once.
     private func failed(_ error: any Error) {
-        guard !stopped, !Task.isCancelled, !(error is MarfaError), !(error is CancellationError) else { return }
+        guard !stopped, !Task.isCancelled, !(error is CancellationError) else { return }
+        if let error = error as? MarfaError {
+            switch error {
+            case .invalid, .unknownType, .validation: stop(for: error)
+            default: break
+            }
+            return
+        }
         Telemetry.syncStoppedUnnamed(during: "refresh")
         hub.set(.unavailable(message: error.localizedDescription))
+        tellOnce(SourceFailure(kind: .failed, message: error.localizedDescription))
     }
 
     // MARK: Attachments
@@ -525,6 +538,7 @@ actor MarfaSync {
         if !faulted, drainFailureTold {
             drainFailureTold = false
             told = false
+            if connection == .following || connection == .local { hub.set(.online) }
         }
         // The drain ends once the engine has taken the answers, so a flush returns with them taken.
         await withCheckedContinuation { taken in
@@ -533,13 +547,13 @@ actor MarfaSync {
     }
 
     /// Whether a failed drain left the writes queued for a reason asking again may not clear, which the package
-    /// neither retries nor shows. An unreachable server, a transient error and a refused key are shown through the
+    /// neither retries nor shows. A copy with no server has nothing to send to, so that is no fault. An unreachable server, a transient error and a refused key are shown through the
     /// connection, and a copy that needs hydrating is hydrated.
     private static func isDrainFault(_ error: any Error) -> Bool {
         guard let error = error as? MarfaError else { return !(error is CancellationError) }
         if error.isOffline || error.isTransient || error.isKeyRefusal || error.isHydrationNeeded { return false }
         switch error {
-        case .canceled, .closed: return false
+        case .canceled, .closed, .noServer: return false
         default: return true
         }
     }
@@ -571,6 +585,8 @@ actor MarfaSync {
             if error.isOffline || error.isTransient { return }
             if case .canceled = error { return }
             if case .closed = error { return }
+            // A copy with no server never answers for the bin, and has nothing to read.
+            if case .noServer = error { return }
             Telemetry.binUnreadable(error)
             _ = tell(.failed(SourceFailure(kind: .failed, message: error.message)))
             return
