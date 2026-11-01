@@ -214,8 +214,12 @@ struct ItemRelationshipPicker: View {
     let owner: ItemID
     let relationship: ItemRelationship
     let candidates: [Item]
-    /// Whether the library accepted the selection, answered once it has judged it.
-    let onSave: ([ItemID]) async -> Bool
+    /// What the person changed from the items linked when the picker opened: the items to link and to unlink.
+    /// Whether the library accepted the change, answered once it has judged it. The library applies it to the links it
+    /// holds then, so a change made while the picker was open is kept.
+    let onSave: (_ adding: [ItemID], _ removing: [ItemID]) async -> Bool
+    /// The items linked when the picker opened, which the selection is compared with.
+    private let opened: Set<ItemID>
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     @State private var selection: Set<ItemID>
@@ -223,12 +227,13 @@ struct ItemRelationshipPicker: View {
     /// While the library judges the selection, so a second Save does not send it again.
     @State private var saving = false
 
-    init(owner: ItemID, relationship: ItemRelationship, candidates: [Item], onSave: @escaping ([ItemID]) async -> Bool) {
+    init(owner: ItemID, relationship: ItemRelationship, candidates: [Item], onSave: @escaping ([ItemID], [ItemID]) async -> Bool) {
         self.owner = owner
         self.relationship = relationship
         self.candidates = candidates
         self.onSave = onSave
-        _selection = State(initialValue: Set(relationship.targets.compactMap(\.itemID)))
+        opened = Set(relationship.targets.compactMap(\.itemID))
+        _selection = State(initialValue: opened)
     }
 
     var body: some View {
@@ -268,10 +273,11 @@ struct ItemRelationshipPicker: View {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Save") {
-                    let chosen = selection.sorted { $0.rawValue < $1.rawValue }
+                    let adding = selection.subtracting(opened).sorted { $0.rawValue < $1.rawValue }
+                    let removing = opened.subtracting(selection).sorted { $0.rawValue < $1.rawValue }
                     saving = true
                     Task {
-                        if await onSave(chosen) { dismiss() } else { rejected = true }
+                        if await onSave(adding, removing) { dismiss() } else { rejected = true }
                         saving = false
                     }
                 }

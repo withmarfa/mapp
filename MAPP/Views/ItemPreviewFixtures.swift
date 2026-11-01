@@ -121,7 +121,7 @@ private struct WhenLoaded<Content: View>: View {
     WhenLoaded(library: ItemPreviewFixtures.library) { library in
         if let relationship = library.relationships(for: ItemPreviewFixtures.ticketID).first {
             ItemRelationshipPicker(owner: ItemPreviewFixtures.ticketID, relationship: relationship,
-                                   candidates: library.relationshipCandidates(for: ItemPreviewFixtures.ticketID, field: relationship.field), onSave: { _ in true })
+                                   candidates: library.relationshipCandidates(for: ItemPreviewFixtures.ticketID, field: relationship.field), onSave: { _, _ in true })
                 .environment(\.library, library)
         }
     }

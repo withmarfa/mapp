@@ -196,7 +196,7 @@ extension LiveMarfaTests {
                 // A new parent replaces the one link a child holds, as one move of the edge's source: the child never
                 // holds none, and a refusal would leave it where it was.
                 let moving = await source.engine.sync.hooks.hydrations
-                await stepAsync { #expect(await library.setItemRelationship(child, field: "child-of", targetIDs: [other], undoManager: undo)) }
+                await stepAsync { #expect(await library.changeItemRelationship(child, field: "child-of", adding: [other], removing: [parent], undoManager: undo)) }
                 #expect(await eventually {
                     library.relationships(for: child).first { $0.field == "child-of" }?.targets.map(\.itemID) == [other]
                 })
@@ -223,11 +223,11 @@ extension LiveMarfaTests {
                 await source.flush()
                 try #require(try await rehydrated(after: undoing))
                 // Without a parent, then under another, each seen from both ends, and undone.
-                await stepAsync { #expect(await library.setItemRelationship(child, field: "child-of", targetIDs: [], undoManager: undo)) }
+                await stepAsync { #expect(await library.changeItemRelationship(child, field: "child-of", adding: [], removing: [parent], undoManager: undo)) }
                 #expect(await eventually {
                     library.relationships(for: child).first { $0.field == "child-of" }?.targets.isEmpty == true
                 })
-                await stepAsync { #expect(await library.setItemRelationship(child, field: "child-of", targetIDs: [other], undoManager: undo)) }
+                await stepAsync { #expect(await library.changeItemRelationship(child, field: "child-of", adding: [other], removing: [], undoManager: undo)) }
                 #expect(await eventually {
                     library.relationships(for: other).first { $0.field == "inverse:parent-of" }?.targets.map(\.itemID) == [child]
                 })

@@ -35,8 +35,7 @@ struct ItemInspectorHost: View {
                     onOpen: open,
                     onEdit: { editing = $0 },
                     onRemove: { relationship, target in
-                        await library.setItemRelationship(id, field: relationship.field,
-                            targetIDs: relationship.targets.compactMap(\.itemID).filter { $0 != target }, undoManager: undoManager)
+                        await library.changeItemRelationship(id, field: relationship.field, adding: [], removing: [target], undoManager: undoManager)
                     },
                     tags: library.tags(of: item),
                     onAddTag: { library.addTag($0, to: [id], undoManager: undoManager) },
@@ -57,7 +56,7 @@ struct ItemInspectorHost: View {
         .sheet(item: $editing) { relationship in
             if let id = selectedID {
                 ItemRelationshipPicker(owner: id, relationship: relationship, candidates: library.relationshipCandidates(for: id, field: relationship.field)) {
-                    await library.setItemRelationship(id, field: relationship.field, targetIDs: $0, undoManager: undoManager)
+                    await library.changeItemRelationship(id, field: relationship.field, adding: $0, removing: $1, undoManager: undoManager)
                 }
             }
         }

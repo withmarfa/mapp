@@ -101,9 +101,19 @@ import Observation
     @ObservationIgnored private var refusals: [WriteID: Refusal] = [:]
     @ObservationIgnored private var following: [Task<Void, Never>] = []
     /// The relationship changes asked for and not yet written or refused, and the last of them, which the next waits
-    /// for so changes run in the order they were made (`setItemRelationship`).
+    /// for so changes run in the order they were made (`changeItemRelationship`).
     @ObservationIgnored var relationshipChangesInFlight = 0
     @ObservationIgnored var relationshipChain: Task<Void, Never>?
+    /// The relationship writes the source took that the copy has not yet taken in or the source has not answered, and
+    /// the changes waiting for some of them.
+    @ObservationIgnored var unsettled: Set<WriteID> = []
+    @ObservationIgnored var waiters: [Waiter] = []
+
+    /// A change waiting until each of `pending` is settled.
+    struct Waiter {
+        var pending: Set<WriteID>
+        let resume: CheckedContinuation<Void, Never>
+    }
     /// The item each create names, until the source answers it.
     @ObservationIgnored private var creating: [WriteID: ItemID] = [:]
     /// The item each property edit is for, until the copy takes or refuses it. Observed, so an editor holding a list it
@@ -209,6 +219,8 @@ import Observation
                     guard let self else { return }
                     await take(change)
                 }
+                // Nothing more will be taken or answered, so no change waits for it.
+                self?.endWaits()
             },
             Task { [weak self] in
                 for await report in reports { self?.syncReport = report }
@@ -390,12 +402,14 @@ import Observation
             propertyMarks[id] = nil
             read(id)
             answered(id, outcome)
+            settle(id)
         case .taken(let id):
             textSaves.removeValue(forKey: id)?.end()
             propertyWrites[id] = nil
             if let mark = propertyMarks.removeValue(forKey: id) { remember(taken: mark) }
             took(id)
             read(id)
+            settle(id)
         case .catalogue(let catalogue):
             self.catalogue = holdingChosenIcons(catalogue)
             reindex()
@@ -547,6 +561,26 @@ import Observation
         // what the copy holds in the change that follows the answer, and this is what it held before that.
         if let body = sourceText.removeValue(forKey: item) { hold([body]) }
     }
+
+    /// The write is in the copy and read again, or was answered before that: a change waiting for it may go on.
+    private func settle(_ write: WriteID) {
+        guard unsettled.remove(write) != nil else { return }
+        for index in waiters.indices { waiters[index].pending.remove(write) }
+        let done = waiters.filter { $0.pending.isEmpty }
+        waiters.removeAll { $0.pending.isEmpty }
+        for waiter in done { waiter.resume.resume() }
+    }
+
+    /// Lets every waiting change go on, as when the source's changes have ended.
+    private func endWaits() {
+        unsettled = []
+        let all = waiters
+        waiters = []
+        for waiter in all { waiter.resume.resume() }
+    }
+
+    /// Whether the source took the write, so it will be taken or answered.
+    func isFollowed(_ write: WriteID) -> Bool { refusals[write] != nil }
 
     // MARK: Writing through the source
 

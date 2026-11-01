@@ -32,9 +32,9 @@ final class FakeItemLibrary: ItemLibrary {
     var trashDays: Int?
     /// What `relationships(for:)` answers, by item.
     var relationshipsByItem: [ItemID: [ItemRelationship]] = [:]
-    /// Whether `setItemRelationship` takes a write, and the writes it was asked for.
+    /// Whether `changeItemRelationship` takes a write, and the writes it was asked for.
     var acceptsRelationships = false
-    var relationshipWrites: [(item: ItemID, field: String, targets: [ItemID])] = []
+    var relationshipWrites: [(item: ItemID, field: String, adding: [ItemID], removing: [ItemID])] = []
     var syncReport = SyncReport(queueRead: true)
     let now: () -> Date
     /// What `attach` answers, which may wait; nil attaches nothing.
@@ -335,8 +335,8 @@ final class FakeItemLibrary: ItemLibrary {
     func finish() {}
     func wasRefused(creating id: ItemID) -> Bool { refusedCreations.contains(id) }
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool { false }
-    func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) async -> Bool {
-        relationshipWrites.append((id, field, targetIDs))
+    func changeItemRelationship(_ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?) async -> Bool {
+        relationshipWrites.append((id, field, adding, removing))
         return acceptsRelationships
     }
 

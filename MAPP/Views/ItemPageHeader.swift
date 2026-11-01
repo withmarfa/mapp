@@ -26,7 +26,7 @@ struct ItemPageHeader: ViewModifier {
                      attachmentAnchor: .rect(.rect((choosingParent ?? .zero).offsetBy(dx: 0, dy: -containerTop))), arrowEdge: .bottom) {
                 if let parent = Self.parent(of: item.id, in: library) {
                     ItemRelationshipPicker(owner: item.id, relationship: parent, candidates: library.relationshipCandidates(for: item.id, field: parent.field)) {
-                        await library.setItemRelationship(item.id, field: parent.field, targetIDs: $0, undoManager: undoManager)
+                        await library.changeItemRelationship(item.id, field: parent.field, adding: $0, removing: $1, undoManager: undoManager)
                     }
                 }
             }
@@ -195,12 +195,12 @@ struct ItemPageHeader: ViewModifier {
         }
     }
 
-    /// Takes the item out of its parent. A library that refuses leaves the parent as it was, and the page says so
-    /// until the next try or the next item.
+    /// Takes the item out of its parent, the one the person saw. A library that refuses leaves the parent as it was,
+    /// and the page says so until the next try or the next item.
     static func removeParent(
         _ parent: ItemRelationship, of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation, undoManager: UndoManager?
     ) async {
-        drafts.draft(for: id, key: parent.field).rejected = !(await library.setItemRelationship(id, field: parent.field, targetIDs: [], undoManager: undoManager))
+        drafts.draft(for: id, key: parent.field).rejected = !(await library.changeItemRelationship(id, field: parent.field, adding: [], removing: parent.targets.compactMap(\.itemID), undoManager: undoManager))
     }
 
     /// The key of the field the item's status is kept in, if its type has one.

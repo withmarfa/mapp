@@ -75,7 +75,7 @@ import Testing
     /// refusal leaves the edge where it was.
     @Test func aReplacementIsOneMoveRatherThanTwoWrites() async throws {
         let (library, source) = try await loaded()
-        #expect(await library.setItemRelationship(F.e1, field: "child-of", targetIDs: [F.p2], undoManager: nil))
+        #expect(await library.changeItemRelationship(F.e1, field: "child-of", adding: [F.p2], removing: [F.p1], undoManager: nil))
         #expect(await eventually { source.writes == [.moveEdge(EdgeID("c1"), end: .source, to: F.p2)] }, "replacement sent as \(source.writes)")
         #expect(library.notices.waiting.last == nil)
     }
@@ -84,7 +84,7 @@ import Testing
     /// one only once the new one is taken, so a refusal never leaves the field with neither.
     @Test func aRefusedLinkInAReplacementKeepsTheOldLink() async throws {
         let (library, source) = try await loaded()
-        #expect(await library.setItemRelationship(F.n1, field: "about", targetIDs: [F.p2], undoManager: nil))
+        #expect(await library.changeItemRelationship(F.n1, field: "about", adding: [F.p2], removing: [F.p1], undoManager: nil))
         #expect(await eventually { source.writes == [.link(EdgeDraft(type: "about", source: F.n1, target: F.p2), undoing: nil)] })
         let link = try #require(source.submitted.last?.id)
         source.send(.answered(link, .refused(SyncProblem(code: "type_not_permitted", message: "Not permitted."))))

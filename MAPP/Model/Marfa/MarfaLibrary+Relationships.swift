@@ -234,66 +234,70 @@ extension MarfaLibrary {
         index.links(touching: id).filter { $0.type == end.info.id && (end.atTarget ? $0.target == id : $0.source == id) }
     }
 
-    /// Makes the field link `id` to exactly `targetIDs`. A link is added where its ends have room and removed freely.
+    /// Changes the field of `id` by what the person changed: `adding` items to link and `removing` items to unlink,
+    /// relative to what they saw, never the whole list they saw, which a change made since would be undone by.
+    /// A link is added where its ends have room and removed freely.
     /// An end that holds one link of its type has it replaced by moving the edge's other end (`edges/move-target`,
     /// `edges/move-source`), so a new parent is one write and the child never holds none or two (`edges/move-no-gap`):
     /// a replacement is a move, and so is taking an item whose own link points elsewhere, as a child chosen under a
     /// project. A link a third item holds as its own is never taken from it.
     ///
-    /// The change is worked out, the core asked of every link it makes, and then worked out again from what the copy
-    /// holds then and written in the same step, with its undo, so an earlier change that landed meanwhile is not
-    /// undone or repeated and a move's old parent is the one it left. A link new in that second look is asked too.
-    /// Changes run one after another in the order they were made, each once the copy shows the one before. Nothing is written until the core has answered.
+    /// The change is worked out, the core asked of every link it makes, and then worked out again from the links the
+    /// copy holds then and written in the same step, with its undo, so an earlier change that landed meanwhile is
+    /// kept and not repeated, and a move's old parent is the one it left. A link new in that second look is asked too.
+    /// Changes run one after another in the order they were made, each once the copy has taken the writes of the one
+    /// before (see `relationshipChain`). Nothing is written until the core has answered.
     /// True means the core accepted the change and it is written, or there was nothing to change; false means it was
     /// refused and told, by MAPP's own rules (the cardinality rules in `plan`, since `Edges.check` does not judge how
     /// many an end holds) or by the core's, and the field is as it was. `finish` waits for a change in flight.
     @discardableResult
-    func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) async -> Bool {
+    func changeItemRelationship(
+        _ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?
+    ) async -> Bool {
         relationshipChangesInFlight += 1
         let previous = relationshipChain
-        let work = Task { () -> (kept: Bool, change: RelationshipChange?) in
+        let work = Task { () -> (kept: Bool, writes: Set<WriteID>) in
             await previous?.value
-            let done = await self.applyRelationship(id, field: field, targetIDs: targetIDs, undoManager: undoManager)
+            let done = await self.applyRelationship(id, field: field, adding: adding, removing: removing, undoManager: undoManager)
             self.relationshipChangesInFlight -= 1
             return done
         }
-        // The next change reads the copy, which shows this one a moment after it is written, so it waits for that.
+        // The next change reads the copy, which shows this one's writes once the source has taken or answered each.
         relationshipChain = Task {
-            if let change = await work.value.change { await self.waitUntilShown(change) }
+            await self.untilSettled(work.value.writes)
         }
         return await work.value.kept
     }
 
-    /// Returns once the copy shows `change`, or after `Self.relationshipSettle` if it does not, as when the source
-    /// refuses a write or the server has not answered.
-    private func waitUntilShown(_ change: RelationshipChange) async {
-        let deadline = ContinuousClock.now + Self.relationshipSettle
-        while !shows(change), ContinuousClock.now < deadline { try? await Task.sleep(for: .milliseconds(10)) }
-    }
-
-    private func shows(_ change: RelationshipChange) -> Bool {
-        change.adding.allSatisfy { index.link(type: $0.type, source: $0.source, target: $0.target) != nil }
-            && change.removing.allSatisfy { index.link(type: $0.type, source: $0.source, target: $0.target) == nil }
-            && change.moving.allSatisfy { move in index.links(touching: move.to).contains { $0.id == move.edge } }
+    /// Returns once each write has been taken into the copy (`SourceChange.taken`) or answered before that
+    /// (`.answered`, as a refusal is). It ends for a write the source refused to take at all, which is never waited
+    /// for, for a source that closes (the engine answers every write it holds `closed`), and when the source's
+    /// changes end (`endWaits`), so it never waits on a write nothing will answer.
+    private func untilSettled(_ writes: Set<WriteID>) async {
+        let pending = writes.intersection(unsettled)
+        guard !pending.isEmpty else { return }
+        await withCheckedContinuation { (waiter: CheckedContinuation<Void, Never>) in
+            waiters.append(Waiter(pending: pending, resume: waiter))
+        }
     }
 
     private func applyRelationship(
-        _ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?
-    ) async -> (kept: Bool, change: RelationshipChange?) {
+        _ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?
+    ) async -> (kept: Bool, writes: Set<WriteID>) {
         let cantChange = String(localized: "Can’t Change This Relationship")
         var asked: Set<EdgeDraft> = []
         while true {
-            guard let plan = plan(id, field: field, targetIDs: targetIDs) else { return (false, nil) }
-            guard !plan.change.isEmpty else { return (true, nil) }
+            guard let plan = plan(id, field: field, adding: adding, removing: removing) else { return (false, []) }
+            guard !plan.change.isEmpty else { return (true, []) }
             let unasked = plan.made.filter { !asked.contains($0) }
             guard !unasked.isEmpty else {
-                relink(plan.change, name: String(localized: "Edit Relationship"), undoManager: undoManager)
-                return (true, plan.change)
+                let writes = relink(plan.change, name: String(localized: "Edit Relationship"), undoManager: undoManager)
+                return (true, writes)
             }
             for link in unasked {
                 if case .refused(let reason) = await source.edgeVerdict(link) {
                     notices.tell(cantChange, reason)
-                    return (false, nil)
+                    return (false, [])
                 }
                 asked.insert(link)
             }
@@ -302,24 +306,27 @@ extension MarfaLibrary {
 
     /// What the edges would be changed by, and every link it makes, whether added or made by moving an end: what the
     /// core is asked about. Nil where MAPP's own rules refuse, and the person is told.
-    private func plan(_ id: ItemID, field: String, targetIDs: [ItemID]) -> (change: RelationshipChange, made: [EdgeDraft])? {
-        guard let item = item(id), item.isEditable, let end = fieldEnd(field), Set(targetIDs).count == targetIDs.count
-        else { return nil }
+    private func plan(_ id: ItemID, field: String, adding wanted: [ItemID], removing unwanted: [ItemID]) -> (change: RelationshipChange, made: [EdgeDraft])? {
+        guard let item = item(id), item.isEditable, let end = fieldEnd(field) else { return nil }
         let cantChange = String(localized: "Can’t Change This Relationship")
         guard end.info.id != MarfaMapping.bodyLinkEdge else {
             notices.tell(cantChange, String(localized: "A link is changed in the text that holds it."))
             return nil
         }
         let holds = end.info.cardinality(atTarget: end.atTarget)
-        if holds == .one, targetIDs.count > 1 {
-            notices.tell(cantChange, String(localized: "Only one item can be chosen here."))
-            return nil
-        }
         let farEnd = FieldEnd(info: end.info, atTarget: !end.atTarget, isInverse: !end.isInverse)
         // A two-way relation is one list of the links this item holds and the ones pointing at it.
         let own = others(of: id, end)
         let incoming = !end.isInverse && end.info.isTwoWay ? others(of: id, farEnd) : []
         let current = own + incoming.filter { !own.contains($0) }
+        // What the field holds now, with the person's change on it: read here, on every pass, so a change that landed
+        // since the person looked is kept.
+        var targetIDs = current.filter { !unwanted.contains($0) }
+        for other in wanted where !targetIDs.contains(other) && !unwanted.contains(other) { targetIDs.append(other) }
+        guard holds != .one || targetIDs.count <= 1 else {
+            notices.tell(cantChange, String(localized: "Only one item can be chosen here."))
+            return nil
+        }
         let adding = targetIDs.filter { !current.contains($0) }
         let removing = current.filter { !targetIDs.contains($0) }
         var change = RelationshipChange(removing: removing.flatMap { other in
@@ -379,27 +386,36 @@ extension MarfaLibrary {
     /// Where links are added or moved and others removed, as when one item is chosen in place of another in a field
     /// that holds many, the new links go first and the old ones are removed only once the source has taken every new
     /// one, so a refusal leaves the field as it was rather than with the old link gone and the new one missing.
+    ///
+    /// Returns the writes sent now that the source took, which a following change waits for: the adds, the moves and
+    /// any unlink sent at once. An unlink held back for the new links is not one of them, since it is sent only after
+    /// the server answers them, which can be long, and a write the source refused to take is not either.
+    @discardableResult
     func relink(
         _ change: RelationshipChange, name: String, failing title: String = String(localized: "Can’t Change This Relationship"),
         undoManager: UndoManager?
-    ) {
+    ) -> Set<WriteID> {
         var links = change.adding.map { submit(.link($0, undoing: nil), failing: title) }
         links += change.moving.map { submit(.moveEdge($0.edge, end: $0.end, to: $0.to), failing: title) }
+        var sent = Set(links)
         if links.isEmpty {
-            unlink(change.removing, failing: title)
+            sent.formUnion(unlink(change.removing, failing: title))
         } else if !change.removing.isEmpty {
             awaitLinks(Set(links), thenUnlink: change.removing)
         }
         registerUndo(undoManager, name: name) { [weak undoManager] library in
             library.relink(change.reversed, name: name, failing: title, undoManager: undoManager)
         }
+        // A write that was not queued, as after the source closed, was told to the person and gets no answer.
+        sent = sent.filter { isFollowed($0) }
+        unsettled.formUnion(sent)
+        return sent
     }
 
-    func unlink(_ drafts: [EdgeDraft], failing title: String = String(localized: "Can’t Change This Relationship")) {
-        for draft in drafts {
-            if let link = index.link(type: draft.type, source: draft.source, target: draft.target) {
-                submit(.unlink(link.id), failing: title)
-            }
+    @discardableResult
+    func unlink(_ drafts: [EdgeDraft], failing title: String = String(localized: "Can’t Change This Relationship")) -> [WriteID] {
+        drafts.compactMap { draft in
+            index.link(type: draft.type, source: draft.source, target: draft.target).map { submit(.unlink($0.id), failing: title) }
         }
     }
 }

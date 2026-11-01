@@ -69,8 +69,6 @@ extension MarfaLibrary {
 
     /// The longest `finish` waits for a relationship change to be checked.
     static let relationshipWait = Duration.seconds(2)
-    /// The longest a relationship change waits for the copy to show the one before it.
-    static let relationshipSettle = Duration.milliseconds(500)
 
     var engineActivity: EngineActivity? { source.engineActivity }
 

@@ -149,7 +149,8 @@ struct InspectorFieldsTests {
         let drafts = DetailsPresentation()
 
         await ItemPageHeader.removeParent(parent, of: child.id, in: library, drafts: drafts, undoManager: nil)
-        #expect(library.relationshipWrites.map(\.targets) == [[]])
+        #expect(library.relationshipWrites.map(\.removing) == [[ItemID("10000000-0000-0000-0000-000000000009")]])
+        #expect(library.relationshipWrites.map(\.adding) == [[]])
         #expect(ItemPageHeader.header(of: child.id, in: library, drafts: drafts)?.parentRejected == true)
 
         library.acceptsRelationships = true

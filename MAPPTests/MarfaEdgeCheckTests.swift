@@ -78,7 +78,7 @@ struct MarfaEdgeCheckTests {
         try await Self.file("child", under: "a", in: scene)
         // The check judges types, cycles, the bin and flat nesting; how many an end holds is the move's to keep.
         #expect(await scene.library.relationshipVerdict(for: scene.id("child"), field: "child-of", to: scene.id("b")) == .taken)
-        #expect(await scene.library.setItemRelationship(scene.id("child"), field: "child-of", targetIDs: [scene.id("b")], undoManager: nil))
+        #expect(await scene.library.changeItemRelationship(scene.id("child"), field: "child-of", adding: [scene.id("b")], removing: [scene.id("a")], undoManager: nil))
         try #require(await eventually {
             scene.library.relationships(for: scene.id("child")).first { $0.field == "child-of" }?.targets.map(\.itemID) == [scene.id("b")]
         })
@@ -117,13 +117,13 @@ struct MarfaEdgeCheckTests {
         let scene = try await Self.scene([("holiday", "core.collection"), ("archive", "core.collection"), ("note", "core.note")])
         let queued = try await scene.fake.copy.queue.all().count
         // The note may join; the other collection may not, since the type is flat. Neither is written.
-        #expect(await scene.library.setItemRelationship(
-            scene.id("holiday"), field: "inverse:in-collection", targetIDs: [scene.id("note"), scene.id("archive")], undoManager: nil) == false)
+        #expect(await scene.library.changeItemRelationship(
+            scene.id("holiday"), field: "inverse:in-collection", adding: [scene.id("note"), scene.id("archive")], removing: [], undoManager: nil) == false)
         #expect(!scene.library.notices.waiting.isEmpty, "the core's refusal is told before the call answers")
         #expect(try await scene.fake.copy.queue.all().count == queued)
         #expect(scene.library.relationships(for: scene.id("holiday")).allSatisfy { $0.targets.isEmpty })
         // The note alone is taken.
-        #expect(await scene.library.setItemRelationship(scene.id("holiday"), field: "inverse:in-collection", targetIDs: [scene.id("note")], undoManager: nil))
+        #expect(await scene.library.changeItemRelationship(scene.id("holiday"), field: "inverse:in-collection", adding: [scene.id("note")], removing: [], undoManager: nil))
         try #require(await eventuallyAsking { try await scene.fake.copy.queue.all().count == queued + 1 })
         await scene.source.close()
     }
