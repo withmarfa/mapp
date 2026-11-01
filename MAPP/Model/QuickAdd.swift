@@ -467,9 +467,10 @@ extension Browser {
 
     /// Adds the draft as an item of its kind, with its properties and under its place, in one create. Then the
     /// panel closes and the window opens the item, adds it to the collection being shown, and attaches the draft's
-    /// files to it (`finishNewItem`). Where
-    /// the library cannot make it, everything stays as typed and the library tells the person why. A file no
-    /// longer where it was is taken out of the draft and named, and nothing is added until the person has seen
+    /// files to it (`finishNewItem`). Where the library cannot make it, everything stays as typed and the library tells
+    /// the person why. The core is asked about the parent first, with the draft held as being sent: a second Add does
+    /// nothing meanwhile, and a draft changed meanwhile stays as typed and is not added until the person adds again. A
+    /// file no longer where it was is taken out of the draft and named, and nothing is added until the person has seen
     /// that. Nothing empty is ever written.
     @discardableResult
     func saveQuickAdd(in library: any ItemLibrary, undoManager: UndoManager?) async -> ItemID? {
@@ -490,10 +491,18 @@ extension Browser {
             }
             return nil
         }
-        // Before anything is made, so a parent the core refuses leaves no item behind.
-        if let parent = draft.parentID, case .refused(let reason) = await library.newChildVerdict(under: parent) {
-            library.notices.tell(String(localized: "Can’t Create Item"), reason)
-            return nil
+        // Before anything is made, so a parent the core refuses leaves no item behind. The draft is held as being sent
+        // meanwhile, so a second Add does nothing and the window does not hand off what is on its way.
+        if let parent = draft.parentID {
+            quickAdd.saving(draft)
+            let verdict = await library.newChildVerdict(under: parent)
+            quickAdd.saving(nil)
+            // Text typed while the core was asked stays as typed; nothing is made from the draft as it was.
+            guard quickAdd.draft == draft else { return nil }
+            if case .refused(let reason) = verdict {
+                library.notices.tell(String(localized: "Can’t Create Item"), reason)
+                return nil
+            }
         }
         let interval = Telemetry.begin(.navigation, "quickAdd.save")
         defer { interval.end() }
