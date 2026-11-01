@@ -73,14 +73,14 @@ import WebKit
     /// Shows `html` in place of what was shown, once the document has loaded. Until then, and if the load fails, `page`
     /// keeps the page it had, which for the first document is the page that document loads into. Throws
     /// `CancellationError` when the task is cancelled or a later call starts before this one's document has loaded,
-    /// since a document shown over a newer one would be out of date. Its relative links resolve against nothing.
+    /// since a document shown over a newer one would be out of date. A `look` restyles it before it appears. Its relative links resolve against nothing.
     ///
     /// The document is read in `encoding`, or where none is given, in the one `HTMLEncoding` finds for its bytes: the
     /// page has to be told one, which overrides what the document declares.
     ///
     /// Where the pictures' version moved on while the document loaded, as when the setting changed, the page asks
     /// for its pictures again at the version now current, since only those answers count what waits for the person.
-    func show(_ html: Data, encoding: String.Encoding? = nil) async throws {
+    func show(_ html: Data, encoding: String.Encoding? = nil, look: SourceLook? = nil) async throws {
         shows += 1
         let call = shows
         let encoding = encoding ?? HTMLEncoding.of(html)
@@ -99,6 +99,13 @@ import WebKit
         // A cancelled load ends its sequence without an error.
         try Task.checkCancellation()
         guard call == shows else { throw CancellationError() }
+        // Before the page is swapped in, so the person never sees the document unstyled. A look that fails to apply
+        // leaves the document as it loaded.
+        if let look {
+            _ = try? await next.callJavaScript(
+                SourceLook.script, arguments: ["css": look.css, "reader": look.mode == .reader, "title": look.title],
+                contentWorld: Self.world)
+        }
         page = next
         guard let pictures else { return }
         var drawn = pictures.documentVersion
