@@ -123,14 +123,14 @@ actor MarfaEngine {
     var queue: [Marfa.QueuedWrite] = []
     var syncStates: [ItemID: SyncState] = [:]
     var changedSync: Set<ItemID> = []
-    /// Refusals and conflicts answered, which the queue forgets unless the write carried content, kept until a later
-    /// write of the same kind, or an edit, is accepted or merged. Answers already in the queue at launch, from a
-    /// launch that closed before forgetting them, are taken in at the first read of the queue.
+    /// Refusals and conflicts answered, which the copy clears when it hands the answers over (`Queue.takeAnswered`)
+    /// unless the write carried content, kept until a later write of the same kind, or an edit, is accepted or
+    /// merged. Answers recorded before this launch are taken in at the first update.
     var remembered: [ItemID: (state: SyncState, kind: WriteKind)] = [:]
     var readQueueOnce = false
     /// Until the queue is first read, nothing can be said of what waits.
     var queueRead = false
-    /// Refused writes as last read, kept once the queue forgets those that carried no content, so each stays
+    /// Refused writes as last read, kept once the copy clears those that carried no content, so each stays
     /// before the person until they discard it or a later write of its kind lands.
     var refusals: [String: Marfa.QueuedWrite] = [:]
     /// The item each conflicted copy was made from, as its verdict named it, which is known before the copy's link has reached the copy.
@@ -340,8 +340,8 @@ actor MarfaEngine {
         }
     }
 
-    /// A read the copy refuses while a hydration is under way is no failure to tell: the copy says `.refreshed` when
-    /// the hydration ends, and the engine reads it all again then. A source move hydrates a large library again
+    /// A read the copy refuses while a hydration is under way is no failure to tell: the copy's next update
+    /// asks for everything when the hydration ends, and the engine reads it all again then. A source move hydrates a large library again
     /// after every move, so telling it would put up an alert after an ordinary change of parent.
     func readFailed(_ error: any Error) {
         if case MarfaError.hydrationIncomplete = error { return }

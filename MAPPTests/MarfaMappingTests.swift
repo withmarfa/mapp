@@ -397,6 +397,7 @@ struct MarfaMappingTests {
             .conflicted(sibling: ItemID("s"), fields: ["body"]))
         #expect(MarfaMapping.outcome(.blocked(reason: .keySpent)) == .blocked(.keySpent, nil))
         #expect(MarfaMapping.outcome(.blocked(reason: .failingAlone)) == .blocked(.failingAlone, nil))
+        #expect(MarfaMapping.outcome(.blocked(reason: .instanceChanged)) == .blocked(.instanceChanged, nil))
         #expect(MarfaMapping.outcome(.dead) == .dead)
     }
 

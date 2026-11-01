@@ -212,7 +212,7 @@ struct ProblemWordingTests {
     @Test func everyActionOfferedIsOneTheContractAllows() {
         let kinds: [SyncProblemEntry.Kind] = [
             .refused, .blocked(.credentialRefused), .blocked(.keySpent), .blocked(.ancestorUnavailable),
-            .blocked(.conflictUnresolved), .blocked(.failingAlone), .dead, .conflicted(sibling: ItemID("c"), original: nil)
+            .blocked(.conflictUnresolved), .blocked(.failingAlone), .blocked(.instanceChanged), .dead, .conflicted(sibling: ItemID("c"), original: nil)
         ]
         for kind in kinds {
             #expect(wording(entry(kind)).actions.map(\.action) == MarfaProblems.actions(for: kind))

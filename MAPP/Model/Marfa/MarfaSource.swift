@@ -46,9 +46,9 @@ nonisolated enum MarfaConnectionState: Hashable, Sendable {
     /// The server refused the key, or it lacks what reading the library needs. Writes wait until the person gives
     /// another in Settings.
     case keyRefused
-    /// The copy cannot be opened, or following the server stopped; the message is the package's. A stopped follow
-    /// stays stopped until a refresh: one a failed follow waits for, and one the engine makes when the core ended
-    /// the stream on a fault and a new one is taken. The copy still reads and queues.
+    /// The copy cannot be opened, or the sync stopped on a fault that asking again may not clear, such as a copy made
+    /// for another server; the message is the package's. It stays until the package follows the server again or a
+    /// refresh succeeds. The copy still reads and queues.
     case unavailable(message: String)
     /// A different version of the app made the copy, so this one can't open it, and leaves it as it is. The
     /// changes in it that the server has not taken (`unsent`, never 0, and nil where that can't be read) can

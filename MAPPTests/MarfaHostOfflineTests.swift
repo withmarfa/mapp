@@ -71,6 +71,25 @@ struct MarfaHostOfflineTests {
         try await discardEverything(host)
     }
 
+    /// A key the Keychain would not give is not a missing key: nothing is replaced, and the person is told why.
+    @Test
+    func anUnreadableKeyIsToldAndNothingIsReplaced() async throws {
+        let bench = try HostBench()
+        let host = bench.host(opener: { try await MarfaSource.open($0, keys: $1, location: $2) })
+        let connection = try MarfaConnection(address: address)
+        try await host.connect(address: address, key: "first")
+        let source = try #require(host.source)
+        bench.keys.makeUnreadable(connection.address)
+        do {
+            try await host.replaceKey("second")
+            Issue.record("replaced a key it could not read")
+        } catch {
+            #expect(error == .unavailable(message: Words.keyUnreadable), "\(error)")
+        }
+        #expect(host.source === source)
+        try await discardEverything(host)
+    }
+
     /// The count comes from the copy once the write is queued, not from a report not yet passed on.
     @Test
     func aWriteMadeJustBeforeLeavingIsNotLost() async throws {

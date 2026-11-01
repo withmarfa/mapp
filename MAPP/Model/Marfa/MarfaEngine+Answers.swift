@@ -1,7 +1,7 @@
 import Foundation
 import Marfa
 
-/// Taking the answers the copy holds: telling each write its verdict, and the copy forgetting those taken.
+/// Taking the answers the copy holds: telling each write its verdict, and the copy clearing those taken.
 extension MarfaEngine {
     /// The queue as the engine counts the person's text against: what the copy holds, and the answers taken from
     /// it that an item's text has not yet been counted past (`answeredHeld`).

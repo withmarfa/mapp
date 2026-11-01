@@ -64,7 +64,7 @@ import Testing
     }
 
     /// A key sent over plain http to another machine can be read on the way, so the person is told, once in a run
-    /// for each address, including one switched to. The package remembers each address for the whole test run, so
+    /// for each address, including one switched to. The host remembers each address for the whole process, so
     /// these are made up for this test.
     @Test func aPlainHTTPAddressOnAnotherMachineIsToldOnce() async throws {
         let address = "http://plain-\(UUID().uuidString.lowercased()).test:8210"

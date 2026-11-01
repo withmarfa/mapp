@@ -99,8 +99,7 @@ import Observation
     /// The address connected to, kept while its copy cannot be opened, so Settings can offer a key for it.
     private(set) var connection: MarfaConnection?
     /// The library to show, once its copy is open. It holds how its server stands and what its copy last
-    /// reported, and tells the host when the server comes back, so the host keeps neither and follows neither
-    /// while a copy is open.
+    /// reported, so the host keeps neither while a copy is open.
     private(set) var library: MarfaLibrary?
     /// How the server stands while no copy is open: connecting to it, or why its copy could not be opened.
     private var standing = MarfaConnectionState.disconnected
@@ -161,7 +160,7 @@ import Observation
     }
 
     /// Whether Refresh has anything to do: an open copy of a server's library, not already syncing, and a key the
-    /// server has not refused. A server that cannot be reached, and a follow that stopped, still count, so the
+    /// server has not refused. A server that cannot be reached, and a library the sync stopped on a fault, still count, so the
     /// person can try again at once rather than wait for the copy's next try.
     var canRefresh: Bool {
         guard hasServer, source != nil, report.phase == .current else { return false }
@@ -535,10 +534,10 @@ import Observation
         error.localizedDescription
     }
 
-    /// The keychain and the disk can each take a while, which the main actor never waits on.
     /// The plain http origins the person has been told of in this run, since the package keeps no state.
     private nonisolated static let toldPlainHTTP = Mutex(Set<String>())
 
+    /// The keychain and the disk can each take a while, which the main actor never waits on.
     @concurrent nonisolated static func offMain<T: Sendable>(_ work: @Sendable () throws -> T) async throws -> T {
         try work()
     }
