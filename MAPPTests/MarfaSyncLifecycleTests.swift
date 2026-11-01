@@ -143,6 +143,21 @@ struct MarfaSyncLifecycleTests {
         await source.close()
     }
 
+    /// A hydration the app has started is catching up before the package reports its first page, as when it waits
+    /// for a catch-up or another fill to end, so an Undo held meanwhile waits for it (`MarfaEngine.expire`).
+    @Test func aHydrationIsCatchingUpBeforeThePackageReportsItsProgress() async throws {
+        let refresh = ScriptedRefresh(status: ScriptedRefresh.complete(), holding: true)
+        let (fake, source, _) = try await scriptedSource(refreshing: refresh)
+        let expired = MarfaError.copyExpired(reason: "reach_changed", message: "the copy expired")
+
+        fake.sendUpdate(update(.needsHydration(expired)))
+        try #require(await eventually { refresh.hydrations == 1 })
+        #expect(await eventually { source.syncReport.phase == .catchingUp }, "\(source.syncReport.phase)")
+        refresh.letGo()
+        #expect(await eventually { source.syncReport.phase == .current }, "\(source.syncReport.phase)")
+        await source.close()
+    }
+
     /// A first fill that fails transiently shows the copy offline; when the package's wait ends it says the copy needs
     /// hydration again, which is a new turn, so the copy is hydrated again and is not shown following meanwhile.
     @Test func aFirstFillThatFailedTransientlyShowsOfflineAndHydratesAgainWhenAsked() async throws {

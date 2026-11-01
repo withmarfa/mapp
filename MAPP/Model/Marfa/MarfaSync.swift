@@ -272,17 +272,18 @@ actor MarfaSync {
         _ = tell(.failed(failure))
     }
 
-    /// The report is catching up while a hydration runs, and updating while the copy asks its server or the
-    /// person's refresh is under way.
+    /// The report is catching up while a hydration runs, the app's own from its call (before the package reports a
+    /// first page, as while it waits for a catch-up to end) or the package's refill, and updating while the copy asks
+    /// its server, a hydration is about to start or the person's refresh is under way.
     private func publishPhase() {
         let asking: Bool
         switch connection {
         case .connecting?: asking = true
-        // The hydration this connection asks for, started or about to be; with none, Refresh is offered.
-        case .needsHydration?: asking = hydrationUnderway || wantsHydration
+        // The hydration this connection asks for, about to start; with none, Refresh is offered.
+        case .needsHydration?: asking = wantsHydration
         default: asking = false
         }
-        let phase: SyncReport.Phase = fill != nil ? .catchingUp : (asking || refreshes > 0 ? .updating : .current)
+        let phase: SyncReport.Phase = fill != nil || hydrationUnderway ? .catchingUp : (asking || refreshes > 0 ? .updating : .current)
         hub.report.update { $0.phase = phase }
     }
 
@@ -338,7 +339,11 @@ actor MarfaSync {
     /// The stable slice lets the core resume an interrupted fill and includes types registered later.
     private func hydrate() async throws {
         hydrationUnderway = true
-        defer { hydrationUnderway = false }
+        publishPhase()
+        defer {
+            hydrationUnderway = false
+            publishPhase()
+        }
         #if DEBUG
         hooks.seen.update { $0.hydrations += 1 }
         #endif

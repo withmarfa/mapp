@@ -33,7 +33,8 @@ extension MarfaEngine {
     }
 
     /// Tells each verdict to the app's write and shows it on its item. A refusal or conflict stays shown after
-    /// that through `remembered`, and refused writes that carried content stay queued until discarded.
+    /// that through `remembered`, and every refused write through `refusals` until the person discards it; one that carried content stays
+    /// queued until then.
     func answer(_ writes: [Marfa.QueuedWrite]) async {
         #if DEBUG
         await hooks.answering.current?()
@@ -45,6 +46,9 @@ extension MarfaEngine {
             if let itemID = answer.itemId, [.deleteItem, .restoreItem].contains(answer.kind) { leaving.insert(itemID) }
             guard let verdict = answer.verdict else { continue }
             if [.createItem, .updateItem].contains(answer.kind), answer.itemId != nil { answeredHeld[answer.id] = answer }
+            // The copy clears a refused write that carried no content as it hands it over, so no read of the queue
+            // finds it again.
+            if case .refused = verdict { refusals[answer.id] = answer }
             let outcome = MarfaMapping.outcome(verdict)
             ids.formUnion(movedEnds.removeValue(forKey: answer.id) ?? [])
             if let itemID = answer.itemId {
