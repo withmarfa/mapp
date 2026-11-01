@@ -260,7 +260,9 @@ struct MarfaMappingTests {
     }
 
     @Test func theRowsStateTierTagsVersionAndDatesCarryOver() {
-        let item = Self.item(Self.row("t", state: .trashed, tier: .feed, version: 7, tags: ["favorite", "work"]))
+        var row = Self.row("t", state: .trashed, tier: .feed, version: 7, tags: ["favorite", "work"])
+        row.trashedAt = "2026-10-07T09:30:00Z"
+        let item = Self.item(row)
         #expect(item.id == ItemID("t"))
         #expect(item.type == TypeID("aic.ticket"))
         #expect(item.state == .trashed)
@@ -270,7 +272,8 @@ struct MarfaMappingTests {
         #expect(item.version == ItemVersion(7))
         #expect(abs(item.created.timeIntervalSince1970 - 1_791_247_942.021) < 0.001)
         #expect(item.modified == Date(timeIntervalSince1970: 1_791_248_400))
-        #expect(item.trashed == item.modified)
+        #expect(item.trashed == Date(timeIntervalSince1970: 1_791_365_400))
+        #expect(Self.item(Self.row("a")).trashed == nil)
         #expect(Self.item(Self.row("u", tier: nil)).tier == .library)
         #expect(Self.item(Self.row("r", state: .revoked)).state == .archived)
     }
@@ -324,17 +327,6 @@ struct MarfaMappingTests {
         #expect(item.edgesOut.allSatisfy { $0.origin == .body })
         #expect(Set(item.edgesOut.map(\.id)).count == item.edgesOut.count)
         #expect(MarfaMapping.unresolvedLinks(of: "n", in: nil).isEmpty)
-        // Each link is kept in order with what the package bound that very spelling to, so two links to one name can
-        // name two notes, and a name's first note is what a new link with that name would take.
-        #expect(item.boundLinks == [
-            BoundLink(link: NoteLink(name: "Plan"), resolution: .resolved(ItemID("plan"))),
-            BoundLink(link: NoteLink(name: "Plan", alias: "again"), resolution: .missing),
-            BoundLink(link: NoteLink(name: "Later"), resolution: .pending),
-            BoundLink(link: NoteLink(name: "Nowhere"), resolution: .missing),
-            BoundLink(link: NoteLink(name: "Twin"), resolution: .ambiguous([])),
-            BoundLink(link: NoteLink(name: "Banned"), resolution: .refused("forbidden"))
-        ])
-        #expect(item.establishedLinks == [NoteLinks.nameKey("Plan"): ItemID("plan")])
         // Each embed is kept, as written, with the file item the package bound it to, which is what the page shows.
         #expect(item.boundEmbeds == [
             BoundEmbed(text: "![[cat.png]]", resolution: .resolved(ItemID("file"))),

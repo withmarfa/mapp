@@ -220,6 +220,35 @@ nonisolated final class MarfaSource: ItemSource {
         return ItemBody(id: item, text: text, version: ItemVersion(row.version))
     }
 
+    func linkAnswers(of targets: [String], in note: ItemID?) async throws -> [LinkAnswer] {
+        try await copy.items.linkCandidates(of: targets, in: note?.rawValue).map { answer in
+            let state: LinkAnswer.State
+            switch answer.state {
+            case .bound: state = .bound
+            case .ambiguous: state = .ambiguous
+            case .unresolved: state = .unresolved
+            }
+            return LinkAnswer(
+                target: answer.target, state: state, item: answer.item.map { ItemID($0) }, candidates: answer.candidates.map { ItemID($0) })
+        }
+    }
+
+    /// `Edges.check` throws `validation` or `notFound` for an edge the core refuses. Any other error (the key changing,
+    /// the copy closed or not yet whole, a canceled call) says nothing about the edge.
+    func edgeVerdict(_ draft: EdgeDraft) async -> EdgeVerdict {
+        do {
+            try await copy.edges.check(from: draft.source.rawValue, to: draft.target.rawValue, type: draft.type)
+            return .taken
+        } catch let error as MarfaError {
+            switch error {
+            case .validation, .notFound: return .refused(error.message)
+            default: return .unknown
+            }
+        } catch {
+            return .unknown
+        }
+    }
+
     func fileURL(of item: ItemID) async throws -> URL {
         let row = try await self.row(item)
         guard let hash = row.properties[MarfaMapping.blobField]?.string else {
@@ -425,15 +454,11 @@ nonisolated final class MarfaSource: ItemSource {
         }
     }
 
-    /// A row in the bin is not answered by `get`: the copy lists those it still holds, and the rest are the ones
-    /// the server's bin gave.
+    /// A row in the bin is not answered by `get`, so it is asked for with the bin included.
     private func row(_ id: ItemID) async throws -> Marfa.Item {
         do {
-            let row = try await MarfaEngine.asking { () async throws -> Marfa.Item? in
-                if let row = try await copy.items.get(id.rawValue) { return row }
-                return try await copy.items.list(ListFilters(states: [.trashed])).first { $0.id == id.rawValue }
-            }
-            if let row = row ?? hub.binnedRow(id.rawValue) { return row }
+            let rows = try await MarfaEngine.asking { try await copy.items.get([id.rawValue], includingBin: true) }
+            if let row = rows.first { return row }
         } catch let error as MarfaError {
             throw SourceFailure(kind: .failed, message: error.message)
         }
@@ -521,18 +546,8 @@ nonisolated final class MarfaHub: Sendable {
     let activity = EngineActivity()
     private let connectionState = Latest(MarfaConnectionState.connecting)
     let report = Latest(SyncReport())
-    /// The rows of the server's bin that the copy does not hold, for the readers of their text.
-    private let bin = Mutex<[String: Marfa.Item]>([:])
 
     var connection: MarfaConnectionState { connectionState.value }
-
-    func setBinned(_ rows: [String: Marfa.Item]) {
-        bin.withLock { $0 = rows }
-    }
-
-    func binnedRow(_ id: String) -> Marfa.Item? {
-        bin.withLock { $0[id] }
-    }
 
     var catalogue: Catalogue { state.withLock { $0.held?.catalogue ?? Catalogue() } }
 

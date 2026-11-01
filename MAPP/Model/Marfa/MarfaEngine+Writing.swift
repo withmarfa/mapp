@@ -159,15 +159,9 @@ extension MarfaEngine {
             switch state {
             case .trashed: return [try await copy.items.delete(id.rawValue)]
             case .active where rows[id.rawValue]?.state == .trashed || rows[id.rawValue] == nil:
-                // A row the copy lets go of after its delete is answered is restored by its id, and shown nowhere
+                // A row the copy does not hold, as one the slice let go, is restored by its id and shown nowhere
                 // until the server answers.
-                let row = binned[id.rawValue]
-                let queued = try await copy.items.restore(id.rawValue)
-                if let row {
-                    binned[id.rawValue] = nil
-                    restoring[id.rawValue] = row
-                }
-                return [queued]
+                return [try await copy.items.restore(id.rawValue)]
             case .active, .archived:
                 return [try await copy.items.transition(id.rawValue, to: MarfaMapping.marfaState(state))]
             }
@@ -228,14 +222,12 @@ extension MarfaEngine {
     /// takes no call to the server, and its verdict arrives as an event. The copy and the bin follow from the
     /// copy's own word that the item was purged.
     private func purge(_ id: ItemID, at version: ItemVersion, as write: WriteID) {
-        Task { [copy, hub, sync, tell] in
+        Task { [copy, sync, tell] in
             await sync.flush()
             let outcome: WriteOutcome
             do {
                 try await Self.asking { try await copy.items.purge(id.rawValue, version: version.rawValue) }
                 outcome = .accepted
-                // The bin is the server's to say, and the copy never held the item.
-                await sync.binChanged()
             } catch let error as MarfaError {
                 outcome = .refused(Self.problem(for: error))
             } catch {

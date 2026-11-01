@@ -1,55 +1,23 @@
 import Foundation
+import Marfa
 
-/// A `[[link]]` as the page reads it: the name before any `|` or `#`, the heading after `#`, and the alias after `|`,
-/// with the backslash escapes of `[`, `]`, `|`, `#` and `\` taken out, as Inkkit reads a link and as the page posts it.
+/// A `[[link]]` as the core reads it (`linkParts(in:)`): the name before any `|` or `#`, the heading after `#`, and
+/// `raw`, the text between the brackets exactly as written. Marfa has no escape in a link, so a backslash is part of
+/// the text; the page's own reading of one is never used.
 ///
-/// Marfa binds authored spellings separately. Decoded parts support navigation, but only the original text identifies
-/// a binding, including aliases that repeat the name and escaped separators.
+/// `raw` defines equality, byte for byte as Marfa compares authored spellings, so `[[Plan]]` and `[[Plan|Plan]]` stay
+/// distinct.
 nonisolated struct NoteLink: Hashable, Sendable {
-    private(set) var raw: String
-    var name: String
-    var heading: String?
-    var alias: String?
+    let raw: String
+    let name: String
+    let heading: String?
 
-    init(name: String, heading: String? = nil, alias: String? = nil, raw: String? = nil) {
-        self.raw = NoteName.trimmed(raw ?? (name + (heading.map { "#" + $0 } ?? "") + (alias.map { "|" + $0 } ?? "")))
-        let heading = heading.flatMap { NoteName.trimmed($0).isEmpty ? nil : $0 }
-        let alias = alias.flatMap { NoteName.trimmed($0).isEmpty ? nil : $0 }
-        // An alias that only repeats what the link would show is none.
-        let shown = heading.map { name + "#" + $0 } ?? name
-        let kept = alias == shown ? nil : alias
-        var parts = [name, heading, kept]
-        parts[0] = Self.withoutLeadingSpace(name)
-        let last = parts.lastIndex { $0 != nil } ?? 0
-        parts[last] = parts[last].map(Self.withoutTrailingSpace)
-        self.name = parts[0] ?? ""
-        self.heading = parts[1]
-        self.alias = parts[2]
-    }
-
-    /// The name a library looks a link up by, whatever spaces the text puts around it.
-    var lookupName: String { NoteName.trimmed(name) }
-
-    /// The link as Marfa reads the text between the brackets: the name up to the first `|` or `#`, then a heading
-    /// after `#` up to a `|`, then an alias; each with its escapes taken out.
-    init(reading raw: String) {
-        let raw = NoteName.trimmed(raw)
-        defer { self.raw = raw }
-        guard let separator = raw.firstIndex(where: { $0 == "|" || $0 == "#" }) else {
-            self.init(name: Self.unescaped(raw))
-            return
-        }
-        let name = Self.unescaped(String(raw[..<separator]))
-        let rest = raw[raw.index(after: separator)...]
-        if raw[separator] == "|" {
-            self.init(name: name, alias: Self.unescaped(String(rest)))
-        } else if let bar = rest.firstIndex(of: "|") {
-            self.init(
-                name: name, heading: Self.unescaped(String(rest[..<bar])),
-                alias: Self.unescaped(String(rest[rest.index(after: bar)...])))
-        } else {
-            self.init(name: name, heading: Self.unescaped(String(rest)))
-        }
+    /// The link a text holds as a whole, such as `[[Plan#Goals|the plan]]`; nil where the core finds none.
+    init?(linkText: String) {
+        guard let parts = linkParts(in: linkText).first, parts.text == linkText else { return nil }
+        raw = parts.target
+        name = parts.name.text
+        heading = parts.heading?.text
     }
 
     // Swift String equality normalizes Unicode; Marfa's authored binding keys compare bytes.
@@ -59,42 +27,35 @@ nonisolated struct NoteLink: Hashable, Sendable {
         hasher.combine(raw.utf8.count)
         for byte in raw.utf8 { hasher.combine(byte) }
     }
-
-    /// A backslash before `[`, `]`, `|`, `#` or `\` stands for that character, as Inkkit reads it.
-    static func unescaped(_ text: String) -> String {
-        var result = ""
-        var characters = text.makeIterator()
-        while let character = characters.next() {
-            guard character == "\\" else {
-                result.append(character)
-                continue
-            }
-            guard let next = characters.next() else {
-                result.append(character)
-                break
-            }
-            if "[]|#\\".contains(next) { result.append(next) } else { result.append(character); result.append(next) }
-        }
-        return result
-    }
-
-    private static func withoutLeadingSpace(_ text: String) -> String {
-        let scalars = text.unicodeScalars
-        guard let first = scalars.firstIndex(where: { !$0.properties.isWhitespace }) else { return "" }
-        return String(String.UnicodeScalarView(scalars[first...]))
-    }
-
-    private static func withoutTrailingSpace(_ text: String) -> String {
-        let scalars = text.unicodeScalars
-        guard let last = scalars.lastIndex(where: { !$0.properties.isWhitespace }) else { return "" }
-        return String(String.UnicodeScalarView(scalars[...last]))
-    }
 }
 
-/// A link in an item's text with what the library bound it to.
-nonisolated struct BoundLink: Hashable, Sendable {
-    let link: NoteLink
-    let resolution: NoteReferenceResolution
+/// What the core says a link names, from the copy alone (`Items.linkCandidates`). Only `bound` names one note: an
+/// identity the copy holds, or a name the copy already bound. A name that one held note answers to stays
+/// `unresolved`, since the copy holds a slice and the server may hold another note by that name; its `candidates`
+/// say which. An `ambiguous` link has more than one.
+nonisolated struct LinkAnswer: Hashable, Sendable {
+    enum State: Hashable, Sendable { case bound, ambiguous, unresolved }
+
+    /// The text between the link's brackets, as asked.
+    let target: String
+    let state: State
+    /// The note a `bound` link names.
+    let item: ItemID?
+    /// Every note outside the bin the name answers to, including the bound one.
+    let candidates: [ItemID]
+
+    /// Whether no held note answers to the link at all.
+    var isMissing: Bool { state == .unresolved && candidates.isEmpty }
+
+    /// Whether the core binds the link to this note. Only that is a link written to name the note: an `unresolved`
+    /// answer cannot tell that the one note held is the only one, so the server's lookup decides once the link is
+    /// saved (`device/link-candidates-unresolved`).
+    func names(_ note: ItemID) -> Bool { state == .bound && item == note }
+
+    /// Whether this title is a fair offer for the note while the person types it: bound to it, or not bound and
+    /// answered to by it alone among the notes held. The person sees the title and chooses it, and the server decides
+    /// at the save, so an offer can end unresolved; a link written for the person (`names`) never relies on that.
+    func offers(_ note: ItemID) -> Bool { names(note) || (state == .unresolved && candidates == [note]) }
 }
 
 /// An embed in an item's text with what the library bound it to: the file item it shows, or why there is none.

@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 
 /// How what a window shows becomes a view's settings, and a view's settings the window's table options. Marfa
 /// sorts, groups and filters by fields, while the table does so by columns, so only the columns that stand for a
@@ -35,7 +36,8 @@ nonisolated enum ViewDraft {
         case filter(column: String)
         /// Filters that need both AND and OR, which a Marfa filter never mixes.
         case mixedFilters
-        case tooManyFilters
+        /// A filter the core refuses, as it words the refusal.
+        case refused(String)
         case sort(column: String)
         case group(column: String)
         /// The list's sections by date, which a view's grouping cannot hold.
@@ -50,9 +52,6 @@ nonisolated enum ViewDraft {
         var unkept: [Unkept] = []
     }
 
-    static let maxConditions = 10
-    static let maxFilterLength = 2048
-
     /// The query a place stands for, or nil where a view cannot stand for it: Recents, which is a count of the
     /// latest edits, Recently Deleted, an index, and a single favorite. A view lists active items, as MAPP's places
     /// do. A collection's view lists its members, though by the view's own order, since a view cannot sort by an
@@ -63,17 +62,18 @@ nonisolated enum ViewDraft {
         case .allNotes: return LibraryViewQuery(states: active)
         case .inbox: return LibraryViewQuery(tier: .feed, states: active)
         case .favorites:
-            return LibraryViewQuery(states: active, filter: condition("tags", "contains", quoted(ItemTag.favorite)))
+            return LibraryViewQuery(states: active, filter: text(of: FilterCondition(field: .tags, operator: .contains, value: .text(ItemTag.favorite))))
         case .itemType(let raw):
             let type = TypeID(raw)
             // Marfa takes a type with its subtypes, and a type's place holds the type's own items alone.
-            let own = catalogue.descendants(of: type).isEmpty ? nil : condition("type", "eq", quoted(raw))
+            let own = catalogue.descendants(of: type).isEmpty ? nil : text(of: FilterCondition(field: .system(.type), operator: .eq, value: .text(raw)))
             return LibraryViewQuery(types: [type], states: active, filter: own)
         case .files: return LibraryViewQuery(types: [TypeID.file], states: active)
-        case .source(let name): return LibraryViewQuery(states: active, filter: condition("source", "eq", quoted(name)))
+        case .source(let name): return LibraryViewQuery(states: active, filter: text(of: FilterCondition(field: .system(.source), operator: .eq, value: .text(name))))
         case .view(let id): return views.first { $0.id == id }?.query
         case .collection(let id):
-            return LibraryViewQuery(states: active, filter: condition("edge[\(MarfaMapping.collectionEdge)]", "eq", quoted(id.rawValue)))
+            let member = FilterField.edge(type: MarfaMapping.collectionEdge, direction: .outbound)
+            return LibraryViewQuery(states: active, filter: text(of: FilterCondition(field: member, operator: .eq, value: .text(id.rawValue))))
         case .recents, .recentlyDeleted, .sources, .collections, .favoriteItem: return nil
         }
     }
@@ -191,8 +191,17 @@ nonisolated enum ViewDraft {
         _ base: String?, adding filters: [String: Set<String>], columns: [ItemTableColumn]
     ) -> (filter: String?, unkept: [Unkept]) {
         let base = base.flatMap { $0.allSatisfy(\.isWhitespace) ? nil : $0 }
+        let parsed: Parsed
+        do { parsed = try terms(of: base) } catch { return (base, [.refused(message(of: error))]) }
+        return combined(parsed, adding: filters, columns: columns, keeping: base)
+    }
+
+    /// The conditions of `base` with the window's filters added. Where nothing is added, `unchanged` is the filter.
+    private static func combined(
+        _ base: Parsed, adding filters: [String: Set<String>], columns: [ItemTableColumn], keeping unchanged: String?
+    ) -> (filter: String?, unkept: [Unkept]) {
         var unkept: [Unkept] = []
-        var groups: [[String]] = []
+        var groups: [[FilterCondition]] = []
         for column in columns {
             guard let values = filters[column.id], !values.isEmpty else { continue }
             let conditions = values.sorted().map { condition(of: column, value: $0) }
@@ -202,93 +211,57 @@ nonisolated enum ViewDraft {
             }
             groups.append(conditions.compactMap { $0 })
         }
-        guard !groups.isEmpty else { return (base, unkept) }
-        let baseShape = base.map { shape(of: $0) } ?? Shape(conditions: 0, joiner: nil)
-        let added = groups.flatMap { $0 }
+        let held = base.terms.map(\.condition)
+        guard !groups.isEmpty else { return (unchanged, unkept) }
         // Values of one column join by OR, columns by AND, and the view's own filter by AND to what is added.
-        var joiners = Set([baseShape.joiner].compactMap { $0 })
-        if groups.contains(where: { $0.count > 1 }) { joiners.insert("OR") }
-        if groups.count > 1 || baseShape.conditions > 0 { joiners.insert("AND") }
-        guard joiners.count <= 1 else { return (base, unkept + [.mixedFilters]) }
-        guard baseShape.conditions + added.count <= maxConditions else { return (base, unkept + [.tooManyFilters]) }
-        let joiner = joiners.first ?? "AND"
-        let filter = ([base].compactMap { $0 } + added).joined(separator: " \(joiner) ")
-        guard filter.count <= maxFilterLength else { return (base, unkept + [.tooManyFilters]) }
-        return (filter, unkept)
-    }
-
-    /// One table category as a Marfa condition; nil where a filter cannot express it.
-    private static func condition(of column: ItemTableColumn, value: String) -> String? {
-        switch column.content {
-        case .type:
-            return value.isEmpty ? nil : quotedIfPlain(value).map { condition("type", "eq", $0) }
-        case .parent:
-            return value.isEmpty
-                ? condition(parentField, "not_exists", nil)
-                : quotedIfPlain(value).map { condition(parentField, "eq", $0) }
-        case .field(let field):
-            guard isPropertyName(field.key) else { return nil }
-            let path = "properties." + field.key
-            if value.isEmpty { return condition(path, "not_exists", nil) }
-            if column.style == .boolean { return value == "true" || value == "false" ? condition(path, "eq", value) : nil }
-            return quotedIfPlain(value).map { condition(path, "eq", $0) }
-        case .title, .created, .edited, .duration:
-            return nil
+        var joins = Set<FilterJoin>()
+        if held.count > 1 { joins.insert(base.join) }
+        if groups.contains(where: { $0.count > 1 }) { joins.insert(.any) }
+        if groups.count > 1 || !held.isEmpty { joins.insert(.all) }
+        guard joins.count <= 1 else { return (unchanged, unkept + [.mixedFilters]) }
+        let expression = FilterExpression(join: joins.first ?? .all, conditions: held + groups.flatMap { $0 })
+        do {
+            return (try expression.encoded(), unkept)
+        } catch {
+            return (unchanged, unkept + [.refused(message(of: error))])
         }
     }
 
-    private static func condition(_ field: String, _ op: String, _ operand: String?) -> String {
-        operand.map { "\(field) \(op) \($0)" } ?? "\(field) \(op)"
+    /// The field a table column filters, where a filter can express it.
+    private static func filterField(of column: ItemTableColumn) -> FilterField? {
+        switch column.content {
+        case .type: .system(.type)
+        case .parent: .edge(type: MarfaMapping.parentEdge, direction: .backref)
+        case .field(let field): isPropertyName(field.key) ? .property(field.key) : nil
+        case .title, .created, .edited, .duration: nil
+        }
     }
 
-    /// Marfa takes `\"` as a quote and any other backslash as itself, so a value that holds a backslash could end in
-    /// one that escapes the closing quote, and is not kept.
-    private static func quotedIfPlain(_ value: String) -> String? {
-        value.contains("\\") ? nil : quoted(value)
+    /// One table category as a Marfa condition; nil where a filter cannot express it.
+    private static func condition(of column: ItemTableColumn, value: String) -> FilterCondition? {
+        guard let field = filterField(of: column) else { return nil }
+        if value.isEmpty {
+            // The table's type filter keeps a type, never an empty cell.
+            return column.content == .type ? nil : FilterCondition(field: field, operator: .notExists)
+        }
+        if case .field = column.content, column.style == .boolean {
+            return value == "true" || value == "false" ? FilterCondition(field: field, operator: .eq, value: .bool(value == "true")) : nil
+        }
+        return FilterCondition(field: field, operator: .eq, value: .text(value))
     }
 
-    private static func quoted(_ value: String) -> String {
-        "\"" + value.replacingOccurrences(of: "\"", with: "\\\"") + "\""
+    /// The text of one condition on its own, or nil where the core refuses it.
+    private static func text(of condition: FilterCondition) -> String? {
+        try? FilterExpression(conditions: [condition]).encoded()
+    }
+
+    /// What the core says of a refusal, which a person is told as it is worded.
+    static func message(of error: any Error) -> String {
+        (error as? MarfaError)?.message ?? error.localizedDescription
     }
 
     static func isPropertyName(_ key: String) -> Bool {
         key.wholeMatch(of: /[a-zA-Z_][a-zA-Z0-9_]*/) != nil
-    }
-
-    /// How many conditions a filter holds, and the word that joins them.
-    struct Shape: Hashable {
-        var conditions: Int
-        var joiner: String?
-    }
-
-    /// Read from the words outside quoted values: the joiners are AND and OR, and one filter uses one of them.
-    static func shape(of filter: String) -> Shape {
-        var joiners: [String] = []
-        var word = ""
-        var inString = false
-        var characters = Array(filter)[...]
-        func endWord() {
-            if word == "AND" || word == "OR" { joiners.append(word) }
-            word = ""
-        }
-        while let character = characters.popFirst() {
-            if inString {
-                if character == "\\", characters.first == "\"" { characters.removeFirst() }
-                else if character == "\"" { inString = false }
-                continue
-            }
-            if character == "\"" {
-                endWord()
-                inString = true
-            } else if character.isWhitespace {
-                endWord()
-            } else {
-                word.append(character)
-            }
-        }
-        endWord()
-        let trimmed = filter.trimmingCharacters(in: .whitespaces)
-        return Shape(conditions: trimmed.isEmpty ? 0 : joiners.count + 1, joiner: joiners.first)
     }
 
     // MARK: Opening a view
@@ -307,7 +280,8 @@ nonisolated enum ViewDraft {
         } else {
             options.grouping = .none
         }
-        options.filters = shownFilters(of: terms(of: view.query.filter))
+        // A saved filter the core refuses shows no table filters; the refusal is told where the view is saved or changed.
+        options.filters = (try? terms(of: view.query.filter)).map(shownFilters) ?? [:]
         return options
     }
 
@@ -367,103 +341,68 @@ nonisolated enum ViewDraft {
 
     /// One condition of a view's filter, and the table filter it stands for where it is one.
     struct Term: Hashable {
-        var text: String
+        var condition: FilterCondition
         /// The table column it filters, and the category it keeps.
         var column: String?
         var value: String?
-        /// Whether its operand is a bare `true` or `false`, as a filter on a Yes or No column is written.
+        /// Whether its operand is a bool, as a filter on a Yes or No column is written.
         var isBare = false
+
+        /// The condition as the core writes it.
+        var text: String { ViewDraft.text(of: condition) ?? "" }
     }
 
-    /// A filter's conditions, in order, and the word that joins them.
-    static func terms(of filter: String?) -> (terms: [Term], joiner: String?) {
-        guard let filter else { return ([], nil) }
-        var conditions: [[(text: String, quoted: Bool)]] = [[]]
-        var joiner: String?
-        for token in tokens(of: filter) {
-            if !token.quoted, token.text == "AND" || token.text == "OR" {
-                joiner = joiner ?? token.text
-                conditions.append([])
-            } else {
-                conditions[conditions.count - 1].append(token)
-            }
+    /// A filter's conditions, in order, and what joins them.
+    struct Parsed: Hashable {
+        var terms: [Term]
+        var join: FilterJoin
+    }
+
+    /// A filter's conditions as the core reads them; throws what it refuses.
+    static func terms(of filter: String?) throws -> Parsed {
+        guard let filter, !filter.allSatisfy(\.isWhitespace) else { return Parsed(terms: [], join: .all) }
+        let expression = try FilterExpression(decoding: filter)
+        return Parsed(terms: expression.conditions.map(term(of:)), join: expression.join)
+    }
+
+    private static func term(of condition: FilterCondition) -> Term {
+        var term = Term(condition: condition)
+        guard let column = column(of: condition.field) else { return term }
+        switch (condition.operator, condition.value) {
+        case (.notExists, nil):
+            term.column = column
+            term.value = ""
+        case (.eq, .text(let value)?):
+            term.column = column
+            term.value = value
+        case (.eq, .bool(let value)?) where column.hasPrefix("field."):
+            term.column = column
+            term.value = value ? "true" : "false"
+            term.isBare = true
+        default:
+            break
         }
-        let terms = conditions.filter { !$0.isEmpty }.map { tokens in
-            var term = Term(text: tokens.map(\.text).joined(separator: " "))
-            guard let column = column(ofField: tokens[0].text) else { return term }
-            if tokens.count == 2, tokens[1].text == "not_exists" {
-                term.column = column
-                term.value = ""
-            } else if tokens.count == 3, tokens[1].text == "eq" {
-                let operand = tokens[2]
-                if operand.quoted, let value = unquoted(operand.text) {
-                    term.column = column
-                    term.value = value
-                } else if !operand.quoted, column.hasPrefix("field."), operand.text == "true" || operand.text == "false" {
-                    term.column = column
-                    term.value = operand.text
-                    term.isBare = true
-                }
-            }
-            // The table's type filter keeps a type, never an empty cell.
-            if column == ItemTableColumn.type.id, term.value?.isEmpty != false { term.column = nil }
-            return term
-        }
-        return (terms, joiner)
+        // The table's type filter keeps a type, never an empty cell.
+        if column == ItemTableColumn.type.id, term.value?.isEmpty != false { term.column = nil }
+        return term
     }
 
     /// The table column whose filter a condition on this field stands for.
-    private static func column(ofField field: String) -> String? {
+    private static func column(of field: FilterField) -> String? {
         switch field {
-        case "type": return ItemTableColumn.type.id
-        case parentField: return ItemTableColumn.parent.id
-        default:
-            guard field.hasPrefix("properties.") else { return nil }
-            let key = String(field.dropFirst("properties.".count))
-            return isPropertyName(key) ? "field." + key : nil
+        case .system(.type): ItemTableColumn.type.id
+        case .edge(MarfaMapping.parentEdge, .backref): ItemTableColumn.parent.id
+        case .property(let key): isPropertyName(key) ? "field." + key : nil
+        default: nil
         }
-    }
-
-    /// The words and quoted values of a filter, each quoted value whole with its quotes.
-    private static func tokens(of filter: String) -> [(text: String, quoted: Bool)] {
-        var tokens: [(text: String, quoted: Bool)] = []
-        var token = ""
-        var inString = false
-        var characters = Array(filter)[...]
-        func end() {
-            if !token.isEmpty { tokens.append((token, token.first == "\"")) }
-            token = ""
-        }
-        while let character = characters.popFirst() {
-            if inString {
-                token.append(character)
-                if character == "\\", characters.first == "\"" { token.append(characters.removeFirst()) }
-                else if character == "\"" { inString = false }
-            } else if character.isWhitespace {
-                end()
-            } else {
-                if character == "\"" { inString = true }
-                token.append(character)
-            }
-        }
-        end()
-        return tokens
-    }
-
-    /// A quoted value's text, or nil where it holds a backslash other than an escaped quote, which `quotedIfPlain`
-    /// would not write back alike.
-    private static func unquoted(_ text: String) -> String? {
-        guard text.count >= 2, text.first == "\"", text.last == "\"" else { return nil }
-        let inner = String(text.dropFirst().dropLast()).replacingOccurrences(of: "\\\"", with: "\"")
-        return inner.contains("\\") ? nil : inner
     }
 
     /// The table filters a filter's conditions stand for. The table joins a column's values by OR and its columns
     /// by AND, so conditions joined by AND show where each column has one, and conditions joined by OR show only
     /// where all of them filter one column.
-    private static func shownTerms(_ parsed: (terms: [Term], joiner: String?)) -> [Term] {
+    private static func shownTerms(_ parsed: Parsed) -> [Term] {
         let mapped = parsed.terms.filter { $0.column != nil }
-        if parsed.joiner == "OR", parsed.terms.count > 1 {
+        if parsed.join == .any, parsed.terms.count > 1 {
             let columns = Set(mapped.map(\.column))
             return mapped.count == parsed.terms.count && columns.count == 1 ? mapped : []
         }
@@ -471,7 +410,7 @@ nonisolated enum ViewDraft {
         return mapped.filter { counts[$0.column!] == 1 }
     }
 
-    private static func shownFilters(of parsed: (terms: [Term], joiner: String?)) -> [String: Set<String>] {
+    private static func shownFilters(of parsed: Parsed) -> [String: Set<String>] {
         shownTerms(parsed).reduce(into: [:]) { $0[$1.column!, default: []].insert($1.value!) }
     }
 
@@ -481,7 +420,8 @@ nonisolated enum ViewDraft {
     static func replacing(
         _ filter: String?, with filters: [String: Set<String>], columns: [ItemTableColumn]
     ) -> (filter: String?, unkept: [Unkept], unchanged: [String]) {
-        let parsed = terms(of: filter)
+        let parsed: Parsed
+        do { parsed = try terms(of: filter) } catch { return (filter, [.refused(message(of: error))], []) }
         let filterable = Dictionary(uniqueKeysWithValues: columns.filter(\.isCategorical).map { ($0.id, $0) })
         let shown = shownTerms(parsed)
         // A column the table lacks, or one whose filter it writes otherwise, shows none of its conditions.
@@ -489,17 +429,18 @@ nonisolated enum ViewDraft {
             guard let column = filterable[term.column!], (column.style == .boolean) == term.isBare else { return term.column }
             return nil
         })
-        let shownTexts = Set(shown.filter { !hiddenColumns.contains($0.column!) }.map(\.text))
+        let shownConditions = Set(shown.filter { !hiddenColumns.contains($0.column!) }.map(\.condition))
         let seeded = shown.filter { !hiddenColumns.contains($0.column!) }
             .reduce(into: [String: Set<String>]()) { $0[$1.column!, default: []].insert($1.value!) }
         let window = filters.filter { filterable[$0.key] != nil && !$0.value.isEmpty }
         guard window != seeded else { return (filter, [], []) }
-        let unchanged = parsed.terms.map(\.text).filter { !shownTexts.contains($0) }
-        let base = unchanged.isEmpty ? nil : unchanged.joined(separator: " \(parsed.joiner ?? "AND") ")
-        let result = self.filter(base, adding: window, columns: columns)
-        if result.unkept.contains(.mixedFilters) || result.unkept.contains(.tooManyFilters) {
+        let kept = parsed.terms.filter { !shownConditions.contains($0.condition) }
+        let base = Parsed(terms: kept, join: parsed.join)
+        let result = combined(base, adding: window, columns: columns, keeping: nil)
+        if result.unkept.contains(.mixedFilters) || result.unkept.contains(where: { if case .refused = $0 { true } else { false } }) {
             return (filter, result.unkept, [])
         }
-        return (result.filter, result.unkept, unchanged)
+        let filterText = result.filter ?? (kept.isEmpty ? nil : try? FilterExpression(join: parsed.join, conditions: kept.map(\.condition)).encoded())
+        return (filterText, result.unkept, kept.map(\.text))
     }
 }

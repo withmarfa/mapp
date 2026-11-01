@@ -1,6 +1,6 @@
 # Model
 
-The data model, free of SwiftUI: the `ItemLibrary` protocol, `MarfaLibrary` over a Marfa server's working copy, and `Libraries`, which holds the host and the library the windows read. Before changing `Marfa/`, also read `MAPP/Model/Marfa/AGENTS.md`. The types named here carry the detail in their doc comments; read them before changing their behavior.
+The data model, free of SwiftUI: the `ItemLibrary` protocol, `MarfaLibrary` over a Marfa server's working copy, and `Libraries`, which holds the host and the library the windows read. Before changing `Marfa/`, also read `MAPP/Model/Marfa/AGENTS.md`. Read a type's doc comment before changing it.
 
 ## Items and types
 
@@ -12,7 +12,7 @@ The data model, free of SwiftUI: the `ItemLibrary` protocol, `MarfaLibrary` over
 
 ## Commands and writes
 
-- Every item command takes the whole selection, files too, and writes each item through the same queued, offline-safe edit it would use alone, in one undo step. An item a command can't change is counted in `BatchSkips` and told in one notice (`ItemLibrary.tellSkipped`), never passed over silently.
+- Every item command takes the whole selection, files too, and writes each item through the same queued, offline-safe edit it would use alone, in one undo step. An item a command can't change is counted in `BatchSkips` and told in one notice (`ItemLibrary.tellSkipped`).
 - Moving several items to Recently Deleted asks first; one does not, since Undo puts it back. Delete never erases a live item: erasing is only for items already in Recently Deleted, after its own dialog.
 - Change Type, Undo, Redo and Restore wait for every open page to hand over its last edit first, and judge on the item as it stands then, so a change made elsewhere is refused or worked on as it is now, never overwritten.
 - Deleting for good (`purge`), saving, updating, renaming and deleting a view, choosing a type's icon, and changing This Marfa's settings need the server and are never queued. `ItemLibrary.reachesServer` is the one rule that offers them, and the server's refusal is told. Every other write goes to the copy's queue and can always be made.
@@ -36,7 +36,6 @@ The data model, free of SwiftUI: the `ItemLibrary` protocol, `MarfaLibrary` over
 - `PictureAddressPolicy` checks every address and redirect before a request: `https` only, no sign-in, and no private, local or reserved address by name or by any resolved answer. `PictureFetcher` offers no identity or password and tells a picture's kind by its bytes, never SVG.
 - **Known limit: DNS rebinding.** `URLSession` resolves the name again when it connects, so a server that answers the check with a public address and the connection with a private one is not stopped. Do not claim more than this in the interface or the docs.
 - A sealed web page (`SealedWebPage`) has no network, stored data or WebRTC, and reaches only its own pictures.
-- Tests drive `PictureFetcher` through a stub `URLProtocol` and reach no network.
 
 ## Changing libraries and quitting
 
@@ -49,7 +48,6 @@ The data model, free of SwiftUI: the `ItemLibrary` protocol, `MarfaLibrary` over
 - `MAPP/Model/Telemetry/` is the one place for logs and signposts (`Telemetry.logger(_:)`, `Telemetry.signposter(_:)`); never make a `Logger` of your own. `Cost` stays the one mechanism the `Measure` plan reads.
 - **Never log a person's text, titles, property values or keys.** Log kinds, durations and counts, with `privacy: .public` for those alone. An item is named by a count, never its id or title. A message that may quote the person's text is logged with the default (private) privacy.
 - **Reports to WithMarfa.** Everything the app sends leaves through `Telemetry+Reports.swift`, a closed list of calls over `Reporting`; no call site reports on its own, and only `MAPP/Model/Telemetry/` imports `MarfaTelemetry`. A report carries only fixed words, numbers and flags: never a person's text, an item's id or title, the server's address, a path, or an error's message. `Reporting.Gate` keeps tests, previews and the isolated host from reporting.
-- To watch: `log stream --level debug --predicate 'subsystem == "com.withmarfa.mapp.debug"'`.
 - Every alert to the person goes through `Notices` (`tell`, `notKept`); add no other route. A change not kept goes to the clipboard the first time it is shown and is never written over before the person answers.
 
 ## Code Review Rules

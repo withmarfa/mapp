@@ -17,13 +17,6 @@ extension MarfaLibrary {
             return nil
         }
         let id = ItemID.mint(at: now())
-        if let parentID {
-            let draft = EdgeDraft(type: MarfaMapping.parentEdge, source: parentID, target: id)
-            if let problem = linkProblem(draft, sourceType: item(parentID)?.type, targetType: type) {
-                notices.tell(cantCreate, problem)
-                return nil
-            }
-        }
         let text = body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : body
         // The Inbox is the feed tier, so an item made there stays where it was made.
         let draft = ItemDraft(
@@ -57,9 +50,25 @@ extension MarfaLibrary {
 
     /// Waits only until the source holds every write in its queue on this Mac, never for the server, so quitting
     /// or leaving the library offline keeps every write without waiting on the network.
+    ///
+    /// A relationship change whose check the core has not answered is waited for first, since the check is made on this
+    /// Mac and answers at once; if it has not within `Self.relationshipWait`, the person is told it was not made.
     func finish() async {
+        let deadline = ContinuousClock.now + Self.relationshipWait
+        while relationshipChangesInFlight > 0 {
+            guard ContinuousClock.now < deadline else {
+                notices.tell(
+                    String(localized: "Can’t Change This Relationship"),
+                    String(localized: "A change to a connection was still being checked, so it may not have been made. Check it and change it again."))
+                break
+            }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
         await source.queueSubmitted()
     }
+
+    /// The longest `finish` waits for a relationship change to be checked.
+    static let relationshipWait = Duration.seconds(2)
 
     var engineActivity: EngineActivity? { source.engineActivity }
 
@@ -349,8 +358,7 @@ extension MarfaLibrary {
         setStates(changes, name: name, undoManager: undoManager)
     }
 
-    /// An item whose delete the server has taken is in the server's bin, which the source lists with the items the
-    /// copy still holds, so it is restored like any other.
+    /// The copy holds the bin, so an item binned here or elsewhere is restored like any other.
     func recover(_ ids: Set<ItemID>, undoManager: UndoManager?) {
         var changes: [ItemID: (from: ItemState, to: ItemState)] = [:]
         for id in ids { if item(id)?.state == .trashed { changes[id] = (.trashed, .active) } }

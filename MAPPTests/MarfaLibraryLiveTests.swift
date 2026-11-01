@@ -144,6 +144,11 @@ extension LiveMarfaTests {
                     work()
                     undo.endUndoGrouping()
                 }
+                @MainActor func stepAsync(_ work: () async -> Void) async {
+                    undo.beginUndoGrouping()
+                    await work()
+                    undo.endUndoGrouping()
+                }
                 let token = "zq" + UUID().uuidString.prefix(8).lowercased()
                 @MainActor func make(_ title: String, under parent: ItemID? = nil) throws -> ItemID {
                     let id = library.createItem(
@@ -191,7 +196,7 @@ extension LiveMarfaTests {
                 // A new parent replaces the one link a child holds, as one move of the edge's source: the child never
                 // holds none, and a refusal would leave it where it was.
                 let moving = await source.engine.sync.hooks.hydrations
-                step { #expect(library.setItemRelationship(child, field: "child-of", targetIDs: [other], undoManager: undo)) }
+                await stepAsync { #expect(await library.changeItemRelationship(child, field: "child-of", adding: [other], removing: [parent], undoManager: undo)) }
                 #expect(await eventually {
                     library.relationships(for: child).first { $0.field == "child-of" }?.targets.map(\.itemID) == [other]
                 })
@@ -218,11 +223,11 @@ extension LiveMarfaTests {
                 await source.flush()
                 try #require(try await rehydrated(after: undoing))
                 // Without a parent, then under another, each seen from both ends, and undone.
-                step { #expect(library.setItemRelationship(child, field: "child-of", targetIDs: [], undoManager: undo)) }
+                await stepAsync { #expect(await library.changeItemRelationship(child, field: "child-of", adding: [], removing: [parent], undoManager: undo)) }
                 #expect(await eventually {
                     library.relationships(for: child).first { $0.field == "child-of" }?.targets.isEmpty == true
                 })
-                step { #expect(library.setItemRelationship(child, field: "child-of", targetIDs: [other], undoManager: undo)) }
+                await stepAsync { #expect(await library.changeItemRelationship(child, field: "child-of", adding: [other], removing: [], undoManager: undo)) }
                 #expect(await eventually {
                     library.relationships(for: other).first { $0.field == "inverse:parent-of" }?.targets.map(\.itemID) == [child]
                 })
@@ -295,44 +300,6 @@ extension LiveMarfaTests {
                 let bin = try await source.copy.items.bin()
                 #expect(!bin.items.contains { $0.id == purged.rawValue })
                 #expect(!bin.items.contains { $0.id == kept.rawValue })
-            }
-        }
-
-        /// A copy that never held the item reads it from the server's bin, with its text, and restores it from there.
-        @Test(.timeLimit(.minutes(3)))
-        func aFreshCopyListsTheServersBinAndRestoresFromIt() async throws {
-            try await withLibrary { library, source, made in
-                let note = try #require(library.createItem(
-                    typeID: "core.note", title: "MAPPTEST fresh bin \(UUID().uuidString.prefix(8))", body: "In the bin.",
-                    parentID: nil, in: .allNotes, undoManager: nil))
-                made.add(note)
-                try #require(await eventually { library.item(note) != nil })
-                await source.flush()
-                library.delete([note], undoManager: nil)
-                await source.flush()
-                try #require(await eventually { library.item(note)?.state == .trashed })
-
-                let root = URL.temporaryDirectory.appending(path: "MarfaLibraryLiveTests-fresh-\(UUID().uuidString)", directoryHint: .isDirectory)
-                defer { try? FileManager.default.removeItem(at: root) }
-                let connection = try MarfaConnection(address: try LiveMarfa.address())
-                let second = try await MarfaSource.open(
-                    connection, keys: MemoryKeyStore([connection.address: try LiveMarfa.key()]),
-                    location: MarfaStoreLocation(root: root))
-                let fresh = MarfaLibrary(source: second, notices: Notices())
-                second.refresh()
-                try #require(await eventually {
-                    fresh.isLoaded && fresh.connection == .online && LiveMarfa.isWhole(fresh.syncReport)
-                })
-                try #require(await eventually { fresh.items(in: .recentlyDeleted).contains { $0.id == note } })
-                #expect(await eventually { fresh.body(of: note)?.text == "In the bin." })
-
-                // The copy never held the item, so it is restored once the server has taken it.
-                fresh.recover([note], undoManager: nil)
-                try #require(await eventually { fresh.item(note)?.state == .active })
-                #expect(!fresh.items(in: .recentlyDeleted).contains { $0.id == note })
-                #expect(fresh.notices.waiting.last == nil, "\(String(describing: fresh.notices.waiting.last))")
-                await second.flush()
-                await second.close()
             }
         }
 

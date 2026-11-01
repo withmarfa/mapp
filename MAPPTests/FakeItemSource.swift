@@ -46,6 +46,10 @@ nonisolated final class FakeItemSource: ItemSource {
     /// What `search` answers for each query; any other finds nothing.
     let hits = Mutex<[String: [ItemID]]>([:])
     let searches = Mutex(0)
+    /// The refusal for each edge a test names; any other is taken.
+    let refusals = Mutex<[EdgeDraft: String]>([:])
+    /// What the core answers for a link target a test sets; any other target is unresolved.
+    let knownLinks = Mutex<[String: LinkAnswer]>([:])
     let searchFails = Mutex(false)
     /// What a search answers beside its hits, and where it was asked to look.
     let excerpts = Mutex<[String: [ItemID: SearchExcerpt]]>([:])
@@ -144,6 +148,19 @@ nonisolated final class FakeItemSource: ItemSource {
     func body(of item: ItemID) async throws -> ItemBody {
         guard let body = held.withLock({ $0[item] }) else { throw SourceFailure(kind: .missing, message: "No text.") }
         return body
+    }
+
+    /// While set, `edgeVerdict` waits, as the core's check does for a moment.
+    let holdingChecks = Mutex(false)
+    func edgeVerdict(_ draft: EdgeDraft) async -> EdgeVerdict {
+        while holdingChecks.withLock({ $0 }) { try? await Task.sleep(for: .milliseconds(5)) }
+        return refusals.withLock { $0[draft] }.map { .refused($0) } ?? .taken
+    }
+
+    func linkAnswers(of targets: [String], in note: ItemID?) async throws -> [LinkAnswer] {
+        knownLinks.withLock { answers in
+            targets.map { answers[$0] ?? LinkAnswer(target: $0, state: .unresolved, item: nil, candidates: []) }
+        }
     }
 
     func fileURL(of item: ItemID) async throws -> URL {

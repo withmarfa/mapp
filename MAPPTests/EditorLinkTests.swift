@@ -76,13 +76,18 @@ extension EditorTests {
         let identity = "33333333-3333-4333-8333-333333333333"
         let page = try await Page()
         let plan = page.library.add("Plan\n", id: ItemID(identity))
-        page.library.add("Twin\n")
-        page.library.add("Twin\n")
+        let twinA = page.library.add("Twin\n")
+        let twinB = page.library.add("Twin\n")
         try await page.load("Reader\n\n[[Plan]] [[Plan|alias]] [[\(identity)]] [[\(identity)|Plan]] [[Gone]] [[Twin]] [[Plan#Soil]]\n")
         var opened: [ItemID] = []
         var beeps = 0
         page.editor.onOpenNote = { opened.append($0) }
         page.editor.onUnopenableLink = { beeps += 1 }
+        var offered: [[ItemID]] = []
+        page.editor.onChooseAmbiguousLink = { ids, pick in
+            offered.append(ids)
+            pick(ids[1])
+        }
         _ = try await marks(page, until: "live,live,live,live,missing,live,live")
 
         for index in 0..<4 {
@@ -94,15 +99,39 @@ extension EditorTests {
 
         try await commandClick(4, in: page)
         try await page.wait { beeps == 1 }
+        #expect(opened.count == 4, "a link to no note opens nothing")
         try await commandClick(5, in: page)
-        try await page.wait { beeps == 2 }
-        #expect(opened.count == 4, "a link to no note and one to two notes open nothing")
+        try await page.wait { opened.count == 5 }
+        #expect(beeps == 1, "a link to two notes offers both and does not beep")
+        #expect(offered == [[twinA.id, twinB.id]])
+        #expect(opened.last == twinB.id, "the one chosen from the offer is opened")
         #expect(page.library.items.count == 4, "no note is made for a link")
 
         // A plain click only places the caret.
         try await page.run("document.querySelectorAll('.inkkit-wiki-link')[0].dispatchEvent(new MouseEvent('click', { button: 0, bubbles: true }))")
         try await settled(page)
-        #expect(opened.count == 4)
+        #expect(opened.count == 5)
+    }
+
+    @Test func aLinkTheCopyHasNotBoundOffersTheNoteItsNameAnswersToAndOpensItOnlyWhenChosen() async throws {
+        let page = try await Page()
+        let plan = page.library.add("Plan\n")
+        // The copy holds a slice, so the server may hold another note by this name: the core leaves it unbound.
+        page.library.linkAnswerOverrides["Plan"] = LinkAnswer(target: "Plan", state: .unresolved, item: nil, candidates: [plan.id])
+        try await page.load("Reader\n\nSee [[Plan]].\n")
+        var opened: [ItemID] = [], beeps = 0
+        var offered: [[ItemID]] = []
+        var choose: ((ItemID) -> Void)?
+        page.editor.onOpenNote = { opened.append($0) }
+        page.editor.onUnopenableLink = { beeps += 1 }
+        page.editor.onChooseAmbiguousLink = { ids, pick in
+            offered.append(ids)
+            choose = pick
+        }
+        await page.editor.openNote(NoteLink(linkText: "[[Plan]]")!, from: try #require(page.editor.noteID))
+        #expect(offered == [[plan.id]] && opened.isEmpty && beeps == 0)
+        choose?(plan.id)
+        #expect(opened == [plan.id])
     }
 
     @Test func aClickInANoteThePageHasLeftOpensNothing() async throws {
@@ -112,10 +141,10 @@ extension EditorTests {
         var opened = 0, beeps = 0
         page.editor.onOpenNote = { _ in opened += 1 }
         page.editor.onUnopenableLink = { beeps += 1 }
-        page.editor.openNote(NoteLink(name: "Plan"), from: ItemID("another"))
+        await page.editor.openNote(NoteLink(linkText: "[[Plan]]")!, from: ItemID("another"))
         #expect(opened == 0 && beeps == 0)
         page.editor.windowWent()
-        page.editor.openNote(NoteLink(name: "Plan"), from: try #require(page.editor.noteID))
+        await page.editor.openNote(NoteLink(linkText: "[[Plan]]")!, from: try #require(page.editor.noteID))
         #expect(opened == 0 && beeps == 0)
     }
 
@@ -193,10 +222,10 @@ extension EditorTests {
         var beeps = 0
         editor.onUnopenableLink = { beeps += 1 }
 
-        editor.openNote(NoteLink(name: "Gone"), from: reader.id)
+        await editor.openNote(NoteLink(linkText: "[[Gone]]")!, from: reader.id)
         #expect(shown.id == reader.id && beeps == 1, "a link to no note leaves the window as it is")
         window.makeFirstResponder(nil)
-        editor.openNote(NoteLink(name: "Plan"), from: reader.id)
+        await editor.openNote(NoteLink(linkText: "[[Plan]]")!, from: reader.id)
         #expect(shown.id == plan.id, "the window now shows the linked note, which it will find again at the next launch")
         // The window's page loads the note it now shows, and the keyboard goes there with it.
         editor.load(try #require(library.item(plan.id)))

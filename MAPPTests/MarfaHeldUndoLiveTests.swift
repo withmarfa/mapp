@@ -140,7 +140,7 @@ extension LiveMarfaTests {
                 // and that hydration waits for the test.
                 gate.arm()
                 undo.beginUndoGrouping()
-                #expect(library.setItemRelationship(child, field: "child-of", targetIDs: [other], undoManager: undo))
+                #expect(await library.changeItemRelationship(child, field: "child-of", adding: [other], removing: [parent], undoManager: undo))
                 undo.endUndoGrouping()
                 try #require(await eventually {
                     library.relationships(for: child).first { $0.field == "child-of" }?.targets.map(\.itemID) == [other]

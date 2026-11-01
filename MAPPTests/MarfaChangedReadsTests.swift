@@ -169,9 +169,7 @@ import Testing
                 _ = try await copy.edges.delete(edge.id)
             }
             await caughtUp()
-            try await wait("the link bound") {
-                $0.item(titled: "Host")?.boundLinks.first?.resolution == .resolved(ItemID(target))
-            }
+            try await waitForLinks(of: "Host", "the link bound") { $0?.links.first?.target == .item(id: target) }
             #expect(try await copy.edges.from(host).isEmpty, "the host holds no edge to its target")
             return host
         }
@@ -201,6 +199,21 @@ import Testing
 
         func wait(_ what: String, _ condition: @escaping (ChangeLog.State) -> Bool) async throws {
             try #require(await log.wait(until: condition) != nil, "waiting for \(what)")
+        }
+
+        /// The links the engine has read of the shown item titled `title`, as the package answered them.
+        func links(of title: String) async -> BodyLinks? {
+            guard let id = shown(title)?.id.rawValue else { return nil }
+            return await source.engine.bodyLinks[id]
+        }
+
+        /// Waits until what the engine has read of `title`'s links satisfies `condition`.
+        func waitForLinks(of title: String, _ what: String, _ condition: (BodyLinks?) -> Bool) async throws {
+            for _ in 0..<400 {
+                if condition(await links(of: title)) { return }
+                try await Task.sleep(for: .milliseconds(25))
+            }
+            Issue.record("waiting for \(what)")
         }
     }
 
@@ -409,15 +422,13 @@ import Testing
         let host = try await scene.note("Host", body: "See [[Bee]]")
         _ = try await scene.copy.edges.create(from: host, to: target, type: MarfaMapping.bodyLinkEdge)
         await scene.caughtUp()
-        try await scene.wait("the host") { $0.item(titled: "Host")?.boundLinks.isEmpty == false }
-        #expect(scene.shown("Host")?.boundLinks.first?.resolution != .resolved(ItemID(target)))
+        try await scene.waitForLinks(of: "Host", "the host") { $0?.links.isEmpty == false }
+        #expect(await scene.links(of: "Host")?.links.first?.target != .item(id: target))
 
         // Only the target is named: its new title is what the host's link names.
         try await scene.rename(target, to: "Bee")
         await scene.caughtUp()
-        try await scene.wait("the link bound") {
-            $0.item(titled: "Host")?.boundLinks.first?.resolution == .resolved(ItemID(target))
-        }
+        try await scene.waitForLinks(of: "Host", "the link bound") { $0?.links.first?.target == .item(id: target) }
         await finish(scene)
     }
 
@@ -427,7 +438,7 @@ import Testing
         let scene = try await makeScene()
         let host = try await scene.note("Host", body: "See [[Nowhere]]")
         await scene.caughtUp()
-        try await scene.wait("the host") { $0.item(titled: "Host")?.boundLinks.isEmpty == false }
+        try await scene.waitForLinks(of: "Host", "the host") { $0?.links.isEmpty == false }
         scene.reads.linksAsked.withLock { $0 = [] }
 
         let first = try #require(scene.shown("First")).id.rawValue
@@ -445,9 +456,7 @@ import Testing
         let target = try await scene.note("Target")
         _ = try await scene.host(naming: target)
         try await scene.purge(target)
-        try await scene.wait("the link let go") {
-            $0.item(titled: "Host")?.boundLinks.first.map { $0.resolution != .resolved(ItemID(target)) } == true
-        }
+        try await scene.waitForLinks(of: "Host", "the link let go") { $0?.links.first.map { $0.target != .item(id: target) } == true }
         await finish(scene)
     }
 
@@ -463,9 +472,7 @@ import Testing
         try await scene.purge(target)
         await scene.caughtUp()
         scene.reads.letGo()
-        try await scene.wait("the link let go") {
-            $0.item(titled: "Host")?.boundLinks.first.map { $0.resolution != .resolved(ItemID(target)) } == true
-        }
+        try await scene.waitForLinks(of: "Host", "the link let go") { $0?.links.first.map { $0.target != .item(id: target) } == true }
         #expect(scene.reads.everything == 0, "read by what changed")
         await finish(scene)
     }
@@ -510,7 +517,7 @@ import Testing
         let host = try await scene.note("Host", body: "See [[Bee]]")
         _ = try await scene.copy.edges.create(from: host, to: page, type: MarfaMapping.bodyLinkEdge)
         await scene.caughtUp()
-        try await scene.wait("the host") { $0.item(titled: "Host")?.boundLinks.isEmpty == false }
+        try await scene.waitForLinks(of: "Host", "the host") { $0?.links.isEmpty == false }
         await scene.source.engineTook()
         scene.reads.linksAsked.withLock { $0 = [] }
 
@@ -532,7 +539,7 @@ import Testing
         let host = try await scene.note("Host", body: "See [[bee]]")
         _ = try await scene.copy.edges.create(from: host, to: target, type: MarfaMapping.bodyLinkEdge)
         await scene.caughtUp()
-        try await scene.wait("the host") { $0.item(titled: "Host")?.boundLinks.isEmpty == false }
+        try await scene.waitForLinks(of: "Host", "the host") { $0?.links.isEmpty == false }
         await scene.source.engineTook()
 
         // Named by a read of what changed: the copy names the edge alone.
@@ -569,10 +576,8 @@ import Testing
         let child = try await scene.note("Child", body: "See [[Nowhere]]")
         _ = try await scene.copy.edges.create(from: parent, to: child, type: MarfaMapping.parentEdge)
         await scene.caughtUp()
-        try await scene.wait("the child") { state in
-            guard let child = state.item(titled: "Child") else { return false }
-            return !child.boundLinks.isEmpty && !child.edgesOut.isEmpty
-        }
+        try await scene.wait("the child") { $0.item(titled: "Child")?.edgesOut.isEmpty == false }
+        try await scene.waitForLinks(of: "Child", "the child's links") { $0?.links.isEmpty == false }
         await scene.source.engineTook()
         scene.reads.linksAsked.withLock { $0 = [] }
 
@@ -592,7 +597,7 @@ import Testing
         scene.reads.linkFailures.withLock { $0 = 1 }
         _ = try await scene.note("Host", body: "See [[Nowhere]]")
         await scene.caughtUp()
-        try await scene.wait("the host's links") { $0.item(titled: "Host")?.boundLinks.isEmpty == false }
+        try await scene.waitForLinks(of: "Host", "the host's links") { $0?.links.isEmpty == false }
         await scene.source.engineTook()
         #expect(scene.reads.linksAskedAlone.withLock { $0 }.isEmpty, "no row asked alone")
         #expect(scene.reads.whole == whole + 1)
@@ -611,11 +616,11 @@ import Testing
         try await scene.wait("the host") { $0.item(titled: "Host") != nil }
         await scene.source.engineTook()
         #expect(scene.reads.whole == whole + 1)
-        #expect(scene.shown("Host")?.boundLinks.isEmpty == true, "no links read")
+        #expect(await scene.links(of: "Host") == nil, "no links read")
         #expect(await scene.source.engine.cursor == nil, "the whole read took no cursor")
 
         await scene.caughtUp()
-        try await scene.wait("the host's links") { $0.item(titled: "Host")?.boundLinks.isEmpty == false }
+        try await scene.waitForLinks(of: "Host", "the host's links") { $0?.links.isEmpty == false }
         await scene.source.engineTook()
         #expect(scene.reads.whole == whole + 2)
         #expect(await scene.source.engine.cursor != nil)
@@ -645,14 +650,10 @@ import Testing
 
         _ = try await scene.copy.items.delete(target)
         await take("binned")
-        try await scene.wait("the link pending") {
-            $0.item(titled: "Host")?.boundLinks.first.map { $0.resolution != .resolved(ItemID(target)) } == true
-        }
+        try await scene.waitForLinks(of: "Host", "the link pending") { $0?.links.first.map { $0.target != .item(id: target) } == true }
         _ = try await scene.copy.items.restore(target)
         await take("restored")
-        try await scene.wait("the link bound again") {
-            $0.item(titled: "Host")?.boundLinks.first?.resolution == .resolved(ItemID(target))
-        }
+        try await scene.waitForLinks(of: "Host", "the link bound again") { $0?.links.first?.target == .item(id: target) }
         await finish(scene)
     }
 }

@@ -1,39 +1,35 @@
 import Foundation
+import Marfa
 
-/// How the page names a note in a `[[link]]`: by its title, or by a spelling the library resolves to that note alone
-/// (`ItemLibrary.bodyLink(to:)`).
+/// How the page names a note in a `[[link]]`: by its title, or by its identity with the title as a label. Whether a
+/// spelling names the note is the core's to say (`ItemLibrary.bodyLink(to:in:)`); this only builds the text.
 nonisolated enum NoteLinks {
-    /// Whether `[[title]]` names the title as written. A link ends at `]]`, reads `|` as an alias and `#` as a
-    /// heading, and the page reads `\` as an escape, so a title holding one is left out rather than linked to
-    /// something else.
-    static func canSpell(_ text: String) -> Bool {
-        !text.isEmpty && text == NoteName.trimmed(text)
-            && !text.unicodeScalars.contains { "[]|#\\\r\n".unicodeScalars.contains($0) }
+    /// Whether `[[inner]]` is one link the core reads with exactly this name and alias, so the text survives
+    /// as written: no `]]`, line break or padding in it. Marfa has no escape in a link, so a backslash is part of the
+    /// name, but Inkkit, which the page draws links with, reads one as an escape, so a spelling with a backslash
+    /// directly before `]`, `|` or `#` (or the end) would be two different links. Such a spelling is refused.
+    static func spells(_ inner: String, as name: String, alias: String? = nil) -> Bool {
+        guard !name.isEmpty, !escapesDelimiter(inner) else { return false }
+        let text = "[[\(inner)]]"
+        let parts = linkParts(in: text)
+        guard parts.count == 1, let link = parts.first, link.text == text else { return false }
+        return link.name.text == name && link.heading == nil && link.alias?.text == alias
     }
 
-    /// Whether the text is spelled as an identity, which a link reads as the item with that identity before it
-    /// looks at any title, as Marfa (`is_id`) does.
-    static func looksLikeIdentity(_ text: String) -> Bool {
-        text.count == 36 && UUID(uuidString: text) != nil
+    /// Whether a backslash stands directly before a character that ends a part of a link, or ends the link.
+    private static func escapesDelimiter(_ text: String) -> Bool {
+        var previous: Character?
+        for character in text {
+            if previous == "\\", "]|#".contains(character) { return true }
+            previous = character
+        }
+        return previous == "\\"
     }
 
-    /// Whether a title can be the spelling of a link to its own note: it can be written, and it is not read as
-    /// an identity, which would name whichever item holds that identity.
-    static func canName(_ title: String) -> Bool {
-        canSpell(title) && !looksLikeIdentity(title)
-    }
-
-    static func link(to title: String) -> String { "[[\(title)]]" }
-
-    /// A link that names an item by its identity and shows its title: `[[identity|Title]]`, which Marfa reads as
-    /// naming the identity and the page shows as the title. The title is made a single line and its `\`, `[`, `]`,
-    /// `|` and `#` are escaped for the page's linked syntax; a title with nothing left shows nothing.
-    static func identityLink(to identity: String, titled title: String) -> String {
-        let shown = label(title)
-        return shown.isEmpty ? "[[\(identity)]]" : "[[\(identity)|\(shown)]]"
-    }
-
-    /// A title as one line of a link's label. Line breaks and control characters become one space.
+    /// A title as one line of a link's label. Line breaks and control characters become one space; nothing else is
+    /// changed, since a link has no escape, except that a backslash directly before `]`, `|` or `#`, or last, is
+    /// dropped, because the page would read it as an escape. The label is only what the link shows; the identity
+    /// before it names the note.
     static func label(_ title: String) -> String {
         var words: [String] = []
         var word = String.UnicodeScalarView()
@@ -48,17 +44,23 @@ nonisolated enum NoteLinks {
             }
         }
         end()
-        var escaped = String.UnicodeScalarView()
-        for scalar in NoteName.trimmed(words.joined(separator: " ")).unicodeScalars {
-            if "\\[]|#".unicodeScalars.contains(scalar) { escaped.append("\\") }
-            escaped.append(scalar)
+        var label = NoteName.trimmed(words.joined(separator: " "))
+        while escapesDelimiter(label) {
+            var kept = ""
+            for (index, character) in zip(label.indices, label) {
+                let next = label.index(after: index)
+                if character == "\\", next == label.endIndex || "]|#".contains(label[next]) { continue }
+                kept.append(character)
+            }
+            label = NoteName.trimmed(kept)
         }
-        return String(escaped)
+        return label
     }
 
-    /// A name as the library's links compare it: ignoring case and the form of accents.
-    static func nameKey(_ name: String) -> String {
-        name.precomposedStringWithCanonicalMapping.lowercased().precomposedStringWithCanonicalMapping
+    /// A note the page may offer by its title.
+    struct Match: Hashable, Sendable {
+        let id: ItemID
+        let title: String
     }
 
     /// Keeps each note's title folded for matching, so a query that grows one letter at a time folds nothing again
@@ -69,66 +71,48 @@ nonisolated enum NoteLinks {
             let version: ItemVersion
             let title: String
             let folded: [Character]
-            let key: String
-            let nameable: Bool
             let modified: Date
         }
 
         private var entries: [ItemID: Entry] = [:]
-        /// How many notes go by each name, since a title another note shares would be an ambiguous link.
-        private var holders: [String: Int] = [:]
         /// How many titles have been folded, so a test can tell that a query folded none again.
         private(set) var foldedCount = 0
 
-        /// The titles that answer what was typed after `[[`, best first (the closest match, then the most recently
-        /// edited), each once. A title another note also goes by is not offered, since a link to it would not say
-        /// which note, nor one the note it is typed in already links to another note (`established`).
-        func names(matching text: String, among items: [Item], established: [String: ItemID] = [:], limit: Int) -> [String] {
+        /// The notes whose titles answer what was typed after `[[`, best first (the closest match, then the most
+        /// recently edited). Whether a link to one names it alone is the core's to say, so the caller asks.
+        func matches(for text: String, among items: [Item], limit: Int) -> [Match] {
             let query = PaletteMatch.Query(text)
             var notes = 0
-            var best: [(title: String, score: Int, modified: Date)] = []
+            var best: [(match: Match, score: Int, modified: Date)] = []
             for item in items where !item.isFile {
                 notes += 1
                 if let kept = entries[item.id], kept.version == item.version, kept.title == item.title { continue }
-                if let old = entries[item.id] { forget(old.key) }
-                let folded = PaletteMatch.fold(item.title)
-                let entry = Entry(
-                    version: item.version, title: item.title, folded: Array(folded), key: NoteLinks.nameKey(NoteName.trimmed(item.title)),
-                    nameable: NoteLinks.canName(item.title), modified: item.modified)
-                entries[item.id] = entry
-                holders[entry.key, default: 0] += 1
+                entries[item.id] = Entry(
+                    version: item.version, title: item.title, folded: Array(PaletteMatch.fold(item.title)), modified: item.modified)
                 foldedCount += 1
             }
             if entries.count != notes {
                 let live = Set(items.lazy.filter { !$0.isFile }.map(\.id))
-                for (id, entry) in entries where !live.contains(id) {
-                    forget(entry.key)
-                    entries[id] = nil
-                }
+                for id in entries.keys where !live.contains(id) { entries[id] = nil }
             }
             for item in items where !item.isFile {
-                guard let entry = entries[item.id], entry.nameable, holders[entry.key] == 1,
-                      established[entry.key].map({ $0 == item.id }) ?? true,
-                      let score = PaletteMatch.score(folded: entry.folded, query) else { continue }
-                Self.keep((entry.title, score, entry.modified), in: &best, limit: limit)
+                guard let entry = entries[item.id], let score = PaletteMatch.score(folded: entry.folded, query) else { continue }
+                Self.keep((Match(id: item.id, title: entry.title), score, entry.modified), in: &best, limit: limit)
             }
-            return best.map(\.title)
+            return best.map(\.match)
         }
 
-        private func forget(_ key: String) {
-            guard let count = holders[key] else { return }
-            if count <= 1 { holders[key] = nil } else { holders[key] = count - 1 }
-        }
+        private typealias Candidate = (match: Match, score: Int, modified: Date)
 
         /// Whether `a` is offered before `b`: a closer match, then a more recent edit, then the title.
-        private static func precedes(_ a: (title: String, score: Int, modified: Date), _ b: (title: String, score: Int, modified: Date)) -> Bool {
+        private static func precedes(_ a: Candidate, _ b: Candidate) -> Bool {
             if a.score != b.score { return a.score < b.score }
             if a.modified != b.modified { return a.modified > b.modified }
-            return a.title < b.title
+            return a.match.title < b.match.title
         }
 
         /// Keeps the `limit` best without ordering the notes that did not make it.
-        private static func keep(_ match: (title: String, score: Int, modified: Date), in best: inout [(title: String, score: Int, modified: Date)], limit: Int) {
+        private static func keep(_ match: Candidate, in best: inout [Candidate], limit: Int) {
             if best.count == limit, let last = best.last, !precedes(match, last) { return }
             let at = best.firstIndex { precedes(match, $0) } ?? best.endIndex
             best.insert(match, at: at)
@@ -143,8 +127,13 @@ extension ItemLibrary {
         items(in: .allNotes).filter { !$0.isFile && $0.id != id }.sorted { $0.modified > $1.modified }
     }
 
-    func noteNames(matching query: String, in source: ItemID? = nil, using index: NoteLinks.Index, limit: Int = 12) async -> [String] {
-        let established = source.flatMap { item($0)?.establishedLinks } ?? [:]
-        return await index.names(matching: query, among: items(in: .allNotes), established: established, limit: limit)
+    /// The titles to offer for what was typed after `[[` in `note`, best first, each one only where `[[title]]`, written
+    /// there, the core binds to that note or leaves unresolved with that note the only one held (`LinkAnswer.offers`). A title that two notes go by, or that a
+    /// link cannot spell, is left out. The closest matches are asked of the core together, so a few left out leave the list full.
+    func noteNames(matching query: String, in note: ItemID? = nil, using index: NoteLinks.Index, limit: Int = 12) async -> [String] {
+        let matches = await index.matches(for: query, among: items(in: .allNotes), limit: limit * 4)
+            .filter { NoteLinks.spells($0.title, as: $0.title) }
+        guard !matches.isEmpty, let answers = await linkAnswers(of: matches.map(\.title), in: note) else { return [] }
+        return zip(matches, answers).compactMap { $0.1.offers($0.0.id) ? $0.0.title : nil }.prefix(limit).map { $0 }
     }
 }

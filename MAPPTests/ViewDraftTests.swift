@@ -200,26 +200,53 @@ struct ViewDraftTests {
         #expect(ViewDraft.filter(nil, adding: ["parent": [""]], columns: Self.columns).filter == "backref[parent-of] not_exists")
     }
 
-    @Test func valuesAreQuotedAndABackslashIsNotKept() {
-        #expect(ViewDraft.filter(nil, adding: ["field.status": [#"say "hi""#]], columns: Self.columns).filter
-            == #"properties.status eq "say \"hi\"""#)
-        let slash = ViewDraft.filter(nil, adding: ["field.status": [#"a\"#]], columns: Self.columns)
-        #expect(slash == (nil, [.filter(column: "Status")]))
+    @Test func valuesAreQuotedByTheCoreAndABackslashIsKept() throws {
+        let quoted = ViewDraft.filter(nil, adding: ["field.status": [#"say "hi""#]], columns: Self.columns)
+        #expect(quoted.filter == #"properties.status eq "say \"hi\"""#)
+        for value in [#"a\"#, #"C:\temp\"#, #"\""#, #"x\y"#] {
+            let kept = ViewDraft.filter(nil, adding: ["field.status": [value]], columns: Self.columns)
+            #expect(kept.unkept.isEmpty, "\(value) was not kept")
+            let text = try #require(kept.filter)
+            let view = LibraryView(id: ItemID("v"), title: "V", query: LibraryViewQuery(filter: text))
+            #expect(ViewDraft.options(for: view).filters == ["field.status": [value]], "\(value) did not come back")
+        }
         // A field Marfa cannot name has no condition it can express.
         #expect(ViewDraft.filter(nil, adding: ["field.due-date": ["c"]], columns: Self.columns).unkept == [.filter(column: "Due")])
     }
 
-    @Test func moreThanTenConditionsAreNotKept() {
-        let values = Set((1...11).map { "v\($0)" })
-        let filter = ViewDraft.filter(nil, adding: ["field.status": values], columns: Self.columns)
-        #expect(filter == (nil, [.tooManyFilters]))
+    @Test func aFilterIsMeasuredByTheCoreInUTF16UnitsNotCharacters() throws {
+        // Each 🎉 is one character and two UTF-16 units: 1,000 of them fit in 2,048 units and 1,100 do not.
+        func filter(_ count: Int) -> (filter: String?, unkept: [ViewDraft.Unkept]) {
+            ViewDraft.filter(nil, adding: ["field.status": [String(repeating: "🎉", count: count)]], columns: Self.columns)
+        }
+        let fits = filter(1_000)
+        #expect(fits.unkept.isEmpty)
+        #expect(try #require(fits.filter).utf16.count <= 2_048)
+        let over = filter(1_100)
+        #expect(over.filter == nil)
+        guard case .refused(let message)? = over.unkept.first else { Issue.record("not refused: \(over.unkept)"); return }
+        #expect(!message.isEmpty)
     }
 
-    @Test func aFiltersShapeIsReadOutsideItsQuotes() {
-        #expect(ViewDraft.shape(of: "") == ViewDraft.Shape(conditions: 0, joiner: nil))
-        #expect(ViewDraft.shape(of: #"title contains "A AND B""#) == ViewDraft.Shape(conditions: 1, joiner: nil))
-        #expect(ViewDraft.shape(of: #"title eq "x \" OR y" OR tags exists"#) == ViewDraft.Shape(conditions: 2, joiner: "OR"))
-        #expect(ViewDraft.shape(of: "a exists AND b exists AND c exists") == ViewDraft.Shape(conditions: 3, joiner: "AND"))
+    @Test func moreConditionsThanTheCoreTakesAreToldWithItsMessage() {
+        let values = Set((1...11).map { "v\($0)" })
+        let filter = ViewDraft.filter(nil, adding: ["field.status": values], columns: Self.columns)
+        #expect(filter.filter == nil)
+        guard case .refused(let message)? = filter.unkept.first else { Issue.record("not refused: \(filter.unkept)"); return }
+        #expect(!message.isEmpty)
+    }
+
+    @Test func aSavedFilterTheCoreRefusesShowsNoFiltersAndIsNeverOverwritten() {
+        let view = LibraryView(
+            id: ItemID("v"), title: "V", version: 3, query: LibraryViewQuery(types: [Self.task], filter: "properties.status eq"))
+        let seed = ViewDraft.options(for: view)
+        #expect(seed.filters.isEmpty)
+        var options = seed
+        options.filters = ["field.status": ["todo"]]
+        let update = ViewDraft.change(Self.window(.view(view.id), filters: options.filters), options: options, seed: seed, view: view)
+        #expect(update.change.query == nil, "a filter that could not be read is not replaced")
+        guard case .refused(let message)? = update.unkept.first else { Issue.record("not refused: \(update.unkept)"); return }
+        #expect(!message.isEmpty)
     }
 
     // MARK: Updating a view

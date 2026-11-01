@@ -79,7 +79,7 @@ enum SavedViews {
         case .search(let text): String(localized: "The search for “\(text)”")
         case .filter(let column): String(localized: "The filter on \(column)")
         case .mixedFilters: String(localized: "Filters that would join conditions with both “and” and “or”")
-        case .tooManyFilters: String(localized: "Filters beyond the 10 conditions a view can hold")
+        case .refused(let message): String(localized: "A filter Marfa refuses: \(message)")
         case .sort(let column): String(localized: "Sorting by \(column)")
         case .group(let column): String(localized: "Grouping by \(column)")
         case .dateSections: String(localized: "The list’s sections by date")

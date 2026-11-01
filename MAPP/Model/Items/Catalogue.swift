@@ -189,6 +189,9 @@ nonisolated struct EdgeTypeInfo: Identifiable, Hashable, Sendable {
     var reverseCardinality: Cardinality = .many
     var cascadeOnDelete: CascadeOnDelete = .orphan
     var properties: [ItemTypeInfo.Field] = []
+    /// Whether the core refuses, as the source of this edge type, a type its target constraints admit, such as a
+    /// collection inside a collection.
+    var flat = false
 
     /// Whether both ends carry one name, so the relation reads the same from either item and its outgoing and
     /// incoming links form one list.
@@ -332,11 +335,17 @@ nonisolated struct Catalogue: Hashable, Sendable {
     }
 
     /// Whether an item of `type` can be filed in a collection: the catalogue has `in-collection`, its source end
-    /// admits the type, and the type is not a collection itself, since collections are flat
-    /// (`edges/collection-no-nesting`).
+    /// admits the type, and the edge type being flat, the type is not one its target end admits.
     func canJoinCollection(_ type: TypeID) -> Bool {
-        guard let info = edgeTypes[MarfaMapping.collectionEdge], !isCollection(type) else { return false }
-        return admits(type, types: info.sourceTypes, roles: info.sourceRoles)
+        guard let info = edgeTypes[MarfaMapping.collectionEdge], admits(type, source: info) else { return false }
+        return true
+    }
+
+    /// Whether `type` may be the source of an edge of type `info`: its source end admits the type, and where the type is
+    /// flat, its target end does not.
+    func admits(_ type: TypeID, source info: EdgeTypeInfo) -> Bool {
+        guard admits(type, types: info.sourceTypes, roles: info.sourceRoles) else { return false }
+        return !info.flat || !admits(type, types: info.targetTypes, roles: info.targetRoles)
     }
 
     /// The edge type an item writes under `name`, and whether `name` is its reverse.

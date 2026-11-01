@@ -3,7 +3,7 @@ import Marfa
 import os
 
 /// What the copy tells (`WorkingCopy.updates()`), shown on the hub and handed to the engine one update at a time,
-/// and the calls the app makes itself: hydrating a copy that needs it, draining after a write, reading the bin and
+/// and the calls the app makes itself: hydrating a copy that needs it, draining after a write and
 /// fetching kept files. The package keeps the copy following its server, catches it up, and tries again after a
 /// failure and after a drain left writes undelivered; none of that is done here. Attachment downloads run
 /// separately so they cannot hold up a drain or flush.
@@ -48,11 +48,6 @@ actor MarfaSync {
     private var drainFailureTold = false
     private var lane: Task<Void, Never>?
     private var wantsDrain = false
-    /// The bin is read from the server alone, so it is read again when something may have changed it.
-    private var wantsBin = false
-    /// A read of the bin asked for and not yet due, and when the first ask of it came.
-    private var binTimer: Task<Void, Never>?
-    private var binAsked: ContinuousClock.Instant?
     private var working: Task<Void, Never>?
     private var fetching: Task<Void, Never>?
     private var wantsFetch = false
@@ -136,46 +131,9 @@ actor MarfaSync {
         work()
     }
 
-    /// How long the bin's changes are let settle before it is read, and the longest a read waits for them to.
-    nonisolated struct BinWait: Sendable {
-        var quiet: Duration
-        var longest: Duration
-    }
-
-    var binWait: BinWait {
-        #if DEBUG
-        if let wait = hooks.binWait.current { return wait }
-        #endif
-        return BinWait(quiet: .seconds(1), longest: .seconds(5))
-    }
-
     #if DEBUG
     nonisolated let hooks = TestHooks()
     #endif
-
-    /// An item may have gone to or left the server's bin, which the copy does not say. The bin is read from the
-    /// server whole, so a flood of server changes reads it once they pause, and at least every `binWait.longest`.
-    func binChanged() {
-        guard !stopped else { return }
-        let now = ContinuousClock.now
-        let first = binAsked ?? now
-        binAsked = first
-        binTimer?.cancel()
-        let wait = binWait
-        let due = min(now + wait.quiet, first + wait.longest)
-        binTimer = Task {
-            try? await Task.sleep(until: due)
-            guard !Task.isCancelled else { return }
-            self.binDue()
-        }
-    }
-
-    private func binDue() {
-        binAsked = nil
-        binTimer = nil
-        wantsBin = true
-        work()
-    }
 
     /// Returns once a drain begun after this call has ended, or at once when the source is closing.
     func flush() async {
@@ -192,7 +150,6 @@ actor MarfaSync {
         stopped = true
         consuming?.cancel()
         lane?.cancel()
-        binTimer?.cancel()
         working?.cancel()
         fetching?.cancel()
         for flusher in flushers + draining { flusher.resume() }
@@ -270,9 +227,8 @@ actor MarfaSync {
             // that stopped on a fault waits for the person's Refresh instead.
             if before != update.connection, !hydrationUnderway { wantsHydration = true }
         case .following where before != .following:
-            // The server answered: what waited is sent, and the bin and the kept files are asked again.
+            // The server answered: what waited is sent, and the kept files are asked again.
             wantsDrain = true
-            wantsBin = true
             wantsFetch = true
         case .following where !update.reread.isEmpty:
             // Replay or a catch-up may have brought a file the copy does not hold yet.
@@ -371,7 +327,7 @@ actor MarfaSync {
     private func work() {
         startFetch()
         startLane()
-        guard started, !stopped, !paused, working == nil, wantsDrain || wantsBin else { return }
+        guard started, !stopped, !paused, working == nil, wantsDrain else { return }
         working = Task { await self.loop() }
     }
 
@@ -412,7 +368,6 @@ actor MarfaSync {
         try Task.checkCancellation()
         fetchAttachments()
         wantsDrain = true
-        wantsBin = true
         work()
     }
 
@@ -483,7 +438,7 @@ actor MarfaSync {
         startFetch()
     }
 
-    // MARK: Draining and the bin
+    // MARK: Draining
 
     private func loop() async {
         while !stopped, !paused, !Task.isCancelled {
@@ -494,9 +449,6 @@ actor MarfaSync {
                 await runDrain()
                 for flusher in draining { flusher.resume() }
                 draining = []
-            } else if wantsBin {
-                wantsBin = false
-                await runBin()
             } else {
                 break
             }
@@ -518,8 +470,7 @@ actor MarfaSync {
             #if DEBUG
             if let fault = hooks.faulting.current?(.drain) { throw fault }
             #endif
-            let report = try await copy.queue.drain()
-            if report.verdicts.contains(where: { [.deleteItem, .restoreItem].contains($0.kind) }) { wantsBin = true }
+            _ = try await copy.queue.drain()
         } catch {
             // A drain that throws loses its report, and the writes it answered first are recorded, so the engine
             // takes them from the queue below. A copy that needs it hydrates again. The package retries a drain only
@@ -558,48 +509,6 @@ actor MarfaSync {
         default: return true
         }
     }
-
-    /// Reads the server's bin a page at a time, newest change first, and tells the engine. A server that cannot be
-    /// reached leaves the bin as it was, shown from what the engine last held, and is asked again when it can.
-    private func runBin() async {
-        #if DEBUG
-        hooks.seen.update { $0.binReads += 1 }
-        #endif
-        var found: [Marfa.Item] = []
-        var cursor: String?
-        var complete = false
-        do {
-            #if DEBUG
-            if let fault = hooks.faulting.current?(.bin) { throw fault }
-            #endif
-            for _ in 0..<Self.binPages {
-                let page = try await copy.items.bin(after: cursor, limit: Self.binPageSize)
-                found += page.items
-                guard let next = page.nextCursor else {
-                    complete = true
-                    break
-                }
-                cursor = next
-            }
-        } catch let error as MarfaError {
-            // Including a key being changed: the read is asked for again once the new key is in.
-            if error.isOffline || error.isTransient { return }
-            if case .canceled = error { return }
-            if case .closed = error { return }
-            // A copy with no server never answers for the bin, and has nothing to read.
-            if case .noServer = error { return }
-            Telemetry.binUnreadable(error)
-            _ = tell(.failed(SourceFailure(kind: .failed, message: error.message)))
-            return
-        } catch {
-            return
-        }
-        _ = tell(.binned(found, complete: complete))
-    }
-
-    nonisolated static let binPageSize = 100
-    /// Recently Deleted shows this many pages of the bin; the server keeps the rest.
-    nonisolated static let binPages = 10
 }
 
 private nonisolated extension CopyConnection {

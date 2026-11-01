@@ -311,24 +311,6 @@ struct MarfaSyncLifecycleTests {
         await source.close()
     }
 
-    // MARK: The bin
-
-    @Test func aBinReadTheServerRefusesAsInvalidIsToldButOneForAKeyChangeIsNot() async throws {
-        let (_, source, log) = try await scriptedSource(refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()))
-        let sync = await source.engine.sync
-
-        sync.hooks.faulting.set { step in step == .bin ? .keyChanging(message: "The key is changing.") : nil }
-        await sync.refresh()
-        try #require(await eventually { sync.hooks.binReads == 1 })
-        try await Task.sleep(for: .milliseconds(200))
-        #expect(unavailable(log.current) == 0)
-
-        sync.hooks.faulting.set { step in step == .bin ? .invalid(message: "The request is invalid.") : nil }
-        await sync.refresh()
-        _ = try #require(await log.wait { unavailable($0) == 1 })
-        await source.close()
-    }
-
     // MARK: Reading the status
 
     @Test func theCopysStatusIsReadAgainOnlyWhenAFillEndsOrTheConnectionChanges() async throws {

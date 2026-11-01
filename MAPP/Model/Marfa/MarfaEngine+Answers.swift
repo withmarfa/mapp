@@ -50,13 +50,6 @@ extension MarfaEngine {
             if let itemID = answer.itemId {
                 ids.insert(itemID)
                 remember(outcome, of: answer.kind, for: ItemID(itemID))
-                if answer.kind == .restoreItem, let row = restoring.removeValue(forKey: itemID) {
-                    // Taken, the item arrives in the copy; otherwise it is still in the bin.
-                    switch outcome {
-                    case .accepted, .merged: break
-                    default: binned[itemID] = row
-                    }
-                }
             }
             if case .conflicted(let sibling, _) = outcome {
                 ids.insert(sibling.rawValue)

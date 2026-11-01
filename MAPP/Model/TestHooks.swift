@@ -47,8 +47,6 @@ extension MarfaEngine {
 
 extension MarfaSync {
     nonisolated struct TestHooks: Sendable {
-        /// Replaces how long the bin's changes settle before it is read, and the longest a read waits for them.
-        let binWait = TestHook<BinWait>()
         /// Chooses an error a step of the sync fails with before it asks the copy, since a test copy never fails them.
         let faulting = TestHook<@Sendable (Step) -> MarfaError?>()
         /// While true, the sync does not listen to the copy's updates, so a test that tells the engine its updates
@@ -59,7 +57,6 @@ extension MarfaSync {
 
         nonisolated enum Step: Sendable {
             case drain
-            case bin
         }
 
         nonisolated struct Seen: Sendable {
@@ -67,8 +64,6 @@ extension MarfaSync {
             var drains = 0
             /// The hydrations begun.
             var hydrations = 0
-            /// The reads of the bin begun.
-            var binReads = 0
             /// The stops reported and told.
             var stops = 0
             /// The report of the last fetch of kept files that succeeded.
@@ -79,7 +74,6 @@ extension MarfaSync {
 
         var drains: Int { seen.current.drains }
         var hydrations: Int { seen.current.hydrations }
-        var binReads: Int { seen.current.binReads }
         var stops: Int { seen.current.stops }
         var lastKeptFetch: KeptFetch? { seen.current.lastKeptFetch }
         var lastHydration: HydrateReport? { seen.current.lastHydration }

@@ -41,17 +41,7 @@ extension MarfaLibrary {
             notices.tell(title, String(localized: "This collection isn’t in the library."))
             return false
         }
-        let planned = collectionPlan(ids, joining: collection)
-        var skips = planned.skips
-        var joining: [Item] = []
-        for member in planned.joining {
-            let draft = EdgeDraft(type: MarfaMapping.collectionEdge, source: member.id, target: collection)
-            if linkProblem(draft, sourceType: member.type, targetType: target.type) == nil {
-                joining.append(member)
-            } else {
-                skips.skip(.cantJoinCollection)
-            }
-        }
+        var (joining, skips) = collectionPlan(ids, joining: collection)
         tellSkipped(skips, didChange: !joining.isEmpty, failing: title)
         guard !joining.isEmpty else { return skips.isEmpty }
         joining.sort(by: Self.titleOrder)

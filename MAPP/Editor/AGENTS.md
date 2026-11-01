@@ -37,10 +37,11 @@ The Swift side of the note editor: the web view, the controller that drives the 
 
 ## Linking to notes
 
-- A link names a note by a spelling the library resolves to that note alone (`ItemLibrary.bodyLink(to:in:)`); where none does, there is no link and the person is told. Never write a link any other way.
-- `NoteRequests` answers the page's `notes` messages; suggestions come from `NoteLinks.Index`, off the main actor. Link to Note (`NoteLinkPicker`) answers the page exactly once on every path: chosen, cancelled, the document replaced, the note left, the window gone, or the page's process ended.
-- Following a link asks the library what that very link means (`ItemLibrary.resolveLink(_:in:)`, from its authored raw text) and never guesses by title. Only `resolved` opens a note; every other answer opens nothing and beeps. No note is made for a link. Wire `onOpenNote` wherever an editor is made.
-- `NoteLink.raw` keeps the authored text inside the brackets and defines equality, so `[[Plan]]`, `[[Plan|Plan]]` and escaped separators stay distinct.
+- The core reads links: `linkParts(in:)` for their parts (UTF-16 ranges) and `Items.linkCandidates` for what they name (`ItemLibrary.linkAnswers(of:in:)`). MAPP parses no link and folds no name. A backslash is part of a link's text, so pass the page's `raw` on, never what it decoded. Inkkit reads a backslash as an escape, so `NoteLinks.spells` refuses a spelling with one before `]`, `|` or `#` or last, and `NoteLinks.label` leaves such a backslash out of a label.
+- Link to Note writes `[[Title]]` only where the core answers `bound` for that title to that note (`LinkAnswer.names`), and otherwise `[[identity|Title]]` (`ItemLibrary.bodyLink(to:in:)`). The copy holds a slice, so `unresolved` with one held note does not say it is the only one (`device/link-candidates-unresolved`); the server decides at the save. Never write a link any other way.
+- `NoteRequests` answers the page's `notes` messages; suggestions are `NoteLinks.Index` matches off the main actor, kept where `LinkAnswer.offers` holds for the title (bound to the note, or unresolved with it the only note held), since the person sees and chooses the title. A link the core does not read as the one link the page posted is answered as not missing, and the note's other links keep their marks. Link to Note (`NoteLinkPicker`) answers the page exactly once on every path: chosen, cancelled, the document replaced, the note left, the window gone, or the page's process ended.
+- Following a link asks the core what that very link means from its note (`EditorController.openNote`) and never guesses by title. Only `bound` opens a note at once; a link the copy has not bound offers the notes its name answers to in a menu, and one that names none beeps. No note is made for a link. Wire `onOpenNote` wherever an editor is made.
+- `NoteLink.raw` keeps the authored text inside the brackets and defines equality, so `[[Plan]]` and `[[Plan|Plan]]` stay distinct.
 
 ## Printing and PDF export
 
@@ -53,5 +54,5 @@ The Swift side of the note editor: the web view, the controller that drives the 
 - **Runnable file opened.** Flag any route that hands a file to another app without `EmbeddedFiles.opens`.
 - **Editor made for every view value.** Flag an `EditorController`, a web view, or another costly object made in a view's initializer or given to `State(initialValue:)`. Safe path: `EditorSlot`, or make it in `.task` as Apple's `State` documentation shows.
 - **Unguarded private API.** Flag a private WebKit setting set without a `responds(to:)` check, or a new one that Apple's own `WebView` does not use.
-- **Link request left open.** Flag a path that ends Link to Note without answering the page once, or that writes a link without `bodyLink(to:)`.
+- **Link request left open.** Flag a path that ends Link to Note without answering the page once, or that writes a link without `bodyLink(to:in:)`, or parses, escapes or folds a link's text in MAPP.
 - **Edit saved to the wrong place.** Flag a save without the version it was typed on, or one that can land in another note after the page changed notes.

@@ -100,6 +100,20 @@ import Observation
     /// What to tell the person if the source refuses each write the library made.
     @ObservationIgnored private var refusals: [WriteID: Refusal] = [:]
     @ObservationIgnored private var following: [Task<Void, Never>] = []
+    /// The relationship changes asked for and not yet written or refused, and the last of them, which the next waits
+    /// for so changes run in the order they were made (`changeItemRelationship`).
+    @ObservationIgnored var relationshipChangesInFlight = 0
+    @ObservationIgnored var relationshipChain: Task<Void, Never>?
+    /// The relationship writes the source took that the copy has not yet taken in or the source has not answered, and
+    /// the changes waiting for some of them.
+    @ObservationIgnored var unsettled: Set<WriteID> = []
+    @ObservationIgnored var waiters: [Waiter] = []
+
+    /// A change waiting until each of `pending` is settled.
+    struct Waiter {
+        var pending: Set<WriteID>
+        let resume: CheckedContinuation<Void, Never>
+    }
     /// The item each create names, until the source answers it.
     @ObservationIgnored private var creating: [WriteID: ItemID] = [:]
     /// The item each property edit is for, until the copy takes or refuses it. Observed, so an editor holding a list it
@@ -205,6 +219,8 @@ import Observation
                     guard let self else { return }
                     await take(change)
                 }
+                // Nothing more will be taken or answered, so no change waits for it.
+                self?.endWaits()
             },
             Task { [weak self] in
                 for await report in reports { self?.syncReport = report }
@@ -386,12 +402,14 @@ import Observation
             propertyMarks[id] = nil
             read(id)
             answered(id, outcome)
+            settle(id)
         case .taken(let id):
             textSaves.removeValue(forKey: id)?.end()
             propertyWrites[id] = nil
             if let mark = propertyMarks.removeValue(forKey: id) { remember(taken: mark) }
             took(id)
             read(id)
+            settle(id)
         case .catalogue(let catalogue):
             self.catalogue = holdingChosenIcons(catalogue)
             reindex()
@@ -543,6 +561,26 @@ import Observation
         // what the copy holds in the change that follows the answer, and this is what it held before that.
         if let body = sourceText.removeValue(forKey: item) { hold([body]) }
     }
+
+    /// The write is in the copy and read again, or was answered before that: a change waiting for it may go on.
+    private func settle(_ write: WriteID) {
+        guard unsettled.remove(write) != nil else { return }
+        for index in waiters.indices { waiters[index].pending.remove(write) }
+        let done = waiters.filter { $0.pending.isEmpty }
+        waiters.removeAll { $0.pending.isEmpty }
+        for waiter in done { waiter.resume.resume() }
+    }
+
+    /// Lets every waiting change go on, as when the source's changes have ended.
+    private func endWaits() {
+        unsettled = []
+        let all = waiters
+        waiters = []
+        for waiter in all { waiter.resume.resume() }
+    }
+
+    /// Whether the source took the write, so it will be taken or answered.
+    func isFollowed(_ write: WriteID) -> Bool { refusals[write] != nil }
 
     // MARK: Writing through the source
 
@@ -835,23 +873,12 @@ import Observation
 
     // MARK: Links
 
-    /// A link names what the copy bound that very link to when the note was saved (`Item.boundLinks`, the package's
-    /// own answer): Marfa binds each spelling on its own and keeps the first note a spelling was bound to, so two
-    /// links to one name can name two notes. An identity names the item that holds it, whatever other items are
-    /// titled (`device/body-link-id-first`). A link the copy has not bound, as one just typed, or has not been able
-    /// to look up is `pending`, never guessed from the titles held, since the server may hold another note with that
-    /// title; it opens once the copy binds it.
-    func resolveLink(_ link: NoteLink, in source: ItemID) -> NoteReferenceResolution {
-        guard !link.lookupName.isEmpty else { return .missing }
-        if NoteLinks.looksLikeIdentity(link.lookupName), let held = item(ItemID(link.lookupName)) { return Self.named(held) }
-        guard let bound = item(source)?.boundLinks.first(where: { $0.link == link }) else { return .pending }
-        guard case .resolved(let id) = bound.resolution else { return bound.resolution }
-        return item(id).map(Self.named) ?? .pending
-    }
-
-    /// An item in the bin is not a note a link names.
-    private static func named(_ item: Item) -> NoteReferenceResolution {
-        item.state == .trashed ? .missing : .resolved(item.id)
+    /// What the core says each link target names (`Items.linkCandidates`), from the copy alone and read as a link in
+    /// `note` when given, so an answer is whatever saving that link there would do. Nil where the core cannot ask,
+    /// such as for a note the copy does not hold.
+    func linkAnswers(of targets: [String], in note: ItemID?) async -> [LinkAnswer]? {
+        guard !targets.isEmpty else { return [] }
+        return try? await source.linkAnswers(of: targets, in: note)
     }
 
     // MARK: Search

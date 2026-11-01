@@ -112,26 +112,4 @@ nonisolated struct MarfaItemIndex {
     func link(type: String, source: ItemID, target: ItemID) -> Link? {
         links(from: source, type: type).first { $0.target == target }
     }
-
-    /// Every item reached from `id` following `type` from source to target, not including `id` unless a cycle
-    /// leads back to it.
-    func reachable(from id: ItemID, type: String) -> Set<ItemID> {
-        walk(from: id) { links(from: $0, type: type).map(\.target) }
-    }
-
-    /// Every item from which `id` is reached following `type`.
-    func reaching(_ id: ItemID, type: String) -> Set<ItemID> {
-        walk(from: id) { links(to: $0, type: type).map(\.source) }
-    }
-
-    private func walk(from start: ItemID, next: (ItemID) -> [ItemID]) -> Set<ItemID> {
-        var found: Set<ItemID> = []
-        var pending = [start]
-        while let current = pending.popLast() {
-            for other in next(current) where found.insert(other).inserted {
-                pending.append(other)
-            }
-        }
-        return found
-    }
 }

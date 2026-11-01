@@ -137,7 +137,6 @@ import Testing
         var copy: WorkingCopy { fake.copy }
         var wholeReads: Int { reads.wholeReads.withLock { $0 } }
         var rowReads: Int { reads.rowReads.withLock { $0 } }
-        var binReads: Int { get async { await source.engine.sync.hooks.binReads } }
         var shown: SourceSnapshot? { log.current.snapshot }
 
         /// Holds the engine in a reread of `id`, so everything heard until `letGo` is taken as one batch.
@@ -371,11 +370,12 @@ import Testing
             let id = "kept-\(index)"
             let item = try #require(scene.item(id), "\(id) was not shown")
             let answer = answers[id] ?? BodyLinks()
-            let links = answer.links.map {
-                BoundLink(link: NoteLink(reading: MarfaMapping.inside(brackets: $0.text)), resolution: MarfaMapping.resolution(of: $0.target))
-            }
+            let unresolved = answer.links.filter { !$0.target.isItem }.count
             let embeds = answer.embeds.map { BoundEmbed(text: $0.text, resolution: MarfaMapping.resolution(of: $0.target)) }
-            #expect(item.boundLinks == links, "\(id) shows links \(item.boundLinks), the copy answered \(links)")
+            let shown = item.edgesOut.filter { edge in
+                if case .item = edge.target { false } else { edge.origin == .body && edge.type == MarfaMapping.bodyLinkEdge }
+            }.count
+            #expect(shown == unresolved, "\(id) shows \(shown) unresolved links, the copy answered \(unresolved)")
             #expect(item.boundEmbeds == embeds, "\(id) shows embeds \(item.boundEmbeds), the copy answered \(embeds)")
         }
         #expect(scene.reads.linkReads.withLock { $0 } == linking, "each linking row, and no other, was asked once")
@@ -589,50 +589,6 @@ import Testing
         await step(.complete, listed: 4000)
         #expect(scene.source.syncReport.fill == LibraryFill(state: .complete, listed: 4000, expected: 4000))
         #expect(scene.wholeReads == filling + 1)
-        await scene.close()
-    }
-
-    // MARK: The bin
-
-    @Test func rowsDeletedElsewhereInSeparateBatchesReadTheBinOnceTheChangesPause() async throws {
-        let fake = Self.fake([Self.row("kept", title: "Kept")])
-        let doomed = try await Self.makeDoomed(5, in: fake)
-        let scene = try await Self.open(fake)
-        await scene.source.engineTook()
-        let quiet = Duration.milliseconds(500)
-        await scene.source.engine.sync.hooks.binWait.set(.init(quiet: quiet, longest: .seconds(30)))
-        let before = await scene.binReads
-
-        for id in doomed { try await scene.deleteElsewhere(id) }
-        try #require(try await eventuallyAsking { await scene.binReads > before }, "the bin was never read")
-        // Waits past another pause, to see that no deletion of the five reads the bin again.
-        try await Task.sleep(for: quiet * 2)
-        let read = await scene.binReads - before
-        #expect(read == 1, "five deletions read the bin \(read) times")
-        await scene.close()
-    }
-
-    @Test func aFloodOfDeletionsThatNeverPausesReadsTheBinWithinTheLongestWait() async throws {
-        let fake = Self.fake([Self.row("kept", title: "Kept")])
-        let doomed = try await Self.makeDoomed(400, in: fake)
-        let scene = try await Self.open(fake)
-        await scene.source.engineTook()
-        let quiet = Duration.milliseconds(400)
-        let longest = Duration.milliseconds(1500)
-        await scene.source.engine.sync.hooks.binWait.set(.init(quiet: quiet, longest: longest))
-        let before = await scene.binReads
-
-        // One deletion after another for twice the longest wait, so the changes never pause for `quiet`.
-        let start = ContinuousClock.now
-        var index = 0
-        while ContinuousClock.now - start < longest * 2 {
-            try #require(index < doomed.count, "\(index) deletions took less than \(longest * 2)")
-            try await scene.deleteElsewhere(doomed[index])
-            index += 1
-        }
-        let read = await scene.binReads - before
-        #expect(read >= 1, "a flood of \(index) deletions over \(ContinuousClock.now - start) never read the bin")
-        #expect(read <= 3, "a flood of \(index) deletions read the bin \(read) times")
         await scene.close()
     }
 

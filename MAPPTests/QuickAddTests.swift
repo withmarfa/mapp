@@ -481,6 +481,85 @@ struct QuickAddTests {
         #expect(browser.quickAdd.draft == nil)
     }
 
+    private func holdingProject() -> (FakeItemLibrary, Item, release: AsyncStream<Void>.Continuation) {
+        let project = Item(
+            id: .mint(), type: TypeID("test.project"), title: "Launch", titleRule: .property("title"),
+            version: ItemVersion(1), created: start, modified: start)
+        let library = FakeItemLibrary(items: [project], now: start)
+        let (hold, release) = AsyncStream<Void>.makeStream()
+        library.checkingParent = { for await _ in hold { break } }
+        return (library, project, release)
+    }
+
+    @Test func twoAddsWhileTheParentIsCheckedMakeOneItem() async throws {
+        let (library, project, release) = holdingProject()
+        let browser = Browser()
+        browser.openQuickAdd(in: library)
+        browser.quickAdd.draft?.parentID = project.id
+        browser.quickAdd.draft?.title = "Plan"
+        let first = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
+        #expect(await eventually { browser.quickAdd.isSaving })
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil, "a second Add while the first is checked does nothing")
+        release.yield()
+        #expect(await first.value != nil)
+        #expect(library.items.count == 2, "the project and one new item")
+    }
+
+    @Test func textTypedWhileTheParentIsCheckedIsKeptAndTheOldDraftMakesNothing() async throws {
+        let (library, project, release) = holdingProject()
+        let browser = Browser()
+        browser.openQuickAdd(in: library)
+        browser.quickAdd.draft?.parentID = project.id
+        browser.quickAdd.draft?.title = "Plan"
+        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
+        #expect(await eventually { browser.quickAdd.isSaving })
+        browser.quickAdd.draft?.title = "Plan the launch"
+        release.yield()
+        #expect(await saving.value == nil)
+        #expect(library.items == [project], "nothing is made from the draft as it was")
+        #expect(browser.quickAdd.draft?.title == "Plan the launch", "the text typed meanwhile stays")
+        #expect(!browser.quickAdd.isSaving)
+        #expect(browser.quickAdd.isPresented)
+        #expect(library.notices.waiting.last?.title == "Item Not Added", "the person is told the Add did nothing")
+    }
+
+    @Test func aWindowClosedWhileTheParentIsCheckedHandsTheWholeDraftOver() async throws {
+        let (library, project, release) = holdingProject()
+        let browser = Browser()
+        browser.openQuickAdd(in: library)
+        browser.quickAdd.draft?.parentID = project.id
+        browser.quickAdd.draft?.title = "Plan"
+        browser.quickAdd.draft?.body = "The first steps"
+        let saving = Task { await browser.saveQuickAdd(in: library, undoManager: nil) }
+        #expect(await eventually { browser.quickAdd.isSaving })
+        browser.putAwayQuickAdd()
+        browser.quickAdd.handOff(to: library.notices, because: .closed, in: library)
+        release.yield()
+        #expect(await saving.value == nil)
+        #expect(library.items == [project], "nothing is made from a draft handed off")
+        var clipboard: [String] = []
+        let notice = library.notices.show(in: UUID()) { clipboard.append($0) }
+        #expect(notice?.isNotKept == true)
+        #expect(clipboard == ["Plan\n\nThe first steps\n\nParent: Launch"], "the title, text and parent are on the clipboard")
+        #expect(library.notices.waiting.count == 1, "a handed-off draft is told once")
+    }
+
+    @Test func aParentTheCoreRefusesIsToldBeforeAnythingIsMade() async throws {
+        let project = Item(
+            id: .mint(), type: TypeID("test.project"), title: "Launch", titleRule: .property("title"),
+            version: ItemVersion(1), created: start, modified: start)
+        let library = FakeItemLibrary(items: [project], now: start)
+        library.childRefusals[project.id] = "That item is in the bin."
+        let browser = Browser()
+        browser.openQuickAdd(in: library)
+        browser.quickAdd.draft?.parentID = project.id
+        browser.quickAdd.draft?.title = "Plan"
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
+        #expect(library.items == [project], "no item was made")
+        #expect(library.notices.waiting.last?.message == "That item is in the bin.")
+        #expect(browser.quickAdd.draft?.title == "Plan", "the draft stays as typed")
+    }
+
     @Test func aFileDraftWithSeveralFilesWaitsForOne() async throws {
         let library = FakeItemLibrary(now: start)
         let browser = Browser()

@@ -1,4 +1,6 @@
 import Foundation
+import struct Marfa.LinkParts
+import func Marfa.linkParts
 import Observation
 import UniformTypeIdentifiers
 @testable import MAPP
@@ -30,9 +32,9 @@ final class FakeItemLibrary: ItemLibrary {
     var trashDays: Int?
     /// What `relationships(for:)` answers, by item.
     var relationshipsByItem: [ItemID: [ItemRelationship]] = [:]
-    /// Whether `setItemRelationship` takes a write, and the writes it was asked for.
+    /// Whether `changeItemRelationship` takes a write, and the writes it was asked for.
     var acceptsRelationships = false
-    var relationshipWrites: [(item: ItemID, field: String, targets: [ItemID])] = []
+    var relationshipWrites: [(item: ItemID, field: String, adding: [ItemID], removing: [ItemID])] = []
     var syncReport = SyncReport(queueRead: true)
     let now: () -> Date
     /// What `attach` answers, which may wait; nil attaches nothing.
@@ -95,7 +97,7 @@ final class FakeItemLibrary: ItemLibrary {
             sourceTypes: [], targetTypes: [])
         let collection = EdgeTypeInfo(
             id: "in-collection", label: "In collection", reverseLabel: "Contents", reverseName: nil, cardinality: .many,
-            writtenAt: .source, sourceTypes: [], targetTypes: [], targetRoles: ["container"])
+            writtenAt: .source, sourceTypes: [], targetTypes: [], targetRoles: ["container"], flat: true)
         return Catalogue(itemTypes: types, edgeTypes: [parent, collection])
     }()
 
@@ -161,20 +163,38 @@ final class FakeItemLibrary: ItemLibrary {
         guard let item = item(id), !item.isFile else { return nil }
         return ItemBody(id: id, text: bodies[id] ?? "", version: item.version)
     }
-    func resolveLink(_ link: NoteLink, in source: ItemID) -> NoteReferenceResolution {
-        let name = link.lookupName
-        let named = items.filter {
-            $0.state == .active && !$0.isFile
-                && ($0.id.rawValue == name || NoteLinks.nameKey($0.title) == NoteLinks.nameKey(name))
-        }
-        switch named.count {
-        case 0: return .missing
-        case 1: return .resolved(named[0].id)
-        default: return .ambiguous(named.map(\.id))
+    /// What the core answers for a link target a test sets; any other is read by id or by title ignoring case.
+    var linkAnswerOverrides: [String: LinkAnswer] = [:]
+    func linkAnswers(of targets: [String], in note: ItemID?) async -> [LinkAnswer]? {
+        return targets.map { target in
+            if let set = linkAnswerOverrides[target] { return set }
+            let name = linkParts(in: "[[\(target)]]").first?.name.text ?? target
+            let named = items.filter {
+                $0.state == .active && !$0.isFile
+                    && ($0.id.rawValue == name || $0.title.lowercased() == name.lowercased())
+            }.map(\.id)
+            switch named.count {
+            case 0: return LinkAnswer(target: target, state: .unresolved, item: nil, candidates: [])
+            case 1: return LinkAnswer(target: target, state: .bound, item: named[0], candidates: named)
+            default: return LinkAnswer(target: target, state: .ambiguous, item: nil, candidates: named)
+            }
         }
     }
     func relationships(for id: ItemID) -> [ItemRelationship] { relationshipsByItem[id] ?? [] }
     func relationshipCandidates(for id: ItemID, field: String) -> [Item] { [] }
+    /// The refusal for each (item, other) a test sets; any other link is taken.
+    var refusals: [ItemID: [ItemID: String]] = [:]
+    /// The refusal for a new item filed under each parent a test sets.
+    var childRefusals: [ItemID: String] = [:]
+    /// Waits before `newChildVerdict` answers, as the core's check does for a moment.
+    var checkingParent: (() async -> Void)?
+    func newChildVerdict(under parent: ItemID) async -> EdgeVerdict {
+        await checkingParent?()
+        return childRefusals[parent].map { .refused($0) } ?? .taken
+    }
+    func relationshipVerdict(for id: ItemID, field: String, to other: ItemID) async -> EdgeVerdict {
+        refusals[id]?[other].map { .refused($0) } ?? .taken
+    }
     func bodyMentions(for id: ItemID) -> [ItemRelationshipTarget] { [] }
     /// The items each type may be made under, by type.
     var parentCandidates: [String: [ItemID]] = [:]
@@ -315,8 +335,8 @@ final class FakeItemLibrary: ItemLibrary {
     func finish() {}
     func wasRefused(creating id: ItemID) -> Bool { refusedCreations.contains(id) }
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool { false }
-    func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) -> Bool {
-        relationshipWrites.append((id, field, targetIDs))
+    func changeItemRelationship(_ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?) async -> Bool {
+        relationshipWrites.append((id, field, adding, removing))
         return acceptsRelationships
     }
 

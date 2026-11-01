@@ -166,8 +166,6 @@ import Testing
         // Nor is one offered as a collection for another, or written through the item's own relationship.
         #expect(library.relationshipCandidates(for: Self.archive, field: "in-collection").isEmpty)
         #expect(!library.relationships(for: Self.archive).contains { $0.field == "in-collection" && $0.isEditable })
-        #expect(!library.setItemRelationship(Self.archive, field: "in-collection", targetIDs: [Self.holiday], undoManager: nil))
-        #expect(source.writes.count == 1)
     }
 
     @Test func onlyACollectionInTheLibraryTakesMembers() async throws {

@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import Marfa
 import Testing
 import WebKit
 @testable import MAPP
@@ -28,6 +29,17 @@ extension EditorTests {
         #expect(unread == nil || unread is NSNull, "a request that cannot be read is answered, not left waiting")
     }
 
+    @Test func aLinkTheCoreReadsAsTwoDoesNotDropTheMarksOfTheNotesOtherLinks() async throws {
+        let page = try await Page()
+        _ = addNotes(["Plan"], to: page)
+        try await page.load("Intro\n")
+        let note = try #require(page.editor.noteID)
+        // Inkkit read `[[Plan\]] and [[B]]` as one link with an escape; the core finds two in the text it is posted.
+        let links = "[{ raw: \(json("[[Plan\\]] and [[B]]")) }, { raw: \(json("[[Plan]]")) }, { raw: \(json("[[Nowhere]]")) }]"
+        let answer = try await ask(page, "{ type: 'resolve', item: \(json(note.rawValue)), links: \(links) }") as? [Bool]
+        #expect(answer == [false, false, true], "one answer for each link posted, the unreadable one not marked missing")
+    }
+
     @Test func linkToNoteWaitsForTheChoiceAndAnswersWithTheLink() async throws {
         let page = try await Page()
         let ids = addNotes(["Garden ideas"], to: page)
@@ -36,7 +48,7 @@ extension EditorTests {
         try await page.run("window.pick = window.webkit.messageHandlers.notes.postMessage({ type: 'pick', item: '\(current.rawValue)' })")
         try await page.wait { page.editor.linkRequest != nil }
         #expect(page.editor.linkRequest?.note == current)
-        page.editor.finishLinkRequest(choosing: ids[0])
+        await page.editor.finishLinkRequest(choosing: ids[0])
         #expect(page.editor.linkRequest == nil)
         let link = try await page.editor.webView.callAsyncJavaScript("return await window.pick", arguments: [:], in: nil, contentWorld: .page)
         #expect(link as? String == "[[Garden ideas]]")
@@ -131,10 +143,11 @@ extension EditorTests {
         return value as? String
     }
 
-    /// What the library resolves a `[[link]]` to.
-    private func resolution(of link: String, in library: FakeItemLibrary) -> NoteReferenceResolution? {
-        guard link.hasPrefix("[["), link.hasSuffix("]]") else { return nil }
-        return library.resolveLink(NoteLink(reading: String(link.dropFirst(2).dropLast(2))), in: .mint())
+    /// The note the library binds a `[[link]]` to, or nil where it binds none.
+    private func bound(_ link: String, in library: FakeItemLibrary) async -> ItemID? {
+        guard let target = linkParts(in: link).first?.target else { return nil }
+        let answer = await library.linkAnswers(of: [target], in: nil)?.first
+        return answer?.state == .bound ? answer?.item : nil
     }
 
     @Test func choosingBetweenNotesWithTheSameTitleLinksToTheOneChosen() async throws {
@@ -143,9 +156,9 @@ extension EditorTests {
         page.library.add("garden\n")
         try await page.load("Intro\n")
         _ = try await pending(page)
-        page.editor.finishLinkRequest(choosing: older.id)
+        await page.editor.finishLinkRequest(choosing: older.id)
         let link = try #require(try await answer(page), "a note that can be named is linked")
-        #expect(resolution(of: link, in: page.library) == .resolved(older.id), "\(link) names the note chosen and no other")
+        #expect(await bound(link, in: page.library) == older.id, "\(link) names the note chosen and no other")
     }
 
     @Test func aTargetRenamedWhileThePickerIsOpenIsLinkedByItsNewTitle() async throws {
@@ -156,7 +169,7 @@ extension EditorTests {
         let index = try #require(page.library.items.firstIndex { $0.id == target.id })
         page.library.items[index].title = "Allotment"
         try #require(page.library.item(target.id)?.title == "Allotment")
-        page.editor.finishLinkRequest(choosing: target.id)
+        await page.editor.finishLinkRequest(choosing: target.id)
         #expect(try await answer(page) == "[[Allotment]]")
     }
 
@@ -172,24 +185,32 @@ extension EditorTests {
             for name in await library.noteNames(matching: query, using: index) {
                 let owner = try #require(library.items.first { $0.title == name }, "\(name)")
                 #expect(!name.isEmpty)
-                #expect(resolution(of: "[[\(name)]]", in: library) == .resolved(owner.id), "suggesting \(name) for \(query)")
+                #expect(await bound("[[\(name)]]", in: library) == owner.id, "suggesting \(name) for \(query)")
             }
         }
         _ = try await pending(page)
-        #expect(page.editor.finishLinkRequest(choosing: chosen.id))
+        #expect(await page.editor.finishLinkRequest(choosing: chosen.id))
         let link = try #require(try await answer(page))
-        #expect(resolution(of: link, in: library) == .resolved(chosen.id), "\(link) names the note chosen")
+        #expect(await bound(link, in: library) == chosen.id, "\(link) names the note chosen")
     }
 
-    @Test func aLinkByIdentityWithAnEscapedTitleResolvesToTheNoteThatDeclaresIt() async throws {
+    @Test func aLinkByIdentityShowsAnyTitleAndNamesTheNoteThatDeclaresIt() async throws {
         let page = try await Page()
-        let identity = "22222222-2222-4222-8222-222222222222"
-        let declared = page.library.add("Work on it\n", id: ItemID(identity))
-        for title in ["A|B", "A#B", "A]B", "[Draft]", "back\\slash", "Café 日本語", "line\nbreak"] {
-            let link = NoteLinks.identityLink(to: identity, titled: title)
-            #expect(resolution(of: link, in: page.library) == .resolved(declared.id), "\(link)")
+        let titles = ["A|B", "A#B", "A]B", "[Draft]", "back\\slash", "Café 日本語", "line\nbreak"]
+        for title in titles {
+            let note = page.library.add("\(title)\nBody\n")
+            // A title a link cannot spell is named by identity; nothing is escaped, since a link has no escape.
+            let link = try #require(await page.library.bodyLink(to: note.id, in: nil), "\(title.debugDescription)")
+            let parts = try #require(linkParts(in: link).first)
+            #expect(parts.text == link)
+            #expect(await bound(link, in: page.library) == note.id, "\(link)")
         }
-        #expect(NoteLinks.identityLink(to: identity, titled: "A]B") == "[[\(identity)|A\\]B]]")
+        let tricky = try #require(page.library.items.first { $0.title == "A]B" })
+        #expect(await page.library.bodyLink(to: tricky.id, in: nil) == "[[A]B]]", "a single bracket is part of a name")
+        let slash = try #require(page.library.items.first { $0.title == "back\\slash" })
+        #expect(await page.library.bodyLink(to: slash.id, in: nil) == "[[back\\slash]]", "a backslash is part of the name")
+        let bar = try #require(page.library.items.first { $0.title == "A|B" })
+        #expect(await page.library.bodyLink(to: bar.id, in: nil) == "[[\(bar.id.rawValue)|A|B]]")
     }
 
     @Test func aLinkRequestAfterTheWindowWentIsAnsweredWithNothing() async throws {
