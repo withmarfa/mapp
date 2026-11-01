@@ -13,7 +13,9 @@ nonisolated struct MarfaServerVersions: ItemHistorySource {
     var timeout = Duration.seconds(20)
 
     @concurrent func page(of id: ItemID, after cursor: String?, limit: Int) async throws(ItemHistoryFailure) -> ItemHistoryPage {
-        guard let key = try? keys.key(for: connection.address), !key.isEmpty else { throw .keyRefused }
+        let stored: String?
+        do { stored = try keys.key(for: connection.address) } catch { throw .failed(Words.keyUnreadable) }
+        guard let key = stored, !key.isEmpty else { throw .keyRefused }
         do {
             let page = try await connection.server(key: key).snapshots(
                 ofItem: id.rawValue, after: cursor, limit: limit, timeout: timeout)

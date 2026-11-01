@@ -30,7 +30,9 @@ nonisolated struct MarfaServerConfig: InstanceConfigSource {
     }
 
     private func server() throws(InstanceConfigFailure) -> Server {
-        guard let key = try? keys.key(for: connection.address), !key.isEmpty else { throw .keyRefused }
+        let stored: String?
+        do { stored = try keys.key(for: connection.address) } catch { throw .failed(Words.keyUnreadable) }
+        guard let key = stored, !key.isEmpty else { throw .keyRefused }
         return connection.server(key: key)
     }
 

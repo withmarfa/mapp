@@ -11,7 +11,9 @@ nonisolated struct MarfaServerTypeIcons: TypeIconSource {
     var timeout = Duration.seconds(20)
 
     @concurrent func setIcon(_ icon: String?, ofType type: TypeID) async throws(TypeIconFailure) -> String? {
-        guard let key = try? keys.key(for: connection.address), !key.isEmpty else { throw .keyRefused }
+        let stored: String?
+        do { stored = try keys.key(for: connection.address) } catch { throw .failed(Words.keyUnreadable) }
+        guard let key = stored, !key.isEmpty else { throw .keyRefused }
         do {
             return try await connection.server(key: key).setTypeIcon(icon, ofType: type.rawValue, timeout: timeout)
         } catch {

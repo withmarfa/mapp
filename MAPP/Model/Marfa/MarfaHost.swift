@@ -197,7 +197,9 @@ import Observation
     /// whatever became of the step that gave it.
     func holds(_ key: String, for connection: MarfaConnection) async -> Bool {
         let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !key.isEmpty, let kept = try? await Self.offMain({ [keys] in try keys.key(for: connection.address) }) else { return false }
+        guard !key.isEmpty else { return false }
+        // A key the Keychain will not give is not known to be the typed one, so Settings keeps what was typed.
+        let kept = try? await Self.offMain({ [keys] in try keys.key(for: connection.address) })
         return kept == key
     }
 
