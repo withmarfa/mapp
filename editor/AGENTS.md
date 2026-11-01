@@ -35,6 +35,7 @@ The note editor's page: TypeScript on Inkkit, built by Vite into one self-contai
 
 - The page asks the app about notes through the `notes` message handler, which answers every request: `suggest` after `[[`, `pick` for Link to Note (answered when the person has chosen or declined), and `resolve`. A command that gets nothing back leaves the line as typed. Change these with `MAPP/Editor/NoteRequests.swift`.
 - Opening a `[[link]]` posts `openNote` with its exact authored `raw` text. Forward `WikiLinkReference.raw` unchanged through opening, resolution and cache identity: Marfa binds each spelling separately. The page never guesses which note a name means. A link to a heading of its own note is followed in the page (`NoteEditor.revealHeading`).
+- An address leaves the page to be opened only through `openLink` in `src/bridge.ts`, which drops what Inkkit's `canOpenLink` refuses, and the app checks nothing more. Send `openLink` nowhere else.
 - `editor/src/links.ts` answers Inkkit's `WikiLinkAdapter.resolve` from what the app last said, for the note on the page only, and `linksChanged` asks again. Links are drawn again with `refreshReferences` (`NoteEditor.drawLinksAgain`), which never changes the note's text. Inkkit styles wiki links; the page adds no rule for them.
 
 ## Bridge

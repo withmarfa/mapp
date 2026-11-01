@@ -188,7 +188,7 @@ extension EditorController {
     func windowWent() {
         windowIsGone = true
         requestedNoteID = nil
-        cancelLinkRequest()
+        cancelRequests()
         titleDrafts = nil
         for (id, embeds) in pendingEmbeds { notInText(embeds, of: id) }
         pendingEmbeds = [:]

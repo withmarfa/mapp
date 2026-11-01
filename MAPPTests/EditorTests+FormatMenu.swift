@@ -48,9 +48,9 @@ extension EditorTests {
         let request = try #require(page.editor.webLinkRequest)
         #expect(!request.removable)
         #expect(request.address.isEmpty)
-        #expect(!page.editor.finishWebLink("not an address"), "an address Inkkit would refuse keeps the request open")
+        #expect(await !page.editor.setWebLink("not an address"), "an address Inkkit would refuse keeps the request open")
         #expect(page.editor.webLinkRequest != nil)
-        #expect(page.editor.finishWebLink("example.com/docs"))
+        #expect(await page.editor.setWebLink("example.com/docs"))
         #expect(page.editor.webLinkRequest == nil)
         try await page.wait { page.changes.last == "Read the [docs](https://example.com/docs)\n" }
     }
@@ -65,7 +65,7 @@ extension EditorTests {
         let request = try #require(page.editor.webLinkRequest)
         #expect(request.removable)
         #expect(request.address == "https://example.com", "the sheet starts from the link's own address")
-        #expect(page.editor.finishWebLink(nil))
+        page.editor.removeWebLink()
         try await page.wait { page.changes.last == "Read the docs\n" }
     }
 
@@ -76,7 +76,7 @@ extension EditorTests {
         try await page.wait { Format.link.isActive(in: page.editor.caret) }
         page.editor.format(.link)
         try await page.wait { page.editor.webLinkRequest != nil }
-        #expect(page.editor.finishWebLink("example.org:8080/docs"))
+        #expect(await page.editor.setWebLink("example.org:8080/docs"))
         try await page.wait { page.changes.last == "Read the [docs](https://example.org:8080/docs)\n" }
     }
 
@@ -90,29 +90,37 @@ extension EditorTests {
         #expect(page.editor.webLinkRequest == nil)
         #expect(page.changes.isEmpty)
     }
-}
 
-struct WebLinkAddressTests {
-    @Test(arguments: [
-        ("https://example.com/a?b=1", "https://example.com/a?b=1"),
-        ("http://example.com", "http://example.com"),
-        ("  example.com  ", "https://example.com"),
-        ("www.example.com/path", "https://www.example.com/path"),
-        ("me@example.com", "mailto:me@example.com"),
-        ("mailto:me@example.com", "mailto:me@example.com"),
-        ("tel:+441234567890", "tel:+441234567890"),
-        ("example.com:8080", "https://example.com:8080"),
-        ("localhost:3000/a", "https://localhost:3000/a"),
-        ("HTTPS://Example.com/Path", "https://Example.com/Path"),
-        ("MAILTO:me@example.com", "mailto:me@example.com"),
-        ("Tel:+441234567890", "tel:+441234567890"),
-    ])
-    func anAddressIsKeptOrGivenItsScheme(typed: String, written: String) {
-        #expect(WebLinkAddress.normalized(typed) == written)
+    /// Opens the Link sheet on "docs", then has the note changed elsewhere so the page reloads under a new generation.
+    private func reload(_ page: Page, whileAsking ask: (() async -> Bool)? = nil) async throws -> Bool? {
+        let note = page.library.add("Read the docs\n")
+        try await page.show(note.id)
+        try await select("docs", in: page)
+        try await page.wait { page.editor.canApply(.link) }
+        page.editor.format(.link)
+        try #require(page.editor.webLinkRequest != nil)
+        let asking = ask.map { ask in Task { await ask() } }
+        // The task runs as far as the page's question; the page answers only after the reload below.
+        await Task.yield()
+        page.library.updateBody(of: note.id, to: "Read the docs, changed elsewhere\n")
+        page.editor.noteChanged(try #require(page.library.item(note.id)))
+        return await asking?.value
     }
 
-    @Test(arguments: ["", "   ", "two words", "javascript:alert(1)", "file:///etc/passwd", "https://", "mailto:", "ftp://example.com", "JavaScript:alert(1)", "data:text/html,x", "FILE:///etc/passwd"])
-    func anythingElseIsRefused(typed: String) {
-        #expect(WebLinkAddress.normalized(typed) == nil)
+    @Test func aReloadClosesTheLinkSheetBeforeAnAddressIsAdded() async throws {
+        let page = try await Page()
+        _ = try await reload(page)
+        #expect(page.editor.webLinkRequest == nil, "the selection the sheet was opened for is gone")
+        #expect(await !page.editor.setWebLink("example.com"), "nothing is open to add to")
+        #expect(page.changes.isEmpty)
+    }
+
+    @Test func aReloadWhileTheAddressIsReadClosesTheSheetAndWritesNoLink() async throws {
+        let page = try await Page()
+        let answered = try await reload(page) { await page.editor.setWebLink("example.com") }
+        #expect(answered == true, "the sheet is not told the address was refused")
+        #expect(page.editor.webLinkRequest == nil)
+        _ = try await page.shownText(until: "Read the docs, changed elsewhere")
+        #expect(page.changes.isEmpty, "no link was written on the reloaded page")
     }
 }

@@ -86,18 +86,19 @@ test('an alias repeating the name keeps its own binding and opening request', ()
     expect(editor.snapshot().text).toBe('[[Plan]] and [[Plan|Plan]]\n')
   }))
 
-test('escaped link separators reach the host exactly as authored', () =>
-  withEditor('[[A\\|B]] and [[Plan#A\\#B|alias]]\n', async (editor, root) => {
+test('a backslash in a link is part of its text, as in Marfa, and the link reaches the host as authored', () =>
+  withEditor('\\[[x]] and [[Plan\\]] and [[A\\|B]]\n', async (editor, root) => {
     await settle()
     const request = page.asked.find((request) => request.type === 'resolve')
-    expect(request?.type === 'resolve' && request.links.map((link) => link.raw)).toEqual([
-      '[[A\\|B]]',
-      '[[Plan#A\\#B|alias]]',
+    expect(request?.type === 'resolve' && request.links).toEqual([
+      { raw: '[[x]]', target: 'x' },
+      { raw: '[[Plan\\]]', target: 'Plan\\' },
+      { raw: '[[A\\|B]]', target: 'A\\', alias: 'B' },
     ])
     page.hosted.length = 0
-    modClick(links(root)[0]!)
-    expect(page.hosted[0]).toMatchObject({ type: 'openNote', raw: '[[A\\|B]]', target: 'A|B' })
-    expect(editor.snapshot().text).toBe('[[A\\|B]] and [[Plan#A\\#B|alias]]\n')
+    modClick(links(root)[1]!)
+    expect(page.hosted[0]).toMatchObject({ type: 'openNote', raw: '[[Plan\\]]', target: 'Plan\\' })
+    expect(editor.snapshot().text).toBe('\\[[x]] and [[Plan\\]] and [[A\\|B]]\n')
   }))
 
 const forms: [string, { target: string; heading?: string; alias?: string }][] = [
