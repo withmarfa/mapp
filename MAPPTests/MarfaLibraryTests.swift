@@ -304,7 +304,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, _) = try await loaded(F.items + [album])
         #expect(ids(library.relationshipCandidates(for: F.n1, field: "in-collection")) == [album.id])
         #expect(library.relationships(for: F.n1).contains { $0.field == "in-collection" })
-        #expect(library.setItemRelationship(F.n1, field: "in-collection", targetIDs: [album.id], undoManager: nil))
+        #expect(await library.setItemRelationship(F.n1, field: "in-collection", targetIDs: [album.id], undoManager: nil))
     }
 
     @Test func aFileIsFetchedAndANoteHasNoFile() async throws {
@@ -596,7 +596,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         undo.groupsByEvent = false
         // A new parent replaces the one link a child holds: one move of the edge's source, which keeps its id.
         undo.beginUndoGrouping()
-        #expect(library.setItemRelationship(F.t1, field: "child-of", targetIDs: [F.p1], undoManager: undo))
+        #expect(await library.setItemRelationship(F.t1, field: "child-of", targetIDs: [F.p1], undoManager: undo))
         // The core is asked first, so the write follows; it joins the open group.
         #expect(await eventually { source.writes == [.moveEdge(EdgeID("c2"), end: .source, to: F.p1)] }, "sent \(source.writes)")
         undo.endUndoGrouping()
@@ -611,7 +611,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         // A child chosen under a project from the project's side is taken from the parent it has, in one move.
         source.clearWrites()
         undo.beginUndoGrouping()
-        #expect(library.setItemRelationship(F.p2, field: "inverse:parent-of", targetIDs: [F.e1], undoManager: undo))
+        #expect(await library.setItemRelationship(F.p2, field: "inverse:parent-of", targetIDs: [F.e1], undoManager: undo))
         #expect(await eventually { source.writes == [.moveEdge(EdgeID("c1"), end: .source, to: F.p2)] }, "sent \(source.writes)")
         undo.endUndoGrouping()
         source.clearWrites()
@@ -622,14 +622,14 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
         // Removing the parent, then choosing one for an end that holds none, are each one write.
         undo.beginUndoGrouping()
-        #expect(library.setItemRelationship(F.t1, field: "child-of", targetIDs: [], undoManager: undo))
+        #expect(await library.setItemRelationship(F.t1, field: "child-of", targetIDs: [], undoManager: undo))
         undo.endUndoGrouping()
         #expect(source.writes == [.unlink(EdgeID("c2"))])
         source.send(.upserted([F.item(F.t1, F.bug, "Bug one", age: 3, tags: [ItemTag.favorite])]))
         #expect(await eventually { library.relationships(for: F.t1).first { $0.field == "child-of" }?.targets.isEmpty == true })
         source.clearWrites()
         undo.beginUndoGrouping()
-        #expect(library.setItemRelationship(F.t1, field: "child-of", targetIDs: [F.p1], undoManager: undo))
+        #expect(await library.setItemRelationship(F.t1, field: "child-of", targetIDs: [F.p1], undoManager: undo))
         let toProject = EdgeDraft(type: "parent-of", source: F.p1, target: F.t1)
         #expect(await eventually { source.writes == [.link(toProject, undoing: nil)] }, "sent \(source.writes)")
         undo.endUndoGrouping()
@@ -645,7 +645,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
         // A field that holds many adds and removes in one change.
         source.clearWrites()
-        #expect(library.setItemRelationship(F.n1, field: "about", targetIDs: [F.p2], undoManager: nil))
+        #expect(await library.setItemRelationship(F.n1, field: "about", targetIDs: [F.p2], undoManager: nil))
         #expect(await eventually { source.writes == [.link(EdgeDraft(type: "about", source: F.n1, target: F.p2), undoing: nil)] })
         // The old link goes once the source has taken the new one.
         source.send(.answered(try #require(source.submitted.last?.id), .accepted))
@@ -658,14 +658,14 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         ])
         let (library, source) = try await loaded(F.items + [bug2])
         #expect(library.relationships(for: F.t1).first { $0.field == "inverse:supersedes" }?.allowsMultiple == false)
-        #expect(!library.setItemRelationship(F.t1, field: "inverse:supersedes", targetIDs: [F.e1, bug2.id], undoManager: nil))
+        #expect(await library.setItemRelationship(F.t1, field: "inverse:supersedes", targetIDs: [F.e1, bug2.id], undoManager: nil) == false)
         #expect(library.notices.waiting.last?.message == String(localized: "Only one item can be chosen here."))
         #expect(source.writes.isEmpty)
 
         // The first bug is already superseded by the second. That link is the second bug's own, so the task does
         // not take it: the person is told which item holds it, and nothing is sent.
         library.notices.answerAll()
-        #expect(!library.setItemRelationship(F.e1, field: "supersedes", targetIDs: [F.t1], undoManager: nil))
+        #expect(await library.setItemRelationship(F.e1, field: "supersedes", targetIDs: [F.t1], undoManager: nil) == false)
         #expect(library.notices.waiting.last?.message
             == String(localized: "“\("Bug two")” already holds this link to “\("Bug one")”. Remove it there first."))
         #expect(source.writes.isEmpty)
@@ -673,7 +673,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         // Chosen from the other end, the second bug's own link changes from the first bug to the task: the edge's
         // target moves.
         library.notices.answerAll()
-        #expect(library.setItemRelationship(F.e1, field: "inverse:supersedes", targetIDs: [bug2.id], undoManager: nil))
+        #expect(await library.setItemRelationship(F.e1, field: "inverse:supersedes", targetIDs: [bug2.id], undoManager: nil))
         #expect(await eventually { source.writes == [.moveEdge(EdgeID("s1"), end: .target, to: F.e1)] }, "sent \(source.writes)")
         #expect(library.notices.waiting.last == nil)
     }
@@ -688,19 +688,19 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded(F.items + [bug("a"), bug("b"), bug("c", supersedes: ItemID("a"), edge: "s1"),
             bug("d", supersedes: ItemID("b"), edge: "s2")])
         // `a`, superseded by `c`, would be superseded by `d` instead, which supersedes `b`: two edges would change.
-        #expect(!library.setItemRelationship(ItemID("a"), field: "inverse:supersedes", targetIDs: [ItemID("d")], undoManager: nil))
+        #expect(await library.setItemRelationship(ItemID("a"), field: "inverse:supersedes", targetIDs: [ItemID("d")], undoManager: nil) == false)
         #expect(library.notices.waiting.last?.message
             == String(localized: "Both items already hold a link of this kind, so one can’t take the other’s."))
         #expect(source.writes.isEmpty)
         // From `c`'s own side, `b` is held by `d` as its own link, which is never taken from it.
         library.notices.answerAll()
-        #expect(!library.setItemRelationship(ItemID("c"), field: "supersedes", targetIDs: [ItemID("b")], undoManager: nil))
+        #expect(await library.setItemRelationship(ItemID("c"), field: "supersedes", targetIDs: [ItemID("b")], undoManager: nil) == false)
         #expect(library.notices.waiting.last?.message
             == String(localized: "“\("Bug d")” already holds this link to “\("Bug b")”. Remove it there first."))
         #expect(source.writes.isEmpty)
         // Replacing its own link for an item that holds none is one move of the end that goes.
         library.notices.answerAll()
-        #expect(library.setItemRelationship(ItemID("c"), field: "supersedes", targetIDs: [F.t1], undoManager: nil))
+        #expect(await library.setItemRelationship(ItemID("c"), field: "supersedes", targetIDs: [F.t1], undoManager: nil))
         #expect(await eventually { source.writes == [.moveEdge(EdgeID("s1"), end: .target, to: F.t1)] }, "sent \(source.writes)")
     }
 
@@ -708,7 +708,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     /// server's words, and the link stays where it was.
     @Test func aMoveTheServerRefusesIsToldAndLeavesTheOldLink() async throws {
         let (library, source) = try await loaded()
-        library.setItemRelationship(F.t1, field: "child-of", targetIDs: [F.p1], undoManager: nil)
+        await library.setItemRelationship(F.t1, field: "child-of", targetIDs: [F.p1], undoManager: nil)
         try #require(await eventually { source.submitted.last != nil })
         let move = try #require(source.submitted.last?.id)
         source.send(.answered(move, .refused(SyncProblem(code: "edge_cycle", message: "That would close a cycle."))))
@@ -719,6 +719,85 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(source.writes.count == 1)
     }
 
+    /// The note's `about` links as the copy shows them after the source has taken the writes so far.
+    private static func note(about targets: [ItemID]) -> MAPP.Item {
+        F.item(F.n1, F.note, "Plain note", age: 4, tags: [ItemTag.favorite], edges: targets.enumerated().map { position, target in
+            Edge(id: EdgeID("a\(position + 1)"), type: "about", source: F.n1, target: .item(target), origin: .property("about"))
+        })
+    }
+
+    @Test func twoChangesMadeBeforeTheFirstIsCheckedDoNotAddALinkTwice() async throws {
+        let (library, source) = try await loaded()
+        source.holdingChecks.withLock { $0 = true }
+        // The note is about the first project. One change adds the second, the next, made at once, keeps both and adds a task.
+        let first = Task { await library.setItemRelationship(F.n1, field: "about", targetIDs: [F.p1, F.p2], undoManager: nil) }
+        let second = Task { await library.setItemRelationship(F.n1, field: "about", targetIDs: [F.p1, F.p2, F.e1], undoManager: nil) }
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(source.writes.isEmpty, "nothing is written before the core has answered")
+        source.holdingChecks.withLock { $0 = false }
+        try #require(await eventually { source.writes == [.link(EdgeDraft(type: "about", source: F.n1, target: F.p2), undoing: nil)] })
+        // The copy shows the first change; only then is the second worked out.
+        source.send(.upserted([Self.note(about: [F.p1, F.p2])]))
+        #expect(await first.value)
+        #expect(await second.value)
+        #expect(source.writes == [
+            .link(EdgeDraft(type: "about", source: F.n1, target: F.p2), undoing: nil),
+            .link(EdgeDraft(type: "about", source: F.n1, target: F.e1), undoing: nil),
+        ], "sent \(source.writes)")
+    }
+
+    @Test func aRefusalByTheCoreIsAnsweredToTheCallerAndNothingIsWritten() async throws {
+        let (library, source) = try await loaded()
+        source.refusals.withLock { $0[EdgeDraft(type: "about", source: F.n1, target: F.p2)] = "That would close a cycle." }
+        #expect(await library.setItemRelationship(F.n1, field: "about", targetIDs: [F.p1, F.p2], undoManager: nil) == false)
+        #expect(library.notices.waiting.last?.message == "That would close a cycle.")
+        #expect(source.writes.isEmpty)
+    }
+
+    @Test func undoingAParentMoveGoesBackToTheParentItLeft() async throws {
+        let (library, source) = try await loaded()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        source.holdingChecks.withLock { $0 = true }
+        undo.beginUndoGrouping()
+        // The bug is under the task. It is moved under the first project, and at once under the second.
+        let first = Task { await library.setItemRelationship(F.t1, field: "child-of", targetIDs: [F.p1], undoManager: undo) }
+        let second = Task { await library.setItemRelationship(F.t1, field: "child-of", targetIDs: [F.p2], undoManager: undo) }
+        try await Task.sleep(for: .milliseconds(50))
+        source.holdingChecks.withLock { $0 = false }
+        try #require(await eventually { source.writes == [.moveEdge(EdgeID("c2"), end: .source, to: F.p1)] })
+        source.send(.upserted([F.item(F.t1, F.bug, "Bug one", age: 3, tags: [ItemTag.favorite], edges: [F.child("c2", F.t1, of: F.p1)])]))
+        #expect(await first.value)
+        #expect(await second.value)
+        undo.endUndoGrouping()
+        #expect(source.writes.last == .moveEdge(EdgeID("c2"), end: .source, to: F.p2), "sent \(source.writes)")
+        source.clearWrites()
+        undo.undo()
+        // The second move is undone to the project the first put it under, then the first to the task it started under.
+        #expect(source.writes == [
+            .moveEdge(EdgeID("c2"), end: .source, to: F.p1), .moveEdge(EdgeID("c2"), end: .source, to: F.e1),
+        ], "sent \(source.writes)")
+    }
+
+    @Test func leavingTheLibraryWaitsForAChangeStillBeingChecked() async throws {
+        let (library, source) = try await loaded()
+        source.holdingChecks.withLock { $0 = true }
+        let change = Task { await library.setItemRelationship(F.n1, field: "about", targetIDs: [F.p1, F.p2], undoManager: nil) }
+        try #require(await eventually { library.relationshipChangesInFlight == 1 })
+        let finished = LiveMarfa.Flag()
+        let finishing = Task {
+            await library.finish()
+            finished.set()
+        }
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(!finished.isSet, "the flush returned with the change not yet written")
+        source.holdingChecks.withLock { $0 = false }
+        await finishing.value
+        #expect(source.writes == [.link(EdgeDraft(type: "about", source: F.n1, target: F.p2), undoing: nil)], "sent \(source.writes)")
+        #expect(await change.value)
+        #expect(library.notices.waiting.isEmpty)
+    }
+
     @Test func aFieldThatTakesOneItemRefusesTwoAndSendsNothing() async throws {
         let (library, source) = try await loaded()
         let refusals: [(ItemID, String, [ItemID])] = [
@@ -726,11 +805,11 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         ]
         for (id, field, targets) in refusals {
             library.notices.answerAll()
-            #expect(!library.setItemRelationship(id, field: field, targetIDs: targets, undoManager: nil), "\(field) \(targets)")
+            #expect(await library.setItemRelationship(id, field: field, targetIDs: targets, undoManager: nil) == false, "\(field) \(targets)")
             #expect(library.notices.waiting.last?.title == String(localized: "Can’t Change This Relationship"), "\(field) \(targets)")
         }
-        #expect(!library.setItemRelationship(F.f1, field: "about", targetIDs: [F.p1], undoManager: nil))
-        #expect(!library.setItemRelationship(F.n1, field: "nothing", targetIDs: [F.p1], undoManager: nil))
+        #expect(await library.setItemRelationship(F.f1, field: "about", targetIDs: [F.p1], undoManager: nil) == false)
+        #expect(await library.setItemRelationship(F.n1, field: "nothing", targetIDs: [F.p1], undoManager: nil) == false)
         #expect(source.writes.isEmpty)
     }
 
@@ -961,7 +1040,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(linked.label == "Referenced by")
         #expect(linked.targets.map(\.itemID) == [F.n1])
         #expect(!linked.isEditable)
-        #expect(!library.setItemRelationship(F.t1, field: "inverse:references", targetIDs: [], undoManager: nil))
+        #expect(await library.setItemRelationship(F.t1, field: "inverse:references", targetIDs: [], undoManager: nil) == false)
     }
 
     @Test func anEmbeddedFileShowsAtBothEndsOfItsAttachment() async throws {
@@ -1285,7 +1364,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     @Test func removingFromTheCombinedListRemovesTheLinkInTheDirectionItWasMade() async throws {
         let (library, source) = try await Self.loaded()
         source.clearWrites()
-        #expect(library.setItemRelationship(F.n1, field: "related", targetIDs: [F.p1], undoManager: nil))
+        #expect(await library.setItemRelationship(F.n1, field: "related", targetIDs: [F.p1], undoManager: nil))
         #expect(source.writes == [.unlink(EdgeID("rel2"))])
     }
 
@@ -1312,7 +1391,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let library = MarfaLibrary(source: source, notices: Notices())
         source.send(.loaded(SourceSnapshot(items: items, catalogue: catalogue)))
         try #require(await eventually { library.isLoaded })
-        #expect(library.setItemRelationship(F.n1, field: "partner", targetIDs: [F.p1], undoManager: nil))
+        #expect(await library.setItemRelationship(F.n1, field: "partner", targetIDs: [F.p1], undoManager: nil))
         #expect(await eventually { source.writes == [.moveEdge(EdgeID("pt1"), end: .source, to: F.p1)] }, "sent \(source.writes)")
         #expect(library.notices.waiting.last == nil)
     }

@@ -238,23 +238,82 @@ extension MarfaLibrary {
     /// An end that holds one link of its type has it replaced by moving the edge's other end (`edges/move-target`,
     /// `edges/move-source`), so a new parent is one write and the child never holds none or two (`edges/move-no-gap`):
     /// a replacement is a move, and so is taking an item whose own link points elsewhere, as a child chosen under a
-    /// project. A link a third item holds as its own is never taken from it. A change the contract would refuse is told
-    /// and sent nowhere. The cardinality rules above are MAPP's, since `Edges.check` does not judge how many an end
-    /// holds, and are told here. The core's own check is asked of every new link after this returns and before any is
-    /// written, so its refusal is told then, and true means only that MAPP's own rules took the change.
+    /// project. A link a third item holds as its own is never taken from it.
+    ///
+    /// The change is worked out, the core asked of every link it makes, and then worked out again from what the copy
+    /// holds then and written in the same step, with its undo, so an earlier change that landed meanwhile is not
+    /// undone or repeated and a move's old parent is the one it left. A link new in that second look is asked too.
+    /// Changes run one after another in the order they were made, each once the copy shows the one before. Nothing is written until the core has answered.
+    /// True means the core accepted the change and it is written, or there was nothing to change; false means it was
+    /// refused and told, by MAPP's own rules (the cardinality rules in `plan`, since `Edges.check` does not judge how
+    /// many an end holds) or by the core's, and the field is as it was. `finish` waits for a change in flight.
     @discardableResult
-    func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) -> Bool {
+    func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) async -> Bool {
+        relationshipChangesInFlight += 1
+        let previous = relationshipChain
+        let work = Task { () -> (kept: Bool, change: RelationshipChange?) in
+            await previous?.value
+            let done = await self.applyRelationship(id, field: field, targetIDs: targetIDs, undoManager: undoManager)
+            self.relationshipChangesInFlight -= 1
+            return done
+        }
+        // The next change reads the copy, which shows this one a moment after it is written, so it waits for that.
+        relationshipChain = Task {
+            if let change = await work.value.change { await self.waitUntilShown(change) }
+        }
+        return await work.value.kept
+    }
+
+    /// Returns once the copy shows `change`, or after `Self.relationshipSettle` if it does not, as when the source
+    /// refuses a write or the server has not answered.
+    private func waitUntilShown(_ change: RelationshipChange) async {
+        let deadline = ContinuousClock.now + Self.relationshipSettle
+        while !shows(change), ContinuousClock.now < deadline { try? await Task.sleep(for: .milliseconds(10)) }
+    }
+
+    private func shows(_ change: RelationshipChange) -> Bool {
+        change.adding.allSatisfy { index.link(type: $0.type, source: $0.source, target: $0.target) != nil }
+            && change.removing.allSatisfy { index.link(type: $0.type, source: $0.source, target: $0.target) == nil }
+            && change.moving.allSatisfy { move in index.links(touching: move.to).contains { $0.id == move.edge } }
+    }
+
+    private func applyRelationship(
+        _ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?
+    ) async -> (kept: Bool, change: RelationshipChange?) {
+        let cantChange = String(localized: "Can’t Change This Relationship")
+        var asked: Set<EdgeDraft> = []
+        while true {
+            guard let plan = plan(id, field: field, targetIDs: targetIDs) else { return (false, nil) }
+            guard !plan.change.isEmpty else { return (true, nil) }
+            let unasked = plan.made.filter { !asked.contains($0) }
+            guard !unasked.isEmpty else {
+                relink(plan.change, name: String(localized: "Edit Relationship"), undoManager: undoManager)
+                return (true, plan.change)
+            }
+            for link in unasked {
+                if case .refused(let reason) = await source.edgeVerdict(link) {
+                    notices.tell(cantChange, reason)
+                    return (false, nil)
+                }
+                asked.insert(link)
+            }
+        }
+    }
+
+    /// What the edges would be changed by, and every link it makes, whether added or made by moving an end: what the
+    /// core is asked about. Nil where MAPP's own rules refuse, and the person is told.
+    private func plan(_ id: ItemID, field: String, targetIDs: [ItemID]) -> (change: RelationshipChange, made: [EdgeDraft])? {
         guard let item = item(id), item.isEditable, let end = fieldEnd(field), Set(targetIDs).count == targetIDs.count
-        else { return false }
+        else { return nil }
         let cantChange = String(localized: "Can’t Change This Relationship")
         guard end.info.id != MarfaMapping.bodyLinkEdge else {
             notices.tell(cantChange, String(localized: "A link is changed in the text that holds it."))
-            return false
+            return nil
         }
         let holds = end.info.cardinality(atTarget: end.atTarget)
         if holds == .one, targetIDs.count > 1 {
             notices.tell(cantChange, String(localized: "Only one item can be chosen here."))
-            return false
+            return nil
         }
         let farEnd = FieldEnd(info: end.info, atTarget: !end.atTarget, isInverse: !end.isInverse)
         // A two-way relation is one list of the links this item holds and the ones pointing at it.
@@ -287,17 +346,17 @@ extension MarfaLibrary {
                     notices.tell(
                         cantChange, String(localized: "“\(holder)” already holds this link to “\(chosen)”. Remove it there first.")
                     )
-                    return false
+                    return nil
                 }
                 guard !replacingOwn else {
                     notices.tell(cantChange, String(localized: "Both items already hold a link of this kind, so one can’t take the other’s."))
-                    return false
+                    return nil
                 }
                 change.moving.append(.init(edge: theirs.id, end: farIsTarget ? .source : .target, to: id, from: old))
             } else if replacingOwn {
                 guard removing.count == 1 else {
                     notices.tell(cantChange, String(localized: "Choose one item here, or remove the link first."))
-                    return false
+                    return nil
                 }
                 // The end that stays holds one link, and its other end changes. A two-way link may point here instead,
                 // and then the end that moves is the one on the far side of that edge.
@@ -307,29 +366,14 @@ extension MarfaLibrary {
                     change.moving.append(.init(edge: old.id, end: farIsTarget ? .source : .target, to: other, from: removing[0]))
                 } else {
                     notices.tell(cantChange, String(localized: "Choose one item here, or remove the link first."))
-                    return false
+                    return nil
                 }
                 change.removing = []
             } else {
                 change.adding.append(link)
             }
         }
-        guard !change.isEmpty else { return true }
-        guard !made.isEmpty else {
-            relink(change, name: String(localized: "Edit Relationship"), undoManager: undoManager)
-            return true
-        }
-        // Each new link is asked of the core before any is written, so a refusal of one leaves the field as it was
-        // rather than with some of the change made.
-        Task {
-            for link in made {
-                if case .refused(let reason) = await source.edgeVerdict(link) {
-                    return notices.tell(cantChange, reason)
-                }
-            }
-            relink(change, name: String(localized: "Edit Relationship"), undoManager: undoManager)
-        }
-        return true
+        return (change, made)
     }
 
     /// Where links are added or moved and others removed, as when one item is chosen in place of another in a field

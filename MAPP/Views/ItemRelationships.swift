@@ -14,7 +14,7 @@ struct ItemRelationshipGroup: View {
     var onShowAll: () -> Void = {}
     let onOpen: (ItemID) -> Void
     let onEdit: () -> Void
-    let onRemove: (ItemID) -> Bool
+    let onRemove: (ItemID) async -> Bool
     /// Whether the page shows this relationship too, and what changes it; nil offers no choice.
     var shownOnPage = true
     var onShowOnPage: ((Bool) -> Void)?
@@ -38,7 +38,7 @@ struct ItemRelationshipGroup: View {
             let links = LinkLimit.split(relationship.targets, expanded: isExpanded)
             ForEach(links.shown) { target in
                 ItemTargetRow(target: target, relationship: relationship, typeIcon: typeIcon, onOpen: onOpen, onEdit: onEdit) { id in
-                    rejected = !onRemove(id)
+                    Task { rejected = !(await onRemove(id)) }
                 }
             }
             if links.hidden > 0 {
@@ -214,13 +214,16 @@ struct ItemRelationshipPicker: View {
     let owner: ItemID
     let relationship: ItemRelationship
     let candidates: [Item]
-    let onSave: ([ItemID]) -> Bool
+    /// Whether the library accepted the selection, answered once it has judged it.
+    let onSave: ([ItemID]) async -> Bool
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     @State private var selection: Set<ItemID>
     @State private var rejected = false
+    /// While the library judges the selection, so a second Save does not send it again.
+    @State private var saving = false
 
-    init(owner: ItemID, relationship: ItemRelationship, candidates: [Item], onSave: @escaping ([ItemID]) -> Bool) {
+    init(owner: ItemID, relationship: ItemRelationship, candidates: [Item], onSave: @escaping ([ItemID]) async -> Bool) {
         self.owner = owner
         self.relationship = relationship
         self.candidates = candidates
@@ -265,8 +268,14 @@ struct ItemRelationshipPicker: View {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("Save") {
-                    if onSave(selection.sorted { $0.rawValue < $1.rawValue }) { dismiss() } else { rejected = true }
+                    let chosen = selection.sorted { $0.rawValue < $1.rawValue }
+                    saving = true
+                    Task {
+                        if await onSave(chosen) { dismiss() } else { rejected = true }
+                        saving = false
+                    }
                 }
+                .disabled(saving)
                 .keyboardShortcut(.defaultAction)
                 .accessibilityIdentifier("RelationshipSave")
             }

@@ -100,6 +100,10 @@ import Observation
     /// What to tell the person if the source refuses each write the library made.
     @ObservationIgnored private var refusals: [WriteID: Refusal] = [:]
     @ObservationIgnored private var following: [Task<Void, Never>] = []
+    /// The relationship changes asked for and not yet written or refused, and the last of them, which the next waits
+    /// for so changes run in the order they were made (`setItemRelationship`).
+    @ObservationIgnored var relationshipChangesInFlight = 0
+    @ObservationIgnored var relationshipChain: Task<Void, Never>?
     /// The item each create names, until the source answers it.
     @ObservationIgnored private var creating: [WriteID: ItemID] = [:]
     /// The item each property edit is for, until the copy takes or refuses it. Observed, so an editor holding a list it

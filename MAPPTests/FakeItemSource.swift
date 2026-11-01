@@ -150,7 +150,12 @@ nonisolated final class FakeItemSource: ItemSource {
         return body
     }
 
-    func edgeVerdict(_ draft: EdgeDraft) async -> EdgeVerdict { refusals.withLock { $0[draft] }.map { .refused($0) } ?? .taken }
+    /// While set, `edgeVerdict` waits, as the core's check does for a moment.
+    let holdingChecks = Mutex(false)
+    func edgeVerdict(_ draft: EdgeDraft) async -> EdgeVerdict {
+        while holdingChecks.withLock({ $0 }) { try? await Task.sleep(for: .milliseconds(5)) }
+        return refusals.withLock { $0[draft] }.map { .refused($0) } ?? .taken
+    }
 
     func linkAnswers(of targets: [String], in note: ItemID?) async throws -> [LinkAnswer] {
         knownLinks.withLock { answers in

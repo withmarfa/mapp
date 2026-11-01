@@ -35,7 +35,7 @@ struct ItemInspectorHost: View {
                     onOpen: open,
                     onEdit: { editing = $0 },
                     onRemove: { relationship, target in
-                        library.setItemRelationship(id, field: relationship.field,
+                        await library.setItemRelationship(id, field: relationship.field,
                             targetIDs: relationship.targets.compactMap(\.itemID).filter { $0 != target }, undoManager: undoManager)
                     },
                     tags: library.tags(of: item),
@@ -57,7 +57,7 @@ struct ItemInspectorHost: View {
         .sheet(item: $editing) { relationship in
             if let id = selectedID {
                 ItemRelationshipPicker(owner: id, relationship: relationship, candidates: library.relationshipCandidates(for: id, field: relationship.field)) {
-                    library.setItemRelationship(id, field: relationship.field, targetIDs: $0, undoManager: undoManager)
+                    await library.setItemRelationship(id, field: relationship.field, targetIDs: $0, undoManager: undoManager)
                 }
             }
         }
@@ -109,7 +109,7 @@ struct ItemInspector: View {
     var isWritingProperties: () -> Bool = { false }
     let onOpen: (ItemID) -> Void
     let onEdit: (ItemRelationship) -> Void
-    let onRemove: (ItemRelationship, ItemID) -> Bool
+    let onRemove: (ItemRelationship, ItemID) async -> Bool
     /// The tags the person manages, which exclude the favorite tag, and what adds and removes one. A tag is added
     /// by its text, which the library refuses with the reason.
     var tags: [String] = []
@@ -211,7 +211,7 @@ struct ItemInspector: View {
                     ItemRelationshipGroup(
                         relationship: relationship, typeIcon: typeIcon, isExpanded: presentation.expandedLinks.contains(group),
                         onShowAll: { presentation.expandLinks(group) }, onOpen: onOpen, onEdit: { onEdit(relationship) },
-                        onRemove: { onRemove(relationship, $0) }, shownOnPage: placement.showsOnPage(relationship.field),
+                        onRemove: { await onRemove(relationship, $0) }, shownOnPage: placement.showsOnPage(relationship.field),
                         onShowOnPage: showOnPage(relationship.field))
                 }
                 if !mentions.isEmpty { contentLinks }

@@ -149,8 +149,11 @@ protocol ItemLibrary: AnyObject, Observable {
     /// editor can tell a write that landed and was changed again before it drew, as by Undo, from one refused.
     var lastPropertyWrite: Int? { get }
     func tookPropertyWrite(_ mark: Int) -> Bool
+    /// Makes the field link `id` to exactly `targetIDs`, once the library has judged the change. True means the
+    /// library accepted it and holds it, or there was nothing to change; false means it refused, told the person, and
+    /// left the field as it was.
     @discardableResult
-    func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) -> Bool
+    func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) async -> Bool
     /// Moves each item to `type`, its title and text to the new type's keys in the same edit, with `filling` for
     /// the required fields an item lacks (`TypeChange`). Fields the new type does not use stay on the item. An item
     /// that cannot become `type`, or cannot be changed, is skipped and the library tells the person how many and why;

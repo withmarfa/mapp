@@ -50,9 +50,27 @@ extension MarfaLibrary {
 
     /// Waits only until the source holds every write in its queue on this Mac, never for the server, so quitting
     /// or leaving the library offline keeps every write without waiting on the network.
+    ///
+    /// A relationship change whose check the core has not answered is waited for first, since the check is made on this
+    /// Mac and answers at once; if it has not within `Self.relationshipWait`, the person is told it was not made.
     func finish() async {
+        let deadline = ContinuousClock.now + Self.relationshipWait
+        while relationshipChangesInFlight > 0 {
+            guard ContinuousClock.now < deadline else {
+                notices.tell(
+                    String(localized: "Can’t Change This Relationship"),
+                    String(localized: "A change to a connection was still being checked, so it may not have been made. Check it and change it again."))
+                break
+            }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
         await source.queueSubmitted()
     }
+
+    /// The longest `finish` waits for a relationship change to be checked.
+    static let relationshipWait = Duration.seconds(2)
+    /// The longest a relationship change waits for the copy to show the one before it.
+    nonisolated(unsafe) static var relationshipSettle = Duration.milliseconds(500)
 
     var engineActivity: EngineActivity? { source.engineActivity }
 

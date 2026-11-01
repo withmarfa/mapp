@@ -186,7 +186,12 @@ final class FakeItemLibrary: ItemLibrary {
     var refusals: [ItemID: [ItemID: String]] = [:]
     /// The refusal for a new item filed under each parent a test sets.
     var childRefusals: [ItemID: String] = [:]
-    func newChildVerdict(under parent: ItemID) async -> EdgeVerdict { childRefusals[parent].map { .refused($0) } ?? .taken }
+    /// Waits before `newChildVerdict` answers, as the core's check does for a moment.
+    var checkingParent: (() async -> Void)?
+    func newChildVerdict(under parent: ItemID) async -> EdgeVerdict {
+        await checkingParent?()
+        return childRefusals[parent].map { .refused($0) } ?? .taken
+    }
     func relationshipVerdict(for id: ItemID, field: String, to other: ItemID) async -> EdgeVerdict {
         refusals[id]?[other].map { .refused($0) } ?? .taken
     }
@@ -330,7 +335,7 @@ final class FakeItemLibrary: ItemLibrary {
     func finish() {}
     func wasRefused(creating id: ItemID) -> Bool { refusedCreations.contains(id) }
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool { false }
-    func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) -> Bool {
+    func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) async -> Bool {
         relationshipWrites.append((id, field, targetIDs))
         return acceptsRelationships
     }

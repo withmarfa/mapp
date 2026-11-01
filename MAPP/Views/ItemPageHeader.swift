@@ -26,7 +26,7 @@ struct ItemPageHeader: ViewModifier {
                      attachmentAnchor: .rect(.rect((choosingParent ?? .zero).offsetBy(dx: 0, dy: -containerTop))), arrowEdge: .bottom) {
                 if let parent = Self.parent(of: item.id, in: library) {
                     ItemRelationshipPicker(owner: item.id, relationship: parent, candidates: library.relationshipCandidates(for: item.id, field: parent.field)) {
-                        library.setItemRelationship(item.id, field: parent.field, targetIDs: $0, undoManager: undoManager)
+                        await library.setItemRelationship(item.id, field: parent.field, targetIDs: $0, undoManager: undoManager)
                     }
                 }
             }
@@ -186,7 +186,7 @@ struct ItemPageHeader: ViewModifier {
                 menu.addItem(change)
                 menu.addItem(.separator())
                 let remove = actionItem(String(localized: "Remove \(parent.label)")) {
-                    Self.removeParent(parent, of: id, in: library, drafts: drafts, undoManager: undoManager)
+                    Task { await Self.removeParent(parent, of: id, in: library, drafts: drafts, undoManager: undoManager) }
                 }
                 remove.isEnabled = parent.isEditable
                 menu.addItem(remove)
@@ -199,8 +199,8 @@ struct ItemPageHeader: ViewModifier {
     /// until the next try or the next item.
     static func removeParent(
         _ parent: ItemRelationship, of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation, undoManager: UndoManager?
-    ) {
-        drafts.draft(for: id, key: parent.field).rejected = !library.setItemRelationship(id, field: parent.field, targetIDs: [], undoManager: undoManager)
+    ) async {
+        drafts.draft(for: id, key: parent.field).rejected = !(await library.setItemRelationship(id, field: parent.field, targetIDs: [], undoManager: undoManager))
     }
 
     /// The key of the field the item's status is kept in, if its type has one.
