@@ -342,8 +342,7 @@ extension MarfaLibrary {
         setStates(changes, name: name, undoManager: undoManager)
     }
 
-    /// An item whose delete the server has taken is in the server's bin, which the source lists with the items the
-    /// copy still holds, so it is restored like any other.
+    /// The copy holds the bin, so an item binned here or elsewhere is restored like any other.
     func recover(_ ids: Set<ItemID>, undoManager: UndoManager?) {
         var changes: [ItemID: (from: ItemState, to: ItemState)] = [:]
         for id in ids { if item(id)?.state == .trashed { changes[id] = (.trashed, .active) } }

@@ -38,8 +38,8 @@ The Swift side of the note editor: the web view, the controller that drives the 
 ## Linking to notes
 
 - The core reads links: `linkParts(in:)` for their parts (UTF-16 ranges) and `Items.linkCandidates` for what they name (`ItemLibrary.linkAnswers(of:in:)`). MAPP parses no link and folds no name. A backslash is part of a link's text, so pass the page's `raw` on, never what it decoded.
-- A link names a note by a spelling the core says names that note alone (`ItemLibrary.bodyLink(to:in:)`); where none does, there is no link and the person is told. Never write a link any other way.
-- `NoteRequests` answers the page's `notes` messages; suggestions are `NoteLinks.Index` matches off the main actor, kept only where the core says the title names that note alone. Link to Note (`NoteLinkPicker`) answers the page exactly once on every path: chosen, cancelled, the document replaced, the note left, the window gone, or the page's process ended.
+- A link names a note by a spelling the core binds to that note, or leaves unbound with that note the only one the copy holds by the name (`LinkAnswer.names`, `ItemLibrary.bodyLink(to:in:)`); where none does, there is no link and the person is told. Never write a link any other way.
+- `NoteRequests` answers the page's `notes` messages; suggestions are `NoteLinks.Index` matches off the main actor, kept only where `LinkAnswer.names` holds for the title. Link to Note (`NoteLinkPicker`) answers the page exactly once on every path: chosen, cancelled, the document replaced, the note left, the window gone, or the page's process ended.
 - Following a link asks the core what that very link means from its note (`EditorController.openNote`) and never guesses by title. Only `bound` opens a note at once; a link the copy has not bound offers the notes its name answers to in a menu, and one that names none beeps. No note is made for a link. Wire `onOpenNote` wherever an editor is made.
 - `NoteLink.raw` keeps the authored text inside the brackets and defines equality, so `[[Plan]]` and `[[Plan|Plan]]` stay distinct.
 

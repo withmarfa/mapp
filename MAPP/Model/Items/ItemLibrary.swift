@@ -218,9 +218,9 @@ extension ItemLibrary {
     }
     func hiddenPropertyKeys(of item: Item) -> Set<String> { catalogue.pageKeys(of: item) }
 
-    /// The title as a link where the core says it names this note alone from `note`. Otherwise the item's identity
-    /// with its title as the label (`[[identity|Title]]`). Each spelling is read back through `linkParts` so it is
-    /// the link it was meant to be, and the core is asked what it binds to.
+    /// The title as a link where, from `note`, the core binds it to this note, or leaves it unbound with this note the
+    /// only one the copy holds by that name (`LinkAnswer.names`). Otherwise the item's identity with its title as the
+    /// label (`[[identity|Title]]`). Each spelling is read back through `linkParts` so it is the link it was meant to be.
     func bodyLink(to id: ItemID, in note: ItemID?) async -> String? {
         guard let target = item(id), !target.isFile else { return nil }
         let title = target.title

@@ -15,7 +15,7 @@ struct MarfaBinTests {
             let queued = try await fake.copy.items.create(Draft(type: "core.note", properties: ["title": .string(name)]))
             ids[name] = ItemID(try #require(queued.itemId))
         }
-        // Nothing here refreshes from a server, so every row is read from the copy. One item is binned by this device and two arrive as the server's changes.
+        // Nothing here refreshes from a server, so every row is read from the copy. One item is binned through the library and two straight in the copy, as another writer's deletes reach it.
         let source = MarfaSource(copy: fake.copy, connection: SampleLibrary.connection)
         source.events.yield(.paint)
         let library = MarfaLibrary(source: source, notices: Notices())

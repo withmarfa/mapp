@@ -47,7 +47,7 @@
 
 ## Edges and files
 
-- A relationship is an edge written by the end that holds it. Check links against the catalogue's types, roles, how many each end may hold, and the contract's cycle rule (`conformance/spec/edges.md`) before sending.
+- A relationship is an edge written by the end that holds it. The core judges an edge's end types, nesting and cycles (`Edges.check` for a picker's rows, and again when the edge is queued); MAPP judges only how many links each end may hold (`conformance/spec/edges.md`), which the core does not.
 - An end that holds one link of its type has it replaced by moving the edge's other end (one `edges.update` with an `EdgeEdit`). Never remove and add: that can leave the end holding none or two.
 - Never take a link that a third item holds as its own; tell the person which item holds it. Where a field that holds many swaps one item for another, add the new links first and remove the old ones only once the source has taken them.
 - What an item's text links or embeds is written as edges by the package when the text is saved: change a link in the text, never as a relationship. Answer a link only from the core (`ItemSource.linkAnswers`), never from the titles held.

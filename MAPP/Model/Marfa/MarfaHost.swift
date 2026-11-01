@@ -171,8 +171,8 @@ import Observation
         }
     }
 
-    /// Pulls what the server has changed since the copy last looked, then sends the changes waiting in the copy and
-    /// reads the bin again: the sync a launch and a return of the server run.
+    /// Pulls what the server has changed since the copy last looked, then sends the changes waiting in the copy: the
+    /// sync a launch and a return of the server run.
     func refresh() {
         guard canRefresh else { return }
         source?.refresh()

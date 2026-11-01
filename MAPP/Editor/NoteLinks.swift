@@ -104,9 +104,9 @@ extension ItemLibrary {
         items(in: .allNotes).filter { !$0.isFile && $0.id != id }.sorted { $0.modified > $1.modified }
     }
 
-    /// The titles to offer for what was typed after `[[` in `note`, best first, each one only if the core says
-    /// `[[title]]`, written there, names that note alone. A title that two notes go by, or that a link cannot spell, is
-    /// left out. The closest matches are asked of the core together, so a few left out leave the list full.
+    /// The titles to offer for what was typed after `[[` in `note`, best first, each one only where `[[title]]`, written
+    /// there, names that note as far as the copy knows (`LinkAnswer.names`). A title that two notes go by, or that a
+    /// link cannot spell, is left out. The closest matches are asked of the core together, so a few left out leave the list full.
     func noteNames(matching query: String, in note: ItemID? = nil, using index: NoteLinks.Index, limit: Int = 12) async -> [String] {
         let matches = await index.matches(for: query, among: items(in: .allNotes), limit: limit * 4)
             .filter { NoteLinks.spells($0.title, as: $0.title) }
