@@ -105,6 +105,9 @@ import WebKit
             _ = try? await next.callJavaScript(
                 SourceLook.script, arguments: ["css": look.css, "reader": look.mode == .reader, "title": look.title],
                 contentWorld: Self.world)
+            // The await above is a suspension: a newer call may have started, or this one been cancelled.
+            try Task.checkCancellation()
+            guard call == shows else { throw CancellationError() }
         }
         page = next
         guard let pictures else { return }

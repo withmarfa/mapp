@@ -100,10 +100,11 @@ nonisolated struct SourceLook: Equatable, Sendable {
     /// content world.
     ///
     /// Of the reader look's cleanup:
-    /// - An anchor is removed when it is a lone `#`, `¶` or `§`, or is marked as a heading's permalink.
-    /// - A backslash before a quote is removed in text, except in code, where it may be the code.
-    /// - The first heading is removed when nothing readable comes before it and it says the title, ignoring case,
-    ///   punctuation and spacing, or begins with a title the source cut short. Whatever it leaves empty goes with it.
+    /// - An anchor is removed when it is a heading's permalink: a lone `#`, `¶` or `§`, or one marked as such, in or next to
+    ///   a heading and linking to a fragment of the page or to the heading's id. Other links stay.
+    /// - A backslash before a quote is removed in text, except in code, keyboard input and sample output, where it may be the code.
+    /// - The first heading is removed when nothing readable comes before it and it says exactly the title, ignoring case,
+    ///   punctuation and spacing, or extends a title that ends in an ellipsis. Only an ancestor left with nothing else goes with it.
     nonisolated static let script = """
         const sheet = document.createElement('style');
         sheet.textContent = css;
@@ -114,13 +115,20 @@ nonisolated struct SourceLook: Equatable, Sendable {
             if (e.matches('img, video, svg, canvas, iframe')) { e.removeAttribute('width'); e.removeAttribute('height'); }
           }
           const permalink = 'a.anchor, a.heading-anchor, a.header-anchor, a.headerlink, a.permalink, a[aria-label*="ermalink" i]';
+          const headings = 'h1, h2, h3, h4, h5, h6';
           for (const a of document.querySelectorAll('a')) {
             const text = a.textContent.trim();
-            if (/^[#¶§]$/.test(text) || (a.matches(permalink) && a.closest('h1, h2, h3, h4, h5, h6'))) a.remove();
+            if (!/^[#¶§]$/.test(text) && !a.matches(permalink)) continue;
+            const owner = a.closest(headings)
+              || [a.previousElementSibling, a.nextElementSibling].find(e => e && e.matches(headings));
+            if (!owner) continue;
+            const href = a.getAttribute('href') || '';
+            const hash = href.includes('#') ? decodeURIComponent(href.slice(href.indexOf('#') + 1)) : null;
+            if (href.startsWith('#') || (owner.id && hash === owner.id)) a.remove();
           }
           const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
           for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-            if (node.parentElement && node.parentElement.closest('pre, code, script, style, textarea')) continue;
+            if (node.parentElement && node.parentElement.closest('pre, code, kbd, samp, script, style, textarea')) continue;
             if (node.nodeValue.includes('\\\\')) node.nodeValue = node.nodeValue.replace(/\\\\(["'\\u2018\\u2019\\u201C\\u201D])/g, '$1');
           }
           const words = s => s.toLowerCase().replace(/[^\\p{L}\\p{N}]+/gu, ' ').trim();
@@ -131,11 +139,13 @@ nonisolated struct SourceLook: Equatable, Sendable {
             before.setStart(document.body, 0);
             before.setEndBefore(heading);
             const said = words(heading.textContent);
-            const repeats = said === wanted || (said.length >= 20 && wanted.startsWith(said));
+            const cut = /(\\u2026|\\.\\.\\.)\\s*$/.test(title.trim());
+            const repeats = said === wanted || (cut && said.startsWith(wanted));
             if (repeats && words(before.toString()) === '') {
               let gone = heading;
+              const bare = n => n.nodeType === Node.COMMENT_NODE || (n.nodeType === Node.TEXT_NODE && n.nodeValue.trim() === '');
               while (gone.parentElement && gone.parentElement !== document.body
-                     && !gone.parentElement.querySelector('img, video, svg') && words(gone.parentElement.textContent) === said) {
+                     && [...gone.parentElement.childNodes].every(n => n === gone || bare(n))) {
                 gone = gone.parentElement;
               }
               gone.remove();

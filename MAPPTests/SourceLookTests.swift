@@ -52,4 +52,33 @@ import WebKit
         // The reader view follows the page's own width setting, not the original's.
         #expect(look(.reader, wide: true).inset.contains("100vw - 702px"))
     }
+
+    private func text(of html: String, title: String, mode: SourceViewMode = .reader) async throws -> String {
+        let page = try await SealedWebPage.make(runsScripts: false)
+        try await page.show(Data("<html><body>\(html)</body></html>".utf8), look: look(mode, title: title))
+        return try #require(try await page.page.callJavaScript("return document.body.innerText") as? String)
+    }
+
+    @Test func removingTheTitleKeepsAContainersOtherContent() async throws {
+        let text = try await text(of: "<section><h1>Title</h1><pre>=== --- +++</pre></section>", title: "Title")
+        #expect(text.contains("=== --- +++") && !text.contains("Title"))
+    }
+
+    @Test func onlyAHeadingsPermalinkIsRemoved() async throws {
+        let text = try await text(
+            of: "<p>The <a href=\"https://example.com/hash\">#</a> character.</p><h2 id=\"a\">Head <a href=\"#a\">#</a></h2>",
+            title: "Other")
+        #expect(text.contains("The # character") && text.contains("Head") && !text.contains("Head #"))
+    }
+
+    @Test func keyboardAndSampleTextKeepTheirBackslashes() async throws {
+        let text = try await text(of: "<p><kbd>echo \\\"hi\\\"</kbd> <samp>a\\'b</samp></p>", title: "Other")
+        #expect(text.contains("echo \\\"hi\\\"") && text.contains("a\\'b"))
+    }
+
+    @Test func aHeadingThatOnlyBeginsLikeTheTitleStays() async throws {
+        let html = "<h2>Understanding security</h2><p>Body</p>"
+        #expect(try await text(of: html, title: "Understanding security boundaries").contains("Understanding security"))
+        #expect(!(try await text(of: html, title: "Understanding security\u{2026}")).contains("Understanding security"))
+    }
 }
