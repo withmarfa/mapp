@@ -32,7 +32,7 @@ import WebKit
         let text = try await text(of: look(.reader))
         #expect(!text.contains("CaMeL"), "the heading that repeats the title is gone")
         #expect(text.contains("Why it matters") && !text.contains("Why it matters#"), "the # link is gone")
-        #expect(text.contains("\"I don't know\"") && !text.contains("\\\""), "escaped quotes are plain")
+        #expect(text.contains("\"I don't know\"") && !text.contains("\\\"I don"), "escaped quotes are plain")
         #expect(text.contains("keep \\\"this\\\""), "code is left as written")
         #expect(text.contains("A link"))
     }
