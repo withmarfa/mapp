@@ -10,16 +10,18 @@ struct WebPageView: View {
     private let encoding: String.Encoding?
     private let pictures: SealedPictures?
     private let runsScripts: Bool
+    private let look: SourceLook?
     @State private var sealed: SealedWebPage?
     @State private var failure: String?
 
     /// An HTML document already in hand, which runs its own scripts only where `runsScripts` says so. It is read in
     /// `encoding`, or where none is given, in the one its bytes declare (`SealedWebPage.show`).
-    init(html: Data, encoding: String.Encoding? = nil, pictures: SealedPictures? = nil, runsScripts: Bool) {
+    init(html: Data, encoding: String.Encoding? = nil, pictures: SealedPictures? = nil, runsScripts: Bool, look: SourceLook? = nil) {
         self.html = html
         self.encoding = encoding
         self.pictures = pictures
         self.runsScripts = runsScripts
+        self.look = look
     }
 
     var body: some View {
@@ -44,11 +46,17 @@ struct WebPageView: View {
             }
         }
         .accessibilityIdentifier("WebPageView")
-        .task(id: html) { await load() }
+        .task(id: Reload(html: html, look: look)) { await load() }
         .onChange(of: pictures?.version) { _, version in
             guard let version, let sealed else { return }
             Task { await sealed.redrawPictures(version: version) }
         }
+    }
+
+    /// A document is shown again when its bytes or its look change; a look cannot be taken off a loaded document.
+    private struct Reload: Equatable {
+        let html: Data
+        let look: SourceLook?
     }
 
     private func load() async {
@@ -56,7 +64,7 @@ struct WebPageView: View {
         do {
             let page: SealedWebPage
             if let sealed { page = sealed } else { page = try await SealedWebPage.make(pictures: pictures, runsScripts: runsScripts) }
-            try await page.show(html, encoding: encoding)
+            try await page.show(html, encoding: encoding, look: look)
             sealed = page
         } catch is CancellationError {
         } catch {

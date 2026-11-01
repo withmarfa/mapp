@@ -31,6 +31,8 @@ struct WebPageItemPage: View {
     @CurrentLibrary private var library
     @StoredPageStyle private var style
     @AppStorage(RemotePictureSetting.key) private var remotePictures = RemotePictureSetting.standard
+    @AppStorage(SourceViewMode.key) private var mode = SourceViewMode.standard
+    @AppStorage(SourceViewMode.wideKey) private var originalWide = SourceViewMode.wideStandard
     let item: Item
     /// The file that holds the HTML.
     let document: ItemID
@@ -52,7 +54,7 @@ struct WebPageItemPage: View {
         GeometryReader { geometry in
             let inset = style.horizontalInset(for: geometry.size.width)
             VStack(spacing: 0) {
-                WebPageHeader(item: item, inset: inset)
+                WebPageHeader(item: item, inset: inset, mode: $mode)
                 // The header is inset like the other item pages' and the page draws to its own margin, so the line
                 // sets the page apart as a document under its header.
                 Divider()
@@ -77,7 +79,9 @@ struct WebPageItemPage: View {
         case .loading:
             ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
         case .ready(let html, let encoding):
-            WebPageView(html: html, encoding: encoding, pictures: pictures, runsScripts: runsScripts)
+            WebPageView(
+                html: html, encoding: encoding, pictures: pictures, runsScripts: runsScripts,
+                look: SourceLook(mode: mode, title: item.displayTitle, page: style, originalWide: originalWide))
                 // Each item's pictures are answered by a page made for it.
                 .id(pictures.map(ObjectIdentifier.init))
         case .unavailable:
@@ -200,6 +204,23 @@ private struct PicturePillStyle: ButtonStyle {
     }
 }
 
+/// The switch between the reader look and the source's own, remembered for every such item.
+struct SourceViewPicker: View {
+    @Binding var mode: SourceViewMode
+
+    var body: some View {
+        Picker("View", selection: $mode) {
+            Text("Reader").tag(SourceViewMode.reader)
+            Text("Original").tag(SourceViewMode.original)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
+        .accessibilityLabel("View")
+        .accessibilityIdentifier("SourceViewMode")
+    }
+}
+
 /// The title and the line under it: what the item is, who it came from and when. The sizes follow the note page's
 /// header, a bold title at nearly twice the text size and a quiet secondary line at the interface's text size.
 private struct WebPageHeader: View {
@@ -208,6 +229,7 @@ private struct WebPageHeader: View {
     @StoredPageStyle private var style
     let item: Item
     let inset: CGFloat
+    @Binding var mode: SourceViewMode
 
     var body: some View {
         let byline = PageByline(item: item, now: library.now())
@@ -228,6 +250,8 @@ private struct WebPageHeader: View {
             .font(.system(size: CGFloat(interfaceTextSize)))
             .foregroundStyle(.secondary)
             .accessibilityIdentifier("WebPageByline")
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .overlay(alignment: .trailing) { SourceViewPicker(mode: $mode) }
         }
         .textSelection(.enabled)
         .frame(maxWidth: .infinity, alignment: .leading)
