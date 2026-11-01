@@ -54,7 +54,8 @@ struct MarfaLinkAnswerTests {
         let answers = try #require(await scene.library.linkAnswers(of: ["Plan", "plan", "Nowhere", plan.rawValue + "|Plan"], in: scene.id("Reader")))
         #expect(answers.map(\.state) == [.unresolved, .unresolved, .unresolved, .bound], "case does not matter to the core")
         #expect(answers[0].candidates == [plan] && answers[1].candidates == [plan])
-        #expect(answers[0].names(plan) && !answers[0].isMissing, "answered to by this note alone")
+        #expect(!answers[0].names(plan), "the copy cannot tell that this note is the only one, so the title does not name it")
+        #expect(answers[0].offers(plan) && !answers[0].isMissing, "but it is a fair offer while typing: answered to by this note alone")
         #expect(answers[2].isMissing && answers[2].item == nil)
         #expect(answers[3].item == plan && answers[3].names(plan))
         await scene.finish()
@@ -75,7 +76,8 @@ struct MarfaLinkAnswerTests {
         // `A\|B` is the name `A\` with the alias `B`: the bar still separates, and the backslash stays in the name.
         #expect(answers[1].candidates == [scene.id("A\\")])
         #expect(answers[2].isMissing)
-        #expect(await scene.library.bodyLink(to: scene.id("back\\slash"), in: scene.id("Reader")) == "[[back\\slash]]")
+        // Not bound by title, so the note is named by identity.
+        #expect(await scene.library.bodyLink(to: scene.id("back\\slash"), in: scene.id("Reader")) == "[[\(scene.id("back\\slash").rawValue)|back\\slash]]")
         await scene.finish()
     }
 
@@ -104,7 +106,9 @@ struct MarfaLinkAnswerTests {
         #expect(link == "[[\(first.id.rawValue)|Plan]]")
         let names = await scene.library.noteNames(matching: "plan", in: scene.id("Reader"), using: NoteLinks.Index())
         #expect(names == ["Plan B"])
-        #expect(await scene.library.bodyLink(to: scene.id("Plan B"), in: scene.id("Reader")) == "[[Plan B]]")
+        #expect(
+            await scene.library.bodyLink(to: scene.id("Plan B"), in: scene.id("Reader")) == "[[\(scene.id("Plan B").rawValue)|Plan B]]",
+            "the copy has not bound the title, so the server may hold another note by it")
         await scene.finish()
     }
 }

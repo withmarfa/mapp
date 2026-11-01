@@ -6,17 +6,30 @@ import Marfa
 nonisolated enum NoteLinks {
     /// Whether `[[inner]]` is one link the core reads with exactly this name and alias, so the text survives
     /// as written: no `]]`, line break or padding in it. Marfa has no escape in a link, so a backslash is part of the
-    /// name.
+    /// name, but Inkkit, which the page draws links with, reads one as an escape, so a spelling with a backslash
+    /// directly before `]`, `|` or `#` (or the end) would be two different links. Such a spelling is refused.
     static func spells(_ inner: String, as name: String, alias: String? = nil) -> Bool {
-        guard !name.isEmpty else { return false }
+        guard !name.isEmpty, !escapesDelimiter(inner) else { return false }
         let text = "[[\(inner)]]"
         let parts = linkParts(in: text)
         guard parts.count == 1, let link = parts.first, link.text == text else { return false }
         return link.name.text == name && link.heading == nil && link.alias?.text == alias
     }
 
+    /// Whether a backslash stands directly before a character that ends a part of a link, or ends the link.
+    private static func escapesDelimiter(_ text: String) -> Bool {
+        var previous: Character?
+        for character in text {
+            if previous == "\\", "]|#".contains(character) { return true }
+            previous = character
+        }
+        return previous == "\\"
+    }
+
     /// A title as one line of a link's label. Line breaks and control characters become one space; nothing else is
-    /// changed, since a link has no escape.
+    /// changed, since a link has no escape, except that a backslash directly before `]`, `|` or `#`, or last, is
+    /// dropped, because the page would read it as an escape. The label is only what the link shows; the identity
+    /// before it names the note.
     static func label(_ title: String) -> String {
         var words: [String] = []
         var word = String.UnicodeScalarView()
@@ -31,7 +44,17 @@ nonisolated enum NoteLinks {
             }
         }
         end()
-        return NoteName.trimmed(words.joined(separator: " "))
+        var label = NoteName.trimmed(words.joined(separator: " "))
+        while escapesDelimiter(label) {
+            var kept = ""
+            for (index, character) in zip(label.indices, label) {
+                let next = label.index(after: index)
+                if character == "\\", next == label.endIndex || "]|#".contains(label[next]) { continue }
+                kept.append(character)
+            }
+            label = NoteName.trimmed(kept)
+        }
+        return label
     }
 
     /// A note the page may offer by its title.
@@ -105,12 +128,12 @@ extension ItemLibrary {
     }
 
     /// The titles to offer for what was typed after `[[` in `note`, best first, each one only where `[[title]]`, written
-    /// there, names that note as far as the copy knows (`LinkAnswer.names`). A title that two notes go by, or that a
+    /// there, the core binds to that note or leaves unresolved with that note the only one held (`LinkAnswer.offers`). A title that two notes go by, or that a
     /// link cannot spell, is left out. The closest matches are asked of the core together, so a few left out leave the list full.
     func noteNames(matching query: String, in note: ItemID? = nil, using index: NoteLinks.Index, limit: Int = 12) async -> [String] {
         let matches = await index.matches(for: query, among: items(in: .allNotes), limit: limit * 4)
             .filter { NoteLinks.spells($0.title, as: $0.title) }
         guard !matches.isEmpty, let answers = await linkAnswers(of: matches.map(\.title), in: note) else { return [] }
-        return zip(matches, answers).compactMap { $0.1.names($0.0.id) ? $0.0.title : nil }.prefix(limit).map { $0 }
+        return zip(matches, answers).compactMap { $0.1.offers($0.0.id) ? $0.0.title : nil }.prefix(limit).map { $0 }
     }
 }

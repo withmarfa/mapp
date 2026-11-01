@@ -47,11 +47,15 @@ nonisolated struct LinkAnswer: Hashable, Sendable {
     /// Whether no held note answers to the link at all.
     var isMissing: Bool { state == .unresolved && candidates.isEmpty }
 
-    /// Whether the link names this note and no other, as far as the copy knows: bound to it, or not bound and
-    /// answered to by it alone.
-    func names(_ note: ItemID) -> Bool {
-        (state == .bound && item == note) || (state == .unresolved && candidates == [note])
-    }
+    /// Whether the core binds the link to this note. Only that is a link written to name the note: an `unresolved`
+    /// answer cannot tell that the one note held is the only one, so the server's lookup decides once the link is
+    /// saved (`device/link-candidates-unresolved`).
+    func names(_ note: ItemID) -> Bool { state == .bound && item == note }
+
+    /// Whether this title is a fair offer for the note while the person types it: bound to it, or not bound and
+    /// answered to by it alone among the notes held. The person sees the title and chooses it, and the server decides
+    /// at the save, so an offer can end unresolved; a link written for the person (`names`) never relies on that.
+    func offers(_ note: ItemID) -> Bool { names(note) || (state == .unresolved && candidates == [note]) }
 }
 
 /// An embed in an item's text with what the library bound it to: the file item it shows, or why there is none.

@@ -319,6 +319,24 @@ private struct RelationshipCandidateRow: View {
     let choose: () -> Void
     @State private var refusal: String?
 
+    /// Asks until the core answers: a check that could not be made (the copy not whole yet, the key changing) is
+    /// asked again after a pause, and only the core's own refusal disables the row.
+    private func check() async {
+        refusal = nil
+        guard !isLinked else { return }
+        var pause = Duration.seconds(1)
+        for _ in 0..<6 {
+            switch await library.relationshipVerdict(for: owner, field: field, to: candidate.id) {
+            case .refused(let message): return refusal = message
+            case .taken: return
+            case .unknown:
+                try? await Task.sleep(for: pause)
+                if Task.isCancelled { return }
+                pause *= 2
+            }
+        }
+    }
+
     var body: some View {
         Button(action: choose) {
             HStack {
@@ -341,9 +359,7 @@ private struct RelationshipCandidateRow: View {
         }
         .buttonStyle(.plain)
         .disabled(refusal != nil)
-        .task(id: candidate.id) {
-            refusal = isLinked ? nil : await library.relationshipRefusal(for: owner, field: field, to: candidate.id)
-        }
+        .task(id: candidate.id) { await check() }
         .accessibilityIdentifier("RelationshipCandidate.\(candidate.id.rawValue)")
         .accessibilityValue(isSelected ? "Selected" : "Not Selected")
     }

@@ -16,7 +16,9 @@ struct NoteLinksTests {
         for title in ["Garden ideas", "Café", "Q3: plan", "日本語のノート", "A \"quoted\" title", "back\\slash", "A]B", "😀 plans"] {
             #expect(NoteLinks.spells(title, as: title), "\(title)")
         }
-        for title in ["", " leading", "trailing ", "A|B", "A#B", "A [x]]", "two\nlines", "two\r\nlines"] {
+        // Inkkit reads a backslash before a delimiter as an escape, which the core does not, so the two would read
+        // these as different links.
+        for title in ["", " leading", "trailing ", "A|B", "A#B", "A [x]]", "two\nlines", "two\r\nlines", "Plan\\", "A\\]", "A\\|B", "A\\#B"] {
             #expect(!NoteLinks.spells(title, as: title), "\(title.debugDescription)")
         }
     }
@@ -125,6 +127,15 @@ struct NoteLinksTests {
         #expect(library.notesToLink(excluding: library.items[3].id).map(\.title) == ["A|B", "garden IDEAS", "Garden ideas"])
     }
 
+    @Test func aTitleLinkIsWrittenOnlyWhereTheCoreBindsItToTheNote() async {
+        let plan = note("Plan")
+        let library = FakeItemLibrary(items: [plan])
+        library.linkAnswerOverrides["Plan"] = LinkAnswer(target: "Plan", state: .unresolved, item: nil, candidates: [plan.id])
+        #expect(await library.bodyLink(to: plan.id, in: nil) == "[[\(plan.id.rawValue)|Plan]]", "one held note is not proof it is the only one")
+        library.linkAnswerOverrides["Plan"] = LinkAnswer(target: "Plan", state: .bound, item: plan.id, candidates: [plan.id])
+        #expect(await library.bodyLink(to: plan.id, in: nil) == "[[Plan]]")
+    }
+
     @Test func aSuggestionIsATitleTheCoreBindsToItsOwnNote() async {
         let library = FakeItemLibrary(items: [note("Garden", minutes: 1), note("garden", minutes: 2), note("Gardening", minutes: 3), note("Garden | x", minutes: 4)])
         let index = NoteLinks.Index()
@@ -134,8 +145,30 @@ struct NoteLinksTests {
         #expect(await library.noteNames(matching: "gard", using: index).isEmpty)
     }
 
+    @Test func aBackslashBeforeAnEndOfAPartIsRefusedInEverySpelling() {
+        #expect(!NoteLinks.spells("id|Plan\\", as: "id", alias: "Plan\\"))
+        #expect(!NoteLinks.spells("id|Plan\\#x", as: "id", alias: "Plan\\#x"))
+        #expect(NoteLinks.spells("id|Plan", as: "id", alias: "Plan"))
+        #expect(NoteLinks.spells("id|C:\\dir", as: "id", alias: "C:\\dir"), "a backslash inside a label is its text")
+    }
+
+    @Test func aTitleEndingInABackslashIsLinkedByIdentityWithTheBackslashLeftOutOfTheLabel() async {
+        let plan = note("Plan\\")
+        let hash = note("Plan\\#2")
+        let library = FakeItemLibrary(items: [plan, hash])
+        // The label is only what the link shows; the identity names the note, and both readings agree on it.
+        #expect(await library.bodyLink(to: plan.id, in: nil) == "[[\(plan.id.rawValue)|Plan]]")
+        #expect(await library.bodyLink(to: hash.id, in: nil) == "[[\(hash.id.rawValue)|Plan#2]]", "a backslash before a delimiter is left out")
+        let path = note("C:\\dir")
+        library.items.append(path)
+        #expect(await library.bodyLink(to: path.id, in: nil) == "[[C:\\dir]]", "a backslash before a letter is text, in the title itself")
+        let only = note("\\")
+        library.items.append(only)
+        #expect(await library.bodyLink(to: only.id, in: nil) == "[[\(only.id.rawValue)]]")
+    }
+
     @Test func aLabelIsOneLineAndNothingIsEscaped() {
-        let cases = [("Plan", "Plan"), ("A|B", "A|B"), ("back\\slash", "back\\slash"), ("two\nlines", "two lines"), (" padded ", "padded"), ("\n\u{0}", "")]
+        let cases = [("Plan", "Plan"), ("A|B", "A|B"), ("back\\slash", "back\\slash"), ("Plan\\", "Plan"), ("A\\|B", "A|B"), ("A\\\\", "A"), ("two\nlines", "two lines"), (" padded ", "padded"), ("\n\u{0}", "")]
         for (title, label) in cases { #expect(NoteLinks.label(title) == label, "\(title.debugDescription)") }
     }
 }

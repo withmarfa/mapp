@@ -289,7 +289,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     @Test func candidatesFollowTheCatalogueAndLeaveCyclesToTheCoresCheck() async throws {
         let (library, _) = try await loaded()
         // Not itself or anything in the bin. The task below it is offered: whether a link closes a cycle is the core's
-        // to say (`relationshipRefusal`), not this list's.
+        // to say (`relationshipVerdict`), not this list's.
         #expect(Set(ids(library.relationshipCandidates(for: F.e1, field: "child-of"))) == [F.p1, F.n1, F.n2, F.en1, F.f1, F.p2, F.t1])
         #expect(Set(ids(library.relationshipCandidates(for: F.t1, field: "inverse:parent-of"))) == [F.n1, F.n2, F.en1, F.f1, F.p2, F.p1, F.e1])
         #expect(ids(library.relationshipCandidates(for: F.e1, field: "supersedes")) == [F.t1])

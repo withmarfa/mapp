@@ -233,14 +233,19 @@ nonisolated final class MarfaSource: ItemSource {
         }
     }
 
-    func edgeRefusal(_ draft: EdgeDraft) async -> String? {
+    /// `Edges.check` throws `validation` or `notFound` for an edge the core refuses. Any other error (the key changing,
+    /// the copy closed or not yet whole, a canceled call) says nothing about the edge.
+    func edgeVerdict(_ draft: EdgeDraft) async -> EdgeVerdict {
         do {
             try await copy.edges.check(from: draft.source.rawValue, to: draft.target.rawValue, type: draft.type)
-            return nil
+            return .taken
         } catch let error as MarfaError {
-            return error.message
+            switch error {
+            case .validation, .notFound: return .refused(error.message)
+            default: return .unknown
+            }
         } catch {
-            return error.localizedDescription
+            return .unknown
         }
     }
 

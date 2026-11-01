@@ -490,6 +490,11 @@ extension Browser {
             }
             return nil
         }
+        // Before anything is made, so a parent the core refuses leaves no item behind.
+        if let parent = draft.parentID, case .refused(let reason) = await library.newChildVerdict(under: parent) {
+            library.notices.tell(String(localized: "Can’t Create Item"), reason)
+            return nil
+        }
         let interval = Telemetry.begin(.navigation, "quickAdd.save")
         defer { interval.end() }
         let catalogue = library.catalogue

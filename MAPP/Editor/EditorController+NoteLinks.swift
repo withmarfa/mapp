@@ -81,7 +81,8 @@ extension EditorController {
             entry.representedObject = id.rawValue
             menu.addItem(entry)
         }
-        menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
+        // A menu item holds its target weakly, and `popUp` returns once the choice is made, so keep the target alive to then.
+        withExtendedLifetime(chosen) { _ = menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil) }
     }
 
     func revealPendingHeading(in note: ItemID) {

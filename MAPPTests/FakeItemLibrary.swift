@@ -184,7 +184,12 @@ final class FakeItemLibrary: ItemLibrary {
     func relationshipCandidates(for id: ItemID, field: String) -> [Item] { [] }
     /// The refusal for each (item, other) a test sets; any other link is taken.
     var refusals: [ItemID: [ItemID: String]] = [:]
-    func relationshipRefusal(for id: ItemID, field: String, to other: ItemID) async -> String? { refusals[id]?[other] }
+    /// The refusal for a new item filed under each parent a test sets.
+    var childRefusals: [ItemID: String] = [:]
+    func newChildVerdict(under parent: ItemID) async -> EdgeVerdict { childRefusals[parent].map { .refused($0) } ?? .taken }
+    func relationshipVerdict(for id: ItemID, field: String, to other: ItemID) async -> EdgeVerdict {
+        refusals[id]?[other].map { .refused($0) } ?? .taken
+    }
     func bodyMentions(for id: ItemID) -> [ItemRelationshipTarget] { [] }
     /// The items each type may be made under, by type.
     var parentCandidates: [String: [ItemID]] = [:]

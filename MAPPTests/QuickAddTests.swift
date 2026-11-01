@@ -481,6 +481,22 @@ struct QuickAddTests {
         #expect(browser.quickAdd.draft == nil)
     }
 
+    @Test func aParentTheCoreRefusesIsToldBeforeAnythingIsMade() async throws {
+        let project = Item(
+            id: .mint(), type: TypeID("test.project"), title: "Launch", titleRule: .property("title"),
+            version: ItemVersion(1), created: start, modified: start)
+        let library = FakeItemLibrary(items: [project], now: start)
+        library.childRefusals[project.id] = "That item is in the bin."
+        let browser = Browser()
+        browser.openQuickAdd(in: library)
+        browser.quickAdd.draft?.parentID = project.id
+        browser.quickAdd.draft?.title = "Plan"
+        #expect(await browser.saveQuickAdd(in: library, undoManager: nil) == nil)
+        #expect(library.items == [project], "no item was made")
+        #expect(library.notices.waiting.last?.message == "That item is in the bin.")
+        #expect(browser.quickAdd.draft?.title == "Plan", "the draft stays as typed")
+    }
+
     @Test func aFileDraftWithSeveralFilesWaitsForOne() async throws {
         let library = FakeItemLibrary(now: start)
         let browser = Browser()

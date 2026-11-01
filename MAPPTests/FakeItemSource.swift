@@ -150,7 +150,7 @@ nonisolated final class FakeItemSource: ItemSource {
         return body
     }
 
-    func edgeRefusal(_ draft: EdgeDraft) async -> String? { refusals.withLock { $0[draft] } }
+    func edgeVerdict(_ draft: EdgeDraft) async -> EdgeVerdict { refusals.withLock { $0[draft] }.map { .refused($0) } ?? .taken }
 
     func linkAnswers(of targets: [String], in note: ItemID?) async throws -> [LinkAnswer] {
         knownLinks.withLock { answers in

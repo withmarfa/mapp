@@ -7,8 +7,9 @@ nonisolated enum NoteRequest: Equatable, Sendable {
     case suggest(String, in: ItemID?)
     /// The Link to Note command, from the note it was typed in.
     case pick(ItemID)
-    /// Which of a note's links name no note.
-    case resolve([NoteLink], in: ItemID)
+    /// Which of a note's links name no note. A link the core does not read as the one link the page posted is nil, and
+    /// keeps its place so the answer lines up with the page's links.
+    case resolve([NoteLink?], in: ItemID)
 
     init?(body: Any) {
         guard let dict = body as? [String: Any], let type = dict["type"] as? String else { return nil }
@@ -21,9 +22,7 @@ nonisolated enum NoteRequest: Equatable, Sendable {
             self = .pick(ItemID(item))
         case "resolve":
             guard let item = dict["item"] as? String, !item.isEmpty, let links = dict["links"] as? [[String: Any]] else { return nil }
-            let parsed = links.compactMap(NoteLink.init(page:))
-            guard parsed.count == links.count else { return nil }
-            self = .resolve(parsed, in: ItemID(item))
+            self = .resolve(links.map(NoteLink.init(page:)), in: ItemID(item))
         default:
             return nil
         }
@@ -50,9 +49,20 @@ final class NoteRequests: NSObject, WKScriptMessageHandlerWithReply {
             switch request {
             case .suggest(let query, let source): replyHandler(await suggest(query, source), nil)
             case .pick(let item): replyHandler(await pick(item), nil)
-            case .resolve(let links, let source): replyHandler(await missing(links, source), nil)
+            case .resolve(let links, let source): replyHandler(await answerMissing(links, in: source), nil)
             }
         }
+    }
+
+    /// One answer for each link the page posted. A link the core does not read as one link is not asked about and
+    /// is answered as not missing, so the page draws it as a live link rather than a red one it cannot vouch for;
+    /// the note's other links keep their marks.
+    func answerMissing(_ links: [NoteLink?], in source: ItemID) async -> [Bool] {
+        let readable = links.compactMap { $0 }
+        let answers = readable.isEmpty ? [] : await missing(readable, source)
+        guard answers.count == readable.count else { return links.map { _ in false } }
+        var next = answers.makeIterator()
+        return links.map { $0 == nil ? false : next.next() ?? false }
     }
 }
 

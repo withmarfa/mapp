@@ -74,9 +74,13 @@ protocol ItemLibrary: AnyObject, Observable {
     func hiddenPropertyKeys(of item: Item) -> Set<String>
     func relationships(for id: ItemID) -> [ItemRelationship]
     func relationshipCandidates(for id: ItemID, field: String) -> [Item]
-    /// Why the core would refuse linking `id` through `field` to `other`, in its words; nil where it would take the
-    /// link. Judged on what is held, with nothing queued and no server.
-    func relationshipRefusal(for id: ItemID, field: String, to other: ItemID) async -> String?
+    /// What the core says of linking `id` through `field` to `other`, judged on what is held, with nothing queued and
+    /// no server: taken, refused in its words, or unknown where it could not be asked.
+    func relationshipVerdict(for id: ItemID, field: String, to other: ItemID) async -> EdgeVerdict
+    /// What the core says of filing a new item under `parent`, asked before the item exists: a parent in the bin or of a
+    /// type that cannot be one is refused, as is nesting under a flat type. The new item has no id the copy holds, so
+    /// the core does not judge its type here; `creationParentCandidates` keeps to the types the parent end admits.
+    func newChildVerdict(under parent: ItemID) async -> EdgeVerdict
     func bodyMentions(for id: ItemID) -> [ItemRelationshipTarget]
     func creationParentCandidates(typeID: String) -> [Item]
     /// Whether `creationParentCandidates` would list anything: a cheap check that sorts and builds nothing, for a
@@ -210,6 +214,7 @@ extension ItemLibrary {
     var lastPropertyWrite: Int? { nil }
     func tookPropertyWrite(_ mark: Int) -> Bool { false }
     var history: (any ItemHistorySource)? { nil }
+    func newChildVerdict(under parent: ItemID) async -> EdgeVerdict { .taken }
 
     func createItem(
         typeID: String, title: String, body: String, parentID: ItemID?, in place: SidebarItem, undoManager: UndoManager?
@@ -218,9 +223,10 @@ extension ItemLibrary {
     }
     func hiddenPropertyKeys(of item: Item) -> Set<String> { catalogue.pageKeys(of: item) }
 
-    /// The title as a link where, from `note`, the core binds it to this note, or leaves it unbound with this note the
-    /// only one the copy holds by that name (`LinkAnswer.names`). Otherwise the item's identity with its title as the
-    /// label (`[[identity|Title]]`). Each spelling is read back through `linkParts` so it is the link it was meant to be.
+    /// The title as a link only where, from `note`, the core binds it to this note (`LinkAnswer.names`). The copy holds
+    /// a slice and cannot tell that a note it holds is the only one by its title, so a title the core has not bound is
+    /// not enough. Otherwise the item's identity with its title as the label (`[[identity|Title]]`). Each spelling is
+    /// read back through `linkParts` so it is the link it was meant to be.
     func bodyLink(to id: ItemID, in note: ItemID?) async -> String? {
         guard let target = item(id), !target.isFile else { return nil }
         let title = target.title

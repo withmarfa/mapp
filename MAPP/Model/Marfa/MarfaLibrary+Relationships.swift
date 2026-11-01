@@ -61,11 +61,17 @@ extension MarfaLibrary {
         atTarget ? admits(type, constraint(of: info, atTarget: true)) : catalogue.admits(type, source: info)
     }
 
-    /// Why the core would refuse linking `id` through `field` to `other`, in its words; nil where it would take the
-    /// link. Judged on what the copy holds, with no server and nothing queued, so a picker can ask of each row.
-    func relationshipRefusal(for id: ItemID, field: String, to other: ItemID) async -> String? {
-        guard let end = fieldEnd(field) else { return nil }
-        return await source.edgeRefusal(draft(id, other, end))
+    /// What the core says of linking `id` through `field` to `other`. Judged on what the copy holds, with no server and
+    /// nothing queued, so a picker can ask of each row.
+    func relationshipVerdict(for id: ItemID, field: String, to other: ItemID) async -> EdgeVerdict {
+        guard let end = fieldEnd(field) else { return .unknown }
+        return await source.edgeVerdict(draft(id, other, end))
+    }
+
+    /// The edge is checked to the id the item will be given, which the copy does not hold yet: the core then judges
+    /// the parent (held, not in the bin, a type that may be one, not flat) and skips the target's type.
+    func newChildVerdict(under parent: ItemID) async -> EdgeVerdict {
+        await source.edgeVerdict(EdgeDraft(type: MarfaMapping.parentEdge, source: parent, target: ItemID.mint(at: now())))
     }
 
     // MARK: Reading
@@ -155,7 +161,7 @@ extension MarfaLibrary {
     }
 
     /// Active items of a type the field's far end allows. Which of them the core would refuse, such as one that
-    /// would close a cycle, is asked of each (`relationshipRefusal`).
+    /// would close a cycle, is asked of each (`relationshipVerdict`).
     func relationshipCandidates(for id: ItemID, field: String) -> [Item] {
         guard let item = item(id), let end = fieldEnd(field) else { return [] }
         guard admits(item.type, end.info, atTarget: end.atTarget) else { return [] }
@@ -233,7 +239,8 @@ extension MarfaLibrary {
     /// `edges/move-source`), so a new parent is one write and the child never holds none or two (`edges/move-no-gap`):
     /// a replacement is a move, and so is taking an item whose own link points elsewhere, as a child chosen under a
     /// project. A link a third item holds as its own is never taken from it. A change the contract would refuse is told
-    /// here and sent nowhere.
+    /// here and sent nowhere: the cardinality rules above are MAPP's, since `Edges.check` does not judge how many an end
+    /// holds, and the core's own check (`Edges.check`) is asked of every new link before any is written.
     @discardableResult
     func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) -> Bool {
         guard let item = item(id), item.isEditable, let end = fieldEnd(field), Set(targetIDs).count == targetIDs.count
@@ -262,8 +269,11 @@ extension MarfaLibrary {
         // Replacing this item's own link moves the far end; taking another item's link moves this item's end.
         let farIsTarget = !end.atTarget
         let replacingOwn = holds == .one && !removing.isEmpty && !adding.isEmpty
+        // Every link the change makes, whether added or made by moving an end: what the core is asked about.
+        var made: [EdgeDraft] = []
         for other in adding {
             let link = draft(id, other, end)
+            made.append(link)
             let taken = farHolds == .one ? held(by: other, farEnd).filter { (farIsTarget ? $0.source : $0.target) != id } : []
             if let theirs = taken.first {
                 let old = farIsTarget ? theirs.source : theirs.target
@@ -304,7 +314,20 @@ extension MarfaLibrary {
             }
         }
         guard !change.isEmpty else { return true }
-        relink(change, name: String(localized: "Edit Relationship"), undoManager: undoManager)
+        guard !made.isEmpty else {
+            relink(change, name: String(localized: "Edit Relationship"), undoManager: undoManager)
+            return true
+        }
+        // Each new link is asked of the core before any is written, so a refusal of one leaves the field as it was
+        // rather than with some of the change made.
+        Task {
+            for link in made {
+                if case .refused(let reason) = await source.edgeVerdict(link) {
+                    return notices.tell(cantChange, reason)
+                }
+            }
+            relink(change, name: String(localized: "Edit Relationship"), undoManager: undoManager)
+        }
         return true
     }
 

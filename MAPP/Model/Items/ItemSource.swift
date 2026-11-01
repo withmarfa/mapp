@@ -89,9 +89,8 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     @discardableResult
     func submit(_ write: ItemWrite, as id: WriteID, undoing: UndoGroup?) -> Bool
     func body(of item: ItemID) async throws -> ItemBody
-    /// Why the core would refuse `draft` for what the source holds, in its words; nil where it would take the edge.
-    /// Queues nothing and needs no server.
-    func edgeRefusal(_ draft: EdgeDraft) async -> String?
+    /// What the core says of `draft` for what the source holds. Queues nothing and needs no server.
+    func edgeVerdict(_ draft: EdgeDraft) async -> EdgeVerdict
     /// What the copy says each link target names (`Items.linkCandidates`), read as a link in `note`'s text when
     /// given. Throws for a note the copy does not hold.
     func linkAnswers(of targets: [String], in note: ItemID?) async throws -> [LinkAnswer]
@@ -160,4 +159,18 @@ nonisolated extension ItemSource {
 /// The writes of one run of an undo or a redo, which a source holds or drops together.
 nonisolated struct UndoGroup: Hashable, Sendable {
     private let rawValue = UUID()
+}
+
+/// What the core says of an edge before it is written (`Edges.check`). Only its own refusal is `refused`; a check that
+/// could not be made, such as one asked while the key changes or before the copy is whole, is `unknown`, and says
+/// nothing for or against the edge: the write is judged again when it is queued.
+nonisolated enum EdgeVerdict: Equatable, Sendable {
+    case taken
+    case refused(String)
+    case unknown
+
+    /// The core's words where it refused the edge.
+    var refusal: String? {
+        if case .refused(let message) = self { message } else { nil }
+    }
 }

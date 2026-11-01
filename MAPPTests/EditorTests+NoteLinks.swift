@@ -29,6 +29,17 @@ extension EditorTests {
         #expect(unread == nil || unread is NSNull, "a request that cannot be read is answered, not left waiting")
     }
 
+    @Test func aLinkTheCoreReadsAsTwoDoesNotDropTheMarksOfTheNotesOtherLinks() async throws {
+        let page = try await Page()
+        _ = addNotes(["Plan"], to: page)
+        try await page.load("Intro\n")
+        let note = try #require(page.editor.noteID)
+        // Inkkit read `[[Plan\]] and [[B]]` as one link with an escape; the core finds two in the text it is posted.
+        let links = "[{ raw: \(json("[[Plan\\]] and [[B]]")) }, { raw: \(json("[[Plan]]")) }, { raw: \(json("[[Nowhere]]")) }]"
+        let answer = try await ask(page, "{ type: 'resolve', item: \(json(note.rawValue)), links: \(links) }") as? [Bool]
+        #expect(answer == [false, false, true], "one answer for each link posted, the unreadable one not marked missing")
+    }
+
     @Test func linkToNoteWaitsForTheChoiceAndAnswersWithTheLink() async throws {
         let page = try await Page()
         let ids = addNotes(["Garden ideas"], to: page)
