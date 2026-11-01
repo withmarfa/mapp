@@ -10,6 +10,21 @@
     "%@ isn’t a valid value." : {
       "extractionState" : "manual"
     },
+    "MAPP can’t tell whether this copy holds changes that haven’t reached a server." : {
+      "extractionState" : "manual"
+    },
+    "MAPP couldn’t read this library’s key from the Keychain. Unlock the Keychain and quit and reopen MAPP, or enter the key again in Settings." : {
+      "extractionState" : "manual"
+    },
+    "This address now reaches a different Marfa server from the one this copy of your library was made for, so MAPP has stopped syncing it." : {
+      "extractionState" : "manual"
+    },
+    "This change was made for a library the server no longer holds as it was. Try again to send it to the library as it is now, or undo it to put the item back as the server has it." : {
+      "extractionState" : "manual"
+    },
+    "To start a new copy from this server, choose Disconnect in Settings, then connect again." : {
+      "extractionState" : "manual"
+    },
     "“%@” isn’t part of this list. Remove it to save the list." : {
       "extractionState" : "manual"
     },
@@ -1138,9 +1153,6 @@
       "extractionState" : "manual"
     },
     "A deletion wasn’t sent" : {
-      "extractionState" : "manual"
-    },
-    "A different version of MAPP made it, and MAPP couldn’t replace it with a new one. Quit and reopen MAPP to try again." : {
       "extractionState" : "manual"
     },
     "A link is changed in the text that holds it." : {
