@@ -142,7 +142,7 @@ nonisolated enum SampleLibrary {
         EdgeType(
             id: "parent-of", label: "Children", reverseLabel: "Parent", description: "Files one item under another.",
             cardinality: "one-to-many", reverseName: "child-of", writtenAt: .target, cascadeOnDelete: "cascade",
-            shipped: true),
+            shipped: true, acyclic: true),
         EdgeType(id: "about", label: "About", reverseLabel: "Subject of", cardinality: "many-to-many", shipped: true),
         EdgeType(id: "references", label: "References", reverseLabel: "Referenced by", cardinality: "many-to-many", shipped: true),
         EdgeType(
@@ -155,7 +155,7 @@ nonisolated enum SampleLibrary {
             description: "Source item is a member of the target container.", cardinality: "many-to-many",
             targetTypeConstraints: ["role:container"],
             properties: [TypeField(name: "position", type: "number", description: "Ordering within the collection (1-based).", declaredBy: "in-collection")],
-            shipped: true),
+            shipped: true, flat: true),
     ]
 
     /// The sample's catalogue as the app reads it.

@@ -210,6 +210,8 @@ struct InspectorItemRow: View {
 /// Changes are committed together; dismissing the chooser leaves existing connections intact.
 struct ItemRelationshipPicker: View {
     @CurrentLibrary private var library
+    /// The item whose relationship is chosen, which each candidate is checked against.
+    let owner: ItemID
     let relationship: ItemRelationship
     let candidates: [Item]
     let onSave: ([ItemID]) -> Bool
@@ -218,7 +220,8 @@ struct ItemRelationshipPicker: View {
     @State private var selection: Set<ItemID>
     @State private var rejected = false
 
-    init(relationship: ItemRelationship, candidates: [Item], onSave: @escaping ([ItemID]) -> Bool) {
+    init(owner: ItemID, relationship: ItemRelationship, candidates: [Item], onSave: @escaping ([ItemID]) -> Bool) {
+        self.owner = owner
         self.relationship = relationship
         self.candidates = candidates
         self.onSave = onSave
@@ -232,7 +235,11 @@ struct ItemRelationshipPicker: View {
                 .textFieldStyle(.roundedBorder)
                 .accessibilityIdentifier("RelationshipSearch")
             List(filtered) { candidate in
-                Button {
+                RelationshipCandidateRow(
+                    owner: owner, field: relationship.field, candidate: candidate,
+                    isLinked: relationship.targets.contains { $0.itemID == candidate.id },
+                    isSelected: selection.contains(candidate.id)
+                ) {
                     if selection.contains(candidate.id) {
                         selection.remove(candidate.id)
                     } else if relationship.allowsMultiple {
@@ -240,24 +247,7 @@ struct ItemRelationshipPicker: View {
                     } else {
                         selection = [candidate.id]
                     }
-                } label: {
-                    HStack {
-                        Image(systemName: selection.contains(candidate.id) ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(selection.contains(candidate.id) ? Color.accentColor : .secondary)
-                        VStack(alignment: .leading) {
-                            Text(candidate.displayTitle)
-                                .multilineTextAlignment(.leading)
-                                .fixedSize(horizontal: false, vertical: true)
-                            Text(LocalizedStringKey(library.catalogue.itemTypes[candidate.type]?.label ?? candidate.type.rawValue))
-                                .interfaceFont(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                    }
-                    .contentShape(.rect)
                 }
-                .buttonStyle(.plain)
-                .accessibilityIdentifier("RelationshipCandidate.\(candidate.id.rawValue)")
-                .accessibilityValue(selection.contains(candidate.id) ? "Selected" : "Not Selected")
             }
             .overlay {
                 if filtered.isEmpty { ContentUnavailableView.search(text: query) }
@@ -315,3 +305,46 @@ struct ItemRelationshipPicker: View {
     .frame(width: 300)
 }
 #endif
+
+/// One item a relationship could link to. Whether the core would take the link is asked of it when the row appears,
+/// so a picker of many items asks only of those scrolled to; a link the core refuses is dimmed, with why.
+private struct RelationshipCandidateRow: View {
+    @CurrentLibrary private var library
+    let owner: ItemID
+    let field: String
+    let candidate: Item
+    /// Already linked, so not asked: the core judges new edges.
+    let isLinked: Bool
+    let isSelected: Bool
+    let choose: () -> Void
+    @State private var refusal: String?
+
+    var body: some View {
+        Button(action: choose) {
+            HStack {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                VStack(alignment: .leading) {
+                    Text(candidate.displayTitle)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(LocalizedStringKey(library.catalogue.itemTypes[candidate.type]?.label ?? candidate.type.rawValue))
+                        .interfaceFont(.caption).foregroundStyle(.secondary)
+                    if let refusal {
+                        Text(verbatim: refusal).interfaceFont(.caption).foregroundStyle(.red)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                Spacer()
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .disabled(refusal != nil)
+        .task(id: candidate.id) {
+            refusal = isLinked ? nil : await library.relationshipRefusal(for: owner, field: field, to: candidate.id)
+        }
+        .accessibilityIdentifier("RelationshipCandidate.\(candidate.id.rawValue)")
+        .accessibilityValue(isSelected ? "Selected" : "Not Selected")
+    }
+}

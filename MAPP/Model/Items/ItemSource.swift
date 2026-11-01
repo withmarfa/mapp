@@ -89,6 +89,9 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     @discardableResult
     func submit(_ write: ItemWrite, as id: WriteID, undoing: UndoGroup?) -> Bool
     func body(of item: ItemID) async throws -> ItemBody
+    /// Why the core would refuse `draft` for what the source holds, in its words; nil where it would take the edge.
+    /// Queues nothing and needs no server.
+    func edgeRefusal(_ draft: EdgeDraft) async -> String?
     func fileURL(of item: ItemID) async throws -> URL
     /// The items the view lists that the copy holds, in the view's order. Throws where the copy cannot answer the
     /// view, such as one whose filter needs links the copy does not hold whole.

@@ -76,6 +76,9 @@ protocol ItemLibrary: AnyObject, Observable {
     func hiddenPropertyKeys(of item: Item) -> Set<String>
     func relationships(for id: ItemID) -> [ItemRelationship]
     func relationshipCandidates(for id: ItemID, field: String) -> [Item]
+    /// Why the core would refuse linking `id` through `field` to `other`, in its words; nil where it would take the
+    /// link. Judged on what is held, with nothing queued and no server.
+    func relationshipRefusal(for id: ItemID, field: String, to other: ItemID) async -> String?
     func bodyMentions(for id: ItemID) -> [ItemRelationshipTarget]
     func creationParentCandidates(typeID: String) -> [Item]
     /// Whether `creationParentCandidates` would list anything: a cheap check that sorts and builds nothing, for a

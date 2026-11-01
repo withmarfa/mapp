@@ -46,6 +46,8 @@ nonisolated final class FakeItemSource: ItemSource {
     /// What `search` answers for each query; any other finds nothing.
     let hits = Mutex<[String: [ItemID]]>([:])
     let searches = Mutex(0)
+    /// The refusal for each edge a test names; any other is taken.
+    let refusals = Mutex<[EdgeDraft: String]>([:])
     let searchFails = Mutex(false)
     /// What a search answers beside its hits, and where it was asked to look.
     let excerpts = Mutex<[String: [ItemID: SearchExcerpt]]>([:])
@@ -145,6 +147,8 @@ nonisolated final class FakeItemSource: ItemSource {
         guard let body = held.withLock({ $0[item] }) else { throw SourceFailure(kind: .missing, message: "No text.") }
         return body
     }
+
+    func edgeRefusal(_ draft: EdgeDraft) async -> String? { refusals.withLock { $0[draft] } }
 
     func fileURL(of item: ItemID) async throws -> URL {
         URL(filePath: "/dev/null")

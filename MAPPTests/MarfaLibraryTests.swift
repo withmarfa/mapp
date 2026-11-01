@@ -61,7 +61,7 @@ nonisolated enum LibraryFixture {
                 sourceTypes: [ticket], targetTypes: [ticket], reverseCardinality: .one),
             EdgeTypeInfo(
                 id: "in-collection", label: "In collection", reverseLabel: "Contents", reverseName: nil, cardinality: .many, writtenAt: .source,
-                sourceTypes: [], targetTypes: [], targetRoles: ["container"]),
+                sourceTypes: [], targetTypes: [], targetRoles: ["container"], flat: true),
             EdgeTypeInfo(
                 id: "references", label: "References", reverseLabel: "Referenced by", reverseName: nil, cardinality: .many, writtenAt: .source,
                 sourceTypes: [], targetTypes: []),
@@ -286,17 +286,17 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.relationships(for: F.f1).allSatisfy { !$0.isEditable })
     }
 
-    @Test func candidatesFollowTheCatalogueAndNeverCloseACycle() async throws {
+    @Test func candidatesFollowTheCatalogueAndLeaveCyclesToTheCoresCheck() async throws {
         let (library, _) = try await loaded()
-        // Not itself, and not the task below it, which would make it its own ancestor.
-        #expect(ids(library.relationshipCandidates(for: F.e1, field: "child-of")) == [F.p1, F.n1, F.n2, F.en1, F.f1, F.p2])
-        // Not the project above it, nor anything in the bin.
-        #expect(ids(library.relationshipCandidates(for: F.t1, field: "inverse:parent-of")) == [F.n1, F.n2, F.en1, F.f1, F.p2])
+        // Not itself or anything in the bin. The task below it is offered: whether a link closes a cycle is the core's
+        // to say (`relationshipRefusal`), not this list's.
+        #expect(Set(ids(library.relationshipCandidates(for: F.e1, field: "child-of"))) == [F.p1, F.n1, F.n2, F.en1, F.f1, F.p2, F.t1])
+        #expect(Set(ids(library.relationshipCandidates(for: F.t1, field: "inverse:parent-of"))) == [F.n1, F.n2, F.en1, F.f1, F.p2, F.p1, F.e1])
         #expect(ids(library.relationshipCandidates(for: F.e1, field: "supersedes")) == [F.t1])
         #expect(library.relationshipCandidates(for: F.n1, field: "supersedes").isEmpty)
         #expect(library.creationParentCandidates(typeID: "aic.ticket.task").count == 8)
         #expect(library.relationshipCandidates(for: F.e1, field: "child-of").map(\.title) ==
-            ["Ada", "Alpha", "Beta", "Feed note", "Photo", "Plain note"])
+            ["Ada", "Alpha", "Beta", "Bug one", "Feed note", "Photo", "Plain note"])
     }
 
     @Test func aRoleAllowsTheTypesThatPlayIt() async throws {
@@ -305,8 +305,6 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(ids(library.relationshipCandidates(for: F.n1, field: "in-collection")) == [album.id])
         #expect(library.relationships(for: F.n1).contains { $0.field == "in-collection" })
         #expect(library.setItemRelationship(F.n1, field: "in-collection", targetIDs: [album.id], undoManager: nil))
-        #expect(!library.setItemRelationship(F.n1, field: "in-collection", targetIDs: [F.p1], undoManager: nil))
-        #expect(library.notices.waiting.last?.message == String(localized: "This kind of item can’t be linked here."))
     }
 
     @Test func aFileIsFetchedAndANoteHasNoFile() async throws {
@@ -705,7 +703,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(source.writes == [.moveEdge(EdgeID("s1"), end: .target, to: F.t1)])
     }
 
-    /// A refusal that turns on rows the copy may not hold, such as a longer cycle, is the server's: it is told in the
+    /// A refusal the copy could not foresee, such as a cycle through rows outside it, is the server's: it is told in the
     /// server's words, and the link stays where it was.
     @Test func aMoveTheServerRefusesIsToldAndLeavesTheOldLink() async throws {
         let (library, source) = try await loaded()
@@ -719,30 +717,10 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(source.writes.count == 1)
     }
 
-    /// The contract's cycle rule is kept before anything is sent, and a move that would close one leaves the old link.
-    @Test func aMoveThatWouldCloseACycleIsToldAndLeavesTheOldLink() async throws {
-        let (library, source) = try await loaded()
-        let cycle = String(localized: "This would link the item back to itself through the items between them.")
-        // The task's child is below it, so it cannot become the task's parent.
-        #expect(!library.setItemRelationship(F.e1, field: "child-of", targetIDs: [F.t1], undoManager: nil))
-        #expect(library.notices.waiting.last?.message == cycle)
-        // Nor can the project take its own grandchild as its parent from the other end.
-        library.notices.answerAll()
-        #expect(!library.setItemRelationship(F.t1, field: "inverse:parent-of", targetIDs: [F.p1], undoManager: nil))
-        #expect(library.notices.waiting.last?.message == cycle)
-        #expect(source.writes.isEmpty)
-        #expect(library.relationships(for: F.e1).first { $0.field == "child-of" }?.targets.map(\.itemID) == [F.p1])
-    }
-
-    @Test func aRelationshipTheContractRefusesIsToldAndNotSent() async throws {
+    @Test func aFieldThatTakesOneItemRefusesTwoAndSendsNothing() async throws {
         let (library, source) = try await loaded()
         let refusals: [(ItemID, String, [ItemID])] = [
-            (F.e1, "child-of", [F.t1]),
-            (F.e1, "child-of", [F.e1]),
             (F.t1, "child-of", [F.p1, F.p2]),
-            (F.e1, "supersedes", [F.n1]),
-            (F.e1, "child-of", [F.n3]),
-            (F.p1, "inverse:parent-of", [F.p1]),
         ]
         for (id, field, targets) in refusals {
             library.notices.answerAll()

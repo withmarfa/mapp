@@ -222,7 +222,7 @@ nonisolated enum MarfaMapping {
             sourceRoles: constraints(type.sourceTypeConstraints).roles,
             targetRoles: constraints(type.targetTypeConstraints).roles,
             description: type.description, reverseCardinality: other == "one" ? .one : .many,
-            cascadeOnDelete: cascade(type.cascadeOnDelete), properties: type.properties.map { field($0) })
+            cascadeOnDelete: cascade(type.cascadeOnDelete), properties: type.properties.map { field($0) }, flat: type.flat)
     }
 
     private static func cascade(_ name: String) -> EdgeTypeInfo.CascadeOnDelete {

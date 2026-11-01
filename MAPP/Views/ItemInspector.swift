@@ -56,7 +56,7 @@ struct ItemInspectorHost: View {
         }
         .sheet(item: $editing) { relationship in
             if let id = selectedID {
-                ItemRelationshipPicker(relationship: relationship, candidates: library.relationshipCandidates(for: id, field: relationship.field)) {
+                ItemRelationshipPicker(owner: id, relationship: relationship, candidates: library.relationshipCandidates(for: id, field: relationship.field)) {
                     library.setItemRelationship(id, field: relationship.field, targetIDs: $0, undoManager: undoManager)
                 }
             }

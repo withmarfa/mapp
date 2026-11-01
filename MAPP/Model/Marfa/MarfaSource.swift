@@ -220,6 +220,17 @@ nonisolated final class MarfaSource: ItemSource {
         return ItemBody(id: item, text: text, version: ItemVersion(row.version))
     }
 
+    func edgeRefusal(_ draft: EdgeDraft) async -> String? {
+        do {
+            try await copy.edges.check(from: draft.source.rawValue, to: draft.target.rawValue, type: draft.type)
+            return nil
+        } catch let error as MarfaError {
+            return error.message
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
     func fileURL(of item: ItemID) async throws -> URL {
         let row = try await self.row(item)
         guard let hash = row.properties[MarfaMapping.blobField]?.string else {

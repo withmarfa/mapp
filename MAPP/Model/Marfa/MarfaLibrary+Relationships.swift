@@ -7,8 +7,6 @@ import Foundation
 /// shows as linked from, and an embedded file is an `attached-to` edge from the file to the item.
 extension MarfaLibrary {
     static let inversePrefix = "inverse:"
-    /// The contract refuses an edge that would close a cycle for these types only, and a self-loop for any type.
-    static let acyclicEdges: Set<String> = [MarfaMapping.parentEdge, "supersedes"]
 
     /// A relationship field as one item sees it: the edge type, and whether the item is the edge's target.
     nonisolated struct FieldEnd {
@@ -57,30 +55,17 @@ extension MarfaLibrary {
         catalogue.admits(type, types: end.types, roles: end.roles)
     }
 
-    /// Whether an item of `type` may hold the end `atTarget` names of the edge type `info`. Collections are flat, so
-    /// a collection is never a member of another (`edges/collection-no-nesting`), whatever the source end admits.
+    /// Whether an item of `type` may hold the end `atTarget` names of the edge type `info`. The core refuses a flat
+    /// edge type's source a type its target end admits, so the field is not offered there.
     private func admits(_ type: TypeID, _ info: EdgeTypeInfo, atTarget: Bool) -> Bool {
-        if info.id == MarfaMapping.collectionEdge, !atTarget, catalogue.isCollection(type) { return false }
-        return admits(type, constraint(of: info, atTarget: atTarget))
+        atTarget ? admits(type, constraint(of: info, atTarget: true)) : catalogue.admits(type, source: info)
     }
 
-    /// Nil where the server would take the edge as far as the copy can tell; otherwise why not, in the person's
-    /// words. Cardinality is the caller's, since it depends on what is replaced.
-    func linkProblem(_ draft: EdgeDraft, sourceType: TypeID?, targetType: TypeID?) -> String? {
-        guard draft.source != draft.target else { return String(localized: "An item can’t be linked to itself.") }
-        guard let sourceType, let targetType else { return String(localized: "This item isn’t in the library.") }
-        guard let info = catalogue.edgeTypes[draft.type] else { return nil }
-        if info.id == MarfaMapping.collectionEdge, catalogue.isCollection(sourceType) {
-            return String(localized: "A collection can’t be in another collection.")
-        }
-        guard admits(sourceType, constraint(of: info, atTarget: false)), admits(targetType, constraint(of: info, atTarget: true))
-        else {
-            return String(localized: "This kind of item can’t be linked here.")
-        }
-        if Self.acyclicEdges.contains(info.id), index.reachable(from: draft.target, type: info.id).contains(draft.source) {
-            return String(localized: "This would link the item back to itself through the items between them.")
-        }
-        return nil
+    /// Why the core would refuse linking `id` through `field` to `other`, in its words; nil where it would take the
+    /// link. Judged on what the copy holds, with no server and nothing queued, so a picker can ask of each row.
+    func relationshipRefusal(for id: ItemID, field: String, to other: ItemID) async -> String? {
+        guard let end = fieldEnd(field) else { return nil }
+        return await source.edgeRefusal(draft(id, other, end))
     }
 
     // MARK: Reading
@@ -169,15 +154,13 @@ extension MarfaLibrary {
         }
     }
 
-    /// Active items the field could link to: of a type its far end allows, and none that would close a cycle.
+    /// Active items of a type the field's far end allows. Which of them the core would refuse, such as one that
+    /// would close a cycle, is asked of each (`relationshipRefusal`).
     func relationshipCandidates(for id: ItemID, field: String) -> [Item] {
         guard let item = item(id), let end = fieldEnd(field) else { return [] }
         guard admits(item.type, end.info, atTarget: end.atTarget) else { return [] }
-        let loops: Set<ItemID> = Self.acyclicEdges.contains(end.info.id)
-            ? (end.atTarget ? index.reachable(from: id, type: end.info.id) : index.reaching(id, type: end.info.id))
-            : []
         return heldItems(index.ids(in: .active))
-            .filter { $0.id != id && !loops.contains($0.id) && admits($0.type, end.info, atTarget: !end.atTarget) }
+            .filter { $0.id != id && admits($0.type, end.info, atTarget: !end.atTarget) }
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
@@ -281,13 +264,6 @@ extension MarfaLibrary {
         let replacingOwn = holds == .one && !removing.isEmpty && !adding.isEmpty
         for other in adding {
             let link = draft(id, other, end)
-            let farType: TypeID? = self.item(other).flatMap { $0.state == .trashed ? nil : $0.type }
-            let sourceType: TypeID? = end.atTarget ? farType : item.type
-            let targetType: TypeID? = end.atTarget ? item.type : farType
-            if let problem = linkProblem(link, sourceType: sourceType, targetType: targetType) {
-                notices.tell(cantChange, problem)
-                return false
-            }
             let taken = farHolds == .one ? held(by: other, farEnd).filter { (farIsTarget ? $0.source : $0.target) != id } : []
             if let theirs = taken.first {
                 let old = farIsTarget ? theirs.source : theirs.target

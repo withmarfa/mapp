@@ -17,13 +17,6 @@ extension MarfaLibrary {
             return nil
         }
         let id = ItemID.mint(at: now())
-        if let parentID {
-            let draft = EdgeDraft(type: MarfaMapping.parentEdge, source: parentID, target: id)
-            if let problem = linkProblem(draft, sourceType: item(parentID)?.type, targetType: type) {
-                notices.tell(cantCreate, problem)
-                return nil
-            }
-        }
         let text = body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "" : body
         // The Inbox is the feed tier, so an item made there stays where it was made.
         let draft = ItemDraft(

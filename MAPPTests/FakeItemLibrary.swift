@@ -95,7 +95,7 @@ final class FakeItemLibrary: ItemLibrary {
             sourceTypes: [], targetTypes: [])
         let collection = EdgeTypeInfo(
             id: "in-collection", label: "In collection", reverseLabel: "Contents", reverseName: nil, cardinality: .many,
-            writtenAt: .source, sourceTypes: [], targetTypes: [], targetRoles: ["container"])
+            writtenAt: .source, sourceTypes: [], targetTypes: [], targetRoles: ["container"], flat: true)
         return Catalogue(itemTypes: types, edgeTypes: [parent, collection])
     }()
 
@@ -175,6 +175,9 @@ final class FakeItemLibrary: ItemLibrary {
     }
     func relationships(for id: ItemID) -> [ItemRelationship] { relationshipsByItem[id] ?? [] }
     func relationshipCandidates(for id: ItemID, field: String) -> [Item] { [] }
+    /// The refusal for each (item, other) a test sets; any other link is taken.
+    var refusals: [ItemID: [ItemID: String]] = [:]
+    func relationshipRefusal(for id: ItemID, field: String, to other: ItemID) async -> String? { refusals[id]?[other] }
     func bodyMentions(for id: ItemID) -> [ItemRelationshipTarget] { [] }
     /// The items each type may be made under, by type.
     var parentCandidates: [String: [ItemID]] = [:]

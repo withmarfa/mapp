@@ -25,7 +25,7 @@ struct ItemPageHeader: ViewModifier {
             .popover(isPresented: Binding { choosingParent != nil } set: { if !$0 { choosingParent = nil } },
                      attachmentAnchor: .rect(.rect((choosingParent ?? .zero).offsetBy(dx: 0, dy: -containerTop))), arrowEdge: .bottom) {
                 if let parent = Self.parent(of: item.id, in: library) {
-                    ItemRelationshipPicker(relationship: parent, candidates: library.relationshipCandidates(for: item.id, field: parent.field)) {
+                    ItemRelationshipPicker(owner: item.id, relationship: parent, candidates: library.relationshipCandidates(for: item.id, field: parent.field)) {
                         library.setItemRelationship(item.id, field: parent.field, targetIDs: $0, undoManager: undoManager)
                     }
                 }
