@@ -5,7 +5,7 @@ import Testing
 @testable import MAPP
 
 extension LiveMarfaTests {
-    /// Version History over a real test instance: the snapshots `MarfaServerVersions` reads, and a restore written
+    /// Version History over a real test instance: the snapshots `MarfaServerCalls` reads, and a restore written
     /// back through the library. Every item it makes has a title starting `MAPPTEST ` and is purged when the test
     /// ends, passed or not.
     @MainActor
@@ -20,7 +20,7 @@ extension LiveMarfaTests {
             let keys = MemoryKeyStore([connection.address: try LiveMarfa.key()])
             let source = try await MarfaSource.open(connection, keys: keys, location: MarfaStoreLocation(root: root))
             let library = MarfaLibrary(
-                source: source, notices: Notices(), history: MarfaServerVersions(connection: connection, keys: keys))
+                source: source, notices: Notices(), history: MarfaServerCalls(connection: connection, keys: keys))
             func end() async {
                 await source.flush()
                 await source.close()

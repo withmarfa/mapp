@@ -122,9 +122,9 @@ import Observation
         opener: @escaping Opener = { try await MarfaSource.open($0, keys: $1, location: $2) },
         describer: @escaping Describer = { try await $0.server(key: "").instanceDescription().name },
         remover: @escaping Remover = { try await WorkingCopy.remove(store: $0, unsent: $1) },
-        historian: @escaping Historian = { MarfaServerVersions(connection: $0, keys: $1) },
-        configurer: @escaping Configurer = { MarfaServerConfig(connection: $0, keys: $1) },
-        iconKeeper: @escaping IconKeeper = { MarfaServerTypeIcons(connection: $0, keys: $1) }
+        historian: @escaping Historian = { MarfaServerCalls(connection: $0, keys: $1) },
+        configurer: @escaping Configurer = { MarfaServerCalls(connection: $0, keys: $1) },
+        iconKeeper: @escaping IconKeeper = { MarfaServerCalls(connection: $0, keys: $1) }
     ) {
         self.defaults = defaults
         self.keys = keys
