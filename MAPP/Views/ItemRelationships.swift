@@ -319,8 +319,8 @@ private struct RelationshipCandidateRow: View {
     let choose: () -> Void
     @State private var refusal: String?
 
-    /// Asks until the core answers: a check that could not be made (the copy not whole yet, the key changing) is
-    /// asked again after a pause, and only the core's own refusal disables the row.
+    /// A check that could not be made (the copy not whole yet, the key changing) is asked again after a pause that
+    /// doubles, up to six times; only the core's own refusal disables the row.
     private func check() async {
         refusal = nil
         guard !isLinked else { return }

@@ -239,8 +239,9 @@ extension MarfaLibrary {
     /// `edges/move-source`), so a new parent is one write and the child never holds none or two (`edges/move-no-gap`):
     /// a replacement is a move, and so is taking an item whose own link points elsewhere, as a child chosen under a
     /// project. A link a third item holds as its own is never taken from it. A change the contract would refuse is told
-    /// here and sent nowhere: the cardinality rules above are MAPP's, since `Edges.check` does not judge how many an end
-    /// holds, and the core's own check (`Edges.check`) is asked of every new link before any is written.
+    /// and sent nowhere. The cardinality rules above are MAPP's, since `Edges.check` does not judge how many an end
+    /// holds, and are told here. The core's own check is asked of every new link after this returns and before any is
+    /// written, so its refusal is told then, and true means only that MAPP's own rules took the change.
     @discardableResult
     func setItemRelationship(_ id: ItemID, field: String, targetIDs: [ItemID], undoManager: UndoManager?) -> Bool {
         guard let item = item(id), item.isEditable, let end = fieldEnd(field), Set(targetIDs).count == targetIDs.count
