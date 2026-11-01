@@ -403,7 +403,7 @@ actor MarfaSync {
         }
         if error.isOffline || error.isTransient || error.isKeyRefusal { return }
         switch error {
-        // The copy was cancelled or closed, or is changing key; the package asks for the call again.
+        // The call was canceled, the copy closed, or the key is changing; none is a fault.
         case .canceled, .closed: return
         case .keyChanging: return
         // Reported as `.needsHydration`, which hydrates.
@@ -464,7 +464,7 @@ actor MarfaSync {
             }
         }
         working = nil
-        // A loop cancelled for a change of key leaves what it was asked for to the next one.
+        // A loop canceled for a change of key leaves what it was asked for to the next one.
         if Task.isCancelled { work() }
     }
 
