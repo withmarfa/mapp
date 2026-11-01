@@ -191,13 +191,14 @@ nonisolated enum MarfaProblems {
     /// write whose reason clears on its own, a refused key or a missing grant, needs nothing from the queue. A
     /// write the server answers the same way however often it is sent is withdrawn rather than sent again.
     /// A write set aside `failing_alone` met failures that were no answer to it, so it may still be sent again, and
-    /// the person may instead withdraw it.
+    /// the person may instead withdraw it. A write blocked `instanceChanged` was made for an instance that no longer
+    /// answers at the address, and the package takes it back by `withdraw` as well.
     static func actions(for kind: SyncProblemEntry.Kind) -> [SyncAction] {
         switch kind {
         case .refused: [.discard]
         case .blocked(.credentialRefused): []
-        case .blocked(.keySpent), .blocked(.instanceChanged), .dead: [.tryAgain]
-        case .blocked(.failingAlone): [.tryAgain, .withdraw]
+        case .blocked(.keySpent), .dead: [.tryAgain]
+        case .blocked(.failingAlone), .blocked(.instanceChanged): [.tryAgain, .withdraw]
         case .blocked(.ancestorUnavailable), .blocked(.conflictUnresolved): [.withdraw]
         case .conflicted: [.keep, .discard]
         }
