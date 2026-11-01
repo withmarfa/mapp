@@ -181,6 +181,10 @@ actor MarfaEngine {
     /// this point for every row and edge the copy has not named as changed since; nil until a whole read takes one,
     /// and after a whole read that could not read every row's links.
     var cursor: ChangeCursor?
+    /// Whether the last update carried a fill, and what connection it named, so the copy's status is read again only
+    /// when a fill ended or the connection changed, not for each local write.
+    var lastUpdateFilled = false
+    var lastConnection: CopyConnection?
     /// When a hydration's progress may next read the copy whole (`takeFillProgress`).
     var fillReadAllowed = ContinuousClock.now
     private var closed = false

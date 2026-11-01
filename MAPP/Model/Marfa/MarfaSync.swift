@@ -42,6 +42,10 @@ actor MarfaSync {
     private var refreshes = 0
     private var wantsRefresh = false
     private var wantsHydration = false
+    /// True while a hydration is running or about to, so the progress updates it sends ask for no second one.
+    private var hydrationUnderway = false
+    /// Set when a drain failed for a reason nothing else handles and the person was told, until a drain succeeds.
+    private var drainFailureTold = false
     private var lane: Task<Void, Never>?
     private var wantsDrain = false
     /// The bin is read from the server alone, so it is read again when something may have changed it.
@@ -89,7 +93,8 @@ actor MarfaSync {
         self.tell = tell
     }
 
-    /// Nothing reaches the server before the engine has painted from the copy.
+    /// Nothing reaches the server before the engine has painted from the copy. A copy whose slice this build changed
+    /// is filled again here, since the package catches up only a copy whose hydration is complete.
     func start() {
         guard !started else { return }
         started = true
@@ -99,6 +104,13 @@ actor MarfaSync {
             let updates = copy.updates()
             consuming = Task { await self.consume(updates) }
         }
+        work()
+        Task { await self.fillIfSliceChanged() }
+    }
+
+    private func fillIfSliceChanged() async {
+        guard let status = try? await refreshing.readStatus(), !stopped, !hydrationUnderway, Self.needsFill(status) else { return }
+        wantsHydration = true
         work()
     }
 
@@ -239,7 +251,7 @@ actor MarfaSync {
         let before = connection
         connection = update.connection
         fill = update.fill
-        show(update.connection)
+        show(update.connection, changed: before != update.connection)
         hub.report.update { report in
             if let date = update.lastSynced { report.lastSynced = date }
         }
@@ -251,7 +263,8 @@ actor MarfaSync {
         }
         switch update.connection {
         case .needsHydration:
-            wantsHydration = true
+            // The package sends progress updates all through a hydration, each still `.needsHydration`.
+            if !(before?.needsHydration ?? false), !hydrationUnderway { wantsHydration = true }
         case .following where before != .following:
             // The server answered: what waited is sent, and the bin and the kept files are asked again.
             wantsDrain = true
@@ -267,7 +280,9 @@ actor MarfaSync {
         work()
     }
 
-    private func show(_ connection: CopyConnection) {
+    /// `changed` is whether the connection differs from the last update's, since a stop is reported and told once
+    /// however many updates repeat it.
+    private func show(_ connection: CopyConnection, changed: Bool) {
         switch connection {
         case .closed:
             break
@@ -282,7 +297,7 @@ actor MarfaSync {
         case .offline(let error):
             hub.set(.offline(reason: error.message))
         case .stopped(let error):
-            stop(for: error)
+            if changed { stop(for: error) }
         case .keyRefused:
             Self.log.error("sync stopped: the server refused the key")
             hub.set(.keyRefused)
@@ -298,6 +313,9 @@ actor MarfaSync {
             return
         }
         Telemetry.syncStopped(error, during: "refresh")
+        #if DEBUG
+        hooks.seen.update { $0.stops += 1 }
+        #endif
         hub.set(.unavailable(message: error.message))
         tellOnce(SourceFailure(kind: .failed, message: error.message))
     }
@@ -348,6 +366,7 @@ actor MarfaSync {
             let hydrating = wantsHydration
             wantsRefresh = false
             wantsHydration = false
+            hydrationUnderway = hydrating
             refreshes += 1
             publishPhase()
             do {
@@ -356,6 +375,7 @@ actor MarfaSync {
                 await failed(error)
             }
             refreshes -= 1
+            hydrationUnderway = false
             publishPhase()
         }
         lane = nil
@@ -379,6 +399,8 @@ actor MarfaSync {
 
     /// The stable slice lets the core resume an interrupted fill and includes types registered later.
     private func hydrate() async throws {
+        hydrationUnderway = true
+        defer { hydrationUnderway = false }
         #if DEBUG
         hooks.seen.update { $0.hydrations += 1 }
         #endif
@@ -401,14 +423,19 @@ actor MarfaSync {
             hub.set(.unavailable(message: error.localizedDescription))
             return
         }
-        if error.isOffline || error.isTransient || error.isKeyRefusal { return }
+        if Self.isFault(error) { stop(for: error) }
+    }
+
+    /// Whether `error` is a fault asking again may not clear, which the package neither shows nor retries. An
+    /// unreachable server, a transient error and a refused key are shown through the connection; a canceled call, a
+    /// closed copy and a key being changed are no fault; a copy that needs hydrating is reported as `.needsHydration`.
+    private static func isFault(_ error: any Error) -> Bool {
+        guard let error = error as? MarfaError else { return !(error is CancellationError) }
+        if error.isOffline || error.isTransient || error.isKeyRefusal { return false }
         switch error {
-        // The call was canceled, the copy closed, or the key is changing; none is a fault.
-        case .canceled, .closed: return
-        case .keyChanging: return
-        // Reported as `.needsHydration`, which hydrates.
-        case .copyExpired, .instanceChanged, .noCursor, .hydrationIncomplete, .firstSyncWaiting: return
-        default: stop(for: error)
+        case .canceled, .closed, .keyChanging: return false
+        case .copyExpired, .instanceChanged, .noCursor, .hydrationIncomplete, .firstSyncWaiting: return false
+        default: return true
         }
     }
 
@@ -475,18 +502,34 @@ actor MarfaSync {
         #if DEBUG
         hooks.seen.update { $0.drains += 1 }
         #endif
+        var faulted = false
         do {
+            #if DEBUG
+            if let fault = hooks.faulting.current?(.drain) { throw fault }
+            #endif
             let report = try await copy.queue.drain()
             if report.verdicts.contains(where: { [.deleteItem, .restoreItem].contains($0.kind) }) { wantsBin = true }
         } catch {
             // A drain that throws loses its report, and the writes it answered first are recorded, so the engine
-            // takes them from the queue below. An expired copy hydrates again.
+            // takes them from the queue below. An expired copy hydrates again. The package retries a drain only
+            // for a key refusal or a transient error; any other fault leaves the writes queued, so it is told, once
+            // until a drain succeeds.
             switch error as? MarfaError {
             case .copyExpired?, .instanceChanged?, .hydrationIncomplete?:
                 wantsHydration = true
             default:
-                break
+                if Self.isFault(error) {
+                    faulted = true
+                    if !drainFailureTold {
+                        drainFailureTold = true
+                        await failed(error)
+                    }
+                }
             }
+        }
+        if !faulted, drainFailureTold {
+            drainFailureTold = false
+            told = false
         }
         // The drain ends once the engine has taken the answers, so a flush returns with them taken.
         await withCheckedContinuation { taken in
@@ -504,6 +547,9 @@ actor MarfaSync {
         var cursor: String?
         var complete = false
         do {
+            #if DEBUG
+            if let fault = hooks.faulting.current?(.bin) { throw fault }
+            #endif
             for _ in 0..<Self.binPages {
                 let page = try await copy.items.bin(after: cursor, limit: Self.binPageSize)
                 found += page.items
@@ -517,7 +563,8 @@ actor MarfaSync {
             if error.isOffline || error.isTransient { return }
             if case .canceled = error { return }
             if case .closed = error { return }
-            if case .invalid = error { return }
+            // The key is changing: the read is asked for again once the new key is in.
+            if case .keyChanging = error { return }
             Telemetry.binUnreadable(error)
             _ = tell(.failed(SourceFailure(kind: .failed, message: error.message)))
             return
@@ -530,4 +577,10 @@ actor MarfaSync {
     nonisolated static let binPageSize = 100
     /// Recently Deleted shows this many pages of the bin; the server keeps the rest.
     nonisolated static let binPages = 10
+}
+
+private nonisolated extension CopyConnection {
+    var needsHydration: Bool {
+        if case .needsHydration = self { true } else { false }
+    }
 }

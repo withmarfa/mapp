@@ -16,7 +16,8 @@ import Testing
         ]])
         let write = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Arriving", "body": "First"]))
         let reads = FillingReads(copy: copy, completeness: completeness)
-        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads)
+        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads,
+                                  refreshing: ScriptedRefresh(status: ScriptedRefresh.complete(), listensToCopy: true))
         let log = ChangeLog(source)
         source.events.yield(.paint)
         let painted = try #require(await log.wait { $0.item(titled: "Arriving") != nil })
@@ -99,7 +100,8 @@ import Testing
         defer { store.remove() }
         let copy = try await store.open()
         let reads = HydratingReads(copy: copy)
-        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads)
+        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads,
+                                  refreshing: ScriptedRefresh(status: ScriptedRefresh.complete(), listensToCopy: true))
         let log = ChangeLog(source)
         source.events.yield(.paint)
         _ = try #require(await log.wait { $0.snapshot != nil })

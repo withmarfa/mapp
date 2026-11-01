@@ -213,7 +213,8 @@ import Testing
         ]])
         _ = try await copy.items.create(Draft(type: "example.note", properties: ["title": "First", "body": "Text"]))
         let reads = Watched(copy: copy)
-        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads, refreshing: QuietRefresh(copy: copy))
+        let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads,
+                                  refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()))
         let log = ChangeLog(source)
         source.events.yield(.paint)
         let scene = Scene(store: store, copy: copy, reads: reads, source: source, log: log)

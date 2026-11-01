@@ -37,6 +37,9 @@ extension MarfaEngine {
         var viewsChanged = false
         var queueChanged = false
         var rowsChanged = false
+        let statusChanged = lastUpdateFilled || lastConnection != update.connection
+        lastUpdateFilled = update.fill != nil
+        lastConnection = update.connection
         defer { tookFirstUpdate = true }
         switch update.reread {
         case .everything:
@@ -87,10 +90,11 @@ extension MarfaEngine {
             let end = ContinuousClock.now
             fillReadAllowed = end + max(Self.fillReadSpacing, (end - start) * 4)
         }
-        if update.fill == nil { await finishFill() }
+        if update.fill == nil, statusChanged { await finishFill() }
     }
 
-    /// The report says complete as soon as the copy reads whole with no fill under way.
+    /// The report says complete as soon as the copy reads whole with no fill under way. It is read when a fill has
+    /// just ended or the connection changed, the two things that change the copy's status; a local write does not.
     private func finishFill() async {
         guard let status = try? await reading.status() else { return }
         let fill = LibraryFill(status, completeness: status.hydration == .stale ? .stale :
