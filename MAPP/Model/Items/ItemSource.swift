@@ -92,6 +92,9 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     /// Why the core would refuse `draft` for what the source holds, in its words; nil where it would take the edge.
     /// Queues nothing and needs no server.
     func edgeRefusal(_ draft: EdgeDraft) async -> String?
+    /// What the copy says each link target names (`Items.linkCandidates`), read as a link in `note`'s text when
+    /// given. Throws for a note the copy does not hold.
+    func linkAnswers(of targets: [String], in note: ItemID?) async throws -> [LinkAnswer]
     func fileURL(of item: ItemID) async throws -> URL
     /// The items the view lists that the copy holds, in the view's order. Throws where the copy cannot answer the
     /// view, such as one whose filter needs links the copy does not hold whole.

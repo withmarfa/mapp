@@ -220,6 +220,19 @@ nonisolated final class MarfaSource: ItemSource {
         return ItemBody(id: item, text: text, version: ItemVersion(row.version))
     }
 
+    func linkAnswers(of targets: [String], in note: ItemID?) async throws -> [LinkAnswer] {
+        try await copy.items.linkCandidates(of: targets, in: note?.rawValue).map { answer in
+            let state: LinkAnswer.State
+            switch answer.state {
+            case .bound: state = .bound
+            case .ambiguous: state = .ambiguous
+            case .unresolved: state = .unresolved
+            }
+            return LinkAnswer(
+                target: answer.target, state: state, item: answer.item.map { ItemID($0) }, candidates: answer.candidates.map { ItemID($0) })
+        }
+    }
+
     func edgeRefusal(_ draft: EdgeDraft) async -> String? {
         do {
             try await copy.edges.check(from: draft.source.rawValue, to: draft.target.rawValue, type: draft.type)

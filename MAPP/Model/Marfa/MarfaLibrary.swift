@@ -835,23 +835,12 @@ import Observation
 
     // MARK: Links
 
-    /// A link names what the copy bound that very link to when the note was saved (`Item.boundLinks`, the package's
-    /// own answer): Marfa binds each spelling on its own and keeps the first note a spelling was bound to, so two
-    /// links to one name can name two notes. An identity names the item that holds it, whatever other items are
-    /// titled (`device/body-link-id-first`). A link the copy has not bound, as one just typed, or has not been able
-    /// to look up is `pending`, never guessed from the titles held, since the server may hold another note with that
-    /// title; it opens once the copy binds it.
-    func resolveLink(_ link: NoteLink, in source: ItemID) -> NoteReferenceResolution {
-        guard !link.lookupName.isEmpty else { return .missing }
-        if NoteLinks.looksLikeIdentity(link.lookupName), let held = item(ItemID(link.lookupName)) { return Self.named(held) }
-        guard let bound = item(source)?.boundLinks.first(where: { $0.link == link }) else { return .pending }
-        guard case .resolved(let id) = bound.resolution else { return bound.resolution }
-        return item(id).map(Self.named) ?? .pending
-    }
-
-    /// An item in the bin is not a note a link names.
-    private static func named(_ item: Item) -> NoteReferenceResolution {
-        item.state == .trashed ? .missing : .resolved(item.id)
+    /// What the core says each link target names (`Items.linkCandidates`), from the copy alone and read as a link in
+    /// `note` when given, so an answer is whatever saving that link there would do. Nil where the core cannot ask,
+    /// such as for a note the copy does not hold.
+    func linkAnswers(of targets: [String], in note: ItemID?) async -> [LinkAnswer]? {
+        guard !targets.isEmpty else { return [] }
+        return try? await source.linkAnswers(of: targets, in: note)
     }
 
     // MARK: Search

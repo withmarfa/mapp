@@ -370,11 +370,12 @@ import Testing
             let id = "kept-\(index)"
             let item = try #require(scene.item(id), "\(id) was not shown")
             let answer = answers[id] ?? BodyLinks()
-            let links = answer.links.map {
-                BoundLink(link: NoteLink(reading: MarfaMapping.inside(brackets: $0.text)), resolution: MarfaMapping.resolution(of: $0.target))
-            }
+            let unresolved = answer.links.filter { !$0.target.isItem }.count
             let embeds = answer.embeds.map { BoundEmbed(text: $0.text, resolution: MarfaMapping.resolution(of: $0.target)) }
-            #expect(item.boundLinks == links, "\(id) shows links \(item.boundLinks), the copy answered \(links)")
+            let shown = item.edgesOut.filter { edge in
+                if case .item = edge.target { false } else { edge.origin == .body && edge.type == MarfaMapping.bodyLinkEdge }
+            }.count
+            #expect(shown == unresolved, "\(id) shows \(shown) unresolved links, the copy answered \(unresolved)")
             #expect(item.boundEmbeds == embeds, "\(id) shows embeds \(item.boundEmbeds), the copy answered \(embeds)")
         }
         #expect(scene.reads.linkReads.withLock { $0 } == linking, "each linking row, and no other, was asked once")

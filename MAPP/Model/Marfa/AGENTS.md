@@ -50,7 +50,7 @@
 - A relationship is an edge written by the end that holds it. Check links against the catalogue's types, roles, how many each end may hold, and the contract's cycle rule (`conformance/spec/edges.md`) before sending.
 - An end that holds one link of its type has it replaced by moving the edge's other end (one `edges.update` with an `EdgeEdit`). Never remove and add: that can leave the end holding none or two.
 - Never take a link that a third item holds as its own; tell the person which item holds it. Where a field that holds many swaps one item for another, add the new links first and remove the old ones only once the source has taken them.
-- What an item's text links or embeds is written as edges by the package when the text is saved: change a link in the text, never as a relationship. Answer a link only from the copy's binding (`Item.boundLinks`), never from the titles held.
+- What an item's text links or embeds is written as edges by the package when the text is saved: change a link in the text, never as a relationship. Answer a link only from the core (`ItemSource.linkAnswers`), never from the titles held.
 - Attachments go through the package's `attach(to:file:)`, with a name unique among the item's attachments. Never use `embed(file:in:_:)`, which edits the body outside the editor's versioned saves.
 
 ## Wording

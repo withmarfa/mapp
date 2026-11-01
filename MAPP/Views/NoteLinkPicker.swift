@@ -101,6 +101,7 @@ struct NoteLinkPicker: View {
     private func choose(_ matches: [Item], at index: Int) {
         guard matches.indices.contains(index) else { return }
         // The note is read again by identity as it is chosen, so a rename or a new twin since the list was made is seen.
-        refused = !editor.finishLinkRequest(choosing: matches[index].id)
+        let id = matches[index].id
+        Task { refused = !(await editor.finishLinkRequest(choosing: id)) }
     }
 }

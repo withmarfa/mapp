@@ -1,4 +1,6 @@
 import Foundation
+import struct Marfa.LinkParts
+import func Marfa.linkParts
 import Observation
 import UniformTypeIdentifiers
 @testable import MAPP
@@ -161,16 +163,21 @@ final class FakeItemLibrary: ItemLibrary {
         guard let item = item(id), !item.isFile else { return nil }
         return ItemBody(id: id, text: bodies[id] ?? "", version: item.version)
     }
-    func resolveLink(_ link: NoteLink, in source: ItemID) -> NoteReferenceResolution {
-        let name = link.lookupName
-        let named = items.filter {
-            $0.state == .active && !$0.isFile
-                && ($0.id.rawValue == name || NoteLinks.nameKey($0.title) == NoteLinks.nameKey(name))
-        }
-        switch named.count {
-        case 0: return .missing
-        case 1: return .resolved(named[0].id)
-        default: return .ambiguous(named.map(\.id))
+    /// What the core answers for a link target a test sets; any other is read by id or by title ignoring case.
+    var linkAnswerOverrides: [String: LinkAnswer] = [:]
+    func linkAnswers(of targets: [String], in note: ItemID?) async -> [LinkAnswer]? {
+        return targets.map { target in
+            if let set = linkAnswerOverrides[target] { return set }
+            let name = linkParts(in: "[[\(target)]]").first?.name.text ?? target
+            let named = items.filter {
+                $0.state == .active && !$0.isFile
+                    && ($0.id.rawValue == name || $0.title.lowercased() == name.lowercased())
+            }.map(\.id)
+            switch named.count {
+            case 0: return LinkAnswer(target: target, state: .unresolved, item: nil, candidates: [])
+            case 1: return LinkAnswer(target: target, state: .bound, item: named[0], candidates: named)
+            default: return LinkAnswer(target: target, state: .ambiguous, item: nil, candidates: named)
+            }
         }
     }
     func relationships(for id: ItemID) -> [ItemRelationship] { relationshipsByItem[id] ?? [] }

@@ -62,15 +62,13 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Whether text saved to the item has not yet been read back from the library's copy, so what the copy bound
     /// in the text (`Item.boundEmbeds`) may not cover it yet.
     func hasUnreadSave(_ id: ItemID) -> Bool
-    /// The `[[link]]` that the text of `source` can hold and the library resolves, from that note, to this item and
-    /// no other, or nil when no spelling does. A name `source` already links keeps its first target, so it is not
-    /// used for another item.
-    func bodyLink(to id: ItemID, in source: ItemID?) -> String?
-    /// What `link` written in the note `source` names. Its name may be a title, a path or an identity. The library
-    /// answers as it reads links itself, by what the copy bound that very link to, so the app and the library never
-    /// disagree about which note a link opens. A link names a note only when the answer is `resolved`; `missing` is
-    /// the one that names none at all.
-    func resolveLink(_ link: NoteLink, in source: ItemID) -> NoteReferenceResolution
+    /// The `[[link]]` that the text of `note` can hold and the core binds, from that note, to this item and no
+    /// other, or nil when no spelling does.
+    func bodyLink(to id: ItemID, in note: ItemID?) async -> String?
+    /// What the core says each link target names, read as a link in `note` when given (`Items.linkCandidates`):
+    /// bound to one note, ambiguous with its candidates, or unresolved. Nil where the library cannot ask, such as
+    /// for a note it does not hold; the answer is never guessed from the titles held.
+    func linkAnswers(of targets: [String], in note: ItemID?) async -> [LinkAnswer]?
     /// The property keys of the item that the inspector never lists: what the page shows as the title and the text,
     /// and any a library keeps for its own use.
     func hiddenPropertyKeys(of item: Item) -> Set<String>
@@ -220,20 +218,24 @@ extension ItemLibrary {
     }
     func hiddenPropertyKeys(of item: Item) -> Set<String> { catalogue.pageKeys(of: item) }
 
-    /// The title as a link where it is this note's alone, as the library's links compare names, and the note it is
-    /// written in has not already bound that name to another. Otherwise the item's identity with its title as the label
-    /// (`[[identity|Title]]`), which Marfa reads as naming the identity.
-    func bodyLink(to id: ItemID, in source: ItemID?) -> String? {
+    /// The title as a link where the core says it names this note alone from `note`. Otherwise the item's identity
+    /// with its title as the label (`[[identity|Title]]`). Each spelling is read back through `linkParts` so it is
+    /// the link it was meant to be, and the core is asked what it binds to.
+    func bodyLink(to id: ItemID, in note: ItemID?) async -> String? {
         guard let target = item(id), !target.isFile else { return nil }
-        let established = source.flatMap { item($0)?.establishedLinks } ?? [:]
-        if NoteLinks.canName(target.title), established[NoteLinks.nameKey(target.title)].map({ $0 == id }) ?? true {
-            let key = NoteLinks.nameKey(target.title)
-            let shared = items(in: .allNotes).contains {
-                $0.id != id && !$0.isFile && NoteLinks.nameKey(NoteName.trimmed($0.title)) == key
-            }
-            if !shared { return NoteLinks.link(to: target.title) }
+        let title = target.title
+        let identity = id.rawValue
+        let label = NoteLinks.label(title)
+        let spellings = [
+            NoteLinks.spells(title, as: title) ? title : nil,
+            label.isEmpty ? nil : NoteLinks.spells("\(identity)|\(label)", as: identity, alias: label) ? "\(identity)|\(label)" : nil,
+            NoteLinks.spells(identity, as: identity) ? identity : nil,
+        ].compactMap { $0 }
+        guard let answers = await linkAnswers(of: spellings, in: note) else { return nil }
+        for (spelling, answer) in zip(spellings, answers) where answer.names(id) {
+            return "[[\(spelling)]]"
         }
-        return NoteLinks.looksLikeIdentity(id.rawValue) ? NoteLinks.identityLink(to: id.rawValue, titled: target.title) : nil
+        return nil
     }
 
     /// Erases what the person confirmed, if the library still can: a Marfa library cannot while its server is out

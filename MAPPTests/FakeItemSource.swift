@@ -48,6 +48,8 @@ nonisolated final class FakeItemSource: ItemSource {
     let searches = Mutex(0)
     /// The refusal for each edge a test names; any other is taken.
     let refusals = Mutex<[EdgeDraft: String]>([:])
+    /// What the core answers for a link target a test sets; any other target is unresolved.
+    let knownLinks = Mutex<[String: LinkAnswer]>([:])
     let searchFails = Mutex(false)
     /// What a search answers beside its hits, and where it was asked to look.
     let excerpts = Mutex<[String: [ItemID: SearchExcerpt]]>([:])
@@ -149,6 +151,12 @@ nonisolated final class FakeItemSource: ItemSource {
     }
 
     func edgeRefusal(_ draft: EdgeDraft) async -> String? { refusals.withLock { $0[draft] } }
+
+    func linkAnswers(of targets: [String], in note: ItemID?) async throws -> [LinkAnswer] {
+        knownLinks.withLock { answers in
+            targets.map { answers[$0] ?? LinkAnswer(target: $0, state: .unresolved, item: nil, candidates: []) }
+        }
+    }
 
     func fileURL(of item: ItemID) async throws -> URL {
         URL(filePath: "/dev/null")

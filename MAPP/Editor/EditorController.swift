@@ -64,6 +64,9 @@ final class EditorController: NSObject {
     @ObservationIgnored var onOpenNote: (ItemID) -> Void = { _ in }
     /// A link in the page names no note the window can open, which is told only by a beep: nothing is made.
     @ObservationIgnored var onUnopenableLink: () -> Void = { NSSound.beep() }
+    /// Asks the person which of several notes an ambiguous link means, in place of the menu at the pointer. The
+    /// handler is called with the one they chose, and not at all if they choose none.
+    @ObservationIgnored var onChooseAmbiguousLink: (([ItemID], @escaping (ItemID) -> Void) -> Void)?
     /// The heading a link asked for in the note it is opening, scrolled to once that note is on the page.
     @ObservationIgnored var pendingHeading: (note: ItemID, text: String)?
     /// What the page writes for files quick add attached to a new note, put at the end of its text once the page
@@ -185,8 +188,9 @@ final class EditorController: NSObject {
         }
         noteRequests.pick = { [weak self] note in await self?.chooseNoteToLink(from: note) }
         noteRequests.missing = { [weak self] links, source in
-            guard let library = self?.library else { return links.map { _ in false } }
-            return links.map { library.resolveLink($0, in: source) == .missing }
+            let answers = await self?.library?.linkAnswers(of: links.map(\.raw), in: source)
+            guard let answers, answers.count == links.count else { return links.map { _ in false } }
+            return answers.map(\.isMissing)
         }
         configuration.userContentController.addScriptMessageHandler(noteRequests, contentWorld: .page, name: "notes")
         pictureRequests.inFeed = { [weak self] item in self?.library?.item(item)?.tier == .feed }
@@ -655,7 +659,7 @@ final class EditorController: NSObject {
         case .openEmbed(let item, let reference):
             openEmbed(reference, in: item)
         case .openNote(let item, let link):
-            openNote(link, from: item)
+            Task { await openNote(link, from: item) }
         case .embedMenu(let embed):
             menuEmbed = embed
         case .rowMenu(let row):

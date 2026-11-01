@@ -108,29 +108,12 @@ nonisolated struct Item: Identifiable, Hashable, Sendable {
     var edgesOut: [Edge] = []
     var sync: SyncState = .settled
     var problem: ItemProblem?
-    /// Each link in this item's text, in order, with what the library bound it to, including those that name no
-    /// note, more than one, or none yet. A library that binds each spelling on its own, as Marfa does, answers a
-    /// link by its own binding. Empty where links are read afresh.
-    var boundLinks: [BoundLink] = []
     /// Each embed in this item's text, in order, with the file item the library bound it to or why it has none.
     var boundEmbeds: [BoundEmbed] = []
     /// What made the item, as the library names it: for a Marfa item, the source of the key that wrote it. Nil
     /// where the library does not know. An item written in MAPP has one too, so this does not separate captured
     /// items from the person's own.
     var source: String?
-
-    /// The items the links in this item's text were already bound to, by the name each link is spelled with (read
-    /// as `NoteLinks.nameKey`). A library that keeps a name's first target, as Marfa does, answers a new link with
-    /// the same name with that target, whatever now goes by the name.
-    var establishedLinks: [String: ItemID] {
-        var established: [String: ItemID] = [:]
-        for bound in boundLinks {
-            guard case .resolved(let id) = bound.resolution else { continue }
-            let key = NoteLinks.nameKey(bound.link.lookupName)
-            if established[key] == nil { established[key] = id }
-        }
-        return established
-    }
 
     var isFavorite: Bool { tags.contains(ItemTag.favorite) }
 

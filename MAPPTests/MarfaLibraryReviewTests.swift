@@ -190,6 +190,9 @@ nonisolated final class FailingSearchSource: ItemSource {
     func submit(_ write: ItemWrite, as id: WriteID, undoing: UndoGroup?) -> Bool { inner.submit(write, as: id, undoing: undoing) }
     func body(of item: ItemID) async throws -> ItemBody { try await inner.body(of: item) }
     func edgeRefusal(_ draft: EdgeDraft) async -> String? { await inner.edgeRefusal(draft) }
+    func linkAnswers(of targets: [String], in note: ItemID?) async throws -> [LinkAnswer] {
+        try await inner.linkAnswers(of: targets, in: note)
+    }
     func fileURL(of item: ItemID) async throws -> URL { try await inner.fileURL(of: item) }
     func search(_ text: String, in target: SearchTarget) async throws -> SourceSearch {
         throw SourceFailure(kind: .failed, message: "fts5: syntax error")

@@ -300,9 +300,6 @@ nonisolated enum MarfaMapping {
         // A row the copy could not read shows no properties and no text. Saying why, rather than showing an empty
         // item, keeps it from being taken for one the person emptied; the problem also keeps it from being edited.
         let damaged = row.unreadableProperties != nil
-        let bound = (bodyLinks?.links ?? []).map { name in
-            BoundLink(link: NoteLink(reading: Self.inside(brackets: name.text)), resolution: resolution(of: name.target))
-        }
         let embeds = (bodyLinks?.embeds ?? []).map { BoundEmbed(text: $0.text, resolution: resolution(of: $0.target)) }
         let content = content(of: row, catalogue: catalogue)
         let preview: String
@@ -316,14 +313,8 @@ nonisolated enum MarfaMapping {
             preview: damaged ? MarfaProblems.unreadableMessage : preview, content: content, state: state,
             tier: row.tier.map(tier) ?? .library, tags: Set(row.tags), version: ItemVersion(row.version),
             created: created, modified: modified, trashed: state == .trashed ? row.trashedDate : nil, edgesOut: edgesOut,
-            sync: sync, problem: damaged ? ItemProblem(message: MarfaProblems.unreadableMessage, withholdsText: true) : nil, boundLinks: bound,
+            sync: sync, problem: damaged ? ItemProblem(message: MarfaProblems.unreadableMessage, withholdsText: true) : nil,
             boundEmbeds: embeds, source: row.source.isEmpty ? nil : row.source)
-    }
-
-    /// The text between the brackets of a link as the package renders it, `[[text]]`.
-    static func inside(brackets text: String) -> String {
-        guard text.hasPrefix("[["), text.hasSuffix("]]"), text.count >= 4 else { return text }
-        return String(text.dropFirst(2).dropLast(2))
     }
 
     /// What a link in an item's text names, as the package reads it from the copy.
