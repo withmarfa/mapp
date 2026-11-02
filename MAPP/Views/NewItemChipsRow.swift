@@ -16,8 +16,8 @@ extension View {
     }
 }
 
-/// "Make something new": the four types with most items as chips, then a More menu with the rest. A chip opens quick
-/// add on that type.
+/// The four types with most items as chips, then a More menu with the rest. A chip opens quick add on that type. The
+/// row shows no label; its accessibility label says what it is for.
 private struct MakeSomethingNew: View {
     @CurrentLibrary private var library
     let browser: Browser
@@ -29,10 +29,6 @@ private struct MakeSomethingNew: View {
         let split = NewItemChips.split(QuickAdd.types(in: library), usedMost: library.itemTypeCounts.map(\.id))
         ScrollView(.horizontal) {
             HStack(spacing: 10) {
-                Text("Make something new")
-                    .interfaceFont(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .padding(.trailing, 4)
                 ForEach(split.shown) { option in
                     Button { browser.openQuickAdd(typeID: option.id.rawValue, in: library) } label: {
                         ChipLabel(title: option.label, icon: .type(option.icon))
@@ -62,6 +58,7 @@ private struct MakeSomethingNew: View {
         }
         .scrollIndicators(.hidden)
         .fixedSize(horizontal: false, vertical: true)
+        .accessibilityLabel("Make something new")
         .accessibilityIdentifier("MakeSomethingNew")
     }
 }
