@@ -105,6 +105,7 @@ struct SidebarFootRow: View {
             .focused($focus, equals: .refresh)
             .simultaneousGesture(TapGesture().onEnded { focus = nil })
             .opacity(isHovering || focus == .refresh ? 1 : 0)
+            .accessibilityHidden(false)
             .help("Refresh")
             .accessibilityLabel(Text("Refresh"))
             .accessibilityIdentifier("SidebarRefresh")
