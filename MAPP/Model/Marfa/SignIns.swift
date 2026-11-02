@@ -56,9 +56,6 @@ nonisolated enum SignInOutcome: Hashable, Sendable {
     /// The Keychain would not keep or give the sign-in; the words are the system's, logged and never shown.
     case keychain(String)
 
-    /// What the package says when another process holds the sign-in; it has no case of its own for it.
-    private static let inUseMessage = "another process is using the sign-in"
-
     init(_ error: any Error) {
         if error is CancellationError {
             self = .canceled
@@ -67,7 +64,8 @@ nonisolated enum SignInOutcome: Hashable, Sendable {
             case .canceled: self = .canceled
             case .denied: self = .denied
             case .expired: self = .expired
-            case .unavailable(let message): self = message == Self.inUseMessage ? .inUse : .unreachable(message)
+            case .unavailable(let message): self = .unreachable(message)
+            case .heldElsewhere: self = .inUse
             case .stateMismatch, .notSignedIn, .notAServer, .otherServer, .noRedirect, .refused, .unreadable:
                 self = .refused(error.description)
             }

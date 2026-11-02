@@ -1089,6 +1089,12 @@
     "“%@” already holds this link to “%@”. Remove it there first." : {
       "extractionState" : "manual"
     },
+    "“%@” can hold only one link of this kind, and already holds it." : {
+      "extractionState" : "manual"
+    },
+    "These items are already linked this way." : {
+      "extractionState" : "manual"
+    },
     "“%@” wasn’t created" : {
       "extractionState" : "manual"
     },
@@ -1410,9 +1416,6 @@
     "Bold" : {
 
     },
-    "Both items already hold a link of this kind, so one can’t take the other’s." : {
-      "extractionState" : "manual"
-    },
     "Bulleted List" : {
 
     },
@@ -1519,9 +1522,6 @@
 
     },
     "Choose Date" : {
-      "extractionState" : "manual"
-    },
-    "Choose one item here, or remove the link first." : {
       "extractionState" : "manual"
     },
     "Clear Filters" : {
@@ -2144,9 +2144,6 @@
     },
     "Oldest First" : {
 
-    },
-    "Only one item can be chosen here." : {
-      "extractionState" : "manual"
     },
     "Open" : {
 

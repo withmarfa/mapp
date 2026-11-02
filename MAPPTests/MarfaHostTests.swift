@@ -452,7 +452,7 @@ import Testing
         (.refused(code: "invalid_grant", message: "No."), .refused(SignInError.refused(code: "invalid_grant", message: "No.").description)),
         (.unavailable(message: "offline"), .unreachable("offline")),
         (.unreadable(message: "locked"), .refused("locked")),
-        (.unavailable(message: "another process is using the sign-in"), .inUse),
+        (.heldElsewhere, .inUse),
     ])
     func aSignInThatDoesNotFinishLeavesTheOldOneAndTheCopyAlone(_ error: SignInError, _ outcome: SignInOutcome) async throws {
         let bench = try HostBench()
