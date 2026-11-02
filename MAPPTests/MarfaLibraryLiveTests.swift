@@ -244,6 +244,7 @@ extension LiveMarfaTests {
 
                 // A second parent beside the one it has is refused by the core's check, which the copy makes; nothing is
                 // written and the child stays where it is.
+                #expect(await eventually { library.syncReport.waiting == 0 })
                 let waiting = library.syncReport.waiting
                 library.notices.answerAll()
                 #expect(await library.changeItemRelationship(child, field: "child-of", adding: [other], removing: [], undoManager: undo) == false)

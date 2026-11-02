@@ -1225,10 +1225,16 @@ extension LiveMarfaTests {
                         && state.snapshot?.items.first { $0.id == child }?.edgesOut.contains { $0.target == .item(first) } == true
                 })
                 await source.flush()
-                let edge = try #require(try await source.copy.edges.from(first.rawValue).first { $0.edgeType == MarfaMapping.parentEdge })
+                // A read while the copy fills again is refused as incomplete, so it is asked until it answers.
+                var held: String?
+                _ = await LiveMarfa.until {
+                    held = (try? await source.copy.edges.from(first.rawValue))?.first { $0.edgeType == MarfaMapping.parentEdge }?.id
+                    return held != nil
+                }
+                let edge = try #require(held)
 
                 let move = WriteID(), tagged = WriteID()
-                source.submit(.moveEdge(EdgeID(edge.id), end: .source, to: second), as: move)
+                source.submit(.moveEdge(EdgeID(edge), end: .source, to: second), as: move)
                 source.submit(.tag(child, ItemTag.favorite, on: true), as: tagged)
                 let done = try #require(await log.wait { state in
                     state.answer(to: move) != nil && state.answer(to: tagged) != nil
@@ -1245,8 +1251,11 @@ extension LiveMarfaTests {
                 #expect(moved.edgesOut.contains { $0.target == .item(second) })
                 #expect(!moved.edgesOut.contains { $0.target == .item(first) })
                 #expect(moved.isFavorite)
-                #expect(try await source.copy.edges.from(second.rawValue).contains { $0.targetId == child.rawValue })
-                #expect(try await source.copy.queue.all().isEmpty)
+                // The copy fills again after the move is answered, and a read made meanwhile is refused as incomplete.
+                #expect(await LiveMarfa.until {
+                    (try? await source.copy.edges.from(second.rawValue))?.contains { $0.targetId == child.rawValue } == true
+                })
+                #expect(await LiveMarfa.until { (try? await source.copy.queue.all())?.isEmpty == true })
                 #expect(await waitForConnection(source) { $0 == .online })
             }
         }
