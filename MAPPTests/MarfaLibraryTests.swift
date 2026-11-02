@@ -656,16 +656,12 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(await eventually { source.writes.last == .unlink(EdgeID("a1")) })
     }
 
-    @Test func anItemPointedAtOnlyOnceKeepsItsOne() async throws {
+    @Test func aLinkAThirdItemHoldsIsNeverTakenFromIt() async throws {
         let bug2 = F.item(ItemID("t2"), F.bug, "Bug two", age: 0, edges: [
             Edge(id: EdgeID("s1"), type: "supersedes", source: ItemID("t2"), target: .item(F.t1), origin: .property("supersedes")),
         ])
         let (library, source) = try await loaded(F.items + [bug2])
         #expect(library.relationships(for: F.t1).first { $0.field == "inverse:supersedes" }?.allowsMultiple == false)
-        #expect(await library.changeItemRelationship(F.t1, field: "inverse:supersedes", adding: [F.e1], removing: [], undoManager: nil) == false)
-        #expect(library.notices.waiting.last?.message == String(localized: "Only one item can be chosen here."))
-        #expect(source.writes.isEmpty)
-
         // The first bug is already superseded by the second. That link is the second bug's own, so the task does
         // not take it: the person is told which item holds it, and nothing is sent.
         library.notices.answerAll()
@@ -682,8 +678,9 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.notices.waiting.last == nil)
     }
 
-    /// Both ends hold one link of their type, so the one move cannot also free the end it takes from.
-    @Test func aMoveThatNeedsTwoEdgesToChangeIsToldAndNotSent() async throws {
+    /// A replacement of the one link an end holds is one move, asked of the core as a move, since a new link would be refused
+    /// for the end that is full; the third item's own link is still not taken.
+    @Test func aReplacementOfAnItemsOwnLinkIsAskedAsAMove() async throws {
         func bug(_ id: String, supersedes target: ItemID? = nil, edge: String = "") -> MAPP.Item {
             F.item(ItemID(id), F.bug, "Bug \(id)", age: 0, edges: target.map {
                 [Edge(id: EdgeID(edge), type: "supersedes", source: ItemID(id), target: .item($0), origin: .property("supersedes"))]
@@ -691,13 +688,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         }
         let (library, source) = try await loaded(F.items + [bug("a"), bug("b"), bug("c", supersedes: ItemID("a"), edge: "s1"),
             bug("d", supersedes: ItemID("b"), edge: "s2")])
-        // `a`, superseded by `c`, would be superseded by `d` instead, which supersedes `b`: two edges would change.
-        #expect(await library.changeItemRelationship(ItemID("a"), field: "inverse:supersedes", adding: [ItemID("d")], removing: [ItemID("c")], undoManager: nil) == false)
-        #expect(library.notices.waiting.last?.message
-            == String(localized: "Both items already hold a link of this kind, so one can’t take the other’s."))
-        #expect(source.writes.isEmpty)
         // From `c`'s own side, `b` is held by `d` as its own link, which is never taken from it.
-        library.notices.answerAll()
         #expect(await library.changeItemRelationship(ItemID("c"), field: "supersedes", adding: [ItemID("b")], removing: [ItemID("a")], undoManager: nil) == false)
         #expect(library.notices.waiting.last?.message
             == String(localized: "“\("Bug d")” already holds this link to “\("Bug b")”. Remove it there first."))
@@ -706,6 +697,22 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         library.notices.answerAll()
         #expect(await library.changeItemRelationship(ItemID("c"), field: "supersedes", adding: [F.t1], removing: [ItemID("a")], undoManager: nil))
         #expect(await eventually { source.writes == [.moveEdge(EdgeID("s1"), end: .target, to: F.t1)] }, "sent \(source.writes)")
+        #expect(source.asked.withLock { $0 } == [.moved(EdgeID("s1"), .target, F.t1)])
+    }
+
+    /// The core is asked of a replacement as a move and of every other link as a new one, whichever the picker asks.
+    @Test func theCoreIsAskedOfAMoveForAReplacementAndOfANewLinkForAnAdd() async throws {
+        let (library, source) = try await loaded()
+        #expect(await library.relationshipVerdict(for: F.t1, field: "child-of", to: F.p2) == .taken)
+        #expect(await library.relationshipVerdict(for: F.n1, field: "about", to: F.p2) == .taken)
+        #expect(source.asked.withLock { $0 }
+            == [.moved(EdgeID("c2"), .source, F.p2), .added(EdgeDraft(type: "about", source: F.n1, target: F.p2))])
+        // The core refuses the move: the row is refused with its words, and a change is told the same and sends nothing.
+        source.moveRefusals.withLock { $0[EdgeID("c2")] = "That would close a cycle." }
+        #expect(await library.relationshipVerdict(for: F.t1, field: "child-of", to: F.p2) == .refused("That would close a cycle."))
+        #expect(await library.changeItemRelationship(F.t1, field: "child-of", adding: [F.p2], removing: [F.e1], undoManager: nil) == false)
+        #expect(library.notices.waiting.last?.message == "That would close a cycle.")
+        #expect(source.writes.isEmpty)
     }
 
     /// A refusal the copy could not foresee, such as a cycle through rows outside it, is the server's: it is told in the
@@ -883,16 +890,8 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.notices.waiting.isEmpty)
     }
 
-    @Test func aFieldThatTakesOneItemRefusesTwoAndSendsNothing() async throws {
+    @Test func aFieldOrItemThatCantChangeSendsNothing() async throws {
         let (library, source) = try await loaded()
-        let refusals: [(ItemID, String, [ItemID])] = [
-            (F.t1, "child-of", [F.p1, F.p2]),
-        ]
-        for (id, field, targets) in refusals {
-            library.notices.answerAll()
-            #expect(await library.changeItemRelationship(id, field: field, adding: targets, removing: [], undoManager: nil) == false, "\(field) \(targets)")
-            #expect(library.notices.waiting.last?.title == String(localized: "Can’t Change This Relationship"), "\(field) \(targets)")
-        }
         #expect(await library.changeItemRelationship(F.f1, field: "about", adding: [F.p1], removing: [], undoManager: nil) == false)
         #expect(await library.changeItemRelationship(F.n1, field: "nothing", adding: [F.p1], removing: [], undoManager: nil) == false)
         #expect(source.writes.isEmpty)

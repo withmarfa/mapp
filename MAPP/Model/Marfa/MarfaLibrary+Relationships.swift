@@ -61,11 +61,32 @@ extension MarfaLibrary {
         atTarget ? admits(type, constraint(of: info, atTarget: true)) : catalogue.admits(type, source: info)
     }
 
-    /// What the core says of linking `id` through `field` to `other`. Judged on what the copy holds, with no server and
-    /// nothing queued, so a picker can ask of each row.
+    /// What the core says of linking `id` through `field` to `other`, as the change would be made: a field that holds one
+    /// link has it replaced by moving an end, which the core judges as a move, and any other link as a new one. Judged
+    /// on what the copy holds, with no server and nothing queued, so a picker can ask of each row.
     func relationshipVerdict(for id: ItemID, field: String, to other: ItemID) async -> EdgeVerdict {
         guard let end = fieldEnd(field) else { return .unknown }
-        return await source.edgeVerdict(draft(id, other, end))
+        let current = linked(to: id, end)
+        guard !current.contains(other) else { return .taken }
+        // A picker of a field that holds one link replaces it with the item chosen.
+        let replaced = end.info.cardinality(atTarget: end.atTarget) == .one ? current : []
+        switch plan(id, field: field, adding: [other], removing: replaced) {
+        case .unavailable: return await source.edgeVerdict(draft(id, other, end))
+        case .refused(let reason): return .refused(reason)
+        case .change(_, let made):
+            for link in made {
+                let verdict = await verdict(of: link)
+                if verdict != .taken { return verdict }
+            }
+            return .taken
+        }
+    }
+
+    private func verdict(of link: MadeLink) async -> EdgeVerdict {
+        switch link {
+        case .added(let draft): await source.edgeVerdict(draft)
+        case .moved(let move): await source.edgeVerdict(moving: move.edge, end: move.end, to: move.to)
+        }
     }
 
     /// The edge is checked to the id the item will be given, which the copy does not hold yet: the core then judges
@@ -208,7 +229,7 @@ extension MarfaLibrary {
     /// What one change to a field does to the edges, each as one write.
     nonisolated struct RelationshipChange {
         /// One end of an edge replaced by another item, which the edge keeps its id and properties through.
-        struct Move {
+        struct Move: Hashable {
             let edge: EdgeID
             let end: EdgeTypeInfo.End
             let to: ItemID
@@ -229,6 +250,22 @@ extension MarfaLibrary {
         }
     }
 
+    /// A link a change makes, which the core is asked about as it would be written: a new link, or an end moved.
+    nonisolated enum MadeLink: Hashable {
+        case added(EdgeDraft)
+        case moved(RelationshipChange.Move)
+    }
+
+    /// What working out a change comes to.
+    private enum Planning {
+        /// The field or the item is not one MAPP changes; nothing is told.
+        case unavailable
+        /// MAPP's own policy refuses the change, in the words to tell the person.
+        case refused(String)
+        /// The edges to write, and every link they make.
+        case change(RelationshipChange, made: [MadeLink])
+    }
+
     /// The edges of the field's type that `id` holds at the end `end` names.
     private func held(by id: ItemID, _ end: FieldEnd) -> [MarfaItemIndex.Link] {
         index.links(touching: id).filter { $0.type == end.info.id && (end.atTarget ? $0.target == id : $0.source == id) }
@@ -236,20 +273,21 @@ extension MarfaLibrary {
 
     /// Changes the field of `id` by what the person changed: `adding` items to link and `removing` items to unlink,
     /// relative to what they saw, never the whole list they saw, which a change made since would be undone by.
-    /// A link is added where its ends have room and removed freely.
+    /// A link is removed freely; the core judges every link added, and how many an end may hold.
     /// An end that holds one link of its type has it replaced by moving the edge's other end (`edges/move-target`,
     /// `edges/move-source`), so a new parent is one write and the child never holds none or two (`edges/move-no-gap`):
     /// a replacement is a move, and so is taking an item whose own link points elsewhere, as a child chosen under a
     /// project. A link a third item holds as its own is never taken from it.
     ///
-    /// The change is worked out, the core asked of every link it makes, and then worked out again from the links the
-    /// copy holds then and written in the same step, with its undo, so an earlier change that landed meanwhile is
-    /// kept and not repeated, and a move's old parent is the one it left. A link new in that second look is asked too.
+    /// The change is worked out, the core asked of every link it makes (`Edges.check(from:to:type:)` of a new link,
+    /// `Edges.check(_:moving:)` of a move), and then worked out again from the links the copy holds then and written in
+    /// the same step, with its undo, so an earlier change that landed meanwhile is kept and not repeated, and a move's
+    /// old parent is the one it left. A link new in that second look is asked too.
     /// Changes run one after another in the order they were made, each once the copy has taken the writes of the one
     /// before (see `relationshipChain`). Nothing is written until the core has answered.
     /// True means the core accepted the change and it is written, or there was nothing to change; false means it was
-    /// refused and told, by MAPP's own rules (the cardinality rules in `plan`, since `Edges.check` does not judge how
-    /// many an end holds) or by the core's, and the field is as it was. `finish` waits for a change in flight.
+    /// refused and told, by MAPP's own policy (`plan`) or by the core's judgement, and the field is as it was. `finish`
+    /// waits for a change in flight.
     @discardableResult
     func changeItemRelationship(
         _ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?
@@ -285,9 +323,16 @@ extension MarfaLibrary {
         _ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?
     ) async -> (kept: Bool, writes: Set<WriteID>) {
         let cantChange = String(localized: "Can’t Change This Relationship")
-        var asked: Set<EdgeDraft> = []
+        var asked: Set<MadeLink> = []
         while true {
-            guard let plan = plan(id, field: field, adding: adding, removing: removing) else { return (false, []) }
+            let plan: (change: RelationshipChange, made: [MadeLink])
+            switch self.plan(id, field: field, adding: adding, removing: removing) {
+            case .unavailable: return (false, [])
+            case .refused(let reason):
+                notices.tell(cantChange, reason)
+                return (false, [])
+            case .change(let change, let made): plan = (change, made)
+            }
             guard !plan.change.isEmpty else { return (true, []) }
             let unasked = plan.made.filter { !asked.contains($0) }
             guard !unasked.isEmpty else {
@@ -295,7 +340,7 @@ extension MarfaLibrary {
                 return (true, writes)
             }
             for link in unasked {
-                if case .refused(let reason) = await source.edgeVerdict(link) {
+                if case .refused(let reason) = await verdict(of: link) {
                     notices.tell(cantChange, reason)
                     return (false, [])
                 }
@@ -304,83 +349,86 @@ extension MarfaLibrary {
         }
     }
 
+    /// The items `id` is linked to through the end `end` names; for a two-way relation, the ones it holds and the ones
+    /// pointing at it, as a single list.
+    private func linked(to id: ItemID, _ end: FieldEnd) -> [ItemID] {
+        let own = others(of: id, end)
+        guard !end.isInverse, end.info.isTwoWay else { return own }
+        let farEnd = FieldEnd(info: end.info, atTarget: !end.atTarget, isInverse: !end.isInverse)
+        return own + others(of: id, farEnd).filter { !own.contains($0) }
+    }
+
     /// What the edges would be changed by, and every link it makes, whether added or made by moving an end: what the
-    /// core is asked about. Nil where MAPP's own rules refuse, and the person is told.
-    private func plan(_ id: ItemID, field: String, adding wanted: [ItemID], removing unwanted: [ItemID]) -> (change: RelationshipChange, made: [EdgeDraft])? {
-        guard let item = item(id), item.isEditable, let end = fieldEnd(field) else { return nil }
-        let cantChange = String(localized: "Can’t Change This Relationship")
+    /// core is asked about. MAPP decides only which edges to write: an end that holds one link of its type has it
+    /// replaced by a move, and a link another item holds as its own is never taken. How many links an end may hold is
+    /// the core's to judge, of the links this makes.
+    private func plan(_ id: ItemID, field: String, adding wanted: [ItemID], removing unwanted: [ItemID]) -> Planning {
+        guard let item = item(id), item.isEditable, let end = fieldEnd(field) else { return .unavailable }
         guard end.info.id != MarfaMapping.bodyLinkEdge else {
-            notices.tell(cantChange, String(localized: "A link is changed in the text that holds it."))
-            return nil
+            return .refused(String(localized: "A link is changed in the text that holds it."))
         }
         let holds = end.info.cardinality(atTarget: end.atTarget)
         let farEnd = FieldEnd(info: end.info, atTarget: !end.atTarget, isInverse: !end.isInverse)
         // A two-way relation is one list of the links this item holds and the ones pointing at it.
         let own = others(of: id, end)
         let incoming = !end.isInverse && end.info.isTwoWay ? others(of: id, farEnd) : []
-        let current = own + incoming.filter { !own.contains($0) }
+        let current = linked(to: id, end)
         // What the field holds now, with the person's change on it: read here, on every pass, so a change that landed
         // since the person looked is kept.
         var targetIDs = current.filter { !unwanted.contains($0) }
         for other in wanted where !targetIDs.contains(other) && !unwanted.contains(other) { targetIDs.append(other) }
-        guard holds != .one || targetIDs.count <= 1 else {
-            notices.tell(cantChange, String(localized: "Only one item can be chosen here."))
-            return nil
-        }
         let adding = targetIDs.filter { !current.contains($0) }
         let removing = current.filter { !targetIDs.contains($0) }
-        var change = RelationshipChange(removing: removing.flatMap { other in
-            (own.contains(other) ? [draft(id, other, end)] : []) + (incoming.contains(other) ? [draft(id, other, farEnd)] : [])
-        })
         let farHolds = end.info.cardinality(atTarget: !end.atTarget)
         // Replacing this item's own link moves the far end; taking another item's link moves this item's end.
         let farIsTarget = !end.atTarget
         let replacingOwn = holds == .one && !removing.isEmpty && !adding.isEmpty
+        var unlinking = removing
+        var change = RelationshipChange()
         // Every link the change makes, whether added or made by moving an end: what the core is asked about.
-        var made: [EdgeDraft] = []
+        var made: [MadeLink] = []
         for other in adding {
-            let link = draft(id, other, end)
-            made.append(link)
             let taken = farHolds == .one ? held(by: other, farEnd).filter { (farIsTarget ? $0.source : $0.target) != id } : []
-            if let theirs = taken.first {
+            if let theirs = taken.first, !end.isInverse {
+                // The item chosen holds its one link elsewhere, and it is the third item's own: the move would take it from
+                // an item the person is not looking at, so they are told which item holds it. Where that link is the
+                // chosen item's own, as a child's parent is, the move changes it to this one.
                 let old = farIsTarget ? theirs.source : theirs.target
-                // The item chosen holds its one link elsewhere. Where that link is its own, as a child's parent is,
-                // the move changes it to this one. Where it is the third item's own, the move would take it from an
-                // item the person is not looking at, so they are told which item holds it.
-                guard end.isInverse else {
-                    let chosen = self.item(other)?.title ?? ""
-                    let holder = self.item(old)?.title ?? ""
-                    notices.tell(
-                        cantChange, String(localized: "“\(holder)” already holds this link to “\(chosen)”. Remove it there first.")
-                    )
-                    return nil
+                let chosen = self.item(other)?.title ?? ""
+                let holder = self.item(old)?.title ?? ""
+                return .refused(String(localized: "“\(holder)” already holds this link to “\(chosen)”. Remove it there first."))
+            }
+            // The end that stays holds one link, and its other end changes. A two-way link may point here instead, and
+            // then the end that moves is the one on the far side of that edge.
+            let replaced = replacingOwn ? unlinking.compactMap { old -> (ItemID, RelationshipChange.Move)? in
+                if let edge = held(by: id, end).first(where: { (farIsTarget ? $0.target : $0.source) == old }) {
+                    return (old, .init(edge: edge.id, end: farIsTarget ? .target : .source, to: other, from: old))
                 }
-                guard !replacingOwn else {
-                    notices.tell(cantChange, String(localized: "Both items already hold a link of this kind, so one can’t take the other’s."))
-                    return nil
+                if let edge = held(by: id, farEnd).first(where: { (farIsTarget ? $0.source : $0.target) == old }) {
+                    return (old, .init(edge: edge.id, end: farIsTarget ? .source : .target, to: other, from: old))
                 }
-                change.moving.append(.init(edge: theirs.id, end: farIsTarget ? .source : .target, to: id, from: old))
-            } else if replacingOwn {
-                guard removing.count == 1 else {
-                    notices.tell(cantChange, String(localized: "Choose one item here, or remove the link first."))
-                    return nil
-                }
-                // The end that stays holds one link, and its other end changes. A two-way link may point here instead,
-                // and then the end that moves is the one on the far side of that edge.
-                if let old = held(by: id, end).first(where: { (farIsTarget ? $0.target : $0.source) == removing[0] }) {
-                    change.moving.append(.init(edge: old.id, end: farIsTarget ? .target : .source, to: other, from: removing[0]))
-                } else if let old = held(by: id, farEnd).first(where: { (farIsTarget ? $0.source : $0.target) == removing[0] }) {
-                    change.moving.append(.init(edge: old.id, end: farIsTarget ? .source : .target, to: other, from: removing[0]))
-                } else {
-                    notices.tell(cantChange, String(localized: "Choose one item here, or remove the link first."))
-                    return nil
-                }
-                change.removing = []
+                return nil
+            }.first : nil
+            if let (old, move) = replaced {
+                unlinking.removeAll { $0 == old }
+                change.moving.append(move)
+                made.append(.moved(move))
+            } else if let theirs = taken.first {
+                let old = farIsTarget ? theirs.source : theirs.target
+                let move = RelationshipChange.Move(edge: theirs.id, end: farIsTarget ? .source : .target, to: id, from: old)
+                change.moving.append(move)
+                made.append(.moved(move))
             } else {
+                let link = draft(id, other, end)
                 change.adding.append(link)
+                made.append(.added(link))
             }
         }
-        return (change, made)
+        // A link that a move replaced is not removed as well.
+        change.removing = unlinking.flatMap { other in
+            (own.contains(other) ? [draft(id, other, end)] : []) + (incoming.contains(other) ? [draft(id, other, farEnd)] : [])
+        }
+        return .change(change, made: made)
     }
 
     /// Where links are added or moved and others removed, as when one item is chosen in place of another in a field

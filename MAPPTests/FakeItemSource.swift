@@ -48,6 +48,15 @@ nonisolated final class FakeItemSource: ItemSource {
     let searches = Mutex(0)
     /// The refusal for each edge a test names; any other is taken.
     let refusals = Mutex<[EdgeDraft: String]>([:])
+    /// The refusal for each edge a test names that is asked of as a move; any other move is taken.
+    let moveRefusals = Mutex<[EdgeID: String]>([:])
+
+    /// What the core was asked of, in order: a new link or a moved end.
+    enum Asked: Equatable {
+        case added(EdgeDraft)
+        case moved(EdgeID, EdgeTypeInfo.End, ItemID)
+    }
+    let asked = Mutex<[Asked]>([])
     /// What the core answers for a link target a test sets; any other target is unresolved.
     let knownLinks = Mutex<[String: LinkAnswer]>([:])
     let searchFails = Mutex(false)
@@ -154,7 +163,14 @@ nonisolated final class FakeItemSource: ItemSource {
     let holdingChecks = Mutex(false)
     func edgeVerdict(_ draft: EdgeDraft) async -> EdgeVerdict {
         while holdingChecks.withLock({ $0 }) { try? await Task.sleep(for: .milliseconds(5)) }
+        asked.withLock { $0.append(.added(draft)) }
         return refusals.withLock { $0[draft] }.map { .refused($0) } ?? .taken
+    }
+
+    func edgeVerdict(moving edge: EdgeID, end: EdgeTypeInfo.End, to: ItemID) async -> EdgeVerdict {
+        while holdingChecks.withLock({ $0 }) { try? await Task.sleep(for: .milliseconds(5)) }
+        asked.withLock { $0.append(.moved(edge, end, to)) }
+        return moveRefusals.withLock { $0[edge] }.map { .refused($0) } ?? .taken
     }
 
     func linkAnswers(of targets: [String], in note: ItemID?) async throws -> [LinkAnswer] {

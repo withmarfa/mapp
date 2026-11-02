@@ -42,7 +42,7 @@ nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, Ty
         switch error {
         case .forbidden: return .notPermitted
         case .notFound: return .notFound(error.message)
-        case .validation(_, let message): return .refused(reason(message))
+        case .validation(_, let message, _): return .refused(reason(message))
         case .instanceChanged: return .instanceChanged(error.message)
         default: return .failed(error.message)
         }

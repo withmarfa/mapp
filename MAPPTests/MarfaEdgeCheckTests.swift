@@ -73,15 +73,96 @@ struct MarfaEdgeCheckTests {
         await scene.source.close()
     }
 
-    @Test func aSecondParentIsNotTheChecksToRefuseSoTheLibraryMovesTheEdge() async throws {
+    /// `source` linked to `target` by an edge of `type`, once the library shows it.
+    private static func link(_ type: String, from source: String, to target: String, in scene: Scene) async throws {
+        _ = try await scene.fake.copy.edges.create(from: scene.id(source).rawValue, to: scene.id(target).rawValue, type: type)
+        try #require(await eventually {
+            scene.library.relationships(for: scene.id(target)).contains { $0.targets.contains { $0.itemID == scene.id(source) } }
+        })
+    }
+
+    private static func holds(_ name: String, _ field: String, in scene: Scene) -> [ItemID?] {
+        scene.library.relationships(for: scene.id(name)).first { $0.field == field }?.targets.map(\.itemID) ?? []
+    }
+
+    private func fullMessage(_ name: String) -> String {
+        String(localized: "“\(name)” can hold only one link of this kind, and already holds it.")
+    }
+
+    @Test func aSecondParentIsRefusedByTheCoreAndAReplacementIsAMoveItTakes() async throws {
         let scene = try await Self.scene([("a", "core.note"), ("b", "core.note"), ("child", "core.note")])
         try await Self.file("child", under: "a", in: scene)
-        // The check judges types, cycles, the bin and flat nesting; how many an end holds is the move's to keep.
+        let queued = try await scene.fake.copy.queue.all().count
+        // A picker replaces the one parent, so the row is asked as a move, which the core takes.
         #expect(await scene.library.relationshipVerdict(for: scene.id("child"), field: "child-of", to: scene.id("b")) == .taken)
+        // A second parent beside the first is the core's to refuse, in words naming the item that holds one already.
+        #expect(await scene.library.changeItemRelationship(scene.id("child"), field: "child-of", adding: [scene.id("b")], removing: [], undoManager: nil) == false)
+        #expect(scene.library.notices.waiting.last?.title == String(localized: "Can’t Change This Relationship"))
+        #expect(scene.library.notices.waiting.last?.message == fullMessage("child"))
+        #expect(try await scene.fake.copy.queue.all().count == queued, "a refused change queued a write")
+        #expect(Self.holds("child", "child-of", in: scene) == [scene.id("a")])
+        // Replacing it is one move.
+        scene.library.notices.answerAll()
         #expect(await scene.library.changeItemRelationship(scene.id("child"), field: "child-of", adding: [scene.id("b")], removing: [scene.id("a")], undoManager: nil))
-        try #require(await eventually {
-            scene.library.relationships(for: scene.id("child")).first { $0.field == "child-of" }?.targets.map(\.itemID) == [scene.id("b")]
-        })
+        try #require(await eventually { Self.holds("child", "child-of", in: scene) == [scene.id("b")] })
+        #expect(scene.library.notices.waiting.isEmpty)
+        await scene.source.close()
+    }
+
+    @Test func twoParentsChosenAtOnceAreRefusedAndNeitherIsWritten() async throws {
+        let scene = try await Self.scene([("a", "core.note"), ("b", "core.note"), ("c", "core.note"), ("child", "core.note")])
+        try await Self.file("child", under: "a", in: scene)
+        let queued = try await scene.fake.copy.queue.all().count
+        #expect(await scene.library.changeItemRelationship(
+            scene.id("child"), field: "child-of", adding: [scene.id("b"), scene.id("c")], removing: [], undoManager: nil) == false)
+        #expect(scene.library.notices.waiting.last?.message == fullMessage("child"))
+        #expect(try await scene.fake.copy.queue.all().count == queued)
+        // Chosen under a parent that has the child already, from either end, is not a new link.
+        #expect(await scene.library.changeItemRelationship(scene.id("a"), field: "inverse:parent-of", adding: [scene.id("child")], removing: [], undoManager: nil))
+        #expect(try await scene.fake.copy.queue.all().count == queued)
+        await scene.source.close()
+    }
+
+    @Test func aChildChosenUnderAParentFromTheParentsSideIsAMoveTheCoreChecks() async throws {
+        let scene = try await Self.scene([("a", "core.note"), ("b", "core.note"), ("child", "core.note")])
+        try await Self.file("child", under: "a", in: scene)
+        #expect(await scene.library.changeItemRelationship(scene.id("b"), field: "inverse:parent-of", adding: [scene.id("child")], removing: [], undoManager: nil))
+        try #require(await eventually { Self.holds("child", "child-of", in: scene) == [scene.id("b")] })
+        #expect(scene.library.notices.waiting.isEmpty)
+        await scene.source.close()
+    }
+
+    @Test func aLinkBothOfWhoseEndsHoldOneIsMovedOnlyWhereTheOtherEndHasRoom() async throws {
+        let scene = try await Self.scene([("x", "core.note"), ("y", "core.note"), ("z", "core.note"), ("w", "core.note"), ("v", "core.note")])
+        // `x` supersedes `y`, and `z` supersedes `w`: each of the four holds its one link.
+        try await Self.link("supersedes", from: "x", to: "y", in: scene)
+        try await Self.link("supersedes", from: "z", to: "w", in: scene)
+        let queued = try await scene.fake.copy.queue.all().count
+
+        // A second link beside the one `x` holds is refused naming `x`.
+        #expect(await scene.library.changeItemRelationship(scene.id("x"), field: "supersedes", adding: [scene.id("v")], removing: [], undoManager: nil) == false)
+        #expect(scene.library.notices.waiting.last?.message == fullMessage("x"))
+        // Replacing `y` by `w`, whose superseder is `z`'s link, is never taken from `z`.
+        scene.library.notices.answerAll()
+        #expect(await scene.library.changeItemRelationship(scene.id("x"), field: "supersedes", adding: [scene.id("w")], removing: [scene.id("y")], undoManager: nil) == false)
+        #expect(scene.library.notices.waiting.last?.message
+            == String(localized: "“\("z")” already holds this link to “\("w")”. Remove it there first."))
+        // `y`'s superseder `x` replaced by `z`, which already supersedes `w`, would leave `z` with two.
+        scene.library.notices.answerAll()
+        #expect(await scene.library.changeItemRelationship(scene.id("y"), field: "inverse:supersedes", adding: [scene.id("z")], removing: [scene.id("x")], undoManager: nil) == false)
+        #expect(scene.library.notices.waiting.last?.message == fullMessage("z"))
+        // Taken from the other end it is the same: `z`'s link would move onto `y`, which has one.
+        scene.library.notices.answerAll()
+        #expect(await scene.library.changeItemRelationship(scene.id("y"), field: "inverse:supersedes", adding: [scene.id("z")], removing: [], undoManager: nil) == false)
+        #expect(scene.library.notices.waiting.last?.message == fullMessage("y"))
+        #expect(try await scene.fake.copy.queue.all().count == queued, "a refused change queued a write")
+
+        // `y` replaced by `v`, which holds none, is one move.
+        scene.library.notices.answerAll()
+        #expect(await scene.library.changeItemRelationship(scene.id("x"), field: "supersedes", adding: [scene.id("v")], removing: [scene.id("y")], undoManager: nil))
+        try #require(await eventually { Self.holds("x", "supersedes", in: scene) == [scene.id("v")] })
+        #expect(scene.library.notices.waiting.isEmpty)
+        #expect(Self.holds("y", "inverse:supersedes", in: scene).isEmpty)
         await scene.source.close()
     }
 

@@ -190,6 +190,9 @@ nonisolated final class FailingSearchSource: ItemSource {
     func submit(_ write: ItemWrite, as id: WriteID, undoing: UndoGroup?) -> Bool { inner.submit(write, as: id, undoing: undoing) }
     func body(of item: ItemID) async throws -> ItemBody { try await inner.body(of: item) }
     func edgeVerdict(_ draft: EdgeDraft) async -> EdgeVerdict { await inner.edgeVerdict(draft) }
+    func edgeVerdict(moving edge: EdgeID, end: EdgeTypeInfo.End, to: ItemID) async -> EdgeVerdict {
+        await inner.edgeVerdict(moving: edge, end: end, to: to)
+    }
     func linkAnswers(of targets: [String], in note: ItemID?) async throws -> [LinkAnswer] {
         try await inner.linkAnswers(of: targets, in: note)
     }

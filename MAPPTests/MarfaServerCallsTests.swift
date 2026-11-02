@@ -100,7 +100,7 @@ private typealias PackagePatch = Marfa.InstanceConfigPatch
     }
 
     @Test func aRefusalGivesTheServersReasonWithoutItsDetails() {
-        let error = MarfaError.validation(code: "invalid_config", message: "Windows must not decrease. Details: {\"x\":1}")
+        let error = MarfaError.validation(code: "invalid_config", message: "Windows must not decrease. Details: {\"x\":1}", details: nil)
         let ending = MarfaServerCalls.ending(error)
         #expect(MarfaServerCalls.configFailure(ending) == .refused("Windows must not decrease."))
         #expect(MarfaServerCalls.iconFailure(ending) == .refused("Windows must not decrease."))

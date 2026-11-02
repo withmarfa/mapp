@@ -91,6 +91,9 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     func body(of item: ItemID) async throws -> ItemBody
     /// What the core says of `draft` for what the source holds. Queues nothing and needs no server.
     func edgeVerdict(_ draft: EdgeDraft) async -> EdgeVerdict
+    /// What the core says of moving one end of the edge `edge` to `to`, which it judges as a move: an end that holds
+    /// the one link of its type may be given another, which a new link to it would not be.
+    func edgeVerdict(moving edge: EdgeID, end: EdgeTypeInfo.End, to: ItemID) async -> EdgeVerdict
     /// What the copy says each link target names (`Items.linkCandidates`), read as a link in `note`'s text when
     /// given. Throws for a note the copy does not hold.
     func linkAnswers(of targets: [String], in note: ItemID?) async throws -> [LinkAnswer]

@@ -637,8 +637,8 @@ struct MarfaSourceOfflineTests {
         let selfLoop = WriteID()
         source.submit(.moveEdge(EdgeID(parentOf.id), end: .source, to: child), as: selfLoop)
         let answered = try #require(await log.wait { $0.answer(to: notReplaceable) != nil && $0.answer(to: selfLoop) != nil })
-        var validation = try #require(MarfaEngine.moveProblem(.validation(code: "validation_error", message: "")))
-        var cycle = try #require(MarfaEngine.moveProblem(.validation(code: "edge_cycle", message: "")))
+        var validation = try #require(MarfaEngine.moveProblem(.validation(code: "validation_error", message: "", details: nil)))
+        var cycle = try #require(MarfaEngine.moveProblem(.validation(code: "edge_cycle", message: "", details: nil)))
         // Refused before anything was queued.
         validation.notQueued = true
         cycle.notQueued = true
@@ -807,7 +807,7 @@ struct MarfaSourceOfflineTests {
         ] {
             #expect(MarfaEngine.problem(for: error) == SyncProblem(code: error.code(), message: MarfaEngine.notCurrent))
         }
-        let other = MarfaError.validation(code: "invalid_properties", message: "body: Required field is missing")
+        let other = MarfaError.validation(code: "invalid_properties", message: "body: Required field is missing", details: nil)
         #expect(MarfaEngine.problem(for: other) == SyncProblem(code: "invalid_properties", message: other.message))
         // The package's own refusal names the server's code, as a drain's verdict would.
         let reserved = MarfaError.forbidden(code: "type_not_permitted", message: "system.folder is written only through its own operation")
