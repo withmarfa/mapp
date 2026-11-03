@@ -79,7 +79,7 @@ nonisolated final class MarfaSource: ItemSource {
         let events = MarfaEngine.Events(continuation, activity: hub.activity)
         self.events = events
         embeds = MarfaEmbeds(events: events)
-        engine = MarfaEngine(copy: copy, hub: hub, downloads: downloads, reading: reading, refreshing: refreshing, tell: { event in
+        engine = MarfaEngine(copy: copy, hub: hub, reading: reading, refreshing: refreshing, tell: { event in
             if case .terminated = events.yield(event) { false } else { true }
         })
         Task { [engine] in await engine.run(stream) }

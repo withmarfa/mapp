@@ -84,13 +84,6 @@ extension MarfaSync {
     }
 }
 
-extension MarfaDownloads {
-    nonisolated struct TestHooks: Sendable {
-        /// Runs after the downloads are trimmed and before the budget is put back.
-        let removing = TestHook<@Sendable () async -> Void>()
-    }
-}
-
 extension PictureCache {
     nonisolated struct TestHooks: Sendable {
         /// Runs as a trim begins, given whether the lock `removeAll` and `store` share is free then.

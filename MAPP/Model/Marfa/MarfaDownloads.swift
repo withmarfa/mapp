@@ -46,15 +46,8 @@ nonisolated extension DownloadedFileState {
     }
 }
 
-actor MarfaDownloads: DownloadedFiles {
+struct MarfaDownloads: DownloadedFiles {
     private let copy: WorkingCopy
-    private var changing = false
-    private(set) var stopped = false
-    private var waiting: [CheckedContinuation<Void, Never>] = []
-
-    #if DEBUG
-    nonisolated let hooks = TestHooks()
-    #endif
 
     init(copy: WorkingCopy) {
         self.copy = copy
@@ -65,55 +58,17 @@ actor MarfaDownloads: DownloadedFiles {
     }
 
     func setBudget(_ budget: DownloadBudget) async throws {
-        guard !stopped else { throw MarfaError.closed(message: MarfaEngine.closedLibrary) }
-        guard !changing else { throw Self.busy }
-        changing = true
-        defer { finished() }
         _ = try await copy.blobs.setBudget(budget.marfa)
     }
 
+    /// The package takes the files it can fetch again and leaves the budget alone. A cache it cannot read is an error
+    /// to tell, never "nothing to remove".
     func removeDownloadedFiles() async throws {
-        guard !stopped else { throw MarfaError.closed(message: MarfaEngine.closedLibrary) }
-        guard !changing else { throw Self.busy }
-        changing = true
-        defer { finished() }
-        let setting = try await copy.blobs.cache().setting
-        // A zero budget trims only expendable downloads; attachments, uploads and leased files stay.
-        // Restore even if the trim throws after persisting the temporary setting.
         do {
-            _ = try await copy.blobs.setBudget(.bytes(bytes: 0))
-            #if DEBUG
-            await hooks.removing.current?()
-            #endif
-        } catch {
-            try await restore(setting)
-            throw error
+            _ = try await copy.blobs.removeFetchedFiles()
+        } catch let error as MarfaError {
+            throw SourceFailure(kind: .failed, message: String(localized: "Couldn’t remove downloaded files. \(error.message)"))
         }
-        try await restore(setting)
         await MarfaSource.removeKeptCopies()
-    }
-
-    /// The package refuses a call made from a canceled task, so the saved budget is put back from a task of its own:
-    /// a removal that is canceled partway must not leave the temporary zero in the store.
-    private func restore(_ setting: FileBudget) async throws {
-        let blobs = copy.blobs
-        _ = try await Task { try await blobs.setBudget(setting) }.value
-    }
-
-    /// The package has no trim-to-zero call that leaves the preference alone. Closing must wait for its restore.
-    func stop() async {
-        stopped = true
-        if changing { await withCheckedContinuation { waiting.append($0) } }
-    }
-
-    private func finished() {
-        changing = false
-        let done = waiting
-        waiting = []
-        for waiter in done { waiter.resume() }
-    }
-
-    private static var busy: SourceFailure {
-        SourceFailure(kind: .failed, message: String(localized: "Wait for the current download change to finish."))
     }
 }

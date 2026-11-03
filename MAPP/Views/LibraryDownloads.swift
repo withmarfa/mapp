@@ -5,7 +5,7 @@ struct LibraryDownloads: View {
     @State private var state: DownloadedFileState?
     @State private var working = false
     @State private var readFailed = false
-    @State private var actionFailed = false
+    @State private var actionFailure: String?
 
     private static let sizes: [UInt64] = [1, 5, 10, 25, 100].map { $0 * 1_000_000_000 }
 
@@ -57,8 +57,8 @@ struct LibraryDownloads: View {
                 Text("Couldn’t read downloaded files. MAPP will try again.")
                     .foregroundStyle(.secondary)
             }
-            if actionFailed {
-                Text("Couldn’t change downloaded files. Check the current limit and try again.")
+            if let actionFailure {
+                Text(actionFailure)
                     .foregroundStyle(.secondary)
             }
         } header: {
@@ -95,9 +95,11 @@ struct LibraryDownloads: View {
             defer { working = false }
             do {
                 try await action()
-                actionFailed = false
+                actionFailure = nil
+            } catch let failure as SourceFailure {
+                actionFailure = failure.message
             } catch {
-                actionFailed = true
+                actionFailure = String(localized: "Couldn’t change downloaded files. Check the current limit and try again.")
             }
             await read()
         }

@@ -870,6 +870,9 @@
     "Couldn’t change downloaded files. Check the current limit and try again." : {
       "extractionState" : "manual"
     },
+    "Couldn’t remove downloaded files. %@" : {
+      "extractionState" : "manual"
+    },
     "Couldn’t read downloaded files. MAPP will try again." : {
       "extractionState" : "manual"
     },
@@ -1010,9 +1013,6 @@
     },
     "Use a different server" : {
 
-    },
-    "Wait for the current download change to finish." : {
-      "extractionState" : "manual"
     },
     "Items listed: %llu" : {
       "extractionState" : "manual"

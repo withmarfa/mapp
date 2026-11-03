@@ -101,7 +101,6 @@ actor MarfaEngine {
 
     let sync: MarfaSync
     let copy: WorkingCopy
-    private let downloads: MarfaDownloads
     let reading: any MarfaReading
     let hub: MarfaHub
     let tell: @Sendable (Event) -> Bool
@@ -190,15 +189,14 @@ actor MarfaEngine {
     nonisolated let hooks = TestHooks()
     #endif
 
-    init(copy: WorkingCopy, hub: MarfaHub, downloads: MarfaDownloads, reading: (any MarfaReading)? = nil,
+    init(copy: WorkingCopy, hub: MarfaHub, reading: (any MarfaReading)? = nil,
          refreshing: (any MarfaRefreshing)? = nil,
          tell: @escaping @Sendable (Event) -> Bool) {
         self.copy = copy
-        self.downloads = downloads
         self.reading = reading ?? MarfaRead(copy: copy)
         self.hub = hub
         self.tell = tell
-        sync = MarfaSync(copy: copy, hub: hub, downloads: downloads, refreshing: refreshing, tell: tell)
+        sync = MarfaSync(copy: copy, hub: hub, refreshing: refreshing, tell: tell)
     }
 
     func run(_ events: AsyncStream<Event>) async {
@@ -323,7 +321,6 @@ actor MarfaEngine {
         }
         held = []
         await sync.stop()
-        await downloads.stop()
         await copy.close()
     }
 
