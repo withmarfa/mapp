@@ -56,24 +56,25 @@ struct DateDisplayTests {
         #expect(label(-400).hasSuffix("2025"))
     }
 
+    // Value tests use an afternoon time: the morning hour's padding (9:12 or 09:12) is the system's to decide.
     @Test func automaticValuesAreAbbreviatedWithTheTimeWhereThereIsOne() {
-        let date = moment(daysAgo: 0)
-        #expect(text(date, .value, .automatic) == "25 Sep 2026 at 09:12")
+        let date = moment(daysAgo: 0, hour: 14, minute: 30)
+        #expect(text(date, .value, .automatic) == "25 Sep 2026 at 14:30")
         #expect(text(date, hasTime: false, .value, .automatic) == "25 Sep 2026")
     }
 
     // MARK: The other formats
 
     @Test func relativeValuesSayTheDayInWordsAndKeepTheTime() {
-        #expect(text(moment(daysAgo: 0), .value, .relative) == "Today at 09:12")
-        #expect(text(moment(daysAgo: 1), .value, .relative) == "Yesterday at 09:12")
-        #expect(text(moment(daysAgo: 1), hasTime: false, .value, .relative) == "Yesterday")
+        #expect(text(moment(daysAgo: 0, hour: 14, minute: 30), .value, .relative) == "Today at 14:30")
+        #expect(text(moment(daysAgo: 1, hour: 14, minute: 30), .value, .relative) == "Yesterday at 14:30")
+        #expect(text(moment(daysAgo: 1, hour: 14, minute: 30), hasTime: false, .value, .relative) == "Yesterday")
         #expect(text(moment(daysAgo: 30), hasTime: false, .value, .relative).hasPrefix("26 Aug"))
     }
 
     @Test func shortWritesTheDateInNumbersEverywhere() {
-        let date = moment(daysAgo: 1)
-        #expect(text(date, .value, .short) == "24/09/2026, 09:12")
+        let date = moment(daysAgo: 1, hour: 14, minute: 30)
+        #expect(text(date, .value, .short) == "24/09/2026, 14:30")
         #expect(text(date, hasTime: false, .value, .short) == "24/09/2026")
         #expect(text(date, .list, .short) == "24/09/2026")
         #expect(text(date, hasTime: false, .table, .short) == "24/09/2026")
@@ -81,8 +82,8 @@ struct DateDisplayTests {
     }
 
     @Test func longWritesTheMonthInFullEverywhere() {
-        let date = moment(daysAgo: 1)
-        #expect(text(date, .value, .long) == "24 September 2026 at 09:12")
+        let date = moment(daysAgo: 1, hour: 14, minute: 30)
+        #expect(text(date, .value, .long) == "24 September 2026 at 14:30")
         #expect(text(date, hasTime: false, .value, .long) == "24 September 2026")
         #expect(text(date, .list, .long) == "24 September 2026")
         #expect(text(date, hasTime: false, .table, .long) == "24 September 2026")
