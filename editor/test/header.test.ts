@@ -42,6 +42,7 @@ const ticket: HeaderModel = {
   propertyRejected: false,
   parentRejected: false,
   interfaceTextSize: 13,
+  titleLines: 2,
 }
 
 beforeEach(() => {
@@ -533,6 +534,11 @@ test('the byline keeps one dot between its parts however often it is drawn again
   header.set({ ...ticket, byline: { source: 'GitHub', date: 'Yesterday' } })
   header.set({ ...ticket, byline: { source: 'GitHub', date: 'Today' } })
   expect(dots()).toBe(first)
+})
+
+test('the title is told how many lines to show', () => {
+  header.set({ ...ticket, titleLines: 4 })
+  expect(root.style.getPropertyValue('--title-lines')).toBe('4')
 })
 
 test('a collection lists what it holds under its text, open, apart from what links to it', () => {

@@ -15,17 +15,10 @@ nonisolated enum NoteLinks {
         return link.name.text == name && link.heading == nil && link.alias?.text == alias
     }
 
-    /// Whether a title can stand as `[[Title]]` for the core and for Inkkit alike. Inkkit draws no link around
-    /// a `[`, `]` or a second `|`, and `|` and `#` split a link into its parts for both, so a title with any of them
-    /// is written by its identity instead.
-    static func isPlainName(_ title: String) -> Bool {
-        !title.contains { "[]|#".contains($0) }
-    }
-
-    /// A title as one line of a link's label. Line breaks, control characters and the characters neither the core
-    /// nor Inkkit can carry in a label (`[`, `]`, `|`, `#`) become one space; nothing else is changed, and a backslash
-    /// stays as it is, since both read it literally. The label is only what the link shows; the identity before it
-    /// names the note.
+    /// A title as one line of a link's label. Line breaks and control characters become one space, and so does a
+    /// bracket that repeats the one before it or closes the label, since `[[` and `]]` there would end or open
+    /// another link. Everything else stays: Inkkit and the core read `[`, a lone `]`, `|`, `#` and a backslash in a
+    /// label as the text they are. The label is only what the link shows; the identity before it names the note.
     static func label(_ title: String) -> String {
         var words: [String] = []
         var word = String.UnicodeScalarView()
@@ -37,11 +30,14 @@ nonisolated enum NoteLinks {
             switch scalar.properties.generalCategory {
             case .control, .lineSeparator, .paragraphSeparator: end()
             default:
-                if "[]|#".unicodeScalars.contains(scalar) { end() } else { word.append(scalar) }
+                if (scalar == "[" || scalar == "]") && word.last == scalar { end() }
+                word.append(scalar)
             }
         }
         end()
-        return NoteName.trimmed(words.joined(separator: " "))
+        var label = NoteName.trimmed(words.joined(separator: " "))
+        while label.hasSuffix("]") { label = NoteName.trimmed(String(label.dropLast())) }
+        return label
     }
 
     /// A note the page may offer by its title.
@@ -119,7 +115,7 @@ extension ItemLibrary {
     /// link cannot spell, is left out. The closest matches are asked of the core together, so a few left out leave the list full.
     func noteNames(matching query: String, in note: ItemID? = nil, using index: NoteLinks.Index, limit: Int = 12) async -> [String] {
         let matches = await index.matches(for: query, among: items(in: .allNotes), limit: limit * 4)
-            .filter { NoteLinks.isPlainName($0.title) && NoteLinks.spells($0.title, as: $0.title) }
+            .filter { NoteLinks.spells($0.title, as: $0.title) }
         guard !matches.isEmpty, let answers = await linkAnswers(of: matches.map(\.title), in: note) else { return [] }
         return zip(matches, answers).compactMap { $0.1.offers($0.0.id) ? $0.0.title : nil }.prefix(limit).map { $0 }
     }

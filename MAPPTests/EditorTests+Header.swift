@@ -16,7 +16,7 @@ extension EditorTests {
                    parent: .init(label: "Field Research", enabled: true),
                    byline: PageByline(source: "Marfa", date: "Yesterday"),
                    properties: [PropertyRow(id: "status", label: "Status", value: .status), PropertyRow(id: "child-of", label: "Parent", value: .parent)],
-                   contents: [], linked: [], showsText: true, showMore: "Show 0 More", showMoreContents: "Show 0 More", showMoreLinked: "Show 0 More", propertyRejected: false, parentRejected: false, interfaceTextSize: 13)
+                   contents: [], linked: [], showsText: true, showMore: "Show 0 More", showMoreContents: "Show 0 More", showMoreLinked: "Show 0 More", propertyRejected: false, parentRejected: false, interfaceTextSize: 13, titleLines: 2)
     }
 
     static func json(_ value: some Encodable) -> String {
@@ -51,6 +51,17 @@ extension EditorTests {
         }
         #expect(focused == "ItemPageTitle")
         #expect(selected == "Untitled", "the title is selected, so typing names the item")
+    }
+
+    @Test(arguments: [2, 5])
+    func theTitleIsCutAtTheChosenLines(lines: Int) async throws {
+        let page = try await Page()
+        var header = Self.header("A long title " + String(repeating: "that runs on ", count: 40))
+        header.titleLines = lines
+        page.editor.setHeader(header)
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        let clamp = "getComputedStyle(document.querySelector('#ItemPageTitle')).webkitLineClamp"
+        #expect(try await page.editor.webView.evaluateJavaScript(clamp) as? String == String(lines))
     }
 
     @Test func theItemHeaderScrollsWithTheTextInsideThePage() async throws {

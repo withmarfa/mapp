@@ -198,6 +198,14 @@ body[data-text='none'] #editor {
   user-select: text;
 }
 
+/* Cut at the chosen number of lines while the title is not being edited; editing shows it whole. */
+.item-title:not(:focus) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--title-lines, 2);
+  overflow: hidden;
+}
+
 .item-title[hidden] {
   display: none;
 }

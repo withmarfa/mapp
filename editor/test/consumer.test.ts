@@ -1046,3 +1046,40 @@ test('the caret from quick add is placed in the page', async () => {
     expect(engine.textSnapshot(1).selection).toMatchObject({ from: 17, to: 17 })
   })
 })
+
+test('a wiki link is drawn for every form Marfa reads as one link', async () => {
+  const drawn = [
+    'a]b',
+    'a[b',
+    '[c',
+    '[',
+    'c[',
+    'a|b|c',
+    'a#b#c',
+    'a#',
+    'a|',
+    'x [y] z',
+    '[ [c',
+    'id|[c',
+    'id|c[',
+    'id|a|b',
+    'id|a#b',
+    'id|c[ [',
+    'id|[ [',
+    'id|a] ]b',
+    'id|a[ [b',
+  ]
+  for (const inner of drawn)
+    await withEditor(`See [[${inner}]] end\n`, (editor) => {
+      expect(document.querySelectorAll('.inkkit-wiki-link'), inner).toHaveLength(1)
+      expect(editor.snapshot().text).toBe(`See [[${inner}]] end\n`)
+    })
+})
+
+test('a link whose brackets touch more opening brackets stays exact source', async () => {
+  for (const inner of ['[[c', '[[[c', 'c[[', '[[]'])
+    await withEditor(`[[${inner}]]\n`, (editor) => {
+      expect(document.querySelectorAll('.inkkit-wiki-link'), inner).toHaveLength(0)
+      expect(editor.snapshot().text).toBe(`[[${inner}]]\n`)
+    })
+})

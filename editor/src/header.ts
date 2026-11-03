@@ -126,6 +126,8 @@ export interface HeaderModel {
   parentRejected: boolean
   /** The interface's text size in points, which the pins and messages follow. */
   interfaceTextSize: number
+  /** How many lines the title shows before an ellipsis cuts it, while it is not being edited. */
+  titleLines: number
 }
 
 /** A symbol the app drew, as an image the page uses as a mask so it takes the text's color. */
@@ -508,6 +510,7 @@ export class ItemHeader {
     this.footer.hidden = model.hidden
     this.root.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)
     this.footer.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)
+    this.root.style.setProperty('--title-lines', String(model.titleLines))
     document.body.dataset.text = model.showsText ? 'shown' : 'none'
     this.root.dataset.kind = model.kind
     document.body.dataset.header = model.hidden ? 'general' : model.kind

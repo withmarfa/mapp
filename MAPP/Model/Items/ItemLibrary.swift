@@ -237,7 +237,7 @@ extension ItemLibrary {
         let identity = id.rawValue
         let label = NoteLinks.label(title)
         let spellings = [
-            NoteLinks.isPlainName(title) && NoteLinks.spells(title, as: title) ? title : nil,
+            NoteLinks.spells(title, as: title) ? title : nil,
             label.isEmpty ? nil : NoteLinks.spells("\(identity)|\(label)", as: identity, alias: label) ? "\(identity)|\(label)" : nil,
             NoteLinks.spells(identity, as: identity) ? identity : nil,
         ].compactMap { $0 }

@@ -89,6 +89,8 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     var propertyRejected: Bool
     var parentRejected: Bool
     var interfaceTextSize: Int
+    /// How many lines the title shows before an ellipsis cuts it, while it is not being edited.
+    var titleLines: Int
 
     /// The icons of the types the header names, which the page draws as images.
     var typeIconNames: Set<String?> {
