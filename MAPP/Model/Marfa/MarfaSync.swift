@@ -25,7 +25,6 @@ actor MarfaSync {
     private static let log = Telemetry.logger(.sync)
 
     private let copy: WorkingCopy
-    private let downloads: MarfaDownloads
     private let refreshing: any MarfaRefreshing
     private let hub: MarfaHub
     /// False once the engine has stopped taking events.
@@ -77,10 +76,9 @@ actor MarfaSync {
         }
     }
 
-    init(copy: WorkingCopy, hub: MarfaHub, downloads: MarfaDownloads? = nil, refreshing: (any MarfaRefreshing)? = nil,
+    init(copy: WorkingCopy, hub: MarfaHub, refreshing: (any MarfaRefreshing)? = nil,
          tell: @escaping @Sendable (MarfaEngine.Event) -> Bool) {
         self.copy = copy
-        self.downloads = downloads ?? MarfaDownloads(copy: copy)
         self.refreshing = refreshing ?? MarfaRefresh(copy: copy)
         self.hub = hub
         self.tell = tell

@@ -12,7 +12,7 @@
 - A type's search follows Include Subtypes (`SearchScope.typeWithSubtypes`, one type through `SearchFilters.types`); `MarfaSource.search` is one call, so more than ten types is refused, shown as "Can’t Search".
 - The engine keeps every `system.*` row out of items, Recents, counts, search and the bin (`MarfaMapping.isLibraryItem`).
 - Properties, bodies and answers cross the package as values, not JSON text. The package owns its types (`Item`, `Edge`, `Draft`, `Edit`, `JSONValue`); `import Marfa` is its only import.
-- Tests step into the engine, `MarfaSync`, `MarfaDownloads` and `PictureCache` only through their `hooks`, counting through `TestTally` (`TestHooks.swift`, Debug only). Never add a setter or an override for tests to a shipping type.
+- Tests step into the engine, `MarfaSync` and `PictureCache` only through their `hooks`, counting through `TestTally` (`TestHooks.swift`, Debug only). Never add a setter or an override for tests to a shipping type.
 - `MarfaHost` owns the connection: the address in defaults, the sign-in in the Keychain, made on the server's own page. Each address has its own copy (`MarfaStoreLocation`). The library is the one subscriber to the source's states and reports and tells the host by callback.
 - An address that sends the sign-in over plain http to another machine is told once a run (`Server.plainHTTPOrigin`). `Server` calls go over `URLSession`, so App Transport Security applies; `Info.plist` has no exception.
 
