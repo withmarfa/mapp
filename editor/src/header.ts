@@ -126,6 +126,8 @@ export interface HeaderModel {
   parentRejected: boolean
   /** The interface's text size in points, which the pins and messages follow. */
   interfaceTextSize: number
+  /** How many lines the title shows before an ellipsis cuts it, while it is not being edited. */
+  titleLines: number
 }
 
 /** A symbol the app drew, as an image the page uses as a mask so it takes the text's color. */
@@ -508,6 +510,7 @@ export class ItemHeader {
     this.footer.hidden = model.hidden
     this.root.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)
     this.footer.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)
+    this.root.style.setProperty('--title-lines', String(model.titleLines))
     document.body.dataset.text = model.showsText ? 'shown' : 'none'
     this.root.dataset.kind = model.kind
     document.body.dataset.header = model.hidden ? 'general' : model.kind
@@ -720,15 +723,9 @@ export class ItemHeader {
     this.drawn = key
 
     // The type, then who made the item and when, as one quiet line.
-    for (const extra of [...this.byline.querySelectorAll('.item-byline-part, .item-byline-dot')])
-      extra.remove()
-    let first = this.typePin.hidden
+    for (const extra of [...this.byline.querySelectorAll('.item-byline-part')]) extra.remove()
     for (const part of [source, model.byline.date, model.byline.detail]) {
-      if (!part) continue
-      if (!first)
-        element('span', 'item-byline-dot', this.byline).setAttribute('aria-hidden', 'true')
-      first = false
-      element('span', 'item-byline-part', this.byline).textContent = part
+      if (part) element('span', 'item-byline-part', this.byline).textContent = part
     }
 
     const shown = this.expanded.properties

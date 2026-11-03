@@ -198,6 +198,14 @@ body[data-text='none'] #editor {
   user-select: text;
 }
 
+/* Cut at the chosen number of lines while the title is not being edited; editing shows it whole. */
+.item-title:not(:focus) {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--title-lines, 2);
+  overflow: hidden;
+}
+
 .item-title[hidden] {
   display: none;
 }
@@ -406,7 +414,8 @@ body[data-text='none'] #editor {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0 calc(var(--step) * 2);
+  /* 14 pt at the base text size: wider than the grid's 4 pt steps, so the parts read as separate without a mark. */
+  gap: 0 calc(var(--step) * 3.5);
   margin-top: calc(var(--step) * -1);
   color: var(--label-secondary);
   font-size: calc(var(--interface-text-size) * 13 / 13);

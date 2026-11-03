@@ -106,6 +106,7 @@ private struct EditorSettings: View {
                 PageWidthOptions()
                 ReadingWidthOptions()
                 SourceViewWidthOption()
+                TitleLinesOption()
             }
             Section("Text") { TextOptions() }
             Section {

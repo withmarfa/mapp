@@ -196,7 +196,7 @@ extension EditorTests {
 
     @Test func aLinkByIdentityShowsAnyTitleAndNamesTheNoteThatDeclaresIt() async throws {
         let page = try await Page()
-        let titles = ["A|B", "A#B", "A]B", "[Draft]", "back\\slash", "Café 日本語", "line\nbreak"]
+        let titles = ["A|B", "A#B", "A]B", "[Draft]", "[[c", "c[[", "a]]b", "back\\slash", "Café 日本語", "line\nbreak"]
         for title in titles {
             let note = page.library.add("\(title)\nBody\n")
             // A title a link cannot spell is named by identity; nothing is escaped, since a link has no escape.
@@ -206,11 +206,11 @@ extension EditorTests {
             #expect(await bound(link, in: page.library) == note.id, "\(link)")
         }
         let tricky = try #require(page.library.items.first { $0.title == "A]B" })
-        #expect(await page.library.bodyLink(to: tricky.id, in: nil) == "[[\(tricky.id.rawValue)|A B]]", "Inkkit draws no link around a bracket, so the identity names it")
+        #expect(await page.library.bodyLink(to: tricky.id, in: nil) == "[[A]B]]", "Inkkit 0.7.2 and the core both read a lone bracket as part of the name")
         let slash = try #require(page.library.items.first { $0.title == "back\\slash" })
         #expect(await page.library.bodyLink(to: slash.id, in: nil) == "[[back\\slash]]", "a backslash is part of the name")
         let bar = try #require(page.library.items.first { $0.title == "A|B" })
-        #expect(await page.library.bodyLink(to: bar.id, in: nil) == "[[\(bar.id.rawValue)|A B]]")
+        #expect(await page.library.bodyLink(to: bar.id, in: nil) == "[[\(bar.id.rawValue)|A|B]]", "the bar splits a title link, so the identity names it and the label keeps the bar")
     }
 
     @Test func aLinkRequestAfterTheWindowWentIsAnsweredWithNothing() async throws {

@@ -6,7 +6,25 @@ enum PageKey {
     static let textSize = "noteTextSize"
     static let checksSpelling = "checksSpelling"
     static let readingWidth = "readingWidth"
-    static let all = [fullWidth, textSize, checksSpelling, readingWidth]
+    static let titleLines = "titleLines"
+    static let all = [fullWidth, textSize, checksSpelling, readingWidth, titleLines]
+}
+
+/// How many lines an item page's title shows before an ellipsis cuts it, while the title is not being edited.
+enum TitleLines {
+    static let choices = [2, 3, 4, 5]
+    static let standard = 2
+
+    /// A stored value as the number of lines shown: the standard where nothing usable is stored, and the nearest
+    /// choice where the value lies outside them.
+    static func resolved(_ stored: Int?) -> Int {
+        guard let stored else { return standard }
+        return min(choices.last!, max(choices.first!, stored))
+    }
+
+    static func stored(in defaults: UserDefaults = .standard) -> Int {
+        resolved(defaults.object(forKey: PageKey.titleLines) as? Int)
+    }
 }
 
 /// How a note's page is set out. The defaults here are the only ones; stored settings fall back to them.
@@ -98,5 +116,19 @@ struct TextOptions: View {
         Toggle("Check Spelling While Typing", systemImage: "textformat.abc.dottedunderline", isOn: $checksSpelling)
             .accessibilityLabel("Check Spelling While Typing")
             .accessibilityIdentifier("CheckSpelling")
+    }
+}
+
+/// How much of a long title an item page shows while it is not being edited.
+struct TitleLinesOption: View {
+    @AppStorage(PageKey.titleLines) private var titleLines = TitleLines.standard
+
+    var body: some View {
+        Picker("Title Length", selection: Binding { TitleLines.resolved(titleLines) } set: { titleLines = $0 }) {
+            ForEach(TitleLines.choices, id: \.self) { lines in
+                Text("\(lines) Lines").tag(lines)
+            }
+        }
+        .accessibilityIdentifier("TitleLines")
     }
 }

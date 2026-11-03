@@ -42,6 +42,7 @@ const ticket: HeaderModel = {
   propertyRejected: false,
   parentRejected: false,
   interfaceTextSize: 13,
+  titleLines: 2,
 }
 
 beforeEach(() => {
@@ -525,14 +526,20 @@ test('a long list of linked items expands, and folds again', () => {
   expect(section.querySelectorAll('.item-linked-row')).toHaveLength(3)
 })
 
-test('the byline keeps one dot between its parts however often it is drawn again', () => {
-  const dots = () => root.querySelectorAll('.item-byline-dot').length
+test('the byline draws each part once, with no mark between them, however often it is drawn again', () => {
+  const parts = () => root.querySelectorAll('.item-byline-part').length
   header.set({ ...ticket, byline: { source: 'GitHub', date: 'Today' } })
-  const first = dots()
+  const first = parts()
   expect(first).toBe(2)
   header.set({ ...ticket, byline: { source: 'GitHub', date: 'Yesterday' } })
   header.set({ ...ticket, byline: { source: 'GitHub', date: 'Today' } })
-  expect(dots()).toBe(first)
+  expect(parts()).toBe(first)
+  expect(root.querySelector('.item-byline .item-byline-dot')).toBeNull()
+})
+
+test('the title is told how many lines to show', () => {
+  header.set({ ...ticket, titleLines: 4 })
+  expect(root.style.getPropertyValue('--title-lines')).toBe('4')
 })
 
 test('a collection lists what it holds under its text, open, apart from what links to it', () => {

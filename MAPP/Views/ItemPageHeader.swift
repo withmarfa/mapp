@@ -11,6 +11,7 @@ struct ItemPageHeader: ViewModifier {
     @Environment(\.undoManager) private var undoManager
     @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
+    @AppStorage(PageKey.titleLines) private var titleLines = TitleLines.standard
     let item: Item
     let editor: EditorController
     let drafts: DetailsPresentation
@@ -44,6 +45,7 @@ struct ItemPageHeader: ViewModifier {
                 editor.showHeader { Cost.measure(.pageHeader) { Self.header(of: id, in: library, drafts: drafts) } }
             }
             .onChange(of: interfaceTextSize) { editor.refreshHeader() }
+            .onChange(of: titleLines) { editor.refreshHeader() }
             // The page is drawn from the defaults as they are when it is read, so a change made anywhere, in the
             // inspector, in the sheet or from the page's own menu, needs it read again.
             .onChange(of: placements) { editor.refreshHeader() }
@@ -52,7 +54,8 @@ struct ItemPageHeader: ViewModifier {
 
     /// What the page's header shows for the item, read from the library and the window's drafts as they are now.
     static func header(
-        of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation, placements: PagePlacements = .stored()
+        of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation, placements: PagePlacements = .stored(),
+        titleLines: Int = TitleLines.stored()
     ) -> PageHeader? {
         guard let item = library.item(id) else { return nil }
         let placement = placements.placement(of: item.type, in: library.catalogue)
@@ -122,7 +125,8 @@ struct ItemPageHeader: ViewModifier {
             showMoreLinked: String(localized: "Show \(max(0, linked.count - LinkedItem.foldAfter)) More"),
             propertyRejected: status.map { drafts.draft(for: item.id, key: $0.key).rejected } ?? false,
             parentRejected: parent.map { drafts.draft(for: item.id, key: $0.field).rejected } ?? false,
-            interfaceTextSize: UserDefaults.standard.object(forKey: InterfaceKey.textSize) as? Int ?? InterfaceStyle.defaultTextSize
+            interfaceTextSize: UserDefaults.standard.object(forKey: InterfaceKey.textSize) as? Int ?? InterfaceStyle.defaultTextSize,
+            titleLines: titleLines
         )
     }
 
