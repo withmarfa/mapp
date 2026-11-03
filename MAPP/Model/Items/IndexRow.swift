@@ -51,18 +51,19 @@ nonisolated enum IndexRows {
             .sorted { $0.code.localizedStandardCompare($1.code) == .orderedAscending }
     }
 
-    /// The sources of `items`, by the name the server gives each, with the types it wrote and its latest change. A
-    /// row counts what the server counted for its source, and the loaded items until the server has answered.
+    /// The sources `directory` lists (`SourceDirectory.listing`), each with the types of its loaded `items` and their
+    /// latest change; a source whose items are not loaded has a row with no types.
     static func sources(of items: [Item], catalogue: Catalogue, directory: SourceDirectory = SourceDirectory()) -> [IndexRow] {
-        groupedBySource(items).map { code, items in
-            let info = directory.info(code)
+        let grouped = Dictionary(uniqueKeysWithValues: groupedBySource(items).map { ($0.code, $0.items) })
+        return directory.listing(loaded: grouped.mapValues(\.count)).map { entry in
+            let items = grouped[entry.code] ?? []
+            let info = directory.info(entry.code)
             let breakdown = breakdown(of: items, catalogue: catalogue)
             let types = summary(of: breakdown)
             return IndexRow(
-                place: .source(code), title: info.name, icon: SourceTile.icon(for: info), secondary: types, types: types,
-                count: directory.counts?[code] ?? items.count, latest: items.map(\.modified).max(), breakdown: breakdown)
+                place: .source(entry.code), title: entry.name, icon: SourceTile.icon(for: info), secondary: types, types: types,
+                count: entry.count, latest: items.map(\.modified).max(), breakdown: breakdown)
         }
-        .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
     /// `collections` in the order given, each with its members' types. Its secondary line is its own type.

@@ -28,6 +28,15 @@ nonisolated struct SourceDirectory: Equatable, Sendable {
     /// The source `code`, or the code standing in for its name while the server has not named it.
     func info(_ code: String) -> SourceInfo { infos[code] ?? .unnamed(code) }
     func name(_ code: String) -> String { info(code).name }
+
+    /// The sources a list shows, by name, each with its count. Once the server has answered, they are its sources
+    /// that hold items (the last answer, while it cannot be reached); until then, the sources of the items loaded,
+    /// counted as `loaded` has them. The one place that chooses the sources, counts and order.
+    func listing(loaded: [String: Int]) -> [(code: String, name: String, count: Int)] {
+        (counts?.filter { $0.value > 0 } ?? loaded).filter { !$0.key.isEmpty }
+            .map { (code: $0.key, name: name($0.key), count: $0.value) }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
 }
 
 /// One field of a source, changed or taken back.
