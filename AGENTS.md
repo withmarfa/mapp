@@ -70,7 +70,7 @@ These hold across the app. The nested files say how the library keeps them.
 xcodebuild -project MAPP.xcodeproj -scheme MAPP -destination 'platform=macOS' -derivedDataPath build test
 # UI tests: take control of the keyboard and mouse.
 xcodebuild -project MAPP.xcodeproj -scheme 'MAPP UI Tests' -destination 'platform=macOS' -derivedDataPath build test
-# Before a release: the Live plan, against a Marfa test instance only. Without the address, key and instance id, each live test fails.
+# Before a release: the Live plan, against a Marfa test instance only.
 TEST_RUNNER_MARFA_API_URL=<address> TEST_RUNNER_MARFA_API_KEY=<key> TEST_RUNNER_MARFA_TEST_INSTANCE_ID=<instance_id> \
   xcodebuild -project MAPP.xcodeproj -scheme MAPP -testPlan Live -destination 'platform=macOS' -derivedDataPath build test
 ```

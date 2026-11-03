@@ -88,7 +88,7 @@ extension MarfaEngine {
     /// before queueing it; `code()` names only the kind of error, such as `forbidden` for `type_not_permitted`.
     nonisolated static func refusalCode(of error: MarfaError) -> String {
         switch error {
-        case .notFound(let code, _), .unauthorized(let code, _), .forbidden(let code, _), .validation(let code, _),
+        case .notFound(let code, _), .unauthorized(let code, _), .forbidden(let code, _), .validation(let code, _, _),
             .rateLimited(let code, _, _), .server(_, let code, _):
             code
         default:
@@ -99,7 +99,7 @@ extension MarfaEngine {
     /// What the package refuses a move for before it queues anything, in the person's words: a self-loop, or a
     /// type whose end that stays can hold more than one edge. Anything else is the package's own.
     nonisolated static func moveProblem(_ error: MarfaError) -> SyncProblem? {
-        guard case .validation(let code, _) = error else { return nil }
+        guard case .validation(let code, _, _) = error else { return nil }
         switch code {
         case "edge_cycle":
             return SyncProblem(code: code, message: String(localized: "An item can’t be linked to itself."))

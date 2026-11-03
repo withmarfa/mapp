@@ -242,6 +242,18 @@ extension LiveMarfaTests {
                 })
                 #expect(library.relationships(for: other).first { $0.field == "inverse:parent-of" } == nil)
 
+                // A second parent beside the one it has is refused by the core's check, which the copy makes; nothing is
+                // written and the child stays where it is.
+                #expect(await eventually { library.syncReport.waiting == 0 })
+                let waiting = library.syncReport.waiting
+                library.notices.answerAll()
+                #expect(await library.changeItemRelationship(child, field: "child-of", adding: [other], removing: [], undoManager: undo) == false)
+                #expect(library.notices.waiting.last?.message
+                    == String(localized: "“\(title)” can hold only one link of this kind, and already holds it."), "\(String(describing: library.notices.waiting.last))")
+                #expect(library.syncReport.waiting == waiting)
+                #expect(library.relationships(for: child).first { $0.field == "child-of" }?.targets.map(\.itemID) == [parent])
+                library.notices.answerAll()
+
                 // A favorite, and its undo.
                 step { library.setFavorite([child], true, undoManager: undo) }
                 #expect(await eventually { library.items(in: .favorites).contains { $0.id == child } })

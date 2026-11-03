@@ -224,16 +224,44 @@ nonisolated final class MarfaSource: ItemSource {
     /// `Edges.check` throws `validation` or `notFound` for an edge the core refuses. Any other error (the key changing,
     /// the copy closed or not yet whole, a canceled call) says nothing about the edge.
     func edgeVerdict(_ draft: EdgeDraft) async -> EdgeVerdict {
+        await verdict { try await copy.edges.check(from: draft.source.rawValue, to: draft.target.rawValue, type: draft.type) }
+    }
+
+    func edgeVerdict(moving edge: EdgeID, end: EdgeTypeInfo.End, to: ItemID) async -> EdgeVerdict {
+        let move: EdgeEdit.Move = end == .source ? .source(to.rawValue) : .target(to.rawValue)
+        return await verdict { try await copy.edges.check(edge.rawValue, moving: move) }
+    }
+
+    private func verdict(_ check: () async throws -> Void) async -> EdgeVerdict {
         do {
-            try await copy.edges.check(from: draft.source.rawValue, to: draft.target.rawValue, type: draft.type)
+            try await check()
             return .taken
         } catch let error as MarfaError {
             switch error {
-            case .validation, .notFound: return .refused(error.message)
+            case .validation, .notFound: return .refused(await refusal(error))
             default: return .unknown
             }
         } catch {
             return .unknown
+        }
+    }
+
+    /// The core's refusal in the person's words where MAPP can say more than the core does: an end that already holds the
+    /// one link of its type is named, as is a link made twice. Any other refusal is the core's own.
+    private func refusal(_ error: MarfaError) async -> String {
+        guard case .validation("edge_constraint_violation", _, let details) = error else { return error.message }
+        switch details?.object?["constraint"]?.string {
+        case "cardinality":
+            let object = details?.object
+            let full = (object?["target_id"] ?? object?["source_id"])?.string
+            var title: String?
+            if let full { title = try? await row(ItemID(full)).title }
+            let name = title.flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "Untitled")
+            return String(localized: "“\(name)” can hold only one link of this kind, and already holds it.")
+        case "duplicate":
+            return String(localized: "These items are already linked this way.")
+        default:
+            return error.message
         }
     }
 
