@@ -228,18 +228,18 @@ struct ListEntryTests {
             "phones": .array([Self.entry(["value": .string("+44 20 7946 0000")])]),
             "addresses": .array([Self.entry(["label": .string("home"), "street_address": .string("1 High Street"), "locality": .string("London")])]),
         ])
-        let lead = PageHeaderLead(for: item, kind: .person, body: nil, now: .now)
+        let lead = PageHeaderLead(for: item, kind: .person, body: nil, now: .now, format: .automatic)
         let rows = lead.refine(PropertyRow.rows(
-            of: item, type: Self.person, hidden: ["title"], relationships: [], parentField: "child-of", tags: []))
+            of: item, type: Self.person, hidden: ["title"], relationships: [], parentField: "child-of", format: .automatic, tags: []))
         #expect(rows.map(\.id) == ["emails", "phones", "addresses"])
         #expect(rows.map(\.value) == [.email("main@example.com"), .phone("+44 20 7946 0000"), .text("home, 1 High Street, London")])
     }
 
     @Test func aLabelledNumberIsStillANumberToCall() {
         let item = Self.personItem(["phones": .array([Self.entry(["value": .string("+44 20 7946 0000"), "label": .string("work")])])])
-        let lead = PageHeaderLead(for: item, kind: .person, body: nil, now: .now)
+        let lead = PageHeaderLead(for: item, kind: .person, body: nil, now: .now, format: .automatic)
         let rows = lead.refine(PropertyRow.rows(
-            of: item, type: Self.person, hidden: ["title"], relationships: [], parentField: "child-of", tags: []))
+            of: item, type: Self.person, hidden: ["title"], relationships: [], parentField: "child-of", format: .automatic, tags: []))
         #expect(rows.map(\.value) == [.phone("+44 20 7946 0000")])
     }
 
@@ -249,8 +249,8 @@ struct ListEntryTests {
             id: "core.entity.person", label: "Person", fields: [TypeField(name: "title", type: "string", declaredBy: "core.entity"), postcodes],
             titleField: "title"))
         let item = Self.personItem(["addresses": .array([Self.entry(["postal_code": .string("90210 12345")])])])
-        let lead = PageHeaderLead(for: item, kind: .person, body: nil, now: .now)
-        let rows = lead.refine(PropertyRow.rows(of: item, type: person, hidden: ["title"], relationships: [], parentField: "child-of", tags: []))
+        let lead = PageHeaderLead(for: item, kind: .person, body: nil, now: .now, format: .automatic)
+        let rows = lead.refine(PropertyRow.rows(of: item, type: person, hidden: ["title"], relationships: [], parentField: "child-of", format: .automatic, tags: []))
         #expect(rows.map(\.value) == [.text("90210 12345")])
         // Only a list whose first member is required plain text holds a number to call, and only in that member.
         #expect(try Self.shape(postcodes).numberToCall(in: ["postal_code": .string("90210 12345")]) == nil)
@@ -260,7 +260,7 @@ struct ListEntryTests {
 
     @Test func aPersonWithNoEntriesHasNoRows() {
         let item = Self.personItem(["emails": .array([])])
-        let rows = PropertyRow.rows(of: item, type: Self.person, hidden: ["title"], relationships: [], parentField: "child-of", tags: [])
+        let rows = PropertyRow.rows(of: item, type: Self.person, hidden: ["title"], relationships: [], parentField: "child-of", format: .automatic, tags: [])
         #expect(rows.isEmpty)
     }
 

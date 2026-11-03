@@ -54,7 +54,7 @@ nonisolated struct PageHeaderLead: Equatable, Sendable {
 
     /// The lead for `item`. `body` is its text, which a reading time is counted from.
     init(
-        for item: Item, kind: PageHeaderKind, body: String?, now: Date, calendar: Calendar = .current, locale: Locale = .current
+        for item: Item, kind: PageHeaderKind, body: String?, now: Date, format: DateFormat, calendar: Calendar = .current, locale: Locale = .current
     ) {
         self.kind = kind
         switch kind {
@@ -71,7 +71,7 @@ nonisolated struct PageHeaderLead: Equatable, Sendable {
             subtitle = person.subtitle
             consumed = PersonHeader.keys
         case .reading:
-            let reading = ReadingHeader(item: item, body: body, locale: locale, calendar: calendar)
+            let reading = ReadingHeader(item: item, body: body, format: format, locale: locale, calendar: calendar)
             subtitle = reading.dek
             byline = reading.byline
             showsType = false

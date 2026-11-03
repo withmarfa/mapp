@@ -322,7 +322,7 @@ struct InspectorFieldsTests {
             Property(key: "mail", value: .string("b@example.com")),
             Property(key: "notes", value: .string("en-GB")),
         ])
-        let values = Dictionary(uniqueKeysWithValues: type.fields.map { ($0.key, PropertyRow.value(of: $0, in: item)) })
+        let values = Dictionary(uniqueKeysWithValues: type.fields.map { ($0.key, PropertyRow.value(of: $0, in: item, format: .automatic)) })
         #expect(values["home"] == .url("https://example.com/a"))
         #expect(values["site"] == .url("https://example.com/b"))
         #expect(values["contact"] == .email("a@example.com"))

@@ -32,7 +32,7 @@ struct PropertyRowTests {
         hidden: Set<String> = ["title", "body"]
     ) -> [PropertyRow] {
         PropertyRow.rows(
-            of: item(properties), type: ticket, hidden: hidden, relationships: relationships, parentField: "child-of", tags: tags)
+            of: item(properties), type: ticket, hidden: hidden, relationships: relationships, parentField: "child-of", format: .automatic, tags: tags)
     }
 
     private static func relationship(_ field: String, _ label: String, _ titles: [(String, String)]) -> ItemRelationship {
@@ -53,7 +53,7 @@ struct PropertyRowTests {
         #expect(rows.map(\.id) == ["status", "priority", "due_at", "done", "estimate", "link", "contact"])
         #expect(rows[0].value == .status)
         #expect(rows[1].value == .text("High"))
-        #expect(rows[2].value == .date(ItemDate.parse("2026-10-27")!.text()))
+        #expect(rows[2].value == .date(ItemDate.parse("2026-10-27")!.text(format: .automatic)))
         #expect(rows[3].value == .boolean(true))
         #expect(rows[4].value == .text("5"))
         #expect(rows[5].value == .url("https://example.com/a"))
@@ -62,7 +62,7 @@ struct PropertyRowTests {
 
     @Test func aDatetimeReadsAsADate() {
         let rows = Self.rows(["due_at": .string("2026-10-27T14:00:00Z")])
-        #expect(rows.first { $0.id == "due_at" }?.value == .date(ItemDate.parse("2026-10-27T14:00:00Z")!.text()))
+        #expect(rows.first { $0.id == "due_at" }?.value == .date(ItemDate.parse("2026-10-27T14:00:00Z")!.text(format: .automatic)))
     }
 
     @Test func labelsComeFromTheCatalogue() {
@@ -107,7 +107,7 @@ struct PropertyRowTests {
         let type = MarfaMapping.itemType(ItemType(id: "aic.note", label: "Note", fields: [Self.field("title")], titleField: "title"))
         let rows = PropertyRow.rows(
             of: Self.item([:]), type: type, hidden: ["title"],
-            relationships: [Self.relationship("child-of", "Parent", [("Project", "p1")])], parentField: "child-of", tags: [])
+            relationships: [Self.relationship("child-of", "Parent", [("Project", "p1")])], parentField: "child-of", format: .automatic, tags: [])
         #expect(rows.map(\.value) == [.parent])
     }
 
@@ -129,7 +129,7 @@ struct PropertyRowTests {
     @Test func aLinkCarriesTheIconOfTheItemItOpens() {
         let blocks = Self.relationship("blocks", "Blocks", [("Ship it", "a"), ("Test it", "b")])
         let rows = PropertyRow.rows(
-            of: Self.item([:]), type: Self.ticket, hidden: ["title", "body"], relationships: [blocks], parentField: "child-of", tags: [],
+            of: Self.item([:]), type: Self.ticket, hidden: ["title", "body"], relationships: [blocks], parentField: "child-of", format: .automatic, tags: [],
             icon: { $0 == ItemID("a") ? "lucide:rocket" : nil })
         #expect(rows[1].value == .items([
             PropertyRow.Target(title: "Ship it", item: ItemID("a"), icon: "lucide:rocket"),
@@ -184,10 +184,10 @@ struct PropertyRowTests {
         calendar.timeZone = TimeZone(identifier: "Europe/London")!
         let now = calendar.date(from: DateComponents(year: 2026, month: 10, day: 27, hour: 12))!
         let created = calendar.date(from: DateComponents(year: 2026, month: 10, day: 26, hour: 9))!
-        let byline = PageByline(item: Self.item([:], source: "workbench-folder", created: created), now: now, calendar: calendar, locale: Locale(identifier: "en_GB"))
+        let byline = PageByline(item: Self.item([:], source: "workbench-folder", created: created), now: now, format: .automatic, calendar: calendar, locale: Locale(identifier: "en_GB"))
         #expect(byline.source == "workbench-folder")
         #expect(byline.date == "Yesterday")
-        #expect(PageByline(item: Self.item([:], source: "  "), now: now, calendar: calendar).source == nil)
+        #expect(PageByline(item: Self.item([:], source: "  "), now: now, format: .automatic, calendar: calendar).source == nil)
     }
 
     // MARK: Linked from
@@ -211,7 +211,7 @@ struct PropertyRowTests {
             Self.relationship("blocks", "Blocks", [("Mine", "d")]),
         ]
         let list = LinkedItem.list(
-            pointingTo: ItemID("self"), in: relationships, catalogue: catalogue, now: day, item: { id in items.first { $0.id == id } })
+            pointingTo: ItemID("self"), in: relationships, catalogue: catalogue, now: day, format: .automatic, item: { id in items.first { $0.id == id } })
         #expect(list.map(\.title) == ["New", "Old"])
         #expect(list.first?.icon == "lucide:file-text")
         #expect(list.first?.type == "Note")
@@ -234,7 +234,7 @@ struct PropertyRowTests {
         ]
         func titles(_ members: LinkedItem.Members) -> [String] {
             LinkedItem.list(
-                pointingTo: ItemID("self"), in: relationships, catalogue: catalogue, now: day, members: members,
+                pointingTo: ItemID("self"), in: relationships, catalogue: catalogue, now: day, format: .automatic, members: members,
                 item: { id in items.first { $0.id == id } }).map(\.title)
         }
         #expect(titles(.only) == ["File"])

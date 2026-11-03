@@ -15,6 +15,7 @@ struct ItemTableCell: View {
     let column: ItemTableColumn
     let browser: Browser
     let order: NoteOrder
+    let dateFormat: DateFormat
     /// Which row the pointer is on, shared by the row's cells, so the name's cell can answer to it from any of them.
     let hover: ItemTableHover
     @State private var isHovering = false
@@ -213,7 +214,7 @@ struct ItemTableCell: View {
         let now = library.now()
         let isLate = isDue && date < Calendar.current.startOfDay(for: now)
             && library.catalogue.statusGroup(of: row.item)?.isFinished != true
-        return Text(ItemTableDate.label(for: date, now: now))
+        return Text(DateDisplay.text(of: date, hasTime: false, place: .table, format: dateFormat, now: now))
             .foregroundStyle(isLate ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
             .monospacedDigit()
     }
@@ -296,25 +297,6 @@ struct ItemTableLabelStyle: LabelStyle {
         HStack(spacing: 6) {
             configuration.icon.frame(minWidth: 14)
             configuration.title
-        }
-    }
-}
-
-/// How the table writes a day.
-nonisolated enum ItemTableDate {
-    static func label(for date: Date, now: Date, calendar: Calendar = .current, locale: Locale = .current) -> String {
-        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)).day ?? 0
-        switch days {
-        case 0: return String(localized: "Today")
-        case -1: return String(localized: "Yesterday")
-        case 1: return String(localized: "Tomorrow")
-        case -6...(-2), 2...6:
-            return date.formatted(Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone).weekday(.wide))
-        default:
-            let sameYear = calendar.isDate(date, equalTo: now, toGranularity: .year)
-            var style = Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone).day().month(.abbreviated)
-            if !sameYear { style = style.year() }
-            return date.formatted(style)
         }
     }
 }

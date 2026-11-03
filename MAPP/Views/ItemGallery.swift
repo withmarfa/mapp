@@ -15,6 +15,7 @@ struct ItemGallery: View {
     @State private var anchor: ItemID?
     @State private var cursor: ItemID?
     @State private var daysSeen = 0
+    @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
 
     private static let spacing: CGFloat = 20
     private static let inset: CGFloat = 24
@@ -160,7 +161,7 @@ struct ItemGallery: View {
 
     private func card(_ item: Item, ids: [ItemID]) -> some View {
         GalleryCell(
-            item: item, browser: browser, order: order, day: daysSeen, width: thumbnailWidth, pane: pane,
+            item: item, browser: browser, order: order, day: daysSeen, dateFormat: dateFormat, width: thumbnailWidth, pane: pane,
             select: { id, extending, toggling in select(id, ids: ids, extending: extending, toggling: toggling) })
     }
 
@@ -187,6 +188,7 @@ private struct GalleryCell: View {
     let browser: Browser
     let order: NoteOrder
     let day: Int
+    let dateFormat: DateFormat
     let width: CGFloat
     var pane: FocusState<Browser.Pane?>.Binding
     let select: (ItemID, _ extending: Bool, _ toggling: Bool) -> Void
@@ -199,7 +201,7 @@ private struct GalleryCell: View {
             select(item.id, modifiers.contains(.shift), modifiers.contains(.command))
             pane.wrappedValue = .list
         } label: {
-            GalleryCard(item: item, browser: browser, order: order, day: day, width: width)
+            GalleryCard(item: item, browser: browser, order: order, day: day, dateFormat: dateFormat, width: width)
                 .equatable()
         }
         .buttonStyle(.plain)

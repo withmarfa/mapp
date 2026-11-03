@@ -93,6 +93,13 @@ private struct AppearanceSettings: View {
                 OrderOptions()
                 ListPreviewOptions()
             }
+            Section {
+                DateFormatOptions()
+            } header: {
+                Text("Dates")
+            } footer: {
+                Text("Automatic uses words in lists and tables, such as “Yesterday”, and abbreviated dates elsewhere. Times follow your Mac’s 12 or 24 hour setting.")
+            }
         }
         .labelStyle(.titleOnly)
         .settingsForm()
@@ -129,6 +136,24 @@ private struct SourceViewWidthOption: View {
     var body: some View {
         Toggle("Show Original Pages Wide", isOn: $wide)
             .accessibilityIdentifier("SourceOriginalWide")
+    }
+}
+
+private struct DateFormatOptions: View {
+    @AppStorage(DateFormat.key) private var format = DateFormat.standard
+
+    var body: some View {
+        Picker("Date Format", selection: $format) {
+            ForEach(DateFormat.allCases) { option in
+                switch option {
+                case .automatic: Text("Automatic")
+                case .relative: Text("Relative")
+                case .short: Text("Short")
+                case .long: Text("Long")
+                }
+            }
+        }
+        .accessibilityIdentifier("DateFormat")
     }
 }
 

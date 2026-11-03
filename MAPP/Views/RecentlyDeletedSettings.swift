@@ -4,6 +4,7 @@ import SwiftUI
 /// and Empty commands as the Recently Deleted place, which `RecentlyDeletedActions` supplies.
 struct RecentlyDeletedSettings: View {
     @Environment(\.library) private var library
+    @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     @State private var selection: Set<ItemID> = []
 
     var body: some View {
@@ -20,7 +21,7 @@ struct RecentlyDeletedSettings: View {
                         HStack {
                             Text(item.displayTitle).lineLimit(1)
                             Spacer(minLength: 8)
-                            Text(item.modified, format: .dateTime.day().month().year())
+                            Text(DateDisplay.text(of: item.modified, hasTime: false, place: .value, format: dateFormat))
                                 .foregroundStyle(.secondary)
                                 .monospacedDigit()
                         }

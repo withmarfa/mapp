@@ -3,7 +3,7 @@ import Marfa
 
 /// What an event's page shows first: a calendar block, the time with its zone, and how far off it is. Worked out
 /// from the event's own fields, in the event's own time zone, so the day an event falls on is the same for
-/// every reader.
+/// every reader. It is laid out in the event's zone and ignores the Dates setting (`DateFormat`).
 nonisolated struct EventHeader: Hashable, Sendable, Encodable {
     /// The calendar block: "OCT", "29", "Thursday".
     let month: String

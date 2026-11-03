@@ -226,13 +226,14 @@ struct SourceViewPicker: View {
 private struct WebPageHeader: View {
     @CurrentLibrary private var library
     @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
+    @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     @StoredPageStyle private var style
     let item: Item
     let inset: CGFloat
     @Binding var mode: SourceViewMode
 
     var body: some View {
-        let byline = PageByline(item: item, sourceName: item.source.map { library.sources.name($0) }, now: library.now())
+        let byline = PageByline(item: item, sourceName: item.source.map { library.sources.name($0) }, now: library.now(), format: dateFormat)
         let type = library.catalogue.itemTypes[item.type]
         VStack(alignment: .leading, spacing: 8) {
             Text(verbatim: item.displayTitle)
