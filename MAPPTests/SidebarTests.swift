@@ -202,6 +202,19 @@ struct SidebarTests {
         #expect(plan.destinations == [.all, .sources, .collections])
     }
 
+    @Test func theLibraryGroupShowsUntilEveryPlaceInItIsHidden() async throws {
+        let library = try await marfaLibrary()
+        var layout = SidebarLayout()
+        #expect(SidebarPlan(library, layout: layout).showsLibrary)
+        layout.setHidden(.all, true)
+        layout.setHidden(.sources, true)
+        #expect(SidebarPlan(library, layout: layout).showsLibrary, "one place left keeps the group")
+        layout.setHidden(.collections, true)
+        let plan = SidebarPlan(library, layout: layout)
+        #expect(!plan.showsLibrary)
+        #expect(plan.destinations == [.all, .sources, .collections], "Settings still offers them back")
+    }
+
     @Test func filesStayUnderItemsWithoutAddingAnotherSidebarDestination() async throws {
         let library = try await marfaLibrary()
         let plan = SidebarPlan(library, layout: SidebarLayout())

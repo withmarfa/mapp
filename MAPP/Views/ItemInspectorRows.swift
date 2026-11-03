@@ -8,11 +8,11 @@ enum InspectorMetrics {
     static let nameWidth: CGFloat = 96
     static let maxNameShare: CGFloat = 0.4
     static let gap: CGFloat = 8
-    static let rowPadding: CGFloat = 3
+    static let rowPadding: CGFloat = 5
     /// The space between two sections, in place of a rule.
-    static let sectionGap: CGFloat = 20
+    static let sectionGap: CGFloat = 28
     /// The space between a section's heading and what it holds.
-    static let headingGap: CGFloat = 6
+    static let headingGap: CGFloat = 8
     static let chipRadius: CGFloat = 7
     /// A chip's horizontal padding, both sides together.
     static let chipPadding: CGFloat = 16
@@ -141,7 +141,7 @@ struct InspectorFoldHeading<Add: View>: View {
                     .accessibilityHidden(true)
             }
             .interfaceFont(.title3.weight(.semibold))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.primary)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)

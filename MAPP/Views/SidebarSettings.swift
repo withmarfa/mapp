@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The Sidebar page of Settings: what the open library's sidebar shows, in the sidebar's own order and under its own
-/// names, each with a switch. The first group is Items, Sources and Collections under New and Search. The Views block
+/// names, each with a switch. The first group, Library, is Items, Sources and Collections. The Views block
 /// has its built-in views (Inbox, Recents and Favorites), a switch for the saved views and one for each of them. The
 /// Types block has a switch for itself and one for each type. A row moves within its group by dragging, by Move Up
 /// and Move Down in its context menu, or by the same two accessibility actions. The choices belong to the library
@@ -26,6 +26,8 @@ struct SidebarSettings: View {
         return Form {
             Section {
                 group(plan.destinations, in: library, plan: plan)
+            } header: {
+                Text("Library")
             }
             Section {
                 group(plan.builtInViews, in: library, plan: plan)

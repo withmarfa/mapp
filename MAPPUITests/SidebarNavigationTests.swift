@@ -21,8 +21,8 @@ final class SidebarNavigationTests: XCTestCase {
         app.terminate()
     }
 
-    func testSidebarListsTheTopBlockThenViewsAndTypes() {
-        let destinations = ["New", "Search", "Items", "Sources", "Collections", "Views", "Inbox", "Recents", "Favorites", "Recent Notes", "Types"]
+    func testSidebarListsNewAndSearchThenTheLibraryGroupThenViewsAndTypes() {
+        let destinations = ["New", "Search", "Library", "Items", "Sources", "Collections", "Views", "Inbox", "Recents", "Favorites", "Recent Notes", "Types"]
         for title in destinations {
             XCTAssertTrue(sidebarText(title).exists, "\(title) is available")
         }
@@ -34,7 +34,7 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertFalse(element("NewItemToolbar").exists, "the foot has no New Item button")
         XCTAssertTrue(element("SidebarNew").exists, "New is a row of the top block")
         XCTAssertTrue(element("SidebarSearch").exists, "Search is a row of the top block")
-        XCTAssertFalse(sidebarText("Browse").exists, "the top block has no heading")
+        XCTAssertFalse(sidebarText("Browse").exists, "New and Search have no heading")
         XCTAssertFalse(element("SidebarOpenSettings").exists, "Settings is the foot's cog")
         XCTAssertFalse(element("SidebarRecentlyDeleted").exists, "Recently Deleted is a Settings page")
         for title in ["Sources", "Collections"] {
@@ -172,7 +172,7 @@ final class SidebarNavigationTests: XCTestCase {
     func testTheCollectionsIndexListsTheLibrarysCollections() {
         XCTAssertTrue(sidebarText("Collections").waitForExistence(timeout: 3))
         XCTAssertLessThan(sidebarText("Sources").frame.maxY, sidebarText("Collections").frame.minY)
-        XCTAssertLessThan(sidebarText("Collections").frame.maxY, sidebarText("Favorites").frame.minY, "the indexes are in the top block, above Views")
+        XCTAssertLessThan(sidebarText("Collections").frame.maxY, sidebarText("Favorites").frame.minY, "the indexes are in the Library group, above Views")
         XCTAssertFalse(sidebarText("Home").exists, "collection entries belong in the index")
         sidebarText("Collections").click()
         let index = element("SidebarIndex")
