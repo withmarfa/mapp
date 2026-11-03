@@ -1064,6 +1064,10 @@ test('a wiki link is drawn for every form Marfa reads as one link', async () => 
     'id|c[',
     'id|a|b',
     'id|a#b',
+    'id|c[ [',
+    'id|[ [',
+    'id|a] ]b',
+    'id|a[ [b',
   ]
   for (const inner of drawn)
     await withEditor(`See [[${inner}]] end\n`, (editor) => {

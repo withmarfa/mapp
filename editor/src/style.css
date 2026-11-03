@@ -414,8 +414,7 @@ body[data-text='none'] #editor {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  /* 14 pt at the base text size: wider than the grid's 4 pt steps, so the parts read as separate without a mark. */
-  gap: 0 calc(var(--step) * 3.5);
+  gap: 0 calc(var(--step) * 2);
   margin-top: calc(var(--step) * -1);
   color: var(--label-secondary);
   font-size: calc(var(--interface-text-size) * 13 / 13);

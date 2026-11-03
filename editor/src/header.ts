@@ -723,9 +723,15 @@ export class ItemHeader {
     this.drawn = key
 
     // The type, then who made the item and when, as one quiet line.
-    for (const extra of [...this.byline.querySelectorAll('.item-byline-part')]) extra.remove()
+    for (const extra of [...this.byline.querySelectorAll('.item-byline-part, .item-byline-dot')])
+      extra.remove()
+    let first = this.typePin.hidden
     for (const part of [source, model.byline.date, model.byline.detail]) {
-      if (part) element('span', 'item-byline-part', this.byline).textContent = part
+      if (!part) continue
+      if (!first)
+        element('span', 'item-byline-dot', this.byline).setAttribute('aria-hidden', 'true')
+      first = false
+      element('span', 'item-byline-part', this.byline).textContent = part
     }
 
     const shown = this.expanded.properties

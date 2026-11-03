@@ -526,15 +526,14 @@ test('a long list of linked items expands, and folds again', () => {
   expect(section.querySelectorAll('.item-linked-row')).toHaveLength(3)
 })
 
-test('the byline draws each part once, with no mark between them, however often it is drawn again', () => {
-  const parts = () => root.querySelectorAll('.item-byline-part').length
+test('the byline keeps one dot between its parts however often it is drawn again', () => {
+  const dots = () => root.querySelectorAll('.item-byline-dot').length
   header.set({ ...ticket, byline: { source: 'GitHub', date: 'Today' } })
-  const first = parts()
+  const first = dots()
   expect(first).toBe(2)
   header.set({ ...ticket, byline: { source: 'GitHub', date: 'Yesterday' } })
   header.set({ ...ticket, byline: { source: 'GitHub', date: 'Today' } })
-  expect(parts()).toBe(first)
-  expect(root.querySelector('.item-byline .item-byline-dot')).toBeNull()
+  expect(dots()).toBe(first)
 })
 
 test('the title is told how many lines to show', () => {

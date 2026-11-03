@@ -21,7 +21,7 @@ struct NoteLinksTests {
             #expect(NoteLinks.spells(title, as: title), "\(title.debugDescription)")
         }
         // The core does not read these as a link to the title, whatever the page draws.
-        for title in ["", " leading", "trailing ", "A|B", "A#B", "a|b|c", "a#", "a|", "a[b]", "A [x]]", "[[c", "[[[c", "c[[", "[[", "two\nlines", "two\r\nlines"] {
+        for title in ["", " leading", "trailing ", "A|B", "A#B", "a|b|c", "a#", "a|", "a[b]", "A [x]]", "[[c", "[[[c", "c[[", "a[[b", "a]]b", "[[", "two\nlines", "two\r\nlines"] {
             #expect(!NoteLinks.spells(title, as: title), "\(title.debugDescription)")
         }
     }
@@ -156,7 +156,7 @@ struct NoteLinksTests {
     }
 
     @Test func eachAwkwardTitleIsLinkedWithoutAnAddedBackslash() async {
-        let titles = ["Plan\\", "a|b", "a#b", "a[b]", "a\\b", "[[c", "[c", "c[[", "a]]b", "c]"]
+        let titles = ["Plan\\", "a|b", "a#b", "a[b]", "a\\b", "[[c", "[c", "c[[", "a]]b", "c]", "a[[b"]
         let notes = titles.map { note($0) }
         let library = FakeItemLibrary(items: notes)
         for (title, item) in zip(titles, notes) {
@@ -179,6 +179,7 @@ struct NoteLinksTests {
         #expect(await library.bodyLink(to: notes[7].id, in: nil) == "[[\(notes[7].id.rawValue)|c[ []]")
         #expect(await library.bodyLink(to: notes[8].id, in: nil) == "[[\(notes[8].id.rawValue)|a] ]b]]")
         #expect(await library.bodyLink(to: notes[9].id, in: nil) == "[[\(notes[9].id.rawValue)|c]]")
+        #expect(await library.bodyLink(to: notes[10].id, in: nil) == "[[\(notes[10].id.rawValue)|a[ [b]]")
     }
 
     @Test func aLabelIsOneLineAndNothingIsEscaped() {
