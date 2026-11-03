@@ -6,7 +6,9 @@ final class WindowBringBackUITests: XCTestCase {
     /// `fresh` starts from the default window; otherwise the window comes back as the last run left it.
     private func launch(fresh: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = (fresh ? ["-ApplePersistenceIgnoreState", "YES"] : []) + ["-MAPPSampleLibrary"]
+        // Windows are kept on quit whatever System Settings says about closing them.
+        app.launchArguments = (fresh ? ["-ApplePersistenceIgnoreState", "YES"] : [])
+            + ["-NSQuitAlwaysKeepsWindows", "YES", "-MAPPSampleLibrary"]
         app.launch()
         return app
     }
