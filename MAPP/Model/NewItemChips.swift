@@ -1,7 +1,7 @@
 import Foundation
 
 extension Browser {
-    /// Whether the "Make something new" row of chips stands above the page: on the Sources and Collections indexes,
+    /// Whether the row of new-item chips stands above the page: on the Sources and Collections indexes,
     /// and on Items while it shows in a layout that spans the window (the gallery, table, board or timeline), not once
     /// an item is open.
     var offersNewItemChips: Bool {
@@ -17,7 +17,7 @@ extension Browser {
     }
 }
 
-/// Which types the "Make something new" row offers as chips, and which wait under its More chip.
+/// Which types the row of new-item chips offers as chips, and which wait under its More chip.
 enum NewItemChips {
     static let shownCount = 4
 
