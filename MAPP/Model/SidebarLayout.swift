@@ -16,7 +16,7 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
     /// One saved view's row, by its item ID.
     case view(ItemID)
 
-    /// The places under New and Search, in their default order.
+    /// The places in the Library group, under New and Search, in their default order.
     static let destinations: [SidebarPlace] = [.all, .sources, .collections]
     /// The built-in views at the top of the Views block, in their default order.
     static let builtInViews: [SidebarPlace] = [.inbox, .recents, .favorites]
@@ -154,7 +154,7 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
 /// sidebar, in order, hidden places included so Settings can offer them back.
 @MainActor
 struct SidebarPlan {
-    /// The places under New and Search: every item, the sources they came from, and the collections they are filed
+    /// The places in the Library group: every item, the sources they came from, and the collections they are filed
     /// under. Files are included in Items.
     let destinations: [SidebarPlace]
     /// The built-in views at the top of the Views block: Inbox, Recents and Favorites. They are places, not saved
@@ -184,6 +184,8 @@ struct SidebarPlan {
     func isShown(_ place: SidebarPlace) -> Bool { !layout.isHidden(place) }
 
     var shownDestinations: [SidebarPlace] { destinations.filter(isShown) }
+    /// The Library group shows while any of its places is switched on, so its heading never stands over nothing.
+    var showsLibrary: Bool { !shownDestinations.isEmpty }
     var shownBuiltInViews: [SidebarPlace] { builtInViews.filter(isShown) }
     /// The blocks of `library` that show. The saved views are absent once every one of them is hidden, as they are
     /// when there are none.

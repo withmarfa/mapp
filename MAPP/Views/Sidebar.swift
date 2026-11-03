@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// The window's sidebar, in the manner of the Claude desktop app: New and Search act, then Items, Sources and
-/// Collections open. The Views block follows, holding Inbox, Recents and Favorites and then the saved views, and the
-/// Types block after it. Settings > Sidebar switches each place on or off, and the foot holds the instance.
+/// The window's sidebar, in the manner of the Claude desktop app: New and Search act, then the Library group holds
+/// Items, Sources and Collections. The Views block follows, holding Inbox, Recents and Favorites and then the saved
+/// views, and the Types block after it. Settings > Sidebar switches each place on or off, and the foot holds the instance.
 struct Sidebar: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
@@ -90,7 +90,10 @@ private struct SidebarList: View {
         let plan = content.plan
         let folding = SidebarFolding(library: library, libraries: libraries, browser: browser, order: order, plan: plan)
         List(selection: selection) {
-            SidebarTopSection(canCreate: content.canCreate, destinations: content.destinations, browser: browser)
+            SidebarActionsSection(canCreate: content.canCreate, browser: browser)
+            if plan.showsLibrary {
+                SidebarLibrarySection(destinations: content.destinations)
+            }
             if plan.showsViews {
                 SidebarViewsSection(builtIn: content.builtInViews, plan: plan, browser: browser)
             }
@@ -113,15 +116,14 @@ private struct SidebarList: View {
     }
 }
 
-/// New and Search act, then Items, Sources and Collections open.
-private struct SidebarTopSection: View, Equatable {
+/// New and Search act, ungrouped at the top.
+private struct SidebarActionsSection: View, Equatable {
     @CurrentLibrary private var library
     @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
     let canCreate: Bool
-    let destinations: [SidebarPlaceRowData]
     let browser: Browser
 
-    static func == (a: Self, b: Self) -> Bool { a.canCreate == b.canCreate && a.destinations == b.destinations }
+    static func == (a: Self, b: Self) -> Bool { a.canCreate == b.canCreate }
 
     var body: some View {
         Section {
@@ -132,10 +134,23 @@ private struct SidebarTopSection: View, Equatable {
             SidebarActionRow(title: String(localized: "Search"), symbol: "magnifyingglass", identifier: "SidebarSearch") {
                 browser.palette = .search
             }
+        }
+    }
+}
+
+/// Items, Sources and Collections open, under the Library heading.
+private struct SidebarLibrarySection: View, Equatable {
+    let destinations: [SidebarPlaceRowData]
+
+    var body: some View {
+        Section {
             ForEach(destinations, id: \.place.key) { data in
                 SidebarPlaceRow(data: data).tag(data.item)
             }
+        } header: {
+            Text("Library")
         }
+        .accessibilityIdentifier("SidebarLibraryGroup")
     }
 }
 
