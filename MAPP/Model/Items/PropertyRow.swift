@@ -160,8 +160,9 @@ nonisolated struct PageByline: Hashable, Sendable, Encodable {
         self.detail = detail
     }
 
-    init(item: Item, now: Date, calendar: Calendar = .current, locale: Locale = .current) {
-        let source = item.source?.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// `sourceName` is what the server names the item's source (`SourceDirectory.name`), given for an item that has one.
+    init(item: Item, sourceName: String? = nil, now: Date, calendar: Calendar = .current, locale: Locale = .current) {
+        let source = (sourceName ?? item.source)?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.source = source?.isEmpty == false ? source : nil
         date = NoteDate.listLabel(for: item.created, now: now, calendar: calendar, locale: locale)
     }

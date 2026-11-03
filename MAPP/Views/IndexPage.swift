@@ -27,6 +27,31 @@ private extension View {
     }
 }
 
+/// The menu of a row that is a source.
+private struct SourceMenu: View {
+    let place: SidebarItem
+    let edit: (SourceEditRequest) -> Void
+
+    var body: some View {
+        if case .source(let code) = place {
+            Button("Rename…") { edit(SourceEditRequest(code: code, mode: .name)) }
+            Button("Choose Mark…") { edit(SourceEditRequest(code: code, mode: .mark)) }
+        }
+    }
+}
+
+private extension View {
+    /// Gives a source's row a context menu to rename it and choose its mark.
+    @ViewBuilder
+    func editingSource(_ edit: ((SourceEditRequest) -> Void)?, on row: IndexRow) -> some View {
+        if let edit {
+            contextMenu { SourceMenu(place: row.place, edit: edit) }
+        } else {
+            self
+        }
+    }
+}
+
 /// A page of rows that each lead to a place, shown as a list, as cards or as a table, within a width. Sources and
 /// Collections are two of them.
 struct IndexPage: View {
@@ -41,15 +66,17 @@ struct IndexPage: View {
     var showsSecondaryOnCards = true
     /// Set where the rows are items' places, so a collection's row takes drops. The table does not take them.
     var drop: IndexDrop?
+    /// Set where a row's source can be renamed or given a mark, by its context menu.
+    var edit: ((SourceEditRequest) -> Void)?
     let open: (IndexRow) -> Void
     @State private var isUnderToolbar = false
 
     var body: some View {
         Group {
             switch layout {
-            case .list: IndexList(rows: rows, drop: drop, isUnderToolbar: $isUnderToolbar, open: open)
-            case .cards: IndexCards(rows: rows, palette: palette, showsSecondary: showsSecondaryOnCards, drop: drop, isUnderToolbar: $isUnderToolbar, open: open)
-            case .table: IndexTable(rows: rows, typesTitle: typesTitle, open: open)
+            case .list: IndexList(rows: rows, drop: drop, edit: edit, isUnderToolbar: $isUnderToolbar, open: open)
+            case .cards: IndexCards(rows: rows, palette: palette, showsSecondary: showsSecondaryOnCards, drop: drop, edit: edit, isUnderToolbar: $isUnderToolbar, open: open)
+            case .table: IndexTable(rows: rows, typesTitle: typesTitle, edit: edit, open: open)
             }
         }
         .contentMargins(.top, IndexMetrics.top, for: .scrollContent)
@@ -96,6 +123,7 @@ struct IndexLatest: View {
 private struct IndexList: View {
     let rows: [IndexRow]
     let drop: IndexDrop?
+    let edit: ((SourceEditRequest) -> Void)?
     @Binding var isUnderToolbar: Bool
     let open: (IndexRow) -> Void
     @State private var hovered: IndexRow.ID?
@@ -139,6 +167,7 @@ private struct IndexList: View {
                     .padding(.horizontal, 8)
             )
             .takingDrops(drop, on: row)
+            .editingSource(edit, on: row)
             .accessibilityIdentifier("IndexRow")
         }
         .listStyle(.plain)
@@ -152,6 +181,7 @@ private struct IndexCards: View {
     let palette: IndexPalette
     let showsSecondary: Bool
     let drop: IndexDrop?
+    let edit: ((SourceEditRequest) -> Void)?
     @Binding var isUnderToolbar: Bool
     let open: (IndexRow) -> Void
 
@@ -161,6 +191,7 @@ private struct IndexCards: View {
                 ForEach(rows) { row in
                     IndexCard(row: row, palette: palette, showsSecondary: showsSecondary, open: open)
                         .takingDrops(drop, on: row)
+                        .editingSource(edit, on: row)
                 }
             }
             .padding(.horizontal, IndexMetrics.side)
@@ -272,6 +303,7 @@ struct IndexBreakdownKey: View {
 private struct IndexTable: View {
     let rows: [IndexRow]
     let typesTitle: LocalizedStringKey
+    let edit: ((SourceEditRequest) -> Void)?
     let open: (IndexRow) -> Void
     @State private var sortOrder = [KeyPathComparator(\IndexRow.title, comparator: .localizedStandard)]
     @State private var sorted: [IndexRow] = []
@@ -303,7 +335,8 @@ private struct IndexTable: View {
         .alternatingRowBackgrounds(.disabled)
         .onChange(of: rows, initial: true) { sorted = rows.sorted(using: sortOrder) }
         .onChange(of: sortOrder) { sorted = rows.sorted(using: sortOrder) }
-        .contextMenu(forSelectionType: IndexRow.ID.self) { _ in
+        .contextMenu(forSelectionType: IndexRow.ID.self) { ids in
+            if let edit, ids.count == 1, let place = ids.first { SourceMenu(place: place, edit: edit) }
         } primaryAction: { ids in
             if let row = rows.first(where: { ids.contains($0.id) }) { open(row) }
         }

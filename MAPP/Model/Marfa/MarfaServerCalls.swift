@@ -2,12 +2,12 @@ import Foundation
 import Marfa
 
 /// The calls that ask the Marfa server itself instead of the working copy: an item's snapshots (Version History),
-/// the server's own settings (This Marfa) and the owner's icon for a type. They need a connection, so they fail while
-/// the server cannot be reached. Every call goes through the package's `Server`, with the address and the sign-in read
+/// the server's own settings (This Marfa), the owner's icon for a type and the names, marks and counts of sources.
+/// They need a connection, so they fail while the server cannot be reached. Every call goes through the package's `Server`, with the address and the sign-in read
 /// from the Keychain on each call, so a sign-in the person has since made again is the one used. `Server` calls go over
 /// `URLSession`, so App Transport Security applies to a plain http address, unlike the copy, which goes through the
 /// package's core.
-nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, TypeIconSource {
+nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, TypeIconSource, SourceNameSource {
     let connection: MarfaConnection
     let signIns: any SignIns
     /// How long a call waits for the server before it fails, so an unreachable server never leaves a page waiting.
@@ -179,6 +179,64 @@ nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, Ty
     }
 
     static func iconFailure(_ ending: Ending) -> TypeIconFailure {
+        switch ending {
+        case .unreachable: .unreachable
+        case .keyRefused: .keyRefused
+        case .notPermitted: .notPermitted
+        case .refused(let reason): .refused(reason)
+        case .notFound(let message), .instanceChanged(let message), .failed(let message): .failed(message)
+        }
+    }
+
+    // MARK: Sources (`GET /sources`, `PATCH /source`, `GET /items/stats?by=source`)
+
+    @concurrent func sources() async throws(SourceEditFailure) -> [SourceInfo] {
+        do {
+            return try await server().sources(timeout: timeout).map(Self.info)
+        } catch let ending as Ending {
+            throw Self.sourceFailure(ending)
+        } catch {
+            throw Self.sourceFailure(Self.ending(error))
+        }
+    }
+
+    /// The items the library lists, which are the active ones in either tier. The server leaves out `system.*` items
+    /// and the ones the key cannot read by itself.
+    @concurrent func counts() async throws(SourceEditFailure) -> [String: Int] {
+        do {
+            return try await server().itemCountsBySource(state: "active", timeout: timeout)
+        } catch let ending as Ending {
+            throw Self.sourceFailure(ending)
+        } catch {
+            throw Self.sourceFailure(Self.ending(error))
+        }
+    }
+
+    @concurrent func update(
+        _ code: String, name: SourceFieldChange?, mark: SourceFieldChange?
+    ) async throws(SourceEditFailure) -> SourceInfo {
+        do {
+            return Self.info(
+                try await server().updateSource(code, name: name.map(Self.change), mark: mark.map(Self.change), timeout: timeout))
+        } catch let ending as Ending {
+            throw Self.sourceFailure(ending)
+        } catch {
+            throw Self.sourceFailure(Self.ending(error))
+        }
+    }
+
+    static func info(_ source: Marfa.ItemSource) -> SourceInfo {
+        SourceInfo(code: source.code, name: source.name, mark: source.mark, hasChosenName: source.nameOrigin == .set)
+    }
+
+    static func change(_ change: SourceFieldChange) -> SettingChange<String> {
+        switch change {
+        case .set(let value): .set(value)
+        case .clear: .clear
+        }
+    }
+
+    static func sourceFailure(_ ending: Ending) -> SourceEditFailure {
         switch ending {
         case .unreachable: .unreachable
         case .keyRefused: .keyRefused

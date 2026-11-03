@@ -178,7 +178,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     return flag
 }
 
-nonisolated final class FailingSearchSource: ItemSource {
+nonisolated final class FailingSearchSource: MAPP.ItemSource {
     let inner = FakeItemSource()
     var embeds: any EmbedResolver { inner.embeds }
     var connectionState: MarfaConnectionState { inner.connectionState }

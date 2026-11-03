@@ -29,33 +29,40 @@ nonisolated struct IndexRow: Identifiable, Hashable, Sendable {
     var latestOrOldest: Date { latest ?? .distantPast }
 }
 
-/// Where a source's icon is chosen. MAPP does not know what kind a source is (a folder, a connector, an app or an
-/// API key), so every source has one icon; a kind, once known, chooses here.
+/// The mark beside a source: the one the server gives it, else a neutral symbol, since MAPP does not know what kind a
+/// source is (a folder, a connector, an app or an API key).
 nonisolated enum SourceTile {
-    static func symbol(forSource name: String) -> String { "antenna.radiowaves.left.and.right" }
+    static let fallbackSymbol = "antenna.radiowaves.left.and.right"
+
+    static func icon(for source: SourceInfo) -> RowIcon {
+        source.mark.map { .type($0) } ?? .symbol(fallbackSymbol)
+    }
 }
 
 nonisolated enum IndexRows {
-    /// The items of each source, in name order. Items with no source belong to none. The index page and the
+    /// The items of each source, in code order. Items with no source belong to none. The index page and the
     /// palette's source list both read this, so they cannot disagree.
-    static func groupedBySource(_ items: [Item]) -> [(name: String, items: [Item])] {
+    static func groupedBySource(_ items: [Item]) -> [(code: String, items: [Item])] {
         var named: [String: [Item]] = [:]
         for item in items {
             if let source = item.source, !source.isEmpty { named[source, default: []].append(item) }
         }
-        return named.map { (name: $0.key, items: $0.value) }
-            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        return named.map { (code: $0.key, items: $0.value) }
+            .sorted { $0.code.localizedStandardCompare($1.code) == .orderedAscending }
     }
 
-    /// The sources of `items`, by name, each with the types it wrote and its latest change.
-    static func sources(of items: [Item], catalogue: Catalogue) -> [IndexRow] {
-        groupedBySource(items).map { name, items in
+    /// The sources of `items`, by the name the server gives each, with the types it wrote and its latest change. A
+    /// row counts what the server counted for its source, and the loaded items until the server has answered.
+    static func sources(of items: [Item], catalogue: Catalogue, directory: SourceDirectory = SourceDirectory()) -> [IndexRow] {
+        groupedBySource(items).map { code, items in
+            let info = directory.info(code)
             let breakdown = breakdown(of: items, catalogue: catalogue)
             let types = summary(of: breakdown)
             return IndexRow(
-                place: .source(name), title: name, icon: .symbol(SourceTile.symbol(forSource: name)), secondary: types, types: types,
-                count: items.count, latest: items.map(\.modified).max(), breakdown: breakdown)
+                place: .source(code), title: info.name, icon: SourceTile.icon(for: info), secondary: types, types: types,
+                count: directory.counts?[code] ?? items.count, latest: items.map(\.modified).max(), breakdown: breakdown)
         }
+        .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
     /// `collections` in the order given, each with its members' types. Its secondary line is its own type.

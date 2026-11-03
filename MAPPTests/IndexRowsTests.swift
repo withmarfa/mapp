@@ -34,7 +34,7 @@ struct IndexRowsTests {
         #expect(rows.map(\.title) == ["9", "10", "A", "b"])
         let library = FakeItemLibrary(items: items, now: base)
         #expect(Dictionary(uniqueKeysWithValues: rows.map { ($0.title, $0.count) })
-            == Dictionary(uniqueKeysWithValues: library.sourceCounts.map { ($0.name, $0.count) }))
+            == Dictionary(uniqueKeysWithValues: library.sourceCounts.map { ($0.code, $0.count) }))
     }
 
     @Test func theBreakdownIsByTypeMostFirstThenByLabel() {
@@ -119,12 +119,58 @@ struct IndexRowsTests {
         let items = [item("a", source: "b"), item("b", source: "A"), item("c", source: "b"), item("d")]
         let library = FakeItemLibrary(items: items, now: base)
         let groups = IndexRows.groupedBySource(library.items(in: .allNotes))
-        #expect(library.sourceCounts.map(\.name) == groups.map(\.name))
+        #expect(library.sourceCounts.map(\.code) == groups.map(\.code))
         #expect(library.sourceCounts.map(\.count) == groups.map(\.items.count))
     }
 
-    @Test func everySourceHasTheSameIconUntilItsKindIsKnown() {
-        #expect(SourceTile.symbol(forSource: "workbench-folder") == SourceTile.symbol(forSource: "agents"))
+    // MARK: Names, marks and counts from the server
+
+    private let readwise = SourceInfo(code: "readwise", name: "Readwise", mark: "simple-icons:readwise", hasChosenName: true)
+    private let github = SourceInfo(code: "gh", name: "GitHub", mark: nil, hasChosenName: false)
+
+    private func directory(counts: [String: Int]? = nil) -> SourceDirectory {
+        SourceDirectory(infos: ["readwise": readwise, "gh": github], counts: counts)
+    }
+
+    @Test func aSourceRowShowsTheServersNameAndMarkAndKeepsTheCodeAsItsPlace() throws {
+        let rows = IndexRows.sources(
+            of: [item("a", source: "readwise"), item("b", source: "gh"), item("c", source: "unnamed")], catalogue: catalogue,
+            directory: directory())
+        let row = try #require(rows.first { $0.title == "Readwise" })
+        #expect(row.place == .source("readwise"))
+        #expect(row.icon == .type("simple-icons:readwise"))
+        #expect(try #require(rows.first { $0.title == "GitHub" }).icon == .symbol(SourceTile.fallbackSymbol))
+        // A source the server has not named shows its code.
+        #expect(rows.map(\.title) == ["GitHub", "Readwise", "unnamed"])
+    }
+
+    @Test func rowsAreInOrderOfTheNameShown() {
+        let rows = IndexRows.sources(of: [item("a", source: "a-code"), item("b", source: "z-code")], catalogue: catalogue, directory: SourceDirectory(
+            infos: ["a-code": .init(code: "a-code", name: "Zebra", mark: nil, hasChosenName: true), "z-code": .init(code: "z-code", name: "Apple", mark: nil, hasChosenName: true)]))
+        #expect(rows.map(\.title) == ["Apple", "Zebra"])
+    }
+
+    @Test func aRowCountsWhatTheServerCountedAndTheLoadedItemsUntilItHas() throws {
+        let items = [item("a", source: "readwise"), item("b", source: "readwise")]
+        let before = IndexRows.sources(of: items, catalogue: catalogue, directory: directory())
+        #expect(before.first?.count == 2)
+        let after = IndexRows.sources(of: items, catalogue: catalogue, directory: directory(counts: ["readwise": 40]))
+        #expect(after.first?.count == 40)
+    }
+
+    @Test func theLibrarysSourceCountsUseTheServersNamesAndCounts() {
+        let library = FakeItemLibrary(items: [item("a", source: "readwise"), item("b", source: "gh")], now: base)
+        library.sources = directory(counts: ["readwise": 7, "gh": 3])
+        #expect(library.sourceCounts.map(\.name) == ["GitHub", "Readwise"])
+        #expect(library.sourceCounts.map(\.count) == [3, 7])
+        #expect(library.sourceCounts.map(\.code) == ["gh", "readwise"])
+    }
+
+    @Test func theInspectorsMarkIsTheSourcesMarkOrNone() {
+        #expect(SourceTile.icon(for: readwise) == .type("simple-icons:readwise"))
+        #expect(SourceTile.icon(for: .unnamed("x")) == .symbol(SourceTile.fallbackSymbol))
+        #expect(directory().info("missing") == .unnamed("missing"))
+        #expect(directory().name("missing") == "missing")
     }
 }
 

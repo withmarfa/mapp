@@ -20,6 +20,7 @@ struct PaletteIndexKey: Equatable {
     let content: Int
     let membership: Int
     let views: [LibraryView]
+    let sources: SourceDirectory
 }
 
 extension Browser {
@@ -28,7 +29,7 @@ extension Browser {
     func paletteIndex(in library: any ItemLibrary) -> PaletteIndex {
         let key = PaletteIndexKey(
             library: ObjectIdentifier(library), content: library.contentRevision, membership: library.membershipRevision,
-            views: library.views)
+            views: library.views, sources: library.sources)
         if let held = paletteMemo, held.key == key { return held.index }
         let index = Cost.measure(.paletteIndex) { Self.makePaletteIndex(in: library) }
         paletteMemo = (key, index)
@@ -41,7 +42,7 @@ extension Browser {
         }
         places.append(.init(item: .recentlyDeleted, icon: .symbol("trash"), title: nil))
         places += library.sourceCounts.map {
-            .init(item: .source($0.name), icon: .symbol("antenna.radiowaves.left.and.right"), title: $0.name)
+            .init(item: .source($0.code), icon: SourceTile.icon(for: library.sources.info($0.code)), title: $0.name)
         }
         places += library.collections.map {
             .init(item: .collection($0.id), icon: .type(library.catalogue.icon(for: $0.type)), title: $0.displayTitle)

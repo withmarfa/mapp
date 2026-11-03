@@ -27,6 +27,7 @@ struct ItemInspectorHost: View {
                     item: item,
                     type: library.catalogue.itemTypes[item.type],
                     place: item.tier == .feed ? String(localized: "Inbox") : String(localized: "Library"),
+                    source: item.source.map { library.sources.info($0) },
                     catalogue: library.catalogue,
                     hiddenKeys: library.hiddenPropertyKeys(of: item),
                     relationships: relationships,
@@ -97,6 +98,8 @@ struct ItemInspector: View {
     let type: ItemTypeInfo?
     /// The Inbox or the Library, by the item's tier.
     var place: String? = nil
+    /// The source that made the item, as the server names it; the code stands in until it has.
+    var source: SourceInfo? = nil
     /// Calls a property the item's type does not define by the label another type gives it.
     var catalogue = Catalogue()
     /// The item's property keys that are not listed: the title, the text, and any the library keeps for itself.
@@ -276,7 +279,7 @@ struct ItemInspector: View {
         VStack(alignment: .leading, spacing: 0) {
             detail("Created", ItemDate.text(of: item.created, hasTime: true), isDate: true)
             detail("Edited", ItemDate.text(of: item.modified, hasTime: true), isDate: true)
-            if let source = item.source { detail("Made by", source) }
+            if let source { InspectorDetailRow(name: String(localized: "Made by"), value: source.name, mark: source.mark) }
             if let place { detail("Place", place) }
             detail("Version", item.version.rawValue.formatted())
             if case .file(let contentType, let byteCount) = item.content {
@@ -361,10 +364,15 @@ private struct InspectorDetailRow: View {
     let name: String
     let value: String
     var isDate = false
+    /// An icon ID drawn before the value.
+    var mark: String?
 
     var body: some View {
         InspectorRow(verbatimName: name) {
-            InspectorText(text: value, keepsOneLine: isDate)
+            HStack(spacing: 6) {
+                if let mark { TypeIcon(id: mark).foregroundStyle(.secondary) }
+                InspectorText(text: value, keepsOneLine: isDate)
+            }
         }
         .contextMenu { Button("Copy") { InspectorPasteboard.copy(value) } }
     }
