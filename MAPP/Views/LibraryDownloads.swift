@@ -97,7 +97,7 @@ struct LibraryDownloads: View {
                 try await action()
                 actionFailure = nil
             } catch let failure as SourceFailure {
-                actionFailure = String(localized: "Couldn’t remove downloaded files. \(failure.message)")
+                actionFailure = failure.message
             } catch {
                 actionFailure = String(localized: "Couldn’t change downloaded files. Check the current limit and try again.")
             }

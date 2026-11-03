@@ -67,7 +67,7 @@ struct MarfaDownloads: DownloadedFiles {
         do {
             _ = try await copy.blobs.removeFetchedFiles()
         } catch let error as MarfaError {
-            throw SourceFailure(kind: .failed, message: error.message)
+            throw SourceFailure(kind: .failed, message: String(localized: "Couldn’t remove downloaded files. \(error.message)"))
         }
         await MarfaSource.removeKeptCopies()
     }
