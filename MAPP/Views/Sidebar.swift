@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// The window's sidebar, in the manner of the Claude desktop app: New and Search act, then the Library group holds
-/// Items, Sources and Collections. The Views block follows, holding Inbox, Recents and Favorites and then the saved views, and the
-/// Types block after it. Settings > Sidebar switches each place on or off, and the foot holds the instance.
+/// Items, Sources and Collections. The Views block follows, holding Inbox, Recents and Favorites and then the saved
+/// views, and the Types block after it. Settings > Sidebar switches each place on or off, and the foot holds the instance.
 struct Sidebar: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
@@ -150,7 +150,7 @@ private struct SidebarLibrarySection: View, Equatable {
         } header: {
             Text("Library")
         }
-        .accessibilityIdentifier("SidebarLibrary")
+        .accessibilityIdentifier("SidebarLibraryGroup")
     }
 }
 
