@@ -9,14 +9,10 @@ nonisolated struct SourceCount: Identifiable, Hashable {
 }
 
 extension ItemLibrary {
-    /// Sources visible through this library's active items, by name, never the owner's source registry. A source's
-    /// count is the server's when it has answered, else the loaded items'.
+    /// The sources the library lists, by name (`SourceDirectory.listing`), never the owner's source registry.
     var sourceCounts: [SourceCount] {
-        let directory = sources
-        return IndexRows.groupedBySource(items(in: .allNotes)).map {
-            SourceCount(code: $0.code, name: directory.name($0.code), count: directory.counts?[$0.code] ?? $0.items.count)
-        }
-        .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        let loaded = IndexRows.groupedBySource(items(in: .allNotes)).reduce(into: [:]) { $0[$1.code] = $1.items.count }
+        return sources.listing(loaded: loaded).map { SourceCount(code: $0.code, name: $0.name, count: $0.count) }
     }
 
     /// The name to show for the source `code`.

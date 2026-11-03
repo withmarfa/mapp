@@ -166,6 +166,23 @@ struct IndexRowsTests {
         #expect(library.sourceCounts.map(\.code) == ["gh", "readwise"])
     }
 
+    @Test func onceTheServerHasAnsweredEverySourceWithItemsHasARowAndNoOtherDoes() {
+        let items = [item("a", source: "readwise"), item("b", source: "loaded-only")]
+        let rows = IndexRows.sources(of: items, catalogue: catalogue, directory: directory(counts: ["readwise": 4, "gh": 9, "empty": 0]))
+        #expect(rows.map(\.title) == ["GitHub", "Readwise"])
+        #expect(rows.map(\.count) == [9, 4])
+        // A source whose items are not loaded still has its row, with no types.
+        #expect(rows.first?.types == "")
+        #expect(rows.last?.types.isEmpty == false)
+        #expect(IndexRows.sources(of: items, catalogue: catalogue, directory: directory(counts: [:])).isEmpty)
+    }
+
+    @Test func theSidebarsSourcesAreTheRowsSources() {
+        let library = FakeItemLibrary(items: [item("a", source: "readwise")], now: base)
+        library.sources = directory(counts: ["readwise": 4, "gh": 9, "empty": 0])
+        #expect(library.sourceCounts.map(\.name) == IndexRows.sources(of: library.items(in: .allNotes), catalogue: catalogue, directory: library.sources).map(\.title))
+    }
+
     @Test func theInspectorsMarkIsTheSourcesMarkOrNone() {
         #expect(SourceTile.icon(for: readwise) == .type("simple-icons:readwise"))
         #expect(SourceTile.icon(for: .unnamed("x")) == .symbol(SourceTile.fallbackSymbol))
