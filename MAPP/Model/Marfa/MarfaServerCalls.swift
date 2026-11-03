@@ -2,8 +2,8 @@ import Foundation
 import Marfa
 
 /// The calls that ask the Marfa server itself instead of the working copy: an item's snapshots (Version History),
-/// the server's own settings (This Marfa), the owner's icon for a type and the names, marks and counts of sources. They need a connection, so they fail while
-/// the server cannot be reached. Every call goes through the package's `Server`, with the address and the sign-in read
+/// the server's own settings (This Marfa), the owner's icon for a type and the names, marks and counts of sources.
+/// They need a connection, so they fail while the server cannot be reached. Every call goes through the package's `Server`, with the address and the sign-in read
 /// from the Keychain on each call, so a sign-in the person has since made again is the one used. `Server` calls go over
 /// `URLSession`, so App Transport Security applies to a plain http address, unlike the copy, which goes through the
 /// package's core.
