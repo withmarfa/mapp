@@ -204,6 +204,14 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Chooses the icon of `type` for every app, or the type's own default where `icon` is nil, and draws the answer at
     /// once. Nil on success; otherwise why not, in words for the person.
     func setIcon(_ icon: String?, ofType type: TypeID) async -> TypeIconFailure?
+    /// The names, marks and counts of sources the server last gave. Empty before it answers, so a view falls back to the
+    /// code (`SourceDirectory.info`); a rename shows at once, and a refresh follows the server.
+    var sources: SourceDirectory { get }
+    /// Asks the server for the sources' names, marks and counts again; a failed ask keeps what was read before.
+    func refreshSources() async
+    /// Renames the source `code` or changes its mark, for every app; a field left nil stays. Nil on success; otherwise
+    /// why not, in words for the person.
+    func updateSource(_ code: String, name: SourceFieldChange?, mark: SourceFieldChange?) async -> SourceEditFailure?
     /// The view as the server saved it, or nil.
     func createView(_ settings: LibraryViewSettings) async -> LibraryView?
     /// Sent at `baseVersion`, the version of the view the window read.

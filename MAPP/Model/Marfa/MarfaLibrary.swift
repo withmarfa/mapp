@@ -54,6 +54,9 @@ import Observation
     @ObservationIgnored let typeIcons: (any TypeIconSource)?
     /// Reads the server's own settings, for the bin's retention; nil where there is no server to ask, as in the sample.
     @ObservationIgnored let config: (any InstanceConfigSource)?
+    /// Reads and changes the names, marks and counts of sources, which only the server holds. Nil where there is no
+    /// server to ask, as in the sample.
+    @ObservationIgnored let sourceNames: (any SourceNameSource)?
     /// The icon each type last showed after the person chose one, until the working copy's own catalogue shows the type
     /// with another icon than it had when the person chose, since the copy takes a schema change only when its stream
     /// reopens. `before` is the icon the copy showed then.
@@ -200,12 +203,14 @@ import Observation
     init(
         source: any ItemSource, notices: Notices, history: (any ItemHistorySource)? = nil,
         typeIcons: (any TypeIconSource)? = nil, config: (any InstanceConfigSource)? = nil,
+        sourceNames: (any SourceNameSource)? = nil,
         now: @escaping () -> Date = Date.init,
         cameOnline: @escaping () -> Void = {}) {
         self.source = source
         self.history = history
         self.typeIcons = typeIcons
         self.config = config
+        self.sourceNames = sourceNames
         self.notices = notices
         self.now = now
         syncReport = source.syncReport
@@ -233,11 +238,13 @@ import Observation
                     if state == .online, !wasOnline {
                         cameOnline()
                         readTrashDays()
+                        Task { await self.refreshSources() }
                     }
                 }
             }
         ]
         readTrashDays()
+        Task { await refreshSources() }
     }
 
     isolated deinit {
@@ -245,6 +252,48 @@ import Observation
     }
 
     var reachesServer: Bool { connection == .online }
+
+    // MARK: Sources
+
+    /// The names, marks and counts the server last gave, kept while it cannot be reached. Before the first answer a
+    /// source shows its code, and its count is the loaded items'.
+    private(set) var sources = SourceDirectory()
+    /// Counts the asks as they start, so an answer that comes after a later ask or a rename does not put back what it
+    /// found before.
+    @ObservationIgnored private var sourceTurn = 0
+    @ObservationIgnored private var appliedNamesTurn = 0
+    @ObservationIgnored private var appliedCountsTurn = 0
+
+    /// Asks the server for the names and the counts. An ask that fails keeps the earlier answer for that part.
+    func refreshSources() async {
+        guard let sourceNames else { return }
+        sourceTurn += 1
+        let turn = sourceTurn
+        async let named = try? await sourceNames.sources()
+        async let counted = try? await sourceNames.counts()
+        let (names, counts) = await (named, counted)
+        if let names, turn > appliedNamesTurn {
+            appliedNamesTurn = turn
+            sources.infos = Dictionary(names.map { ($0.code, $0) }, uniquingKeysWith: { $1 })
+        }
+        if let counts, turn > appliedCountsTurn {
+            appliedCountsTurn = turn
+            sources.counts = counts
+        }
+    }
+
+    func updateSource(_ code: String, name: SourceFieldChange?, mark: SourceFieldChange?) async -> SourceEditFailure? {
+        guard let sourceNames else { return .unsupported }
+        do {
+            let changed = try await sourceNames.update(code, name: name, mark: mark)
+            sourceTurn += 1
+            appliedNamesTurn = sourceTurn
+            sources = sources.updating(changed)
+            return nil
+        } catch {
+            return error
+        }
+    }
 
     func setIcon(_ icon: String?, ofType type: TypeID) async -> TypeIconFailure? {
         guard let typeIcons else { return .unsupported }
@@ -845,7 +894,7 @@ import Observation
         case .allNotes: String(localized: "Items")
         case .sources: String(localized: "Sources")
         case .collections: String(localized: "Collections")
-        case .source(let name): name
+        case .source(let code): sources.name(code)
         case .favorites: String(localized: "Favorites")
         case .favoriteItem(let id), .collection(let id): item(id)?.displayTitle ?? ""
         case .itemType(let type): catalogue.plural(for: TypeID(type))

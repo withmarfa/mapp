@@ -27,6 +27,13 @@ final class FakeItemLibrary: ItemLibrary {
     /// While set, an icon choice waits for `answerIcon()` before it answers.
     var holdsIconAnswers = false
     private var heldIconAnswer: CheckedContinuation<Void, Never>?
+    /// What the server last gave for sources; `serverSources` is what the next refresh reads.
+    var sources = SourceDirectory()
+    var serverSources: SourceDirectory?
+    /// What the next source change answers: nil takes it, a failure refuses it.
+    var sourceFailure: SourceEditFailure?
+    private(set) var sourceChanges: [(code: String, name: SourceFieldChange?, mark: SourceFieldChange?)] = []
+    private(set) var sourceRefreshes = 0
     /// What every view write fails with while set.
     var viewFailure: ViewWriteFailure?
     var trashDays: Int?
@@ -462,6 +469,32 @@ final class FakeItemLibrary: ItemLibrary {
         if let iconFailure { return iconFailure }
         chosenIcons.append((type, icon))
         catalogue = catalogue.choosingIcon(icon, ofType: type)
+        return nil
+    }
+
+    func refreshSources() async {
+        sourceRefreshes += 1
+        if let serverSources { sources = serverSources }
+    }
+
+    func updateSource(_ code: String, name: SourceFieldChange?, mark: SourceFieldChange?) async -> SourceEditFailure? {
+        if let sourceFailure { return sourceFailure }
+        sourceChanges.append((code, name, mark))
+        let old = sources.info(code)
+        let newName: String
+        var chosen = old.hasChosenName
+        switch name {
+        case .set(let text)?: newName = text; chosen = true
+        case .clear?: newName = code; chosen = false
+        case nil: newName = old.name
+        }
+        let newMark: String?
+        switch mark {
+        case .set(let id)?: newMark = id
+        case .clear?: newMark = nil
+        case nil: newMark = old.mark
+        }
+        sources = sources.updating(SourceInfo(code: code, name: newName, mark: newMark, hasChosenName: chosen))
         return nil
     }
 

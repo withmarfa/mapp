@@ -115,7 +115,7 @@ struct ItemPageHeader: ViewModifier {
                 return PageHeader.Pin(label: title ?? $0.label, enabled: title != nil || $0.isEditable,
                                       empty: title == nil, opensMenu: title != nil)
             },
-            byline: lead.byline ?? PageByline(item: item, now: now),
+            byline: lead.byline ?? PageByline(item: item, sourceName: item.source.map { library.sources.name($0) }, now: now),
             properties: properties,
             contents: contents,
             linked: linked,

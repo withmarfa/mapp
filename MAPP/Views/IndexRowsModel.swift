@@ -59,7 +59,7 @@ final class IndexRowsModel {
     private static func rows(for place: IndexPlace, in library: any ItemLibrary) -> [IndexRow] {
         switch place {
         case .sources:
-            IndexRows.sources(of: library.items(in: .allNotes), catalogue: library.catalogue)
+            IndexRows.sources(of: library.items(in: .allNotes), catalogue: library.catalogue, directory: library.sources)
         case .collections:
             IndexRows.collections(
                 library.collections, membersOf: { library.items(in: .collection($0.id)) }, catalogue: library.catalogue)

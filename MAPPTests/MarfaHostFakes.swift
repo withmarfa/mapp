@@ -7,7 +7,7 @@ import Testing
 
 /// A library that answers nothing of its own: the test sets its connection and report, and reads what it was
 /// asked to do.
-nonisolated final class FakeMarfaSource: ItemSource {
+nonisolated final class FakeMarfaSource: MAPP.ItemSource {
     let connection: MarfaConnection
     let embeds: any EmbedResolver = FakeEmbeds()
     let state = Latest(MarfaConnectionState.connecting)

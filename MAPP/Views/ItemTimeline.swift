@@ -49,7 +49,7 @@ struct ItemTimeline: View {
                             .opacity(row.id == group.rows.first?.id ? 1 : 0)
                             .accessibilityHidden(row.id != group.rows.first?.id)
                             .frame(width: 112, alignment: .leading)
-                        ItemTimelineEntry(row: row, catalogue: library.catalogue)
+                        ItemTimelineEntry(row: row, catalogue: library.catalogue, sources: library.sources)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .padding(.vertical, 10)
@@ -126,6 +126,7 @@ struct ItemTimeline: View {
 private struct ItemTimelineEntry: View {
     let row: ItemTimelineRow
     let catalogue: Catalogue
+    let sources: SourceDirectory
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -134,8 +135,9 @@ private struct ItemTimelineEntry: View {
                 .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Label { Text(catalogue.label(for: row.item.type)) } icon: { TypeIcon(id: catalogue.icon(for: row.item.type)) }
-                if let source = row.item.source {
-                    Text(verbatim: source)
+                if let source = row.item.source.map({ sources.info($0) }) {
+                    Label { Text(verbatim: source.name) } icon: { if let mark = source.mark { TypeIcon(id: mark) } }
+                        .labelStyle(.titleAndIcon)
                 }
             }
             .interfaceFont(.caption)

@@ -41,7 +41,8 @@
 
 ## Server calls
 
-- `MarfaServerCalls` makes Version History, This Marfa and type-icon calls through `Server`; build no second client.
+- `MarfaServerCalls` makes Version History, This Marfa, type-icon and source calls through `Server`; build no second client.
+- Source names, marks and counts are server-only: `MarfaLibrary.sources` holds the last answer in memory (a source shows its code until the server has named it, and keeps the last answer offline). It is read again at start, on coming online and when the Sources page opens; a turn counter stops a read that began before a rename from undoing it. Counts come from `itemCountsBySource(state: "active")`, both tiers, so they can include attached files that the list hides.
 - This Marfa changes settings with `PATCH /config` carrying only the changed fields (`null` removes one) and the instance it read in `X-Marfa-Instance-Id`. Never send `PUT`, `instance_id` in the body, or an unchanged field.
 - Delete Permanently is `purge`, never queued, offered only while the server can be reached, run after earlier writes, at the version the person was shown.
 - Saved views (`system.view`) are written through the package's `createView`, `changeView` and `deleteView`, never queued or as items, each on the version the window read.

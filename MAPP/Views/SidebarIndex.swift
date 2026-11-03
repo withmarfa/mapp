@@ -7,16 +7,28 @@ struct SidebarIndex: View {
     let order: NoteOrder
     let showsCreation: Bool
     @State private var model = IndexRowsModel()
+    @State private var editing: SourceEditRequest?
 
     private var place: IndexPlace { browser.indexPlace ?? .sources }
 
     var body: some View {
         IndexContent(
             place: place, rows: model.rows(for: place), isBuilt: model.isBuilt(for: place), slots: model.slots, browser: browser,
-            order: order) { row in
+            order: order, edit: place == .sources ? { editing = $0 } : nil) { row in
             browser.show(row.place, in: library, order: order)
         }
         .task(id: Following(place: place, library: ObjectIdentifier(library))) { model.follow(place, in: library) }
+        // The names and counts are the server's, so they are asked again whenever the items change while the page is
+        // open, and when the page opens.
+        .task(id: SourceRefresh(place: place, library: ObjectIdentifier(library), membership: library.membershipRevision)) {
+            if place == .sources { await library.refreshSources() }
+        }
+        .sheet(item: $editing) { request in
+            switch request.mode {
+            case .name: SourceNameSheet(request: request, library: library)
+            case .mark: SourceMarkSheet(request: request, library: library)
+            }
+        }
         .onDisappear { model.stop() }
         .navigationTitle(library.name(of: browser.item))
         .navigationSubtitle(summary)
@@ -30,6 +42,12 @@ struct SidebarIndex: View {
             IndexToolbar(browser: browser, place: place)
         }
         .accessibilityIdentifier("SidebarIndex")
+    }
+
+    private struct SourceRefresh: Hashable {
+        let place: IndexPlace
+        let library: ObjectIdentifier
+        let membership: Int
     }
 
     private struct Following: Hashable {
@@ -60,13 +78,14 @@ private struct IndexContent: View {
     let slots: IndexSlots
     let browser: Browser
     let order: NoteOrder
+    let edit: ((SourceEditRequest) -> Void)?
     let open: (IndexRow) -> Void
     @AppStorage private var layout: IndexLayout
     @AppStorage private var width: IndexWidth
 
     init(
         place: IndexPlace, rows: [IndexRow], isBuilt: Bool, slots: IndexSlots, browser: Browser, order: NoteOrder,
-        open: @escaping (IndexRow) -> Void
+        edit: ((SourceEditRequest) -> Void)?, open: @escaping (IndexRow) -> Void
     ) {
         self.place = place
         self.rows = rows
@@ -74,6 +93,7 @@ private struct IndexContent: View {
         self.slots = slots
         self.browser = browser
         self.order = order
+        self.edit = edit
         self.open = open
         _layout = AppStorage(wrappedValue: .default, place.layoutKey)
         _width = AppStorage(wrappedValue: .default, place.widthKey)
@@ -92,7 +112,7 @@ private struct IndexContent: View {
                 IndexPage(
                     rows: shown, palette: IndexPalette(slots: slots), layout: layout, width: width, typesTitle: typesTitle,
                     showsSecondaryOnCards: place != .sources,
-                    drop: place == .collections ? IndexDrop(browser: browser, order: order) : nil, open: open)
+                    drop: place == .collections ? IndexDrop(browser: browser, order: order) : nil, edit: edit, open: open)
             }
         }
     }

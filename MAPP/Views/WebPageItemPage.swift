@@ -232,7 +232,7 @@ private struct WebPageHeader: View {
     @Binding var mode: SourceViewMode
 
     var body: some View {
-        let byline = PageByline(item: item, now: library.now())
+        let byline = PageByline(item: item, sourceName: item.source.map { library.sources.name($0) }, now: library.now())
         let type = library.catalogue.itemTypes[item.type]
         VStack(alignment: .leading, spacing: 8) {
             Text(verbatim: item.displayTitle)
