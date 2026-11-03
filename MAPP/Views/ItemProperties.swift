@@ -7,6 +7,7 @@ import SwiftUI
 /// it is committed; unrelated inspector updates do not replace it, and a change made elsewhere meanwhile is never
 /// written over silently.
 struct ItemPropertyRow: View {
+    @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     let definition: ItemTypeInfo.Field
     let value: PropertyValue?
     let isEditable: Bool
@@ -336,7 +337,7 @@ struct ItemPropertyRow: View {
     /// A date as the person reads it; a value that is not one keeps its text, and the row warns about it.
     private var dateText: String? {
         guard let text = value?.string, !text.isEmpty else { return nil }
-        return ItemDate.parse(text)?.text() ?? text
+        return ItemDate.parse(text)?.text(format: dateFormat) ?? text
     }
 
     private var storedDate: ItemDate? { value?.string.flatMap { ItemDate.parse($0) } }

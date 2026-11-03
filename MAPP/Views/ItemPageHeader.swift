@@ -12,6 +12,7 @@ struct ItemPageHeader: ViewModifier {
     @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
     @AppStorage(PageKey.titleLines) private var titleLines = TitleLines.standard
+    @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     let item: Item
     let editor: EditorController
     let drafts: DetailsPresentation
@@ -46,6 +47,7 @@ struct ItemPageHeader: ViewModifier {
             }
             .onChange(of: interfaceTextSize) { editor.refreshHeader() }
             .onChange(of: titleLines) { editor.refreshHeader() }
+            .onChange(of: dateFormat) { editor.refreshHeader() }
             // The page is drawn from the defaults as they are when it is read, so a change made anywhere, in the
             // inspector, in the sheet or from the page's own menu, needs it read again.
             .onChange(of: placements) { editor.refreshHeader() }
@@ -55,7 +57,7 @@ struct ItemPageHeader: ViewModifier {
     /// What the page's header shows for the item, read from the library and the window's drafts as they are now.
     static func header(
         of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation, placements: PagePlacements = .stored(),
-        titleLines: Int = TitleLines.stored()
+        titleLines: Int = TitleLines.stored(), dateFormat: DateFormat = .stored()
     ) -> PageHeader? {
         guard let item = library.item(id) else { return nil }
         let placement = placements.placement(of: item.type, in: library.catalogue)
@@ -67,21 +69,21 @@ struct ItemPageHeader: ViewModifier {
         let now = library.now()
         let kind = PageHeaderKind.of(item.type, in: library.catalogue)
         let lead = PageHeaderLead(
-            for: item, kind: kind, body: kind == .reading ? library.body(of: item.id)?.text : nil, now: now)
+            for: item, kind: kind, body: kind == .reading ? library.body(of: item.id)?.text : nil, now: now, format: dateFormat)
         let properties = lead.refine(PropertyRow.rows(
             of: item, type: type, hidden: library.hiddenPropertyKeys(of: item).union(lead.consumed), relationships: relationships,
-            parentField: Self.parentField, tags: library.tags(of: item), placement: placement,
+            parentField: Self.parentField, format: dateFormat, tags: library.tags(of: item), placement: placement,
             icon: { target in library.item(target).flatMap { library.catalogue.icon(for: $0.type) } }))
         let isCollection = library.catalogue.isCollection(item.type)
         let contents = isCollection
             ? LinkedItem.list(
-                pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: now, members: .only,
+                pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: now, format: dateFormat, members: .only,
                 item: { library.item($0) })
             : []
         // Where the person put Linked From: the page's foot, or only the inspector.
         let linked = placement.linkedFromPlace == .page
             ? LinkedItem.list(
-                pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: now,
+                pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: now, format: dateFormat,
                 members: isCollection ? .excluding : .all, item: { library.item($0) })
             : []
         let hasText = library.catalogue.itemTypes[item.type]?.bodyKey != nil
@@ -115,7 +117,7 @@ struct ItemPageHeader: ViewModifier {
                 return PageHeader.Pin(label: title ?? $0.label, enabled: title != nil || $0.isEditable,
                                       empty: title == nil, opensMenu: title != nil)
             },
-            byline: lead.byline ?? PageByline(item: item, sourceName: item.source.map { library.sources.name($0) }, now: now),
+            byline: lead.byline ?? PageByline(item: item, sourceName: item.source.map { library.sources.name($0) }, now: now, format: dateFormat),
             properties: properties,
             contents: contents,
             linked: linked,

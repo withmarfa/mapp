@@ -88,7 +88,7 @@ struct PageHeaderKindTests {
 
     @Test func aPersonsNumberToCallIsALinkWhateverTheFieldIsCalled() {
         let item = Self.item("core.entity.person", title: "Ruth Okonjo", [:])
-        let lead = PageHeaderLead(for: item, kind: .person, body: nil, now: .now)
+        let lead = PageHeaderLead(for: item, kind: .person, body: nil, now: .now, format: .automatic)
         let rows = [
             PropertyRow(id: "mobiles", label: "Mobiles", value: .text("+44 20 7946 0000, work"), numberToCall: "+44 20 7946 0000"),
             PropertyRow(id: "mail", label: "Mail", value: .email("a@example.com")),
@@ -96,7 +96,7 @@ struct PageHeaderKindTests {
             PropertyRow(id: "phone", label: "Phone", value: .text("+44 20 7946 0000")),
         ]
         #expect(lead.refine(rows).map(\.value) == [.phone("+44 20 7946 0000"), .email("a@example.com"), .text("+44 20 7946 0000")])
-        let general = PageHeaderLead(for: item, kind: .general, body: nil, now: .now)
+        let general = PageHeaderLead(for: item, kind: .general, body: nil, now: .now, format: .automatic)
         #expect(general.refine(rows) == rows)
     }
 
@@ -202,28 +202,28 @@ struct PageHeaderKindTests {
 
     @Test func aShortClippingHasNoReadingTime() {
         let item = Self.item("core.bookmark", ["url": .string("https://www.ycombinator.com/blog/x")])
-        #expect(ReadingHeader(item: item, body: "A few words.").byline.detail == nil)
+        #expect(ReadingHeader(item: item, body: "A few words.", format: .automatic).byline.detail == nil)
         let long = String(repeating: "word ", count: 1_320)
-        #expect(ReadingHeader(item: item, body: long, locale: Locale(identifier: "en_GB")).byline.detail == "6 min read")
-        #expect(ReadingHeader(item: item, body: nil).byline.detail == nil)
+        #expect(ReadingHeader(item: item, body: long, format: .automatic, locale: Locale(identifier: "en_GB")).byline.detail == "6 min read")
+        #expect(ReadingHeader(item: item, body: nil, format: .automatic).byline.detail == nil)
     }
 
     @Test func theSourceIsNamedBeforeThePublisherBeforeTheHost() {
         let url: [String: PropertyValue] = ["url": .string("https://www.ycombinator.com/blog/x")]
-        #expect(ReadingHeader(item: Self.item("core.bookmark", url), body: nil).byline.source == "ycombinator.com")
-        #expect(ReadingHeader(item: Self.item("core.bookmark", url.merging(["publisher": .string("YC")]) { $1 }), body: nil).byline.source == "YC")
+        #expect(ReadingHeader(item: Self.item("core.bookmark", url), body: nil, format: .automatic).byline.source == "ycombinator.com")
+        #expect(ReadingHeader(item: Self.item("core.bookmark", url.merging(["publisher": .string("YC")]) { $1 }), body: nil, format: .automatic).byline.source == "YC")
         let both = url.merging(["publisher": .string("YC"), "source_title": .string("Y Combinator Blog")]) { $1 }
-        #expect(ReadingHeader(item: Self.item("core.bookmark", both), body: nil).byline.source == "Y Combinator Blog")
+        #expect(ReadingHeader(item: Self.item("core.bookmark", both), body: nil, format: .automatic).byline.source == "Y Combinator Blog")
     }
 
     @Test func thePublishedDateAndTheDekComeFromTheItem() {
         let item = Self.item("core.bookmark", [
             "published_at": .string("2025-10-02"), "description": .string("  Why startups fail  "), "url": .string("https://example.com")
         ])
-        let reading = ReadingHeader(item: item, body: nil, locale: Locale(identifier: "en_GB"), calendar: Self.utc)
+        let reading = ReadingHeader(item: item, body: nil, format: .automatic, locale: Locale(identifier: "en_GB"), calendar: Self.utc)
         #expect(reading.byline.date == "2 Oct 2025")
         #expect(reading.dek == "Why startups fail")
-        #expect(PageHeaderLead(for: item, kind: .reading, body: nil, now: .now).showsType == false)
+        #expect(PageHeaderLead(for: item, kind: .reading, body: nil, now: .now, format: .automatic).showsType == false)
     }
 
     @Test func onlyAWebAddressCanBeOpened() {

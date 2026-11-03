@@ -73,7 +73,7 @@ struct GalleryTests {
         let (library, _, newer, other) = BrowserTests().makeFakeLibrary()
         let browser = Browser()
         func card(_ item: Item, width: CGFloat = 200) -> GalleryCard {
-            GalleryCard(item: item, browser: browser, order: NoteOrder(), day: 1, width: width)
+            GalleryCard(item: item, browser: browser, order: NoteOrder(), day: 1, dateFormat: .automatic, width: width)
         }
         let before = card(newer)
         browser.show(.allNotes, in: library, order: NoteOrder())

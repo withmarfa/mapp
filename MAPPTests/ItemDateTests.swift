@@ -19,7 +19,7 @@ struct ItemDateTests {
         let calendar = Self.calendar(zone)
         let parsed = try #require(ItemDate.parse("2026-10-24", calendar: calendar))
         #expect(!parsed.hasTime)
-        #expect(parsed.text(locale: Locale(identifier: "en_GB"), calendar: calendar) == "24 Oct 2026")
+        #expect(parsed.text(format: .automatic, locale: Locale(identifier: "en_GB"), calendar: calendar) == "24 Oct 2026")
         #expect(ItemDate.day(parsed.date, calendar: calendar) == "2026-10-24")
     }
 
@@ -61,10 +61,10 @@ struct ItemDateTests {
         let london = Self.calendar("Europe/London")
         let locale = Locale(identifier: "en_GB")
         let moment = try #require(ItemDate.parse("2026-10-27T14:00:00.000Z", calendar: london))
-        #expect(moment.text(locale: locale, calendar: london) == "27 Oct 2026 at 14:00")
+        #expect(moment.text(format: .automatic, locale: locale, calendar: london) == "27 Oct 2026 at 14:00")
         let tokyo = Self.calendar("Asia/Tokyo")
-        #expect(moment.text(locale: locale, calendar: tokyo) == "27 Oct 2026 at 23:00")
+        #expect(moment.text(format: .automatic, locale: locale, calendar: tokyo) == "27 Oct 2026 at 23:00")
         let day = try #require(ItemDate.parse("2026-10-27", calendar: tokyo))
-        #expect(day.text(locale: locale, calendar: tokyo) == "27 Oct 2026")
+        #expect(day.text(format: .automatic, locale: locale, calendar: tokyo) == "27 Oct 2026")
     }
 }

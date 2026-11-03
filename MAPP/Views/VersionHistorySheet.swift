@@ -42,6 +42,7 @@ struct VersionHistorySheet: View {
 
 private struct VersionHistoryBody: View {
     @CurrentLibrary private var library
+    @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     @Bindable var model: ItemHistoryModel
     let request: VersionHistoryRequest
     let close: () -> Void
@@ -194,7 +195,7 @@ private struct VersionHistoryBody: View {
 
     private func when(_ snapshot: ItemSnapshot) -> String {
         guard let written = snapshot.written else { return String(localized: "Version \(snapshot.version)") }
-        return written.formatted(date: .abbreviated, time: .shortened)
+        return DateDisplay.text(of: written, place: .value, format: dateFormat)
     }
 
     private func who(_ snapshot: ItemSnapshot) -> String? {

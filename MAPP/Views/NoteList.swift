@@ -13,6 +13,7 @@ struct NoteList: View, Equatable {
     @State private var daysSeen = 0
     @State private var width = ColumnWidth.list.defaultWidth
     @AppStorage(ListKey.previewLines) private var previewLines = ListKey.defaultPreviewLines
+    @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
 
     static func == (a: NoteList, b: NoteList) -> Bool { a.browser === b.browser && a.order == b.order }
 
@@ -37,7 +38,7 @@ struct NoteList: View, Equatable {
             // line alone; set inside `ListLineRow`, they would have SwiftUI run every row's body to find them.
             ForEach(ListLine.lines(of: sections)) { line in
                 let row = ListLineRow(
-                    line: line, order: order, now: now, context: context, previewLines: previewLines,
+                    line: line, order: order, now: now, dateFormat: dateFormat, context: context, previewLines: previewLines,
                     excerpt: excerpts[line.id])
                 .selectionDisabled(line.isHeading)
                 .listRowSeparator(line.isHeading ? .hidden : .automatic, edges: .top)
@@ -220,6 +221,7 @@ private struct ListLineRow: View {
     let line: ListLine
     let order: NoteOrder
     let now: Date
+    let dateFormat: DateFormat
     let context: ItemMeta.Context
     let previewLines: Int
     let excerpt: SearchExcerpt?
@@ -235,7 +237,7 @@ private struct ListLineRow: View {
         case .item(let item, _):
             ItemRow(
                 item: item,
-                dateLabel: NoteDate.listLabel(for: order.sort.date(of: item), now: now),
+                dateLabel: DateDisplay.text(of: order.sort.date(of: item), place: .list, format: dateFormat, now: now),
                 meta: ItemMeta.make(for: item, in: library, context: context),
                 previewLines: previewLines,
                 excerpt: excerpt

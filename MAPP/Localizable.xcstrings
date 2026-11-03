@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ at %@" : {
+      "extractionState" : "manual"
+    },
     "%@ has an entry that isn’t finished. Finish it, or cancel it, to add the item." : {
       "extractionState" : "manual"
     },
@@ -13,6 +16,9 @@
     "Approve MAPP With This Code" : {
       "extractionState" : "manual"
     },
+    "Automatic uses words in lists and tables, such as “Yesterday”, and abbreviated dates elsewhere. Times follow your Mac’s 12 or 24 hour setting." : {
+      "extractionState" : "manual"
+    },
     "Can’t Keep the Sign-In" : {
       "extractionState" : "manual"
     },
@@ -22,10 +28,19 @@
     "Copy Code" : {
       "extractionState" : "manual"
     },
+    "Date Format" : {
+      "extractionState" : "manual"
+    },
+    "Dates" : {
+      "extractionState" : "manual"
+    },
     "Disconnected, but MAPP Is Still Approved" : {
       "extractionState" : "manual"
     },
     "It will be sent once you sign in again. Do that in Settings." : {
+      "extractionState" : "manual"
+    },
+    "Long" : {
       "extractionState" : "manual"
     },
     "MAPP can’t tell whether this copy holds changes that haven’t reached a server." : {
@@ -80,6 +95,12 @@
       "extractionState" : "manual"
     },
     "Open Page" : {
+      "extractionState" : "manual"
+    },
+    "Relative" : {
+      "extractionState" : "manual"
+    },
+    "Short" : {
       "extractionState" : "manual"
     },
     "Sign In" : {

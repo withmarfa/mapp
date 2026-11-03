@@ -19,14 +19,14 @@ nonisolated struct ReadingHeader: Equatable, Sendable {
     static let shortestRead = 100
     static let wordsPerMinute = 220
 
-    init(item: Item, body: String?, locale: Locale = .current, calendar: Calendar = .current) {
+    init(item: Item, body: String?, format: DateFormat, locale: Locale = .current, calendar: Calendar = .current) {
         func text(_ key: String) -> String? {
             item.value(of: key)?.string.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.flatMap { $0.isEmpty ? nil : $0 }
         }
         original = Self.webAddress(text("url"))
         let host = original?.host(percentEncoded: false).map { $0.hasPrefix("www.") ? String($0.dropFirst(4)) : $0 }
         let published = text("published_at").flatMap { ItemDate.parse($0, calendar: calendar) }
-            .map { ItemDate.text(of: $0.date, hasTime: false, locale: locale, calendar: calendar) }
+            .map { ItemDate.text(of: $0.date, hasTime: false, format: format, locale: locale, calendar: calendar) }
         let words = body.map { Self.words(in: $0) } ?? 0
         let minutes = words >= Self.shortestRead ? Self.minutes(words: words) : nil
         byline = PageByline(

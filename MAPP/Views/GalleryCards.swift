@@ -69,11 +69,12 @@ struct GalleryCard: View, Equatable {
     let order: NoteOrder
     /// Changes when the day does, since the line about the item reads as Today or Yesterday.
     let day: Int
+    let dateFormat: DateFormat
     /// The thumbnail's width in points, which sets the scale of the miniature page.
     let width: CGFloat
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.item == rhs.item && lhs.browser === rhs.browser && lhs.order == rhs.order && lhs.day == rhs.day && lhs.width == rhs.width
+        lhs.item == rhs.item && lhs.browser === rhs.browser && lhs.order == rhs.order && lhs.day == rhs.day && lhs.dateFormat == rhs.dateFormat && lhs.width == rhs.width
     }
 
     var body: some View {
@@ -88,7 +89,7 @@ struct GalleryCard: View, Equatable {
                     .multilineTextAlignment(.leading)
                 HStack(spacing: 5) {
                     TypeIcon(id: facts.icon)
-                    Text(NoteDate.listLabel(for: order.sort.date(of: item), now: library.now())).lineLimit(1)
+                    Text(DateDisplay.text(of: order.sort.date(of: item), place: .list, format: dateFormat, now: library.now())).lineLimit(1)
                     if item.isFavorite { Image(systemName: "star.fill") }
                 }
                 .interfaceFont(.caption)

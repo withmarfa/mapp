@@ -14,6 +14,7 @@ struct ItemTable: View {
     var pane: FocusState<Browser.Pane?>.Binding
     /// Each place's columns as the person arranged them: shown or hidden, in their order, at their widths.
     @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
+    @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     @State private var daysSeen = 0
     @State private var hover = ItemTableHover()
     @State private var placeTrace = TablePlaceTrace()
@@ -64,7 +65,7 @@ struct ItemTable: View {
             // changes, which for the many columns of a mixed place costs far more than the few it shows.
             TableColumnForEach(ItemTableColumnLayouts.shown(columns, in: layout)) { column in
                 TableColumn(Text(verbatim: column.label), sortUsing: ItemTableComparator(column: column, order: column.firstOrder)) { row in
-                    ItemTableCell(library: library, row: row, column: column, browser: browser, order: order, hover: hover)
+                    ItemTableCell(library: library, row: row, column: column, browser: browser, order: order, dateFormat: dateFormat, hover: hover)
                 }
                 .width(min: column.widths.min, ideal: column.widths.ideal, max: column.widths.max)
                 .customizationID(column.id)

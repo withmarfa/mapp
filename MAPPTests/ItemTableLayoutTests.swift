@@ -206,23 +206,4 @@ struct ItemTableLayoutTests {
         #expect(ItemTableLayout.filter(rows, by: ["field.status": ["pending"]], columns: columns).map(\.item.title) == ["A"])
         #expect(ItemTableLayout.filter(rows, by: ["field.status": ["pending", ""]], columns: columns).map(\.item.title) == ["A", "C"])
     }
-
-    // MARK: Dates
-
-    @Test func aDayReadsAsPeopleSayIt() throws {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = try #require(TimeZone(identifier: "Europe/London"))
-        let locale = Locale(identifier: "en_GB")
-        let now = try #require(calendar.date(from: DateComponents(year: 2026, month: 10, day: 23, hour: 12)))
-        func label(_ days: Int) -> String {
-            ItemTableDate.label(for: calendar.date(byAdding: .day, value: days, to: now)!, now: now, calendar: calendar, locale: locale)
-        }
-        #expect(label(0) == "Today")
-        #expect(label(1) == "Tomorrow")
-        #expect(label(-1) == "Yesterday")
-        #expect(label(-3) == "Tuesday")
-        // The month's abbreviation is the locale's own, so only what the label must hold is checked.
-        #expect(label(-30).hasPrefix("23 Sep") && !label(-30).contains("2026"))
-        #expect(label(-400).hasSuffix("2025"))
-    }
 }

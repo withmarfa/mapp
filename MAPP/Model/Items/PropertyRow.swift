@@ -76,7 +76,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// item with no parent has no parent row: the parent is set from the inspector, and the pin keeps its menu once
     /// it has a value.
     static func rows(
-        of item: Item, type: ItemTypeInfo?, hidden: Set<String>, relationships: [ItemRelationship], parentField: String,
+        of item: Item, type: ItemTypeInfo?, hidden: Set<String>, relationships: [ItemRelationship], parentField: String, format: DateFormat,
         tags: [String], placement: PagePlacement = .standard, icon: (ItemID) -> String? = { _ in nil }
     ) -> [PropertyRow] {
         var rows: [PropertyRow] = []
@@ -86,7 +86,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
             if field.key == status?.key {
                 if placement.showsOnPage(field.key) { rows.append(PropertyRow(id: field.key, label: field.label, value: .status)) }
                 if parent, placement.showsOnPage(parentField) { rows.append(parentRow(relationships, parentField)) }
-            } else if placement.showsOnPage(field.key), let value = value(of: field, in: item) {
+            } else if placement.showsOnPage(field.key), let value = value(of: field, in: item, format: format) {
                 rows.append(PropertyRow(id: field.key, label: field.label, value: value, numberToCall: numberToCall(of: field, in: item)))
             }
         }
@@ -121,7 +121,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     }
 
     /// The value a field's row draws, or nil where the field has none or holds something a row does not show.
-    static func value(of field: ItemTypeInfo.Field, in item: Item) -> Value? {
+    static func value(of field: ItemTypeInfo.Field, in item: Item, format: DateFormat) -> Value? {
         guard let stored = item.value(of: field.key), InspectorFields.hasValue(stored) else { return nil }
         switch (field.kind, stored) {
         case (.list(let shape), .array(let entries)):
@@ -130,7 +130,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
             return shape.rowValue(of: main)
         case (.boolean, .bool(let flag)): return .boolean(flag)
         case (.number, .number(let number)): return .text(number.formatted())
-        case (.date, .string(let text)): return .date(ItemDate.parse(text)?.text() ?? text)
+        case (.date, .string(let text)): return .date(ItemDate.parse(text)?.text(format: format) ?? text)
         case (.choice, .string(let text)): return .text(ItemTypeInfo.Field.label(ofOption: text))
         case (.text, .string(let text)):
             let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -161,10 +161,10 @@ nonisolated struct PageByline: Hashable, Sendable, Encodable {
     }
 
     /// `sourceName` is what the server names the item's source (`SourceDirectory.name`), given for an item that has one.
-    init(item: Item, sourceName: String? = nil, now: Date, calendar: Calendar = .current, locale: Locale = .current) {
+    init(item: Item, sourceName: String? = nil, now: Date, format: DateFormat, calendar: Calendar = .current, locale: Locale = .current) {
         let source = (sourceName ?? item.source)?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.source = source?.isEmpty == false ? source : nil
-        date = NoteDate.listLabel(for: item.created, now: now, calendar: calendar, locale: locale)
+        date = DateDisplay.text(of: item.created, place: .list, format: format, now: now, calendar: calendar, locale: locale)
     }
 }
 
@@ -210,16 +210,16 @@ nonisolated struct LinkedItem: Hashable, Sendable, Encodable {
     /// The active items that hold a link to `id` in any relationship the library reads (the inverse ones), once
     /// each, the most recently edited first.
     static func list(
-        pointingTo id: ItemID, in relationships: [ItemRelationship], catalogue: Catalogue, now: Date,
+        pointingTo id: ItemID, in relationships: [ItemRelationship], catalogue: Catalogue, now: Date, format: DateFormat,
         members: Members = .all, item: (ItemID) -> Item?, calendar: Calendar = .current, locale: Locale = .current
     ) -> [LinkedItem] {
         Cost.measure(.linkedItems) {
-            find(pointingTo: id, in: relationships, catalogue: catalogue, now: now, members: members, item: item, calendar: calendar, locale: locale)
+            find(pointingTo: id, in: relationships, catalogue: catalogue, now: now, format: format, members: members, item: item, calendar: calendar, locale: locale)
         }
     }
 
     private static func find(
-        pointingTo id: ItemID, in relationships: [ItemRelationship], catalogue: Catalogue, now: Date,
+        pointingTo id: ItemID, in relationships: [ItemRelationship], catalogue: Catalogue, now: Date, format: DateFormat,
         members: Members, item: (ItemID) -> Item?, calendar: Calendar, locale: Locale
     ) -> [LinkedItem] {
         var seen: Set<ItemID> = [id]
@@ -237,7 +237,7 @@ nonisolated struct LinkedItem: Hashable, Sendable, Encodable {
                 LinkedItem(
                     item: held.id, title: held.title, icon: catalogue.icon(for: held.type),
                     type: catalogue.label(for: held.type),
-                    date: NoteDate.listLabel(for: held.modified, now: now, calendar: calendar, locale: locale))
+                    date: DateDisplay.text(of: held.modified, place: .list, format: format, now: now, calendar: calendar, locale: locale))
             }
     }
 }

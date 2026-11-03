@@ -12,6 +12,7 @@ struct ItemInspectorHost: View {
     let details: DetailsPresentation
     @State private var editing: ItemRelationship?
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
+    @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
 
     init(browser: Browser, details: DetailsPresentation) { self.browser = browser; itemID = nil; self.details = details }
     init(itemID: ItemID, details: DetailsPresentation = DetailsPresentation()) { self.itemID = itemID; browser = nil; self.details = details }
@@ -70,7 +71,7 @@ struct ItemInspectorHost: View {
     /// its page.
     private func linked(to item: Item, in relationships: [ItemRelationship]) -> [LinkedItem] {
         LinkedItem.list(
-            pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: library.now(),
+            pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: library.now(), format: dateFormat,
             members: library.catalogue.isCollection(item.type) ? .excluding : .all, item: { library.item($0) })
     }
 
@@ -93,6 +94,7 @@ struct ItemInspectorHost: View {
 /// here; a context menu on one says whether the page shows it too.
 struct ItemInspector: View {
     @Environment(\.interfaceTextSize) private var textSize
+    @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     let item: Item
     /// Nil for a type the catalogue does not hold, which is shown with no fields.
     let type: ItemTypeInfo?
@@ -277,8 +279,8 @@ struct ItemInspector: View {
 
     @ViewBuilder private var details: some View {
         VStack(alignment: .leading, spacing: 0) {
-            detail("Created", ItemDate.text(of: item.created, hasTime: true), isDate: true)
-            detail("Edited", ItemDate.text(of: item.modified, hasTime: true), isDate: true)
+            detail("Created", ItemDate.text(of: item.created, hasTime: true, format: dateFormat), isDate: true)
+            detail("Edited", ItemDate.text(of: item.modified, hasTime: true, format: dateFormat), isDate: true)
             if let source { InspectorDetailRow(name: String(localized: "Made by"), value: source.name, mark: source.mark) }
             if let place { detail("Place", place) }
             detail("Version", item.version.rawValue.formatted())
@@ -292,7 +294,7 @@ struct ItemInspector: View {
             ForEach(otherProperties) { property in
                 InspectorDetailRow(
                     name: Self.name(of: property.key, label: catalogue.label(ofField: property.key, for: item.type)),
-                    value: Self.text(of: property.value), isDate: Self.isDate(property.value))
+                    value: Self.text(of: property.value, format: dateFormat), isDate: Self.isDate(property.value))
             }
         }
     }
@@ -339,8 +341,8 @@ struct ItemInspector: View {
     }
 
     /// A value no field describes, with a date in it read as the fields' dates are.
-    private static func text(of value: PropertyValue) -> String {
-        if let string = value.string, let date = ItemDate.parse(string) { return date.text() }
+    private static func text(of value: PropertyValue, format: DateFormat) -> String {
+        if let string = value.string, let date = ItemDate.parse(string) { return date.text(format: format) }
         return ItemValueText.string(value)
     }
 
