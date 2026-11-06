@@ -133,7 +133,7 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
 }
 
 extension PropertyRow: Encodable {
-    private enum Key: String, CodingKey { case id, label, symbol, kind, text, texts, items, options }
+    private enum Key: String, CodingKey { case id, label, symbol, kind, text, texts, items, options, people }
     /// What the page draws of an item a row links to: a type chip in the item's own tone, or a person's initials and
     /// name. The tone is one of `TypeTone`'s names; the page never picks a color.
     private struct Link: Encodable {
@@ -153,6 +153,11 @@ extension PropertyRow: Encodable {
             initials = target.kind == .person ? PersonInitials.of(target.title) : nil
         }
     }
+    /// A person a list names: initials and a name, with no item to open.
+    private struct Listed: Encodable {
+        let title: String
+        let initials: String?
+    }
     private struct Option: Encodable {
         let label: String
         let tone: String
@@ -169,6 +174,9 @@ extension PropertyRow: Encodable {
         case .items(let targets):
             try container.encode("items", forKey: .kind)
             try container.encode(targets.map(Link.init), forKey: .items)
+        case .people(let names):
+            try container.encode("people", forKey: .kind)
+            try container.encode(names.map { Listed(title: $0, initials: PersonInitials.of($0)) }, forKey: .people)
         case .options(let options):
             try container.encode("options", forKey: .kind)
             try container.encode(options.map { Option(label: $0, tone: OptionTone.tone(for: $0).rawValue) }, forKey: .options)

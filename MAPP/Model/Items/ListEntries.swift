@@ -157,6 +157,19 @@ nonisolated struct ListShape: Hashable, Sendable {
         return .text(summary)
     }
 
+    /// Whether the entries are people: the first declared member is plain text with no format and the next is an email,
+    /// as the people a list names (a name, then an address). Read from the shape alone; no field is named.
+    var holdsPeople: Bool {
+        guard members.count >= 2, case .text(nil) = members[0].kind, case .text(.email) = members[1].kind else { return false }
+        return true
+    }
+
+    /// The name a person's entry goes by in a list of people: the first member's text, or the next member's (the email)
+    /// where the first is blank. Nil where the entry holds neither.
+    func personName(of entry: [String: PropertyValue]) -> String? {
+        members.prefix(2).lazy.compactMap { text(of: $0, in: entry) }.first
+    }
+
     /// The number to call an entry holds, or nil. Marfa declares no phone format, so this reads the definition: only
     /// a list whose first declared member is required plain text (an entry is that value first, labelled after) can
     /// hold one, and only that member's own text is read. A list whose members are all optional, such as an address,

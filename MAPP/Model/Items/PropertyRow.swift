@@ -23,6 +23,8 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         /// The parent pin, drawn the same way.
         case parent
         case items([Target])
+        /// The entries of a list of people, each by the name it goes by (`ListShape.personName`), drawn as the person chip.
+        case people([String])
         /// A choice, or a list of words a field holds, such as labels: each drawn with a dot of its own color.
         case options([String])
         /// The item's own tags, each drawn after a `#`.
@@ -43,6 +45,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
             case .status: "circle.dotted"
             case .parent: "square.stack"
             case .items: "link"
+            case .people: "person.2"
             case .options: "list.bullet"
             case .tags: "tag"
             case .date: "calendar"
@@ -55,7 +58,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         }
 
         /// Every symbol a row can show, for a page that draws them as images.
-        static let symbols = ["circle.dotted", "square.stack", "link", "tag", "calendar", "globe", "envelope", "phone", "checkmark.square", "text.alignleft", "list.bullet"]
+        static let symbols = ["circle.dotted", "square.stack", "link", "tag", "calendar", "globe", "envelope", "phone", "checkmark.square", "text.alignleft", "list.bullet", "person.2"]
     }
 
     let id: String
@@ -134,6 +137,10 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         guard let stored = item.value(of: field.key), InspectorFields.hasValue(stored) else { return nil }
         switch (field.kind, stored) {
         case (.list(let shape), .array(let entries)):
+            if shape.holdsPeople {
+                let names = entries.compactMap { ListEntries.object($0).flatMap(shape.personName(of:)) }
+                return names.isEmpty ? nil : .people(names)
+            }
             // Only the main entry shows on the page; the inspector lists them all.
             guard let main = entries.first.flatMap(ListEntries.object) else { return nil }
             return shape.rowValue(of: main)

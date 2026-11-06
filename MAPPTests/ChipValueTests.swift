@@ -109,4 +109,16 @@ struct ChipValueTests {
         #expect(items[1]["initials"] == nil)
         #expect(items[0]["tone"] == nil)
     }
+
+    @Test func thePeopleAListNamesAreSentWithInitialsAndNoItemToOpen() throws {
+        let row = PropertyRow(id: "assignees", label: "Assignees", value: .people(["Mira Castell", "r@example.com", "   "]))
+        let sent = try encoded(row)
+        #expect(sent["kind"] as? String == "people")
+        #expect(sent["symbol"] as? String == "person.2")
+        #expect(PropertyRow.Value.symbols.contains("person.2"))
+        let people = try #require(sent["people"] as? [[String: Any]])
+        #expect(people.map { $0["title"] as? String } == ["Mira Castell", "r@example.com", "   "])
+        #expect(people.map { $0["initials"] as? String } == ["MC", "R", nil])
+        #expect(people.allSatisfy { $0["item"] == nil })
+    }
 }

@@ -499,6 +499,43 @@ test('a person is initials in a circle and a name, and a name with nothing in it
   expect(posted).toEqual([{ type: 'openItem', item: 'mira' }])
 })
 
+test('the people a list names are all drawn as person chips that open nothing, and a name is text only', () => {
+  const twenty = Array.from({ length: 20 }, (_, index) => ({
+    title: `Person ${index}`,
+    initials: `P${index}`.slice(0, 2),
+  }))
+  header.set({
+    ...ticket,
+    properties: [
+      {
+        id: 'assignees',
+        label: 'Assignees',
+        symbol: 'person.2',
+        kind: 'people',
+        people: [
+          { title: 'Mira Castell', initials: 'MC' },
+          { title: 'r@example.com', initials: 'R' },
+          { title: '<img src=x onerror=alert(1)><b>Bold</b>', initials: '<I' },
+          ...twenty,
+        ],
+      },
+    ],
+  })
+  const people = [...root.querySelectorAll<HTMLElement>('.item-prop-value .item-person')]
+  expect(people).toHaveLength(23)
+  expect(people[0]!.querySelector('.item-person-initials')!.textContent).toBe('MC')
+  expect(people[1]!.querySelector('.item-chip-text')!.textContent).toBe('r@example.com')
+  expect(people[2]!.querySelector('.item-chip-text')!.textContent).toBe(
+    '<img src=x onerror=alert(1)><b>Bold</b>',
+  )
+  expect(root.querySelector('.item-prop-value img')).toBeNull()
+  expect(root.querySelector('.item-prop-value b')).toBeNull()
+  expect(root.querySelector('.item-prop-value button')).toBeNull()
+  posted = []
+  people[0]!.click()
+  expect(posted).toEqual([])
+})
+
 test('the looks the app sent are set on the header for the appearance the page is in', () => {
   header.set({
     ...ticket,

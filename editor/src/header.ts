@@ -39,6 +39,13 @@ export interface HeaderItem {
   initials?: string | null
 }
 
+/** A person a list names (an assignee, an attendee): initials and a name, with no item behind them to open. */
+export interface HeaderListedPerson {
+  title: string
+  /** Absent where the name has no letters, so no empty circle is drawn. */
+  initials?: string | null
+}
+
 /** One row of the property block. The status and parent rows hold the header's own pins, which keep their
  *  menus; every other value is read only, and a link opens its item or its address. */
 export interface HeaderRow {
@@ -47,13 +54,24 @@ export interface HeaderRow {
   /** The SF Symbol name of the row's icon, a key of `HeaderIcons.symbols`. */
   symbol: string
   kind:
-    'status' | 'parent' | 'items' | 'options' | 'tags' | 'date' | 'url' | 'email' | 'phone' | 'text'
+    | 'status'
+    | 'parent'
+    | 'items'
+    | 'people'
+    | 'options'
+    | 'tags'
+    | 'date'
+    | 'url'
+    | 'email'
+    | 'phone'
+    | 'text'
   text?: string
   /** A tag's words, each after a number sign. */
   texts?: string[]
   /** A choice or a list of words, each with the tone of its dot. */
   options?: { label: string; tone: string }[]
   items?: HeaderItem[]
+  people?: HeaderListedPerson[]
 }
 
 /** An item that links to the one on the page. */
@@ -782,17 +800,28 @@ export class ItemHeader {
     return chip
   }
 
+  /** A person's initials and name. The name is set as text, never as markup. */
+  private person<T extends 'button' | 'span'>(
+    parent: HTMLElement,
+    tag: T,
+    target: { title: string; initials?: string | null },
+  ) {
+    const person = element(tag, 'item-person', parent)
+    // A name with no letters has no circle, not an empty one.
+    if (target.initials) {
+      element('span', 'item-person-initials', person).textContent = target.initials
+      person.firstElementChild!.setAttribute('aria-hidden', 'true')
+    }
+    element('span', 'item-chip-text', person).textContent = target.title
+    return person
+  }
+
   /** An item a row links to: a chip of its type in its own tone, or a person's initials and name. */
   private linkedItem(parent: HTMLElement, target: HeaderItem) {
     const open = () => postToHost({ type: 'openItem', item: target.item })
     if (target.kind === 'person') {
-      const person = element('button', 'item-person', parent)
+      const person = this.person(parent, 'button', target)
       person.type = 'button'
-      // A name with no letters has no circle, not an empty one.
-      if (target.initials)
-        element('span', 'item-person-initials', person).textContent = target.initials
-      if (target.initials) person.firstElementChild!.setAttribute('aria-hidden', 'true')
-      element('span', 'item-chip-text', person).textContent = target.title
       person.addEventListener('click', open)
       return
     }
@@ -916,6 +945,9 @@ export class ItemHeader {
         break
       case 'items':
         for (const target of row.items ?? []) this.linkedItem(value, target)
+        break
+      case 'people':
+        for (const person of row.people ?? []) this.person(value, 'span', person)
         break
       case 'options':
         for (const option of row.options ?? [])
