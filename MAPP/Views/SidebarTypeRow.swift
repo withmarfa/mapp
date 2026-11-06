@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// A sidebar row's mark and name, laid out as the system lays out its own sidebar labels. Without a mark it is the
-/// name alone.
+/// A sidebar row's mark and name, laid out as the system lays out its own sidebar labels. A place's mark is a
+/// symbol in the system's grey; a type's is its colored `TypeMark`. Without a mark it is the name alone.
 struct SidebarLabel: View {
     let title: String
     let icon: RowIcon?
@@ -11,7 +11,10 @@ struct SidebarLabel: View {
             Label {
                 name
             } icon: {
-                RowIconImage(icon: icon).interfaceFont(.body).foregroundStyle(.secondary)
+                switch icon {
+                case .symbol(let symbol): Image(systemName: symbol).interfaceFont(.body).foregroundStyle(.secondary)
+                case .type(let id): TypeMark(icon: id, size: .side)
+                }
             }
         } else {
             name
@@ -25,6 +28,8 @@ struct SidebarLabel: View {
 
 /// A row of the Types section: the type's mark and name, a count at the trailing edge in line with the system's own,
 /// and, where the row folds subtypes under it, a chevron.
+///
+/// Only a parent type's row has a mark by default; its subtypes, such as Sessions and Logs under Agent, have none.
 ///
 /// A subtype sits one step in under its parent, and a thin guide runs down the rows the parent holds and bends into
 /// each of them from under the parent's mark. A subtype either keeps its mark, so the mark lies under its parent's
@@ -167,7 +172,7 @@ private struct SidebarGuide: View {
                 Label {
                     Text(verbatim: "")
                 } icon: {
-                    Image(systemName: "circle").alignmentGuide(.markCenter) { $0[HorizontalAlignment.center] }
+                    TypeMark(icon: nil, size: .side).alignmentGuide(.markCenter) { $0[HorizontalAlignment.center] }
                 }
                 .interfaceFont(.body)
                 .hidden()

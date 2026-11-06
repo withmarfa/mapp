@@ -445,15 +445,10 @@ final class Browser {
         let options: ItemTableOptions
     }
 
-    /// What the rows of the list say about themselves: the type where the list holds several, and nothing that the
-    /// list itself already says.
+    /// What the rows of the list say about themselves: the type where the list holds several. It reads the items
+    /// shown, so it holds for every place, search results and Include Subtypes alike.
     func metaContext(for items: [Item]) -> ItemMeta.Context {
-        var context = ItemMeta.Context()
-        context.mixesTypes = Set(items.lazy.map(\.type)).count > 1
-        if !isSearching {
-            context.isInbox = item == .inbox
-        }
-        return context
+        ItemMeta.Context(mixesTypes: Set(items.lazy.map(\.type)).count > 1)
     }
 
     private var showsOnlyFavorites: Bool {

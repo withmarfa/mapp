@@ -178,7 +178,6 @@ struct ItemRow: View {
             }
             if !meta.isEmpty {
                 ItemMetaLine(meta: meta)
-                    .foregroundStyle(.secondary)
                     .padding(.top, 1)
             }
         }
@@ -187,16 +186,22 @@ struct ItemRow: View {
     }
 }
 
-/// The pieces that say what an item is and where it sits, side by side with room between them.
+/// The pieces that say what an item is, side by side with room between them. A type shows as its colored mark; a
+/// piece with a symbol keeps the symbol. A long label gives way before the mark does.
 struct ItemMetaLine: View {
     let meta: ItemMeta
 
     var body: some View {
         HStack(spacing: 12) {
             ForEach(meta.pieces) { piece in
-                Label { Text(piece.label) } icon: { RowIconImage(icon: piece.icon) }
-                    .labelStyle(.titleAndIcon)
-                    .lineLimit(1)
+                HStack(spacing: 5) {
+                    switch piece.icon {
+                    case .symbol(let name): Image(systemName: name)
+                    case .type(let id): TypeMark(icon: id, size: .chip)
+                    }
+                    Text(piece.label).lineLimit(1)
+                }
+                .foregroundStyle(.secondary)
             }
         }
         .interfaceFont(.caption)
