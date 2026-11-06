@@ -11,6 +11,8 @@ nonisolated enum LinkedFromPlace: String, Codable, Sendable {
 /// customized has no entry and follows the defaults in `PagePlacement`.
 nonisolated struct PagePlacements: Equatable, Sendable {
     static let key = "pagePlacements"
+    /// Each entry is stored text that could not be read, in the order it was found.
+    static let setAsideKey = "pagePlacementsSetAside"
 
     /// What the person chose for one type. A row not named here follows the default.
     struct Choice: Codable, Equatable, Sendable {
@@ -124,6 +126,10 @@ nonisolated extension PagePlacements {
     }
 
     static func update(in defaults: UserDefaults = .standard, _ change: (inout PagePlacements) -> Void) {
+        // This write replaces every type's choices, so text it could not read is kept rather than lost.
+        if let text = defaults.string(forKey: key), PagePlacements(rawValue: text) == nil {
+            defaults.set((defaults.stringArray(forKey: setAsideKey) ?? []) + [text], forKey: setAsideKey)
+        }
         var value = stored(in: defaults)
         change(&value)
         defaults.set(value.rawValue, forKey: key)

@@ -334,6 +334,21 @@ struct PagePlacementsTests {
         #expect(placements.hasChoice(for: Self.ticket))
     }
 
+    @Test func storedTextThatCannotBeReadIsSetAsideBeforeItIsWrittenOver() throws {
+        let suite = "PagePlacementsTests.setAside"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let unreadable = #"{"aic.ticket":{"rows":{"repo":"not a flag"}}}"#
+        defaults.set(unreadable, forKey: PagePlacements.key)
+
+        PagePlacements.update(in: defaults) { $0.setShown(false, row: "repo", of: Self.ticket) }
+        PagePlacements.update(in: defaults) { $0.setShown(true, row: "repo", of: Self.ticket) }
+
+        #expect(defaults.stringArray(forKey: PagePlacements.setAsideKey) == [unreadable])
+        #expect(PagePlacements.stored(in: defaults).choices["aic.ticket"]?.rows == ["repo": true])
+    }
+
     @Test func theTypeSourceAndUpdatedRowsShowOnThePageByDefault() {
         let placement = PagePlacements().placement(of: Self.ticket, in: Self.catalogue)
         for row in ["#type", "#source", "#updated"] { #expect(placement.showsOnPage(row)) }
