@@ -12,8 +12,8 @@ nonisolated enum PageHeaderKind: String, Encodable, Sendable {
     case person
     /// `core.bookmark` and `core.media`: something to read.
     case reading
-    /// `core.file.webpage`: the page itself. A file has no text to edit, so the page draws a title and byline above
-    /// the HTML (`WebPageItemPage`), not the editor's header.
+    /// `core.file.webpage`: the page itself. A file has no text to edit, so SwiftUI draws the header above the HTML
+    /// (`WebPageItemPage`), with the same pins and chips as the editor's header, from the same `PageHeaderParts`.
     case webpage
 
     static func of(_ type: TypeID, in catalogue: Catalogue) -> PageHeaderKind {
