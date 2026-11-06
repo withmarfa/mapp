@@ -13,13 +13,12 @@ export interface HeaderChipStyle {
   dark: Record<string, string>
 }
 
-/** A pin under the title. An empty pin has no value yet and shows a plus in place of its symbol. */
+/** The status or the parent as a button that opens the menu the app builds, wherever the page draws it: in a pin or in
+ *  a row of the property block. An empty status, in a row, has no value yet and shows a plus in place of its mark. */
 export interface HeaderPin {
   label: string
   enabled: boolean
   empty: boolean
-  /** False for a pin that opens the app's chooser directly: it has no chevron, as a pop-up button does. */
-  opensMenu: boolean
   /** Only the status pin has a mark. */
   mark?: { tone: HeaderTone; fill: HeaderFill }
   /** Only the parent pin has these: the parent's type icon, a key of `HeaderIcons.symbols`, and its tone's name. */
@@ -46,8 +45,9 @@ export interface HeaderListedPerson {
   initials?: string | null
 }
 
-/** One row of the property block. The status and parent rows hold the header's own pins, which keep their
- *  menus; every other value is read only, and a link opens its item or its address. */
+/** One row of the property block, or one pin under the title (the app sends both in this shape). The status and parent
+ *  rows hold the header's own buttons, which keep their menus; every other value is read only, and a link opens its
+ *  item or its address. */
 export interface HeaderRow {
   id: string
   label: string
@@ -56,6 +56,7 @@ export interface HeaderRow {
   kind:
     | 'status'
     | 'parent'
+    | 'type'
     | 'items'
     | 'people'
     | 'options'
@@ -72,6 +73,11 @@ export interface HeaderRow {
   options?: { label: string; tone: string }[]
   items?: HeaderItem[]
   people?: HeaderListedPerson[]
+  /** The type's chip: the key of its icon in `HeaderIcons.symbols` and the name of its tone. */
+  icon?: string | null
+  tone?: string | null
+  /** How many values of a list a pin left out, shown as "+N" after the first two. */
+  more?: number
 }
 
 /** An item that links to the one on the page. */
@@ -87,15 +93,15 @@ export interface HeaderLinked {
  * Which header the page draws, chosen by the app from the core type the item's type builds on
  * (`PageHeaderKind`). The page draws the shared parts and never decides a kind or names a type.
  *
- * - `general`: the title, byline, properties and Linked From.
+ * - `general`: the title, the pins, the properties and Linked From.
  * - `event`: adds a calendar tile of one fixed height (month band over the day) with two lines beside it, centered
  *   against it: the time or range, then the weekday, zone and a relative phrase, which wraps as a whole line where
  *   the page is narrow.
  * - `person`: adds an avatar, a subtitle and rows whose email and phone values open `mailto:` and `tel:` links, and
  *   calls Linked From "Timeline", open by default.
  * - `reading` (`core.bookmark`, `core.media`): puts the source, published date and reading time above the title
- *   (`byline.detail`), the description under it as a dek, and the text in a larger serif face set through
- *   `body[data-header]`, at the page width the person chose like any other page.
+ *   (`byline`, which no other kind has), the description under it as a dek, and the text in a larger serif face set
+ *   through `body[data-header]`, at the page width the person chose like any other page. The pins follow the title.
  *
  * A fifth kind, `webpage` (`core.file.webpage`), never reaches this page: a file has no text to edit, so SwiftUI
  * draws a Web Page's title and byline natively (`WebPageItemPage`) above the sealed HTML view.
@@ -138,11 +144,6 @@ export interface HeaderModel {
    *  the derived title, and `bottom` and the scrolled-away report do not change. Decided from the title rule, never
    *  from a type. */
   showsTitle?: boolean
-  type: string | null
-  /** The key of the type's icon in `HeaderIcons.symbols`, drawn before the type's name, and the name of the tone the
-   *  type's chip takes. */
-  icon?: string | null
-  typeTone?: string
   kind: HeaderKind
   event?: HeaderEvent | null
   person?: HeaderPerson | null
@@ -150,8 +151,11 @@ export interface HeaderModel {
   subtitle?: string | null
   status: HeaderPin | null
   parent: HeaderPin | null
-  /** Who made the item, if the library knows, and when. */
-  byline: { source?: string | null; date: string; detail?: string | null }
+  /** The properties the person pinned under the title, in their order, at most four. The app has left out a pin with
+   *  nothing to show and any that the kind's own line already says. */
+  pins: HeaderRow[]
+  /** A reading item's line above the title; no other page has one. */
+  byline: { source?: string | null; date: string; detail?: string | null } | null
   properties: HeaderRow[]
   /** How many rows show before the rest wait behind a button. */
   foldAfter: number
@@ -196,7 +200,6 @@ export interface HeaderIcons {
 export interface HeaderLabels {
   untitled: string
   title: string
-  itemType: string
   status: string
   discardChanges: string
   propertyRejected: string
@@ -218,7 +221,6 @@ const lineBreaks = /\s*[\r\n\u2028\u2029\u0085]+\s*/g
 const englishLabels: HeaderLabels = {
   untitled: 'Untitled',
   title: 'Title',
-  itemType: 'Item Type',
   status: 'Status',
   discardChanges: 'Discard Changes',
   propertyRejected: 'The value could not be saved. Please try again.',
@@ -351,11 +353,12 @@ class LinkedSection {
  *  menu. The header belongs to MAPP's page, not to Inkkit; do not move it back into a native overlay that follows
  *  WebKit's scrolling.
  *
- *  Under the title the header draws a byline (the type pin, which starts with the type's own icon, the source and
- *  the day), then the property block: the rows Swift sends (`HeaderRow`, one model for every item), folded after
- *  `foldAfter` rows with "Show N More" expanding in place, and "Show Less" once expanded. The status and parent pins
- *  are the values of their rows, moved into them with their menus unchanged. A link value posts `openItem` or
- *  `openLink`; nothing else in the block is edited here.
+ *  Under the title the header draws the pins the app sends (`HeaderModel.pins`, at most four, each a key above its
+ *  value), then the property block: the rows Swift sends (`HeaderRow`, one model for every item), folded after
+ *  `foldAfter` rows with "Show N More" expanding in place, and "Show Less" once expanded. The status, in a pin or a
+ *  row, and the parent, in a row, are one button each, moved into place with its menu unchanged. A link value posts
+ *  `openItem` or `openLink`; nothing else here is edited. A pin that is a list shows what the app sent, and its
+ *  "+N". The layout of the pins follows the width of the page's column, by container query (`style.css`).
  *
  *  Linked From (a folded section of the items that link to this one) and a collection's Contents are drawn in the
  *  footer, under the text. */
@@ -370,6 +373,8 @@ export class ItemHeader {
   private readonly titleError: HTMLDivElement
   private readonly titleRefusal: HTMLParagraphElement
   private readonly byline: HTMLDivElement
+  private readonly pins: HTMLDListElement
+  private readonly pinsBox: HTMLDivElement
   private readonly properties: HTMLDListElement
   private readonly moreProperties: HTMLButtonElement
   private readonly contents: LinkedSection
@@ -380,7 +385,6 @@ export class ItemHeader {
   private drawn = ''
   /** Whether the person has expanded the rows, for the item on the page. */
   private expanded = { item: '', properties: false }
-  private readonly typePin: HTMLSpanElement
   private readonly statusPin: HTMLButtonElement
   private readonly parentPin: HTMLButtonElement
   private readonly propertyError: HTMLParagraphElement
@@ -423,20 +427,13 @@ export class ItemHeader {
       if (this.model) postToHost({ type: 'titleDiscard', item: this.model.item })
     })
     this.byline = element('div', 'item-byline', root)
-    this.typePin = element('span', 'item-pin item-chip', this.byline)
-    this.typePin.id = 'ItemTypePin'
-    this.typePin.dataset.kind = 'type'
-    this.typePin.title = this.labels.itemType
-    element('span', 'item-chip-mark item-icon-type', this.typePin).setAttribute(
-      'aria-hidden',
-      'true',
-    )
-    element('span', 'item-pin-label item-chip-text', this.typePin)
     this.when = element('div', 'item-when', root)
-    const pins = document.createElement('div')
-    this.statusPin = this.menuPin('ItemStatusPin', 'status', pins)
+    this.pinsBox = element('div', 'item-pins', root)
+    this.pins = element('dl', 'item-pin-list', this.pinsBox)
+    const buttons = document.createElement('div')
+    this.statusPin = this.menuPin('ItemStatusPin', 'status', buttons)
     this.statusPin.setAttribute('aria-label', this.labels.status)
-    this.parentPin = this.menuPin('ItemParentPin', 'parent', pins)
+    this.parentPin = this.menuPin('ItemParentPin', 'parent', buttons)
     this.properties = element('dl', 'item-props', root)
     this.properties.setAttribute('aria-label', this.labels.properties)
     this.moreProperties = this.moreButton(root, () => {
@@ -603,10 +600,6 @@ export class ItemHeader {
     this.titleRefusal.textContent = model.titleRefusal
     this.propertyError.hidden = !model.propertyRejected
     this.parentError.hidden = !model.parentRejected
-    this.typePin.hidden = model.type == null
-    this.typePin.querySelector('.item-pin-label')!.textContent = model.type ?? ''
-    useTone(this.typePin, model.typeTone)
-    this.drawTypeIcon()
     this.showPin(this.statusPin, model.status)
     this.showPin(this.parentPin, model.parent)
     if (previous?.item !== model.item) {
@@ -666,7 +659,6 @@ export class ItemHeader {
     const style = this.root.style
     const footerStyle = this.footer.style
     this.symbols = icons.symbols ?? {}
-    this.drawTypeIcon()
     this.drawParentIcon()
     this.drawn = ''
     this.redraw()
@@ -679,12 +671,6 @@ export class ItemHeader {
       footerStyle.setProperty(`--icon-${name}-width`, `${icon.width}px`)
       footerStyle.setProperty(`--icon-${name}-height`, `${icon.height}px`)
     }
-  }
-
-  /** The icon of the item's type before its name, in the secondary color; none for a type the app drew nothing for. */
-  private drawTypeIcon() {
-    const node = this.typePin.querySelector<HTMLElement>('.item-icon-type')!
-    maskSymbol(node, this.model?.icon ? this.symbols[this.model.icon] : undefined)
   }
 
   /** The parent chip's symbol is the icon of the parent's own type. */
@@ -708,9 +694,6 @@ export class ItemHeader {
     pin.hidden = model == null
     pin.disabled = !(model?.enabled ?? false)
     pin.classList.toggle('empty', model?.empty ?? false)
-    const opensMenu = model?.opensMenu ?? true
-    pin.classList.toggle('direct', !opensMenu)
-    pin.setAttribute('aria-haspopup', opensMenu ? 'menu' : 'dialog')
     pin.querySelector('.item-pin-label')!.textContent = model?.label ?? ''
     // The status ring is drawn here, from the tone and fill the app chose, since the catalogue holds no colors.
     const mark = pin.querySelector<HTMLElement>('.item-status-mark')
@@ -732,9 +715,10 @@ export class ItemHeader {
     const pin = element('button', 'item-pin item-chip item-menu-pin', parent)
     pin.type = 'button'
     pin.id = id
+    pin.setAttribute('aria-haspopup', 'menu')
     // The status is a status chip; the parent is a linked item and looks like one.
     pin.dataset.kind = menu === 'status' ? 'status' : 'link'
-    // An empty pin shows a plus where a filled one shows its symbol.
+    // An empty status shows a plus where a filled one shows its mark.
     const symbol =
       menu === 'status'
         ? element('span', 'item-pin-symbol item-status-mark', pin)
@@ -839,16 +823,16 @@ export class ItemHeader {
     link.addEventListener('click', open)
   }
 
-  /** Draws the byline, the property block and the linked items from the model. */
+  /** Draws the byline, the pins, the property block and the linked items from the model. */
   private redraw() {
     const model = this.model
     if (!model) return
-    const source = model.byline.source
     const key = JSON.stringify([
       model.kind,
       model.event,
       model.person,
       model.byline,
+      model.pins,
       model.properties,
       model.contents,
       model.linked,
@@ -863,17 +847,20 @@ export class ItemHeader {
     if (key === this.drawn) return
     this.drawn = key
 
-    // The type, then who made the item and when, as one quiet line.
-    for (const extra of [...this.byline.querySelectorAll('.item-byline-part, .item-byline-dot')])
-      extra.remove()
-    let first = this.typePin.hidden
-    for (const part of [source, model.byline.date, model.byline.detail]) {
+    // Where a reading item came from, when it was published and how long it takes, as one quiet line.
+    this.byline.replaceChildren()
+    let first = true
+    for (const part of [model.byline?.source, model.byline?.date, model.byline?.detail]) {
       if (!part) continue
       if (!first)
         element('span', 'item-byline-dot', this.byline).setAttribute('aria-hidden', 'true')
       first = false
       element('span', 'item-byline-part', this.byline).textContent = part
     }
+    this.byline.hidden = first
+
+    this.pins.replaceChildren(...model.pins.map((pin) => this.pin(pin, model)))
+    this.pinsBox.hidden = model.pins.length === 0
 
     const shown = this.expanded.properties
       ? model.properties
@@ -935,7 +922,28 @@ export class ItemHeader {
     const term = element('dt', 'item-prop-label', entry)
     this.glyph(row.symbol, term)
     element('span', 'item-prop-name', term).textContent = row.label
-    const value = element('dd', 'item-prop-value', entry)
+    this.value(element('dd', 'item-prop-value', entry), row, model)
+    return entry
+  }
+
+  /** A pin: its key above its value, the symbol on the value's chip and none on the key. The status pin is the same
+   *  button as the status row's. */
+  private pin(row: HeaderRow, model: HeaderModel): HTMLElement {
+    const entry = element('div', 'item-pin-item')
+    entry.dataset.pin = row.id
+    entry.dataset.kind = row.kind
+    element('dt', 'item-pin-key', entry).textContent = row.label
+    const value = element('dd', 'item-pin-value', entry)
+    this.value(value, row, model, true)
+    if (row.more) {
+      const more = element('span', 'item-pin-more', value)
+      more.textContent = `+${row.more}`
+      more.title = String(row.more)
+    }
+    return entry
+  }
+
+  private value(value: HTMLElement, row: HeaderRow, model: HeaderModel, pinned = false) {
     switch (row.kind) {
       case 'status':
         if (model.status) value.append(this.statusPin)
@@ -943,6 +951,18 @@ export class ItemHeader {
       case 'parent':
         if (model.parent) value.append(this.parentPin)
         break
+      case 'type': {
+        const chip = this.chip(value, 'type', row.text ?? '', row.tone)
+        if (pinned) chip.id = 'ItemTypePin'
+        const symbol = row.icon ? this.symbols[row.icon] : undefined
+        if (symbol) {
+          const mark = element('span', 'item-chip-mark')
+          mark.setAttribute('aria-hidden', 'true')
+          maskSymbol(mark, symbol)
+          chip.prepend(mark)
+        }
+        break
+      }
       case 'items':
         for (const target of row.items ?? []) this.linkedItem(value, target)
         break
@@ -959,7 +979,7 @@ export class ItemHeader {
       case 'url': {
         const href = row.text ?? ''
         if (/^https?:\/\//i.test(href)) this.link(value, href, () => openLink(href), href)
-        else element('span', '', value).textContent = href
+        else element('span', 'item-text', value).textContent = href
         break
       }
       case 'email': {
@@ -972,14 +992,13 @@ export class ItemHeader {
         const number = row.text ?? ''
         // A number is dialed as its digits and a leading plus, whatever spacing it is written with.
         const dialed = number.replace(/(?!^\+)[^\d]/g, '')
-        if (dialed.replace('+', '') === '') element('span', '', value).textContent = number
+        if (dialed.replace('+', '') === '') element('span', 'item-text', value).textContent = number
         else this.link(value, number, () => openLink(`tel:${dialed}`), `tel:${dialed}`)
         break
       }
       default:
-        element('span', '', value).textContent = row.text ?? ''
+        element('span', 'item-text', value).textContent = row.text ?? ''
     }
-    return entry
   }
 
   /** The row of the property block, or Linked From, that an event's target is in, for the app to add Hide from

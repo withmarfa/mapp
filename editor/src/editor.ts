@@ -41,7 +41,6 @@ export type AppLabels = Partial<EditorLabels & HeaderLabels> & AppWords
 const headerLabelKeys: readonly (keyof HeaderLabels)[] = [
   'untitled',
   'title',
-  'itemType',
   'status',
   'discardChanges',
   'propertyRejected',

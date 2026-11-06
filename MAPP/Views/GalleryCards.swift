@@ -16,7 +16,7 @@ enum GalleryKind: Equatable {
     static func of(_ item: Item, in library: any ItemLibrary) -> GalleryKind {
         if case .file(let type, _) = item.content { return .file(type) }
         let info = library.catalogue.itemTypes[item.type]
-        if let field = info?.statusField, let value = ItemPageHeader.statusValue(of: item, in: field) {
+        if let field = info?.statusField, let value = PagePins.statusValue(of: item, in: field) {
             return .task(GalleryStatus(
                 label: ItemTypeInfo.Field.label(ofOption: value), mark: PageHeader.Mark(group: field.statusGroup(of: value))))
         }

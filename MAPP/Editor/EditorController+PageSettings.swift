@@ -107,7 +107,6 @@ extension EditorController {
             "linkToNote": String(localized: "Link to Note"),
             "untitled": String(localized: "Untitled"),
             "title": String(localized: "Title"),
-            "itemType": String(localized: "Item Type"),
             "status": String(localized: "Status"),
             "discardChanges": String(localized: "Discard Changes"),
             "propertyRejected": String(localized: "The value could not be saved. Please try again."),

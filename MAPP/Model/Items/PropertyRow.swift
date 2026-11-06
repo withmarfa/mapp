@@ -1,9 +1,9 @@
 import Foundation
 import Marfa
 
-/// One row of the property block an item's page draws under its title: the label and a value drawn by the
-/// kind of field it came from. The block is for reading at a glance; every value is edited in the inspector, except
-/// the status and the parent, which keep the menus they had as pins.
+/// One row of the property block an item's page draws under its title, or one pin above it: the label and a value
+/// drawn by the kind of field it came from. The block is for reading at a glance; every value is edited in the
+/// inspector, except the status, and the parent where it is a row, which keep their menus.
 nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// An item a row links to.
     struct Target: Hashable, Sendable {
@@ -18,10 +18,14 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     }
 
     enum Value: Hashable, Sendable {
-        /// The status pill, drawn by the page from the header's status pin.
+        /// The status pill, drawn by the page from the header's status menu.
         case status
-        /// The parent pin, drawn the same way.
+        /// The parent's pill, drawn the same way. A pinned parent is `items`, a link that only opens it.
         case parent
+        /// The name of the item's type, drawn as the type's chip: its mark and tint come from its icon.
+        case type(String, icon: String?)
+        /// What the item came from, by the name the library gives its source.
+        case source(String)
         case items([Target])
         /// The entries of a list of people, each by the name it goes by (`ListShape.personName`), drawn as the person chip.
         case people([String])
@@ -44,6 +48,8 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
             switch self {
             case .status: "circle.dotted"
             case .parent: "square.stack"
+            case .type: "square.grid.2x2"
+            case .source: "dot.radiowaves.left.and.right"
             case .items: "link"
             case .people: "person.2"
             case .options: "list.bullet"
@@ -58,7 +64,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         }
 
         /// Every symbol a row can show, for a page that draws them as images.
-        static let symbols = ["circle.dotted", "square.stack", "link", "tag", "calendar", "globe", "envelope", "phone", "checkmark.square", "text.alignleft", "list.bullet", "person.2"]
+        static let symbols = ["circle.dotted", "square.stack", "link", "tag", "calendar", "globe", "envelope", "phone", "checkmark.square", "text.alignleft", "list.bullet", "person.2", "square.grid.2x2", "dot.radiowaves.left.and.right"]
     }
 
     let id: String
@@ -66,6 +72,8 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     let value: Value
     /// The number to call the main entry of a list holds, where its list can hold one (`ListShape.numberToCall`).
     var numberToCall: String?
+    /// How many values of a list a pin left out, for the "+N" after the first two. Always 0 in the property block.
+    var more = 0
 
     /// How many rows show before "Show N more".
     static let foldAfter = 6
@@ -79,46 +87,61 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// A text value too long to read in a row belongs in the body or the inspector.
     static let longestText = 120
 
-    /// The rows for an item, in the order a person reads them: the type's fields as the catalogue orders them,
-    /// then the parent if the item has one, then the item's other relationships, then its tags. A field shows only
-    /// with a value, except the status, which always shows where the type has one, since its pill is how a status
-    /// is set. The keys in `hidden` are what the page shows elsewhere, such as the title and the text, and
-    /// `placement` is the person's choice of which of the rest the page shows (the inspector lists them all). An
-    /// item with no parent has no parent row: the parent is set from the inspector, and the pin keeps its menu once
-    /// it has a value.
-    static func rows(
+    /// The rows of the property block, in the order a person reads them: of the item's `candidates`, those the person's
+    /// `placement` shows, except `excluding`, which the page shows another way (`PagePins.leftOutOfBlock`).
+    static func block(_ candidates: [PropertyRow], placement: PagePlacement, excluding: Set<String> = []) -> [PropertyRow] {
+        candidates.filter { placement.showsOnPage($0.id) && !excluding.contains($0.id) }
+    }
+
+    /// Every row the item could show, whatever the person chose, in the order a person reads them: its type, source
+    /// and last edit, the type's fields as the catalogue orders them, then the parent if the item has one, then the
+    /// item's other relationships, then its tags. A field shows only with a value, except the status, which always
+    /// shows where the type has one, since its pill is how a status is set from the page. The keys in `hidden` are what
+    /// the page shows elsewhere, such as the title and the text. An item with no parent has no parent row: the parent
+    /// is set from the inspector, and the row keeps its menu once it has a value. The block and the pins are both
+    /// chosen from these.
+    static func candidates(
         of item: Item, type: ItemTypeInfo?, hidden: Set<String>, relationships: [ItemRelationship], parentField: String, format: DateFormat,
-        tags: [String], placement: PagePlacement = .standard, icon: (ItemID) -> String? = { _ in nil },
-        isPerson: (ItemID) -> Bool = { _ in false }
+        tags: [String], typeLabel: String?, typeIcon: String?, sourceName: String?, now: Date, calendar: Calendar, locale: Locale,
+        icon: (ItemID) -> String?, isPerson: (ItemID) -> Bool
     ) -> [PropertyRow] {
         var rows: [PropertyRow] = []
+        if let typeLabel {
+            rows.append(PropertyRow(id: PagePlacement.type, label: String(localized: "Type"), value: .type(typeLabel, icon: typeIcon)))
+        }
+        if let source = (sourceName ?? item.source)?.trimmingCharacters(in: .whitespacesAndNewlines), !source.isEmpty {
+            rows.append(PropertyRow(id: PagePlacement.source, label: String(localized: "Source"), value: .source(source)))
+        }
+        rows.append(PropertyRow(
+            id: PagePlacement.updated, label: String(localized: "Updated"),
+            value: .date(DateDisplay.text(of: item.modified, place: .list, format: format, now: now, calendar: calendar, locale: locale))))
+        var fields: [PropertyRow] = []
         let parent = relationships.contains { $0.field == parentField && !$0.targets.isEmpty }
         let status = type?.statusField
         for field in type?.fields ?? [] where !hidden.contains(field.key) {
             if field.key == status?.key {
-                if placement.showsOnPage(field.key) { rows.append(PropertyRow(id: field.key, label: field.label, value: .status)) }
-                if parent, placement.showsOnPage(parentField) { rows.append(parentRow(relationships, parentField)) }
-            } else if placement.showsOnPage(field.key), let value = value(of: field, in: item, format: format) {
-                rows.append(PropertyRow(id: field.key, label: field.label, value: value, numberToCall: numberToCall(of: field, in: item)))
+                fields.append(PropertyRow(id: field.key, label: field.label, value: .status))
+                if parent { fields.append(parentRow(relationships, parentField)) }
+            } else if let value = value(of: field, in: item, format: format) {
+                fields.append(PropertyRow(id: field.key, label: field.label, value: value, numberToCall: numberToCall(of: field, in: item)))
             }
         }
-        if parent, placement.showsOnPage(parentField), !rows.contains(where: { $0.value == .parent }) {
-            rows.insert(parentRow(relationships, parentField), at: 0)
+        if parent, !fields.contains(where: { $0.value == .parent }) { fields.insert(parentRow(relationships, parentField), at: 0) }
+        rows += fields
+        for relationship in relationships where !relationship.field.hasPrefix("inverse:") && relationship.field != parentField {
+            if let row = linkRow(relationship, icon: icon, isPerson: isPerson) { rows.append(row) }
         }
-        for relationship in relationships
-        where !relationship.field.hasPrefix("inverse:") && relationship.field != parentField && placement.showsOnPage(relationship.field) {
-            let targets = relationship.targets.compactMap { target -> Target? in
-                guard target.isOpenable, !target.isDeleted, let id = target.itemID else { return nil }
-                return Target(title: target.title, item: id, icon: icon(id), kind: isPerson(id) ? .person : .link)
-            }
-            if !targets.isEmpty {
-                rows.append(PropertyRow(id: relationship.field, label: relationship.label, value: .items(targets)))
-            }
-        }
-        if !tags.isEmpty, placement.showsOnPage(PagePlacement.tags) {
-            rows.append(PropertyRow(id: PagePlacement.tags, label: String(localized: "Tags"), value: .tags(tags)))
-        }
+        if !tags.isEmpty { rows.append(PropertyRow(id: PagePlacement.tags, label: String(localized: "Tags"), value: .tags(tags))) }
         return rows
+    }
+
+    /// The row of the items a relationship links to, or nil where it links to none the page can open.
+    static func linkRow(_ relationship: ItemRelationship, icon: (ItemID) -> String?, isPerson: (ItemID) -> Bool) -> PropertyRow? {
+        let targets = relationship.targets.compactMap { target -> Target? in
+            guard target.isOpenable, !target.isDeleted, let id = target.itemID else { return nil }
+            return Target(title: target.title, item: id, icon: icon(id), kind: isPerson(id) ? .person : .link)
+        }
+        return targets.isEmpty ? nil : PropertyRow(id: relationship.field, label: relationship.label, value: .items(targets))
     }
 
     private static func parentRow(_ relationships: [ItemRelationship], _ field: String) -> PropertyRow {

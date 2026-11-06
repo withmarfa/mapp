@@ -1,7 +1,7 @@
 import Foundation
 
 /// Which header an item's page draws above its text, chosen by the core type the item's type builds on: the page
-/// is the general one (title, byline, properties, Linked From), and these extend it with what a person looks
+/// is the general one (title, pins, properties, Linked From), and these extend it with what a person looks
 /// for first. A type nobody at WithMarfa defined takes the nearest core type above it through the parents the
 /// catalogue names, so the app names no type a person or an app made.
 nonisolated enum PageHeaderKind: String, Encodable, Sendable {
@@ -35,22 +35,34 @@ nonisolated enum PageHeaderKind: String, Encodable, Sendable {
     ]
 }
 
-/// What a kind of header adds to the general page for one item: the block it draws, the line under the title, and
-/// the properties it already shows, which leave the property block so nothing is shown twice.
+/// What a kind of header adds to the general page for one item: the block it draws, the line it keeps, and the
+/// properties it already shows, which leave the property block and the pins so nothing is shown twice. A general
+/// page has no line of its own: its type, source and last edit are pins.
 nonisolated struct PageHeaderLead: Equatable, Sendable {
     var kind = PageHeaderKind.general
     var event: EventHeader?
     var person: PersonHeader?
     /// A person's job and organization, or a reading item's description (its dek).
     var subtitle: String?
-    /// Replaces the general byline (the source, then the day the item was made) where the kind knows better.
+    /// The line above the title where the kind has one: where a reading item came from, when it was published and
+    /// how long it takes. No other page has a byline.
     var byline: PageByline?
-    /// The type is left out of the byline where the kind's own line says what the item is.
+    /// False where the kind's own line says what the item is, so the page names the type nowhere.
     var showsType = true
     /// The keys of the item's properties the header draws.
     var consumed: Set<String> = []
 
     static let general = PageHeaderLead()
+
+    /// The rows the header's own line says already, which no pin and no row of the property block repeats: the
+    /// properties it draws, the type where `showsType` is false, and the source and last edit where the byline stands
+    /// for them.
+    var said: Set<String> {
+        var rows = consumed
+        if !showsType { rows.insert(PagePlacement.type) }
+        if byline != nil { rows.formUnion([PagePlacement.source, PagePlacement.updated]) }
+        return rows
+    }
 
     /// The lead for `item`. `body` is its text, which a reading time is counted from.
     init(

@@ -128,7 +128,7 @@ struct InspectorFieldsTests {
         #expect(ItemPageHeader.statusChoices(of: blocked, in: status) == ["pending", "in_progress", "completed", "canceled", "blocked"])
         let completed = Self.item("aic.ticket.task", properties: [Property(key: "status", value: .string("completed"))])
         #expect(ItemPageHeader.statusChoices(of: completed, in: status) == status.options)
-        #expect(ItemPageHeader.statusValue(of: Self.item("aic.ticket.task", properties: [Property(key: "status", value: .string(""))]), in: status) == nil)
+        #expect(PagePins.statusValue(of: Self.item("aic.ticket.task", properties: [Property(key: "status", value: .string(""))]), in: status) == nil)
     }
 
     @Test func aPinSaysWhetherItOpensAMenu() throws {

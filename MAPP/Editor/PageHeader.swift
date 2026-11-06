@@ -2,8 +2,9 @@ import AppKit
 import MarfaIcons
 import SwiftUI
 
-/// What the page's item header shows: the item's title, or the person's unsaved draft of it, and its pinned
-/// properties. The page draws it above the note so the two scroll as one surface; what it does stays native.
+/// What the page's item header shows: the item's title, or the person's unsaved draft of it, its pinned properties
+/// (`PagePins`) and the rows of the property block. The page draws it above the note so the two scroll as one
+/// surface; what it does stays native.
 nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     /// A status's ring: its color and how it is filled. The catalogue holds neither, so they follow the group the
     /// type puts it in, and a status no group claims gets the plain ring. A tone is one of `TypeTone`'s names, or
@@ -29,13 +30,13 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
         }
     }
 
-    /// A pin that opens a menu. An empty one has no value yet: the page shows a plus and a quieter edge. A pin
-    /// that opens the app's chooser directly, as an empty parent does, is not a menu and has no chevron.
+    /// The status or the parent as the menu the page opens from it, wherever the page draws it. The page draws the
+    /// button; the app builds the menu. An empty status, in the property block, has no value yet: the page shows a
+    /// plus and a quieter edge. A parent exists only with a value.
     struct Pin: Encodable, Equatable, Sendable {
         var label: String
         var enabled: Bool
         var empty = false
-        var opensMenu = true
         /// Only the status pin has a mark.
         var mark: Mark?
         /// Only the parent pin has these: the parent's type icon and the tone of its chip, as a linked item's has.
@@ -88,19 +89,21 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     var editable: Bool
     /// False where the item is titled by the first line of its text, which the page already shows as its text.
     var showsTitle = true
-    var type: String?
-    /// The icon of the item's type, drawn before its name, and the tone of the type's chip.
-    var icon: TypeIconRef
-    var typeTone: String
     /// Which header the page draws, chosen from the core type the item's type builds on.
     var kind: PageHeaderKind
     var event: EventHeader?
     var person: PersonHeader?
     /// The line under the title: a person's work, or a reading item's description.
     var subtitle: String?
+    /// The status menu, for the status row or pin, which holds it; nil where the type has none.
     var status: Pin?
+    /// The parent menu, for the parent row; nil where the item has no parent.
     var parent: Pin?
-    var byline: PageByline
+    /// The pinned properties under the title, in the order the person chose, at most four.
+    var pins: [PropertyRow]
+    /// A reading item's line above the title: its source, when it was published and how long it takes. No other
+    /// page has one.
+    var byline: PageByline?
     /// The property block's rows, all of them; the page shows the first `foldAfter` until it is expanded.
     var properties: [PropertyRow]
     var foldAfter = PropertyRow.foldAfter
@@ -124,16 +127,22 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
 
     /// The icons of the types the header names, which the page draws as images.
     var typeIconNames: Set<String?> {
-        var names: Set<String?> = [icon.name]
+        var names: Set<String?> = []
         names.formUnion((contents + linked).map(\.icon))
         if let parent = parent?.icon { names.insert(parent.name) }
-        for case .items(let targets) in properties.map(\.value) { names.formUnion(targets.map(\.icon)) }
+        for value in (pins + properties).map(\.value) {
+            switch value {
+            case .items(let targets): names.formUnion(targets.map(\.icon))
+            case .type(_, let icon): names.insert(icon)
+            default: break
+            }
+        }
         return names
     }
 }
 
 extension PropertyRow: Encodable {
-    private enum Key: String, CodingKey { case id, label, symbol, kind, text, texts, items, options, people }
+    private enum Key: String, CodingKey { case id, label, symbol, kind, text, texts, items, options, people, icon, tone, more }
     /// What the page draws of an item a row links to: a type chip in the item's own tone, or a person's initials and
     /// name. The tone is one of `TypeTone`'s names; the page never picks a color.
     private struct Link: Encodable {
@@ -171,6 +180,11 @@ extension PropertyRow: Encodable {
         switch value {
         case .status: try container.encode("status", forKey: .kind)
         case .parent: try container.encode("parent", forKey: .kind)
+        case .type(let name, let icon):
+            try Self.encode("type", name, into: &container)
+            try container.encode(TypeIconKey.value(for: icon), forKey: .icon)
+            try container.encode(TypeTone(icon: icon).rawValue, forKey: .tone)
+        case .source(let name): try Self.encode("text", name, into: &container)
         case .items(let targets):
             try container.encode("items", forKey: .kind)
             try container.encode(targets.map(Link.init), forKey: .items)
@@ -191,6 +205,7 @@ extension PropertyRow: Encodable {
             try Self.encode("text", flag ? String(localized: "Yes") : String(localized: "No"), into: &container)
         case .text(let text): try Self.encode("text", text, into: &container)
         }
+        if more > 0 { try container.encode(more, forKey: .more) }
     }
 
     private static func encode(_ kind: String, _ text: String, into container: inout KeyedEncodingContainer<Key>) throws {

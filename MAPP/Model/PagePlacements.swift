@@ -7,8 +7,8 @@ nonisolated enum LinkedFromPlace: String, Codable, Sendable {
 
 /// Where an item's properties show, for each type: MAPP's own setting, kept as one value in the defaults and never
 /// sent to Marfa. The inspector always lists every property of an item. This says which of them the page shows too,
-/// and where Linked From goes. A type the person has never customized has no entry and follows the defaults in
-/// `PagePlacement`.
+/// which are pinned under its title (at most four, in order), and where Linked From goes. A type the person has never
+/// customized has no entry and follows the defaults in `PagePlacement`.
 nonisolated struct PagePlacements: Equatable, Sendable {
     static let key = "pagePlacements"
 
@@ -17,8 +17,11 @@ nonisolated struct PagePlacements: Equatable, Sendable {
         /// Row identifiers (`PagePlacement`) the person chose to show on the page (true) or keep off it (false).
         var rows: [String: Bool] = [:]
         var linkedFrom: LinkedFromPlace?
+        /// The row identifiers pinned under the title, in order. Nil follows the default pins; an empty list is a
+        /// choice, that nothing is pinned. Optional so a choice saved before pins existed still decodes.
+        var pins: [String]?
 
-        var isEmpty: Bool { rows.isEmpty && linkedFrom == nil }
+        var isEmpty: Bool { rows.isEmpty && linkedFrom == nil && pins == nil }
     }
 
     /// By type identifier.
@@ -34,6 +37,42 @@ nonisolated struct PagePlacements: Equatable, Sendable {
     }
 
     func hasChoice(for type: TypeID) -> Bool { choices[type.rawValue] != nil }
+
+    /// The properties pinned for `type`, in order: the person's list, or the default pins with none chosen. At most
+    /// four, none twice. An identifier the type no longer has stays in the list, and the page skips it.
+    func pins(of type: TypeID, in catalogue: Catalogue) -> [String] {
+        placement(of: type, in: catalogue).pins
+    }
+
+    /// Pins exactly these (the first four, none twice), taking the place of the default pins.
+    mutating func setPins(_ pins: [String], of type: TypeID) {
+        update(type) { $0.pins = PagePlacement.limited(pins) }
+    }
+
+    /// Pins `row` after the others. Returns whether it is pinned: false where four are already, and the list is left
+    /// alone. A row already pinned stays where it is. The default pins are the list to add to while none is chosen,
+    /// which is why the catalogue is asked.
+    @discardableResult
+    mutating func pin(_ row: String, of type: TypeID, in catalogue: Catalogue) -> Bool {
+        let pins = pins(of: type, in: catalogue)
+        if pins.contains(row) { return true }
+        guard pins.count < PagePlacement.pinLimit else { return false }
+        setPins(pins + [row], of: type)
+        return true
+    }
+
+    mutating func unpin(_ row: String, of type: TypeID, in catalogue: Catalogue) {
+        setPins(pins(of: type, in: catalogue).filter { $0 != row }, of: type)
+    }
+
+    /// Moves a pinned row to `index` among the pins, which is kept within them. A row that is not pinned stays unpinned.
+    mutating func movePin(_ row: String, to index: Int, of type: TypeID, in catalogue: Catalogue) {
+        var pins = pins(of: type, in: catalogue)
+        guard let from = pins.firstIndex(of: row) else { return }
+        pins.remove(at: from)
+        pins.insert(row, at: min(max(index, 0), pins.count))
+        setPins(pins, of: type)
+    }
 
     mutating func setShown(_ shown: Bool, row: String, of type: TypeID) {
         update(type) { $0.rows[row] = shown }
@@ -92,10 +131,23 @@ nonisolated extension PagePlacements {
 }
 
 /// What the page shows of one type's items. A row is named by its identifier: a field's key, a relationship's field
-/// (the parent's is `child-of`), `#tags`, or `#linked` for Linked From.
+/// (the parent's is `child-of`), `#type`, `#source`, `#updated` (the item's own type, source and last edit), `#tags`,
+/// or `#linked` for Linked From.
 nonisolated struct PagePlacement: Equatable, Sendable {
+    static let type = "#type"
+    static let source = "#source"
+    static let updated = "#updated"
     static let tags = "#tags"
     static let linkedFrom = "#linked"
+    /// The relationship the parent is held in.
+    static let parent = "child-of"
+    /// The most properties a page pins.
+    static let pinLimit = 4
+
+    /// The properties pinned under the title, in order (`pinLimit` at most, none twice): the person's choice, or with
+    /// none the type's own, then the status, the parent and the last edit. A default pin that a saved choice turned
+    /// off (`choice.rows[id] == false`) stays off, since that is the person's choice too.
+    let pins: [String]
 
     /// The type's link field: the connector's own identity for the item, which says nothing to a person.
     let linkField: String?
@@ -107,21 +159,34 @@ nonisolated struct PagePlacement: Equatable, Sendable {
     /// Every row on the page, as before any choice was made.
     static let standard = PagePlacement(linkField: nil, choice: .init(), defaultLinkedFrom: .inspector)
 
-    init(linkField: String?, choice: PagePlacements.Choice, defaultLinkedFrom: LinkedFromPlace, bookkeeping: Set<String> = []) {
+    init(
+        linkField: String?, choice: PagePlacements.Choice, defaultLinkedFrom: LinkedFromPlace, bookkeeping: Set<String> = [],
+        pins: [String] = []
+    ) {
         self.linkField = linkField
         self.choice = choice
         self.defaultLinkedFrom = defaultLinkedFrom
         self.bookkeeping = bookkeeping
+        self.pins = pins
     }
 
     init(type: TypeID, catalogue: Catalogue, choice: PagePlacements.Choice) {
         // A person's page lists who they have been with, and a collection's lists what it holds, so each keeps its
         // links on the page. Every other item's links are for looking up, which the inspector is for.
         let kind = PageHeaderKind.of(type, in: catalogue)
+        let info = catalogue.itemTypes[type]
+        let pins = choice.pins
+            ?? [Self.type, info?.statusField?.key, Self.parent, Self.updated].compactMap { $0 }.filter { choice.rows[$0] != false }
         self.init(
-            linkField: catalogue.itemTypes[type]?.linkField, choice: choice,
+            linkField: info?.linkField, choice: choice,
             defaultLinkedFrom: kind == .person || catalogue.isCollection(type) ? .page : .inspector,
-            bookkeeping: Set((catalogue.itemTypes[type]?.fields ?? []).filter(Self.isBookkeeping).map(\.key)))
+            bookkeeping: Set((info?.fields ?? []).filter(Self.isBookkeeping).map(\.key)), pins: Self.limited(pins))
+    }
+
+    /// The first `pinLimit` of `rows`, each once.
+    static func limited(_ rows: [String]) -> [String] {
+        var seen: Set<String> = []
+        return Array(rows.filter { seen.insert($0).inserted }.prefix(pinLimit))
     }
 
     /// Whether a field is a connector's bookkeeping, which says nothing to a person reading the page: one that a
