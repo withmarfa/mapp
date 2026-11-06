@@ -3,6 +3,22 @@ import Marfa
 import Testing
 @testable import MAPP
 
+extension PropertyRow {
+    /// The property block as a type with a status would show it beside its default pins: the type, source and last edit
+    /// are the pins' (or not asked for), so the rows are the type's own fields, parent, relationships and tags.
+    static func rows(
+        of item: MAPP.Item, type: ItemTypeInfo?, hidden: Set<String>, relationships: [ItemRelationship], parentField: String, format: DateFormat,
+        tags: [String], placement: PagePlacement = .standard, icon: (ItemID) -> String? = { _ in nil },
+        isPerson: (ItemID) -> Bool = { _ in false }
+    ) -> [PropertyRow] {
+        block(
+            candidates(
+                of: item, type: type, hidden: hidden, relationships: relationships, parentField: parentField, format: format, tags: tags,
+                typeLabel: nil, typeIcon: nil, sourceName: nil, now: .now, calendar: .current, locale: .current, icon: icon, isPerson: isPerson),
+            placement: placement, excluding: [PagePlacement.updated])
+    }
+}
+
 struct PropertyRowTests {
     private static func field(_ name: String, _ type: String = "string", label: String? = nil, description: String? = nil, definition: JSONObject = [:]) -> TypeField {
         TypeField(name: name, label: label, type: type, description: description, declaredBy: "aic.ticket", definition: definition)

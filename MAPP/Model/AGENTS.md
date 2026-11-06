@@ -8,6 +8,7 @@ The data model, free of SwiftUI: the `ItemLibrary` protocol, `MarfaLibrary` over
 - A field is a status only when it is of the `status` kind, and a list of entries only when it is an `array` of `object` with `items_fields` (`Field.Kind.list`), whatever it is called. Name no field in code. `ListEntries` is the only place that changes a list; every edit returns the whole list with the other entries as they were. The person's work on a list lives in `ListEditing`, never in the rows.
 - Folders are facts on items, never places: MAPP syncs no folders and has no Folders section, Move To or New Folder.
 - What the item page shows of a type (`PagePlacements`), the sidebar layout (`SidebarLayouts`), column widths and a view's last layout are MAPP's own settings on this Mac, never written to Marfa. An unreadable stored sidebar layout is set aside under its own key (`SidebarLayouts.setAsideKey`), never removed.
+- Which properties sit under an item page's title is decided once, in `PagePins` (pure, no SwiftUI), from `PagePlacements` and the header's `PageHeaderLead`; the page draws and decides nothing. A type pins at most four, and a stored list longer than that shows its first four. A pin that is empty, stale or said by the header's own line is not drawn, and a stale one stays in storage. A pinned row is not also in the property block.
 - Change Type is one queued edit (`ItemLibrary.changeType`, planned by `TypeChange.plan`), so it works offline. Nothing is left under a key the new type does not read, written twice, or dropped.
 
 ## Commands and writes

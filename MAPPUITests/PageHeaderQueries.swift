@@ -13,7 +13,7 @@ extension XCUIElement {
     /// The status pin in the page's header, a pop-up button named "Status".
     var itemStatusPin: XCUIElement { pageHeaderElement("ItemStatusPin", named: "Status", type: .any) }
 
-    /// The parent pin in the page's header, a pop-up button named "Parent".
+    /// The parent in the page's property block, a pop-up button named "Parent". A pinned parent is a link, with no menu.
     var itemParentPin: XCUIElement { pageHeaderElement("ItemParentPin", named: "Parent", type: .any) }
 
     // The header is web content, where WebKit may not expose the DOM id as the identifier, so its accessible name
