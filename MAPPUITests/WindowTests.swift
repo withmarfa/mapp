@@ -466,7 +466,7 @@ final class WindowTests: XCTestCase {
                 // window does not look active, which another app's panel can cause at any moment.
                 let isSidebarFoot = element.frame.minY >= sidebarFrame.maxY
                     && element.frame.minX >= sidebarFrame.minX && element.frame.maxX <= sidebarFrame.maxX
-                // The page's byline and property labels above the text are drawn in the system's secondary label
+                // The page's pins and property labels above the text are drawn in the system's secondary label
                 // colour, which the audit finds a shade short in the light appearance.
                 let isPageHeader = element.frame.minX >= listFrame.maxX && element.frame.maxY <= bodyTop
                 return isIn(sidebarFrame) || isIn(listFrame) || isListTitle || isSidebarFoot || isPageHeader

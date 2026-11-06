@@ -3,9 +3,8 @@ import SwiftUI
 
 /// The page owns its title; the inspector is reserved for the rest of the item's details. The page draws the
 /// title and pinned properties above the note, so they scroll with it as one surface, and this carries out what
-/// the person does there: the title is saved as the item's property, and each pin opens a native menu (the parent
-/// pin opens the chooser directly while the item has no parent). Applied to the editor's view, whose container
-/// the pins' frames arrive in.
+/// the person does there: the title is saved as the item's property, and the status and the parent row open native
+/// menus. Applied to the editor's view, whose container the menus' frames arrive in.
 struct ItemPageHeader: ViewModifier {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
@@ -19,7 +18,7 @@ struct ItemPageHeader: ViewModifier {
     /// How far the editor's container reaches above the view's own frame: SwiftUI anchors a popover in the frame
     /// the safe area leaves, while the container runs up under the toolbar.
     let containerTop: CGFloat
-    /// The parent pin's frame while its chooser is open.
+    /// The parent row's frame while its chooser is open.
     @State private var choosingParent: CGRect?
 
     func body(content: Content) -> some View {
@@ -38,7 +37,7 @@ struct ItemPageHeader: ViewModifier {
                     drafts.saveTitle(of: old, in: library, undoManager: undoManager)
                     // A refused status belongs to the visit, as the page showed it before.
                     if let key = Self.statusKey(of: old, in: library) { drafts.draft(for: old, key: key).rejected = false }
-                    drafts.draft(for: old, key: Self.parentField).rejected = false
+                    drafts.draft(for: old, key: PagePlacement.parent).rejected = false
                     choosingParent = nil
                 }
                 editor.onHeaderEvent = handler
@@ -67,10 +66,10 @@ struct ItemPageHeader: ViewModifier {
         guard let item = library.item(id) else { return nil }
         let placement = placements.placement(of: item.type, in: library.catalogue)
         let draft = drafts.draft(for: item.id, key: "title")
-        let status = library.catalogue.itemTypes[item.type]?.statusField
+        let type = library.catalogue.itemTypes[item.type]
+        let status = type?.statusField
         let relationships = library.relationships(for: item.id)
         let parent = Self.parent(in: relationships)
-        let type = library.catalogue.itemTypes[item.type]
         let now = library.now()
         let kind = PageHeaderKind.of(item.type, in: library.catalogue)
         let lead = PageHeaderLead(
@@ -78,11 +77,19 @@ struct ItemPageHeader: ViewModifier {
         func typeIcon(of target: ItemID) -> String? {
             library.item(target).flatMap { library.catalogue.icon(for: $0.type) }
         }
-        let properties = lead.refine(PropertyRow.rows(
+        func isPerson(_ target: ItemID) -> Bool {
+            library.item(target).map { PageHeaderKind.of($0.type, in: library.catalogue) == .person } ?? false
+        }
+        let candidates = PropertyRow.candidates(
             of: item, type: type, hidden: library.hiddenPropertyKeys(of: item).union(lead.consumed), relationships: relationships,
-            parentField: Self.parentField, format: dateFormat, tags: library.tags(of: item), placement: placement,
-            icon: { target in typeIcon(of: target) },
-            isPerson: { target in library.item(target).map { PageHeaderKind.of($0.type, in: library.catalogue) == .person } ?? false }))
+            parentField: PagePlacement.parent, format: dateFormat, tags: library.tags(of: item),
+            typeLabel: type.map { Self.localized($0.label) }, typeIcon: library.catalogue.icon(for: item.type),
+            sourceName: item.source.map { library.sources.name($0) }, now: now, calendar: .current, locale: .current,
+            icon: { typeIcon(of: $0) }, isPerson: { isPerson($0) })
+        let pins = PagePins.resolve(
+            for: item, type: type, placement: placement, lead: lead, relationships: relationships, candidates: candidates,
+            icon: { typeIcon(of: $0) }, isPerson: { isPerson($0) })
+        let properties = lead.refine(PropertyRow.block(candidates, placement: placement, excluding: pins.leftOutOfBlock))
         let isCollection = library.catalogue.isCollection(item.type)
         let contents = isCollection
             ? LinkedItem.list(
@@ -108,28 +115,23 @@ struct ItemPageHeader: ViewModifier {
             titleRefusal: library.titleRefusal,
             editable: library.canSetTitle(of: item),
             showsTitle: item.titleRule != .firstLine,
-            type: lead.showsType ? library.catalogue.itemTypes[item.type].map { Self.localized($0.label) } : nil,
-            icon: .init(name: library.catalogue.icon(for: item.type)),
-            typeTone: TypeTone(icon: library.catalogue.icon(for: item.type)).rawValue,
             kind: kind,
             event: lead.event,
             person: lead.person,
             subtitle: lead.subtitle,
             status: status.map { field in
-                let value = Self.statusValue(of: item, in: field)
+                let value = PagePins.statusValue(of: item, in: field)
                 // With nothing to pick from, the pin only shows the status the item has.
                 return PageHeader.Pin(label: value.map { ItemTypeInfo.Field.label(ofOption: $0) } ?? String(localized: "Status"),
                                       enabled: item.isEditable && field.isPicked, empty: value == nil, mark: .init(group: value.flatMap(field.statusGroup(of:))))
             },
-            parent: parent.map {
-                // An item with no parent can only gain one, so the pin is idle where it cannot be edited.
-                let title = $0.targets.first?.title
-                let icon = $0.targets.first?.itemID.flatMap(typeIcon(of:))
-                return PageHeader.Pin(label: title ?? $0.label, enabled: title != nil || $0.isEditable,
-                                      empty: title == nil, opensMenu: title != nil,
-                                      icon: title == nil ? nil : .init(name: icon), tone: title == nil ? nil : TypeTone(icon: icon).rawValue)
+            parent: parent.flatMap { parent in
+                guard let target = parent.targets.first else { return nil }
+                let icon = target.itemID.flatMap(typeIcon(of:))
+                return PageHeader.Pin(label: target.title, enabled: true, icon: .init(name: icon), tone: TypeTone(icon: icon).rawValue)
             },
-            byline: lead.byline ?? PageByline(item: item, sourceName: item.source.map { library.sources.name($0) }, now: now, format: dateFormat),
+            pins: pins.pins,
+            byline: lead.byline,
             properties: properties,
             contents: contents,
             linked: linked,
@@ -180,7 +182,7 @@ struct ItemPageHeader: ViewModifier {
                     let entry = actionItem(ItemTypeInfo.Field.label(ofOption: choice)) {
                         drafts.draft(for: id, key: status.key).rejected = !library.setItemProperty(id, key: status.key, value: .string(choice), undoManager: undoManager)
                     }
-                    entry.state = Self.statusValue(of: item, in: status) == choice ? .on : .off
+                    entry.state = PagePins.statusValue(of: item, in: status) == choice ? .on : .off
                     menu.addItem(entry)
                 }
                 editor.popUpMenu(menu, under: rect)
@@ -189,10 +191,7 @@ struct ItemPageHeader: ViewModifier {
                 PagePlacements.update { $0.set(false, row: row, of: type) }
             case .menu(.parent, let id, let rect):
                 guard editor.noteID == id, let parent = Self.parent(of: id, in: library) else { return }
-                guard let target = parent.targets.first else {
-                    if parent.isEditable { choosingParent.wrappedValue = rect }
-                    return
-                }
+                guard let target = parent.targets.first else { return }
                 let menu = NSMenu()
                 menu.autoenablesItems = false
                 let open = actionItem(String(localized: "Open \(target.displayTitle)")) { [weak editor] in
@@ -227,15 +226,10 @@ struct ItemPageHeader: ViewModifier {
         library.item(id).flatMap { library.catalogue.itemTypes[$0.type]?.statusField?.key }
     }
 
-    /// The status the item holds, if it holds one.
-    static func statusValue(of item: Item, in field: ItemTypeInfo.Field) -> String? {
-        item.value(of: field.key)?.string.flatMap { $0.isEmpty ? nil : $0 }
-    }
-
     /// What the status menu offers: the catalogue's values, and the item's own if it holds one the catalogue does
     /// not list, so the menu always shows what is set.
     static func statusChoices(of item: Item, in field: ItemTypeInfo.Field) -> [String] {
-        field.options(including: statusValue(of: item, in: field))
+        field.options(including: PagePins.statusValue(of: item, in: field))
     }
 
     private static func parent(of id: ItemID, in library: any ItemLibrary) -> ItemRelationship? {
@@ -243,11 +237,8 @@ struct ItemPageHeader: ViewModifier {
     }
 
     private static func parent(in relationships: [ItemRelationship]) -> ItemRelationship? {
-        relationships.first { $0.field == parentField }
+        relationships.first { $0.field == PagePlacement.parent }
     }
-
-    /// The relationship the parent pin shows.
-    private static let parentField = "child-of"
 
     /// A catalogue's words, looked up in the String Catalog as SwiftUI's text would look them up.
     static func localized(_ key: String) -> String {

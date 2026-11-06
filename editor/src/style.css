@@ -206,11 +206,6 @@ body[data-text='none'] #editor {
   display: none;
 }
 
-/* A title read from the text is not drawn, so nothing is left to tuck the byline under. */
-#item-header[data-title='derived'] .item-byline {
-  margin-top: 0;
-}
-
 #item-header[data-title='derived']
   .item-lead:has(.item-avatar[hidden]):has(.item-subtitle[hidden]) {
   display: none;
@@ -337,7 +332,8 @@ body[data-text='none'] #editor {
   box-shadow: inset 0 0 0 var(--chip-status-edge-width, 0.5px) var(--chip-edge, var(--separator));
 }
 
-/* An empty pin has no value yet: a plus and a quiet edge, as the design's empty chip. */
+/* An empty status, in a row, has no value yet: a plus and a quiet edge, as the design's empty chip. A pin is never
+   empty; the app leaves it out. */
 .item-chip.empty {
   background: transparent;
   box-shadow: inset 0 0 0 var(--chip-status-edge-width, 0.5px) var(--chip-edge, var(--separator));
@@ -441,7 +437,6 @@ body[data-text='none'] #editor {
   mask-image: var(--icon-indicator);
 }
 
-.item-menu-pin.direct .item-icon-indicator,
 .item-menu-pin:disabled .item-icon-indicator,
 .item-menu-pin[data-kind='link'] .item-icon-indicator {
   display: none;
@@ -484,7 +479,8 @@ body[data-text='none'] #editor {
   outline: none;
 }
 
-/* The byline: the type as a chip, then who made the item and when, as one quiet line under the title. */
+/* The byline of a page for reading: where the item came from, when it was published and how long it takes, as one quiet
+   line. No other page has one. */
 #item-header {
   /* One step of the header's 4 point grid, scaled with the interface's text size. */
   --step: calc(var(--interface-text-size) * 4 / 13);
@@ -495,9 +491,12 @@ body[data-text='none'] #editor {
   flex-wrap: wrap;
   align-items: center;
   gap: 0 calc(var(--step) * 2);
-  margin-top: calc(var(--step) * -1);
   color: var(--label-secondary);
   font-size: calc(var(--interface-text-size) * 13 / 13);
+}
+
+.item-byline[hidden] {
+  display: none;
 }
 
 .item-byline-dot {
@@ -510,12 +509,116 @@ body[data-text='none'] #editor {
   opacity: 0.7;
 }
 
+/* The pins: a key above its value, 20 points apart, 16 under the title and 20 above the property block. They share one
+   row while they fit, then fall to three to a row and then two, by the width of the page's column and not of the
+   window (a container query on the box round the list; the thresholds are the 13 point design's 440 and 320 points in
+   the box's own em, which follows the interface's text size). The status and the type keep their whole words; a list
+   gives way first. */
+.item-pins {
+  container-type: inline-size;
+  align-self: stretch;
+  margin-top: calc(var(--step) * 1.5);
+  font-size: var(--interface-text-size);
+}
+
+.item-pins[hidden] {
+  display: none;
+}
+
+.item-pin-list {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: calc(var(--step) * 4) calc(var(--step) * 5);
+  margin: 0;
+  padding: 0;
+}
+
+.item-pin-item {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  gap: calc(var(--step) * 1.25);
+  min-width: 0;
+  max-width: 50%;
+}
+
+.item-pin-item[data-kind='status'],
+.item-pin-item[data-kind='type'] {
+  flex-shrink: 0;
+}
+
+.item-pin-item[data-kind='items'],
+.item-pin-item[data-kind='people'],
+.item-pin-item[data-kind='options'],
+.item-pin-item[data-kind='tags'] {
+  flex-shrink: 3;
+}
+
+@container (max-width: 33.85em) {
+  .item-pin-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .item-pin-item {
+    max-width: none;
+  }
+}
+
+@container (max-width: 24.6em) {
+  .item-pin-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.item-pin-key {
+  overflow: hidden;
+  margin: 0;
+  color: var(--label-secondary);
+  font-size: calc(var(--interface-text-size) * 12 / 13);
+  line-height: calc(var(--step) * 3.75);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A value keeps to two lines: a list wraps its chips onto a second line at most, and a text is cut after two. */
+.item-pin-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(var(--step) * 1.5) calc(var(--step) * 2);
+  min-width: 0;
+  min-height: calc(var(--step) * 6);
+  margin: 0;
+  max-height: calc(var(--c-height) * 2 + var(--step) * 1.5);
+  overflow: hidden;
+  color: var(--label-primary);
+  font-size: var(--interface-text-size);
+}
+
+.item-pin-value > .item-text,
+.item-pin-value > .item-link {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.item-pin-more {
+  flex: none;
+  color: var(--label-secondary);
+  white-space: nowrap;
+}
+
 /* The property block: a label and its value in two columns, every value on one edge. */
 .item-props {
   align-self: stretch;
   display: flex;
   flex-direction: column;
-  margin: calc(var(--step) * 3) 0 0;
+  margin: calc(var(--step) * 2.5) 0 0;
   padding: 0;
 }
 

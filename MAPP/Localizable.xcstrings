@@ -1933,9 +1933,6 @@
     "Item not found" : {
       "extractionState" : "manual"
     },
-    "Item Type" : {
-
-    },
     "Item unavailable" : {
       "extractionState" : "manual"
     },
@@ -2868,6 +2865,9 @@
 
     },
     "Syncing…" : {
+
+    },
+    "Updated" : {
 
     },
     "Updated just now" : {

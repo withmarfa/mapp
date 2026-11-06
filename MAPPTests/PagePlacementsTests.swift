@@ -23,7 +23,19 @@ struct PagePlacementsTests {
             titleField: "title", linkField: "github_id")),
         MarfaMapping.itemType(ItemType(id: "core.entity.person", label: "Person", fields: [], icon: "lucide:user")),
         MarfaMapping.itemType(ItemType(id: "aic.folder", label: "Folder", fields: [], roles: [MarfaMapping.containerRole])),
+        MarfaMapping.itemType(ItemType(
+            id: "aic.task", label: "Task",
+            fields: [
+                field("title", "aic.task"),
+                TypeField(
+                    name: "state", type: "status", declaredBy: "aic.task",
+                    definition: ["status_values": [["value": "open", "group": "not_started"], ["value": "shut", "group": "completed"]]]),
+            ],
+            titleField: "title")),
+        MarfaMapping.itemType(ItemType(id: "aic.subtask", label: "Subtask", parent: "aic.task", fields: [])),
     ])
+    private static let task = TypeID("aic.task")
+    private static let subtask = TypeID("aic.subtask")
 
     private static func item(_ type: TypeID, _ properties: [String: PropertyValue] = [:]) -> MAPP.Item {
         MAPP.Item(
@@ -202,5 +214,143 @@ struct PagePlacementsTests {
         placements.setShown(false, row: "child-of", of: Self.ticket)
         placements.setShown(false, row: "about", of: Self.ticket)
         #expect(rows(placements).isEmpty)
+    }
+
+    // MARK: Pins
+
+    @Test func withNoChoiceTheTypeStatusParentAndUpdatedArePinnedInThatOrder() {
+        let placements = PagePlacements()
+        // The status is the type's own status field, whatever it is called.
+        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["#type", "state", "child-of", "#updated"])
+        // A type with no status has none to pin.
+        #expect(placements.pins(of: Self.ticket, in: Self.catalogue) == ["#type", "child-of", "#updated"])
+        #expect(placements.pins(of: TypeID("aic.unknown"), in: Self.catalogue) == ["#type", "child-of", "#updated"])
+    }
+
+    @Test func aSubtypeDoesNotFollowItsParentsPins() {
+        var placements = PagePlacements()
+        placements.setPins(["#source"], of: Self.task)
+        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["#source"])
+        #expect(placements.pins(of: Self.subtask, in: Self.catalogue) == ["#type", "child-of", "#updated"])
+    }
+
+    @Test func aDefaultPinThatASavedChoiceTurnedOffStaysOff() {
+        var placements = PagePlacements()
+        placements.setShown(false, row: "state", of: Self.task)
+        placements.setShown(false, row: "#updated", of: Self.task)
+        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["#type", "child-of"])
+        // Turning it on again gives the default pin back.
+        placements.setShown(true, row: "state", of: Self.task)
+        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["#type", "state", "child-of"])
+    }
+
+    @Test func aChosenListTakesThePlaceOfTheDefaultPins() {
+        var placements = PagePlacements()
+        placements.setPins(["#updated", "repo"], of: Self.ticket)
+        #expect(placements.pins(of: Self.ticket, in: Self.catalogue) == ["#updated", "repo"])
+        // A hidden row is the person's word about the property block; a pin they chose is theirs too.
+        placements.setShown(false, row: "repo", of: Self.ticket)
+        #expect(placements.pins(of: Self.ticket, in: Self.catalogue) == ["#updated", "repo"])
+    }
+
+    @Test func aFifthPinIsRefusedAndTheListIsLeftAlone() {
+        var placements = PagePlacements()
+        placements.setPins(["#type", "#source", "#updated", "repo"], of: Self.ticket)
+        var took = placements.pin("child-of", of: Self.ticket, in: Self.catalogue)
+        #expect(!took)
+        #expect(placements.pins(of: Self.ticket, in: Self.catalogue) == ["#type", "#source", "#updated", "repo"])
+        // One already pinned stays pinned, where it is.
+        took = placements.pin("#source", of: Self.ticket, in: Self.catalogue)
+        #expect(took)
+        #expect(placements.pins(of: Self.ticket, in: Self.catalogue) == ["#type", "#source", "#updated", "repo"])
+        placements.unpin("#type", of: Self.ticket, in: Self.catalogue)
+        took = placements.pin("child-of", of: Self.ticket, in: Self.catalogue)
+        #expect(took)
+        #expect(placements.pins(of: Self.ticket, in: Self.catalogue) == ["#source", "#updated", "repo", "child-of"])
+    }
+
+    @Test func pinningStartsFromTheDefaultPinsAndMovingKeepsThemWithinTheList() {
+        var placements = PagePlacements()
+        var took = placements.pin("#source", of: Self.task, in: Self.catalogue)
+        #expect(!took, "four defaults fill the list")
+        placements.unpin("#type", of: Self.task, in: Self.catalogue)
+        took = placements.pin("#source", of: Self.task, in: Self.catalogue)
+        #expect(took)
+        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["state", "child-of", "#updated", "#source"])
+        placements.movePin("#source", to: 0, of: Self.task, in: Self.catalogue)
+        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["#source", "state", "child-of", "#updated"])
+        placements.movePin("#source", to: 99, of: Self.task, in: Self.catalogue)
+        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["state", "child-of", "#updated", "#source"])
+        placements.movePin("repo", to: 0, of: Self.task, in: Self.catalogue)
+        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["state", "child-of", "#updated", "#source"])
+    }
+
+    @Test func fiveStoredPinsShowFourAndADuplicateCountsOnce() throws {
+        let stored = try #require(PagePlacements(rawValue: ##"{"aic.ticket":{"rows":{},"pins":["#type","#type","repo","#source","#updated","child-of"]}}"##))
+        #expect(stored.pins(of: Self.ticket, in: Self.catalogue) == ["#type", "repo", "#source", "#updated"])
+        // The list in storage is not cut by reading it.
+        #expect(stored.choices["aic.ticket"]?.pins?.count == 6)
+    }
+
+    @Test func aPinNamingAFieldTheTypeNoLongerHasStaysInStorage() throws {
+        var placements = try #require(PagePlacements(rawValue: ##"{"aic.ticket":{"rows":{},"pins":["gone","#type"]}}"##))
+        #expect(placements.pins(of: Self.ticket, in: Self.catalogue) == ["gone", "#type"])
+        // Another change to the list does not drop it.
+        placements.unpin("#type", of: Self.ticket, in: Self.catalogue)
+        #expect(placements.choices["aic.ticket"]?.pins == ["gone"])
+        #expect(PagePlacements(rawValue: placements.rawValue) == placements)
+    }
+
+    @Test func aChoiceSavedBeforePinsStillReadsAndKeepsEverythingItHeld() throws {
+        let old = #"{"aic.ticket":{"linkedFrom":"page","rows":{"repo":false}}}"#
+        let placements = try #require(PagePlacements(rawValue: old))
+        let choice = try #require(placements.choices["aic.ticket"])
+        #expect(choice.pins == nil)
+        #expect(choice.rows == ["repo": false])
+        #expect(choice.linkedFrom == .page)
+        #expect(placements.pins(of: Self.ticket, in: Self.catalogue) == ["#type", "child-of", "#updated"])
+        #expect(placements.rawValue == old, "written back as it was read")
+    }
+
+    @Test func noPinsIsAChoiceThatSurvivesStorage() throws {
+        var placements = PagePlacements()
+        placements.setPins([], of: Self.task)
+        #expect(placements.hasChoice(for: Self.task), "an empty list is not dropped as no choice")
+        #expect(placements.pins(of: Self.task, in: Self.catalogue).isEmpty)
+        let again = try #require(PagePlacements(rawValue: placements.rawValue))
+        #expect(again == placements)
+        #expect(again.choices["aic.task"]?.pins == [])
+        #expect(again.pins(of: Self.task, in: Self.catalogue).isEmpty)
+        #expect(PagePlacements(["aic.task": .init(pins: [])]).hasChoice(for: Self.task))
+    }
+
+    @Test func resettingATypeGivesItsDefaultPinsBackToo() {
+        var placements = PagePlacements()
+        placements.setPins(["#source"], of: Self.task)
+        placements.setShown(false, row: "repo", of: Self.ticket)
+        placements.reset(Self.task)
+        #expect(placements.pins(of: Self.task, in: Self.catalogue) == ["#type", "state", "child-of", "#updated"])
+        #expect(!placements.hasChoice(for: Self.task))
+        #expect(placements.hasChoice(for: Self.ticket))
+    }
+
+    @Test func storedTextThatCannotBeReadIsSetAsideBeforeItIsWrittenOver() throws {
+        let suite = "PagePlacementsTests.setAside"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let unreadable = #"{"aic.ticket":{"rows":{"repo":"not a flag"}}}"#
+        defaults.set(unreadable, forKey: PagePlacements.key)
+
+        PagePlacements.update(in: defaults) { $0.setShown(false, row: "repo", of: Self.ticket) }
+        PagePlacements.update(in: defaults) { $0.setShown(true, row: "repo", of: Self.ticket) }
+
+        #expect(defaults.stringArray(forKey: PagePlacements.setAsideKey) == [unreadable])
+        #expect(PagePlacements.stored(in: defaults).choices["aic.ticket"]?.rows == ["repo": true])
+    }
+
+    @Test func theTypeSourceAndUpdatedRowsShowOnThePageByDefault() {
+        let placement = PagePlacements().placement(of: Self.ticket, in: Self.catalogue)
+        for row in ["#type", "#source", "#updated"] { #expect(placement.showsOnPage(row)) }
     }
 }

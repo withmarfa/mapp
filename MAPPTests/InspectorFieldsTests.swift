@@ -90,7 +90,27 @@ struct InspectorFieldsTests {
         #expect(header?.status?.label == "In Progress")
         #expect(header?.status?.empty == false)
         #expect(header?.status?.enabled == true)
-        #expect(header?.status?.opensMenu == true)
+    }
+
+    @MainActor @Test func aReadOnlyItemsPinnedStatusCannotBeEdited() {
+        var item = Self.item("aic.ticket.task", properties: [Property(key: "status", value: .string("in_progress"))])
+        item.state = .trashed
+        let library = FakeItemLibrary(items: [item])
+        library.catalogue = Catalogue(itemTypes: [Self.task])
+        let header = ItemPageHeader.header(of: item.id, in: library, drafts: DetailsPresentation())
+        #expect(header?.pins.map(\.id) == ["#type", "status", "#updated"])
+        #expect(header?.status?.enabled == false)
+    }
+
+    @MainActor @Test func anEmptyStatusAndAMissingParentLeaveNoPinAndAGeneralPageHasNoLine() {
+        let item = Self.item("aic.ticket.task")
+        let library = FakeItemLibrary(items: [item])
+        library.catalogue = Catalogue(itemTypes: [Self.task])
+        let header = ItemPageHeader.header(of: item.id, in: library, drafts: DetailsPresentation())
+        #expect(header?.pins.map(\.id) == ["#type", "#updated"])
+        #expect(header?.byline == nil)
+        // A pinned row is not in the property block either: an empty status is set from the sidebar.
+        #expect(header?.properties.map(\.id).contains("status") == false)
     }
 
     @MainActor @Test func theHeaderDrawsATitleOnlyForAnItemWhoseTitleIsItsOwn() {
@@ -128,15 +148,7 @@ struct InspectorFieldsTests {
         #expect(ItemPageHeader.statusChoices(of: blocked, in: status) == ["pending", "in_progress", "completed", "canceled", "blocked"])
         let completed = Self.item("aic.ticket.task", properties: [Property(key: "status", value: .string("completed"))])
         #expect(ItemPageHeader.statusChoices(of: completed, in: status) == status.options)
-        #expect(ItemPageHeader.statusValue(of: Self.item("aic.ticket.task", properties: [Property(key: "status", value: .string(""))]), in: status) == nil)
-    }
-
-    @Test func aPinSaysWhetherItOpensAMenu() throws {
-        let direct = try JSONEncoder().encode(PageHeader.Pin(label: "Parent", enabled: true, empty: true, opensMenu: false))
-        let menu = try JSONEncoder().encode(PageHeader.Pin(label: "Status", enabled: true))
-        #expect(try JSONSerialization.jsonObject(with: direct) as? [String: Any] != nil)
-        #expect(String(decoding: direct, as: UTF8.self).contains("\"opensMenu\":false"))
-        #expect(String(decoding: menu, as: UTF8.self).contains("\"opensMenu\":true"))
+        #expect(PagePins.statusValue(of: Self.item("aic.ticket.task", properties: [Property(key: "status", value: .string(""))]), in: status) == nil)
     }
 
     @MainActor @Test func aRefusedRemoveParentIsToldAndAnAcceptedOneClearsTheTelling() async throws {

@@ -226,6 +226,20 @@ struct PageHeaderKindTests {
         #expect(PageHeaderLead(for: item, kind: .reading, body: nil, now: .now, format: .automatic).showsType == false)
     }
 
+    @Test func aPinNeverRepeatsWhatTheHeadersOwnLineSays() {
+        func said(_ type: String, _ kind: PageHeaderKind, _ properties: [String: PropertyValue] = [:]) -> Set<String> {
+            PageHeaderLead(for: Self.item(type, properties), kind: kind, body: nil, now: .now, format: .automatic).said
+        }
+        // A general page has no line, so every pin shows.
+        #expect(said("aic.plain", .general).isEmpty)
+        // An event's line is its time, and a person's is their work: each says only what it draws.
+        #expect(said("core.event", .event, ["starts_at": .string("2026-10-29T10:00:00Z")]) == EventHeader.keys)
+        #expect(said("core.entity.person", .person) == PersonHeader.keys)
+        // A page for reading says what it is, where it came from and when, so no pin repeats the type, the source
+        // or the last edit.
+        #expect(said("core.bookmark", .reading) == ReadingHeader.keys.union([PagePlacement.type, PagePlacement.source, PagePlacement.updated]))
+    }
+
     @Test func onlyAWebAddressCanBeOpened() {
         #expect(ReadingHeader.webAddress("https://example.com/a")?.host() == "example.com")
         #expect(ReadingHeader.webAddress("javascript:alert(1)") == nil)

@@ -110,10 +110,12 @@ struct MarfaDrainAnswersTests {
         }
         Task { await source.tellAnswers() }
         #expect(await LiveMarfa.until { holding.isSet })
-        #expect(activity.snapshot().step == "answers")
+        // An update the first write set off can take the answers before `tellAnswers` does, so either event may hold.
+        let holder = activity.snapshot().step
+        #expect(holder == "answers" || holder == "update")
         // With no write told, a quit does not wait behind the slow read.
         await source.queueSubmitted()
-        #expect(activity.snapshot().step == "answers", "the quit waited for a read of the copy")
+        #expect(activity.snapshot().step == holder, "the quit waited for a read of the copy")
         let second = ItemID.mint()
         source.submit(.create(id: second, ItemDraft(type: TypeID("core.note"), title: "Second", body: "Second")), as: WriteID())
         #expect(activity.snapshot().waiting >= 1, "the write told behind the slow event is not counted as waiting")
