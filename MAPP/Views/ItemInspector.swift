@@ -173,7 +173,8 @@ struct ItemInspector: View {
     // MARK: Sections
 
     private var properties: some View {
-        InspectorSectionView(.properties, title: "Properties", add: { hovering in
+        InspectorSectionView(.properties, title: "Properties", count: fields.count,
+                             placeholder: fields.isEmpty ? "No Properties" : nil, add: { hovering in
             if !emptyFields.isEmpty {
                 InspectorPlusMenu(accessibilityLabel: "Add Property", identifier: "ItemInspectorAddProperty", isRowHovered: hovering) {
                     ForEach(emptyFields) { field in
@@ -183,24 +184,23 @@ struct ItemInspector: View {
                 }
             }
         }) {
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(fields) { field in
-                    ItemPropertyRow(definition: field, value: item.value(of: field.key), isEditable: item.isEditable,
-                                    // A property the person has touched stays listed, even once cleared.
-                                    onChange: { revealed.insert(field.key); return onProperty(field.key, $0) },
-                                    retainedDraft: drafts?.draft(for: item.id, key: field.key),
-                                    startsEditing: adding == field.key,
-                                    // The window holds the draft, so folding this section does not give it back.
-                                    handsOffOnLeave: drafts == nil,
-                                    shownOnPage: placement.showsOnPage(field.key), onShowOnPage: showOnPage(field.key),
-                                    isWriting: field.kind.isList && isWritingProperties())
-                }
+            ForEach(fields) { field in
+                ItemPropertyRow(definition: field, value: item.value(of: field.key), isEditable: item.isEditable,
+                                // A property the person has touched stays listed, even once cleared.
+                                onChange: { revealed.insert(field.key); return onProperty(field.key, $0) },
+                                retainedDraft: drafts?.draft(for: item.id, key: field.key),
+                                startsEditing: adding == field.key,
+                                // The window holds the draft, so folding this section does not give it back.
+                                handsOffOnLeave: drafts == nil,
+                                shownOnPage: placement.showsOnPage(field.key), onShowOnPage: showOnPage(field.key),
+                                isWriting: field.kind.isList && isWritingProperties())
             }
         }
     }
 
     private var relationshipSection: some View {
-        InspectorSectionView(.relationships, title: "Relationships", add: { hovering in
+        InspectorSectionView(.relationships, title: "Relationships", count: relationshipCount,
+                             placeholder: relationshipCount == 0 ? "No Relationships" : nil, add: { hovering in
             if !addable.isEmpty {
                 InspectorPlusMenu(accessibilityLabel: "Add Relationship", identifier: "RelationshipAddMenu", isRowHovered: hovering) {
                     ForEach(addable) { option in
@@ -210,39 +210,42 @@ struct ItemInspector: View {
                 }
             }
         }) {
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(shownRelationships) { relationship in
-                    let group = LinkGroup(item: item.id, field: relationship.field)
-                    ItemRelationshipGroup(
-                        relationship: relationship, typeIcon: typeIcon, isExpanded: presentation.expandedLinks.contains(group),
-                        onShowAll: { presentation.expandLinks(group) }, onOpen: onOpen, onEdit: { onEdit(relationship) },
-                        onRemove: { await onRemove(relationship, $0) }, shownOnPage: placement.showsOnPage(relationship.field),
-                        onShowOnPage: showOnPage(relationship.field))
-                }
-                if !mentions.isEmpty { contentLinks }
-                if !linked.isEmpty { linkedGroup }
+            ForEach(shownRelationships) { relationship in
+                let group = LinkGroup(item: item.id, field: relationship.field)
+                ItemRelationshipGroup(
+                    relationship: relationship, typeIcon: typeIcon, isExpanded: presentation.expandedLinks.contains(group),
+                    onShowAll: { presentation.expandLinks(group) }, onOpen: onOpen, onEdit: { onEdit(relationship) },
+                    onRemove: { await onRemove(relationship, $0) }, shownOnPage: placement.showsOnPage(relationship.field),
+                    onShowOnPage: showOnPage(relationship.field))
             }
+            if !mentions.isEmpty { contentLinks }
+            if !linked.isEmpty { linkedGroup }
         }
     }
 
-    private var contentLinks: some View {
+    /// Every link the section lists, which its heading counts.
+    private var relationshipCount: Int {
+        shownRelationships.reduce(0) { $0 + $1.targets.count } + mentions.count + linked.count
+    }
+
+    @ViewBuilder private var contentLinks: some View {
         let group = LinkGroup.content(of: item.id)
         let links = LinkLimit.split(mentions, expanded: presentation.expandedLinks.contains(group))
-        return VStack(alignment: .leading, spacing: 0) {
-            InspectorSubheading(title: String(localized: "Links in Content")).padding(.bottom, 2)
-            ForEach(links.shown) { target in
-                InspectorItemRow(target: target, typeIcon: typeIcon, onOpen: onOpen)
-            }
-            if links.hidden > 0 {
-                ItemShowMoreButton(count: links.hidden, identifier: "ContentLinksShowMore") {
-                    presentation.expandLinks(group)
-                }
+        InspectorSubheading(title: String(localized: "Links in Content"), count: mentions.count)
+        ForEach(links.shown) { target in
+            InspectorItemRow(target: target, typeIcon: typeIcon, onOpen: onOpen)
+        }
+        if links.hidden > 0 {
+            ItemShowMoreButton(count: links.hidden, identifier: "ContentLinksShowMore") {
+                presentation.expandLinks(group)
             }
         }
     }
 
     private var tagSection: some View {
-        InspectorSectionView(.tags, title: "Tags", add: { hovering in
+        InspectorSectionView(.tags, title: "Tags", count: tags.count,
+                             placeholder: tags.isEmpty && !addingTag && (drafts?.draft(for: item.id, key: "new-tag").text ?? "").isEmpty
+                                 ? "No Tags" : nil, add: { hovering in
             if item.canEditTags {
                 InspectorPlusButton(accessibilityLabel: "Add Tag", identifier: "ItemTagAdd", isRowHovered: hovering) { addingTag = true }
             }
@@ -254,23 +257,21 @@ struct ItemInspector: View {
     }
 
     /// The items that link to this one, as a group after the links the item makes.
-    private var linkedGroup: some View {
+    @ViewBuilder private var linkedGroup: some View {
         let group = LinkGroup(item: item.id, field: "#linked")
         let links = LinkLimit.split(linked, expanded: presentation.expandedLinks.contains(group))
-        return VStack(alignment: .leading, spacing: 0) {
-            InspectorSubheading(title: String(localized: "Linked From"), count: linked.count).padding(.bottom, 2)
-            ForEach(links.shown, id: \.item) { link in
-                LinkedItemRow(link: link, onOpen: onOpen)
-            }
-            if links.hidden > 0 {
-                ItemShowMoreButton(count: links.hidden, identifier: "LinkedFromShowMore") {
-                    presentation.expandLinks(group)
-                }
+        InspectorSubheading(title: String(localized: "Linked From"), count: linked.count)
+            .accessibilityIdentifier("ItemInspectorLinkedFrom")
+            .showOnPageMenu(isShown: false, onChange: showOnPage(PagePlacement.linkedFrom))
+        ForEach(links.shown, id: \.item) { link in
+            LinkedItemRow(link: link, onOpen: onOpen)
+                .showOnPageMenu(isShown: false, onChange: showOnPage(PagePlacement.linkedFrom))
+        }
+        if links.hidden > 0 {
+            ItemShowMoreButton(count: links.hidden, identifier: "LinkedFromShowMore") {
+                presentation.expandLinks(group)
             }
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("ItemInspectorLinkedFrom")
-        .showOnPageMenu(isShown: false, onChange: showOnPage(PagePlacement.linkedFrom))
     }
 
     private var detailsSection: some View {
@@ -278,24 +279,22 @@ struct ItemInspector: View {
     }
 
     @ViewBuilder private var details: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            detail("Created", ItemDate.text(of: item.created, hasTime: true, format: dateFormat), isDate: true)
-            detail("Edited", ItemDate.text(of: item.modified, hasTime: true, format: dateFormat), isDate: true)
-            if let source { InspectorDetailRow(name: String(localized: "Made by"), value: source.name, mark: source.mark) }
-            if let place { detail("Place", place) }
-            detail("Version", item.version.rawValue.formatted())
-            if case .file(let contentType, let byteCount) = item.content {
-                detail("Kind", contentType.localizedDescription ?? String(localized: "File"))
-                // A server gives a file's size once it holds the bytes, so a file not yet sent has none.
-                if byteCount > 0 {
-                    detail("Size", ByteCountFormatter.string(fromByteCount: byteCount, countStyle: .file))
-                }
+        detail("Created", ItemDate.text(of: item.created, hasTime: true, format: dateFormat), isDate: true)
+        detail("Edited", ItemDate.text(of: item.modified, hasTime: true, format: dateFormat), isDate: true)
+        if let source { InspectorDetailRow(name: String(localized: "Made by"), value: source.name, mark: source.mark) }
+        if let place { detail("Place", place) }
+        detail("Version", item.version.rawValue.formatted())
+        if case .file(let contentType, let byteCount) = item.content {
+            detail("Kind", contentType.localizedDescription ?? String(localized: "File"))
+            // A server gives a file's size once it holds the bytes, so a file not yet sent has none.
+            if byteCount > 0 {
+                detail("Size", ByteCountFormatter.string(fromByteCount: byteCount, countStyle: .file))
             }
-            ForEach(otherProperties) { property in
-                InspectorDetailRow(
-                    name: Self.name(of: property.key, label: catalogue.label(ofField: property.key, for: item.type)),
-                    value: Self.text(of: property.value, format: dateFormat), isDate: Self.isDate(property.value))
-            }
+        }
+        ForEach(otherProperties) { property in
+            InspectorDetailRow(
+                name: Self.name(of: property.key, label: catalogue.label(ofField: property.key, for: item.type)),
+                value: Self.text(of: property.value, format: dateFormat), isDate: Self.isDate(property.value))
         }
     }
 
@@ -380,7 +379,7 @@ private struct InspectorDetailRow: View {
     }
 }
 
-/// An item that links to the one shown: a light row with its type's icon and title, and the day it last changed.
+/// An item that links to the one shown: a light row with its type's mark and title, and the day it last changed.
 private struct LinkedItemRow: View {
     let link: LinkedItem
     let onOpen: (ItemID) -> Void
@@ -388,10 +387,10 @@ private struct LinkedItemRow: View {
     var body: some View {
         Button { onOpen(link.item) } label: {
             HStack(spacing: 6) {
-                TypeIcon(id: link.icon)
-                Text(verbatim: link.title).lineLimit(1)
+                TypeMark(icon: link.icon, size: .row)
+                Text(verbatim: link.title).lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: 6)
-                Text(verbatim: link.date).foregroundStyle(.secondary).lineLimit(1)
+                Text(verbatim: link.date).foregroundStyle(.secondary).lineLimit(1).fixedSize()
                     .interfaceFont(.callout)
             }
             .interfaceFont(.body)

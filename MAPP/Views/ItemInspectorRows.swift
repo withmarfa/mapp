@@ -8,11 +8,19 @@ enum InspectorMetrics {
     static let nameWidth: CGFloat = 96
     static let maxNameShare: CGFloat = 0.4
     static let gap: CGFloat = 8
-    static let rowPadding: CGFloat = 5
-    /// The space between two sections, in place of a rule.
-    static let sectionGap: CGFloat = 28
-    /// The space between a section's heading and what it holds.
-    static let headingGap: CGFloat = 8
+    /// The space between two sections.
+    static let sectionGap: CGFloat = 20
+    /// The space between a section's heading and its box.
+    static let headingGap: CGFloat = 6
+    /// A heading's inset from the box's edges.
+    static let headingInset: CGFloat = 4
+    /// A section's box: its side padding, which is also how far a divider stops short of both edges, the height of
+    /// a row in it, and its corners. The vertical padding is what a row of several lines keeps above and below.
+    static let boxInset: CGFloat = 12
+    static let boxRowHeight: CGFloat = 32
+    static let boxRowPadding: CGFloat = 6
+    static let boxRadius: CGFloat = 10
+    static let boxStroke: CGFloat = 0.5
     static let chipRadius: CGFloat = 7
     /// A chip's horizontal padding, both sides together.
     static let chipPadding: CGFloat = 16
@@ -59,7 +67,7 @@ private struct SharedNameColumn: ViewModifier {
 }
 
 /// The inspector's sections, each of which folds and keeps whether it is open for every item and launch.
-enum InspectorSection: CaseIterable {
+enum InspectorSectionKind: CaseIterable {
     case details, properties, relationships, tags
 
     var key: String {
@@ -81,45 +89,78 @@ enum InspectorSection: CaseIterable {
     }
 }
 
-/// A section: a heading with a chevron at its end that folds what the section holds, open until the person folds it.
-/// The heading is one button, so VoiceOver and the keyboard reach the chevron by it. A section that can take
-/// something new has a small plus on its heading, beside the chevron.
-struct InspectorSectionView<Content: View, Add: View>: View {
-    @AppStorage private var isOpen: Bool
-    let section: InspectorSection
+/// A section of the inspector: a heading above a grouped box, with the section's name, then its count, and a chevron at
+/// the end that folds the box. The heading is one button, so VoiceOver and the keyboard reach the chevron by it. A
+/// section that can take something new has a small plus on its heading, beside the chevron.
+///
+/// The box takes each view of `content` as a row, with a divider between rows, so a row is a view of its own, never a
+/// stack of several. A section with nothing in it shows `placeholder` as its one row.
+struct InspectorSection<Content: View, Add: View>: View {
     let title: LocalizedStringKey
+    var count: Int?
+    @Binding var isOpen: Bool
+    let identifier: String
+    var placeholder: LocalizedStringKey?
     /// The plus control, given whether the heading is hovered.
     let add: (Bool) -> Add
     @ViewBuilder let content: Content
 
-    init(_ section: InspectorSection, title: LocalizedStringKey,
+    var body: some View {
+        VStack(alignment: .leading, spacing: InspectorMetrics.headingGap) {
+            InspectorFoldHeading(title: title, count: count, isOpen: $isOpen, identifier: identifier, add: add)
+            if isOpen {
+                InspectorBox {
+                    if let placeholder {
+                        Text(placeholder).foregroundStyle(.secondary)
+                    } else {
+                        content
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// An `InspectorSection` that keeps whether it is open for every item and launch.
+struct InspectorSectionView<Content: View, Add: View>: View {
+    @AppStorage private var isOpen: Bool
+    let kind: InspectorSectionKind
+    let title: LocalizedStringKey
+    var count: Int?
+    var placeholder: LocalizedStringKey?
+    let add: (Bool) -> Add
+    @ViewBuilder let content: Content
+
+    init(_ kind: InspectorSectionKind, title: LocalizedStringKey, count: Int? = nil, placeholder: LocalizedStringKey? = nil,
          @ViewBuilder add: @escaping (Bool) -> Add, @ViewBuilder content: () -> Content) {
-        _isOpen = AppStorage(wrappedValue: true, section.key)
-        self.section = section
+        _isOpen = AppStorage(wrappedValue: true, kind.key)
+        self.kind = kind
         self.title = title
+        self.count = count
+        self.placeholder = placeholder
         self.add = add
         self.content = content()
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: InspectorMetrics.headingGap) {
-            InspectorFoldHeading(title: title, isOpen: $isOpen, identifier: section.identifier, add: add)
-            if isOpen { content }
-        }
+        InspectorSection(title: title, count: count, isOpen: $isOpen, identifier: kind.identifier, placeholder: placeholder,
+                         add: add) { content }
     }
 }
 
 extension InspectorSectionView where Add == EmptyView {
-    init(_ section: InspectorSection, title: LocalizedStringKey, @ViewBuilder content: () -> Content) {
-        self.init(section, title: title, add: { _ in EmptyView() }, content: content)
+    init(_ kind: InspectorSectionKind, title: LocalizedStringKey, count: Int? = nil, placeholder: LocalizedStringKey? = nil,
+         @ViewBuilder content: () -> Content) {
+        self.init(kind, title: title, count: count, placeholder: placeholder, add: { _ in EmptyView() }, content: content)
     }
 }
 
-/// A section's heading: the system's title with the disclosure at its end, and the plus, in the trailing column,
-/// where the section takes something new.
+/// A section's heading: the system's title, the count, and the disclosure at the end, and the plus, in the trailing
+/// column, where the section takes something new.
 struct InspectorFoldHeading<Add: View>: View {
     @Environment(\.interfaceTextSize) private var textSize
     let title: LocalizedStringKey
+    var count: Int?
     @Binding var isOpen: Bool
     let identifier: String
     let add: (Bool) -> Add
@@ -131,7 +172,13 @@ struct InspectorFoldHeading<Add: View>: View {
             withAnimation(.snappy(duration: 0.2)) { isOpen.toggle() }
         } label: {
             HStack(spacing: 6) {
-                Text(title)
+                HStack(spacing: 4) {
+                    Text(title)
+                    if let count, count > 0 {
+                        Text(count, format: .number).monospacedDigit().fontWeight(.regular).foregroundStyle(.secondary)
+                    }
+                }
+                .lineLimit(1)
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10 * scale, weight: .semibold))
@@ -140,8 +187,9 @@ struct InspectorFoldHeading<Add: View>: View {
                     .frame(width: InspectorMetrics.foldColumn * scale)
                     .accessibilityHidden(true)
             }
-            .interfaceFont(.title3.weight(.semibold))
+            .interfaceFont(.body.weight(.semibold))
             .foregroundStyle(.primary)
+            .padding(.horizontal, InspectorMetrics.headingInset)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -153,6 +201,39 @@ struct InspectorFoldHeading<Add: View>: View {
             add(hovering).inspectorTrailingColumn()
         }
         .onHover { hovering = $0 }
+    }
+}
+
+/// The grouped box of a section: each view of its content is a row at least `boxRowHeight` high, inset by `boxInset`,
+/// with a divider above every row but the first that stops `boxInset` short of both edges.
+struct InspectorBox<Content: View>: View {
+    @Environment(\.interfaceTextSize) private var textSize
+    @Environment(\.colorScheme) private var scheme
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        let scale = InterfaceStyle.scale(for: textSize)
+        let shape = RoundedRectangle(cornerRadius: InspectorMetrics.boxRadius, style: .continuous)
+        VStack(alignment: .leading, spacing: 0) {
+            Group(subviews: content) { rows in
+                ForEach(rows) { row in
+                    row
+                        .padding(.horizontal, InspectorMetrics.boxInset)
+                        .padding(.vertical, InspectorMetrics.boxRowPadding)
+                        .frame(maxWidth: .infinity, minHeight: InspectorMetrics.boxRowHeight * scale, alignment: .leading)
+                        .overlay(alignment: .top) {
+                            if row.id != rows.first?.id {
+                                Rectangle().fill(.separator).frame(height: InspectorMetrics.boxStroke)
+                                    .padding(.horizontal, InspectorMetrics.boxInset)
+                            }
+                        }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(scheme == .dark ? Color.white.opacity(0.03) : Color(nsColor: .controlBackgroundColor), in: shape)
+        .overlay { shape.strokeBorder(.separator, lineWidth: InspectorMetrics.boxStroke) }
+        .clipShape(shape)
     }
 }
 
@@ -206,7 +287,6 @@ struct InspectorRow<Value: View>: View {
             value
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.vertical, InspectorMetrics.rowPadding * scale)
         .interfaceFont(.body)
     }
 }
@@ -279,6 +359,8 @@ struct InspectorRowButtonStyle: ButtonStyle {
                 )
                 .contentShape(.rect(cornerRadius: InspectorMetrics.rowRadius, style: .continuous))
                 .padding(.horizontal, -InspectorMetrics.rowInset)
+                // The box sets a row's height, so the fill's room above and below does not add to it.
+                .padding(.vertical, -4)
                 .onHover { hovering = $0 }
         }
     }
@@ -382,15 +464,18 @@ struct InspectorPlusMenu<Content: View>: View {
 
 private struct InspectorTrailingColumn: ViewModifier {
     @Environment(\.interfaceTextSize) private var textSize
+    let clearsFold: Bool
+
     func body(content: Content) -> some View {
         let scale = InterfaceStyle.scale(for: textSize)
         content
             .frame(width: InspectorMetrics.trailingColumn * scale)
-            .padding(.trailing, InspectorMetrics.foldColumn * scale)
+            .padding(.trailing, clearsFold ? InspectorMetrics.foldColumn * scale : 0)
     }
 }
 
 extension View {
-    /// Puts the view in the inspector's trailing column, where every add plus and row menu lines up.
-    func inspectorTrailingColumn() -> some View { modifier(InspectorTrailingColumn()) }
+    /// Puts the view in the inspector's trailing column, where every add plus and row menu lines up. A heading's plus
+    /// clears the chevron's column; a row in a box ends at the box's inset instead.
+    func inspectorTrailingColumn(clearsFold: Bool = true) -> some View { modifier(InspectorTrailingColumn(clearsFold: clearsFold)) }
 }

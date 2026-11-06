@@ -106,13 +106,13 @@ struct InspectorEditingTests {
     // MARK: Folding
 
     @Test func everySectionHasItsOwnStoredKeyAndIsResetWithTheRest() {
-        let keys = InspectorSection.allCases.map(\.key)
-        #expect(Set(keys).count == InspectorSection.allCases.count)
+        let keys = InspectorSectionKind.allCases.map(\.key)
+        #expect(Set(keys).count == InspectorSectionKind.allCases.count)
         for key in keys { #expect(InterfaceKey.all.contains(key)) }
     }
 
     /// The height a section takes in a hosting view, whose stored fold state is `defaults`.
-    private static func height(of section: InspectorSection, in defaults: UserDefaults) -> CGFloat {
+    private static func height(of section: InspectorSectionKind, in defaults: UserDefaults) -> CGFloat {
         let view = InspectorSectionView(section, title: "Section") { Color.clear.frame(width: 100, height: 200) }
             .defaultAppStorage(defaults)
         return NSHostingView(rootView: view).fittingSize.height
@@ -124,7 +124,7 @@ struct InspectorEditingTests {
         defer { defaults.removePersistentDomain(forName: name) }
         let open = Self.height(of: .tags, in: defaults)
         #expect(open >= 200, "nothing stored: the content shows")
-        defaults.set(false, forKey: InspectorSection.tags.key)
+        defaults.set(false, forKey: InspectorSectionKind.tags.key)
         #expect(Self.height(of: .tags, in: defaults) < open - 100, "folded: only the heading")
         #expect(Self.height(of: .properties, in: defaults) == open, "another section is not folded with it")
     }

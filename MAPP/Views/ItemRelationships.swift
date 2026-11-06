@@ -21,36 +21,35 @@ struct ItemRelationshipGroup: View {
     @State private var rejected = false
     @State private var hovering = false
 
+    /// The rows of a box, never one row holding them: the heading, each link, and the rest of them.
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 4) {
-                InspectorSubheading(title: relationship.label)
-                Spacer(minLength: 0)
-                if relationship.isEditable && relationship.allowsMultiple {
-                    InspectorPlusButton(
-                        accessibilityLabel: "Add to \(relationship.label)",
-                        identifier: "RelationshipAddRow.\(relationship.field)", isRowHovered: hovering, action: onEdit)
-                        .inspectorTrailingColumn()
-                }
-            }
-            // Below the heading's row, not inside it, so the plus is centered on the heading.
-            .padding(.bottom, 2)
-            let links = LinkLimit.split(relationship.targets, expanded: isExpanded)
-            ForEach(links.shown) { target in
-                ItemTargetRow(target: target, relationship: relationship, typeIcon: typeIcon, onOpen: onOpen, onEdit: onEdit) { id in
-                    Task { rejected = !(await onRemove(id)) }
-                }
-            }
-            if links.hidden > 0 {
-                ItemShowMoreButton(count: links.hidden, identifier: "RelationshipShowMore.\(relationship.field)", action: onShowAll)
-            }
-            if rejected {
-                Text("The connection could not be removed.")
-                    .interfaceFont(.caption).foregroundStyle(.red)
+        HStack(spacing: 4) {
+            InspectorSubheading(title: relationship.label, count: relationship.targets.count)
+            Spacer(minLength: 0)
+            if relationship.isEditable && relationship.allowsMultiple {
+                InspectorPlusButton(
+                    accessibilityLabel: "Add to \(relationship.label)",
+                    identifier: "RelationshipAddRow.\(relationship.field)", isRowHovered: hovering, action: onEdit)
+                    .inspectorTrailingColumn(clearsFold: false)
             }
         }
+        .contentShape(.rect)
         .onHover { hovering = $0 }
         .showOnPageMenu(isShown: shownOnPage, onChange: onShowOnPage)
+        let links = LinkLimit.split(relationship.targets, expanded: isExpanded)
+        ForEach(links.shown) { target in
+            ItemTargetRow(target: target, relationship: relationship, typeIcon: typeIcon, onOpen: onOpen, onEdit: onEdit) { id in
+                Task { rejected = !(await onRemove(id)) }
+            }
+            .showOnPageMenu(isShown: shownOnPage, onChange: onShowOnPage)
+        }
+        if links.hidden > 0 {
+            ItemShowMoreButton(count: links.hidden, identifier: "RelationshipShowMore.\(relationship.field)", action: onShowAll)
+        }
+        if rejected {
+            Text("The connection could not be removed.")
+                .interfaceFont(.caption).foregroundStyle(.red)
+        }
     }
 }
 
@@ -90,14 +89,12 @@ struct ItemTargetRow: View {
         let scale = InterfaceStyle.scale(for: textSize)
         let shows = relationship.isEditable && hovering
         InspectorItemRow(target: target, typeIcon: typeIcon, onOpen: onOpen,
-                         trailingInset: shows ? (InspectorMetrics.trailingColumn + InspectorMetrics.foldColumn) * scale : 0)
+                         trailingInset: shows ? InspectorMetrics.trailingColumn * scale : 0)
             .overlay(alignment: .trailing) {
-                if shows { actions.inspectorTrailingColumn() }
+                if shows { actions.inspectorTrailingColumn(clearsFold: false) }
             }
             .onHover { hovering = $0 }
             .contextMenu { menuItems }
-            // Space between rows. The menu is centered on the row itself, so it stays level with a row of two lines.
-            .padding(.vertical, 2)
     }
 
     private var actions: some View {
@@ -162,10 +159,11 @@ struct InspectorItemRow: View {
             if let id = target.itemID, target.isOpenable {
                 Button { onOpen(id) } label: {
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        TypeIcon(id: typeIcon(id))
+                        TypeMark(icon: typeIcon(id), size: .row)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(target.displayTitle)
-                                .lineLimit(2)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
                                 .multilineTextAlignment(.leading)
                             if target.isDeleted {
                                 Label("Deleted", systemImage: "trash")
@@ -179,6 +177,7 @@ struct InspectorItemRow: View {
                 }
                 .buttonStyle(InspectorRowButtonStyle())
                 .foregroundStyle(.primary)
+                .help(target.displayTitle)
                 .accessibilityIdentifier("RelationshipTarget.\(id.rawValue)")
             } else {
                 VStack(alignment: .leading, spacing: 2) {
