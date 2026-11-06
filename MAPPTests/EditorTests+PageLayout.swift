@@ -104,34 +104,39 @@ extension EditorTests {
         })()
         """
 
-    @Test func anItemARowLinksToIsDrawnAsAChipLikeTheParentPin() async throws {
+    @Test func everyKindOfChipIsOneHeightAndStaysInsideItsColumn() async throws {
         let page = try await Page()
         try await page.load("A note.\n")
         var header = Self.header("A highlight")
         header.item = try #require(page.editor.noteID).rawValue
-        let target = PropertyRow.Target(title: "A source article", item: ItemID("source"), icon: "book")
-        header.properties.append(PropertyRow(id: "about", label: "About", value: .items([target])))
+        let source = PropertyRow.Target(title: "A source article", item: ItemID("source"), icon: "lucide:book-open")
+        let person = PropertyRow.Target(title: "Mira Castell", item: ItemID("mira"), icon: "lucide:user", kind: .person)
+        header.properties.append(PropertyRow(id: "about", label: "About", value: .items([source, person])))
+        header.properties.append(PropertyRow(id: "priority", label: "Priority", value: .options(["High", String(repeating: "a very long option ", count: 20)])))
+        header.properties.append(PropertyRow(id: "#tags", label: "Tags", value: .tags(["favorite"])))
         page.editor.setHeader(header)
         let window = try await Self.show(page, width: 900)
         defer { window.orderOut(nil); window.contentView = nil; window.close() }
-        // The chip's and the parent pin's height, fill, radius and title color, and the text after the chip.
+        // Every chip, the status and parent pins and the type chip among them: their heights, and whether each ends inside its row.
         let measured = try #require(try await settle(page.editor, """
             (() => {
-              const chip = document.querySelector('.item-link-chip')
-              const pin = document.querySelector('.item-prop[data-row="child-of"] .item-menu-pin')
-              if (!chip || !pin) return null
-              const a = getComputedStyle(chip), b = getComputedStyle(pin)
-              const title = getComputedStyle(chip.querySelector('.item-link-text')).color
-              const label = getComputedStyle(pin.querySelector('.item-pin-label')).color
-              return [chip.getBoundingClientRect().height === pin.getBoundingClientRect().height, a.backgroundColor === b.backgroundColor,
-                      a.borderRadius === b.borderRadius, title === label, getComputedStyle(chip, '::after').content.includes('↗')]
+              const chips = [...document.querySelectorAll('#item-header .item-chip')]
+              const person = document.querySelector('.item-person')
+              if (chips.length < 7 || !person) return null
+              const heights = chips.map(chip => chip.getBoundingClientRect().height)
+              const inside = chips.every(chip => {
+                const row = chip.closest('.item-prop-value') || chip.parentElement
+                return chip.getBoundingClientRect().right <= row.getBoundingClientRect().right + 0.5
+              })
+              const circle = person.querySelector('.item-person-initials').getBoundingClientRect()
+              return [Math.min(...heights), Math.max(...heights), inside ? 1 : 0, circle.width, circle.height,
+                      getComputedStyle(person).backgroundColor === 'rgba(0, 0, 0, 0)' ? 1 : 0]
             })()
-            """, as: [Bool].self) { $0 != nil })
-        #expect(measured[0], "the chip is as tall as the parent pin")
-        #expect(measured[1], "the chip has the pin's fill")
-        #expect(measured[2], "the chip has the pin's radius")
-        #expect(measured[3], "the title is in the normal text color, not the link color")
-        #expect(measured[4], "a small arrow ends the chip")
+            """, as: [Double].self) { $0 != nil })
+        #expect(measured[0] == 22 && measured[1] == 22, "chips are \(measured[0]) to \(measured[1]) points high")
+        #expect(measured[2] == 1, "a long value stays inside its column")
+        #expect(measured[3] == 17 && measured[4] == 17, "the initials are in a 17 point circle")
+        #expect(measured[5] == 1, "a person has no chip behind it")
     }
 
     @Test func longUnbrokenValuesWrapInsideTheColumnInsteadOfWideningThePage() async throws {

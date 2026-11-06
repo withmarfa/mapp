@@ -54,12 +54,12 @@ nonisolated enum TypeTone: String, CaseIterable, Sendable {
 
     /// The tone as CSS custom properties for the web page: `--tone`, and `--tone-mark` and `--tone-chip` for the pale
     /// fills at the opacities in force.
-    static func cssColors(for icon: String?, dark: Bool, looks: ChipLooks = .current) -> [String: String] {
+    @MainActor static func cssColors(for icon: String?, dark: Bool, looks: ChipLooks = .current) -> [String: String] {
         cssColors(for: TypeTone(icon: icon), dark: dark, looks: looks)
     }
 
     /// The same for a tone chosen directly, such as an option's (`OptionTone`).
-    static func cssColors(for tone: TypeTone, dark: Bool, looks: ChipLooks = .current) -> [String: String] {
+    @MainActor static func cssColors(for tone: TypeTone, dark: Bool, looks: ChipLooks = .current) -> [String: String] {
         let (r, g, b) = tone.components(dark: dark)
         let (red, green, blue) = (Int((r * 255).rounded()), Int((g * 255).rounded()), Int((b * 255).rounded()))
         return [
