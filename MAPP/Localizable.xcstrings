@@ -28,6 +28,13 @@
     "Copy Code" : {
       "extractionState" : "manual"
     },
+    "Customize Layout…" : {
+      "extractionState" : "manual"
+    },
+    "Customize Layout in the Title Row" : {
+      "extractionState" : "manual",
+      "localizations" : { "en" : { "stringUnit" : { "state" : "translated", "value" : "Customize Layout" } } }
+    },
     "Date Format" : {
       "extractionState" : "manual"
     },
@@ -37,7 +44,19 @@
     "Disconnected, but MAPP Is Still Approved" : {
       "extractionState" : "manual"
     },
+    "Four Pins at Most" : {
+      "extractionState" : "manual"
+    },
+    "Hidden" : {
+      "extractionState" : "manual"
+    },
     "It will be sent once you sign in again. Do that in Settings." : {
+      "extractionState" : "manual"
+    },
+    "Layout Options" : {
+      "extractionState" : "manual"
+    },
+    "%lld of %lld" : {
       "extractionState" : "manual"
     },
     "Long" : {
@@ -91,10 +110,25 @@
     "Nothing changed." : {
       "extractionState" : "manual"
     },
+    "Nothing Hidden" : {
+      "extractionState" : "manual"
+    },
+    "Nothing on the Page" : {
+      "extractionState" : "manual"
+    },
+    "Nothing Pinned" : {
+      "extractionState" : "manual"
+    },
     "Open %@ on any device, sign in and type the code. It stops working at %@." : {
       "extractionState" : "manual"
     },
     "Open Page" : {
+      "extractionState" : "manual"
+    },
+    "Pin" : {
+      "extractionState" : "manual"
+    },
+    "Pinned" : {
       "extractionState" : "manual"
     },
     "Relative" : {
@@ -116,6 +150,9 @@
       "extractionState" : "manual"
     },
     "Sign in to this server again to see them." : {
+      "extractionState" : "manual"
+    },
+    "Unpin" : {
       "extractionState" : "manual"
     },
     "Your Sign-In" : {
@@ -295,9 +332,6 @@
     "The new entry wasn’t finished, so it wasn’t added." : {
       "extractionState" : "manual"
     },
-    "A collection’s contents always stay on its page." : {
-      "extractionState" : "manual"
-    },
     "Icon Set" : {
       "extractionState" : "manual"
     },
@@ -370,19 +404,7 @@
     "Ask" : {
 
     },
-    "Choose what the page shows. The inspector always lists everything." : {
-      "extractionState" : "manual"
-    },
     "Clear" : {
-      "extractionState" : "manual"
-    },
-    "Customize %@ Pages" : {
-      "extractionState" : "manual"
-    },
-    "Customize Page…" : {
-      "extractionState" : "manual"
-    },
-    "In the Inspector" : {
       "extractionState" : "manual"
     },
     "On the Page" : {

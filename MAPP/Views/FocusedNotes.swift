@@ -36,8 +36,12 @@ final class DetailsPresentation {
     var typeChange: TypeChangeRequest?
     /// The item the window's Version History sheet is open for.
     var history: VersionHistoryRequest?
-    /// The item whose type the window's Customize Page sheet is open for.
-    var pageCustomization: PageCustomizationRequest?
+    /// Whether the window's right sidebar is arranging the page's layout (Customize Layout) in place of the inspector.
+    /// It belongs to the window, not to an item: another item shows its own type's rows, and a file, which cannot be
+    /// arranged, shows the inspector until a note is back.
+    private(set) var isCustomizingLayout = false
+    /// Whether ending Customize Layout closes the sidebar, because starting it opened the sidebar.
+    @ObservationIgnored private var closesSidebarAtEnd = false
     /// The items the window's Add to Collection sheet is open for.
     var collectionPick: CollectionPickRequest?
     /// The items the window's Add Tag sheet is open for.
@@ -61,6 +65,29 @@ final class DetailsPresentation {
     }
 
     func expandLinks(_ group: LinkGroup) { expandedLinks.insert(group) }
+
+    /// Starts or ends Customize Layout.
+    func toggleLayout() {
+        if isCustomizingLayout { endLayout() } else { beginLayout() }
+    }
+
+    /// Shows the sidebar, which takes the layout, and remembers to close it again if it was closed.
+    func beginLayout() {
+        guard !isCustomizingLayout else { return }
+        closesSidebarAtEnd = !isPresented
+        isCustomizingLayout = true
+        isPresented = true
+    }
+
+    func endLayout() {
+        guard isCustomizingLayout else { return }
+        isCustomizingLayout = false
+        if closesSidebarAtEnd { isPresented = false }
+        closesSidebarAtEnd = false
+    }
+
+    /// Whether the person has the sidebar open, for the next launch: a sidebar only Customize Layout opened is not.
+    var isPresentedByPerson: Bool { isPresented && !(isCustomizingLayout && closesSidebarAtEnd) }
 
     func draft(for itemID: ItemID, key: String) -> ItemPropertyDraft {
         if let draft = drafts[itemID]?[key] { return draft }

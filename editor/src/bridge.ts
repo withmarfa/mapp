@@ -47,6 +47,10 @@ export type EditorMessage =
       rect: [number, number, number, number]
       viewportHeight: number
     }
+  /** Customize Layout in the row above the title: the app starts or ends it. */
+  | { type: 'toggleLayout' }
+  /** Linked From in the row above the title: the app shows what links here. */
+  | { type: 'showLinked' }
   | { type: 'openLink'; href: string }
   | { type: 'openItem'; item: string }
   | { type: 'copy'; text: string }

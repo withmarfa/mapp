@@ -78,12 +78,11 @@ struct ItemPageHeader: ViewModifier {
                 pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: now, format: dateFormat, members: .only,
                 item: { library.item($0) })
             : []
+        let allLinked = LinkedItem.list(
+            pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: now, format: dateFormat,
+            members: isCollection ? .excluding : .all, item: { library.item($0) })
         // Where the person put Linked From: the page's foot, or only the inspector.
-        let linked = placement.linkedFromPlace == .page
-            ? LinkedItem.list(
-                pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: now, format: dateFormat,
-                members: isCollection ? .excluding : .all, item: { library.item($0) })
-            : []
+        let linked = placement.linkedFromPlace == .page ? allLinked : []
         let hasText = library.catalogue.itemTypes[item.type]?.bodyKey != nil
         // A collection with no text, as a folder a connector keeps has, is its members: an editor with nothing in it
         // would only invite typing that the connector puts back.
@@ -125,7 +124,9 @@ struct ItemPageHeader: ViewModifier {
             parentRejected: parent.map { drafts.draft(for: item.id, key: $0.field).rejected } ?? false,
             interfaceTextSize: UserDefaults.standard.object(forKey: InterfaceKey.textSize) as? Int ?? InterfaceStyle.defaultTextSize,
             titleLines: titleLines,
-            chips: .init()
+            chips: .init(),
+            linkedCount: allLinked.count,
+            layoutOn: PageCustomization.isAvailable(for: item) ? drafts.isCustomizingLayout : nil
         )
     }
 
@@ -168,6 +169,12 @@ struct ItemPageHeader: ViewModifier {
                     menu.addItem(entry)
                 }
                 editor.popUpMenu(menu, under: rect)
+            case .toggleLayout:
+                drafts.toggleLayout()
+            case .showLinked:
+                // Linked From is in the inspector, which Customize Layout stands in for.
+                drafts.endLayout()
+                drafts.isPresented = true
             case .hideFromPage(let row, let id):
                 guard editor.noteID == id, let type = library.item(id)?.type else { return }
                 PagePlacements.update { $0.set(false, row: row, of: type) }

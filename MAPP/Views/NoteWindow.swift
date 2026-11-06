@@ -37,6 +37,7 @@ struct NoteWindow: View {
     static func makeEditor(library: any ItemLibrary, details: DetailsPresentation, showing id: Binding<ItemID?>) -> EditorController {
         let editor = EditorController(library: library)
         editor.titleDrafts = details
+        editor.onEscape = { [details] in details.endLayout() }
         editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
         // The keyboard follows the link to the note it opened, as it does in a main window.
         editor.onOpenNote = { [weak editor] linked in
@@ -87,10 +88,11 @@ struct NoteWindow: View {
         .environment(details)
         .sheet(item: Binding { details.typeChange } set: { details.typeChange = $0 }) { TypeChangeSheet(request: $0) }
         .sheet(item: Binding { details.history } set: { details.history = $0 }) { VersionHistorySheet(request: $0) }
-        .sheet(item: Binding { details.pageCustomization } set: { details.pageCustomization = $0 }) { CustomizePageSheet(request: $0) }
         .sheet(item: Binding { details.collectionPick } set: { details.collectionPick = $0 }) { CollectionPickerSheet(request: $0) }
         .sheet(item: Binding { details.tagRequest } set: { details.tagRequest = $0 }) { TagSheet(request: $0) }
-        .onChange(of: details.isPresented) { storedDetailsPresented = details.isPresented }
+        .onChange(of: details.isPresentedByPerson) { storedDetailsPresented = details.isPresentedByPerson }
+        // Closing the sidebar by hand finishes Customize Layout, which has nowhere else to show.
+        .onChange(of: details.isPresented) { if !details.isPresented { details.endLayout() } }
         .onAppear {
             details.isPresented = storedDetailsPresented
         }

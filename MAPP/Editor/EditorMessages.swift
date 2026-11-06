@@ -50,6 +50,10 @@ nonisolated enum EditorMessage: Sendable {
     case titleDiscard(ItemID)
     /// A pin asks for its menu, with the pin's frame in the page's window and the height of that window.
     case headerMenu(PageHeaderMenu, ItemID, CGRect, viewportHeight: Double)
+    /// Customize Layout, in the row above the title, was pressed.
+    case toggleLayout
+    /// Linked From, in the row above the title, was pressed.
+    case showLinked
     case openLink(String)
     /// A link in the item's property block or its linked items was clicked.
     case openItem(ItemID)
@@ -129,6 +133,10 @@ nonisolated enum EditorMessage: Sendable {
                   let viewportHeight = (dict["viewportHeight"] as? NSNumber)?.doubleValue, viewportHeight.isFinite
             else { return nil }
             self = .headerMenu(menu, ItemID(item), CGRect(x: rect[0], y: rect[1], width: rect[2], height: rect[3]), viewportHeight: viewportHeight)
+        case "toggleLayout":
+            self = .toggleLayout
+        case "showLinked":
+            self = .showLinked
         case "copy":
             guard let text = dict["text"] as? String else { return nil }
             self = .copy(text)

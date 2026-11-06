@@ -73,7 +73,7 @@ struct PagePlacementsTests {
         }
         // A core type declares its own fields as content, even one whose key ends the same way.
         #expect(placement.showsOnPage("source_id"))
-        // Show on Page and Customize Page override the default either way.
+        // Show on Page and Customize Layout override the default either way.
         var chosen = PagePlacements()
         chosen.setShown(true, row: "feed_hash", of: TypeID("rss.entry"))
         chosen.setShown(false, row: "url", of: TypeID("rss.entry"))
@@ -310,6 +310,29 @@ struct PagePlacementsTests {
         #expect(choice.linkedFrom == .page)
         #expect(placements.pins(of: Self.ticket, in: Self.catalogue) == ["#type", "child-of", "#updated"])
         #expect(placements.rawValue == old, "written back as it was read")
+    }
+
+    @Test func aChoiceSavedBeforeOrderingStillReadsAndAnOrderRoundTrips() throws {
+        let old = ##"{"aic.ticket":{"pins":["#type"],"rows":{"repo":false}}}"##
+        let placements = try #require(PagePlacements(rawValue: old))
+        #expect(placements.choices["aic.ticket"]?.rowOrder == nil)
+        #expect(placements.rawValue == old, "written back as it was read")
+
+        var ordered = placements
+        ordered.setRowOrder(["repo", "#tags", "repo"], of: Self.ticket)
+        #expect(ordered.choices["aic.ticket"]?.rowOrder == ["repo", "#tags"], "each row once")
+        #expect(PagePlacements(rawValue: ordered.rawValue) == ordered)
+        ordered.setRowOrder(nil, of: Self.ticket)
+        #expect(ordered == placements)
+    }
+
+    @Test func thePropertyBlockFollowsTheChosenOrderAndRowsNotNamedKeepTheirOrderAfterIt() {
+        func row(_ id: String) -> PropertyRow { PropertyRow(id: id, label: id, value: .text(id)) }
+        let candidates = ["a", "b", "c", "d"].map(row)
+        var placements = PagePlacements()
+        placements.setRowOrder(["c", "gone", "a"], of: Self.task)
+        let placement = placements.placement(of: Self.task, in: Self.catalogue)
+        #expect(PropertyRow.block(candidates, placement: placement).map(\.id) == ["c", "a", "b", "d"])
     }
 
     @Test func noPinsIsAChoiceThatSurvivesStorage() throws {

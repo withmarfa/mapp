@@ -643,6 +643,10 @@ final class EditorController: NSObject {
             onHeaderEvent(.titleDiscard(item))
         case .headerMenu(let menu, let item, let rect, let viewportHeight):
             onHeaderEvent(.menu(menu, item, containerRect(rect, viewportHeight: viewportHeight)))
+        case .toggleLayout:
+            onHeaderEvent(.toggleLayout)
+        case .showLinked:
+            onHeaderEvent(.showLinked)
         case .openLink(let href):
             // The page has already refused what Inkkit's `canOpenLink` does not allow.
             if let url = URL(string: href) { NSWorkspace.shared.open(url) }

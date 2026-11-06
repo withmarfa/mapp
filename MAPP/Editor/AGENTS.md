@@ -31,6 +31,7 @@ The Swift side of the note editor: the web view, the controller that drives the 
 ## Header
 
 - The header is drawn in the page (see `editor/AGENTS.md`); `MAPP/Views/ItemPageHeader.swift` builds its data and carries out its events. The title saves through `setItemProperty`. A refused status, Remove Parent or title is shown and kept, never dropped.
+- Customize Layout is the window's (`DetailsPresentation.isCustomizingLayout`), not the editor's: the header reads it, the page's control posts `toggleLayout`, and Escape from the page ends it (`EditorController.onEscape`). Linked From in the row above the title ends it and opens the sidebar.
 - The editor builds the header again only when what it reads changes (`EditorController.showHeader`). Never read `contentRevision` or a whole list while building it, or an edit anywhere rebuilds the open page's header.
 - A title is editable only where `ItemLibrary.canSetTitle(of:)` says so. Each window's unsaved and refused titles live in `EditorController.titleDrafts` until saved or discarded; `flushAll` tries them again, and a title still refused stops a quit, a library change or a window close and names the item.
 - When a window goes, `windowWent()` removes its editor from `EditorController.open`. Closures the editor keeps, and the Format menu's focused editor, hold it weakly, or `flushAll` would visit a closed window.

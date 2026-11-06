@@ -200,10 +200,11 @@ struct MainView: View {
         .focusedSceneValue(\.detailsPresentation, details)
         .sheet(item: Binding { details.typeChange } set: { details.typeChange = $0 }) { TypeChangeSheet(request: $0) }
         .sheet(item: Binding { details.history } set: { details.history = $0 }) { VersionHistorySheet(request: $0) }
-        .sheet(item: Binding { details.pageCustomization } set: { details.pageCustomization = $0 }) { CustomizePageSheet(request: $0) }
         .sheet(item: Binding { details.collectionPick } set: { details.collectionPick = $0 }) { CollectionPickerSheet(request: $0) }
         .sheet(item: Binding { details.tagRequest } set: { details.tagRequest = $0 }) { TagSheet(request: $0) }
-        .onChange(of: details.isPresented) { if restoresWindow { storedDetailsPresented = details.isPresented } }
+        .onChange(of: details.isPresentedByPerson) { if restoresWindow { storedDetailsPresented = details.isPresentedByPerson } }
+        // Closing the sidebar by hand finishes Customize Layout, which has nowhere else to show.
+        .onChange(of: details.isPresented) { if !details.isPresented { details.endLayout() } }
         .overlay(alignment: .top) {
             if let palette = browser.palette {
                 FloatingPanel {
@@ -266,7 +267,9 @@ struct MainView: View {
                 }
             }
             editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
-            editor.onEscape = { [browser] in browser.focusRequest = .list }
+            editor.onEscape = { [browser, details] in
+                if details.isCustomizingLayout { details.endLayout() } else { browser.focusRequest = .list }
+            }
             editor.onOpenNote = { [browser, library, order] id in
                 if let item = library.item(id) { browser.open(linked: item, in: library, order: order) }
             }

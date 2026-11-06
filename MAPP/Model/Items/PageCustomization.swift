@@ -2,7 +2,7 @@ import Foundation
 
 /// What a type's page can be customized for: the choices of `PagePlacements` reach the property block and
 /// Linked From, which only some items draw.
-enum PageCustomization {
+nonisolated enum PageCustomization {
     /// Whether choosing what the page shows means anything for `item`.
     static func isAvailable(for item: Item?) -> Bool {
         item.map { !$0.isFile } ?? false
@@ -15,7 +15,7 @@ enum PageCustomization {
         PageHeaderLead(for: item, kind: PageHeaderKind.of(item.type, in: catalogue), body: nil, now: Date(), format: .automatic).consumed
     }
 
-    /// The fields the Customize Page sheet and the inspector's Show on Page offer for `item`: those the library
+    /// The fields Customize Layout and the inspector's Show on Page offer for `item`: those the library
     /// does not keep for itself and the header does not draw.
     static func fields(of item: Item, type: ItemTypeInfo?, hidden: Set<String>, catalogue: Catalogue) -> [ItemTypeInfo.Field] {
         let drawn = drawnKeys(of: item, in: catalogue)

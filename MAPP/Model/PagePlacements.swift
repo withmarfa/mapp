@@ -22,8 +22,12 @@ nonisolated struct PagePlacements: Equatable, Sendable {
         /// The row identifiers pinned under the title, in order. Nil follows the default pins; an empty list is a
         /// choice, that nothing is pinned. Optional so a choice saved before pins existed still decodes.
         var pins: [String]?
+        /// The row identifiers in the order the page lists them, the property block's order. A row not named keeps its
+        /// own order after those named. Nil follows the default order. Optional so a choice saved before ordering
+        /// existed still decodes.
+        var rowOrder: [String]?
 
-        var isEmpty: Bool { rows.isEmpty && linkedFrom == nil && pins == nil }
+        var isEmpty: Bool { rows.isEmpty && linkedFrom == nil && pins == nil && rowOrder == nil }
     }
 
     /// By type identifier.
@@ -74,6 +78,11 @@ nonisolated struct PagePlacements: Equatable, Sendable {
         pins.remove(at: from)
         pins.insert(row, at: min(max(index, 0), pins.count))
         setPins(pins, of: type)
+    }
+
+    /// Lists the rows in this order (each once), which the property block follows.
+    mutating func setRowOrder(_ order: [String]?, of type: TypeID) {
+        update(type) { $0.rowOrder = order.map(PagePlacement.unique) }
     }
 
     mutating func setShown(_ shown: Bool, row: String, of type: TypeID) {
@@ -191,8 +200,20 @@ nonisolated struct PagePlacement: Equatable, Sendable {
 
     /// The first `pinLimit` of `rows`, each once.
     static func limited(_ rows: [String]) -> [String] {
+        Array(unique(rows).prefix(pinLimit))
+    }
+
+    static func unique(_ rows: [String]) -> [String] {
         var seen: Set<String> = []
-        return Array(rows.filter { seen.insert($0).inserted }.prefix(pinLimit))
+        return rows.filter { seen.insert($0).inserted }
+    }
+
+    /// `items` in the person's row order: those it names first, in its order, then the rest as they were.
+    func ordered<Item>(_ items: [Item], id: (Item) -> String) -> [Item] {
+        guard let order = choice.rowOrder, !order.isEmpty else { return items }
+        let position = Dictionary(order.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
+        let named = items.filter { position[id($0)] != nil }.sorted { position[id($0)]! < position[id($1)]! }
+        return named + items.filter { position[id($0)] == nil }
     }
 
     /// Whether a field is a connector's bookkeeping, which says nothing to a person reading the page: one that a

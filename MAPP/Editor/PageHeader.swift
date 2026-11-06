@@ -124,6 +124,10 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     /// How many lines the title shows before an ellipsis cuts it, while it is not being edited.
     var titleLines: Int
     var chips: ChipStyle
+    /// How many items link to this one, for the row above the title, wherever Linked From is placed.
+    var linkedCount = 0
+    /// Customize Layout in the row above the title: nil where the item cannot be laid out, else whether it is on.
+    var layoutOn: Bool?
 
     /// The icons of the types the header names, which the page draws as images.
     var typeIconNames: Set<String?> {
@@ -229,6 +233,10 @@ enum PageHeaderEvent {
     /// Hide from Page was chosen in the menu over a row of the property block, or Linked From: the row's
     /// identifier (`PagePlacement`) and the item the header was showing.
     case hideFromPage(row: String, ItemID)
+    /// Customize Layout in the row above the title was pressed.
+    case toggleLayout
+    /// Linked From in the row above the title was pressed, to see what links here.
+    case showLinked
 }
 
 /// SF Symbols the header shows, drawn here because the page cannot draw them itself. The page uses each as a mask,
@@ -248,6 +256,9 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
     /// The symbol on the callout that says pictures at web addresses are not loaded, kept with the row symbols.
     static let pictureSymbol = "photo"
 
+    /// The symbols of the row above the title: Linked From and Customize Layout.
+    static let titleToolSymbols = ["arrow.down.left", "rectangle.split.2x1"]
+
     /// The symbols at the size the pins' 12 point text gives them, following the interface's text size, and the
     /// icons of `typeIcons` (Iconify IDs), which the Swift SDK draws.
     @MainActor
@@ -260,7 +271,7 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
         self.plus = plus
         self.indicator = indicator
         var symbols: [String: Icon] = [:]
-        for name in PropertyRow.Value.symbols + [Self.pictureSymbol] {
+        for name in PropertyRow.Value.symbols + [Self.pictureSymbol] + Self.titleToolSymbols {
             symbols[name] = Self.symbol(name, size: size, weight: .regular)
         }
         for name in typeIcons {

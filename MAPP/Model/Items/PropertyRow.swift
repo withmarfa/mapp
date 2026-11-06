@@ -87,10 +87,11 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// A text value too long to read in a row belongs in the body or the inspector.
     static let longestText = 120
 
-    /// The rows of the property block, in the order a person reads them: of the item's `candidates`, those the person's
-    /// `placement` shows, except `excluding`, which the page shows another way (`PagePins.leftOutOfBlock`).
+    /// The rows of the property block, in the order the person chose, else the order a person reads them: of the item's
+    /// `candidates`, those the person's `placement` shows, except `excluding`, which the page shows another way
+    /// (`PagePins.leftOutOfBlock`).
     static func block(_ candidates: [PropertyRow], placement: PagePlacement, excluding: Set<String> = []) -> [PropertyRow] {
-        candidates.filter { placement.showsOnPage($0.id) && !excluding.contains($0.id) }
+        placement.ordered(candidates.filter { placement.showsOnPage($0.id) && !excluding.contains($0.id) }, id: \.id)
     }
 
     /// Every row the item could show, whatever the person chose, in the order a person reads them: its type, source

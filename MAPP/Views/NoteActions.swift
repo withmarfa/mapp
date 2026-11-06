@@ -37,7 +37,7 @@ private struct NoteActionContext {
     var isEmpty: Bool { items.isEmpty && !keepsPlace }
 }
 
-/// Favorites, Add Tag, Change Type, Customize Page and Version History for the selection, or Recover for deleted items. The
+/// Favorites, Add Tag, Change Type, Customize Layout and Version History for the selection, or Recover for deleted items. The
 /// collection actions sit beside these (`CollectionActions`).
 struct NoteOrganizeActions: View {
     @CurrentLibrary private var library
@@ -67,7 +67,7 @@ struct NoteOrganizeActions: View {
             .disabled(active.isEmpty)
             AddTagButton(ids: ids, details: details, undoManager: undoManager)
             TypeChangeButton(ids: ids, details: details, undoManager: undoManager)
-            CustomizePageButton(ids: ids, details: details)
+            CustomizeLayoutButton(ids: ids, details: details)
             VersionHistoryButton(ids: ids, details: details, undoManager: undoManager)
         }
     }
