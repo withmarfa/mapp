@@ -87,11 +87,14 @@ struct ItemFileView: View {
 struct FileItemPage: View {
     @CurrentLibrary private var library
     let item: Item
+    let drafts: DetailsPresentation
+    /// Shows the item a link in the page names.
+    let open: (ItemID) -> Void
     var onResolved: (URL?) -> Void = { _ in }
 
     var body: some View {
         if case .webPage(let document, let runsScripts) = library.pageLayout(of: item) {
-            WebPageItemPage(item: item, document: document, runsScripts: runsScripts, onResolved: onResolved)
+            WebPageItemPage(item: item, document: document, runsScripts: runsScripts, drafts: drafts, open: open, onResolved: onResolved)
         } else {
             ItemFileView(id: item.id, onResolved: onResolved)
         }
