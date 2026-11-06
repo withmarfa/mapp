@@ -67,15 +67,15 @@ extension Knob.Value {
 /// `body` redraws when it changes.
 @Observable
 final class Tuning {
-    /// Add a knob here to show it in the panel; remove it here when it is settled. Empty until a design value needs
-    /// comparing.
+    /// Add a knob here to show it in the panel; remove it here when it is settled. Today it holds the `Chips` group,
+    /// which adjusts `ChipLooks`: when a chip value is settled, delete its knob and keep its named default there.
     ///
     /// To add one: declare it with `Knob.slider`, `.toggle` or `.picker`, with the code's own constant as its
     /// default, and list it here. Read it in the view with `number(_:)`, `choice(_:as:)` or, for a toggle,
     /// `tuning[knob] == .flag(true)`, behind `#if DEBUG` with the constant in the `#else`, so Release keeps the
     /// constant. The `Copy` button turns the values into text to paste into a chat. Settle a knob by deleting its
     /// declaration, its use and this entry in one change; none stays as a setting. Panel text is not localized.
-    static let shared = Tuning(knobs: [])
+    static let shared = Tuning(knobs: Chips.fields.map(\.knob))
 
     static let prefix = "tuning."
 
@@ -132,6 +132,52 @@ final class Tuning {
         case .option: (raw as? String).map(Knob.Value.option)
         }
         return value.map(knob.coerced) ?? knob.initial
+    }
+}
+
+extension Tuning {
+    /// The `Chips` group: each knob adjusts one number of `ChipLooks`, with that value's default as its start.
+    enum Chips {
+        typealias Field = (knob: Knob, path: WritableKeyPath<ChipLooks, Double>)
+
+        private static func size(_ name: String, _ path: WritableKeyPath<ChipLooks, Double>, in range: ClosedRange<Double>, step: Double = 1) -> Field {
+            (.slider("Chips", name, ChipLooks.defaults[keyPath: path], in: range, step: step), path)
+        }
+
+        private static func opacity(_ name: String, _ path: WritableKeyPath<ChipLooks, Double>) -> Field {
+            (.slider("Chips", name, ChipLooks.defaults[keyPath: path], in: 0...1, step: 0.005), path)
+        }
+
+        static let fields: [Field] = [
+            size("Height", \.height, in: 16...32),
+            size("Corner radius", \.cornerRadius, in: 0...16, step: 0.5),
+            size("Text size", \.textSize, in: 9...16, step: 0.5),
+            size("Padding", \.padding, in: 0...16, step: 0.5),
+            size("Gap", \.gap, in: 0...12, step: 0.5),
+            size("Type chip mark", \.chipMarkSize, in: 8...20),
+            size("Person circle", \.personCircle, in: 10...26),
+            size("Person initials", \.personInitialsSize, in: 6...12, step: 0.5),
+            opacity("Type tint", \.typeTintOpacity),
+            opacity("Mark tint", \.markOpacity),
+            size("Status edge width", \.statusEdgeWidth, in: 0...2, step: 0.25),
+            opacity("Edge light", \.edgeOpacityLight),
+            opacity("Edge dark", \.edgeOpacityDark),
+            opacity("Option fill light", \.optionFillOpacityLight),
+            opacity("Option fill dark", \.optionFillOpacityDark),
+            opacity("Tag fill light", \.tagFillOpacityLight),
+            opacity("Tag fill dark", \.tagFillOpacityDark),
+            opacity("Status fill dark", \.statusDarkFillOpacity),
+            opacity("Filter fill light", \.filterFillOpacityLight),
+            opacity("Filter fill dark", \.filterFillOpacityDark),
+            opacity("Chevron", \.chevronOpacity),
+        ]
+    }
+
+    /// The chip looks with every knob's value applied. A view that reads it in its `body` redraws when a knob moves.
+    var chipLooks: ChipLooks {
+        var looks = ChipLooks.defaults
+        for field in Chips.fields { looks[keyPath: field.path] = number(field.knob) }
+        return looks
     }
 }
 #endif
