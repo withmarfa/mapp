@@ -3,7 +3,7 @@ import SwiftUI
 /// The color a type's mark and chip take, chosen by the type's icon id (`ItemType.icon`, an Iconify id such as
 /// `lucide:book-open`). The key is only the icon, so no item type is named here. The table follows the design's
 /// `typeTones`, which is keyed by SF Symbol; each Lucide id takes the tone of the symbol that means the same.
-enum TypeTone: String, CaseIterable, Sendable {
+nonisolated enum TypeTone: String, CaseIterable, Sendable {
     case blue, green, orange, red, purple, teal, yellow, pink, indigo, gray
 
     /// Any icon not in the table, including no icon at all.
@@ -55,7 +55,12 @@ enum TypeTone: String, CaseIterable, Sendable {
     /// The tone as CSS custom properties for the web page: `--tone`, and `--tone-mark` and `--tone-chip` for the pale
     /// fills at the opacities in force.
     static func cssColors(for icon: String?, dark: Bool, looks: ChipLooks = .current) -> [String: String] {
-        let (r, g, b) = TypeTone(icon: icon).components(dark: dark)
+        cssColors(for: TypeTone(icon: icon), dark: dark, looks: looks)
+    }
+
+    /// The same for a tone chosen directly, such as an option's (`OptionTone`).
+    static func cssColors(for tone: TypeTone, dark: Bool, looks: ChipLooks = .current) -> [String: String] {
+        let (r, g, b) = tone.components(dark: dark)
         let (red, green, blue) = (Int((r * 255).rounded()), Int((g * 255).rounded()), Int((b * 255).rounded()))
         return [
             "--tone": "rgb(\(red), \(green), \(blue))",

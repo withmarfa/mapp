@@ -51,6 +51,11 @@ struct ItemPageHeader: ViewModifier {
             // The page is drawn from the defaults as they are when it is read, so a change made anywhere, in the
             // inspector, in the sheet or from the page's own menu, needs it read again.
             .onChange(of: placements) { editor.refreshHeader() }
+            #if DEBUG
+            // A chip knob in the Tuning panel changes the open page's header at once. Reading the looks here makes the
+            // view depend on them, and the header reads them again as it is rebuilt.
+            .onChange(of: Tuning.shared.chipLooks) { editor.refreshHeader() }
+            #endif
             .onDisappear { drafts.saveTitle(of: item.id, in: library, undoManager: undoManager) }
     }
 
@@ -70,10 +75,14 @@ struct ItemPageHeader: ViewModifier {
         let kind = PageHeaderKind.of(item.type, in: library.catalogue)
         let lead = PageHeaderLead(
             for: item, kind: kind, body: kind == .reading ? library.body(of: item.id)?.text : nil, now: now, format: dateFormat)
+        func typeIcon(of target: ItemID) -> String? {
+            library.item(target).flatMap { library.catalogue.icon(for: $0.type) }
+        }
         let properties = lead.refine(PropertyRow.rows(
             of: item, type: type, hidden: library.hiddenPropertyKeys(of: item).union(lead.consumed), relationships: relationships,
             parentField: Self.parentField, format: dateFormat, tags: library.tags(of: item), placement: placement,
-            icon: { target in library.item(target).flatMap { library.catalogue.icon(for: $0.type) } }))
+            icon: { target in typeIcon(of: target) },
+            isPerson: { target in library.item(target).map { PageHeaderKind.of($0.type, in: library.catalogue) == .person } ?? false }))
         let isCollection = library.catalogue.isCollection(item.type)
         let contents = isCollection
             ? LinkedItem.list(
@@ -101,6 +110,7 @@ struct ItemPageHeader: ViewModifier {
             showsTitle: item.titleRule != .firstLine,
             type: lead.showsType ? library.catalogue.itemTypes[item.type].map { Self.localized($0.label) } : nil,
             icon: .init(name: library.catalogue.icon(for: item.type)),
+            typeTone: TypeTone(icon: library.catalogue.icon(for: item.type)).rawValue,
             kind: kind,
             event: lead.event,
             person: lead.person,
@@ -114,8 +124,10 @@ struct ItemPageHeader: ViewModifier {
             parent: parent.map {
                 // An item with no parent can only gain one, so the pin is idle where it cannot be edited.
                 let title = $0.targets.first?.title
+                let icon = $0.targets.first?.itemID.flatMap(typeIcon(of:))
                 return PageHeader.Pin(label: title ?? $0.label, enabled: title != nil || $0.isEditable,
-                                      empty: title == nil, opensMenu: title != nil)
+                                      empty: title == nil, opensMenu: title != nil,
+                                      icon: title == nil ? nil : .init(name: icon), tone: title == nil ? nil : TypeTone(icon: icon).rawValue)
             },
             byline: lead.byline ?? PageByline(item: item, sourceName: item.source.map { library.sources.name($0) }, now: now, format: dateFormat),
             properties: properties,
@@ -128,7 +140,8 @@ struct ItemPageHeader: ViewModifier {
             propertyRejected: status.map { drafts.draft(for: item.id, key: $0.key).rejected } ?? false,
             parentRejected: parent.map { drafts.draft(for: item.id, key: $0.field).rejected } ?? false,
             interfaceTextSize: UserDefaults.standard.object(forKey: InterfaceKey.textSize) as? Int ?? InterfaceStyle.defaultTextSize,
-            titleLines: titleLines
+            titleLines: titleLines,
+            chips: .init()
         )
     }
 

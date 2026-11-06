@@ -18,9 +18,7 @@
   --separator: rgb(0 0 0 / 0.1);
   --placeholder: rgb(0 0 0 / 0.498);
   --error: rgb(255 56 60);
-  --status-orange: rgb(245 134 37);
   --status-red: rgb(255 56 60);
-  --status-green: rgb(52 199 89);
   --link: var(--inkkit-accent-color);
   /* Selected text: the accent over the page while the editor has the keyboard, and a quiet grey of the text's own
      color while the window is in the background, the header's title has the keyboard or the editor was blurred.
@@ -40,8 +38,6 @@
     --separator: rgb(255 255 255 / 0.1);
     --placeholder: rgb(255 255 255 / 0.549);
     --error: rgb(255 66 69);
-    --status-orange: rgb(255 159 10);
-    --status-green: rgb(48 209 88);
   }
 }
 
@@ -238,8 +234,7 @@ body[data-text='none'] #editor {
 }
 
 .item-title-error[hidden],
-.item-error[hidden],
-.item-pin[hidden] {
+.item-error[hidden] {
   display: none;
 }
 
@@ -256,67 +251,97 @@ body[data-text='none'] #editor {
     sans-serif;
 }
 
-.item-pins {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: calc(var(--interface-text-size) * 6 / 13);
-  max-width: 100%;
+/* Every chip, one look for each kind of value, drawn from the custom properties the app sends (`ChipLooks`,
+   `TypeTone`): the sizes and fills as `--chip-*`, and each tone's colors as `--tone-<name>`. A chip names its tone and
+   the page forwards the name; no color is chosen here. Each size is the app's value in points, scaled by
+   `--chip-scale`, the interface text size over 13, so chips follow the text size as the rest of the header does.
+   The sizes are the same for every kind, so chips side by side always line up. */
+#item-header {
+  --chip-scale: 1;
+  --c-height: calc(var(--chip-height, 22px) * var(--chip-scale));
+  --c-radius: calc(var(--chip-radius, 6px) * var(--chip-scale));
+  --c-text: calc(var(--chip-text-size, 12px) * var(--chip-scale));
+  --c-padding: calc(var(--chip-padding, 8px) * var(--chip-scale));
+  --c-gap: calc(var(--chip-gap, 5px) * var(--chip-scale));
+  --c-type-start: calc(var(--chip-type-padding-start, 6px) * var(--chip-scale));
+  --c-tag-start: calc(var(--chip-tag-padding-start, 7px) * var(--chip-scale));
+  --c-mark: calc(var(--chip-mark-size, 13px) * var(--chip-scale));
+  --c-person: calc(var(--chip-person-circle, 17px) * var(--chip-scale));
+  --c-initials: calc(var(--chip-person-initials-size, 8px) * var(--chip-scale));
+  --c-person-gap: calc(var(--chip-person-gap, 6px) * var(--chip-scale));
+  --c-dot: calc(7px * var(--chip-scale));
+  --c-ring: calc(12px * var(--chip-scale));
 }
 
-/* One shape for every pin: a quiet fill with no edge, so a pin and an item chip read as one family, and a symbol
-   in the secondary color. An empty pin has no fill to show, only a dashed edge asking to be filled. The transparent
-   1 point border keeps the size the same with and without the dashed edge. Every size is on the 4 point grid
-   (`--step`) and scales with the interface text size. */
-.item-pin {
+.item-chip {
   box-sizing: border-box;
   display: inline-flex;
+  flex: 0 1 auto;
   align-items: center;
-  gap: calc(var(--interface-text-size) * 5 / 13);
+  gap: var(--c-gap);
   max-width: 100%;
   min-width: 0;
-  height: calc(var(--interface-text-size) * 24 / 13);
+  height: var(--c-height);
   margin: 0;
-  padding: 0 calc(var(--interface-text-size) * 8 / 13);
-  border: 1px solid transparent;
-  border-radius: calc(var(--step) * 2);
-  background: var(--label-quinary);
+  padding: 0 var(--c-padding);
+  border: 0;
+  border-radius: var(--c-radius);
+  background: var(--chip-option-fill, var(--label-quinary));
   color: var(--label-primary);
   font:
-    500 calc(var(--interface-text-size) * 12 / 13) / normal -apple-system,
+    400 var(--c-text) / normal -apple-system,
     system-ui,
     sans-serif;
+  text-align: start;
+  white-space: nowrap;
   -webkit-appearance: none;
   appearance: none;
 }
 
-.item-pin-label {
+.item-chip[hidden] {
+  display: none;
+}
+
+.item-chip-text {
   overflow: hidden;
   min-width: 0;
-  white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.item-menu-pin {
-  cursor: default;
+.item-chip:focus-visible,
+.item-person:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--inkkit-accent-color) 60%, transparent);
+  outline-offset: 1px;
 }
 
-.item-menu-pin:enabled:hover {
-  background: color-mix(in srgb, var(--label-quinary) 70%, var(--label-secondary));
+/* Type, and a linked item, which reads the same: tinted in the type's color, its symbol in color. */
+.item-chip[data-kind='type'],
+.item-chip[data-kind='link'] {
+  padding-inline-start: var(--c-type-start);
+  background: var(--tone-chip);
 }
 
-.item-menu-pin.empty {
-  border: 1px dashed var(--separator);
+.item-chip-mark {
+  flex: none;
+  width: var(--c-mark);
+  height: var(--c-mark);
+  background: var(--tone);
+  -webkit-mask: center / contain no-repeat;
+  mask: center / contain no-repeat;
+}
+
+/* Status: a fine grey edge round its group's mark, and a faint fill in dark. */
+.item-chip[data-kind='status'] {
+  padding-inline-start: var(--c-type-start);
+  background: var(--chip-status-fill, transparent);
+  box-shadow: inset 0 0 0 var(--chip-status-edge-width, 0.5px) var(--chip-edge, var(--separator));
+}
+
+/* An empty pin has no value yet: a plus and a quiet edge, as the design's empty chip. */
+.item-chip.empty {
   background: transparent;
+  box-shadow: inset 0 0 0 var(--chip-status-edge-width, 0.5px) var(--chip-edge, var(--separator));
   color: var(--label-secondary);
-}
-
-.item-menu-pin.empty:enabled:hover {
-  background: var(--label-quinary);
-}
-
-.item-menu-pin:disabled {
-  opacity: 0.5;
 }
 
 .item-menu-pin:focus-visible {
@@ -324,10 +349,73 @@ body[data-text='none'] #editor {
   outline-offset: 1px;
 }
 
-/* A filled pin shows its own symbol, an empty one a plus. */
+.item-menu-pin:disabled {
+  opacity: 1;
+}
+
 .item-menu-pin.empty .item-pin-symbol,
 .item-menu-pin:not(.empty) .item-icon-plus {
   display: none;
+}
+
+/* An option: neutral, with a dot in its color. */
+.item-chip-dot {
+  flex: none;
+  width: var(--c-dot);
+  height: var(--c-dot);
+  border-radius: 50%;
+  background: var(--tone);
+}
+
+/* A tag: grey, after a number sign. */
+.item-chip[data-kind='tag'] {
+  padding-inline-start: var(--c-tag-start);
+  background: var(--chip-tag-fill, var(--label-quinary));
+}
+
+.item-chip-hash {
+  margin-inline-end: calc(var(--chip-scale) * -2px);
+  color: var(--label-secondary);
+}
+
+/* A person: one or two initials in a pale circle, then the name. No chip round it. */
+.item-person {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: var(--c-person-gap);
+  max-width: 100%;
+  min-width: 0;
+  height: var(--c-height);
+  margin: 0;
+  padding: 0 calc(var(--chip-scale) * 2px) 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--label-primary);
+  font:
+    400 var(--c-text) / normal -apple-system,
+    system-ui,
+    sans-serif;
+  white-space: nowrap;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.item-person-initials {
+  box-sizing: border-box;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--c-person);
+  height: var(--c-person);
+  border-radius: 50%;
+  background: var(--chip-option-fill, var(--label-quinary));
+  box-shadow: inset 0 0 0 var(--chip-status-edge-width, 0.5px) var(--chip-edge, var(--separator));
+  color: var(--label-secondary);
+  font-size: var(--c-initials);
+  font-weight: 500;
+  letter-spacing: 0;
 }
 
 .item-pin-icon {
@@ -337,13 +425,6 @@ body[data-text='none'] #editor {
   mask: center / contain no-repeat;
 }
 
-.item-icon-parent {
-  width: var(--icon-parent-width, 1em);
-  height: var(--icon-parent-height, 1em);
-  -webkit-mask-image: var(--icon-parent);
-  mask-image: var(--icon-parent);
-}
-
 .item-icon-plus {
   width: var(--icon-plus-width, 1em);
   height: var(--icon-plus-height, 1em);
@@ -351,42 +432,31 @@ body[data-text='none'] #editor {
   mask-image: var(--icon-plus);
 }
 
+/* The chevron of a chip that opens a menu. A chip the person cannot change has none. */
 .item-icon-indicator {
   width: var(--icon-indicator-width, 0.6em);
   height: var(--icon-indicator-height, 0.6em);
+  opacity: var(--chip-chevron-opacity, 0.5);
   -webkit-mask-image: var(--icon-indicator);
   mask-image: var(--icon-indicator);
 }
 
-.item-menu-pin.direct .item-icon-indicator {
+.item-menu-pin.direct .item-icon-indicator,
+.item-menu-pin:disabled .item-icon-indicator,
+.item-menu-pin[data-kind='link'] .item-icon-indicator {
   display: none;
 }
 
-/* The status mark: a ring in the status's color, with half or all of it filled. */
+/* The status mark: a ring in the group's color, with half or all of it filled, or a slash across it. */
 .item-status-mark {
   --mark: var(--label-secondary);
+  position: relative;
   flex: none;
   box-sizing: border-box;
-  width: calc(var(--interface-text-size) * 12 / 13);
-  height: calc(var(--interface-text-size) * 12 / 13);
-  border: 1.5px solid var(--mark);
+  width: var(--c-ring);
+  height: var(--c-ring);
+  border: calc(var(--chip-scale) * 1.5px) solid var(--mark);
   border-radius: 50%;
-}
-
-.item-status-mark[data-tone='orange'] {
-  --mark: var(--status-orange);
-}
-
-.item-status-mark[data-tone='red'] {
-  --mark: var(--status-red);
-}
-
-.item-status-mark[data-tone='green'] {
-  --mark: var(--status-green);
-}
-
-.item-status-mark[data-tone='grey'] {
-  --mark: var(--label-secondary);
 }
 
 .item-status-mark[data-fill='half'] {
@@ -397,14 +467,24 @@ body[data-text='none'] #editor {
   background: var(--mark);
 }
 
+.item-status-mark[data-fill='slash']::after {
+  content: '';
+  position: absolute;
+  inset-inline: calc(var(--chip-scale) * 1px);
+  top: 50%;
+  height: calc(var(--chip-scale) * 1.5px);
+  margin-top: calc(var(--chip-scale) * -0.75px);
+  background: var(--mark);
+  transform: rotate(-45deg);
+}
+
 /* The caret and selection show text focus; embedded controls keep their keyboard rings. */
 .inkkit-root .ProseMirror:focus-visible,
 .inkkit-root .inkkit-plain:focus-visible {
   outline: none;
 }
 
-/* The byline: the type with its icon, who made the item and when, as one quiet line under the title. The type is
-   plain text here rather than an outlined pin. */
+/* The byline: the type as a chip, then who made the item and when, as one quiet line under the title. */
 #item-header {
   /* One step of the header's 4 point grid, scaled with the interface's text size. */
   --step: calc(var(--interface-text-size) * 4 / 13);
@@ -418,15 +498,6 @@ body[data-text='none'] #editor {
   margin-top: calc(var(--step) * -1);
   color: var(--label-secondary);
   font-size: calc(var(--interface-text-size) * 13 / 13);
-}
-
-.item-byline .item-pin {
-  height: auto;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
 }
 
 .item-byline-dot {
@@ -505,7 +576,7 @@ body[data-text='none'] #editor {
    column. Each value shrinks to the column and breaks inside itself. A tag keeps its fixed height. A first layout at
    no width breaks it after every character, which is why the header is drawn again once the page has a width. An item
    chip has a fixed height too, and its own `max-width` and ellipsis keep it inside the column. */
-.item-prop-value > :not(.item-chip, .item-link-chip) {
+.item-prop-value > :not(.item-chip, .item-person) {
   min-width: 0;
 }
 
@@ -532,57 +603,6 @@ body[data-text='none'] #editor {
 
 .item-link:hover {
   text-decoration: underline;
-}
-
-.item-chip {
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  height: calc(var(--step) * 5);
-  padding: 0 calc(var(--step) * 2);
-  border-radius: calc(var(--step) * 2);
-  background: var(--label-quinary);
-  color: var(--label-secondary);
-  font-size: calc(var(--interface-text-size) * 12 / 13);
-}
-
-/* An item a row links to is a chip in the pins' shape: the same height, fill, radius and type, the icon of its type
-   before its title in the primary color, and a small arrow where a menu pin has its chevron. */
-.item-link-chip {
-  box-sizing: border-box;
-  display: inline-flex;
-  align-items: center;
-  gap: calc(var(--interface-text-size) * 5 / 13);
-  max-width: 100%;
-  height: calc(var(--interface-text-size) * 24 / 13);
-  padding: 0 calc(var(--interface-text-size) * 8 / 13);
-  border: 1px solid transparent;
-  border-radius: calc(var(--step) * 2);
-  background: var(--label-quinary);
-  color: var(--label-primary);
-  font:
-    500 calc(var(--interface-text-size) * 12 / 13) / normal -apple-system,
-    system-ui,
-    sans-serif;
-}
-
-.item-link-chip::after {
-  content: '\2197';
-  flex: none;
-  color: var(--label-secondary);
-  font-size: calc(var(--interface-text-size) * 10 / 13);
-}
-
-.item-link-chip:hover {
-  background: color-mix(in srgb, var(--label-quinary) 70%, var(--label-secondary));
-  text-decoration: none;
-}
-
-.item-link-text {
-  overflow: hidden;
-  min-width: 0;
-  white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 .item-more {
