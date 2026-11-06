@@ -2,7 +2,7 @@ import Foundation
 
 /// What a type's page can be customized for: the choices of `PagePlacements` reach the property block and
 /// Linked From, which only some items draw.
-enum PageCustomization {
+nonisolated enum PageCustomization {
     /// Whether choosing what the page shows means anything for `item`.
     static func isAvailable(for item: Item?) -> Bool {
         item.map { !$0.isFile } ?? false

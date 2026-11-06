@@ -312,6 +312,29 @@ struct PagePlacementsTests {
         #expect(placements.rawValue == old, "written back as it was read")
     }
 
+    @Test func aChoiceSavedBeforeOrderingStillReadsAndAnOrderRoundTrips() throws {
+        let old = ##"{"aic.ticket":{"pins":["#type"],"rows":{"repo":false}}}"##
+        let placements = try #require(PagePlacements(rawValue: old))
+        #expect(placements.choices["aic.ticket"]?.rowOrder == nil)
+        #expect(placements.rawValue == old, "written back as it was read")
+
+        var ordered = placements
+        ordered.setRowOrder(["repo", "#tags", "repo"], of: Self.ticket)
+        #expect(ordered.choices["aic.ticket"]?.rowOrder == ["repo", "#tags"], "each row once")
+        #expect(PagePlacements(rawValue: ordered.rawValue) == ordered)
+        ordered.setRowOrder(nil, of: Self.ticket)
+        #expect(ordered == placements)
+    }
+
+    @Test func thePropertyBlockFollowsTheChosenOrderAndRowsNotNamedKeepTheirOrderAfterIt() {
+        func row(_ id: String) -> PropertyRow { PropertyRow(id: id, label: id, value: .text(id)) }
+        let candidates = ["a", "b", "c", "d"].map(row)
+        var placements = PagePlacements()
+        placements.setRowOrder(["c", "gone", "a"], of: Self.task)
+        let placement = placements.placement(of: Self.task, in: Self.catalogue)
+        #expect(PropertyRow.block(candidates, placement: placement).map(\.id) == ["c", "a", "b", "d"])
+    }
+
     @Test func noPinsIsAChoiceThatSurvivesStorage() throws {
         var placements = PagePlacements()
         placements.setPins([], of: Self.task)
