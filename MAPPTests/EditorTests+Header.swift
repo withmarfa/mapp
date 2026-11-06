@@ -12,11 +12,11 @@ extension EditorTests {
     static func header(_ title: String, id: ItemID = ItemID("note"), hidden: Bool = false) -> PageHeader {
         PageHeader(item: id.rawValue, hidden: hidden, title: title, draft: nil, titleRejected: false,
                    titleRefusal: "The title could not be saved.", editable: true,
-                   type: "Task", icon: .init(name: "lucide:list-checks"), kind: .general, event: nil, person: nil, subtitle: nil, status: .init(label: "In Progress", enabled: true),
+                   type: "Task", icon: .init(name: "lucide:list-checks"), typeTone: "blue", kind: .general, event: nil, person: nil, subtitle: nil, status: .init(label: "In Progress", enabled: true),
                    parent: .init(label: "Field Research", enabled: true),
                    byline: PageByline(source: "Marfa", date: "Yesterday"),
                    properties: [PropertyRow(id: "status", label: "Status", value: .status), PropertyRow(id: "child-of", label: "Parent", value: .parent)],
-                   contents: [], linked: [], showsText: true, showMore: "Show 0 More", showMoreContents: "Show 0 More", showMoreLinked: "Show 0 More", propertyRejected: false, parentRejected: false, interfaceTextSize: 13, titleLines: 2)
+                   contents: [], linked: [], showsText: true, showMore: "Show 0 More", showMoreContents: "Show 0 More", showMoreLinked: "Show 0 More", propertyRejected: false, parentRejected: false, interfaceTextSize: 13, titleLines: 2, chips: .init(looks: .defaults))
     }
 
     static func json(_ value: some Encodable) -> String {

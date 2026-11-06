@@ -248,10 +248,10 @@ struct StatusMark: View {
 
     private var color: Color {
         switch mark.tone {
-        case .orange: .orange
+        case .blue: .blue
         case .red: .red
         case .green: .green
-        case .grey, .neutral: Color.secondary
+        case .gray, .neutral: Color.secondary
         }
     }
 
@@ -262,6 +262,7 @@ struct StatusMark: View {
                 case .none: EmptyView()
                 case .full: Circle().fill(color)
                 case .half: Circle().fill(color).mask(alignment: .leading) { Rectangle().frame(width: size / 2) }
+                case .slash: Capsule().fill(color).frame(width: size - 2, height: 1.5).rotationEffect(.degrees(-45))
                 }
             }
             .frame(width: size, height: size)

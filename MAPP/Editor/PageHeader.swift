@@ -5,11 +5,12 @@ import SwiftUI
 /// What the page's item header shows: the item's title, or the person's unsaved draft of it, and its pinned
 /// properties. The page draws it above the note so the two scroll as one surface; what it does stays native.
 nonisolated struct PageHeader: Encodable, Equatable, Sendable {
-    /// A status's ring: its color and how much of it is filled. The catalogue holds neither, so they follow the
-    /// group the type puts it in, and a status no group claims gets the plain ring.
+    /// A status's ring: its color and how it is filled. The catalogue holds neither, so they follow the group the
+    /// type puts it in, and a status no group claims gets the plain ring. A tone is one of `TypeTone`'s names, or
+    /// `neutral` for the ring in the text's own color.
     struct Mark: Encodable, Equatable, Sendable {
-        enum Tone: String, Encodable, Sendable { case neutral, orange, red, green, grey }
-        enum Fill: String, Encodable, Sendable { case none, half, full }
+        enum Tone: String, Encodable, Sendable { case neutral, blue, green, red, gray }
+        enum Fill: String, Encodable, Sendable { case none, half, full, slash }
         var tone: Tone
         var fill: Fill
 
@@ -20,9 +21,9 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
 
         init(group: StatusGroup?) {
             switch group {
-            case .inProgress: self.init(tone: .orange, fill: .half)
+            case .inProgress: self.init(tone: .blue, fill: .half)
             case .completed: self.init(tone: .green, fill: .full)
-            case .canceled: self.init(tone: .grey, fill: .full)
+            case .canceled: self.init(tone: .gray, fill: .slash)
             case .notStarted, nil: self.init(tone: .neutral, fill: .none)
             }
         }
@@ -35,7 +36,34 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
         var enabled: Bool
         var empty = false
         var opensMenu = true
+        /// Only the status pin has a mark.
         var mark: Mark?
+        /// Only the parent pin has these: the parent's type icon and the tone of its chip, as a linked item's has.
+        var icon: TypeIconRef?
+        var tone: String?
+    }
+
+    /// Every chip look as CSS custom properties for the page, resolved for light and for dark so an appearance
+    /// change needs no resend: the sizes and fills (`ChipLooks.cssVariables`) and each tone's colors as
+    /// `--tone-<name>`, `--tone-<name>-mark` and `--tone-<name>-chip`. A chip names its tone and the page forwards the name.
+    struct ChipStyle: Encodable, Equatable, Sendable {
+        var light: [String: String]
+        var dark: [String: String]
+
+        @MainActor
+        init(looks: ChipLooks = .current) {
+            func variables(dark: Bool) -> [String: String] {
+                var all = ChipLooks.cssVariables(dark: dark, looks: looks)
+                for tone in TypeTone.allCases {
+                    for (name, value) in TypeTone.cssColors(for: tone, dark: dark, looks: looks) {
+                        all["--tone-\(tone.rawValue)\(name.dropFirst("--tone".count))"] = value
+                    }
+                }
+                return all
+            }
+            light = variables(dark: false)
+            dark = variables(dark: true)
+        }
     }
 
     /// A type's icon as the page names it among the images the app sends (`TypeIconKey`), and the Iconify ID the app
@@ -61,8 +89,9 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     /// False where the item is titled by the first line of its text, which the page already shows as its text.
     var showsTitle = true
     var type: String?
-    /// The icon of the item's type, drawn before its name.
+    /// The icon of the item's type, drawn before its name, and the tone of the type's chip.
     var icon: TypeIconRef
+    var typeTone: String
     /// Which header the page draws, chosen from the core type the item's type builds on.
     var kind: PageHeaderKind
     var event: EventHeader?
@@ -91,22 +120,47 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     var interfaceTextSize: Int
     /// How many lines the title shows before an ellipsis cuts it, while it is not being edited.
     var titleLines: Int
+    var chips: ChipStyle
 
     /// The icons of the types the header names, which the page draws as images.
     var typeIconNames: Set<String?> {
         var names: Set<String?> = [icon.name]
         names.formUnion((contents + linked).map(\.icon))
+        if let parent = parent?.icon { names.insert(parent.name) }
         for case .items(let targets) in properties.map(\.value) { names.formUnion(targets.map(\.icon)) }
         return names
     }
 }
 
 extension PropertyRow: Encodable {
-    private enum Key: String, CodingKey { case id, label, symbol, kind, text, texts, items }
+    private enum Key: String, CodingKey { case id, label, symbol, kind, text, texts, items, options, people }
+    /// What the page draws of an item a row links to: a type chip in the item's own tone, or a person's initials and
+    /// name. The tone is one of `TypeTone`'s names; the page never picks a color.
     private struct Link: Encodable {
         let title: String
         let item: String
         let symbol: String
+        let kind: String
+        let tone: String?
+        let initials: String?
+
+        init(_ target: Target) {
+            title = target.title
+            item = target.item.rawValue
+            symbol = TypeIconKey.value(for: target.icon)
+            kind = target.kind.rawValue
+            tone = target.kind == .link ? TypeTone(icon: target.icon).rawValue : nil
+            initials = target.kind == .person ? PersonInitials.of(target.title) : nil
+        }
+    }
+    /// A person a list names: initials and a name, with no item to open.
+    private struct Listed: Encodable {
+        let title: String
+        let initials: String?
+    }
+    private struct Option: Encodable {
+        let label: String
+        let tone: String
     }
 
     func encode(to encoder: any Encoder) throws {
@@ -119,7 +173,13 @@ extension PropertyRow: Encodable {
         case .parent: try container.encode("parent", forKey: .kind)
         case .items(let targets):
             try container.encode("items", forKey: .kind)
-            try container.encode(targets.map { Link(title: $0.title, item: $0.item.rawValue, symbol: TypeIconKey.value(for: $0.icon)) }, forKey: .items)
+            try container.encode(targets.map(Link.init), forKey: .items)
+        case .people(let names):
+            try container.encode("people", forKey: .kind)
+            try container.encode(names.map { Listed(title: $0, initials: PersonInitials.of($0)) }, forKey: .people)
+        case .options(let options):
+            try container.encode("options", forKey: .kind)
+            try container.encode(options.map { Option(label: $0, tone: OptionTone.tone(for: $0).rawValue) }, forKey: .options)
         case .tags(let tags):
             try container.encode("tags", forKey: .kind)
             try container.encode(tags, forKey: .texts)
@@ -156,8 +216,8 @@ enum PageHeaderEvent {
     case hideFromPage(row: String, ItemID)
 }
 
-/// SF Symbols the header's pins show, drawn here because the page cannot draw them itself. The page uses each
-/// as a mask, so it takes the pin's secondary color in light and dark.
+/// SF Symbols the header shows, drawn here because the page cannot draw them itself. The page uses each as a mask,
+/// so it takes the color of the text or the chip it is in.
 nonisolated struct PageHeaderIcons: Encodable, Sendable {
     struct Icon: Encodable, Sendable {
         var url: String
@@ -165,7 +225,6 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
         var height: Double
     }
 
-    var parent: Icon
     var plus: Icon
     var indicator: Icon
     /// The symbols of the property rows by SF Symbol name, and the icons of the types by `TypeIconKey`.
@@ -180,11 +239,9 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
     init?(textSize: Int, typeIcons: Set<String?>) {
         let size = 13 * InterfaceStyle.scale(for: textSize)
         if Self.drawn.textSize != textSize { Self.drawn = Drawn(textSize: textSize) }
-        guard let parent = Self.symbol("square.stack", size: size, weight: .regular),
-              let plus = Self.symbol("plus", size: size, weight: .regular),
+        guard let plus = Self.symbol("plus", size: size, weight: .regular),
               let indicator = Self.symbol("chevron.down", size: size * 0.7, weight: .bold)
         else { return nil }
-        self.parent = parent
         self.plus = plus
         self.indicator = indicator
         var symbols: [String: Icon] = [:]

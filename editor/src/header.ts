@@ -1,8 +1,17 @@
 import { openLink, postToHost } from './bridge'
 
-/** How a status pin draws its mark: the color the status carries and how much of the ring it fills. */
-export type HeaderTone = 'neutral' | 'orange' | 'red' | 'green' | 'grey'
-export type HeaderFill = 'none' | 'half' | 'full'
+/** How a status pin draws its mark: the color the status carries (a tone's name, or `neutral` for the text's own
+ *  color) and how the ring is filled. */
+export type HeaderTone = 'neutral' | 'blue' | 'red' | 'green' | 'gray'
+export type HeaderFill = 'none' | 'half' | 'full' | 'slash'
+
+/** Every chip look as CSS custom properties, resolved by the app for light and for dark: the sizes and fills
+ *  (`--chip-*`) and each tone's colors (`--tone-<name>`, `--tone-<name>-mark`, `--tone-<name>-chip`). The page applies
+ *  the set for the appearance it is in and never picks a color or a size of its own. */
+export interface HeaderChipStyle {
+  light: Record<string, string>
+  dark: Record<string, string>
+}
 
 /** A pin under the title. An empty pin has no value yet and shows a plus in place of its symbol. */
 export interface HeaderPin {
@@ -13,6 +22,28 @@ export interface HeaderPin {
   opensMenu: boolean
   /** Only the status pin has a mark. */
   mark?: { tone: HeaderTone; fill: HeaderFill }
+  /** Only the parent pin has these: the parent's type icon, a key of `HeaderIcons.symbols`, and its tone's name. */
+  icon?: string | null
+  tone?: string | null
+}
+
+/** An item a row links to: drawn as a chip of its type in the item's own tone, or, for a person, as initials and the
+ *  name. The app chooses the kind and the tone. */
+export interface HeaderItem {
+  title: string
+  item: string
+  symbol: string
+  kind: 'link' | 'person'
+  tone?: string | null
+  /** A person's initials; absent where the name has none, so no empty circle is drawn. */
+  initials?: string | null
+}
+
+/** A person a list names (an assignee, an attendee): initials and a name, with no item behind them to open. */
+export interface HeaderListedPerson {
+  title: string
+  /** Absent where the name has no letters, so no empty circle is drawn. */
+  initials?: string | null
 }
 
 /** One row of the property block. The status and parent rows hold the header's own pins, which keep their
@@ -22,10 +53,25 @@ export interface HeaderRow {
   label: string
   /** The SF Symbol name of the row's icon, a key of `HeaderIcons.symbols`. */
   symbol: string
-  kind: 'status' | 'parent' | 'items' | 'tags' | 'date' | 'url' | 'email' | 'phone' | 'text'
+  kind:
+    | 'status'
+    | 'parent'
+    | 'items'
+    | 'people'
+    | 'options'
+    | 'tags'
+    | 'date'
+    | 'url'
+    | 'email'
+    | 'phone'
+    | 'text'
   text?: string
+  /** A tag's words, each after a number sign. */
   texts?: string[]
-  items?: { title: string; item: string; symbol: string }[]
+  /** A choice or a list of words, each with the tone of its dot. */
+  options?: { label: string; tone: string }[]
+  items?: HeaderItem[]
+  people?: HeaderListedPerson[]
 }
 
 /** An item that links to the one on the page. */
@@ -93,8 +139,10 @@ export interface HeaderModel {
    *  from a type. */
   showsTitle?: boolean
   type: string | null
-  /** The key of the type's icon in `HeaderIcons.symbols`, drawn before the type's name. */
+  /** The key of the type's icon in `HeaderIcons.symbols`, drawn before the type's name, and the name of the tone the
+   *  type's chip takes. */
   icon?: string | null
+  typeTone?: string
   kind: HeaderKind
   event?: HeaderEvent | null
   person?: HeaderPerson | null
@@ -128,6 +176,7 @@ export interface HeaderModel {
   interfaceTextSize: number
   /** How many lines the title shows before an ellipsis cuts it, while it is not being edited. */
   titleLines: number
+  chips?: HeaderChipStyle
 }
 
 /** A symbol the app drew, as an image the page uses as a mask so it takes the text's color. */
@@ -138,7 +187,6 @@ export interface HeaderIcon {
 }
 
 export interface HeaderIcons {
-  parent: HeaderIcon
   plus: HeaderIcon
   indicator: HeaderIcon
   /** The symbols of the property rows and of the types, by SF Symbol name. */
@@ -191,6 +239,27 @@ function element<K extends keyof HTMLElementTagNameMap>(
   node.className = className
   parent?.append(node)
   return node
+}
+
+/** Gives a chip the tone the app named, from the custom properties the app sent (`--tone-<name>`); the page chooses no
+ *  color. A name that is not a word leaves the chip with no tone. */
+function useTone(node: HTMLElement, name: string | null | undefined) {
+  const tones = ['--tone', '--tone-mark', '--tone-chip']
+  if (!name || !/^[a-z]+$/.test(name)) {
+    for (const property of tones) node.style.removeProperty(property)
+    return
+  }
+  node.style.setProperty('--tone', `var(--tone-${name})`)
+  node.style.setProperty('--tone-mark', `var(--tone-${name}-mark)`)
+  node.style.setProperty('--tone-chip', `var(--tone-${name}-chip)`)
+}
+
+/** A symbol the app drew, as a mask in the tone's color. */
+function maskSymbol(node: HTMLElement, icon: HeaderIcon | undefined) {
+  node.hidden = !icon
+  if (!icon) return
+  node.style.setProperty('-webkit-mask-image', `url("${icon.url}")`)
+  node.style.maskImage = `url("${icon.url}")`
 }
 
 function moreButton(parent: HTMLElement, action: () => void): HTMLButtonElement {
@@ -354,14 +423,15 @@ export class ItemHeader {
       if (this.model) postToHost({ type: 'titleDiscard', item: this.model.item })
     })
     this.byline = element('div', 'item-byline', root)
-    this.typePin = element('span', 'item-pin', this.byline)
+    this.typePin = element('span', 'item-pin item-chip', this.byline)
     this.typePin.id = 'ItemTypePin'
+    this.typePin.dataset.kind = 'type'
     this.typePin.title = this.labels.itemType
-    element('span', 'item-pin-icon item-icon-type', this.typePin).setAttribute(
+    element('span', 'item-chip-mark item-icon-type', this.typePin).setAttribute(
       'aria-hidden',
       'true',
     )
-    element('span', 'item-pin-label', this.typePin)
+    element('span', 'item-pin-label item-chip-text', this.typePin)
     this.when = element('div', 'item-when', root)
     const pins = document.createElement('div')
     this.statusPin = this.menuPin('ItemStatusPin', 'status', pins)
@@ -447,6 +517,9 @@ export class ItemHeader {
     // The app sends the header before the window has sized the page. WebKit keeps the row heights of that first
     // layout at no width, where a shrinking value breaks after every character, so the rows are drawn anew once the
     // page has a width.
+    window
+      .matchMedia?.('(prefers-color-scheme: dark)')
+      .addEventListener?.('change', () => this.applyChips())
     let width = window.innerWidth
     window.addEventListener('resize', () => {
       const had = width
@@ -511,6 +584,7 @@ export class ItemHeader {
     this.root.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)
     this.footer.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)
     this.root.style.setProperty('--title-lines', String(model.titleLines))
+    this.applyChips()
     document.body.dataset.text = model.showsText ? 'shown' : 'none'
     this.root.dataset.kind = model.kind
     document.body.dataset.header = model.hidden ? 'general' : model.kind
@@ -531,6 +605,7 @@ export class ItemHeader {
     this.parentError.hidden = !model.parentRejected
     this.typePin.hidden = model.type == null
     this.typePin.querySelector('.item-pin-label')!.textContent = model.type ?? ''
+    useTone(this.typePin, model.typeTone)
     this.drawTypeIcon()
     this.showPin(this.statusPin, model.status)
     this.showPin(this.parentPin, model.parent)
@@ -574,11 +649,25 @@ export class ItemHeader {
     selection.addRange(range)
   }
 
+  /** Sets the chip looks the app sent for the appearance the page is in, on the header and the footer, with the scale
+   *  that follows the interface's text size. A tone or size the app changes reaches an open page this way. */
+  private applyChips() {
+    const model = this.model
+    if (!model) return
+    const dark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
+    const looks = (dark ? model.chips?.dark : model.chips?.light) ?? {}
+    for (const node of [this.root, this.footer]) {
+      for (const [name, value] of Object.entries(looks)) node.style.setProperty(name, value)
+    }
+    this.root.style.setProperty('--chip-scale', String(model.interfaceTextSize / 13))
+  }
+
   setIcons(icons: HeaderIcons) {
     const style = this.root.style
     const footerStyle = this.footer.style
     this.symbols = icons.symbols ?? {}
     this.drawTypeIcon()
+    this.drawParentIcon()
     this.drawn = ''
     this.redraw()
     for (const [name, icon] of Object.entries(icons) as [keyof HeaderIcons, HeaderIcon][]) {
@@ -595,13 +684,16 @@ export class ItemHeader {
   /** The icon of the item's type before its name, in the secondary color; none for a type the app drew nothing for. */
   private drawTypeIcon() {
     const node = this.typePin.querySelector<HTMLElement>('.item-icon-type')!
-    const icon = this.model?.icon ? this.symbols[this.model.icon] : undefined
-    node.hidden = !icon
-    if (!icon) return
-    node.style.width = `${icon.width}px`
-    node.style.height = `${icon.height}px`
-    node.style.setProperty('-webkit-mask-image', `url("${icon.url}")`)
-    node.style.maskImage = `url("${icon.url}")`
+    maskSymbol(node, this.model?.icon ? this.symbols[this.model.icon] : undefined)
+  }
+
+  /** The parent chip's symbol is the icon of the parent's own type. */
+  private drawParentIcon() {
+    const icon = this.model?.parent?.icon
+    maskSymbol(
+      this.parentPin.querySelector<HTMLElement>('.item-icon-parent')!,
+      icon ? this.symbols[icon] : undefined,
+    )
   }
 
   /** The person's draft where there is one, otherwise the saved title; never while they are typing it. */
@@ -623,23 +715,33 @@ export class ItemHeader {
     // The status ring is drawn here, from the tone and fill the app chose, since the catalogue holds no colors.
     const mark = pin.querySelector<HTMLElement>('.item-status-mark')
     if (mark) {
-      mark.dataset.tone = model?.mark?.tone ?? 'neutral'
+      const tone = model?.mark?.tone ?? 'neutral'
+      mark.dataset.tone = tone
       mark.dataset.fill = model?.mark?.fill ?? 'none'
+      if (tone !== 'neutral' && /^[a-z]+$/.test(tone))
+        mark.style.setProperty('--mark', `var(--tone-${tone})`)
+      else mark.style.removeProperty('--mark')
+    }
+    if (pin === this.parentPin) {
+      useTone(pin, model?.tone)
+      this.drawParentIcon()
     }
   }
 
   private menuPin(id: string, menu: HeaderMenu, parent: HTMLElement): HTMLButtonElement {
-    const pin = element('button', 'item-pin item-menu-pin', parent)
+    const pin = element('button', 'item-pin item-chip item-menu-pin', parent)
     pin.type = 'button'
     pin.id = id
+    // The status is a status chip; the parent is a linked item and looks like one.
+    pin.dataset.kind = menu === 'status' ? 'status' : 'link'
     // An empty pin shows a plus where a filled one shows its symbol.
     const symbol =
       menu === 'status'
         ? element('span', 'item-pin-symbol item-status-mark', pin)
-        : element('span', 'item-pin-symbol item-pin-icon item-icon-parent', pin)
+        : element('span', 'item-pin-symbol item-chip-mark item-icon-parent', pin)
     symbol.setAttribute('aria-hidden', 'true')
     element('span', 'item-pin-icon item-icon-plus', pin).setAttribute('aria-hidden', 'true')
-    element('span', 'item-pin-label', pin)
+    element('span', 'item-pin-label item-chip-text', pin)
     element('span', 'item-pin-icon item-icon-indicator', pin).setAttribute('aria-hidden', 'true')
     // A native pop-up button opens as the mouse goes down, and from the keyboard on Space or Return.
     pin.addEventListener('pointerdown', (event) => {
@@ -671,31 +773,70 @@ export class ItemHeader {
     node.style.maskImage = `url("${icon.url}")`
   }
 
-  private link(
-    parent: HTMLElement,
-    text: string,
-    open: () => void,
-    href?: string,
-    symbol?: string,
-  ): void {
-    const link = element(
-      href ? 'a' : 'button',
-      symbol ? 'item-link item-link-chip' : 'item-link',
-      parent,
-    )
-    if (symbol) {
-      this.glyph(symbol, link)
-      element('span', 'item-link-text', link).textContent = text
-    } else link.textContent = text
-    if (link instanceof HTMLButtonElement) link.type = 'button'
-    else {
-      link.href = href!
-      link.setAttribute('role', 'link')
-    }
+  /** An address or number as plain text that opens it, in the link color. */
+  private link(parent: HTMLElement, text: string, open: () => void, href: string): void {
+    const link = element('a', 'item-link', parent)
+    link.textContent = text
+    link.href = href
+    link.setAttribute('role', 'link')
     link.addEventListener('click', (event) => {
       event.preventDefault()
       open()
     })
+  }
+
+  /** A chip of one kind of value. The text is set as text, never as markup. */
+  private chip(parent: HTMLElement, kind: string, text: string, tone?: string | null) {
+    const chip = element('span', 'item-chip', parent)
+    chip.dataset.kind = kind
+    useTone(chip, tone)
+    if (kind === 'option')
+      element('span', 'item-chip-dot', chip).setAttribute('aria-hidden', 'true')
+    if (kind === 'tag') {
+      element('span', 'item-chip-hash', chip).textContent = '#'
+      chip.lastElementChild!.setAttribute('aria-hidden', 'true')
+    }
+    element('span', 'item-chip-text', chip).textContent = text
+    return chip
+  }
+
+  /** A person's initials and name. The name is set as text, never as markup. */
+  private person<T extends 'button' | 'span'>(
+    parent: HTMLElement,
+    tag: T,
+    target: { title: string; initials?: string | null },
+  ) {
+    const person = element(tag, 'item-person', parent)
+    // A name with no letters has no circle, not an empty one.
+    if (target.initials) {
+      element('span', 'item-person-initials', person).textContent = target.initials
+      person.firstElementChild!.setAttribute('aria-hidden', 'true')
+    }
+    element('span', 'item-chip-text', person).textContent = target.title
+    return person
+  }
+
+  /** An item a row links to: a chip of its type in its own tone, or a person's initials and name. */
+  private linkedItem(parent: HTMLElement, target: HeaderItem) {
+    const open = () => postToHost({ type: 'openItem', item: target.item })
+    if (target.kind === 'person') {
+      const person = this.person(parent, 'button', target)
+      person.type = 'button'
+      person.addEventListener('click', open)
+      return
+    }
+    const link = element('button', 'item-chip', parent)
+    link.type = 'button'
+    link.dataset.kind = 'link'
+    useTone(link, target.tone)
+    const symbol = this.symbols[target.symbol]
+    if (symbol) {
+      const mark = element('span', 'item-chip-mark', link)
+      mark.setAttribute('aria-hidden', 'true')
+      maskSymbol(mark, symbol)
+    }
+    element('span', 'item-chip-text', link).textContent = target.title
+    link.addEventListener('click', open)
   }
 
   /** Draws the byline, the property block and the linked items from the model. */
@@ -803,17 +944,17 @@ export class ItemHeader {
         if (model.parent) value.append(this.parentPin)
         break
       case 'items':
-        for (const target of row.items ?? [])
-          this.link(
-            value,
-            target.title,
-            () => postToHost({ type: 'openItem', item: target.item }),
-            undefined,
-            target.symbol,
-          )
+        for (const target of row.items ?? []) this.linkedItem(value, target)
+        break
+      case 'people':
+        for (const person of row.people ?? []) this.person(value, 'span', person)
+        break
+      case 'options':
+        for (const option of row.options ?? [])
+          this.chip(value, 'option', option.label, option.tone)
         break
       case 'tags':
-        for (const tag of row.texts ?? []) element('span', 'item-chip', value).textContent = tag
+        for (const tag of row.texts ?? []) this.chip(value, 'tag', tag)
         break
       case 'url': {
         const href = row.text ?? ''

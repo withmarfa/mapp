@@ -11,6 +11,10 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         let item: ItemID
         /// The icon of the item's type, an Iconify ID, which the page draws before the title.
         var icon: String?
+        var kind: Kind = .link
+
+        /// How the page draws the item: as its type does (a type mark and tint), or as a person (initials, then the name).
+        enum Kind: String, Hashable, Sendable { case link, person }
     }
 
     enum Value: Hashable, Sendable {
@@ -19,6 +23,11 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         /// The parent pin, drawn the same way.
         case parent
         case items([Target])
+        /// The entries of a list of people, each by the name it goes by (`ListShape.personName`), drawn as the person chip.
+        case people([String])
+        /// A choice, or a list of words a field holds, such as labels: each drawn with a dot of its own color.
+        case options([String])
+        /// The item's own tags, each drawn after a `#`.
         case tags([String])
         /// A date or datetime as a person reads it.
         case date(String)
@@ -36,6 +45,8 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
             case .status: "circle.dotted"
             case .parent: "square.stack"
             case .items: "link"
+            case .people: "person.2"
+            case .options: "list.bullet"
             case .tags: "tag"
             case .date: "calendar"
             case .url: "globe"
@@ -47,7 +58,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         }
 
         /// Every symbol a row can show, for a page that draws them as images.
-        static let symbols = ["circle.dotted", "square.stack", "link", "tag", "calendar", "globe", "envelope", "phone", "checkmark.square", "text.alignleft"]
+        static let symbols = ["circle.dotted", "square.stack", "link", "tag", "calendar", "globe", "envelope", "phone", "checkmark.square", "text.alignleft", "list.bullet", "person.2"]
     }
 
     let id: String
@@ -77,7 +88,8 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// it has a value.
     static func rows(
         of item: Item, type: ItemTypeInfo?, hidden: Set<String>, relationships: [ItemRelationship], parentField: String, format: DateFormat,
-        tags: [String], placement: PagePlacement = .standard, icon: (ItemID) -> String? = { _ in nil }
+        tags: [String], placement: PagePlacement = .standard, icon: (ItemID) -> String? = { _ in nil },
+        isPerson: (ItemID) -> Bool = { _ in false }
     ) -> [PropertyRow] {
         var rows: [PropertyRow] = []
         let parent = relationships.contains { $0.field == parentField && !$0.targets.isEmpty }
@@ -97,7 +109,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         where !relationship.field.hasPrefix("inverse:") && relationship.field != parentField && placement.showsOnPage(relationship.field) {
             let targets = relationship.targets.compactMap { target -> Target? in
                 guard target.isOpenable, !target.isDeleted, let id = target.itemID else { return nil }
-                return Target(title: target.title, item: id, icon: icon(id))
+                return Target(title: target.title, item: id, icon: icon(id), kind: isPerson(id) ? .person : .link)
             }
             if !targets.isEmpty {
                 rows.append(PropertyRow(id: relationship.field, label: relationship.label, value: .items(targets)))
@@ -125,13 +137,17 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         guard let stored = item.value(of: field.key), InspectorFields.hasValue(stored) else { return nil }
         switch (field.kind, stored) {
         case (.list(let shape), .array(let entries)):
+            if shape.holdsPeople {
+                let names = entries.compactMap { ListEntries.object($0).flatMap(shape.personName(of:)) }
+                return names.isEmpty ? nil : .people(names)
+            }
             // Only the main entry shows on the page; the inspector lists them all.
             guard let main = entries.first.flatMap(ListEntries.object) else { return nil }
             return shape.rowValue(of: main)
         case (.boolean, .bool(let flag)): return .boolean(flag)
         case (.number, .number(let number)): return .text(number.formatted())
         case (.date, .string(let text)): return .date(ItemDate.parse(text)?.text(format: format) ?? text)
-        case (.choice, .string(let text)): return .text(ItemTypeInfo.Field.label(ofOption: text))
+        case (.choice, .string(let text)): return .options([ItemTypeInfo.Field.label(ofOption: text)])
         case (.text, .string(let text)):
             let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
             if field.format == .url { return .url(text) }
@@ -140,7 +156,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
             return .text(text)
         case (_, .array(let values)):
             let words = values.compactMap(\.string).filter { !$0.isEmpty }
-            return words.count == values.count && !words.isEmpty ? .tags(words) : nil
+            return words.count == values.count && !words.isEmpty ? .options(words) : nil
         default: return nil
         }
     }

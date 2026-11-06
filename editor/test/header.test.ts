@@ -23,7 +23,7 @@ const ticket: HeaderModel = {
     enabled: true,
     empty: false,
     opensMenu: true,
-    mark: { tone: 'orange', fill: 'half' },
+    mark: { tone: 'blue', fill: 'half' },
   },
   parent: { label: 'Field Research', enabled: true, empty: false, opensMenu: true },
   byline: { source: 'workbench-folder', date: 'Saturday' },
@@ -59,6 +59,13 @@ afterEach(() => {
   footer.remove()
   delete window.webkit
 })
+
+const icon = { url: 'data:image/png;base64,AAAA', width: 13, height: 13 }
+const icons = {
+  plus: icon,
+  indicator: icon,
+  symbols: { 'square.stack': icon },
+}
 
 const title = () => root.querySelector<HTMLElement>('#ItemPageTitle')!
 const pin = (id: string) => root.querySelector<HTMLElement>('#' + id)!
@@ -96,7 +103,7 @@ test('a pin without a value is drawn empty, and a status pin carries its mark', 
   header.set(ticket)
   const mark = () => pin('ItemStatusPin').querySelector<HTMLElement>('.item-status-mark')!
   expect(pin('ItemParentPin').classList.contains('empty')).toBe(false)
-  expect(mark().dataset.tone).toBe('orange')
+  expect(mark().dataset.tone).toBe('blue')
   expect(mark().dataset.fill).toBe('half')
   header.set({
     ...ticket,
@@ -370,7 +377,9 @@ test('the property block reads as label and value pairs, each drawn by its kind'
         label: 'Blocks',
         symbol: 'link',
         kind: 'items',
-        items: [{ title: 'Ship it', item: 'other', symbol: 'square.stack' }],
+        items: [
+          { title: 'Ship it', item: 'other', symbol: 'square.stack', kind: 'link', tone: 'blue' },
+        ],
       },
       { id: '#tags', label: 'Tags', symbol: 'tag', kind: 'tags', texts: ['mapp', 'storage'] },
       { id: 'url', label: 'Url', symbol: 'globe', kind: 'url', text: 'https://example.com/a' },
@@ -391,12 +400,12 @@ test('the property block reads as label and value pairs, each drawn by its kind'
   expect(pairs[0]!.querySelector('dd #ItemStatusPin')).not.toBeNull()
   expect(pairs[1]!.querySelector('dd #ItemParentPin')).not.toBeNull()
   expect([...pairs[3]!.querySelectorAll('.item-chip')].map((chip) => chip.textContent)).toEqual([
-    'mapp',
-    'storage',
+    '#mapp',
+    '#storage',
   ])
   expect(pairs[6]!.querySelector('dd')!.textContent).toBe('Yes')
   posted = []
-  pairs[2]!.querySelector<HTMLElement>('.item-link')!.click()
+  pairs[2]!.querySelector<HTMLElement>('.item-chip')!.click()
   pairs[4]!.querySelector<HTMLElement>('.item-link')!.click()
   pairs[5]!.querySelector<HTMLElement>('.item-link')!.click()
   expect(posted).toEqual([
@@ -406,7 +415,8 @@ test('the property block reads as label and value pairs, each drawn by its kind'
   ])
 })
 
-test('an item a row links to is a chip with the icon of its type before the title', () => {
+test('an item a row links to is a chip in its own tone, with the icon of its type before the title', () => {
+  header.setIcons(icons)
   header.set({
     ...ticket,
     properties: [
@@ -415,16 +425,156 @@ test('an item a row links to is a chip with the icon of its type before the titl
         label: 'Blocks',
         symbol: 'link',
         kind: 'items',
-        items: [{ title: 'Ship it', item: 'other', symbol: 'square.stack' }],
+        items: [
+          { title: 'Ship it', item: 'other', symbol: 'square.stack', kind: 'link', tone: 'blue' },
+        ],
       },
     ],
   })
-  const chip = root.querySelector<HTMLElement>('.item-prop-value .item-link-chip')!
-  expect(chip.querySelector('.item-glyph')).not.toBeNull()
-  expect(chip.querySelector('.item-link-text')!.textContent).toBe('Ship it')
+  const chip = root.querySelector<HTMLElement>('.item-prop-value .item-chip')!
+  expect(chip.dataset.kind).toBe('link')
+  expect(chip.style.getPropertyValue('--tone')).toBe('var(--tone-blue)')
+  expect(chip.querySelector('.item-chip-mark')).not.toBeNull()
+  expect(chip.querySelector('.item-chip-text')!.textContent).toBe('Ship it')
   posted = []
   chip.click()
   expect(posted).toEqual([{ type: 'openItem', item: 'other' }])
+})
+
+test('each kind of value has its own chip, and its text is never read as markup', () => {
+  header.set({
+    ...ticket,
+    foldAfter: 10,
+    properties: [
+      {
+        id: 'priority',
+        label: 'Priority',
+        symbol: 'list.bullet',
+        kind: 'options',
+        options: [
+          { label: 'High', tone: 'pink' },
+          { label: '<img src=x onerror=alert(1)>', tone: 'blue' },
+        ],
+      },
+      { id: '#tags', label: 'Tags', symbol: 'tag', kind: 'tags', texts: ['a', '<b>b</b>'] },
+    ],
+  })
+  const chips = [...root.querySelectorAll<HTMLElement>('.item-prop-value .item-chip')]
+  expect(chips.map((chip) => chip.dataset.kind)).toEqual(['option', 'option', 'tag', 'tag'])
+  expect(chips[0]!.querySelector('.item-chip-dot')).not.toBeNull()
+  expect(chips[0]!.style.getPropertyValue('--tone')).toBe('var(--tone-pink)')
+  expect(chips[2]!.querySelector('.item-chip-dot')).toBeNull()
+  expect(chips[2]!.querySelector('.item-chip-hash')!.textContent).toBe('#')
+  expect(chips[1]!.querySelector('.item-chip-text')!.textContent).toBe(
+    '<img src=x onerror=alert(1)>',
+  )
+  expect(root.querySelector('.item-prop-value img')).toBeNull()
+  expect(root.querySelector('.item-prop-value b')).toBeNull()
+})
+
+test('a person is initials in a circle and a name, and a name with nothing in it has no circle', () => {
+  header.set({
+    ...ticket,
+    properties: [
+      {
+        id: 'assignee',
+        label: 'Assignee',
+        symbol: 'link',
+        kind: 'items',
+        items: [
+          { title: 'Mira Castell', item: 'mira', symbol: 'person', kind: 'person', initials: 'MC' },
+          { title: '   ', item: 'blank', symbol: 'person', kind: 'person' },
+        ],
+      },
+    ],
+  })
+  const people = [...root.querySelectorAll<HTMLElement>('.item-prop-value .item-person')]
+  expect(people).toHaveLength(2)
+  expect(people[0]!.querySelector('.item-person-initials')!.textContent).toBe('MC')
+  expect(people[0]!.querySelector('.item-chip-text')!.textContent).toBe('Mira Castell')
+  expect(people[1]!.querySelector('.item-person-initials')).toBeNull()
+  expect(people[0]!.classList.contains('item-chip')).toBe(false)
+  posted = []
+  people[0]!.click()
+  expect(posted).toEqual([{ type: 'openItem', item: 'mira' }])
+})
+
+test('the people a list names are all drawn as person chips that open nothing, and a name is text only', () => {
+  const twenty = Array.from({ length: 20 }, (_, index) => ({
+    title: `Person ${index}`,
+    initials: `P${index}`.slice(0, 2),
+  }))
+  header.set({
+    ...ticket,
+    properties: [
+      {
+        id: 'assignees',
+        label: 'Assignees',
+        symbol: 'person.2',
+        kind: 'people',
+        people: [
+          { title: 'Mira Castell', initials: 'MC' },
+          { title: 'r@example.com', initials: 'R' },
+          { title: '<img src=x onerror=alert(1)><b>Bold</b>', initials: '<I' },
+          ...twenty,
+        ],
+      },
+    ],
+  })
+  const people = [...root.querySelectorAll<HTMLElement>('.item-prop-value .item-person')]
+  expect(people).toHaveLength(23)
+  expect(people[0]!.querySelector('.item-person-initials')!.textContent).toBe('MC')
+  expect(people[1]!.querySelector('.item-chip-text')!.textContent).toBe('r@example.com')
+  expect(people[2]!.querySelector('.item-chip-text')!.textContent).toBe(
+    '<img src=x onerror=alert(1)><b>Bold</b>',
+  )
+  expect(root.querySelector('.item-prop-value img')).toBeNull()
+  expect(root.querySelector('.item-prop-value b')).toBeNull()
+  expect(root.querySelector('.item-prop-value button')).toBeNull()
+  posted = []
+  people[0]!.click()
+  expect(posted).toEqual([])
+})
+
+test('the looks the app sent are set on the header for the appearance the page is in', () => {
+  header.set({
+    ...ticket,
+    typeTone: 'orange',
+    interfaceTextSize: 26,
+    chips: {
+      light: { '--chip-height': '22px', '--tone-orange': 'rgb(1, 2, 3)' },
+      dark: { '--chip-height': '30px', '--tone-orange': 'rgb(4, 5, 6)' },
+    },
+  })
+  expect(root.style.getPropertyValue('--chip-height')).toBe('22px')
+  expect(root.style.getPropertyValue('--tone-orange')).toBe('rgb(1, 2, 3)')
+  expect(root.style.getPropertyValue('--chip-scale')).toBe('2')
+  expect(footer.style.getPropertyValue('--chip-height')).toBe('22px')
+  expect(pin('ItemTypePin').style.getPropertyValue('--tone')).toBe('var(--tone-orange)')
+  expect(pin('ItemTypePin').dataset.kind).toBe('type')
+})
+
+test('a parent chip takes the icon and tone of its own type, and a read-only status has no menu to open', () => {
+  header.setIcons(icons)
+  header.set({
+    ...ticket,
+    status: { ...ticket.status!, enabled: false },
+    parent: {
+      label: 'Field Research',
+      enabled: true,
+      empty: false,
+      opensMenu: true,
+      icon: 'square.stack',
+      tone: 'teal',
+    },
+  })
+  expect(pin('ItemParentPin').dataset.kind).toBe('link')
+  expect(pin('ItemParentPin').style.getPropertyValue('--tone')).toBe('var(--tone-teal)')
+  expect(pin('ItemParentPin').querySelector<HTMLElement>('.item-icon-parent')!.hidden).toBe(false)
+  expect((pin('ItemStatusPin') as HTMLButtonElement).disabled).toBe(true)
+  expect(pin('ItemStatusPin').dataset.kind).toBe('status')
+  pin('ItemParentPin').dispatchEvent(new MouseEvent('pointerdown', { button: 0 }))
+  expect(posted.map((message) => message.type)).toEqual(['headerMenu'])
 })
 
 test('a row under the pointer is named, and the context menu is left to WebKit', () => {
@@ -719,7 +869,6 @@ test('the byline draws the icon of the item type, and none for a type with no ic
   header.setIcons(icons)
   header.set({ ...ticket, icon: 'type:globe' })
   expect(node().hidden).toBe(false)
-  expect(node().style.width).toBe('13px')
   header.set({ ...ticket, icon: 'type:' })
   expect(node().hidden).toBe(true)
 })

@@ -52,7 +52,7 @@ struct PropertyRowTests {
         ])
         #expect(rows.map(\.id) == ["status", "priority", "due_at", "done", "estimate", "link", "contact"])
         #expect(rows[0].value == .status)
-        #expect(rows[1].value == .text("High"))
+        #expect(rows[1].value == .options(["High"]))
         #expect(rows[2].value == .date(ItemDate.parse("2026-10-27")!.text(format: .automatic)))
         #expect(rows[3].value == .boolean(true))
         #expect(rows[4].value == .text("5"))
