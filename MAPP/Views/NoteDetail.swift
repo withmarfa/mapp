@@ -15,7 +15,7 @@ struct NoteDetail: View {
                 .onAppear { editor.close() }
         } else if let id = browser.selection.first, let item = library.item(id) {
             if library.pageLayout(of: item) != .text {
-                FileItemPage(item: item) { browser.fileFetched(id, at: $0) }
+                FileItemPage(item: item, drafts: details, open: { [editor] in editor.onOpenNote($0) }) { browser.fileFetched(id, at: $0) }
                     .onAppear { editor.close() }
             } else {
                 NotePage(item: item, editor: editor, headerDrafts: details)

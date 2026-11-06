@@ -1,11 +1,11 @@
 import MarfaIcons
 import SwiftUI
 
-/// An item shown as an HTML document: its title and byline in the manner of the note page's header, then the HTML
-/// filling the rest of the detail area, shown as it was written (`WebPageView`). The document is the item's own file, for
+/// An item shown as an HTML document: its title and pins in the manner of the note page's header (`WebPageHeader`), then
+/// the HTML filling the rest of the detail area, shown as it was written (`WebPageView`). The document is the item's own file, for
 /// a Web Page or an HTML file, or the HTML file attached to it, for a document a connector keeps that way
-/// (`ItemLibrary.pageLayout(of:)`). The body is read only, and the item's title and properties are not edited on the
-/// page; the inspector shows them.
+/// (`ItemLibrary.pageLayout(of:)`). The body is read only, and the title and properties are not edited on the page,
+/// except a pinned status, which keeps its menu; the inspector shows them all.
 ///
 /// Its pictures are the app's to give (`SealedPictures`), for this item: while some wait for the person, a callout at the
 /// top of the page says how many and loads them, as on a note's page.
@@ -37,6 +37,10 @@ struct WebPageItemPage: View {
     /// The file that holds the HTML.
     let document: ItemID
     let runsScripts: Bool
+    /// The window's unsaved drafts, where a refused status is kept for the item, as on the note page.
+    let drafts: DetailsPresentation
+    /// Shows the item a pinned link names.
+    let open: (ItemID) -> Void
     /// Told where the item's file is once it is, and nil when it is not, so the window can share it and open it in a
     /// browser. Never told of a document attached to the item.
     var onResolved: (URL?) -> Void = { _ in }
@@ -54,7 +58,7 @@ struct WebPageItemPage: View {
         GeometryReader { geometry in
             let inset = style.horizontalInset(for: geometry.size.width)
             VStack(spacing: 0) {
-                WebPageHeader(item: item, inset: inset, mode: $mode)
+                WebPageHeader(item: item, inset: inset, drafts: drafts, open: open, mode: $mode)
                 // The header is inset like the other item pages' and the page draws to its own margin, so the line
                 // sets the page apart as a document under its header.
                 Divider()
@@ -221,43 +225,92 @@ struct SourceViewPicker: View {
     }
 }
 
-/// The title and the line under it: what the item is, who it came from and when. The sizes follow the note page's
-/// header, a bold title at nearly twice the text size and a quiet secondary line at the interface's text size.
+/// The page's header, drawn in SwiftUI as the note page's is drawn on the web: the title, then the pins, and where the
+/// item's kind has a line of its own (a page for reading) its byline above the title and its description under it.
+/// `PageHeaderParts` gives both pages their kind, line and pins, and `PageChip` their looks. The switch between the
+/// reader and the original sits at the trailing edge of the line above the title, so it never moves the pins.
 private struct WebPageHeader: View {
     @CurrentLibrary private var library
     @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
+    @AppStorage(PagePlacements.key) private var placements = PagePlacements()
+    @AppStorage(PageKey.titleLines) private var titleLines = TitleLines.standard
     @StoredPageStyle private var style
     let item: Item
     let inset: CGFloat
+    let drafts: DetailsPresentation
+    let open: (ItemID) -> Void
     @Binding var mode: SourceViewMode
 
     var body: some View {
-        let byline = PageByline(item: item, sourceName: item.source.map { library.sources.name($0) }, now: library.now(), format: dateFormat)
-        let type = library.catalogue.itemTypes[item.type]
-        VStack(alignment: .leading, spacing: 8) {
-            Text(verbatim: item.displayTitle)
-                .font(.system(size: CGFloat(style.textSize) * 1.9, weight: .semibold))
-                .accessibilityAddTraits(.isHeader)
-                .accessibilityIdentifier("WebPageTitle")
-            HStack(spacing: 4) {
-                TypeIcon(id: library.catalogue.icon(for: item.type))
-                if let type { Text(verbatim: ItemPageHeader.localized(type.label)) }
-                ForEach(Array([byline.source, byline.date].compactMap { $0 }.filter { !$0.isEmpty }.enumerated()), id: \.offset) { _, part in
-                    Circle().fill(.secondary).opacity(0.7).frame(width: 2, height: 2).accessibilityHidden(true)
-                    Text(verbatim: part)
+        let parts = PageHeaderParts(of: item, in: library, placements: placements, dateFormat: dateFormat)
+        let step = CGFloat(interfaceTextSize) * 4 / 13
+        let reading = parts.kind == .reading
+        let textSize = CGFloat(style.textSize)
+        let statusField = parts.type?.statusField
+        VStack(alignment: .leading, spacing: 10) {
+            line(parts.lead.byline, step: step)
+            VStack(alignment: .leading, spacing: step) {
+                Text(verbatim: item.displayTitle)
+                    .font(reading
+                        ? .system(size: textSize * 2.1, weight: .semibold, design: .serif)
+                        : .system(size: textSize * 1.9, weight: .semibold))
+                    .tracking(reading ? -textSize * 2.1 * 0.01 : 0)
+                    .lineLimit(TitleLines.resolved(titleLines))
+                    .truncationMode(.tail)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+                    .accessibilityAddTraits(.isHeader)
+                    .accessibilityIdentifier("WebPageTitle")
+                if reading, let dek = parts.lead.subtitle {
+                    Text(verbatim: dek)
+                        .font(.system(size: textSize * 1.2, design: .serif))
+                        .lineSpacing(textSize * 0.2)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
                 }
             }
-            .font(.system(size: CGFloat(interfaceTextSize)))
-            .foregroundStyle(.secondary)
-            .accessibilityIdentifier("WebPageByline")
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .overlay(alignment: .trailing) { SourceViewPicker(mode: $mode) }
+            if !parts.pins.pins.isEmpty {
+                PagePinsView(item: item, pins: parts.pins.pins, statusField: statusField, drafts: drafts, open: open)
+                    .padding(.top, step * 1.5)
+            }
+            if let statusField, drafts.draft(for: item.id, key: statusField.key).rejected {
+                Text("The value could not be saved. Please try again.")
+                    .font(.system(size: CGFloat(interfaceTextSize) * 10 / 13))
+                    .foregroundStyle(.red)
+                    .accessibilityAddTraits(.updatesFrequently)
+            }
         }
-        .textSelection(.enabled)
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, inset)
         .padding(.top, 16)
         .padding(.bottom, 12)
+        // A refused status belongs to the visit, as the note page's does.
+        .onChange(of: item.id) { old, _ in
+            if let key = library.item(old).flatMap({ library.catalogue.itemTypes[$0.type]?.statusField?.key }) {
+                drafts.draft(for: old, key: key).rejected = false
+            }
+        }
+    }
+
+    /// Where a page for reading came from, when it was published and how long it takes, as one quiet line, with the
+    /// switch at its trailing edge. Every other kind has the switch alone.
+    private func line(_ byline: PageByline?, step: CGFloat) -> some View {
+        let parts = [byline?.source, byline?.date, byline?.detail].compactMap { $0 }.filter { !$0.isEmpty }
+        return HStack(spacing: step * 2.5) {
+            ForEach(Array(parts.enumerated()), id: \.offset) { index, part in
+                if index > 0 { Circle().fill(.secondary).opacity(0.7).frame(width: 2, height: 2).accessibilityHidden(true) }
+                Text(verbatim: part).lineLimit(1)
+            }
+            .font(.system(size: CGFloat(interfaceTextSize) * 12 / 13, weight: .medium))
+            .tracking(CGFloat(interfaceTextSize) * 12 / 13 * 0.02)
+            .textCase(.uppercase)
+            .foregroundStyle(.secondary)
+            Spacer(minLength: step * 4)
+            SourceViewPicker(mode: $mode)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("WebPageLine")
     }
 }

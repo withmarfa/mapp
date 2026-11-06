@@ -64,32 +64,14 @@ struct ItemPageHeader: ViewModifier {
         titleLines: Int = TitleLines.stored(), dateFormat: DateFormat = .stored()
     ) -> PageHeader? {
         guard let item = library.item(id) else { return nil }
-        let placement = placements.placement(of: item.type, in: library.catalogue)
         let draft = drafts.draft(for: item.id, key: "title")
-        let type = library.catalogue.itemTypes[item.type]
+        let parts = PageHeaderParts(of: item, in: library, placements: placements, dateFormat: dateFormat)
+        let (type, placement, relationships, now, kind, lead, pins) =
+            (parts.type, parts.placement, parts.relationships, parts.now, parts.kind, parts.lead, parts.pins)
         let status = type?.statusField
-        let relationships = library.relationships(for: item.id)
         let parent = Self.parent(in: relationships)
-        let now = library.now()
-        let kind = PageHeaderKind.of(item.type, in: library.catalogue)
-        let lead = PageHeaderLead(
-            for: item, kind: kind, body: kind == .reading ? library.body(of: item.id)?.text : nil, now: now, format: dateFormat)
-        func typeIcon(of target: ItemID) -> String? {
-            library.item(target).flatMap { library.catalogue.icon(for: $0.type) }
-        }
-        func isPerson(_ target: ItemID) -> Bool {
-            library.item(target).map { PageHeaderKind.of($0.type, in: library.catalogue) == .person } ?? false
-        }
-        let candidates = PropertyRow.candidates(
-            of: item, type: type, hidden: library.hiddenPropertyKeys(of: item).union(lead.consumed), relationships: relationships,
-            parentField: PagePlacement.parent, format: dateFormat, tags: library.tags(of: item),
-            typeLabel: type.map { Self.localized($0.label) }, typeIcon: library.catalogue.icon(for: item.type),
-            sourceName: item.source.map { library.sources.name($0) }, now: now, calendar: .current, locale: .current,
-            icon: { typeIcon(of: $0) }, isPerson: { isPerson($0) })
-        let pins = PagePins.resolve(
-            for: item, type: type, placement: placement, lead: lead, relationships: relationships, candidates: candidates,
-            icon: { typeIcon(of: $0) }, isPerson: { isPerson($0) })
-        let properties = lead.refine(PropertyRow.block(candidates, placement: placement, excluding: pins.leftOutOfBlock))
+        func typeIcon(of target: ItemID) -> String? { PageHeaderParts.typeIcon(of: target, in: library) }
+        let properties = lead.refine(PropertyRow.block(parts.candidates, placement: placement, excluding: pins.leftOutOfBlock))
         let isCollection = library.catalogue.isCollection(item.type)
         let contents = isCollection
             ? LinkedItem.list(

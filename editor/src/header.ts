@@ -104,7 +104,7 @@ export interface HeaderLinked {
  *   through `body[data-header]`, at the page width the person chose like any other page. The pins follow the title.
  *
  * A fifth kind, `webpage` (`core.file.webpage`), never reaches this page: a file has no text to edit, so SwiftUI
- * draws a Web Page's title and byline natively (`WebPageItemPage`) above the sealed HTML view.
+ * draws a Web Page's title and pins natively (`WebPageItemPage`) above the sealed HTML view.
  *
  * A kind never loads anything, because the page fetches nothing from the network: a bookmark's `image_url` is not
  * drawn as a hero and leaves the property block (the inspector still shows it), and an event has no map. The fields
