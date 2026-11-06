@@ -88,9 +88,9 @@ struct ItemInspectorHost: View {
 }
 
 /// Inspector content is data-driven and independent of storage, making each item state previewable. It reads as
-/// a property sheet: the item's details first, then the type's properties, the item's relationships (the links it
-/// makes, the links in its content and, where the person placed the list here, the items that link to it) and tags.
-/// Every section folds. Every property is listed
+/// a property sheet: the item's details first, as cells, then the type's properties, the item's relationships, the
+/// links in its page, the items that link to it (where the person placed that list here) and tags. Every section
+/// folds. Every property is listed
 /// here; a context menu on one says whether the page shows it too.
 struct ItemInspector: View {
     @Environment(\.interfaceTextSize) private var textSize

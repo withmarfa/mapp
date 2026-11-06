@@ -137,6 +137,17 @@ struct InspectorEditingTests {
         #expect(InspectorText.lineLimit(for: "https://example.com/a/b", keepsOneLine: false) == 1)
     }
 
+    @Test func aValueTakesWholeRowOnlyWhenItsLineIsWiderThanACell() {
+        #expect(!InspectorCellGrid.takesWholeRow(ideal: 120, column: 130))
+        #expect(!InspectorCellGrid.takesWholeRow(ideal: 130, column: 130))
+        #expect(InspectorCellGrid.takesWholeRow(ideal: 131, column: 130))
+    }
+
+    @Test func aCellValueOfWordsTakesTwoLinesAndOneWithoutSpacesTakesOne() {
+        #expect(InspectorText.lineLimit(for: "a few words that wrap", keepsOneLine: false, lines: InspectorMetrics.cellValueLines) == 2)
+        #expect(InspectorText.lineLimit(for: "https://example.com/a/b", keepsOneLine: false, lines: InspectorMetrics.cellValueLines) == 1)
+    }
+
     @Test func theNameColumnFitsTheLongestNameWithinItsShare() {
         #expect(InspectorMetrics.nameColumn(longest: 60, fallback: 96, available: 300) == 60)
         #expect(InspectorMetrics.nameColumn(longest: 200, fallback: 96, available: 300) == 120)
