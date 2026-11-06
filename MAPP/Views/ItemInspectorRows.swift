@@ -21,6 +21,18 @@ enum InspectorMetrics {
     static let boxRowPadding: CGFloat = 6
     static let boxRadius: CGFloat = 10
     static let boxStroke: CGFloat = 0.5
+    /// A cell of Details: the gap between cells, the padding inside one (the board draws the bottom a point deeper
+    /// than the top), its corners, the gap between its name and its value, and how many lines its value may take.
+    static let cellGap: CGFloat = 6
+    static let cellInsetH: CGFloat = 9
+    static let cellInsetTop: CGFloat = 7
+    static let cellInsetBottom: CGFloat = 8
+    static let cellRadius: CGFloat = 9
+    static let cellValueGap: CGFloat = 3
+    static let cellNameSize: CGFloat = 11
+    static let cellValueLines = 2
+    /// The room between a link row's mark and its title, and between its title and its date.
+    static let markGap: CGFloat = 8
     static let chipRadius: CGFloat = 7
     /// A chip's horizontal padding, both sides together.
     static let chipPadding: CGFloat = 16
@@ -68,13 +80,15 @@ private struct SharedNameColumn: ViewModifier {
 
 /// The inspector's sections, each of which folds and keeps whether it is open for every item and launch.
 enum InspectorSectionKind: CaseIterable {
-    case details, properties, relationships, tags
+    case details, properties, relationships, linksInPage, linkedFrom, tags
 
     var key: String {
         switch self {
         case .details: InterfaceKey.inspectorDetailsOpen
         case .properties: InterfaceKey.inspectorPropertiesOpen
         case .relationships: InterfaceKey.inspectorRelationshipsOpen
+        case .linksInPage: InterfaceKey.inspectorLinksInPageOpen
+        case .linkedFrom: InterfaceKey.inspectorLinkedFromOpen
         case .tags: InterfaceKey.inspectorTagsOpen
         }
     }
@@ -84,6 +98,8 @@ enum InspectorSectionKind: CaseIterable {
         case .details: "ItemInspectorDetails"
         case .properties: "ItemInspectorProperties"
         case .relationships: "ItemInspectorRelationships"
+        case .linksInPage: "ItemInspectorLinksInPage"
+        case .linkedFrom: "ItemInspectorLinkedFrom"
         case .tags: "ItemInspectorTags"
         }
     }
@@ -94,13 +110,15 @@ enum InspectorSectionKind: CaseIterable {
 /// section that can take something new has a small plus on its heading, beside the chevron.
 ///
 /// The box takes each view of `content` as a row, with a divider between rows, so a row is a view of its own, never a
-/// stack of several. A section with nothing in it shows `placeholder` as its one row.
+/// stack of several. A section with nothing in it shows `placeholder` as its one row. A section that is not `boxed`
+/// draws its content as it is, for Details, whose cells are boxes of their own.
 struct InspectorSection<Content: View, Add: View>: View {
     let title: LocalizedStringKey
     var count: Int?
     @Binding var isOpen: Bool
     let identifier: String
     var placeholder: LocalizedStringKey?
+    var boxed = true
     /// The plus control, given whether the heading is hovered.
     let add: (Bool) -> Add
     @ViewBuilder let content: Content
@@ -109,12 +127,16 @@ struct InspectorSection<Content: View, Add: View>: View {
         VStack(alignment: .leading, spacing: InspectorMetrics.headingGap) {
             InspectorFoldHeading(title: title, count: count, isOpen: $isOpen, identifier: identifier, add: add)
             if isOpen {
-                InspectorBox {
-                    if let placeholder {
-                        Text(placeholder).foregroundStyle(.secondary)
-                    } else {
-                        content
+                if boxed {
+                    InspectorBox {
+                        if let placeholder {
+                            Text(placeholder).foregroundStyle(.secondary)
+                        } else {
+                            content
+                        }
                     }
+                } else {
+                    content
                 }
             }
         }
@@ -128,30 +150,33 @@ struct InspectorSectionView<Content: View, Add: View>: View {
     let title: LocalizedStringKey
     var count: Int?
     var placeholder: LocalizedStringKey?
+    var boxed = true
     let add: (Bool) -> Add
     @ViewBuilder let content: Content
 
     init(_ kind: InspectorSectionKind, title: LocalizedStringKey, count: Int? = nil, placeholder: LocalizedStringKey? = nil,
-         @ViewBuilder add: @escaping (Bool) -> Add, @ViewBuilder content: () -> Content) {
+         boxed: Bool = true, @ViewBuilder add: @escaping (Bool) -> Add, @ViewBuilder content: () -> Content) {
         _isOpen = AppStorage(wrappedValue: true, kind.key)
         self.kind = kind
         self.title = title
         self.count = count
         self.placeholder = placeholder
+        self.boxed = boxed
         self.add = add
         self.content = content()
     }
 
     var body: some View {
         InspectorSection(title: title, count: count, isOpen: $isOpen, identifier: kind.identifier, placeholder: placeholder,
-                         add: add) { content }
+                         boxed: boxed, add: add) { content }
     }
 }
 
 extension InspectorSectionView where Add == EmptyView {
     init(_ kind: InspectorSectionKind, title: LocalizedStringKey, count: Int? = nil, placeholder: LocalizedStringKey? = nil,
-         @ViewBuilder content: () -> Content) {
-        self.init(kind, title: title, count: count, placeholder: placeholder, add: { _ in EmptyView() }, content: content)
+         boxed: Bool = true, @ViewBuilder content: () -> Content) {
+        self.init(kind, title: title, count: count, placeholder: placeholder, boxed: boxed, add: { _ in EmptyView() },
+                  content: content)
     }
 }
 
@@ -208,12 +233,10 @@ struct InspectorFoldHeading<Add: View>: View {
 /// with a divider above every row but the first that stops `boxInset` short of both edges.
 struct InspectorBox<Content: View>: View {
     @Environment(\.interfaceTextSize) private var textSize
-    @Environment(\.colorScheme) private var scheme
     @ViewBuilder let content: Content
 
     var body: some View {
         let scale = InterfaceStyle.scale(for: textSize)
-        let shape = RoundedRectangle(cornerRadius: InspectorMetrics.boxRadius, style: .continuous)
         VStack(alignment: .leading, spacing: 0) {
             Group(subviews: content) { rows in
                 ForEach(rows) { row in
@@ -231,9 +254,108 @@ struct InspectorBox<Content: View>: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(scheme == .dark ? Color.white.opacity(0.03) : Color(nsColor: .controlBackgroundColor), in: shape)
-        .overlay { shape.strokeBorder(.separator, lineWidth: InspectorMetrics.boxStroke) }
-        .clipShape(shape)
+        .inspectorSurface(radius: InspectorMetrics.boxRadius)
+    }
+}
+
+extension View {
+    /// The fill and hairline of a box or a cell: white at 3% over the sidebar in dark, the system's control background in
+    /// light.
+    func inspectorSurface(radius: CGFloat) -> some View { modifier(InspectorSurface(radius: radius)) }
+}
+
+private struct InspectorSurface: ViewModifier {
+    @Environment(\.colorScheme) private var scheme
+    let radius: CGFloat
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        content
+            .background(scheme == .dark ? Color.white.opacity(0.03) : Color(nsColor: .controlBackgroundColor), in: shape)
+            .overlay { shape.strokeBorder(.separator, lineWidth: InspectorMetrics.boxStroke) }
+            .clipShape(shape)
+    }
+}
+
+/// A fact of Details in a small box of its own: its name above its value, as the design's `.m-insp-cell`. The value
+/// takes up to `cellValueLines` lines, cut at its end, or one line cut in the middle where it has no space in it.
+struct InspectorCell<Value: View>: View {
+    @Environment(\.interfaceTextSize) private var textSize
+    let name: String
+    @ViewBuilder let value: Value
+
+    var body: some View {
+        let scale = InterfaceStyle.scale(for: textSize)
+        VStack(alignment: .leading, spacing: InspectorMetrics.cellValueGap * scale) {
+            Text(verbatim: name)
+                .interfaceFont(.system(size: InspectorMetrics.cellNameSize))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            value
+                .interfaceFont(.body)
+        }
+        .padding(.horizontal, InspectorMetrics.cellInsetH)
+        .padding(.top, InspectorMetrics.cellInsetTop)
+        .padding(.bottom, InspectorMetrics.cellInsetBottom)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .inspectorSurface(radius: InspectorMetrics.cellRadius)
+        .accessibilityElement(children: .contain)
+    }
+}
+
+/// Lays cells out two to a row. A cell whose value is too long for half the width takes a whole row; a cell left with
+/// no partner sits alone in the first column, as wide as the others. Cells of a row are as tall as the tallest.
+struct InspectorCellGrid: Layout {
+    var spacing: CGFloat
+
+    /// Whether a cell whose value one line needs `ideal` wide does not fit a column of `column`.
+    static func takesWholeRow(ideal: CGFloat, column: CGFloat) -> Bool { ideal > column + 0.5 }
+
+    /// The cells of each row, by index.
+    private func rows(of subviews: Subviews, width: CGFloat) -> [[Int]] {
+        let column = (width - spacing) / 2
+        var rows: [[Int]] = []
+        var open: [Int] = []
+        for index in subviews.indices {
+            if Self.takesWholeRow(ideal: subviews[index].sizeThatFits(.unspecified).width, column: column) {
+                if !open.isEmpty { rows.append(open); open = [] }
+                rows.append([index])
+            } else {
+                open.append(index)
+                if open.count == 2 { rows.append(open); open = [] }
+            }
+        }
+        if !open.isEmpty { rows.append(open) }
+        return rows
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? 300
+        let heights = rows(of: subviews, width: width).map { row in
+            row.map { subviews[$0].sizeThatFits(.init(width: rowWidth(of: row, subviews: subviews, width: width), height: nil)).height }.max() ?? 0
+        }
+        return CGSize(width: width, height: heights.reduce(0, +) + spacing * CGFloat(max(0, heights.count - 1)))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in rows(of: subviews, width: bounds.width) {
+            let cell = rowWidth(of: row, subviews: subviews, width: bounds.width)
+            let height = row.map { subviews[$0].sizeThatFits(.init(width: cell, height: nil)).height }.max() ?? 0
+            for (column, index) in row.enumerated() {
+                subviews[index].place(
+                    at: CGPoint(x: bounds.minX + CGFloat(column) * (cell + spacing), y: y), anchor: .topLeading,
+                    proposal: .init(width: cell, height: height))
+            }
+            y += height + spacing
+        }
+    }
+
+    /// A row's cell: half the width less the gap, or all of it for a cell that takes the row.
+    private func rowWidth(of row: [Int], subviews: Subviews, width: CGFloat) -> CGFloat {
+        let column = (width - spacing) / 2
+        if row.count == 1, Self.takesWholeRow(ideal: subviews[row[0]].sizeThatFits(.unspecified).width, column: column) { return width }
+        return column
     }
 }
 
@@ -293,27 +415,31 @@ struct InspectorRow<Value: View>: View {
 
 /// A value drawn as plain text. A value with no space in it (a link, an ID, a hash) takes one line and is cut in the
 /// middle, where its ends say most; a date takes one line and is cut at its end; a value of words wraps to three
-/// lines. The whole value is its help.
+/// lines (`lines`). The whole value is its help. A value nothing edits may end at the trailing edge, as the design's
+/// box rows draw it.
 struct InspectorText: View {
     let text: String
     var style: AnyShapeStyle = AnyShapeStyle(.primary)
     /// A date, whose day and time stay together: it is cut at its end before it wraps.
     var keepsOneLine = false
+    var lines = 3
+    var endsAtTrailingEdge = false
 
     static func isToken(_ text: String) -> Bool { !text.contains(where: \.isWhitespace) }
 
-    static func lineLimit(for text: String, keepsOneLine: Bool) -> Int {
-        keepsOneLine || isToken(text) ? 1 : 3
+    static func lineLimit(for text: String, keepsOneLine: Bool, lines: Int = 3) -> Int {
+        keepsOneLine || isToken(text) ? 1 : lines
     }
 
     var body: some View {
         let token = Self.isToken(text) && !keepsOneLine
         Text(verbatim: text)
             .foregroundStyle(style)
-            .lineLimit(Self.lineLimit(for: text, keepsOneLine: keepsOneLine))
+            .lineLimit(Self.lineLimit(for: text, keepsOneLine: keepsOneLine, lines: lines))
             .truncationMode(token ? .middle : .tail)
+            .multilineTextAlignment(endsAtTrailingEdge ? .trailing : .leading)
             .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: endsAtTrailingEdge ? .trailing : .leading)
             .help(String(text.prefix(600)))
     }
 }

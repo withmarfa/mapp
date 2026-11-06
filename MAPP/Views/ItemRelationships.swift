@@ -127,6 +127,15 @@ struct ItemTargetRow: View {
     }
 }
 
+extension VerticalAlignment {
+    /// The center of a link row's title, which its mark sits on, whatever stands under the title.
+    static let inspectorTitleCenter = VerticalAlignment(InspectorTitleCenter.self)
+}
+
+private enum InspectorTitleCenter: AlignmentID {
+    static func defaultValue(in context: ViewDimensions) -> CGFloat { context[VerticalAlignment.center] }
+}
+
 /// The control that ends a group of links cut short: it shows the rest.
 struct ItemShowMoreButton: View {
     let count: Int
@@ -136,7 +145,7 @@ struct ItemShowMoreButton: View {
     var body: some View {
         Button(action: action) {
             Text("Show \(count) More")
-                .interfaceFont(.body)
+                .interfaceFont(.callout)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -158,13 +167,14 @@ struct InspectorItemRow: View {
         Group {
             if let id = target.itemID, target.isOpenable {
                 Button { onOpen(id) } label: {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    HStack(alignment: .inspectorTitleCenter, spacing: InspectorMetrics.markGap) {
                         TypeMark(icon: typeIcon(id), size: .row)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(target.displayTitle)
                                 .lineLimit(1)
                                 .truncationMode(.tail)
                                 .multilineTextAlignment(.leading)
+                                .alignmentGuide(.inspectorTitleCenter) { $0[VerticalAlignment.center] }
                             if target.isDeleted {
                                 Label("Deleted", systemImage: "trash")
                                     .interfaceFont(.caption).foregroundStyle(.secondary)

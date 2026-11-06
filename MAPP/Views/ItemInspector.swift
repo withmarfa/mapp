@@ -151,6 +151,8 @@ struct ItemInspector: View {
                 detailsSection
                 if hasProperties { properties }
                 if hasRelationships { relationshipSection }
+                if !mentions.isEmpty { linksInPageSection }
+                if !linked.isEmpty { linkedFromSection }
                 if hasTags { tagSection }
             }
             .sharesInspectorNameColumn()
@@ -218,26 +220,26 @@ struct ItemInspector: View {
                     onRemove: { await onRemove(relationship, $0) }, shownOnPage: placement.showsOnPage(relationship.field),
                     onShowOnPage: showOnPage(relationship.field))
             }
-            if !mentions.isEmpty { contentLinks }
-            if !linked.isEmpty { linkedGroup }
         }
     }
 
     /// Every link the section lists, which its heading counts.
     private var relationshipCount: Int {
-        shownRelationships.reduce(0) { $0 + $1.targets.count } + mentions.count + linked.count
+        shownRelationships.reduce(0) { $0 + $1.targets.count }
     }
 
-    @ViewBuilder private var contentLinks: some View {
+    /// The items the page's text links to, in a section of their own.
+    private var linksInPageSection: some View {
         let group = LinkGroup.content(of: item.id)
         let links = LinkLimit.split(mentions, expanded: presentation.expandedLinks.contains(group))
-        InspectorSubheading(title: String(localized: "Links in Content"), count: mentions.count)
-        ForEach(links.shown) { target in
-            InspectorItemRow(target: target, typeIcon: typeIcon, onOpen: onOpen)
-        }
-        if links.hidden > 0 {
-            ItemShowMoreButton(count: links.hidden, identifier: "ContentLinksShowMore") {
-                presentation.expandLinks(group)
+        return InspectorSectionView(.linksInPage, title: "Links in This Page", count: mentions.count) {
+            ForEach(links.shown) { target in
+                InspectorItemRow(target: target, typeIcon: typeIcon, onOpen: onOpen)
+            }
+            if links.hidden > 0 {
+                ItemShowMoreButton(count: links.hidden, identifier: "ContentLinksShowMore") {
+                    presentation.expandLinks(group)
+                }
             }
         }
     }
@@ -256,34 +258,34 @@ struct ItemInspector: View {
         .showOnPageMenu(isShown: placement.showsOnPage(PagePlacement.tags), onChange: showOnPage(PagePlacement.tags))
     }
 
-    /// The items that link to this one, as a group after the links the item makes.
-    @ViewBuilder private var linkedGroup: some View {
+    /// The items that link to this one, in a section of their own.
+    private var linkedFromSection: some View {
         let group = LinkGroup(item: item.id, field: "#linked")
         let links = LinkLimit.split(linked, expanded: presentation.expandedLinks.contains(group))
-        InspectorSubheading(title: String(localized: "Linked From"), count: linked.count)
-            .accessibilityIdentifier("ItemInspectorLinkedFrom")
-            .showOnPageMenu(isShown: false, onChange: showOnPage(PagePlacement.linkedFrom))
-        ForEach(links.shown, id: \.item) { link in
-            LinkedItemRow(link: link, onOpen: onOpen)
-                .showOnPageMenu(isShown: false, onChange: showOnPage(PagePlacement.linkedFrom))
-        }
-        if links.hidden > 0 {
-            ItemShowMoreButton(count: links.hidden, identifier: "LinkedFromShowMore") {
-                presentation.expandLinks(group)
+        return InspectorSectionView(.linkedFrom, title: "Linked From", count: linked.count) {
+            ForEach(links.shown, id: \.item) { link in
+                LinkedItemRow(link: link, onOpen: onOpen)
+            }
+            if links.hidden > 0 {
+                ItemShowMoreButton(count: links.hidden, identifier: "LinkedFromShowMore") {
+                    presentation.expandLinks(group)
+                }
             }
         }
+        .showOnPageMenu(isShown: false, onChange: showOnPage(PagePlacement.linkedFrom))
     }
 
+    /// Details is a grid of small cells, so its section draws no box around them.
     private var detailsSection: some View {
-        InspectorSectionView(.details, title: "Details") { details }
+        InspectorSectionView(.details, title: "Details", boxed: false) { InspectorCellGrid(spacing: InspectorMetrics.cellGap) { details } }
     }
 
     @ViewBuilder private var details: some View {
+        if let source { InspectorDetailCell(name: String(localized: "Source"), value: source.name, mark: source.mark) }
+        detail("Version", item.version.rawValue.formatted())
         detail("Created", ItemDate.text(of: item.created, hasTime: true, format: dateFormat), isDate: true)
         detail("Edited", ItemDate.text(of: item.modified, hasTime: true, format: dateFormat), isDate: true)
-        if let source { InspectorDetailRow(name: String(localized: "Made by"), value: source.name, mark: source.mark) }
         if let place { detail("Place", place) }
-        detail("Version", item.version.rawValue.formatted())
         if case .file(let contentType, let byteCount) = item.content {
             detail("Kind", contentType.localizedDescription ?? String(localized: "File"))
             // A server gives a file's size once it holds the bytes, so a file not yet sent has none.
@@ -292,14 +294,14 @@ struct ItemInspector: View {
             }
         }
         ForEach(otherProperties) { property in
-            InspectorDetailRow(
+            InspectorDetailCell(
                 name: Self.name(of: property.key, label: catalogue.label(ofField: property.key, for: item.type)),
                 value: Self.text(of: property.value, format: dateFormat), isDate: Self.isDate(property.value))
         }
     }
 
     private func detail(_ name: LocalizedStringResource, _ value: String, isDate: Bool = false) -> some View {
-        InspectorDetailRow(name: String(localized: name), value: value, isDate: isDate)
+        InspectorDetailCell(name: String(localized: name), value: value, isDate: isDate)
     }
 
     // MARK: Contents
@@ -360,8 +362,8 @@ struct ItemInspector: View {
     }
 }
 
-/// A fact about the item in Details: a compact row, with its value cut in the middle where it is long.
-private struct InspectorDetailRow: View {
+/// A fact about the item in Details: a small cell, with its value cut in the middle where it is long.
+private struct InspectorDetailCell: View {
     let name: String
     let value: String
     var isDate = false
@@ -369,12 +371,13 @@ private struct InspectorDetailRow: View {
     var mark: String?
 
     var body: some View {
-        InspectorRow(verbatimName: name) {
+        InspectorCell(name: name) {
             HStack(spacing: 6) {
                 if let mark { TypeIcon(id: mark).foregroundStyle(.secondary) }
-                InspectorText(text: value, keepsOneLine: isDate)
+                InspectorText(text: value, keepsOneLine: isDate, lines: InspectorMetrics.cellValueLines)
             }
         }
+        .help(String(value.prefix(600)))
         .contextMenu { Button("Copy") { InspectorPasteboard.copy(value) } }
     }
 }
@@ -386,7 +389,7 @@ private struct LinkedItemRow: View {
 
     var body: some View {
         Button { onOpen(link.item) } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: InspectorMetrics.markGap) {
                 TypeMark(icon: link.icon, size: .row)
                 Text(verbatim: link.title).lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: 6)
