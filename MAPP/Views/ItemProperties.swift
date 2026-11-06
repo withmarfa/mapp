@@ -113,14 +113,16 @@ struct ItemPropertyRow: View {
     /// A value nothing here changes, read as a Details row is.
     @ViewBuilder private var plain: some View {
         if definition.kind.isDate, let dateText {
-            InspectorText(text: dateText, keepsOneLine: true).accessibilityIdentifier("ItemProperty.\(definition.key)")
+            InspectorText(text: dateText, keepsOneLine: true, endsAtTrailingEdge: true)
+                .accessibilityIdentifier("ItemProperty.\(definition.key)")
         } else if isStatus, let text = value?.string {
             statusLabel(Text(verbatim: ItemTypeInfo.Field.label(ofOption: text)))
                 .accessibilityIdentifier("ItemProperty.\(definition.key)")
         } else if case .choice = definition.kind, let text = value?.string {
-            InspectorText(text: ItemTypeInfo.Field.label(ofOption: text)).accessibilityIdentifier("ItemProperty.\(definition.key)")
+            InspectorText(text: ItemTypeInfo.Field.label(ofOption: text), endsAtTrailingEdge: true)
+                .accessibilityIdentifier("ItemProperty.\(definition.key)")
         } else if !shownText.isEmpty {
-            InspectorText(text: shownText).accessibilityIdentifier("ItemProperty.\(definition.key)")
+            InspectorText(text: shownText, endsAtTrailingEdge: true).accessibilityIdentifier("ItemProperty.\(definition.key)")
         }
     }
 

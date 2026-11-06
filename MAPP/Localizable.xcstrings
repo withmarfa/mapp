@@ -1978,8 +1978,8 @@
     "Link unavailable" : {
 
     },
-    "Links in Content" : {
-      "extractionState" : "manual"
+    "Links in This Page" : {
+
     },
     "List" : {
 
@@ -2003,9 +2003,6 @@
       "extractionState" : "manual"
     },
     "Lowest First" : {
-
-    },
-    "Made by" : {
 
     },
     "Manage Connections…" : {
@@ -2114,7 +2111,16 @@
     "No Matching Items" : {
 
     },
+    "No Properties" : {
+
+    },
+    "No Relationships" : {
+
+    },
     "No Results" : {
+
+    },
+    "No Tags" : {
 
     },
     "None" : {

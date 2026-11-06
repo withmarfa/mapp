@@ -5,16 +5,18 @@ enum InterfaceKey {
     static let textSize = "interfaceTextSize"
     /// Whether the inspector's Details section is open, kept across items and launches.
     static let inspectorDetailsOpen = "inspectorDetailsOpen"
-    /// Whether the inspector's Properties, Relationships and Tags sections are open, kept across items
+    /// Whether the inspector's Properties, Relationships, Links in This Page, Linked From and Tags sections are open, kept across items
     /// and launches.
     static let inspectorPropertiesOpen = "inspectorPropertiesOpen"
     static let inspectorRelationshipsOpen = "inspectorRelationshipsOpen"
+    static let inspectorLinksInPageOpen = "inspectorLinksInPageOpen"
+    static let inspectorLinkedFromOpen = "inspectorLinkedFromOpen"
     static let inspectorTagsOpen = "inspectorTagsOpen"
     /// Whether the window's toolbar shows a note's or item's title once the page's header has scrolled away.
     static let showsScrolledTitle = "showsScrolledTitle"
     /// Whether a note's or item's page backs the toolbar with a blurred band while content scrolls under it.
     static let showsPageToolbarBackground = "showsPageToolbarBackground"
-    static let all = [textSize, inspectorDetailsOpen, inspectorPropertiesOpen, inspectorRelationshipsOpen, inspectorTagsOpen, showsScrolledTitle, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
+    static let all = [textSize, inspectorDetailsOpen, inspectorPropertiesOpen, inspectorRelationshipsOpen, inspectorLinksInPageOpen, inspectorLinkedFromOpen, inspectorTagsOpen, showsScrolledTitle, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
 }
 
 enum InterfaceStyle {

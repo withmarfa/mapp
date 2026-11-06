@@ -106,13 +106,13 @@ struct InspectorEditingTests {
     // MARK: Folding
 
     @Test func everySectionHasItsOwnStoredKeyAndIsResetWithTheRest() {
-        let keys = InspectorSection.allCases.map(\.key)
-        #expect(Set(keys).count == InspectorSection.allCases.count)
+        let keys = InspectorSectionKind.allCases.map(\.key)
+        #expect(Set(keys).count == InspectorSectionKind.allCases.count)
         for key in keys { #expect(InterfaceKey.all.contains(key)) }
     }
 
     /// The height a section takes in a hosting view, whose stored fold state is `defaults`.
-    private static func height(of section: InspectorSection, in defaults: UserDefaults) -> CGFloat {
+    private static func height(of section: InspectorSectionKind, in defaults: UserDefaults) -> CGFloat {
         let view = InspectorSectionView(section, title: "Section") { Color.clear.frame(width: 100, height: 200) }
             .defaultAppStorage(defaults)
         return NSHostingView(rootView: view).fittingSize.height
@@ -124,7 +124,7 @@ struct InspectorEditingTests {
         defer { defaults.removePersistentDomain(forName: name) }
         let open = Self.height(of: .tags, in: defaults)
         #expect(open >= 200, "nothing stored: the content shows")
-        defaults.set(false, forKey: InspectorSection.tags.key)
+        defaults.set(false, forKey: InspectorSectionKind.tags.key)
         #expect(Self.height(of: .tags, in: defaults) < open - 100, "folded: only the heading")
         #expect(Self.height(of: .properties, in: defaults) == open, "another section is not folded with it")
     }
@@ -135,6 +135,17 @@ struct InspectorEditingTests {
         #expect(InspectorText.lineLimit(for: "29 Oct 2026 at 11:54 am", keepsOneLine: true) == 1)
         #expect(InspectorText.lineLimit(for: "a few words that wrap", keepsOneLine: false) == 3)
         #expect(InspectorText.lineLimit(for: "https://example.com/a/b", keepsOneLine: false) == 1)
+    }
+
+    @Test func aValueTakesWholeRowOnlyWhenItsLineIsWiderThanACell() {
+        #expect(!InspectorCellGrid.takesWholeRow(ideal: 120, column: 130))
+        #expect(!InspectorCellGrid.takesWholeRow(ideal: 130, column: 130))
+        #expect(InspectorCellGrid.takesWholeRow(ideal: 131, column: 130))
+    }
+
+    @Test func aCellValueOfWordsTakesTwoLinesAndOneWithoutSpacesTakesOne() {
+        #expect(InspectorText.lineLimit(for: "a few words that wrap", keepsOneLine: false, lines: InspectorMetrics.cellValueLines) == 2)
+        #expect(InspectorText.lineLimit(for: "https://example.com/a/b", keepsOneLine: false, lines: InspectorMetrics.cellValueLines) == 1)
     }
 
     @Test func theNameColumnFitsTheLongestNameWithinItsShare() {
