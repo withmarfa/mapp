@@ -283,8 +283,8 @@ struct ItemInspector: View {
     @ViewBuilder private var details: some View {
         if let source { InspectorDetailCell(name: String(localized: "Source"), value: source.name, mark: source.mark) }
         detail("Version", item.version.rawValue.formatted())
-        detail("Created", ItemDate.text(of: item.created, hasTime: true, format: dateFormat), isDate: true)
-        detail("Edited", ItemDate.text(of: item.modified, hasTime: true, format: dateFormat), isDate: true)
+        moment("Created", item.created)
+        moment("Edited", item.modified)
         if let place { detail("Place", place) }
         if case .file(let contentType, let byteCount) = item.content {
             detail("Kind", contentType.localizedDescription ?? String(localized: "File"))
@@ -302,6 +302,13 @@ struct ItemInspector: View {
 
     private func detail(_ name: LocalizedStringResource, _ value: String, isDate: Bool = false) -> some View {
         InspectorDetailCell(name: String(localized: name), value: value, isDate: isDate)
+    }
+
+    /// The day fits a cell beside its neighbor; the time stays in the help and in what Copy takes.
+    private func moment(_ name: LocalizedStringResource, _ date: Date) -> some View {
+        InspectorDetailCell(
+            name: String(localized: name), value: ItemDate.text(of: date, hasTime: false, format: dateFormat), isDate: true,
+            fullValue: ItemDate.text(of: date, hasTime: true, format: dateFormat))
     }
 
     // MARK: Contents
@@ -369,6 +376,8 @@ private struct InspectorDetailCell: View {
     var isDate = false
     /// An icon ID drawn before the value.
     var mark: String?
+    /// What the help and Copy give where the cell shows less than the whole value.
+    var fullValue: String?
 
     var body: some View {
         InspectorCell(name: name) {
@@ -377,8 +386,8 @@ private struct InspectorDetailCell: View {
                 InspectorText(text: value, keepsOneLine: isDate, lines: InspectorMetrics.cellValueLines)
             }
         }
-        .help(String(value.prefix(600)))
-        .contextMenu { Button("Copy") { InspectorPasteboard.copy(value) } }
+        .help(String((fullValue ?? value).prefix(600)))
+        .contextMenu { Button("Copy") { InspectorPasteboard.copy(fullValue ?? value) } }
     }
 }
 
