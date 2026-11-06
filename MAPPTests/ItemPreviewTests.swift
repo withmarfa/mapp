@@ -109,10 +109,30 @@ struct ItemMetaTests {
         #expect(ItemMeta.make(for: note, in: library, context: .init()).isEmpty)
     }
 
-    @Test func aFeedItemNamesTheInboxAnywhereButTheInbox() {
+    @Test func aFeedItemNamesNoTierOutsideTheInbox() {
         let feed = item("Clipped", tier: .feed)
         let library = FakeItemLibrary(items: [feed])
-        #expect(ItemMeta.make(for: feed, in: library, context: .init()).pieces.map(\.label) == ["Inbox"])
-        #expect(ItemMeta.make(for: feed, in: library, context: .init(isInbox: true)).isEmpty)
+        #expect(ItemMeta.make(for: feed, in: library, context: .init()).isEmpty)
+        #expect(ItemMeta.make(for: feed, in: library, context: .init(mixesTypes: true)).pieces.map(\.label) == ["Note"])
+    }
+
+    /// Reads the context as the note list does, from the items the place shows.
+    private func mixesTypes(in place: SidebarItem, of library: FakeItemLibrary) -> Bool {
+        let browser = Browser()
+        browser.show(place, in: library, order: NoteOrder())
+        let items = browser.sections(in: library, order: NoteOrder(), now: library.now()).flatMap(\.items)
+        return browser.metaContext(for: items).mixesTypes
+    }
+
+    @Test func aListNamesTheTypeOnlyWhereItsItemsMixTypes() {
+        let note = FakeItemLibrary.note("Note", modified: date)
+        let clipped = FakeItemLibrary.note("Clipped", modified: date, tier: .feed)
+        var task = item("Book rooms", type: "core.task")
+        task.tier = .feed
+        let library = FakeItemLibrary(items: [note, clipped, task], now: date)
+        #expect(mixesTypes(in: .allNotes, of: library))
+        #expect(mixesTypes(in: .inbox, of: library))
+        #expect(!mixesTypes(in: .itemType("core.note"), of: FakeItemLibrary(items: [note, clipped], now: date)))
+        #expect(!mixesTypes(in: .inbox, of: FakeItemLibrary(items: [note, clipped], now: date)))
     }
 }
