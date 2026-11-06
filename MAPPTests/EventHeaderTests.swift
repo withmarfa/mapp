@@ -35,7 +35,8 @@ struct EventHeaderTests {
         #expect(event.day == "29")
         #expect(event.weekday == "Thursday")
         #expect(event.time == "09:00 to 10:00")
-        #expect(event.zone == "London time (GMT)")
+        // The system's short name for a zone differs between machines.
+        #expect(["London time (GMT)", "London time (GMT+0)"].contains(event.zone))
         #expect(event.relative == "in 2 days")
     }
 
