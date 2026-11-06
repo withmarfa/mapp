@@ -90,7 +90,9 @@ body {
   flex-direction: column;
   align-items: flex-start;
   gap: 10px;
-  padding: 16px var(--inkkit-column-inset) 8px;
+  /* The top holds the row above the title, which takes no room of its own, so it appears without moving the page. */
+  padding: calc(var(--step) * 7) var(--inkkit-column-inset) 8px;
+  position: relative;
   font-family: -apple-system, system-ui, sans-serif;
   line-height: normal;
   -webkit-user-select: none;
@@ -219,6 +221,70 @@ body[data-text='none'] #editor {
   content: attr(data-placeholder);
   color: var(--placeholder);
   pointer-events: none;
+}
+
+/* The row above the title: Linked From and Customize Layout. Out of the flow, so showing it moves nothing, and only faded
+   (never hidden) while it rests, so the keyboard and VoiceOver reach it always. It shows with the pointer over it or the
+   title, with the keyboard in it, and for as long as Customize Layout is on. */
+.item-tools {
+  position: absolute;
+  top: calc(var(--step) * 1);
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--step) * 4.5);
+  box-sizing: border-box;
+  height: calc(var(--step) * 5);
+  padding: 0 var(--inkkit-column-inset);
+  font-size: var(--interface-text-size);
+  color: var(--label-secondary);
+  opacity: 0;
+}
+
+#item-header:has(.item-lead:hover) .item-tools,
+#item-header[data-layout='on'] .item-tools,
+.item-tools:hover,
+.item-tools:focus-within {
+  opacity: 1;
+}
+
+.item-tools[hidden],
+.item-tool[hidden] {
+  display: none;
+}
+
+.item-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(var(--step) * 1.25);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: default;
+}
+
+.item-tool:hover {
+  color: var(--label-primary);
+}
+
+.item-tool .item-glyph {
+  background: currentColor;
+}
+
+.item-tool[aria-pressed='true'] {
+  padding: calc(var(--step) * 0.5) calc(var(--step) * 1.75);
+  margin: 0 calc(var(--step) * -1.75);
+  border-radius: calc(var(--step) * 1.5);
+  background: color-mix(in srgb, var(--inkkit-accent-color) 16%, transparent);
+  color: var(--inkkit-accent-color);
+}
+
+.item-tool:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--inkkit-accent-color) 60%, transparent);
+  outline-offset: 2px;
 }
 
 .item-title-error {

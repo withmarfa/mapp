@@ -385,10 +385,8 @@ struct CommandPalette: View {
                 details.history = VersionHistoryRequest(item: only.id, undoManager: undoManager)
             }
         }
-        if let details, let only = one, PageCustomization.isAvailable(for: only) {
-            add(String(localized: "Customize Page…"), "slider.horizontal.3") {
-                details.pageCustomization = PageCustomizationRequest(item: only.id)
-            }
+        if let details, !details.isCustomizingLayout, let only = one, PageCustomization.isAvailable(for: only) {
+            add(String(localized: "Customize Layout…"), "slider.horizontal.3") { details.beginLayout() }
         }
         // These act on the whole selection, files too; what an item can't take is left alone and the person is told.
         let ids = Set(everything.map(\.id))

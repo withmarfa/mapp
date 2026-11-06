@@ -4,7 +4,7 @@ import Marfa
 import Testing
 @testable import MAPP
 
-/// What the Customize Page sheet and the inspector's Show on Page offer, which is only what the page can change.
+/// What Customize Layout and the inspector's Show on Page offer, which is only what the page can change.
 struct PageCustomizationTests {
     private static func field(_ name: String) -> TypeField {
         TypeField(name: name, type: "string", declaredBy: "x")

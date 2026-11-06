@@ -73,7 +73,7 @@ struct PagePlacementsTests {
         }
         // A core type declares its own fields as content, even one whose key ends the same way.
         #expect(placement.showsOnPage("source_id"))
-        // Show on Page and Customize Page override the default either way.
+        // Show on Page and Customize Layout override the default either way.
         var chosen = PagePlacements()
         chosen.setShown(true, row: "feed_hash", of: TypeID("rss.entry"))
         chosen.setShown(false, row: "url", of: TypeID("rss.entry"))

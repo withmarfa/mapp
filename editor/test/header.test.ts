@@ -1004,3 +1004,25 @@ test('a header with no pins draws none, and the pins follow what an event shows'
   expect(order.indexOf('item-pins')).toBeGreaterThan(order.indexOf('item-when'))
   expect(root.querySelector<HTMLElement>('.item-byline')!.hidden).toBe(true)
 })
+
+test('the row above the title counts what links here and starts or ends Customize Layout, lit while it is on', () => {
+  header.set({ ...ticket, linkedCount: 6, layoutOn: false })
+  const linked = root.querySelector<HTMLButtonElement>('#ItemLinkedFromTool')!
+  const layout = root.querySelector<HTMLButtonElement>('#ItemCustomizeLayoutTool')!
+  expect(linked.textContent).toBe('6 Linked From')
+  expect(layout.getAttribute('aria-pressed')).toBe('false')
+  linked.click()
+  layout.click()
+  expect(posted).toEqual([{ type: 'showLinked' }, { type: 'toggleLayout' }])
+
+  header.set({ ...ticket, linkedCount: 0, layoutOn: true })
+  expect(root.dataset.layout).toBe('on')
+  expect(layout.getAttribute('aria-pressed')).toBe('true')
+  expect(linked.hidden).toBe(true)
+
+  header.set({ ...ticket, layoutOn: null })
+  expect(
+    root.querySelector<HTMLElement>('.item-tools')!.hidden,
+    'a file has nothing to lay out',
+  ).toBe(true)
+})

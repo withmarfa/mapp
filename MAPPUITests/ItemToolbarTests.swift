@@ -94,7 +94,7 @@ final class ItemToolbarTests: XCTestCase {
     func testMoreHoldsTheItemActionsInOrder() {
         control("MoreToolbar").click()
         let titles = ["Quick Look", "Open in New Window", "Open Original", "Open in Browser", "Share…", "Remove from Favorites", "Add Tag…",
-                      "Change Type…", "Customize Page…", "Version History…", "Add to Collection…", "Add Attachment…",
+                      "Change Type…", "Customize Layout…", "Version History…", "Add to Collection…", "Add Attachment…",
                       "Page Width", "Show Markdown Source", "Print…", "Export as PDF…", "Delete"]
         var previous = -CGFloat.infinity
         for title in titles {

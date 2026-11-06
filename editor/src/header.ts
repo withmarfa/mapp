@@ -164,6 +164,11 @@ export interface HeaderModel {
   contents: HeaderLinked[]
   linked: HeaderLinked[]
   linkedFoldAfter: number
+  /** How many items link to this one, for the row above the title, wherever Linked From is shown. */
+  linkedCount?: number
+  /** Customize Layout in the row above the title: absent where the item cannot be laid out, else whether the mode is
+   *  on. The app decides both; the page only draws them and says when they are pressed. */
+  layoutOn?: boolean | null
   /** False where the page has no text to write, so the page draws no empty editor (`body[data-text='none']`): a
    *  collection with no text sends it. An empty editor only invites typing that a connector holding the item puts
    *  back, and MAPP cannot tell a connector's item from the person's until Marfa marks them read only (marfa issue
@@ -205,6 +210,7 @@ export interface HeaderLabels {
   propertyRejected: string
   parentRejected: string
   linkedFrom: string
+  customizeLayout: string
   /** What a collection's members are called. */
   contents: string
   showLess: string
@@ -226,6 +232,7 @@ const englishLabels: HeaderLabels = {
   propertyRejected: 'The value could not be saved. Please try again.',
   parentRejected: 'The connection could not be removed.',
   linkedFrom: 'Linked From',
+  customizeLayout: 'Customize Layout',
   contents: 'Contents',
   showLess: 'Show Less',
   timeline: 'Timeline',
@@ -365,6 +372,9 @@ class LinkedSection {
 export class ItemHeader {
   private model?: HeaderModel
   private readonly labels: HeaderLabels
+  private readonly tools: HTMLDivElement
+  private readonly linkedTool: HTMLButtonElement
+  private readonly layoutTool: HTMLButtonElement
   private readonly lead: HTMLDivElement
   private readonly avatar: HTMLSpanElement
   private readonly title: HTMLDivElement
@@ -404,6 +414,15 @@ export class ItemHeader {
     this.labels = { ...englishLabels, ...labels }
     root.hidden = true
     footer.hidden = true
+    // The row above the title takes no room of its own (`style.css`), so it appears under the pointer without moving the
+    // page, and it is in the page for the keyboard and for VoiceOver always.
+    this.tools = element('div', 'item-tools', root)
+    this.linkedTool = this.toolButton('ItemLinkedFromTool', () =>
+      postToHost({ type: 'showLinked' }),
+    )
+    this.layoutTool = this.toolButton('ItemCustomizeLayoutTool', () =>
+      postToHost({ type: 'toggleLayout' }),
+    )
     this.lead = element('div', 'item-lead', root)
     this.avatar = element('span', 'item-avatar', this.lead)
     this.avatar.setAttribute('aria-hidden', 'true')
@@ -757,6 +776,32 @@ export class ItemHeader {
     node.style.maskImage = `url("${icon.url}")`
   }
 
+  private toolButton(id: string, action: () => void): HTMLButtonElement {
+    const button = element('button', 'item-tool', this.tools)
+    button.type = 'button'
+    button.id = id
+    button.addEventListener('click', action)
+    return button
+  }
+
+  /** The row above the title: how many items link here, and Customize Layout, lit while the mode is on. */
+  private drawTools(model: HeaderModel) {
+    const count = model.linkedCount ?? 0
+    this.linkedTool.hidden = count === 0
+    this.linkedTool.replaceChildren()
+    this.glyph('arrow.down.left', this.linkedTool)
+    element('span', 'item-tool-text', this.linkedTool).textContent =
+      `${count} ${this.labels.linkedFrom}`
+    const on = model.layoutOn
+    this.layoutTool.hidden = on === undefined || on === null
+    this.layoutTool.replaceChildren()
+    this.glyph('rectangle.split.2x1', this.layoutTool)
+    element('span', 'item-tool-text', this.layoutTool).textContent = this.labels.customizeLayout
+    this.layoutTool.setAttribute('aria-pressed', String(on === true))
+    this.tools.hidden = this.linkedTool.hidden && this.layoutTool.hidden
+    this.root.dataset.layout = on ? 'on' : 'off'
+  }
+
   /** An address or number as plain text that opens it, in the link color. */
   private link(parent: HTMLElement, text: string, open: () => void, href: string): void {
     const link = element('a', 'item-link', parent)
@@ -836,6 +881,8 @@ export class ItemHeader {
       model.properties,
       model.contents,
       model.linked,
+      model.linkedCount,
+      model.layoutOn,
       model.showMore,
       model.showMoreContents,
       model.showMoreLinked,
@@ -847,6 +894,7 @@ export class ItemHeader {
     if (key === this.drawn) return
     this.drawn = key
 
+    this.drawTools(model)
     // Where a reading item came from, when it was published and how long it takes, as one quiet line.
     this.byline.replaceChildren()
     let first = true
