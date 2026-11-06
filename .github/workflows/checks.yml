@@ -8,8 +8,8 @@ name: Checks
 #   since it compiles none of the tests.
 # - The unit tests run one at a time with a 12 minute limit; a run that reaches it uploads samples of its test host
 #   as the `unit-test-diagnostics` artifact and fails. A failed test fails the check, and nothing is retried.
-# - The UI tests are only built here; they take over the keyboard and mouse, so the ones a change touches run
-#   locally before a merge, and the whole plan before a release.
+# - The UI tests are only built here; they take over the keyboard and mouse, so they run locally when a change
+#   needs them.
 # - A change to a workflow is checked by actionlint.
 # - Xcode Cloud archives tagged releases only.
 # The final job, "Checks", always runs; make it the one required check.
@@ -143,8 +143,8 @@ jobs:
         with:
           name: unit-test-diagnostics
           path: diagnostics
-      # The UI tests take over the keyboard and mouse, so they run locally (the ones a change touches before
-      # a merge, all of them before a release); here they are only built, so a change that breaks them is seen.
+      # The UI tests take over the keyboard and mouse, so they run locally when a change needs them; here they
+      # are only built, so a change that breaks them is seen.
       - name: Build the UI tests
         run: >
           xcodebuild -project MAPP.xcodeproj -scheme 'MAPP UI Tests' -destination 'platform=macOS'
