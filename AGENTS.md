@@ -22,7 +22,7 @@ Keep each file under 200 lines and each chain from this file to a nested one und
 - Work on a branch and reach `main` through a pull request, squash-merged once the tests pass and a reviewer has read it.
 - Make worktrees in `.claude/worktrees/` (`git worktree add .claude/worktrees/<name> -b <branch> origin/main`). Once merged, remove the worktree and its local branch (`git worktree remove`, then `git branch -D`: git sees a squash-merge as unmerged) and run `git pull --ff-only` on `main`. If git refuses a removal, report it rather than forcing it.
 - GitHub-hosted checks (`.github/workflows/checks.yml`) run on pull requests, each only when its files changed; `Checks` is the one job to require, and nothing is retried. A draft runs no Swift job: open as a draft, run the tests locally, and mark it ready once reviewed, so CI runs once. The workflow's comments say what each change runs.
-- Run only the tests a change touches, while working and before merging: unit suites with `-only-testing:MAPPTests/<Suite>`, and the UI tests that cover the changed screens with `-only-testing:MAPPUITests/<Class>`. CI runs the whole `Unit` plan once the pull request is ready. Run the whole `UI` plan before a release, not before a candidate.
+- Run only the tests a change touches, while working and before merging: unit suites with `-only-testing:MAPPTests/<Suite>`. CI runs the whole `Unit` plan once the pull request is ready. UI tests take over the keyboard and mouse, so run them (`-only-testing:MAPPUITests/<Class>`, or the whole `UI` plan) when a change needs them and the screen is free. No merge or release requires them, and CI builds them, so a change that breaks them is seen.
 - A test waits with `eventually` or `eventuallyAsking` (`MAPPTests/Waiting.swift`), never a loop of short sleeps. A suite with an `async` test carries `.hangLimit`, except a `Live` suite and `NavigationCostTests`; a test sets no limit of its own. A fixed sleep is only for checking that something did not happen, or letting an animation or scroll settle in a UI test, with a comment saying what it waits for.
 - A comment says only why, never what the code says.
 - Put no absolute paths, machine or account names, or credentials in any file.
@@ -84,6 +84,7 @@ TEST_RUNNER_MARFA_API_URL=<address> TEST_RUNNER_MARFA_API_KEY=<key> TEST_RUNNER_
 
 - Never commit a team identifier, a report destination (`MARFA_POSTHOG_HOST`, `MARFA_POSTHOG_PROJECT_TOKEN`) or a version. They go in the ignored `Config/Local.xcconfig`, and `MARKETING_VERSION` stays `0.0.0`. A build from this source signs to run locally and sends no reports.
 - A version exists only as a git tag (`v0.0.x`, candidates `v0.0.x-rcN`). Tag soon after a merge to `main` that changes what a person sees or does; tests, CI, docs and notes alone are not tagged. Before you sign, tag or check a release, read the README's Signing and Releasing sections: they hold the steps (candidates first, then the release, then App Store Connect to confirm).
+- TestFlight is for active testing with internal testers, so tag freely to get a change in front of them. Use a local build when a choice needs trying before it ships, or for the Debug-only tuning panel.
 
 ## Code Review Rules
 
