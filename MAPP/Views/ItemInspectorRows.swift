@@ -45,6 +45,8 @@ enum InspectorMetrics {
     /// down the inspector. The fold chevron sits beyond it, in `foldColumn`.
     static let trailingColumn: CGFloat = 20
     static let foldColumn: CGFloat = 14
+    /// The space between a heading's plus and the fold chevron.
+    static let foldGap: CGFloat = 4
 
     /// The width of the name column: the longest name shown, or `fallback` until one is measured, and never more
     /// than `maxNameShare` of the `available` width.
@@ -595,7 +597,7 @@ private struct InspectorTrailingColumn: ViewModifier {
         let scale = InterfaceStyle.scale(for: textSize)
         content
             .frame(width: InspectorMetrics.trailingColumn * scale)
-            .padding(.trailing, clearsFold ? InspectorMetrics.foldColumn * scale : 0)
+            .padding(.trailing, clearsFold ? (InspectorMetrics.foldColumn + InspectorMetrics.foldGap) * scale : 0)
     }
 }
 
