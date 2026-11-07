@@ -40,6 +40,7 @@ struct ItemPageHeader: ViewModifier {
                     drafts.draft(for: old, key: PagePlacement.parent).rejected = false
                     choosingParent = nil
                 }
+                ValueEditPresenter.shared.itemChanged(to: id)
                 editor.onHeaderEvent = handler
                 let library = library, drafts = drafts
                 editor.showHeader { Cost.measure(.pageHeader) { Self.header(of: id, in: library, drafts: drafts) } }
@@ -159,15 +160,17 @@ struct ItemPageHeader: ViewModifier {
                 draft.rejected = false
             case .menu(.status, let id, let rect):
                 guard editor.noteID == id, let item = library.item(id), let status = library.catalogue.itemTypes[item.type]?.statusField else { return }
-                let menu = NSMenu()
-                for choice in Self.statusChoices(of: item, in: status) {
-                    let entry = actionItem(ItemTypeInfo.Field.label(ofOption: choice)) {
-                        drafts.draft(for: id, key: status.key).rejected = !library.setItemProperty(id, key: status.key, value: .string(choice), undoManager: undoManager)
-                    }
-                    entry.state = PagePins.statusValue(of: item, in: status) == choice ? .on : .off
-                    menu.addItem(entry)
+                editor.presentEditor(Self.request(.status(status), of: id, in: library, drafts: drafts, undoManager: undoManager), under: rect)
+            case .edit(let row, let id, let rect):
+                guard editor.noteID == id, let item = library.item(id) else { return }
+                let kind: ValueEditKind?
+                if row == PagePlacement.tags {
+                    kind = item.canEditTags ? .tags : nil
+                } else {
+                    kind = library.catalogue.itemTypes[item.type]?.fields.first { $0.key == row }.flatMap(ValueEditKind.init(field:))
                 }
-                editor.popUpMenu(menu, under: rect)
+                guard let kind else { return }
+                editor.presentEditor(Self.request(kind, of: id, in: library, drafts: drafts, undoManager: undoManager), under: rect)
             case .toggleLayout:
                 drafts.toggleLayout()
             case .showLinked:
@@ -198,6 +201,19 @@ struct ItemPageHeader: ViewModifier {
                 menu.addItem(remove)
                 editor.popUpMenu(menu, under: rect)
             }
+        }
+    }
+
+    /// The editor for one of the item's values, which writes as the property row in the inspector does: through the
+    /// library, and marking the value rejected when it refuses.
+    private static func request(
+        _ kind: ValueEditKind, of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation, undoManager: UndoManager?
+    ) -> ValueEditRequest {
+        ValueEditRequest(kind: kind, library: library, item: id, undoManager: undoManager) { value in
+            guard let key = kind.field?.key else { return false }
+            let taken = library.setItemProperty(id, key: key, value: value, undoManager: undoManager)
+            drafts.draft(for: id, key: key).rejected = !taken
+            return taken
         }
     }
 

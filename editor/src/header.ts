@@ -46,11 +46,13 @@ export interface HeaderListedPerson {
 }
 
 /** One row of the property block, or one pin under the title (the app sends both in this shape). The status and parent
- *  rows hold the header's own buttons, which keep their menus; every other value is read only, and a link opens its
- *  item or its address. */
+ *  rows hold the header's own buttons, which keep their menus; a link opens its item or its address. A row the app
+ *  marks `editable` asks the app for its editor under the value; the page never decides which rows are. */
 export interface HeaderRow {
   id: string
   label: string
+  /** Whether the app opens an editor for the value, which the page asks for with `editValue`. */
+  editable?: boolean
   /** The SF Symbol name of the row's icon, a key of `HeaderIcons.symbols`. */
   symbol: string
   kind:
@@ -943,8 +945,40 @@ export class ItemHeader {
     const name = element('span', 'item-prop-name', term)
     name.textContent = row.label
     name.title = row.label
-    this.value(element('dd', 'item-prop-value', entry), row, model)
+    const value = element('dd', 'item-prop-value', entry)
+    this.value(value, row, model)
+    this.editor(entry, term, value, row, model)
     return entry
+  }
+
+  /** Makes an editable row ask for its editor. The label always does, so a value that is itself a link keeps its click;
+   *  the value does too where it holds no link. The editor opens under the value either way. */
+  private editor(
+    entry: HTMLElement,
+    term: HTMLElement,
+    value: HTMLElement,
+    row: HeaderRow,
+    model: HeaderModel,
+  ) {
+    if (!row.editable) return
+    entry.classList.add('editable')
+    const open = () => this.openEditor(value, row.id)
+    const reach = (node: HTMLElement) => {
+      node.tabIndex = 0
+      node.setAttribute('role', 'button')
+      node.addEventListener('click', open)
+      node.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        open()
+      })
+    }
+    reach(term)
+    term.setAttribute('aria-label', row.label)
+    if (!value.querySelector('a, button')) {
+      reach(value)
+      value.setAttribute('aria-label', `${row.label}: ${this.wholeValue(row, model)}`)
+    }
   }
 
   /** A pin: its key with the row's icon at 11 points, above its value on one line, cut with an ellipsis where it is
@@ -960,6 +994,7 @@ export class ItemHeader {
     const value = element('dd', 'item-pin-value', entry)
     value.title = this.wholeValue(row, model)
     this.value(value, row, model, true)
+    this.editor(entry, key, value, row, model)
     if (row.more) {
       const more = element('span', 'item-pin-more', value)
       more.textContent = `+${row.more}`
@@ -1055,6 +1090,19 @@ export class ItemHeader {
   rowAt(target: EventTarget | null): { item: string; row: string } | null {
     const row = (target as Element | null)?.closest?.<HTMLElement>('[data-row]')?.dataset.row
     return this.model && row ? { item: this.model.item, row } : null
+  }
+
+  /** Asks the app for the editor of a row's or a pin's value, with the value's frame as a menu's is. */
+  private openEditor(value: HTMLElement, row: string) {
+    if (!this.model) return
+    const rect = value.getBoundingClientRect()
+    postToHost({
+      type: 'editValue',
+      item: this.model.item,
+      row,
+      rect: [rect.left, rect.top, rect.width, rect.height],
+      viewportHeight: window.innerHeight,
+    })
   }
 
   private openMenu(pin: HTMLElement, menu: HeaderMenu) {

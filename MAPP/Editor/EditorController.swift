@@ -357,6 +357,12 @@ final class EditorController: NSObject {
         Task { menu.popUp(positioning: nil, at: NSPoint(x: rect.minX, y: rect.maxY + 4), in: container) }
     }
 
+    /// Opens a value's editor under `rect` of the page, as a pin's menu opens under the pin.
+    func presentEditor(_ request: ValueEditRequest, under rect: CGRect) {
+        // A system menu runs its own event loop, which waits until the page's message has been handled.
+        Task { ValueEditPresenter.shared.present(request, anchor: container, rect: rect) }
+    }
+
     /// A rect in the page's window, which starts below whatever covers the web view's top, in the container's
     /// coordinates.
     private func containerRect(_ rect: CGRect, viewportHeight: Double) -> CGRect {
@@ -643,6 +649,8 @@ final class EditorController: NSObject {
             onHeaderEvent(.titleDiscard(item))
         case .headerMenu(let menu, let item, let rect, let viewportHeight):
             onHeaderEvent(.menu(menu, item, containerRect(rect, viewportHeight: viewportHeight)))
+        case .editValue(let item, let row, let rect, let viewportHeight):
+            onHeaderEvent(.edit(row: row, item, containerRect(rect, viewportHeight: viewportHeight)))
         case .toggleLayout:
             onHeaderEvent(.toggleLayout)
         case .showLinked:
