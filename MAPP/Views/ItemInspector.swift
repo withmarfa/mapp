@@ -47,7 +47,6 @@ struct ItemInspectorHost: View {
                         await library.changeItemRelationship(id, field: relationship.field, adding: [], removing: [target], undoManager: undoManager)
                     },
                     tags: library.tags(of: item),
-                    onAddTag: { library.addTag($0, to: [id], undoManager: undoManager) },
                     onRemoveTag: { library.removeTag($0, from: [id], undoManager: undoManager) },
                     drafts: details,
                     placement: placement,
@@ -121,10 +120,9 @@ struct ItemInspector: View {
     let onOpen: (ItemID) -> Void
     let onEdit: (ItemRelationship) -> Void
     let onRemove: (ItemRelationship, ItemID) async -> Bool
-    /// The tags the person manages, which exclude the favorite tag, and what adds and removes one. A tag is added
-    /// by its text, which the library refuses with the reason.
+    /// The tags the person manages, which exclude the favorite tag, and what removes one. Tags are added in the value
+    /// editor, which reaches the library itself.
     var tags: [String] = []
-    var onAddTag: (String) -> ItemTag.Refusal? = { _ in nil }
     var onRemoveTag: (String) -> Void = { _ in }
     var drafts: DetailsPresentation? = nil
     /// What the page shows of this type's items, and what changes a row of it. A row not offered a change has no
@@ -144,8 +142,10 @@ struct ItemInspector: View {
     @State private var revealed: Set<String> = []
     /// The property just added, whose row opens ready to edit.
     @State private var adding: String?
-    /// Whether the Tags heading's plus has opened the field for a new tag.
-    @State private var addingTag = false
+    /// Where the Tags heading's plus opens the tag editor.
+    @State private var tagAnchor = ValueEditAnchorBox()
+    @Environment(\.library) private var library
+    @Environment(\.undoManager) private var undoManager
 
     var body: some View {
         ScrollView {
@@ -196,6 +196,7 @@ struct ItemInspector: View {
                 ItemPropertyRow(definition: field, value: item.value(of: field.key), isEditable: item.isEditable,
                                 // A property the person has touched stays listed, even once cleared.
                                 onChange: { revealed.insert(field.key); return onProperty(field.key, $0) },
+                                item: item.id,
                                 retainedDraft: drafts?.draft(for: item.id, key: field.key),
                                 startsEditing: adding == field.key,
                                 // The window holds the draft, so folding this section does not give it back.
@@ -252,16 +253,21 @@ struct ItemInspector: View {
 
     private var tagSection: some View {
         InspectorSectionView(.tags, title: "Tags", count: tags.count,
-                             placeholder: tags.isEmpty && !addingTag && (drafts?.draft(for: item.id, key: "new-tag").text ?? "").isEmpty
-                                 ? "No Tags" : nil, add: { hovering in
+                             placeholder: tags.isEmpty ? "No Tags" : nil, add: { hovering in
             if item.canEditTags {
-                InspectorPlusButton(accessibilityLabel: "Add Tag", identifier: "ItemTagAdd", isRowHovered: hovering) { addingTag = true }
+                InspectorPlusButton(accessibilityLabel: "Add Tag", identifier: "ItemTagAdd", isRowHovered: hovering, action: addTag)
             }
         }) {
-            ItemTagsSection(tags: tags, isEditable: item.canEditTags, retainedDraft: drafts?.draft(for: item.id, key: "new-tag"),
-                            onAdd: onAddTag, onRemove: onRemoveTag, isAdding: $addingTag)
+            ItemTagsSection(tags: tags, isEditable: item.canEditTags, onRemove: onRemoveTag)
         }
+        .background(ValueEditAnchor(box: tagAnchor))
         .showOnPageMenu(isShown: placement.showsOnPage(PagePlacement.tags), onChange: showOnPage(PagePlacement.tags))
+    }
+
+    private func addTag() {
+        guard let library, let view = tagAnchor.view else { return }
+        ValueEditPresenter.shared.present(
+            ValueEditRequest(kind: .tags, library: library, item: item.id, undoManager: undoManager) { _ in false }, anchor: view)
     }
 
     /// The items that link to this one, in a section of their own.

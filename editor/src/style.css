@@ -756,6 +756,22 @@ body[data-text='none'] #editor {
   min-width: 0;
 }
 
+/* A value the app edits in a panel under it: the label and, where it holds no link, the value both open it. The value
+   darkens under the pointer so it reads as something to click, and shows a ring for the keyboard. */
+.editable > [role='button'] {
+  border-radius: 6px;
+}
+
+.editable > .item-prop-value[role='button']:hover,
+.editable > .item-pin-value[role='button']:hover {
+  background: var(--label-quinary);
+}
+
+.editable > [role='button']:focus-visible {
+  outline: 2px solid var(--inkkit-accent-color);
+  outline-offset: 1px;
+}
+
 /* A symbol the app drew, quiet in the secondary color. */
 .item-glyph {
   flex: none;

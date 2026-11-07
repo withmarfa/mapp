@@ -50,6 +50,9 @@ nonisolated enum EditorMessage: Sendable {
     case titleDiscard(ItemID)
     /// A pin asks for its menu, with the pin's frame in the page's window and the height of that window.
     case headerMenu(PageHeaderMenu, ItemID, CGRect, viewportHeight: Double)
+    /// A property row's or a pin's value asks for its editor under it, with the row's identifier and the value's
+    /// frame, as a pin's is.
+    case editValue(ItemID, row: String, CGRect, viewportHeight: Double)
     /// Customize Layout, in the row above the title, was pressed.
     case toggleLayout
     /// Linked From, in the row above the title, was pressed.
@@ -133,6 +136,12 @@ nonisolated enum EditorMessage: Sendable {
                   let viewportHeight = (dict["viewportHeight"] as? NSNumber)?.doubleValue, viewportHeight.isFinite
             else { return nil }
             self = .headerMenu(menu, ItemID(item), CGRect(x: rect[0], y: rect[1], width: rect[2], height: rect[3]), viewportHeight: viewportHeight)
+        case "editValue":
+            guard let item = dict["item"] as? String, let row = dict["row"] as? String, !row.isEmpty,
+                  let rect = (dict["rect"] as? [NSNumber])?.map(\.doubleValue), rect.count == 4, rect.allSatisfy(\.isFinite),
+                  let viewportHeight = (dict["viewportHeight"] as? NSNumber)?.doubleValue, viewportHeight.isFinite
+            else { return nil }
+            self = .editValue(ItemID(item), row: row, CGRect(x: rect[0], y: rect[1], width: rect[2], height: rect[3]), viewportHeight: viewportHeight)
         case "toggleLayout":
             self = .toggleLayout
         case "showLinked":

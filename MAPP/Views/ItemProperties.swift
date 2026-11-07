@@ -3,7 +3,8 @@ import SwiftUI
 
 /// One property of an item as a row of the inspector, drawn with the system's own controls so they behave as they do
 /// everywhere else: a text or number value is a borderless text field that looks like plain text until it is used, a
-/// choice is a pop-up menu, a yes/no is a checkbox and a date opens a calendar. Each row keeps unfinished input until
+/// choice, a status, a date and a list of people open in a panel under the value (`ValueEditPresenter`), and a yes/no
+/// is a checkbox. Each row keeps unfinished input until
 /// it is committed; unrelated inspector updates do not replace it, and a change made elsewhere meanwhile is never
 /// written over silently.
 struct ItemPropertyRow: View {
@@ -12,10 +13,12 @@ struct ItemPropertyRow: View {
     let value: PropertyValue?
     let isEditable: Bool
     let onChange: (PropertyValue?) -> Bool
+    /// The item the value belongs to, which the panel under it reads the value from and closes with. A row for a value
+    /// no item holds yet (quick add's, a change of type's) has none.
+    var item: ItemID? = nil
     var retainedDraft: ItemPropertyDraft? = nil
-    /// A row the person has just added opens ready to edit: a text or number field takes the keyboard and a date
-    /// shows its calendar. A menu cannot be opened from code, so a choice reads "Choose" and a yes/no waits for a
-    /// click.
+    /// A row the person has just added opens ready to edit: a text or number field takes the keyboard and a value
+    /// that opens a panel shows it. A yes/no waits for a click.
     var startsEditing = false
     /// Whether the row writes or hands back what was typed when it leaves the screen. A row whose draft belongs to a
     /// window (the inspector's) or to a sheet that may be cancelled leaves that to its owner: a section folded, or a
@@ -29,8 +32,9 @@ struct ItemPropertyRow: View {
     @Environment(\.interfaceTextSize) private var textSize
     @Environment(\.openURL) private var openURL
     @Environment(\.library) private var library
+    @Environment(\.undoManager) private var undoManager
     @State private var localDraft = ItemPropertyDraft()
-    @State private var choosingDate = false
+    @State private var anchor = ValueEditAnchorBox()
     /// Whether a link's text is being edited, as opposed to followed.
     @State private var editing = false
     /// A status field's value has the status's ring.
@@ -41,7 +45,7 @@ struct ItemPropertyRow: View {
     var body: some View {
         InspectorRow(fieldLabel: definition.label) {
             VStack(alignment: .leading, spacing: 4) {
-                core
+                core.background(ValueEditAnchor(box: anchor))
                 if let invalidValue {
                     Text(invalidValue).interfaceFont(.caption).foregroundStyle(.orange)
                 }
@@ -71,15 +75,23 @@ struct ItemPropertyRow: View {
     @ViewBuilder private var core: some View {
         if case .list(let shape) = definition.kind {
             // The list tells its own refusals, beside the entry they are about.
-            ListEntriesEditor(
-                shape: shape, label: definition.label, key: definition.key, value: value, isEditable: isEditable,
-                editing: input.list, isWriting: isWriting, onChange: onChange)
+            VStack(alignment: .leading, spacing: 8) {
+                ListEntriesEditor(
+                    shape: shape, label: definition.label, key: definition.key, value: value, isEditable: isEditable,
+                    editing: input.list, isWriting: isWriting, onChange: onChange)
+                if isEditable, editKind != nil {
+                    Button { openEditor() } label: { Label("Add Person…", systemImage: "person.badge.plus") }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Add Person to \(definition.label)")
+                        .accessibilityIdentifier("ItemListAddPerson.\(definition.key)")
+                }
+            }
         } else if definition.kind == .boolean {
             checkbox
         } else if isEditable {
             switch definition.kind {
-            case .choice, .status: choiceMenu()
-            case .date: dateButton
+            case .choice, .status: editorButton(placeholder: "Choose", hint: "Opens a list of choices")
+            case .date: editorButton(placeholder: "None", hint: "Opens a calendar", oneLine: true)
             case .text, .number:
                 if link != nil, !editing, !input.isDirty { linkText } else { textField }
             case .other, .list: plain
@@ -279,57 +291,46 @@ struct ItemPropertyRow: View {
 
     private func beginEditing() async {
         await Task.yield()
+        if editKind != nil {
+            openEditor()
+            return
+        }
         switch definition.kind {
-        case .date: choosingDate = true
         case .text, .number: isFocused = true
         default: break
         }
     }
 
-    /// The options of a choice, in the system's pop-up menu: it takes typing to jump to an option, and a long option
-    /// is cut inside the value column.
-    private func choiceMenu() -> some View {
-        let current = value?.string
-        let text = current.map { Text(verbatim: ItemTypeInfo.Field.label(ofOption: $0)) }
-        return Menu {
-            Picker(LocalizedStringKey(definition.label), selection: Binding {
-                current ?? ""
-            } set: { selected in
-                input.rejected = !onChange(selected.isEmpty ? nil : .string(selected))
-            }) {
-                Text("Not Set").tag("")
-                ForEach(definition.options(including: current), id: \.self) {
-                    Text(verbatim: ItemTypeInfo.Field.label(ofOption: $0)).tag($0)
-                }
-            }
-            .pickerStyle(.inline)
-            .labelsHidden()
-        } label: {
-            choiceLabel(text, placeholder: "Choose")
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .menuStyle(.button)
-        .menuIndicator(.hidden)
-        .buttonStyle(.plain)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityLabel(LocalizedStringKey(definition.label))
-        .accessibilityValue(text ?? Text("Not Set"))
-        .accessibilityIdentifier("ItemProperty.\(definition.key)")
+    // MARK: Panel
+
+    /// How the value is edited in a panel under it, or nil where it is edited in the row.
+    private var editKind: ValueEditKind? { ValueEditKind(field: definition) }
+
+    private func openEditor() {
+        guard isEditable, let kind = editKind, let library, let view = anchor.view else { return }
+        let request = ValueEditRequest(
+            kind: kind, library: library, item: item, heldValue: value, undoManager: undoManager,
+            write: { [input] new in
+                let taken = onChange(new)
+                if !isList { input.rejected = !taken }
+                return taken
+            })
+        ValueEditPresenter.shared.present(request, anchor: view)
     }
 
-    /// The value reads as a person writes a date, and changes only through the calendar, so what is stored is
-    /// always one of the forms Marfa takes.
-    private var dateButton: some View {
-        Button { choosingDate = true } label: {
-            choiceLabel(dateText.map { Text(verbatim: $0) }, placeholder: "None", oneLine: true)
+    /// The value at rest, which a click opens in its panel: a choice, a status or a date. It reads as a person writes a
+    /// date, and changes only through the panel, so what is stored is always one of the forms Marfa takes.
+    private func editorButton(placeholder: LocalizedStringKey, hint: LocalizedStringKey, oneLine: Bool = false) -> some View {
+        let text = definition.kind.isDate ? dateText : value?.string.map { ItemTypeInfo.Field.label(ofOption: $0) }
+        return Button { openEditor() } label: {
+            choiceLabel(text.map { Text(verbatim: $0) }, placeholder: placeholder, oneLine: oneLine)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(.rect)
         }
         .buttonStyle(.plain)
-        .popover(isPresented: $choosingDate, arrowEdge: .bottom) { datePicker }
         .accessibilityLabel(LocalizedStringKey(definition.label))
-        .accessibilityValue(dateText.map { Text(verbatim: $0) } ?? Text("Not Set"))
-        .accessibilityHint("Opens a calendar")
+        .accessibilityValue(text.map { Text(verbatim: $0) } ?? Text("Not Set"))
+        .accessibilityHint(hint)
         .accessibilityIdentifier("ItemProperty.\(definition.key)")
     }
 
@@ -340,57 +341,6 @@ struct ItemPropertyRow: View {
     private var dateText: String? {
         guard let text = value?.string, !text.isEmpty else { return nil }
         return ItemDate.parse(text)?.text(format: dateFormat) ?? text
-    }
-
-    private var storedDate: ItemDate? { value?.string.flatMap { ItemDate.parse($0) } }
-
-    /// A `datetime` field may hold a day or a moment, so it shows a time only once the value has one or the person
-    /// asks for one; a `date` field never does.
-    private var allowsTime: Bool {
-        if case .date(let includesTime) = definition.kind { includesTime } else { false }
-    }
-
-    private var datePicker: some View {
-        let hasTime = allowsTime && (storedDate?.hasTime ?? false)
-        return VStack(alignment: .leading, spacing: 10) {
-            DatePicker("Choose Date", selection: Binding {
-                storedDate?.date ?? Date()
-            } set: { setDate($0, includingTime: hasTime) }, displayedComponents: hasTime ? [.date, .hourAndMinute] : [.date])
-            .datePickerStyle(.graphical)
-            .labelsHidden()
-            .accessibilityIdentifier("ItemPropertyDate.\(definition.key)")
-            if allowsTime {
-                Toggle("Time", isOn: Binding { hasTime } set: { include in
-                    setDate(storedDate?.date ?? Date(), includingTime: include)
-                })
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .accessibilityIdentifier("ItemPropertyTime.\(definition.key)")
-            }
-            HStack {
-                // The picker already shows today for an empty date, and picking the day it shows may change nothing.
-                Button("Today") { setDate(Date(), includingTime: hasTime) }
-                    .accessibilityIdentifier("ItemPropertyToday.\(definition.key)")
-                Spacer()
-                Button("Clear") { clearDate() }
-                    .disabled(value == nil)
-                    .accessibilityIdentifier("ItemPropertyClear.\(definition.key)")
-            }
-            .buttonStyle(.borderless)
-        }
-        .padding(12)
-        .fixedSize()
-    }
-
-    private func setDate(_ selected: Date, includingTime: Bool) {
-        let text = includingTime ? ItemDate.instant(selected) : ItemDate.day(selected)
-        input.rejected = !onChange(.string(text))
-        if !input.rejected { input.text = text; input.isDirty = false }
-    }
-
-    private func clearDate() {
-        input.rejected = !onChange(nil)
-        if !input.rejected { input.text = ""; input.isDirty = false; choosingDate = false }
     }
 
     /// The field that edits a value: the system's borderless text field, which reads as plain text at rest and shows
@@ -428,6 +378,7 @@ struct ItemPropertyRow: View {
         switch (definition.kind, value) {
         case (.text, .string), (.boolean, .bool), (.number, .number): valid = true
         case (.choice(let choices), .string(let text)): valid = choices.contains(text)
+        case (.status, .string(let text)): valid = definition.statusGroup(of: text) != nil
         case (.date, .string): valid = definition.kind.accepts(value)
         case (.other, _): valid = true
         case (.list, _): valid = definition.accepts(value)
