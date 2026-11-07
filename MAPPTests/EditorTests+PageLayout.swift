@@ -189,23 +189,30 @@ extension EditorTests {
         header.pins = [
             PropertyRow(id: PagePlacement.when, label: "When", value: .when(time, help: time + "\nAuckland time (NZST), in 2 days")),
             PropertyRow(id: PagePlacement.type, label: "Type", value: .type("Event", icon: nil)),
+            PropertyRow(id: PagePlacement.source, label: "Source", value: .source("Calendar")),
+            PropertyRow(id: PagePlacement.updated, label: "Updated", value: .date("Today")),
         ]
         page.editor.setHeader(header)
-        // How far the time is cut off in its slot, and how far the page runs past what it shows.
+        // How far the time is cut off in its slot, and how far the last pin runs past the pins' box.
         let measure = """
             (() => {
               const value = document.querySelector("[data-pin='#when'] .item-text")
-              if (!value) return null
-              return [value.scrollWidth - value.clientWidth, document.documentElement.scrollWidth - document.documentElement.clientWidth]
+              const pins = document.querySelector('.item-pins')
+              const last = document.querySelector('.item-pin-item:last-child')
+              if (!value || !pins || !last) return null
+              return [value.scrollWidth - value.clientWidth, Math.ceil(last.getBoundingClientRect().right - pins.getBoundingClientRect().right)]
             })()
             """
         let wide = try await Self.show(page, width: 760)
         defer { wide.orderOut(nil); wide.contentView = nil; wide.close() }
         let onWide = try #require(try await settle(page.editor, measure, as: [Int].self) { $0?.count == 2 })
         #expect(onWide[0] <= 0, "the time is cut off by \(onWide[0]) points with room to spare")
-        wide.setContentSize(NSSize(width: 260, height: wide.frame.height))
-        _ = try await eventuallyAsking { try await page.editor.webView.evaluateJavaScript("innerWidth") as? Int == 260 }
-        let onNarrow = try #require(try await settle(page.editor, measure, as: [Int].self) { $0?.count == 2 })
-        #expect(onNarrow[1] <= 0, "the page is \(onNarrow[1]) points wider than it shows")
+        #expect(onWide[1] <= 0, "the last pin runs \(onWide[1]) points past the column")
+        for width in [660, 260] {
+            wide.setContentSize(NSSize(width: CGFloat(width), height: wide.frame.height))
+            _ = try await eventuallyAsking { try await page.editor.webView.evaluateJavaScript("innerWidth") as? Int == width }
+            let measured = try #require(try await settle(page.editor, measure, as: [Int].self) { $0?.count == 2 })
+            #expect(measured[1] <= 0, "at \(width) points the last pin runs \(measured[1]) points past the column")
+        }
     }
 }

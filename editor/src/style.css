@@ -625,6 +625,7 @@ body[data-text='none'] #editor {
 
 .item-pin-item[data-pin='#when'] {
   min-width: var(--pin-slot);
+  max-width: calc(100cqw - var(--pin-slot) * 2);
 }
 
 @container (max-width: 46.15em) {
@@ -634,7 +635,9 @@ body[data-text='none'] #editor {
   }
 
   .item-pin-item[data-pin='#when'] {
+    grid-column: 1 / -1;
     min-width: 0;
+    max-width: none;
   }
 }
 

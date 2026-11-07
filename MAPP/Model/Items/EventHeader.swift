@@ -77,7 +77,7 @@ nonisolated struct EventHeader: Hashable, Sendable {
                 time = dayText(first, in: inZone)
                 span = String(localized: "All day")
             } else {
-                time = String(localized: "\(dayText(first, in: inZone)) to \(dayText(last, in: inZone))")
+                time = String(localized: "\(dayText(first, in: inZone)) to \(dayText(last, in: inEndZone))")
                 span = nil
             }
             zone = nil
