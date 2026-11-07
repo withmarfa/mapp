@@ -585,9 +585,10 @@ body[data-text='none'] #editor {
 }
 
 /* The pins: a key above its value, 16 points under the title and 20 above the property block. Each sits in a slot of a
-   fixed width, 150 points in the 13 point design, so a pin stays where it is from page to page. Four slots share a row
-   while they fit and then two do, by the width of the page's column and not of the window (a container query on the box
-   round the list, in the box's own em, which follows the interface's text size). */
+   fixed width, 150 points in the 13 point design, so a pin stays where it is from page to page. The slots fill a row
+   while another fits and wrap only when none does, by the width of the page's column and not of the window (the
+   list is a flex row that wraps, in the box round it, which is a container so its width is the column's). The app
+   sends at most four pins. */
 .item-pins {
   --pin-slot: calc(var(--interface-text-size) * 150 / 13);
   container-type: inline-size;
@@ -601,44 +602,31 @@ body[data-text='none'] #editor {
 }
 
 .item-pin-list {
-  display: grid;
-  grid-template-columns: repeat(4, var(--pin-slot));
-  align-items: start;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: calc(var(--step) * 4) 0;
   margin: 0;
   padding: 0;
 }
 
+/* A column narrower than a slot gives each pin its width. */
 .item-pin-item {
   box-sizing: border-box;
   display: flex;
+  flex: none;
   flex-direction: column;
   gap: calc(var(--step) * 1.25);
+  width: var(--pin-slot);
   min-width: 0;
+  max-width: 100%;
   padding-inline-end: calc(var(--step) * 2);
 }
 
-/* An event's time is a range as often as not, so its slot takes the room it needs and the others give way. */
-.item-pin-list:has(> [data-pin='#when']) {
-  grid-template-columns: max-content repeat(3, minmax(0, var(--pin-slot)));
-}
-
+/* An event's time is a range as often as not, so its slot takes the room it needs, and the others wrap round it. */
 .item-pin-item[data-pin='#when'] {
-  min-width: var(--pin-slot);
-  max-width: calc(100cqw - var(--pin-slot) * 2);
-}
-
-@container (max-width: 46.15em) {
-  .item-pin-list,
-  .item-pin-list:has(> [data-pin='#when']) {
-    grid-template-columns: repeat(2, minmax(0, var(--pin-slot)));
-  }
-
-  .item-pin-item[data-pin='#when'] {
-    grid-column: 1 / -1;
-    min-width: 0;
-    max-width: none;
-  }
+  width: auto;
+  min-width: min(var(--pin-slot), 100%);
 }
 
 .item-pin-key {
