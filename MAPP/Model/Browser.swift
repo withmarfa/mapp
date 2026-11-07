@@ -7,7 +7,11 @@ import Observation
 final class Browser {
     var sidebarItem: SidebarItem? = .allNotes {
         // A scroll position belongs to the place and layout it was made in.
-        didSet { if sidebarItem != oldValue { listMemory.scrollOffset = nil } }
+        didSet {
+            guard sidebarItem != oldValue else { return }
+            listMemory.scrollOffset = nil
+            viewPanelPlaceChanged()
+        }
     }
     /// Whether the sidebar's Types block lists every type rather than the first few. The window mounts its split view
     /// afresh when the place changes shape (list, gallery, index, Settings), which drops the sidebar's own state, so
@@ -32,7 +36,10 @@ final class Browser {
     @ObservationIgnored private var isSelectingAutomatically = false
     var viewMode: ItemViewMode = .list {
         didSet {
-            if viewMode != oldValue { listMemory.scrollOffset = nil }
+            if viewMode != oldValue {
+                listMemory.scrollOffset = nil
+                recordLayout()
+            }
             isCollectionItemPresented = false
             if viewMode.spansWindow { focusRequest = .list }
         }
@@ -138,7 +145,7 @@ final class Browser {
     /// collections and sources have no layout, so they leave it as it is for the place that follows to judge.
     func fallBackToListIfUnavailable(in library: any ItemLibrary) {
         guard !showsSidebarIndex, !showsSettings, !availableViewModes(in: library).contains(viewMode) else { return }
-        viewMode = .list
+        set(layout: .list)
     }
     /// How each place's table is grouped, sorted and filtered, as the person left it, for the life of the window.
     var tableOptions: [SidebarItem: ItemTableOptions] = [:]
@@ -638,9 +645,10 @@ final class Browser {
         undoManager?.removeAllActions()
         tableOptions = [:]
         viewSeeds = [:]
-        viewEditing = nil
-        viewTitleForm?.handOff(because: .libraryChanged)
-        viewTitleForm = nil
+        deletingView = nil
+        viewPanel?.form?.handOff(because: .libraryChanged)
+        viewPanel = nil
+        viewWorking = [:]
         compactBoards = [:]
         timelineFields = [:]
         selection = []
@@ -721,11 +729,19 @@ final class Browser {
 
     // MARK: Saved views
 
-    var viewEditing: ViewEditing?
+    /// The view the window asks the person to confirm deleting.
+    var deletingView: ItemID?
 
-    /// The title the view sheet holds until the server takes it, kept here so a window that closes or changes
-    /// library can give it back.
-    var viewTitleForm: ViewTitleForm?
+    /// The right sidebar's panel for editing a view, while it is open (`Browser+ViewPanel`). It holds the new view's
+    /// name until the server takes it, so a window that closes or changes library can give it back.
+    var viewPanel: ViewPanel?
+
+    /// The layout, columns and empty groups the person changed in each view and has not saved (`Browser+SavedViews`).
+    var viewWorking: [ItemID: ViewMacSettings] = [:]
+
+    /// Where this Mac's settings for views are kept. A test gives its own.
+    @ObservationIgnored var defaults: UserDefaults = .standard
+    @ObservationIgnored var isApplyingLayout = false
 
     /// The order and grouping each view opened with (`Browser+SavedViews`).
     var viewSeeds: [ItemID: ViewSeed] = [:]

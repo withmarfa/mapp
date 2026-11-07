@@ -1,143 +1,45 @@
 import SwiftUI
 
-/// Saving what a window shows as a view on the Marfa server, and updating, renaming and deleting the view it shows.
-/// Each needs the server, so each is offered only while the library can reach it (`ItemLibrary.reachesServer`).
-enum SavedViews {
-    /// Whether the window's place can be saved as a view: Recents, Recently Deleted, the indexes, a single favorite
-    /// and a collection cannot.
-    static func canSave(_ browser: Browser, in library: any ItemLibrary) -> Bool {
-        library.isLoaded && library.reachesServer && !browser.showsSettings && !browser.showsSidebarIndex
-            && ViewDraft.query(for: browser.item, catalogue: library.catalogue, views: library.views) != nil
-    }
-
-    /// The view the window shows, while the library holds it.
-    static func shown(_ browser: Browser, in library: any ItemLibrary) -> LibraryView? {
-        guard !browser.showsSettings, case .view(let id) = browser.item else { return nil }
-        return library.views.first { $0.id == id }
-    }
-
-    /// What the window shows, as the table works it out. Every layout applies the place's filters.
-    static func window(_ browser: Browser, in library: any ItemLibrary) -> ViewDraft.Window {
-        let content = browser.tableContent(in: library)
-        let options = browser.tableOptions[browser.item] ?? ItemTableOptions()
-        let search = browser.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        // The table's own grouping by status is not one the list or the gallery shows.
-        var grouping = content.grouping
-        if (browser.viewMode == .list || browser.viewMode == .gallery), case .automatic = options.grouping { grouping = nil }
-        var seededTypes: [String]?
-        if case .view(let id) = browser.item { seededTypes = browser.viewSeeds[id]?.types }
-        return ViewDraft.Window(
-            place: browser.item, columns: content.columns, sort: content.sort, grouping: grouping,
-            filters: options.filters, negated: options.negated, search: search.isEmpty ? nil : search,
-            layout: layout(of: browser, in: library, order: nil), timelineDate: browser.timelineFields[browser.item],
-            seededTypes: seededTypes)
-    }
-
-    /// What the window shows in the layout it shows it in, with that layout's own order and grouping, so a new
-    /// view keeps what the person sees.
-    static func window(_ browser: Browser, in library: any ItemLibrary, order: NoteOrder) -> ViewDraft.Window {
-        var window = window(browser, in: library)
-        window.layout = layout(of: browser, in: library, order: order)
-        return window
-    }
-
-    /// The layout the window shows. Without the list's order, which only a new view takes, a list or a gallery is
-    /// read as the table is.
-    private static func layout(of browser: Browser, in library: any ItemLibrary, order: NoteOrder?) -> ViewDraft.Layout {
-        switch browser.viewMode {
-        case .table:
-            return .table
-        case .list, .gallery:
-            // The sort and group the person set, or the view's, are what the list and the gallery show.
-            guard let order, browser.listShape?.arranged != true else { return .table }
-            return .list(order)
-        case .board:
-            let fields = browser.boardFieldChoices(in: library)
-            let field = ItemBoardLayout.selectedField(browser.boardFieldKey(in: browser.item), available: fields)
-            return .board(key: field?.key, label: field?.label ?? "")
-        case .timeline:
-            let fields = browser.timelineFieldChoices(in: library)
-            let key = ItemTimelineLayout.selectedField(browser.timelineFields[browser.item], fields: fields)
-            return .timeline(key: key, label: fields.first { $0.key == key }?.label ?? "")
-        }
-    }
-
-    /// Saves the view the window shows with the window's choices, asking first when it would leave some of the
-    /// window out, or leave conditions of the view's filter the table cannot show as they are.
-    static func update(_ browser: Browser, in library: any ItemLibrary) {
-        guard let shown = shown(browser, in: library),
-              let update = browser.viewUpdate(window(browser, in: library), in: library) else { return }
-        guard update.unkept.isEmpty, update.change.query == nil || update.unchanged.isEmpty else {
-            browser.viewEditing = .update(shown.id)
-            return
-        }
-        Task { await save(update, of: shown.id, browser: browser, library: library) }
-    }
-
-    /// Saves the window's choices to the view at the version they were made on. A view changed elsewhere since is
-    /// not overwritten: the window goes back to the view as it is.
-    static func save(
-        _ update: Browser.ViewUpdate,
-        of id: ItemID, browser: Browser, library: any ItemLibrary
-    ) async {
-        // The window's filters may differ only in ones the view never held, so the window goes back to the view.
-        guard !update.change.isEmpty else { return browser.viewUpdated(update.view, in: library) }
-        switch await library.changeView(id, update.change, baseVersion: update.baseVersion) {
-        case .success(let view): browser.viewUpdated(view, in: library)
-        case .failure(let failure) where failure.kind == .conflict: browser.viewRefused(id, in: library)
-        case .failure: break
-        }
-    }
-
-    static func describe(_ unkept: ViewDraft.Unkept) -> String {
-        switch unkept {
-        case .search(let text): String(localized: "The search for “\(text)”")
-        case .filter(let column): String(localized: "The filter on \(column)")
-        case .mixedFilters: String(localized: "Filters that would join conditions with both “and” and “or”")
-        case .tooManyFilters: String(localized: "More than \(ViewDraft.maxConditions) filter conditions")
-        case .refused(let message): String(localized: "A filter Marfa refuses: \(message)")
-        case .sort(let column): String(localized: "Sorting by \(column)")
-        case .group(let column): String(localized: "Grouping by \(column)")
-        case .dateSections: String(localized: "The list’s sections by date")
-        }
-    }
-}
-
 /// The saved-view commands as the command palette lists them.
 struct SavedViewCommand {
     let title: String
     let systemImage: String
     let action: () -> Void
 
-    static func commands(for browser: Browser, in library: any ItemLibrary) -> [SavedViewCommand] {
-        guard library.reachesServer else { return [] }
+    static func commands(for browser: Browser, in library: any ItemLibrary, order: NoteOrder) -> [SavedViewCommand] {
         var commands: [SavedViewCommand] = []
+        let shown = SavedViews.shown(browser, in: library)
+        if SavedViews.canEdit(browser, in: library) {
+            commands.append(SavedViewCommand(title: String(localized: "Edit View"), systemImage: "slider.horizontal.3") {
+                browser.openViewPanel(in: library)
+            })
+        }
+        guard library.reachesServer else { return commands }
         if SavedViews.canSave(browser, in: library) {
-            commands.append(SavedViewCommand(title: String(localized: "New View…"), systemImage: "plus.rectangle.on.rectangle") {
-                browser.viewEditing = .new
+            commands.append(SavedViewCommand(title: String(localized: "New View"), systemImage: "plus.rectangle.on.rectangle") {
+                browser.openNewViewPanel(in: library)
             })
             // A place that is not a view saves what it shows as one.
-            if SavedViews.shown(browser, in: library) == nil, browser.tableOptions[browser.item]?.isFiltering == true
-                || browser.listShape?.arranged == true {
+            if shown == nil, browser.tableOptions[browser.item]?.isFiltering == true || browser.listShape?.arranged == true {
                 commands.append(SavedViewCommand(title: String(localized: "Save as View…"), systemImage: "plus.rectangle.on.rectangle") {
-                    browser.viewEditing = .new
+                    browser.openNewViewPanel(in: library)
                 })
             }
         }
-        if let view = SavedViews.shown(browser, in: library) {
+        if let view = shown {
             if browser.hasViewChanges {
                 commands.append(SavedViewCommand(title: String(localized: "Save View"), systemImage: "arrow.trianglehead.2.clockwise") {
-                    SavedViews.update(browser, in: library)
+                    SavedViews.save(browser, in: library, order: order)
                 })
                 commands.append(SavedViewCommand(title: String(localized: "Revert View"), systemImage: "arrow.uturn.backward") {
                     browser.revertView(in: library)
                 })
             }
-            commands.append(SavedViewCommand(title: String(localized: "Rename View…"), systemImage: "pencil") {
-                browser.viewEditing = .rename(view.id)
+            commands.append(SavedViewCommand(title: String(localized: "Duplicate View"), systemImage: "plus.square.on.square") {
+                Task { await browser.duplicateView(view.id, in: library, order: order) }
             })
             commands.append(SavedViewCommand(title: String(localized: "Delete View…"), systemImage: "trash") {
-                browser.viewEditing = .delete(view.id)
+                browser.deletingView = view.id
             })
         }
         return commands
@@ -148,28 +50,38 @@ struct SavedViewCommand {
 struct SavedViewMenu: View {
     let browser: Browser?
     let library: (any ItemLibrary)?
+    @StoredOrder private var order
 
     var body: some View {
         let shown = browser.flatMap { browser in library.flatMap { SavedViews.shown(browser, in: $0) } }
         let canEdit = library?.reachesServer == true
-        Button("New View…", systemImage: "plus.rectangle.on.rectangle") { browser?.viewEditing = .new }
-            .disabled(!(browser.flatMap { browser in library.map { SavedViews.canSave(browser, in: $0) } } ?? false))
-        Button("Save as View…", systemImage: "plus.rectangle.on.rectangle") { browser?.viewEditing = .new }
-            .disabled(!canEdit || shown != nil || !(browser.flatMap { browser in library.map { SavedViews.canSave(browser, in: $0) } } ?? false))
-        Button("Save View", systemImage: "arrow.trianglehead.2.clockwise") {
-            if let browser, let library { SavedViews.update(browser, in: library) }
+        let canSave = browser.flatMap { browser in library.map { SavedViews.canSave(browser, in: $0) } } ?? false
+        Button("New View", systemImage: "plus.rectangle.on.rectangle") {
+            if let browser, let library { browser.openNewViewPanel(in: library) }
         }
-        .disabled(!canEdit || shown == nil || browser?.hasViewChanges != true)
+        .disabled(!canSave)
+        Button("Edit View", systemImage: "slider.horizontal.3") {
+            if let browser, let library { browser.openViewPanel(in: library) }
+        }
+        .disabled(!(browser.flatMap { browser in library.map { SavedViews.canEdit(browser, in: $0) } } ?? false))
+        Button("Save as View…", systemImage: "plus.rectangle.on.rectangle") {
+            if let browser, let library { browser.openNewViewPanel(in: library) }
+        }
+        .disabled(!canSave || shown != nil)
+        Button("Duplicate View", systemImage: "plus.square.on.square") {
+            if let browser, let library, let shown { Task { await browser.duplicateView(shown.id, in: library, order: order) } }
+        }
+        .disabled(!canEdit || shown == nil)
+        Button("Save View", systemImage: "arrow.trianglehead.2.clockwise") {
+            if let browser, let library { SavedViews.save(browser, in: library, order: order) }
+        }
+        .disabled(shown == nil || browser?.hasViewChanges != true)
         Button("Revert View", systemImage: "arrow.uturn.backward") {
             if let browser, let library { browser.revertView(in: library) }
         }
         .disabled(shown == nil || browser?.hasViewChanges != true)
-        Button("Rename View…", systemImage: "pencil") {
-            if let shown { browser?.viewEditing = .rename(shown.id) }
-        }
-        .disabled(!canEdit || shown == nil)
         Button("Delete View…", systemImage: "trash") {
-            if let shown { browser?.viewEditing = .delete(shown.id) }
+            if let shown { browser?.deletingView = shown.id }
         }
         .disabled(!canEdit || shown == nil)
     }
@@ -186,12 +98,12 @@ struct ViewsHeading: View {
         HStack {
             Text("Views")
             Spacer()
-            Button("New View", systemImage: "plus") { browser.viewEditing = .new }
+            Button("New View", systemImage: "plus") { browser.openNewViewPanel(in: library) }
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
                 .opacity(isHovering ? 1 : 0)
                 .disabled(!SavedViews.canSave(browser, in: library))
-                .help(SavedViews.canSave(browser, in: library) ? Text("Save what this window shows as a view") : Text("This place can’t be saved as a view"))
+                .help(SavedViews.canSave(browser, in: library) ? Text("Make a view of what this window shows") : Text("This place can’t be saved as a view"))
                 .accessibilityIdentifier("NewSavedView")
         }
         .padding(.trailing, 12)
@@ -205,237 +117,61 @@ struct SavedViewRowMenu: View {
     let view: ItemID
     let browser: Browser
     @CurrentLibrary private var library
+    @StoredOrder private var order
 
     var body: some View {
-        Button("Rename View…") { browser.viewEditing = .rename(view) }
+        Button("Edit View") { browser.editView(view, in: library, order: order) }
+        Button("Duplicate View") { Task { await browser.duplicateView(view, in: library, order: order) } }
             .disabled(!library.reachesServer)
-        Button("Delete View…") { browser.viewEditing = .delete(view) }
+        Divider()
+        Button("Delete View…") { browser.deletingView = view }
             .disabled(!library.reachesServer)
     }
 }
 
 extension View {
-    /// Asks about each saved-view command the window gives, opens each view with its own order, grouping and the
-    /// layout last used for it on this Mac, and keeps that layout as the person changes it.
-    func savedViewDialogs(browser: Browser, order: NoteOrder) -> some View {
-        modifier(SavedViewDialogs(browser: browser, order: order))
+    /// Asks before deleting a view, opens each view with its own order, grouping and the layout and columns this Mac
+    /// keeps for it, and gives the panel that edits one the right sidebar.
+    func savedViewDialogs(browser: Browser, details: DetailsPresentation) -> some View {
+        modifier(SavedViewDialogs(browser: browser, details: details))
     }
 }
 
 private struct SavedViewDialogs: ViewModifier {
     @CurrentLibrary private var library
     let browser: Browser
-    let order: NoteOrder
-    /// The layout last used for each view on this Mac. It is MAPP's own and never written to Marfa.
-    @AppStorage("savedViewLayouts") private var storedLayouts = Data()
+    let details: DetailsPresentation
 
     func body(content: Content) -> some View {
         content
-            .sheet(item: sheet) { editing in
-                SavedViewSheet(editing: editing, browser: browser, library: library, order: order) { id, mode in
-                    remember(mode, for: id)
-                }
-            }
             .confirmationDialog(deleteTitle, isPresented: deleting, titleVisibility: .visible) {
                 Button("Delete", role: .destructive) { delete() }
             } message: {
                 Text("The view is deleted for every app connected to your Marfa server. You can’t undo this action.")
             }
-            .onChange(of: browser.item, initial: true) {
-                openLayout()
+            .onChange(of: browser.item, initial: true) { browser.followView(in: library) }
+            .onChange(of: library.views) {
                 browser.followView(in: library)
+                browser.reconcileViewPanel(in: library)
             }
-            .onChange(of: library.views) { browser.followView(in: library) }
-            .onChange(of: browser.viewMode) {
-                if case .view(let id) = browser.item { remember(browser.viewMode, for: id) }
+            // The panel takes the right sidebar, and gives it back when it closes or the person closes the sidebar.
+            .onChange(of: browser.viewPanel != nil, initial: true) {
+                if browser.viewPanel != nil { details.beginViewPanel() } else { details.endViewPanel() }
             }
-    }
-
-    private var sheet: Binding<Browser.ViewEditing?> {
-        Binding {
-            switch browser.viewEditing {
-            case .new, .rename, .update: browser.viewEditing
-            case .delete, nil: nil
-            }
-        } set: { if $0 == nil { browser.viewEditing = nil } }
-    }
-
-    private var deletingID: ItemID? {
-        if case .delete(let id) = browser.viewEditing { id } else { nil }
+            .onChange(of: details.isPresented) { if !details.isPresented { browser.closeViewPanel(in: library) } }
     }
 
     private var deleting: Binding<Bool> {
-        Binding { deletingID != nil } set: { if !$0 { browser.viewEditing = nil } }
+        Binding { browser.deletingView != nil } set: { if !$0 { browser.deletingView = nil } }
     }
 
     private var deleteTitle: String {
-        let title = deletingID.flatMap { id in library.views.first { $0.id == id }?.title } ?? ""
+        let title = browser.deletingView.flatMap { id in library.views.first { $0.id == id }?.title } ?? ""
         return String(localized: "Delete the view “\(title)”?")
     }
 
     private func delete() {
-        guard let id = deletingID else { return }
-        browser.viewEditing = nil
-        Task {
-            if await library.deleteView(id) { forget(id) }
-        }
-    }
-
-    private var layouts: [String: ItemViewMode] {
-        (try? JSONDecoder().decode([String: ItemViewMode].self, from: storedLayouts)) ?? [:]
-    }
-
-    private func remember(_ mode: ItemViewMode, for id: ItemID) {
-        var layouts = layouts
-        guard layouts[id.rawValue] != mode else { return }
-        layouts[id.rawValue] = mode
-        storedLayouts = (try? JSONEncoder().encode(layouts)) ?? storedLayouts
-    }
-
-    private func forget(_ id: ItemID) {
-        var layouts = layouts
-        guard layouts.removeValue(forKey: id.rawValue) != nil else { return }
-        storedLayouts = (try? JSONEncoder().encode(layouts)) ?? storedLayouts
-    }
-
-    private func openLayout() {
-        guard case .view(let id) = browser.item, let mode = layouts[id.rawValue],
-              browser.availableViewModes(in: library).contains(mode) else { return }
-        browser.viewMode = mode
-    }
-}
-
-/// Asks for a new view's title, a view's new name, or whether to save a view with what it will not keep. A title
-/// stays in the sheet until the server takes it (`ViewTitleForm`).
-private struct SavedViewSheet: View {
-    let editing: Browser.ViewEditing
-    let browser: Browser
-    let library: any ItemLibrary
-    let order: NoteOrder
-    /// Keeps the window's layout for a view it saved.
-    let created: (ItemID, ItemViewMode) -> Void
-    @Environment(\.dismiss) private var dismiss
-    @State private var update: Browser.ViewUpdate?
-    @State private var unkept: [ViewDraft.Unkept] = []
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(heading).font(.headline)
-            switch editing {
-            case .new:
-                if let form = browser.viewTitleForm { ViewTitleField(form: form) }
-            case .rename:
-                if let form = browser.viewTitleForm { ViewTitleField(form: form) }
-            case .update, .delete:
-                Text("The view is saved for every app connected to your Marfa server.")
-                    .foregroundStyle(.secondary)
-            }
-            if !unkept.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("The view won’t keep:")
-                    ForEach(unkept, id: \.self) { Text("• \(SavedViews.describe($0))") }
-                }
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            if let update, update.change.query != nil, !update.unchanged.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("The window can’t show these conditions of the view’s filter, so they stay as they are:")
-                    ForEach(update.unchanged, id: \.self) { Text(verbatim: "• \($0)").monospaced() }
-                }
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            HStack {
-                if browser.viewTitleForm?.isSaving == true { ProgressView().controlSize(.small) }
-                Spacer()
-                Button("Cancel", role: .cancel) { close() }
-                    .keyboardShortcut(.cancelAction)
-                Button(action) { save() }
-                    .keyboardShortcut(.defaultAction)
-                    .disabled(!canSave)
-            }
-        }
-        .padding(20)
-        .frame(width: 420)
-        .onAppear(perform: read)
-    }
-
-    private var heading: String {
-        switch editing {
-        case .new: String(localized: "New View")
-        case .rename: String(localized: "Rename View")
-        case .update(let id), .delete(let id):
-            String(localized: "Save “\(library.views.first { $0.id == id }?.title ?? "")”?")
-        }
-    }
-
-    private var action: String {
-        switch editing {
-        case .new: String(localized: "Save View")
-        case .rename: String(localized: "Rename")
-        case .update, .delete: String(localized: "Save View")
-        }
-    }
-
-    private var canSave: Bool {
-        switch editing {
-        case .new, .rename: browser.viewTitleForm?.canSubmit == true
-        case .update, .delete: library.reachesServer
-        }
-    }
-
-    private func read() {
-        switch editing {
-        case .new:
-            let window = SavedViews.window(browser, in: library, order: order)
-            guard let draft = ViewDraft.draft(window, catalogue: library.catalogue, views: library.views) else { return }
-            unkept = draft.unkept
-            browser.viewTitleForm = ViewTitleForm(
-                new: draft, layout: browser.viewMode, title: library.name(of: browser.item), library: library)
-        case .rename(let id):
-            guard let view = library.views.first(where: { $0.id == id }) else { return }
-            browser.viewTitleForm = ViewTitleForm(renaming: view, library: library)
-        case .update:
-            update = browser.viewUpdate(SavedViews.window(browser, in: library), in: library)
-            unkept = update?.unkept ?? []
-        case .delete:
-            break
-        }
-    }
-
-    private func close() {
-        browser.viewTitleForm = nil
-        browser.viewEditing = nil
-        dismiss()
-    }
-
-    private func save() {
-        switch editing {
-        case .new, .rename:
-            guard let form = browser.viewTitleForm else { return }
-            Task { [browser, library, order, created] in
-                guard case .done(let view) = await form.submit(), browser.viewTitleForm === form else { return }
-                close()
-                if case .new(_, let mode) = form.purpose, let view {
-                    created(view.id, mode)
-                    browser.show(.view(view.id), in: library, order: order)
-                }
-            }
-        case .update(let id):
-            dismiss()
-            guard let update else { return }
-            Task { [browser, library] in await SavedViews.save(update, of: id, browser: browser, library: library) }
-        case .delete:
-            break
-        }
-    }
-}
-
-/// The title a view sheet holds, which stays as typed until the server takes it.
-private struct ViewTitleField: View {
-    @Bindable var form: ViewTitleForm
-
-    var body: some View {
-        TextField("Title", text: $form.title)
-            .disabled(form.isSaving)
+        guard let id = browser.deletingView else { return }
+        Task { await browser.deleteView(id, in: library) }
     }
 }

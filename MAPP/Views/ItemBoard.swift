@@ -20,7 +20,8 @@ struct ItemBoard: View {
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
         VStack(spacing: 0) {
             if let field {
-                board(ItemBoardLayout.lanes(items: items, key: field.key, catalogue: library.catalogue), key: field.key)
+                let lanes = ItemBoardLayout.lanes(items: items, key: field.key, catalogue: library.catalogue)
+                board(browser.hidesEmptyGroups ? lanes.filter { !$0.items.isEmpty } : lanes, key: field.key)
             } else if items.isEmpty {
                 if browser.isSearching { SearchEmptyState(browser: browser) }
                 else { EmptyState("No Items") }

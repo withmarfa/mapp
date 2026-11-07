@@ -45,6 +45,11 @@ final class DetailsPresentation {
     var showsPage = true
     /// Whether ending Customize Layout closes the sidebar, because starting it opened the sidebar.
     @ObservationIgnored private var closesSidebarAtEnd = false
+    /// Whether the window's right sidebar is editing a view (`ViewPanel`), in place of the inspector and of Customize
+    /// Layout. The panel itself is the browser's; this holds the sidebar for it and gives it back.
+    private(set) var isEditingView = false
+    /// Whether closing the view panel closes the sidebar, because opening it opened the sidebar.
+    @ObservationIgnored private var closesSidebarAtViewEnd = false
     /// The items the window's Add to Collection sheet is open for.
     var collectionPick: CollectionPickRequest?
     /// The items the window's Add Tag sheet is open for.
@@ -89,8 +94,27 @@ final class DetailsPresentation {
         closesSidebarAtEnd = false
     }
 
-    /// Whether the person has the sidebar open, for the next launch: a sidebar only Customize Layout opened is not.
-    var isPresentedByPerson: Bool { isPresented && !(isCustomizingLayout && closesSidebarAtEnd) }
+    /// Shows the sidebar, which takes the view panel, and remembers to close it again if it was closed.
+    func beginViewPanel() {
+        guard !isEditingView else { return }
+        endLayout()
+        closesSidebarAtViewEnd = !isPresented
+        isEditingView = true
+        isPresented = true
+    }
+
+    func endViewPanel() {
+        guard isEditingView else { return }
+        isEditingView = false
+        if closesSidebarAtViewEnd { isPresented = false }
+        closesSidebarAtViewEnd = false
+    }
+
+    /// Whether the person has the sidebar open, for the next launch: a sidebar only Customize Layout or the view panel
+    /// opened is not.
+    var isPresentedByPerson: Bool {
+        isPresented && !(isCustomizingLayout && closesSidebarAtEnd) && !(isEditingView && closesSidebarAtViewEnd)
+    }
 
     func draft(for itemID: ItemID, key: String) -> ItemPropertyDraft {
         if let draft = drafts[itemID]?[key] { return draft }

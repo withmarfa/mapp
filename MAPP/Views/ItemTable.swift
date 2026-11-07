@@ -14,6 +14,8 @@ struct ItemTable: View {
     var pane: FocusState<Browser.Pane?>.Binding
     /// Each place's columns as the person arranged them: shown or hidden, in their order, at their widths.
     @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
+    /// What this Mac keeps for each saved view, whose column widths the table records (`Browser.keepWidths`).
+    @AppStorage(ViewLayouts.key) private var viewLayouts = ViewLayouts()
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     @State private var daysSeen = 0
     @State private var hover = ItemTableHover()
@@ -59,17 +61,19 @@ struct ItemTable: View {
     private func table(
         columns: [ItemTableColumn], pages: Pages, grouping: ItemTableColumn?, collapsed: Set<String>
     ) -> some View {
-        let layout = ItemTableColumnLayouts.layout(for: browser.item, in: storedColumns)
-        return Table(of: ItemTableRow.self, selection: $browser.selection, sortOrder: sortBinding(columns), columnCustomization: customization) {
+        let isView = viewID != nil
+        return Table(of: ItemTableRow.self, selection: $browser.selection, sortOrder: sortBinding(columns), columnCustomization: customization(columns)) {
             // Only the columns showing. SwiftUI adds and hides every column it is given on live rows when the place
             // changes, which for the many columns of a mixed place costs far more than the few it shows.
-            TableColumnForEach(ItemTableColumnLayouts.shown(columns, in: layout)) { column in
+            TableColumnForEach(browser.shownColumns(columns, stored: storedColumns)) { column in
                 TableColumn(Text(verbatim: column.label), sortUsing: ItemTableComparator(column: column, order: column.firstOrder)) { row in
                     ItemTableCell(library: library, row: row, column: column, browser: browser, order: order, dateFormat: dateFormat, hover: hover)
                 }
                 .width(min: column.widths.min, ideal: column.widths.ideal, max: column.widths.max)
                 .customizationID(column.id)
+                // A view's order is the panel's to change, since the header cannot hold an arrangement Save waits for.
                 .disabledCustomizationBehavior(column.content == .title ? .visibility : [])
+                .disabledCustomizationBehavior(isView ? .reorder : [])
             }
         } rows: {
             if let grouping {
@@ -168,19 +172,37 @@ struct ItemTable: View {
                 browser.tableOptions[browser.item] ?? ItemTableOptions(), columns: columns, keepsGivenOrder: browser.keepsPlaceOrder)
         } set: { sort in
             if !sort.isEmpty { browser.orderSearch(byRelevance: false) }
-            browser.tableOptions[browser.item, default: .init()].sort = Array(sort.prefix(3))
+            browser.tableOptions[browser.item, default: .init()].sort = Array(sort.prefix(ViewDraft.maxSortKeys))
         }
     }
 
     // MARK: Column layouts
 
-    /// The place's stored layout, which the table reads and writes directly, so the Columns menu and the table's own
-    /// header always agree and a change of place never shows the previous place's columns.
-    private var customization: Binding<TableColumnCustomization<ItemTableRow>> {
+    private var viewID: ItemID? {
+        if case .view(let id) = browser.item { id } else { nil }
+    }
+
+    /// The table's column widths, which a place keeps for itself and a saved view keeps on its own. The table reads and
+    /// writes it directly, so a change of place never shows the previous place's columns. A saved view's shown
+    /// columns and their order are the window's (`ViewColumns`), so a header that hides one is routed there, and what is
+    /// left for the table to keep is the widths alone.
+    private func customization(_ columns: [ItemTableColumn]) -> Binding<TableColumnCustomization<ItemTableRow>> {
         Binding {
-            ItemTableColumnLayouts.layout(for: browser.item, in: storedColumns)
-        } set: {
-            storedColumns = ItemTableColumnLayouts.storing($0, for: browser.item, in: storedColumns)
+            guard let id = viewID else { return ItemTableColumnLayouts.layout(for: browser.item, in: storedColumns) }
+            return viewLayouts.settings(for: id)?.widths.flatMap { try? JSONDecoder().decode(TableColumnCustomization<ItemTableRow>.self, from: $0) }
+                ?? .init()
+        } set: { next in
+            guard let id = viewID else {
+                storedColumns = ItemTableColumnLayouts.storing(next, for: browser.item, in: storedColumns)
+                return
+            }
+            var widths = next
+            for column in columns where column.content != .title && widths[visibility: column.id] == .hidden {
+                browser.changeViewSettings(id) { $0.columns.setShown(column, false) }
+                widths[visibility: column.id] = .automatic
+            }
+            widths.resetOrder()
+            browser.keepWidths(try? JSONEncoder().encode(widths), of: id)
         }
     }
 }

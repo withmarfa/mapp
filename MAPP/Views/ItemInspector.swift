@@ -21,7 +21,10 @@ struct ItemInspectorHost: View {
 
     var body: some View {
         Group {
-            if let id = selectedID, let item = library.item(id), details.isCustomizingLayout, PageCustomization.isAvailable(for: item) {
+            if let browser, details.isEditingView, let panel = browser.viewPanel {
+                ViewEditPanel(browser: browser, panel: panel)
+                    .onExitCommand { browser.cancelViewPanel(in: library) }
+            } else if let id = selectedID, let item = library.item(id), details.isCustomizingLayout, PageCustomization.isAvailable(for: item) {
                 ItemLayoutPanel(item: item)
                     .onExitCommand { details.endLayout() }
             } else if let id = selectedID, let item = library.item(id) {
