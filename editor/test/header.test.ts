@@ -448,6 +448,29 @@ test('a value the item does not have yet is an empty chip with a plus that opens
   expect(posted[0]).toMatchObject({ item: 'ticket', row: 'due' })
 })
 
+test('the app is told where the value its editor is open under has moved to, once for each move', () => {
+  header.set({
+    ...ticket,
+    properties: [
+      { id: 'due', label: 'Due', symbol: 'calendar', kind: 'empty', text: 'Due', editable: true },
+    ],
+  })
+  const value = root.querySelector<HTMLElement>('.item-prop-value')!
+  let frame = { left: 10, top: 20, width: 100, height: 24 }
+  value.getBoundingClientRect = () => frame as DOMRect
+  window.dispatchEvent(new Event('resize'))
+  expect(posted, 'nothing is open, so nothing is told').toEqual([])
+  root.querySelector<HTMLElement>('.item-chip.empty')!.click()
+  expect(posted.map((message) => message.type)).toEqual(['editValue'])
+  window.dispatchEvent(new Event('resize'))
+  expect(posted, 'it has not moved').toHaveLength(1)
+  frame = { left: 10, top: 60, width: 100, height: 24 }
+  window.dispatchEvent(new Event('resize'))
+  window.dispatchEvent(new Event('resize'))
+  expect(posted.map((message) => message.type)).toEqual(['editValue', 'valueMoved'])
+  expect(posted[1]).toMatchObject({ item: 'ticket', row: 'due', rect: [10, 60, 100, 24] })
+})
+
 test('each kind of value has its own chip, and its text is never read as markup', () => {
   header.set({
     ...ticket,

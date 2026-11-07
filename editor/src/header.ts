@@ -360,6 +360,11 @@ class LinkedSection {
  *
  *  Linked From (a folded section of the items that link to this one) and a collection's Contents are drawn in the
  *  footer, under the text. */
+/** A frame as whole points, which is how far a value has to move before the app is told. */
+function rectKey(rect: DOMRect): string {
+  return [rect.left, rect.top, rect.width, rect.height].map(Math.round).join(',')
+}
+
 export class ItemHeader {
   private model?: HeaderModel
   private readonly labels: HeaderLabels
@@ -520,6 +525,7 @@ export class ItemHeader {
     window.addEventListener('resize', () => {
       const had = width
       width = window.innerWidth
+      this.reportValueMoved()
       if (had > 0 || width === 0) return
       this.drawn = ''
       this.redraw()
@@ -606,6 +612,7 @@ export class ItemHeader {
       this.linked.reset(model.kind === 'person')
     }
     this.redraw()
+    requestAnimationFrame(() => this.reportValueMoved())
     // The status pin is named for what it sets; what it is set to is read after.
     this.statusPin.setAttribute(
       'aria-description',
@@ -1113,10 +1120,39 @@ export class ItemHeader {
   private openEditor(value: HTMLElement, row: string) {
     if (!this.model) return
     const rect = value.getBoundingClientRect()
+    this.openValue = { row, rect: rectKey(rect) }
     postToHost({
       type: 'editValue',
       item: this.model.item,
       row,
+      rect: [rect.left, rect.top, rect.width, rect.height],
+      viewportHeight: window.innerHeight,
+    })
+  }
+
+  /** The value whose editor the app opened last, and where the app was last told it is. The app ignores a move for an
+   *  editor that is closed or open for another value. */
+  private openValue?: { row: string; rect: string }
+
+  /** A value moves as the page changes under it: a row set for the first time joins the filled ones, and a narrower
+   *  window wraps what it holds. The editor open under it is told where it is now. */
+  private reportValueMoved() {
+    const model = this.model
+    const open = this.openValue
+    if (!model || !open) return
+    const row = JSON.stringify(open.row)
+    const value = this.root.querySelector<HTMLElement>(
+      `[data-row=${row}] .item-prop-value, [data-pin=${row}] .item-pin-value`,
+    )
+    if (!value) return
+    const rect = value.getBoundingClientRect()
+    const key = rectKey(rect)
+    if (key === open.rect) return
+    open.rect = key
+    postToHost({
+      type: 'valueMoved',
+      item: model.item,
+      row: open.row,
       rect: [rect.left, rect.top, rect.width, rect.height],
       viewportHeight: window.innerHeight,
     })

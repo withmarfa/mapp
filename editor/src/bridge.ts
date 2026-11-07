@@ -56,6 +56,14 @@ export type EditorMessage =
       rect: [number, number, number, number]
       viewportHeight: number
     }
+  /** The value an editor was asked for has moved on the page, to this frame. */
+  | {
+      type: 'valueMoved'
+      item: string
+      row: string
+      rect: [number, number, number, number]
+      viewportHeight: number
+    }
   /** Customize Layout in the row above the title: the app starts or ends it. */
   | { type: 'toggleLayout' }
   /** Linked From in the row above the title: the app shows what links here. */

@@ -14,6 +14,8 @@ protocol ValueEditSession: AnyObject {
     func close(restoringFocus: Bool)
     /// The anchor's window moved: follow it.
     func anchorMoved()
+    /// The value the editor is under moved within the anchor, to `rect`: follow it.
+    func valueMoved(to rect: NSRect)
 }
 
 /// Opens a value in an editor under it, for the inspector's rows and the page's property rows alike: each gives what is
@@ -76,6 +78,13 @@ final class ValueEditPresenter {
     /// The app is quitting or changing library: the editor open ends as it does on a click elsewhere, so what was typed
     /// in it is written to the library it came from or handed back, never lost.
     func handOff() { dismiss(restoringFocus: false) }
+
+    /// The value of `row` of `item` moved within the view that anchors its editor, as a page's rows do when one is set
+    /// for the first time. An editor open for another value stays where it is.
+    func valueMoved(item: ItemID, row: String, to rect: NSRect) {
+        guard let session, session.request.target == item.rawValue + "#" + row else { return }
+        session.valueMoved(to: rect)
+    }
 
     /// The item on show changed: an editor for another item is for a value that is no longer there.
     func itemChanged(to id: ItemID?) {

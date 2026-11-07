@@ -649,6 +649,9 @@ final class EditorController: NSObject {
             onHeaderEvent(.menu(menu, item, containerRect(rect, viewportHeight: viewportHeight)))
         case .editValue(let item, let row, let rect, let viewportHeight):
             onHeaderEvent(.edit(row: row, item, containerRect(rect, viewportHeight: viewportHeight)))
+        case .valueMoved(let item, let row, let rect, let viewportHeight):
+            // The value's editor follows it, which is the presenter's to say whether there is one open for it.
+            ValueEditPresenter.shared.valueMoved(item: item, row: row, to: containerRect(rect, viewportHeight: viewportHeight))
         case .moveRow(let item, let row, let before):
             onHeaderEvent(.moveRow(row: row, before: before, item))
         case .toggleLayout:

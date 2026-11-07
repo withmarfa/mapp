@@ -21,7 +21,7 @@ final class ValueEditPanelSession: ValueEditSession {
     let request: ValueEditRequest
     let model: ValueEditModel
     let anchor: NSView
-    private let rect: NSRect?
+    private var rect: NSRect?
     private var panel: ValueEditPanel?
     private weak var parent: NSWindow?
     private var savedResponder: NSResponder?
@@ -114,6 +114,12 @@ final class ValueEditPanelSession: ValueEditSession {
     }
 
     func anchorMoved() { layoutSoon() }
+
+    func valueMoved(to rect: NSRect) {
+        guard self.rect != rect else { return }
+        self.rect = rect
+        layoutSoon()
+    }
 
     func close(restoringFocus: Bool) {
         guard let panel else { return }

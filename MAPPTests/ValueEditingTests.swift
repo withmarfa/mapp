@@ -510,6 +510,7 @@ struct ValueEditingTests {
         var window: NSWindow? { nil }
         private(set) var isOpen = false
         private(set) var moves = 0
+        private(set) var rects: [NSRect] = []
 
         init(_ request: ValueEditRequest, anchor: NSView) {
             self.request = request
@@ -520,6 +521,7 @@ struct ValueEditingTests {
         func open() { isOpen = true }
         func close(restoringFocus: Bool) { isOpen = false }
         func anchorMoved() { moves += 1 }
+        func valueMoved(to rect: NSRect) { rects.append(rect) }
     }
 
     private func presenter(_ sessions: Box) -> ValueEditPresenter {
@@ -593,6 +595,32 @@ struct ValueEditingTests {
         row.setFrameOrigin(NSPoint(x: 0, y: 80))
         view.setFrameOrigin(NSPoint(x: 0, y: 80))
         #expect(sessions.all.first?.moves == 2)
+    }
+
+    @Test func aValueThePageMovesTakesItsOwnEditorAlongAndNoOthers() throws {
+        let item = Self.item()
+        let sessions = Box()
+        let presenter = presenter(sessions)
+        presenter.present(Self.request(.status(Self.status), item: item, in: Self.library([item])), anchor: anchor())
+        let moved = NSRect(x: 5, y: 60, width: 200, height: 24)
+        presenter.valueMoved(item: item.id, row: Self.status.key, to: moved)
+        #expect(sessions.all.first?.rects == [moved])
+        presenter.valueMoved(item: item.id, row: "other", to: moved)
+        presenter.valueMoved(item: ItemID("elsewhere"), row: Self.status.key, to: moved)
+        #expect(sessions.all.first?.rects == [moved], "a move of another value is not this editor's")
+        presenter.dismiss()
+        presenter.valueMoved(item: item.id, row: Self.status.key, to: moved)
+        #expect(sessions.all.first?.rects == [moved])
+    }
+
+    @Test func theValueMovedMessageCarriesTheRowAndTheValuesNewRectangle() throws {
+        let body: [String: Any] = ["type": "valueMoved", "item": "10000000-0000-0000-0000-000000000001", "row": "status", "rect": [10, 20, 30, 40], "viewportHeight": 800]
+        guard case .valueMoved(let item, let row, let rect, let height) = try #require(EditorMessage(body: body)) else {
+            Issue.record("Not a valueMoved message")
+            return
+        }
+        #expect(item == ItemID("10000000-0000-0000-0000-000000000001") && row == "status")
+        #expect(rect == CGRect(x: 10, y: 20, width: 30, height: 40) && height == 800)
     }
 
     // MARK: The page
