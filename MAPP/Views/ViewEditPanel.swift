@@ -90,9 +90,10 @@ private struct ViewPanelLayoutSection: View {
                             Image(systemName: mode.symbol).font(.system(size: 15 * scale))
                             Text(mode.title).font(.system(size: 10.5 * scale)).lineLimit(1)
                         }
-                        .foregroundStyle(isSelected ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+                        .foregroundStyle(isSelected ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                        .fontWeight(isSelected ? .medium : .regular)
                         .frame(maxWidth: .infinity, minHeight: 46 * scale)
-                        .background(isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary), in: .rect(cornerRadius: 8))
+                        .background(isSelected ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear), in: .rect(cornerRadius: 8))
                         .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
