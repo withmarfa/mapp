@@ -249,6 +249,15 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(table.waitForNonExistence(timeout: 3))
     }
 
+    func testFilterIsOnTheToolbarInEveryLayout() {
+        let filter = control("ItemTableFilter")
+        XCTAssertTrue(filter.waitForExistence(timeout: 3), "the list has Filter")
+        for title in ["as Gallery", "as Table", "as Board"] {
+            show(title)
+            XCTAssertTrue(filter.waitForExistence(timeout: 3), title)
+        }
+    }
+
     /// Chooses a view from the toolbar's View As pop-up.
     private func show(_ title: String) {
         let menu = control("ViewModeMenu")
