@@ -188,6 +188,9 @@
     "More than %lld filter conditions" : {
 
     },
+    "Look" : {
+      "extractionState" : "manual"
+    },
     "Mark" : {
       "extractionState" : "manual"
     },

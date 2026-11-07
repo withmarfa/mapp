@@ -144,7 +144,7 @@ struct LinkLookOption: View {
     @AppStorage(PageKey.linkLook) private var look = LinkLook.standard
 
     var body: some View {
-        Picker("Links", selection: $look) {
+        Picker("Look", selection: $look) {
             ForEach(LinkLook.allCases) { option in
                 switch option {
                 case .mark: Text("Mark")
