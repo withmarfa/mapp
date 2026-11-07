@@ -12,6 +12,8 @@ enum InspectorMetrics {
     static let sectionGap: CGFloat = 20
     /// The space between a section's heading and its box.
     static let headingGap: CGFloat = 6
+    /// The space between the groups of a section that has several, each a small heading above a box of its own.
+    static let groupGap: CGFloat = 14
     /// A heading's inset from the box's edges.
     static let headingInset: CGFloat = 4
     /// A section's box: its side padding, which is also how far a divider stops short of both edges, the height of
@@ -111,7 +113,8 @@ enum InspectorSectionKind: CaseIterable {
 ///
 /// The box takes each view of `content` as a row, with a divider between rows, so a row is a view of its own, never a
 /// stack of several. A section with nothing in it shows `placeholder` as its one row. A section that is not `boxed`
-/// draws its content as it is, for Details, whose cells are boxes of their own.
+/// draws its content as it is, for Details, whose cells are boxes of their own, and for Relationships, whose groups each
+/// draw one. Its `placeholder` is still a box of its own.
 struct InspectorSection<Content: View, Add: View>: View {
     let title: LocalizedStringKey
     var count: Int?
@@ -127,14 +130,10 @@ struct InspectorSection<Content: View, Add: View>: View {
         VStack(alignment: .leading, spacing: InspectorMetrics.headingGap) {
             InspectorFoldHeading(title: title, count: count, isOpen: $isOpen, identifier: identifier, add: add)
             if isOpen {
-                if boxed {
-                    InspectorBox {
-                        if let placeholder {
-                            Text(placeholder).foregroundStyle(.secondary)
-                        } else {
-                            content
-                        }
-                    }
+                if let placeholder {
+                    InspectorBox { Text(placeholder).foregroundStyle(.secondary) }
+                } else if boxed {
+                    InspectorBox { content }
                 } else {
                     content
                 }
