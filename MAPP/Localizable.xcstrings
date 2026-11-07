@@ -224,6 +224,9 @@
     "Pinned" : {
       "extractionState" : "manual"
     },
+    "Put the view back as it was saved" : {
+
+    },
     "Quiet" : {
       "extractionState" : "manual"
     },
@@ -245,7 +248,13 @@
     "Save Changes to “%@”?" : {
 
     },
+    "Save the changes to this view" : {
+
+    },
     "Save “%@”?" : {
+
+    },
+    "Saving a view needs your Marfa server" : {
 
     },
     "Saving the name, filters, sort or group of a view needs your Marfa server. Changes to the layout and columns can be saved without it." : {

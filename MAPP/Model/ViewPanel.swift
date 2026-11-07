@@ -51,8 +51,15 @@ final class ViewPanel {
     private(set) var snapshot: Snapshot?
     var isSaving = false
     /// Why the last save did not happen, in words for the person.
-    var failure: String?
-    var confirmation: Confirmation?
+    var failure: String? {
+        didSet { if failure != nil { isQuiet = false } }
+    }
+    var confirmation: Confirmation? {
+        didSet { if confirmation != nil { isQuiet = false } }
+    }
+    /// Whether the panel stays out of sight, as it does for the toolbar's Save, which needs the sidebar only to ask
+    /// something or to say why a save failed.
+    var isQuiet = false
 
     init(editing view: LibraryView, notices: Notices) {
         purpose = .edit(view.id)

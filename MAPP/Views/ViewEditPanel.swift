@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The right sidebar while a view is edited (`ViewPanel`): its name, layout, filters, sort, group, and the table's columns or the gallery's cards. Each
-/// change shows at once in the window beside it, and none is kept until Save (`ViewPanelActions`). A type's list and
+/// change shows at once in the window beside it, and none is kept until Save (`ViewPanelToolbar`). A type's list and
 /// the other places that can become a view get the same panel without a name, and offer Save as View.
 struct ViewEditPanel: View {
     @CurrentLibrary private var library
@@ -14,7 +14,7 @@ struct ViewEditPanel: View {
         let content = browser.tableContent(in: library)
         ScrollView {
             VStack(alignment: .leading, spacing: InspectorMetrics.sectionGap) {
-                ViewPanelActions(browser: browser, panel: panel)
+                ViewPanelNotes(browser: browser, panel: panel)
                 if panel.purpose != .place {
                     ViewPanelSection(title: "Name") {
                         InspectorBox {
@@ -42,6 +42,7 @@ struct ViewEditPanel: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
+        .modifier(ViewSaveConfirmation(browser: browser, panel: panel))
         .task(id: ObjectIdentifier(panel)) {
             if panel.isNew { nameFocused = true }
         }

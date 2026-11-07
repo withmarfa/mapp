@@ -416,7 +416,7 @@ private struct ItemInspectorColumn: ViewModifier {
                     UserDefaults.standard.set(Double(newWidth), forKey: InterfaceKey.inspectorWidth)
                 }
                 .inspectorColumnWidth(min: 260, ideal: width, max: 440)
-                .toolbar(id: toolbarLayout) { InspectorToolbar(details: details, editor: editor) }
+                .toolbar(id: toolbarLayout) { InspectorToolbar(details: details, editor: editor, browser: browser) }
         }
     }
 }

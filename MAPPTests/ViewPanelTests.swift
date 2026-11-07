@@ -142,6 +142,71 @@ struct ViewPanelTests {
         #expect(!browser.hasViewChanges)
     }
 
+    // MARK: The toolbar's Save
+
+    @Test func theToolbarsSaveLeavesTheSidebarAloneWhenNothingGoesWrong() async {
+        let (browser, library) = Self.opened()
+        browser.tableOptions[browser.item]?.grouping = .none
+        SavedViews.save(browser, in: library, order: Self.order)
+        #expect(!browser.showsViewPanel)
+        await eventually { browser.viewPanel == nil }
+        #expect(!browser.hasViewChanges)
+        #expect(Self.held(library)?.group == nil)
+    }
+
+    @Test func theToolbarsSaveShowsThePanelToSayWhyItFailed() async {
+        let (browser, library) = Self.opened()
+        browser.tableOptions[browser.item]?.grouping = .none
+        library.viewFailure = ViewWriteFailure(kind: .refused, message: "No")
+        SavedViews.save(browser, in: library, order: Self.order)
+        await eventually { browser.showsViewPanel }
+        #expect(browser.viewPanel?.failure == "No")
+        #expect(browser.hasViewChanges)
+    }
+
+    @Test func theToolbarsSaveShowsThePanelToAskFirst() async {
+        let (browser, library) = Self.opened()
+        browser.tableOptions[browser.item]?.grouping = .none
+        browser.searchText = "plans"
+        SavedViews.save(browser, in: library, order: Self.order)
+        await eventually { browser.showsViewPanel }
+        #expect(browser.viewPanel?.confirmation != nil)
+    }
+
+    @Test func editViewBringsOutAPanelSavingQuietly() {
+        let (browser, library) = Self.opened()
+        browser.openViewPanel(in: library)
+        browser.viewPanel?.isQuiet = true
+        browser.openViewPanel(in: library)
+        #expect(browser.showsViewPanel)
+        browser.viewPanel?.isQuiet = true
+        browser.editView(Self.id, in: library, order: Self.order)
+        #expect(browser.showsViewPanel, "the sidebar's Edit View does too")
+    }
+
+    @Test func aSecondSaveLeavesTheSaveUnderWayAlone() async {
+        let (browser, library) = Self.opened()
+        browser.tableOptions[browser.item]?.grouping = .none
+        browser.openViewPanel(in: library)
+        let panel = browser.viewPanel
+        panel?.isQuiet = true
+        panel?.isSaving = true
+        SavedViews.save(browser, in: library, order: Self.order)
+        await Task.yield()
+        #expect(browser.viewPanel === panel)
+        #expect(Self.held(library)?.group != nil, "nothing was written twice")
+    }
+
+    @Test func saveAsViewIsOfferedOnlyWhereAPlaceHoldsChoicesAViewCouldKeep() {
+        let (browser, library) = Self.opened()
+        browser.tableOptions[browser.item]?.setFilter("type", values: ["core.task"])
+        #expect(!SavedViews.hasChoicesToKeep(browser, in: library), "a saved view has Revert and Save")
+        browser.sidebarItem = .itemType("core.task")
+        #expect(!SavedViews.hasChoicesToKeep(browser, in: library))
+        browser.tableOptions[browser.item, default: .init()].setFilter("type", values: ["core.task"])
+        #expect(SavedViews.hasChoicesToKeep(browser, in: library))
+    }
+
     // MARK: A name the person typed is not lost
 
     private static func texts(_ library: FakeItemLibrary) -> [String] {

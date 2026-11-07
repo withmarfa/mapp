@@ -22,7 +22,7 @@ struct SavedViewCommand {
                 browser.openNewViewPanel(in: library)
             })
             // A place that is not a view saves what it shows as one.
-            if shown == nil, browser.tableOptions[browser.item]?.isFiltering == true || browser.listShape?.arranged == true {
+            if SavedViews.hasChoicesToKeep(browser, in: library) {
                 commands.append(SavedViewCommand(title: String(localized: "Save as View…"), systemImage: "plus.rectangle.on.rectangle") {
                     browser.openNewViewPanel(in: library)
                 })
@@ -159,8 +159,8 @@ private struct SavedViewDialogs: ViewModifier {
                 browser.reconcileViewPanel(in: library)
             }
             // The panel takes the right sidebar, and gives it back when it closes or the person closes the sidebar.
-            .onChange(of: browser.viewPanel != nil, initial: true) {
-                if browser.viewPanel != nil { details.beginViewPanel() } else { details.endViewPanel() }
+            .onChange(of: browser.showsViewPanel, initial: true) {
+                if browser.showsViewPanel { details.beginViewPanel() } else { details.endViewPanel() }
             }
             .onChange(of: details.isPresented) { if !details.isPresented { browser.closeViewPanel(in: library) } }
     }

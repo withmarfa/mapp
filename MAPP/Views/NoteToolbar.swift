@@ -4,9 +4,10 @@ import SwiftUI
 /// layout of its own (`WindowToolbarLayout`), since the system reshuffles a saved layout when one identifier moves between
 /// split views. Nothing else in a window may declare a plain `toolbar`, which turns customization off for the whole window.
 ///
-/// The defaults run New Item at the leading side when the sidebar is hidden, then Search, the table's Filter and View
-/// Options, View As, Share and More, and Details at the far right. In the list Search and View Options are the list
-/// column's (`ListToolbar`). Format and `ExtraToolbarItems` start in the tray.
+/// The defaults run New Item at the leading side when the sidebar is hidden, then a view's pencil, Revert and Save or
+/// Save as View while there is something to keep, Search, Filter and View Options, View As, Share and More, and Details at the far
+/// right. In the list the pencil, Search, Filter and View Options are the list column's (`ListToolbar`). Format and
+/// `ExtraToolbarItems` start in the tray.
 struct WindowToolbar: CustomizableToolbarContent {
     @CurrentLibrary private var library
     @AppStorage(InterfaceKey.showsScrolledTitle) private var showsScrolledTitle = true
@@ -24,6 +25,9 @@ struct WindowToolbar: CustomizableToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details, fileURL: fileURL)
         let showsItem = browser?.showsSidebarIndex != true
         let opensFromCollection = browser.map { $0.usesCollection && !$0.showsCollection } == true && !hasListColumn
+        if let browser, !hasListColumn {
+            ViewEditItem(browser: browser)
+        }
         ToolbarItem(id: "newItem") {
             NewItemButton(browser: browser)
         }
@@ -56,6 +60,9 @@ struct WindowToolbar: CustomizableToolbarContent {
             .customizationBehavior(.disabled)
         }
         ToolbarSpacer(.flexible)
+        if let browser {
+            ViewChangeItems(browser: browser)
+        }
         if let browser, !hasListColumn {
             ViewToolbarItems(browser: browser, layout: .item, isHidden: opensFromCollection)
             ToolbarSpacer(.fixed)
@@ -216,18 +223,24 @@ struct ScrolledItemTitle: View {
 }
 
 /// Details above the inspector column, where the system sets a toolbar declared inside the inspector's content, so the
-/// inspector can always be closed whatever a person's layout holds. It contributes nothing while the inspector is
-/// closed, because the system keeps a closed inspector's toolbar and would show a second Details beside the page's.
+/// inspector can always be closed whatever a person's layout holds, or the view panel's actions while it has the
+/// column. It contributes nothing while the inspector is closed, because the system keeps a closed inspector's toolbar
+/// and would show a second Details beside the page's.
 struct InspectorToolbar: CustomizableToolbarContent {
     let details: DetailsPresentation
     let editor: EditorController?
+    var browser: Browser?
 
     var body: some CustomizableToolbarContent {
         if details.isPresented {
-            ToolbarItem(id: "inspectorDetails") {
-                DetailsToggle(details: details, editor: editor)
+            if let browser, details.isEditingView, let panel = browser.viewPanel {
+                ViewPanelToolbar(browser: browser, panel: panel, editor: editor)
+            } else {
+                ToolbarItem(id: "inspectorDetails") {
+                    DetailsToggle(details: details, editor: editor)
+                }
+                .customizationBehavior(.disabled)
             }
-            .customizationBehavior(.disabled)
         }
     }
 }
