@@ -73,7 +73,7 @@ extension Browser {
         if cutOff {
             library.notices.tell(
                 String(localized: "Quick Look"),
-                String(localized: "Showing the first \(Self.quickLookLimit) of ^[\(chosen.count) item](inflect: true)."))
+                AttributedString(localized: "Showing the first \(Self.quickLookLimit) of ^[\(chosen.count) item](inflect: true).").text)
         }
         if quickLook == nil, !chosen.isEmpty {
             library.notices.tell(

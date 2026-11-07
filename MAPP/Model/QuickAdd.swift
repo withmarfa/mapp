@@ -48,7 +48,7 @@ final class QuickAdd {
                     String(localized: "MAPP can’t read \(names.formatted(.list(type: .and))) as a file."))
             }
             if unreadable > 0 {
-                notices.tell(String(localized: "Can’t Add File"), String(localized: "^[\(unreadable) item](inflect: true) can’t be added as a file."))
+                notices.tell(String(localized: "Can’t Add File"), AttributedString(localized: "^[\(unreadable) item](inflect: true) can’t be added as a file.").text)
             }
         }
 

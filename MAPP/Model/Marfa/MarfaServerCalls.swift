@@ -79,7 +79,7 @@ nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, Ty
     static func snapshot(_ version: Marfa.ItemSnapshot) -> ItemSnapshot {
         ItemSnapshot(
             id: version.id, version: version.version, type: TypeID(version.type),
-            properties: properties(version.properties), written: version.occurredAt?.date,
+            properties: properties(version.properties), replaced: version.createdAt,
             writer: version.writer.map { writer in
                 ItemSnapshot.Writer(kind: kind(writer.kind), name: writer.name)
             })

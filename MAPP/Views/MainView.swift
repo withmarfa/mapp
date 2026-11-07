@@ -43,6 +43,7 @@ struct MainView: View {
 
     private var workspacePresentation: WorkspacePresentation {
         if browser.showsSettings { return .settings }
+        if details.history != nil { return .history }
         if browser.showsSidebarIndex { return .index }
         return usesCollectionLayout ? .collection : .list
     }
@@ -66,8 +67,12 @@ struct MainView: View {
                 editor.flush()
                 browser.palette = nil
                 pane = nil
+                details.leaveHistory()
             }
         }
+        // Another place, or the index of one, is somewhere else to go: Version History is of the item it was opened for.
+        .onChange(of: browser.sidebarItem) { details.leaveHistory() }
+        .onChange(of: browser.showsSidebarIndex) { details.leaveHistory() }
     }
 
     private var isSidebarVisible: Bool {
@@ -144,7 +149,9 @@ struct MainView: View {
 
     private var workspace: some View {
         Group {
-            if browser.showsSidebarIndex {
+            if let history = details.history, workspacePresentation == .history {
+                VersionHistoryWorkspace(mode: history, details: details)
+            } else if browser.showsSidebarIndex {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
                     sidebarColumn
                 } detail: {
@@ -202,7 +209,6 @@ struct MainView: View {
         }
         .focusedSceneValue(\.detailsPresentation, details)
         .sheet(item: Binding { details.typeChange } set: { details.typeChange = $0 }) { TypeChangeSheet(request: $0) }
-        .sheet(item: Binding { details.history } set: { details.history = $0 }) { VersionHistorySheet(request: $0) }
         .sheet(item: Binding { details.collectionPick } set: { details.collectionPick = $0 }) { CollectionPickerSheet(request: $0) }
         .sheet(item: Binding { details.tagRequest } set: { details.tagRequest = $0 }) { TagSheet(request: $0) }
         .onChange(of: details.isPresentedByPerson) { if restoresWindow { storedDetailsPresented = details.isPresentedByPerson } }
@@ -247,6 +253,8 @@ struct MainView: View {
         // A draft the inspector held back is given back when the selection moves off its item, shown or not. Folding
         // a section or hiding the inspector keep it, and the item still shown keeps its own.
         .onChange(of: browser.selection) {
+            // Selecting another item, or following a link, leaves the history of the one it was opened for.
+            if let history = details.history, browser.selection != [history.item] { details.leaveHistory() }
             details.handOffProperties(except: browser.selection.count == 1 ? browser.selection.first : nil, in: library, undoManager: undoManager)
         }
         .onChange(of: browser.snapshotParts) {
@@ -358,7 +366,7 @@ struct MainView: View {
 }
 
 private enum WorkspacePresentation: Hashable {
-    case list, collection, settings, index
+    case list, collection, settings, index, history
 }
 
 /// Applied to a detail column, before its toolbar, never to the split view: an inspector on the split view makes every

@@ -56,7 +56,7 @@ struct NoteOrganizeActions: View {
             EmptyView()
         } else if context.allDeleted {
             Button("Recover", systemImage: "arrow.uturn.backward") { library.recover(ids, undoManager: undoManager) }
-            VersionHistoryButton(ids: ids, details: details, undoManager: undoManager)
+            VersionHistoryButton(ids: ids, details: details)
         } else {
             // An item in the bin keeps its tags, so it neither decides the toggle nor takes the change.
             let active = context.items.filter { $0.state == .active }
@@ -71,7 +71,7 @@ struct NoteOrganizeActions: View {
             if details?.showsPage != false || inMenuBar || keepsPlace {
                 CustomizeLayoutButton(ids: ids, details: details)
             }
-            VersionHistoryButton(ids: ids, details: details, undoManager: undoManager)
+            VersionHistoryButton(ids: ids, details: details)
         }
     }
 }
