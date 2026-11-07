@@ -71,6 +71,7 @@ private struct SortRow: View {
             }
             .labelsHidden()
             .pickerStyle(.menu)
+            .fixedSize()
             .accessibilityIdentifier("ViewPanelSortDirection")
             Button("Remove Sort", systemImage: "minus.circle.fill") { write(sort.filter { $0.column.id != key.column.id }) }
                 .labelStyle(.iconOnly)

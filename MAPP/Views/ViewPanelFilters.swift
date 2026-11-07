@@ -57,7 +57,7 @@ private struct FilterRow: View {
         let scale = InterfaceStyle.scale(for: textSize)
         let options = browser.tableOptions[browser.item] ?? ItemTableOptions()
         let kept = options.filters[column.id] ?? []
-        let categories = ItemTableLayout.categories(of: rows, by: column)
+        let categories = ItemTableLayout.offered(in: rows, by: column, keeping: kept)
         HStack(spacing: 6) {
             Text(verbatim: column.label)
                 .lineLimit(1)
@@ -85,6 +85,8 @@ private struct FilterRow: View {
                 Text(verbatim: summary(of: kept, in: categories)).lineLimit(1).truncationMode(.tail)
             }
             .menuStyle(.button)
+            .buttonStyle(.plain)
+            .menuIndicator(.hidden)
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityIdentifier("ViewPanelFilterValues")
             Button("Remove Filter", systemImage: "xmark.circle.fill") {
@@ -108,11 +110,8 @@ private struct FilterRow: View {
         }
     }
 
-    /// The values kept by name, in the menu's order, and a value no row holds any more by what it was kept as.
+    /// The values kept by name, in the menu's order.
     private func summary(of kept: Set<String>, in categories: [ItemTableGroup]) -> String {
-        let named = categories.filter { kept.contains($0.id) }.map(\.title)
-        let known = Set(categories.map(\.id))
-        let rest = kept.subtracting(known).sorted().map { $0.isEmpty ? String(localized: "None") : $0 }
-        return (named + rest).joined(separator: ", ")
+        categories.filter { kept.contains($0.id) }.map(\.title).joined(separator: ", ")
     }
 }
