@@ -208,7 +208,7 @@ struct ItemInspector: View {
 
     private var relationshipSection: some View {
         InspectorSectionView(.relationships, title: "Relationships", count: relationshipCount,
-                             placeholder: relationshipCount == 0 ? "No Relationships" : nil, add: { hovering in
+                             placeholder: relationshipCount == 0 ? "No Relationships" : nil, boxed: false, add: { hovering in
             if !addable.isEmpty {
                 InspectorPlusMenu(accessibilityLabel: "Add Relationship", identifier: "RelationshipAddMenu", isRowHovered: hovering) {
                     ForEach(addable) { option in
@@ -218,13 +218,15 @@ struct ItemInspector: View {
                 }
             }
         }) {
-            ForEach(shownRelationships) { relationship in
-                let group = LinkGroup(item: item.id, field: relationship.field)
-                ItemRelationshipGroup(
-                    relationship: relationship, typeIcon: typeIcon, isExpanded: presentation.expandedLinks.contains(group),
-                    onShowAll: { presentation.expandLinks(group) }, onOpen: onOpen, onEdit: { onEdit(relationship) },
-                    onRemove: { await onRemove(relationship, $0) }, shownOnPage: placement.showsOnPage(relationship.field),
-                    onShowOnPage: showOnPage(relationship.field))
+            VStack(alignment: .leading, spacing: InspectorMetrics.groupGap) {
+                ForEach(shownRelationships) { relationship in
+                    let group = LinkGroup(item: item.id, field: relationship.field)
+                    ItemRelationshipGroup(
+                        relationship: relationship, typeIcon: typeIcon, isExpanded: presentation.expandedLinks.contains(group),
+                        onShowAll: { presentation.expandLinks(group) }, onOpen: onOpen, onEdit: { onEdit(relationship) },
+                        onRemove: { await onRemove(relationship, $0) }, shownOnPage: placement.showsOnPage(relationship.field),
+                        onShowOnPage: showOnPage(relationship.field))
+                }
             }
         }
     }

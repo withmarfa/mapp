@@ -190,7 +190,7 @@ private struct StatusPin: View {
 }
 
 /// Lays the pins out in slots of a fixed width, 150 points at 13 points of text, so a pin stays where it is from page to
-/// page, as the note page's container query does: four to a row while they fit, then two.
+/// page, as the note page's are: as many to a row as fit, and a pin wraps only where no slot is left.
 private struct PinLayout: Layout {
     let step: CGFloat
     let size: CGFloat
@@ -210,7 +210,7 @@ private struct PinLayout: Layout {
 
     private func arrange(width: CGFloat, subviews: Subviews) -> (frames: [CGRect], size: CGSize) {
         guard !subviews.isEmpty else { return ([], .zero) }
-        let columns = width >= slot * 4 ? 4 : 2
+        let columns = min(4, max(1, Int(width / slot)))
         let column = min(slot, max(0, width / CGFloat(columns)))
         var frames: [CGRect] = []
         var y: CGFloat = 0

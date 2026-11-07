@@ -1,10 +1,10 @@
 import MarfaIcons
 import SwiftUI
 
-/// A relationship as a group of the inspector: its name as a small heading, each item it reaches as a light row with
-/// the item's type icon, which opens it, and a small plus in the trailing column at its name where the relationship
-/// takes several. An editable one offers Open, Change or Manage, and Remove from a menu that shows on hover and in the
-/// context menu.
+/// A relationship as a group of the inspector: its name as a small heading above a box of its own, each item it reaches
+/// as a row in the box with the item's type icon, which opens it, and a small plus in the trailing column at its name
+/// where the relationship takes several. An editable one offers Open, Change or Manage, and Remove from a menu that
+/// shows on hover and in the context menu.
 struct ItemRelationshipGroup: View {
     let relationship: ItemRelationship
     /// The icon of the type of the item a target points at.
@@ -21,34 +21,40 @@ struct ItemRelationshipGroup: View {
     @State private var rejected = false
     @State private var hovering = false
 
-    /// The rows of a box, never one row holding them: the heading, each link, and the rest of them.
+    /// The heading sits above a box of its own, so each relationship reads as a group. The box takes the links, the
+    /// rest of them and a refusal as rows, never one row holding them.
     var body: some View {
-        HStack(spacing: 4) {
-            InspectorSubheading(title: relationship.label, count: relationship.targets.count)
-            Spacer(minLength: 0)
-            if relationship.isEditable && relationship.allowsMultiple {
-                InspectorPlusButton(
-                    accessibilityLabel: "Add to \(relationship.label)",
-                    identifier: "RelationshipAddRow.\(relationship.field)", isRowHovered: hovering, action: onEdit)
-                    .inspectorTrailingColumn(clearsFold: false)
+        VStack(alignment: .leading, spacing: InspectorMetrics.headingGap) {
+            HStack(spacing: 4) {
+                InspectorSubheading(title: relationship.label, count: relationship.targets.count)
+                Spacer(minLength: 0)
+                if relationship.isEditable && relationship.allowsMultiple {
+                    InspectorPlusButton(
+                        accessibilityLabel: "Add to \(relationship.label)",
+                        identifier: "RelationshipAddRow.\(relationship.field)", isRowHovered: hovering, action: onEdit)
+                        .inspectorTrailingColumn(clearsFold: false)
+                }
             }
-        }
-        .contentShape(.rect)
-        .onHover { hovering = $0 }
-        .showOnPageMenu(isShown: shownOnPage, onChange: onShowOnPage)
-        let links = LinkLimit.split(relationship.targets, expanded: isExpanded)
-        ForEach(links.shown) { target in
-            ItemTargetRow(target: target, relationship: relationship, typeIcon: typeIcon, onOpen: onOpen, onEdit: onEdit) { id in
-                Task { rejected = !(await onRemove(id)) }
-            }
+            .padding(.horizontal, InspectorMetrics.boxInset)
+            .contentShape(.rect)
+            .onHover { hovering = $0 }
             .showOnPageMenu(isShown: shownOnPage, onChange: onShowOnPage)
-        }
-        if links.hidden > 0 {
-            ItemShowMoreButton(count: links.hidden, identifier: "RelationshipShowMore.\(relationship.field)", action: onShowAll)
-        }
-        if rejected {
-            Text("The connection could not be removed.")
-                .interfaceFont(.caption).foregroundStyle(.red)
+            let links = LinkLimit.split(relationship.targets, expanded: isExpanded)
+            InspectorBox {
+                ForEach(links.shown) { target in
+                    ItemTargetRow(target: target, relationship: relationship, typeIcon: typeIcon, onOpen: onOpen, onEdit: onEdit) { id in
+                        Task { rejected = !(await onRemove(id)) }
+                    }
+                    .showOnPageMenu(isShown: shownOnPage, onChange: onShowOnPage)
+                }
+                if links.hidden > 0 {
+                    ItemShowMoreButton(count: links.hidden, identifier: "RelationshipShowMore.\(relationship.field)", action: onShowAll)
+                }
+                if rejected {
+                    Text("The connection could not be removed.")
+                        .interfaceFont(.caption).foregroundStyle(.red)
+                }
+            }
         }
     }
 }
@@ -320,7 +326,7 @@ struct ItemRelationshipPicker: View {
             .init(title: "Field notes", itemID: id, resolution: .resolved(id)),
             .init(title: "Interview with the site manager", itemID: nil, resolution: .missing)
         ], isEditable: true, allowsMultiple: true)
-    VStack(alignment: .leading, spacing: 12) {
+    VStack(alignment: .leading, spacing: InspectorMetrics.groupGap) {
         ItemRelationshipGroup(relationship: parent, onOpen: { _ in }, onEdit: {}, onRemove: { _ in true })
         ItemRelationshipGroup(relationship: about, onOpen: { _ in }, onEdit: {}, onRemove: { _ in true })
     }
