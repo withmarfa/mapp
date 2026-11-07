@@ -32,6 +32,8 @@ private struct FocusedEditorKey: FocusedValueKey {
 @Observable
 final class DetailsPresentation {
     var isPresented = false
+    /// The Reader and Original switch of the page showing, while it has an article. The toolbar and the menus hold it.
+    private(set) var pageLook: PageLookSwitch?
     /// The items the window's Change Type sheet is open for.
     var typeChange: TypeChangeRequest?
     /// Version History, while the window shows it in place of its page.
@@ -62,6 +64,12 @@ final class DetailsPresentation {
     @ObservationIgnored private var drafts: [ItemID: [String: ItemPropertyDraft]] = [:]
 
     init() { Self.open.add(self) }
+
+    /// Gives the window `item`'s switch, or takes `item`'s away. Another item's is left alone, since a page going away
+    /// can be told after the next one has arrived.
+    func offerPageLook(_ look: PageLookSwitch?, for item: ItemID) {
+        if look != nil || pageLook?.item == item { pageLook = look }
+    }
 
     /// Every window's presentation, so a quit can reach the drafts each holds.
     private static let open = NSHashTable<DetailsPresentation>.weakObjects()

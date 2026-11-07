@@ -19,10 +19,12 @@ struct ItemCommandContext {
     let fileURL: URL?
     /// The window's browser, which Quick Look acts through.
     let browser: Browser?
+    /// The Reader and Original switch of the page in front, when it has an article.
+    let pageLook: PageLookSwitch?
 
     init(
         library: (any ItemLibrary)?, ids: Set<ItemID>, hasBrowser: Bool, pageItem: ItemID?, pageIsEditable: Bool = true,
-        showsSource: Bool = false, fileURL: URL? = nil, browser: Browser? = nil
+        showsSource: Bool = false, fileURL: URL? = nil, browser: Browser? = nil, pageLook: PageLookSwitch? = nil
     ) {
         self.library = library
         self.ids = ids
@@ -32,17 +34,22 @@ struct ItemCommandContext {
         self.showsSource = showsSource
         self.fileURL = fileURL
         self.browser = browser
+        self.pageLook = pageLook
     }
 
     /// The context of a window: its selection, its browser if it has one, and the editor it hands to its menus.
     /// `fileURL` is the file known to the window when the browser has none for the item.
-    init(library: (any ItemLibrary)?, ids: Set<ItemID>, browser: Browser?, editor: EditorController?, fileURL: URL? = nil) {
+    init(
+        library: (any ItemLibrary)?, ids: Set<ItemID>, browser: Browser?, editor: EditorController?, details: DetailsPresentation?,
+        fileURL: URL? = nil
+    ) {
         let single = ids.count == 1 ? ids.first : nil
         self.init(
             library: library, ids: ids, hasBrowser: browser != nil,
             pageItem: Self.pageItem(showsPage: browser?.showsPage ?? true, editorHasNote: editor?.hasNote == true, noteID: editor?.noteID),
             pageIsEditable: editor?.isEditable ?? false, showsSource: editor?.caret.sourceMode ?? false,
-            fileURL: single.flatMap { browser?.fileURL(of: $0) } ?? fileURL, browser: browser)
+            fileURL: single.flatMap { browser?.fileURL(of: $0) } ?? fileURL, browser: browser,
+            pageLook: browser?.showsPage != false ? details?.pageLook : nil)
     }
 
     /// The item whose page is in front: the editor's, only while the page is what the window shows and the editor
@@ -72,7 +79,7 @@ struct ItemCommandContext {
 /// once here: its title, symbol, shortcut, when it applies and what it does. A menu shows every one of them and
 /// dims the ones that do not apply, so the two menus never differ in what they offer or when.
 enum ItemCommand: CaseIterable {
-    case quickLook, openInNewWindow, openOriginal, openInBrowser, addAttachment, toggleSource, print, exportPDF
+    case quickLook, openInNewWindow, openOriginal, openInBrowser, addAttachment, toggleSource, toggleReader, print, exportPDF
 
     func title(in context: ItemCommandContext) -> LocalizedStringResource {
         switch self {
@@ -82,6 +89,7 @@ enum ItemCommand: CaseIterable {
         case .openInBrowser: "Open in Browser"
         case .addAttachment: "Add Attachment…"
         case .toggleSource: context.showsSource ? "Show Formatted Text" : "Show Markdown Source"
+        case .toggleReader: context.pageLook?.mode == .original ? "Show Reader" : "Show Original"
         case .print: "Print…"
         case .exportPDF: "Export as PDF…"
         }
@@ -94,6 +102,7 @@ enum ItemCommand: CaseIterable {
         case .openOriginal, .openInBrowser: "safari"
         case .addAttachment: "paperclip"
         case .toggleSource: "doc.plaintext"
+        case .toggleReader: "text.page"
         case .print: "printer"
         case .exportPDF: "doc.richtext"
         }
@@ -105,7 +114,7 @@ enum ItemCommand: CaseIterable {
         case .openInNewWindow: KeyboardShortcut("o")
         case .addAttachment: KeyboardShortcut("a", modifiers: [.command, .shift])
         case .print: KeyboardShortcut("p")
-        case .quickLook, .openOriginal, .openInBrowser, .toggleSource, .exportPDF: nil
+        case .quickLook, .openOriginal, .openInBrowser, .toggleSource, .toggleReader, .exportPDF: nil
         }
     }
 
@@ -117,6 +126,7 @@ enum ItemCommand: CaseIterable {
         case .openInBrowser: context.browserTarget != nil
         case .addAttachment: context.editableNote != nil
         case .toggleSource, .print, .exportPDF: context.visibleNote != nil
+        case .toggleReader: context.pageLook != nil
         }
     }
 
@@ -131,6 +141,7 @@ enum ItemCommand: CaseIterable {
             if let item = context.item, let target = context.browserTarget { BrowserOpening.open(target, for: item) }
         case .addAttachment: editor?.isChoosingImages = true
         case .toggleSource: editor.map { $0.setSourceMode(!$0.caret.sourceMode) }
+        case .toggleReader: context.pageLook.map { $0.choose($0.mode == .reader ? .original : .reader) }
         case .print: editor?.printNote()
         case .exportPDF: editor?.exportPDF()
         }

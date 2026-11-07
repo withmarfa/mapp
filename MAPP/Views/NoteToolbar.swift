@@ -5,9 +5,9 @@ import SwiftUI
 /// split views. Nothing else in a window may declare a plain `toolbar`, which turns customization off for the whole window.
 ///
 /// The defaults run New Item at the leading side when the sidebar is hidden, then a view's pencil, Revert and Save or
-/// Save as View while there is something to keep, Search, Filter and View Options, View As, Share and More, and Details at the far
-/// right. In the list the pencil, Search, Filter and View Options are the list column's (`ListToolbar`). Format and
-/// `ExtraToolbarItems` start in the tray.
+/// Save as View while there is something to keep, Search, Filter and View Options, the Reader and Original switch on a
+/// page with an article, View As, Share and More, and Details at the far right. In the list the pencil, Search, Filter
+/// and View Options are the list column's (`ListToolbar`). Format and `ExtraToolbarItems` start in the tray.
 struct WindowToolbar: CustomizableToolbarContent {
     @CurrentLibrary private var library
     @AppStorage(InterfaceKey.showsScrolledTitle) private var showsScrolledTitle = true
@@ -68,6 +68,11 @@ struct WindowToolbar: CustomizableToolbarContent {
             ToolbarSpacer(.fixed)
                 .hidden(opensFromCollection || !showsItem)
         }
+        let hidesPageLook = details.pageLook == nil || browser?.showsCollection == true || !showsItem
+        ToolbarItem(id: "pageLook") { SourceViewPicker(details: details) }
+            .hidden(hidesPageLook)
+        ToolbarSpacer(.fixed)
+            .hidden(hidesPageLook)
         ToolbarItem(id: "format") {
             if let editor { FormatMenu(editor: editor, note: tools.editableNote) }
         }
@@ -344,7 +349,7 @@ private struct ItemToolbarActions {
 
     func command(_ command: ItemCommand) -> some View {
         ItemCommandButton(
-            command: command, context: ItemCommandContext(library: library, ids: ids, browser: browser, editor: editor, fileURL: selectedFileURL),
+            command: command, context: ItemCommandContext(library: library, ids: ids, browser: browser, editor: editor, details: details, fileURL: selectedFileURL),
             editor: editor)
     }
 
@@ -412,7 +417,7 @@ private struct MoreMenu: View {
 
     private func command(_ command: ItemCommand) -> some View {
         ItemCommandButton(
-            command: command, context: ItemCommandContext(library: library, ids: ids, browser: browser, editor: editor, fileURL: fileURL),
+            command: command, context: ItemCommandContext(library: library, ids: ids, browser: browser, editor: editor, details: details, fileURL: fileURL),
             editor: editor)
     }
 
@@ -434,6 +439,7 @@ private struct MoreMenu: View {
                 PageWidthOptions().pickerStyle(.inline).labelsHidden()
             }
             command(.toggleSource)
+            command(.toggleReader)
             Divider()
             command(.print)
             command(.exportPDF)

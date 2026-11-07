@@ -88,4 +88,23 @@ struct ItemCommandTests {
         let shortcuts = ItemCommand.allCases.compactMap(\.shortcut).map { "\($0.key.character)\($0.modifiers.rawValue)" }
         #expect(Set(shortcuts).count == shortcuts.count)
     }
+
+    /// A page's switch is what the command acts on, and a page going away takes only its own.
+    @Test func theReaderCommandFollowsThePagesSwitch() {
+        let (first, second) = (ItemID.mint(), ItemID.mint())
+        let details = DetailsPresentation()
+        var chosen: SourceViewMode?
+        details.offerPageLook(PageLookSwitch(item: second, mode: .reader) { chosen = $0 }, for: second)
+        details.offerPageLook(nil, for: first)
+        let context = ItemCommandContext(library: nil, ids: [second], browser: nil, editor: nil, details: details)
+        #expect(context.pageLook?.item == second)
+
+        let reading = ItemCommandContext(library: library, ids: [second], hasBrowser: true, pageItem: nil, pageLook: details.pageLook)
+        ItemCommand.toggleReader.perform(in: reading, editor: nil, openWindow: { _ in })
+        #expect(chosen == .original)
+
+        details.offerPageLook(nil, for: second)
+        let none = ItemCommandContext(library: library, ids: [second], browser: nil, editor: nil, details: details)
+        #expect(!ItemCommand.toggleReader.isEnabled(in: none))
+    }
 }
