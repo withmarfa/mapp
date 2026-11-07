@@ -45,18 +45,16 @@ struct ViewModeMenu: View {
 
     var body: some View {
         let modes = browser.availableViewModes(in: library)
-        // A menu rather than a picker for the toolbar's sake: the tray and Icon and Text name an item by its label.
-        Menu("View As", systemImage: browser.viewMode.symbol) {
-            Picker("View As", selection: $browser.viewMode) {
-                if modes.contains(.list) { Text("as List").tag(ItemViewMode.list) }
-                if modes.contains(.gallery) { Text("as Gallery").tag(ItemViewMode.gallery) }
-                if modes.contains(.table) { Text("as Table").tag(ItemViewMode.table) }
-                if modes.contains(.board) { Text("as Board").tag(ItemViewMode.board) }
-                if modes.contains(.timeline) { Text("as Timeline").tag(ItemViewMode.timeline) }
-            }
-            .pickerStyle(.inline)
-            .labelsHidden()
+        // A picker, not a menu: it says the button chooses one of several, as Finder's does, with the double chevron.
+        Picker("View As", systemImage: browser.viewMode.symbol, selection: $browser.viewMode) {
+            if modes.contains(.list) { Label("as List", systemImage: ItemViewMode.list.symbol).tag(ItemViewMode.list) }
+            if modes.contains(.gallery) { Label("as Gallery", systemImage: ItemViewMode.gallery.symbol).tag(ItemViewMode.gallery) }
+            if modes.contains(.table) { Label("as Table", systemImage: ItemViewMode.table.symbol).tag(ItemViewMode.table) }
+            if modes.contains(.board) { Label("as Board", systemImage: ItemViewMode.board.symbol).tag(ItemViewMode.board) }
+            if modes.contains(.timeline) { Label("as Timeline", systemImage: ItemViewMode.timeline.symbol).tag(ItemViewMode.timeline) }
         }
+        .pickerStyle(.menu)
+        .labelStyle(.iconOnly)
         .help("View As")
         .accessibilityIdentifier("ViewModeMenu")
     }

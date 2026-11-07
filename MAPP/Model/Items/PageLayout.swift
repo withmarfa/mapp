@@ -158,7 +158,7 @@ nonisolated extension PageLayout {
     }
 
     /// The symbol of the value a field holds, as the page's rows draw it (`PropertyRow.Value.symbol`).
-    private static func symbol(of field: ItemTypeInfo.Field) -> String {
+    static func symbol(of field: ItemTypeInfo.Field) -> String {
         switch field.kind {
         case .status: "circle.dotted"
         case .boolean: "checkmark.square"

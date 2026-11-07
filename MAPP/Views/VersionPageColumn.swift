@@ -6,6 +6,7 @@ struct VersionPageColumn: View {
     @CurrentLibrary private var library
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
+    @Environment(\.interfaceTextSize) private var textSize
     let mode: VersionHistoryMode
     let list: VersionList?
 
@@ -64,7 +65,7 @@ struct VersionPageColumn: View {
                 } else if entry.content.title != nil {
                     Text("Untitled").interfaceFont(.largeTitle.bold()).foregroundStyle(.tertiary)
                 }
-                if !pins.isEmpty { pinRow(pins) }
+                if !pins.isEmpty { pinRow(pins, of: entry.content.type) }
                 if let text = entry.content.text {
                     VersionTextView(old: older?.content.text, new: text)
                 } else {
@@ -79,14 +80,31 @@ struct VersionPageColumn: View {
         .accessibilityIdentifier("VersionHistoryPage")
     }
 
-    private func pinRow(_ pins: [VersionFactRow]) -> some View {
-        TagFlowLayout(spacing: 14) {
+    /// The pins as the item's page draws them: each key above its value, in a slot of the same width.
+    private func pinRow(_ pins: [VersionFactRow], of type: TypeID) -> some View {
+        let scale = InterfaceStyle.scale(for: textSize)
+        return TagFlowLayout(spacing: 14 * scale) {
             ForEach(pins) { pin in
-                HStack(spacing: 5) {
-                    Text(LocalizedStringKey(pin.label)).foregroundStyle(.secondary)
-                    Text(verbatim: pin.value)
+                VStack(alignment: .leading, spacing: 5 * scale) {
+                    HStack(spacing: 4 * scale) {
+                        if let symbol = pin.symbol {
+                            Image(systemName: symbol).font(.system(size: 11 * scale)).accessibilityHidden(true)
+                        }
+                        Text(LocalizedStringKey(pin.label)).font(.system(size: 12 * scale))
+                    }
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    if pin.id == PagePlacement.type {
+                        PageChip(text: pin.value, kind: .type(icon: library.catalogue.icon(for: type)))
+                    } else {
+                        Text(verbatim: pin.value)
+                            .interfaceFont(.body)
+                            .lineLimit(1)
+                            .frame(minHeight: 22 * scale)
+                    }
                 }
-                .interfaceFont(.callout)
+                .frame(width: 136 * scale, alignment: .leading)
+                .help(pin.value)
             }
         }
     }
