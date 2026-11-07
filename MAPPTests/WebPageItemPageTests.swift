@@ -94,6 +94,33 @@ struct WebPageItemPageTests {
         #expect(try await settled(view) { has(identifier: "SourceViewMode", in: view) })
     }
 
+    /// The title's frame. The page's own identifier replaces the title's, so it is found by what it says.
+    private func titleFrame(_ item: Item, in view: NSView) -> NSRect? {
+        elements(of: view).first { answer($0, "accessibilityValue") as? String == item.displayTitle || answer($0, "accessibilityLabel") as? String == item.displayTitle }
+            .flatMap { ($0.value(forKey: "accessibilityFrame") as? NSValue)?.rectValue }
+    }
+
+    @Test func theTitleStaysWhereItIsWhenTheArticleArrives() async throws {
+        let folder = try temporaryFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let item = file("A.html")
+        // Long enough to be analyzed for a couple of seconds, so the header is read while the page still loads.
+        let long = "<html><head><title>The cliff path</title></head><body><article><h1>The cliff path</h1>"
+            + (1...Self.longParagraphs).map { "<p>Paragraph \($0) walks along the cliff, past the gorse and the old coastguard hut, and down to the cove where the boats lie.</p>" }.joined()
+            + "</article></body></html>"
+        try Data(long.utf8).write(to: folder.appending(path: "a.html"))
+        let library = FakeItemLibrary(items: [item], now: .now)
+        library.files[item.id] = folder.appending(path: "a.html")
+        let (window, view) = host(Visit(item), in: library)
+        defer { window.orderOut(nil); window.contentView = nil; window.close() }
+
+        try #require(await settled(view) { titleFrame(item, in: view) != nil })
+        let whileLoading = try #require(titleFrame(item, in: view))
+        try #require(!has(identifier: "SourceViewMode", in: view), "the article has not arrived yet")
+        try #require(await settled(view) { has(identifier: "SourceViewMode", in: view) })
+        #expect(titleFrame(item, in: view)?.origin.y == whileLoading.origin.y)
+    }
+
     /// Try Again ran on a task of its own, which the window moving on to another item did not cancel. Its file was
     /// still being analyzed when the other item's page appeared, and when it finished it put its article on that page.
     @Test func aRetryStartedForOneItemNeverShowsItsArticleOnTheNext() async throws {

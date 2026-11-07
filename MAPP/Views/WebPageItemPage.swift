@@ -112,7 +112,8 @@ struct WebPageItemPage: View {
             VStack(spacing: 0) {
                 WebPageHeader(
                     item: item, inset: inset, drafts: drafts, open: open, mode: pickedMode, reading: headerMode == .reader,
-                    offersReader: { if case .ready(let loaded) = content { loaded.reader != nil } else { false } }())
+                    offersReader: { if case .ready(let loaded) = content { loaded.reader != nil } else { false } }(),
+                    isLoading: { if case .loading = content { true } else { false } }())
                 // The header is inset like the other item pages' and the page draws to its own margin, so the line
                 // sets the page apart as a document under its header.
                 Divider()
@@ -315,6 +316,8 @@ private struct WebPageHeader: View {
     let reading: Bool
     /// Whether the page has an article to read, which is the only page the switch is offered for.
     let offersReader: Bool
+    /// Whether the page may yet have an article, so the line holds the switch's place and the title stays where it is.
+    let isLoading: Bool
 
     var body: some View {
         let parts = PageHeaderParts(of: item, in: library, placements: placements, dateFormat: dateFormat)
@@ -323,7 +326,7 @@ private struct WebPageHeader: View {
         let statusField = parts.type?.statusField
         VStack(alignment: .leading, spacing: 10) {
             let byline = [parts.lead.byline?.source, parts.lead.byline?.date, parts.lead.byline?.detail].compactMap { $0 }.filter { !$0.isEmpty }
-            if offersReader || !byline.isEmpty { line(byline, step: step) }
+            if offersReader || isLoading || !byline.isEmpty { line(byline, step: step) }
             VStack(alignment: .leading, spacing: step) {
                 Text(verbatim: item.displayTitle)
                     .font(reading
@@ -369,7 +372,8 @@ private struct WebPageHeader: View {
     }
 
     /// Where a page for reading came from, when it was published and how long it takes, as one quiet line, with the
-    /// switch at its trailing edge where the page has an article to read. The line is drawn where it has either.
+    /// switch at its trailing edge where the page has an article to read. The line is drawn where it has either, and while
+    /// the page loads. The switch is always there, hidden where it is not offered, so the line keeps its height.
     private func line(_ parts: [String], step: CGFloat) -> some View {
         HStack(spacing: step * 2.5) {
             ForEach(Array(parts.enumerated()), id: \.offset) { index, part in
@@ -381,7 +385,7 @@ private struct WebPageHeader: View {
             .textCase(.uppercase)
             .foregroundStyle(.secondary)
             Spacer(minLength: step * 4)
-            if offersReader { SourceViewPicker(mode: $mode) }
+            if offersReader { SourceViewPicker(mode: $mode) } else { SourceViewPicker(mode: $mode).hidden() }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("WebPageLine")
