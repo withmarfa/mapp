@@ -18,7 +18,7 @@ enum InterfaceKey {
     static let showsScrolledTitle = "showsScrolledTitle"
     /// Whether a note's or item's page backs the toolbar with a blurred band while content scrolls under it.
     static let showsPageToolbarBackground = "showsPageToolbarBackground"
-    static let all = [textSize, inspectorDetailsOpen, inspectorPropertiesOpen, inspectorRelationshipsOpen, inspectorLinksInPageOpen, inspectorLinkedFromOpen, inspectorTagsOpen, showsScrolledTitle, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
+    static let all = [textSize, inspectorWidth, inspectorDetailsOpen, inspectorPropertiesOpen, inspectorRelationshipsOpen, inspectorLinksInPageOpen, inspectorLinkedFromOpen, inspectorTagsOpen, showsScrolledTitle, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
 }
 
 enum InterfaceStyle {
