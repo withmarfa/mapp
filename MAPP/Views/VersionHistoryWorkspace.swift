@@ -16,15 +16,21 @@ struct VersionHistoryWorkspace: View {
         NavigationSplitView(columnVisibility: .constant(.all)) {
             VersionThreadColumn(mode: mode, list: list, now: now)
                 .navigationSplitViewColumnWidth(min: 260, ideal: 288, max: 360)
+                // The thread is the mode's whole left side, so there is nothing to hide it for. Removed in the column,
+                // where the split view adds the toggle.
+                .toolbar(removing: .sidebarToggle)
         } detail: {
             VersionPageColumn(mode: mode, list: list)
                 .inspector(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
                     VersionFactsPanel(mode: mode, list: list)
                         .inspectorColumnWidth(min: 260, ideal: 310, max: 440)
                 }
+                // The thread's header already says it. The window keeps the title for Mission Control and VoiceOver.
+                .toolbar(removing: .title)
+                // Plain, not `toolbar(id:)`: the mode has nothing to arrange, so the window's toolbar is not customizable
+                // while it is on, and it names no saved layout to change or lose. The window's own layout comes back as it was.
                 .toolbar { toolbar }
         }
-        .toolbar(removing: .sidebarToggle)
         .navigationTitle("Version History")
         .onExitCommand { details.leaveHistory() }
         .onChange(of: list == nil, initial: true) {
