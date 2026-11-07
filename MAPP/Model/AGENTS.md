@@ -43,7 +43,7 @@ The data model, free of SwiftUI: the `ItemLibrary` protocol, `MarfaLibrary` over
 ## Changing libraries and quitting
 
 - `Libraries` owns the `MarfaHost` and the library the windows read. With no copy open, a window shows the connect, waiting or failure page (`Libraries.mode`); there is no other library to fall back to.
-- Before the host changes library and before the app quits, `Libraries.flushEditors` has every open page hand over its last edit and every unsaved title saved; a flush that fails or runs out of time cancels the step and tells the person why. It never waits on the server, so quitting offline is not held up.
+- Before the host changes library and before the app quits, `Libraries.flushEditors` ends the open value panel (`ValueEditPresenter.handOff`, which writes or hands back what was typed in it), has every open page hand over its last edit and every unsaved title saved; a flush that fails or runs out of time cancels the step and tells the person why. It never waits on the server, so quitting offline is not held up.
 - A change of library resets each window (`Browser.adopt`): selections name items the other library may lack.
 
 ## Logs, reports and notices

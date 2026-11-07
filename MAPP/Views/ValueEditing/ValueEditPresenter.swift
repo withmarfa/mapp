@@ -73,6 +73,10 @@ final class ValueEditPresenter {
         closing.close(restoringFocus: restoringFocus)
     }
 
+    /// The app is quitting or changing library: the editor open ends as it does on a click elsewhere, so what was typed
+    /// in it is written to the library it came from or handed back, never lost.
+    func handOff() { dismiss(restoringFocus: false) }
+
     /// The item on show changed: an editor for another item is for a value that is no longer there.
     func itemChanged(to id: ItemID?) {
         guard let item = session?.request.item, item != id else { return }
