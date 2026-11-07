@@ -60,7 +60,7 @@ nonisolated struct VersionFacts: Equatable, Sendable {
                 let changes = WordDiff.changes(WordDiff.pieces(from: before, to: after))
                 since.append(VersionFactRow(
                     id: "#text", label: String(localized: "Text"),
-                    value: changes == 0 ? String(localized: "Changed") : String(localized: "^[\(changes) change](inflect: true)")))
+                    value: changes == 0 ? String(localized: "Changed") : AttributedString(localized: "^[\(changes) change](inflect: true)").text))
             }
             since += delta.fields.map { change in
                 VersionFactRow(id: change.key, label: change.label, value: change.to == nil ? String(localized: "Cleared") : value(change.to, change.field))
@@ -75,11 +75,11 @@ nonisolated struct VersionFacts: Equatable, Sendable {
     static func describe(additions: Int, removals: Int) -> String {
         switch (additions, removals) {
         case (0, 0): return String(localized: "Changed")
-        case (_, 0): return String(localized: "^[\(additions) addition](inflect: true)")
-        case (0, _): return String(localized: "^[\(removals) removal](inflect: true)")
+        case (_, 0): return AttributedString(localized: "^[\(additions) addition](inflect: true)").text
+        case (0, _): return AttributedString(localized: "^[\(removals) removal](inflect: true)").text
         default:
-            let added = String(localized: "^[\(additions) addition](inflect: true)")
-            let removed = String(localized: "^[\(removals) removal](inflect: true)")
+            let added = AttributedString(localized: "^[\(additions) addition](inflect: true)").text
+            let removed = AttributedString(localized: "^[\(removals) removal](inflect: true)").text
             return String(localized: "\(added), \(removed)")
         }
     }

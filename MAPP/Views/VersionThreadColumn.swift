@@ -38,7 +38,7 @@ struct VersionThreadColumn: View {
         guard mode.thread.phase == .loaded, let list else { return nil }
         let count = list.entries.count
         return list.isComplete
-            ? String(localized: "^[\(count) version](inflect: true)")
+            ? AttributedString(localized: "^[\(count) version](inflect: true)").text
             : String(localized: "\(count) or more versions")
     }
 

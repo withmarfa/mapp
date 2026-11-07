@@ -230,7 +230,16 @@ struct FileDropTests {
         let notice = try #require(library.notices.waiting.first)
         #expect(library.notices.waiting.count == 1)
         #expect(notice.message.contains("10") && notice.message.contains("15"))
+        #expect(!notice.message.contains("^["), "a plural is read as a word, never shown as its markup")
+        #expect(notice.message.hasSuffix("15 items."))
         browser.dismissQuickLook()
+    }
+
+    @Test func thingsThatAreNotFilesAreCountedInWords() {
+        let notices = Notices()
+        QuickAdd.File.tellUnreadable([], unreadable: 1, to: notices)
+        QuickAdd.File.tellUnreadable([], unreadable: 3, to: notices)
+        #expect(notices.waiting.map(\.message) == ["1 item can’t be added as a file.", "3 items can’t be added as a file."])
     }
 
     @Test func quickLookCountsOnlyTheItemsItShowsAgainstItsLimit() async throws {
