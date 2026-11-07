@@ -16,38 +16,47 @@ enum SavedViews {
         return library.views.first { $0.id == id }
     }
 
-    /// What the window shows, as the table works it out. Only the table applies filters, so only its are taken.
+    /// What the window shows, as the table works it out. Every layout applies the place's filters.
     static func window(_ browser: Browser, in library: any ItemLibrary) -> ViewDraft.Window {
         let content = browser.tableContent(in: library)
         let options = browser.tableOptions[browser.item] ?? ItemTableOptions()
         let search = browser.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         return ViewDraft.Window(
             place: browser.item, columns: content.columns, sort: content.sort, grouping: content.grouping,
-            filters: browser.viewMode == .table ? options.filters : [:], search: search.isEmpty ? nil : search)
+            filters: options.filters, negated: options.negated, search: search.isEmpty ? nil : search,
+            layout: layout(of: browser, in: library, order: nil), timelineDate: browser.timelineFields[browser.item])
     }
 
     /// What the window shows in the layout it shows it in, with that layout's own order and grouping, so a new
     /// view keeps what the person sees.
     static func window(_ browser: Browser, in library: any ItemLibrary, order: NoteOrder) -> ViewDraft.Window {
         var window = window(browser, in: library)
-        switch browser.viewMode {
-        case .table:
-            window.layout = .table
-        case .list, .gallery:
-            window.layout = .list(order)
-        case .board:
-            let fields = browser.boardFieldChoices(in: library)
-            let field = ItemBoardLayout.selectedField(browser.boardFields[browser.item], available: fields)
-            window.layout = .board(key: field?.key, label: field?.label ?? "")
-        case .timeline:
-            let fields = browser.timelineFieldChoices(in: library)
-            let key = ItemTimelineLayout.selectedField(browser.timelineFields[browser.item], fields: fields)
-            window.layout = .timeline(key: key, label: fields.first { $0.key == key }?.label ?? "")
-        }
+        window.layout = layout(of: browser, in: library, order: order)
         return window
     }
 
-    /// Updates the view the window shows with the table's choices, asking first when it would leave some of the
+    /// The layout the window shows. Without the list's order, which only a new view takes, a list or a gallery is
+    /// read as the table is.
+    private static func layout(of browser: Browser, in library: any ItemLibrary, order: NoteOrder?) -> ViewDraft.Layout {
+        switch browser.viewMode {
+        case .table:
+            return .table
+        case .list, .gallery:
+            // The sort and group the person set, or the view's, are what the list and the gallery show.
+            guard let order, browser.listShape?.arranged != true else { return .table }
+            return .list(order)
+        case .board:
+            let fields = browser.boardFieldChoices(in: library)
+            let field = ItemBoardLayout.selectedField(browser.boardFieldKey(in: browser.item), available: fields)
+            return .board(key: field?.key, label: field?.label ?? "")
+        case .timeline:
+            let fields = browser.timelineFieldChoices(in: library)
+            let key = ItemTimelineLayout.selectedField(browser.timelineFields[browser.item], fields: fields)
+            return .timeline(key: key, label: fields.first { $0.key == key }?.label ?? "")
+        }
+    }
+
+    /// Saves the view the window shows with the window's choices, asking first when it would leave some of the
     /// window out, or leave conditions of the view's filter the table cannot show as they are.
     static func update(_ browser: Browser, in library: any ItemLibrary) {
         guard let shown = shown(browser, in: library),
@@ -66,9 +75,9 @@ enum SavedViews {
         of id: ItemID, browser: Browser, library: any ItemLibrary
     ) async {
         // The window's filters may differ only in ones the view never held, so the window goes back to the view.
-        guard !update.change.isEmpty else { return browser.viewUpdated(update.view) }
+        guard !update.change.isEmpty else { return browser.viewUpdated(update.view, in: library) }
         switch await library.changeView(id, update.change, baseVersion: update.baseVersion) {
-        case .success(let view): browser.viewUpdated(view)
+        case .success(let view): browser.viewUpdated(view, in: library)
         case .failure(let failure) where failure.kind == .conflict: browser.viewRefused(id, in: library)
         case .failure: break
         }
@@ -79,6 +88,7 @@ enum SavedViews {
         case .search(let text): String(localized: "The search for “\(text)”")
         case .filter(let column): String(localized: "The filter on \(column)")
         case .mixedFilters: String(localized: "Filters that would join conditions with both “and” and “or”")
+        case .tooManyFilters: String(localized: "More than \(ViewDraft.maxConditions) filter conditions")
         case .refused(let message): String(localized: "A filter Marfa refuses: \(message)")
         case .sort(let column): String(localized: "Sorting by \(column)")
         case .group(let column): String(localized: "Grouping by \(column)")
@@ -100,11 +110,21 @@ struct SavedViewCommand {
             commands.append(SavedViewCommand(title: String(localized: "New View…"), systemImage: "plus.rectangle.on.rectangle") {
                 browser.viewEditing = .new
             })
+            // A place that is not a view saves what it shows as one.
+            if SavedViews.shown(browser, in: library) == nil, browser.tableOptions[browser.item]?.isFiltering == true
+                || browser.listShape?.arranged == true {
+                commands.append(SavedViewCommand(title: String(localized: "Save as View…"), systemImage: "plus.rectangle.on.rectangle") {
+                    browser.viewEditing = .new
+                })
+            }
         }
         if let view = SavedViews.shown(browser, in: library) {
             if browser.hasViewChanges {
-                commands.append(SavedViewCommand(title: String(localized: "Update View"), systemImage: "arrow.trianglehead.2.clockwise") {
+                commands.append(SavedViewCommand(title: String(localized: "Save View"), systemImage: "arrow.trianglehead.2.clockwise") {
                     SavedViews.update(browser, in: library)
+                })
+                commands.append(SavedViewCommand(title: String(localized: "Revert View"), systemImage: "arrow.uturn.backward") {
+                    browser.revertView(in: library)
                 })
             }
             commands.append(SavedViewCommand(title: String(localized: "Rename View…"), systemImage: "pencil") {
@@ -128,10 +148,16 @@ struct SavedViewMenu: View {
         let canEdit = library?.reachesServer == true
         Button("New View…", systemImage: "plus.rectangle.on.rectangle") { browser?.viewEditing = .new }
             .disabled(!(browser.flatMap { browser in library.map { SavedViews.canSave(browser, in: $0) } } ?? false))
-        Button("Update View", systemImage: "arrow.trianglehead.2.clockwise") {
+        Button("Save as View…", systemImage: "plus.rectangle.on.rectangle") { browser?.viewEditing = .new }
+            .disabled(!canEdit || shown != nil || !(browser.flatMap { browser in library.map { SavedViews.canSave(browser, in: $0) } } ?? false))
+        Button("Save View", systemImage: "arrow.trianglehead.2.clockwise") {
             if let browser, let library { SavedViews.update(browser, in: library) }
         }
         .disabled(!canEdit || shown == nil || browser?.hasViewChanges != true)
+        Button("Revert View", systemImage: "arrow.uturn.backward") {
+            if let browser, let library { browser.revertView(in: library) }
+        }
+        .disabled(shown == nil || browser?.hasViewChanges != true)
         Button("Rename View…", systemImage: "pencil") {
             if let shown { browser?.viewEditing = .rename(shown.id) }
         }
@@ -273,7 +299,7 @@ private struct SavedViewDialogs: ViewModifier {
     }
 }
 
-/// Asks for a new view's title, a view's new name, or whether to update a view with what it will not keep. A title
+/// Asks for a new view's title, a view's new name, or whether to save a view with what it will not keep. A title
 /// stays in the sheet until the server takes it (`ViewTitleForm`).
 private struct SavedViewSheet: View {
     let editing: Browser.ViewEditing
@@ -295,7 +321,7 @@ private struct SavedViewSheet: View {
             case .rename:
                 if let form = browser.viewTitleForm { ViewTitleField(form: form) }
             case .update, .delete:
-                Text("The view is updated for every app connected to your Marfa server.")
+                Text("The view is saved for every app connected to your Marfa server.")
                     .foregroundStyle(.secondary)
             }
             if !unkept.isEmpty {
@@ -307,7 +333,7 @@ private struct SavedViewSheet: View {
             }
             if let update, update.change.query != nil, !update.unchanged.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("The table can’t show these conditions of the view’s filter, so they stay as they are:")
+                    Text("The window can’t show these conditions of the view’s filter, so they stay as they are:")
                     ForEach(update.unchanged, id: \.self) { Text(verbatim: "• \($0)").monospaced() }
                 }
                 .fixedSize(horizontal: false, vertical: true)
@@ -332,7 +358,7 @@ private struct SavedViewSheet: View {
         case .new: String(localized: "New View")
         case .rename: String(localized: "Rename View")
         case .update(let id), .delete(let id):
-            String(localized: "Update “\(library.views.first { $0.id == id }?.title ?? "")”?")
+            String(localized: "Save “\(library.views.first { $0.id == id }?.title ?? "")”?")
         }
     }
 
@@ -340,7 +366,7 @@ private struct SavedViewSheet: View {
         switch editing {
         case .new: String(localized: "Save View")
         case .rename: String(localized: "Rename")
-        case .update, .delete: String(localized: "Update View")
+        case .update, .delete: String(localized: "Save View")
         }
     }
 
