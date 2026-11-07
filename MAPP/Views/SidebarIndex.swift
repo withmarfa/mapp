@@ -5,7 +5,6 @@ struct SidebarIndex: View {
     @CurrentLibrary private var library
     let browser: Browser
     let order: NoteOrder
-    let showsCreation: Bool
     @State private var model = IndexRowsModel()
     @State private var editing: SourceEditRequest?
 
@@ -32,15 +31,6 @@ struct SidebarIndex: View {
         .onDisappear { model.stop() }
         .navigationTitle(library.name(of: browser.item))
         .navigationSubtitle(summary)
-        .toolbar {
-            if showsCreation {
-                ToolbarItem(id: "indexNewItem") {
-                    NewItemButton(browser: browser)
-                }
-            }
-            ToolbarSpacer(.flexible)
-            IndexToolbar(browser: browser, place: place)
-        }
         .accessibilityIdentifier("SidebarIndex")
     }
 
@@ -146,19 +136,3 @@ private struct IndexContent: View {
 }
 
 /// Search and the page's options, as the gallery and the table have them at the toolbar's trailing side.
-private struct IndexToolbar: ToolbarContent {
-    @Bindable var browser: Browser
-    let place: IndexPlace
-
-    var body: some ToolbarContent {
-        ColumnSearch(
-            isExpanded: $browser.isSearchExpanded,
-            text: $browser.searchText,
-            prompt: String(localized: "Search"),
-            layout: .item,
-            focusRequests: browser.searchFocusRequests
-        ) {
-            IndexViewOptionsMenu(place: place)
-        }
-    }
-}

@@ -85,7 +85,7 @@ struct NoteList: View, Equatable {
         }
         .searchStatus(browser)
         .bandsToolbar()
-        .toolbar { ListToolbar(browser: browser, columnWidth: width) }
+        .toolbar(id: WindowToolbarLayout.list) { ListToolbar(browser: browser, columnWidth: width) }
         .task {
             for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) {
                 daysSeen += 1
