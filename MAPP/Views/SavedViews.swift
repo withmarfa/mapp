@@ -102,6 +102,7 @@ enum SavedViews {
     /// Saves what the panel holds. With no panel open the save goes through a quiet one, which shows only if it has to
     /// ask the person something or say why the save failed.
     static func save(_ browser: Browser, in library: any ItemLibrary, order: NoteOrder, confirmed: Bool = false) {
+        guard browser.viewPanel?.isSaving != true else { return }
         if browser.viewPanel == nil {
             browser.openViewPanel(in: library)
             browser.viewPanel?.isQuiet = true
@@ -111,7 +112,7 @@ enum SavedViews {
         let settings = newViewSettings(browser, in: library)
         Task {
             await browser.saveViewPanel(window: window, newView: settings, confirmed: confirmed, in: library, order: order)
-            if browser.viewPanel?.isQuiet == true { browser.closeViewPanel(in: library) }
+            if let panel = browser.viewPanel, panel.isQuiet, !panel.isSaving { browser.closeViewPanel(in: library) }
         }
     }
 

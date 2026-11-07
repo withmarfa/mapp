@@ -58,7 +58,8 @@ extension Browser {
 
     /// Edit View on a row of the sidebar's Views, which opens the view first.
     func editView(_ id: ItemID, in library: any ItemLibrary, order: NoteOrder) {
-        guard library.views.contains(where: { $0.id == id }), viewPanel?.viewID != id || item != .view(id) else { return }
+        guard library.views.contains(where: { $0.id == id }) else { return }
+        if viewPanel?.viewID == id, item == .view(id) { return openViewPanel(in: library) }
         closeViewPanel(in: library)
         if item != .view(id) {
             show(.view(id), in: library, order: order)

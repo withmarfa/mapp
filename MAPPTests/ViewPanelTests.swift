@@ -179,6 +179,22 @@ struct ViewPanelTests {
         browser.viewPanel?.isQuiet = true
         browser.openViewPanel(in: library)
         #expect(browser.showsViewPanel)
+        browser.viewPanel?.isQuiet = true
+        browser.editView(Self.id, in: library, order: Self.order)
+        #expect(browser.showsViewPanel, "the sidebar's Edit View does too")
+    }
+
+    @Test func aSecondSaveLeavesTheSaveUnderWayAlone() async {
+        let (browser, library) = Self.opened()
+        browser.tableOptions[browser.item]?.grouping = .none
+        browser.openViewPanel(in: library)
+        let panel = browser.viewPanel
+        panel?.isQuiet = true
+        panel?.isSaving = true
+        SavedViews.save(browser, in: library, order: Self.order)
+        await Task.yield()
+        #expect(browser.viewPanel === panel)
+        #expect(Self.held(library)?.group != nil, "nothing was written twice")
     }
 
     @Test func saveAsViewIsOfferedOnlyWhereAPlaceHoldsChoicesAViewCouldKeep() {
