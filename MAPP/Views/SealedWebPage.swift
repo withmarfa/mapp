@@ -129,9 +129,10 @@ import WebKit
     /// them, while the DOM is shared.
     static let world = WKContentWorld.world(name: "MAPPSealedPictures")
 
-    nonisolated static let redraw = """
-        for (const img of document.querySelectorAll('img[src^="\(SealedPictures.scheme):"]')) {
-          img.setAttribute('src', img.getAttribute('src').replace(/([?&]v=)\\d+/, '$1' + version));
+    nonisolated static let redraw = SafeDOM.script + """
+
+        for (const img of dom.queryAllInDocument(document, 'img[src^="\(SealedPictures.scheme):"]')) {
+          dom.setAttribute(img, 'src', dom.getAttribute(img, 'src').replace(/([?&]v=)\\d+/, '$1' + version));
         }
         """
 
@@ -142,8 +143,19 @@ import WebKit
     /// so the rules cannot stop that; the first part ends the click and the submission first. The second part removes
     /// the interfaces through which a page could send UDP to a host it picks, which would show the Mac's address.
     nonisolated static let lockdown = """
-        addEventListener('click', e => { if (e.target instanceof Element && e.target.closest('a[href], area[href]')) e.preventDefault(); }, true);
-        addEventListener('submit', e => e.preventDefault(), true);
+        (() => {
+          // Taken now, before the document's own scripts run, so neither they nor a name in the document can replace them.
+          const call = Function.prototype.call;
+          const closest = call.bind(Element.prototype.closest);
+          const target = call.bind(Object.getOwnPropertyDescriptor(Event.prototype, 'target').get);
+          const stop = call.bind(Event.prototype.preventDefault);
+          addEventListener('click', e => {
+            let link = null;
+            try { link = closest(target(e), 'a[href], area[href]'); } catch (x) {}
+            if (link) stop(e);
+          }, true);
+          addEventListener('submit', e => stop(e), true);
+        })();
         for (const name of ['submit', 'requestSubmit']) Object.defineProperty(HTMLFormElement.prototype, name, { value() {}, writable: false, configurable: false });
         for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnection', 'RTCDataChannel', 'RTCSessionDescription', 'RTCIceCandidate', 'RTCPeerConnectionIceEvent', 'RTCDataChannelEvent', 'RTCRtpSender', 'RTCRtpReceiver', 'RTCRtpTransceiver', 'RTCSctpTransport', 'RTCDtlsTransport', 'RTCIceTransport', 'RTCCertificate']) delete window[name];
         delete Navigator.prototype.mediaDevices;

@@ -26,8 +26,9 @@ nonisolated enum SourceViewMode: String, CaseIterable, Identifiable, Sendable {
 ///   style, color or background of its own, is given a baseline and the text column, since it has no look to keep;
 ///   everything else keeps its design, and its light background keeps its text readable in dark mode because the
 ///   baseline's colors that follow the system are never added to it.
-/// - A mail (`MailColumn`) is Original with its column centered, on the surface behind pages (`isOnSurface`); the column
-///   is given white only where the mail paints no background of its own there.
+/// - A mail (`MailColumn`) is Original with its column centered, on the surface behind pages (`isOnSurface`). It keeps
+///   its own colors: a mail that paints its page, its body or its column paints it still, and a column that nothing
+///   paints is given white only if its text is dark.
 nonisolated struct SourceLook: Equatable, Sendable {
     var mode: SourceViewMode
     var isMail: Bool
@@ -80,12 +81,7 @@ nonisolated struct SourceLook: Equatable, Sendable {
         """
     }
 
-    private static let mailRules = """
-        @layer mapp {
-          html, body { background: transparent; }
-        }
-        [data-mapp-mail] { margin-left: auto; margin-right: auto; float: none; }
-        """
+    private static let mailRules = "[data-mapp-mail] { margin-left: auto; margin-right: auto; float: none; }"
 
     /// The board's prose: New York at 14.6 for every 13 of the page's text, a 1.65 line, headings in the same serif.
     private var readerRules: String {
@@ -118,29 +114,40 @@ nonisolated struct SourceLook: Equatable, Sendable {
             """
     }
 
-    /// Anything a document writes to say how it looks.
-    private static let styled = "style, link[rel~=\"stylesheet\"], [style], [bgcolor], [background], [text], font[color], font[face]"
+    /// Anything a document writes to say how it looks. A style sheet counts only where the document holds it; one it
+    /// names on the web never loads, so a document with nothing else has no look to keep.
+    private static let styled = "style, link[rel~=\"stylesheet\"][href^=\"data:\" i], [style], [bgcolor], [background], [text], font[color], font[face]"
 
     /// The script that applies the look. It takes `css`, `plain`, `mail` and `reader` as arguments and runs in the app's
     /// own content world.
     nonisolated static let script = MailColumn.script + """
 
-        const sheet = document.createElement('style');
+        const sheet = dom.createElement(document, 'style');
         let text = css;
         if (!reader) {
           if (mail) {
-            const column = mailColumn(document.body);
-            if (column) {
-              column.setAttribute('data-mapp-mail', '');
-              // A mail's own color, even from a bgcolor attribute, beats any rule here, so the white is only
-              // given where the column paints nothing.
-              if (getComputedStyle(column).backgroundColor === 'rgba(0, 0, 0, 0)') column.style.backgroundColor = '#fff';
+            const luminance = color => {
+              const m = /^rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/.exec(color);
+              return m ? (0.2126 * m[1] + 0.7152 * m[2] + 0.0722 * m[3]) / 255 : 1;
+            };
+            // A mail's own color, from a bgcolor attribute or a style sheet, is what the person is to see; the
+            // surface behind the pages shows only where nothing paints, and white is only given there to text that
+            // is dark, since light text was written for a page of its own.
+            const paints = e => {
+              const style = getComputedStyle(e);
+              return style.backgroundColor !== 'rgba(0, 0, 0, 0)' || style.backgroundImage !== 'none';
+            };
+            for (const column of mailColumns(dom.body(document))) {
+              dom.setAttribute(column, 'data-mapp-mail', '');
+              let painted = false;
+              for (let e = column; e && !painted; e = dom.parentElement(e)) painted = paints(e);
+              if (!painted && luminance(getComputedStyle(column).color) < 0.5) dom.style(column).backgroundColor = '#fff';
             }
           }
-          if (!document.querySelector('\(styled)')) text += '\\n' + plain;
+          if (!dom.queryInDocument(document, '\(styled)')) text += '\\n' + plain;
         }
         sheet.textContent = text;
-        (document.head || document.documentElement).append(sheet);
+        dom.append(dom.head(document) || dom.documentElement(document), sheet);
         """
 
     var arguments: [String: Any] { ["css": css, "plain": plain, "mail": isMail, "reader": mode == .reader] }

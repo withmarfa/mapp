@@ -12,7 +12,9 @@ import WebKit
 /// here, and is shown as it is.
 ///
 /// A document too large to parse, or one that takes longer than the limit, has no article, so the item shows the
-/// original; nothing waits on the page's thread, since the work is in the web content process.
+/// original. Nothing waits on the page's thread, since the work is in the web content process; but no API ends a script
+/// that is running there, so the scripts are written to end: they read the document only through `SafeDOM`, which a
+/// document's names cannot turn aside, and walk it once.
 enum PageAnalyzer {
     /// The longest an analysis may take before the document is taken to have no article.
     static let timeLimit = Duration.seconds(15)
@@ -69,7 +71,20 @@ enum PageAnalyzer {
 
     /// Takes `title` and `limit`; returns `{ mail, article: { html, length, lang, dir } | null }`.
     ///
+    /// The document names its elements as it likes, and a name can stand where a built-in property should (`SafeDOM`), so
+    /// the script first takes the names off what can carry one in the page it reads (the page is thrown away), and reads
+    /// everything through `dom` besides. Readability, which reads the copy with plain property access, then finds
+    /// nothing in its way.
+    ///
     /// Of the cleanup of the article, which Reader needs and the original does not:
+    /// - Everything that is not text or a picture is removed: scripts, styles, frames, objects, embeds, templates (whose
+    ///   content `querySelectorAll` cannot reach, so the whole element goes), `meta` and `base`, media, form controls
+    ///   and SVG's `foreignObject`, `use` and animation. A form or fieldset is unwrapped and keeps its content.
+    /// - Event handlers, inline styles and the attributes that make a request or carry a script are dropped. A `href`,
+    ///   `xlink:href` or `src` is kept only if its address, parsed as the web view parses it (which ignores the tabs, line
+    ///   breaks and control characters a pattern would miss), is `http`, `https`, `mailto` or `tel`, a relative address, or for
+    ///   a picture a `data:image/` one. The document that shows the article allows no script either, so this is the second of two.
+    /// - A `name` is dropped, except on an anchor, where a legacy page links to it.
     /// - An anchor is removed when it is a heading's permalink: a lone `#`, `¶` or `§`, or one marked as such, in or next to
     ///   a heading and linking to a fragment of the page or to the heading's id. Other links stay.
     /// - A backslash before a quote is removed in text, except in code, keyboard input and sample output, where it may be the code.
@@ -77,85 +92,105 @@ enum PageAnalyzer {
     ///   punctuation and spacing, or extends a title that ends in an ellipsis. Only an ancestor left with nothing else goes with it.
     /// - A table Readability found to hold data is marked `mapp-data`, so Reader draws a grid only for those.
     /// - A picture's fixed size is dropped, so the styles size it to the column.
-    /// - Event handlers and `javascript:` addresses are dropped. The document that shows the article allows no script
-    ///   either, so this is the second of two.
     /// - The first picture, when less than a sentence of text comes before it and it is not an icon, is the lead picture.
     nonisolated static let script = MailColumn.script + #"""
 
+        // The elements through which a document can name something else, which Readability's plain reads would meet.
+        function takeNamesOff() {
+          for (const e of dom.queryAllInDocument(document, 'form[name], img[name], object[name], embed[name], iframe[name], input[name], select[name], textarea[name], button[name], fieldset[name], output[name]')) dom.removeAttribute(e, 'name');
+          for (const e of dom.queryAllInDocument(document, 'img[id], object[id], embed[id], input[id], select[id], textarea[id], button[id], fieldset[id], output[id]')) dom.removeAttribute(e, 'id');
+        }
+
+        const removed = 'script, style, link, iframe, object, embed, template, meta, base, video, audio, input, select, textarea, button, datalist, output, dialog, foreignObject, use, animate, set';
+        const dropped = new Set(['style', 'srcdoc', 'ping', 'action', 'formaction', 'poster', 'data', 'background', 'manifest', 'codebase']);
+
+        function isSafeAddress(value, attribute) {
+          let url;
+          try { url = new URL(value, 'https://reader.invalid/'); } catch (e) { return false; }
+          if (url.protocol === 'http:' || url.protocol === 'https:') return true;
+          if (attribute === 'src') return url.protocol === 'data:' && /^data:image\//i.test(url.href);
+          return url.protocol === 'mailto:' || url.protocol === 'tel:';
+        }
+
         function cleanArticle(root, title) {
-          const doc = root.ownerDocument;
-          for (const e of root.querySelectorAll('script, style, link, iframe, object, embed')) e.remove();
-          for (const e of root.querySelectorAll('*')) {
-            for (const name of e.getAttributeNames()) {
-              if (/^on/i.test(name)) e.removeAttribute(name);
+          const doc = dom.ownerDocument(root);
+          for (const e of dom.queryAll(root, removed)) dom.remove(e);
+          for (const e of dom.queryAll(root, 'form, fieldset')) dom.replaceWith(e, ...Array.from(dom.childNodes(e)));
+          for (const e of dom.queryAll(root, '*')) {
+            for (const name of dom.getAttributeNames(e)) {
+              if (/^on/i.test(name) || dropped.has(name.toLowerCase())) dom.removeAttribute(e, name);
             }
             for (const name of ['href', 'src', 'xlink:href']) {
-              if (/^\s*(javascript|vbscript):/i.test(e.getAttribute(name) || '')) e.removeAttribute(name);
+              const value = dom.getAttribute(e, name);
+              if (value !== null && !isSafeAddress(value, name)) dom.removeAttribute(e, name);
             }
-            if (e.matches('img, video, svg, canvas')) { e.removeAttribute('width'); e.removeAttribute('height'); }
+            if (dom.getAttribute(e, 'name') !== null && !dom.matches(e, 'a')) dom.removeAttribute(e, 'name');
+            if (dom.matches(e, 'img, video, svg, canvas')) { dom.removeAttribute(e, 'width'); dom.removeAttribute(e, 'height'); }
           }
           // Readability has already told a table of data from one a mail or page lays itself out in.
-          for (const t of root.querySelectorAll('table')) if (t._readabilityDataTable) t.classList.add('mapp-data');
+          for (const t of dom.queryAll(root, 'table')) if (t._readabilityDataTable) dom.classList(t).add('mapp-data');
           const permalink = 'a.anchor, a.heading-anchor, a.header-anchor, a.headerlink, a.permalink, a[aria-label*="ermalink" i]';
           const headings = 'h1, h2, h3, h4, h5, h6';
-          for (const a of root.querySelectorAll('a')) {
-            const text = a.textContent.trim();
-            if (!/^[#¶§]$/.test(text) && !a.matches(permalink)) continue;
-            const owner = a.closest(headings)
-              || [a.previousElementSibling, a.nextElementSibling].find(e => e && e.matches(headings));
+          for (const a of dom.queryAll(root, 'a')) {
+            const text = dom.textContent(a).trim();
+            if (!/^[#¶§]$/.test(text) && !dom.matches(a, permalink)) continue;
+            const owner = dom.closest(a, headings)
+              || [dom.previousElementSibling(a), dom.nextElementSibling(a)].find(e => e && dom.matches(e, headings));
             if (!owner) continue;
-            const href = a.getAttribute('href') || '';
+            const href = dom.getAttribute(a, 'href') || '';
             let hash = null;
             if (href.includes('#')) {
               try { hash = decodeURIComponent(href.slice(href.indexOf('#') + 1)); } catch (e) { hash = href.slice(href.indexOf('#') + 1); }
             }
-            if (href.startsWith('#') || (owner.id && hash === owner.id)) a.remove();
+            if (href.startsWith('#') || (dom.getAttribute(owner, 'id') && hash === dom.getAttribute(owner, 'id'))) dom.remove(a);
           }
-          const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+          const walker = dom.createTreeWalker(doc, root, NodeFilter.SHOW_TEXT);
           for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-            if (node.parentElement && node.parentElement.closest('pre, code, kbd, samp, textarea')) continue;
+            const parent = dom.parentElement(node);
+            if (parent && dom.closest(parent, 'pre, code, kbd, samp, textarea')) continue;
             if (node.nodeValue.includes('\\')) node.nodeValue = node.nodeValue.replace(/\\(["'‘’“”])/g, '$1');
           }
           const words = s => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
           const wanted = words(title);
-          const heading = root.querySelector(headings);
+          const heading = dom.query(root, headings);
           if (heading && wanted) {
-            const before = doc.createRange();
+            const before = dom.createRange(doc);
             before.setStart(root, 0);
             before.setEndBefore(heading);
-            const said = words(heading.textContent);
+            const said = words(dom.textContent(heading));
             const cut = /(…|\.\.\.)\s*$/.test(title.trim());
             if ((said === wanted || (cut && said.startsWith(wanted))) && words(before.toString()) === '') {
               let gone = heading;
               const bare = n => n.nodeType === Node.COMMENT_NODE || (n.nodeType === Node.TEXT_NODE && n.nodeValue.trim() === '');
-              while (gone.parentElement && gone.parentElement !== root
-                     && [...gone.parentElement.childNodes].every(n => n === gone || bare(n))) {
-                gone = gone.parentElement;
+              for (let parent = dom.parentElement(gone); parent && parent !== root
+                   && Array.from(dom.childNodes(parent)).every(n => n === gone || bare(n)); parent = dom.parentElement(gone)) {
+                gone = parent;
               }
-              gone.remove();
+              dom.remove(gone);
             }
           }
-          for (const img of root.querySelectorAll('img')) {
-            if (/icon|logo|avatar|emoji/i.test(img.getAttribute('src') || '')) continue;
-            const before = doc.createRange();
+          for (const img of dom.queryAll(root, 'img')) {
+            if (/icon|logo|avatar|emoji/i.test(dom.getAttribute(img, 'src') || '')) continue;
+            const before = dom.createRange(doc);
             before.setStart(root, 0);
             before.setEndBefore(img);
-            if (before.toString().trim().length < 80) (img.closest('figure') || img).classList.add('mapp-lead');
+            if (before.toString().trim().length < 80) dom.classList(dom.closest(img, 'figure') || img).add('mapp-lead');
             break;
           }
         }
 
         let article = null;
         try {
-          const copy = document.cloneNode(true);
+          takeNamesOff();
+          const copy = dom.cloneNode(document, true);
           if (isProbablyReaderable(copy)) {
             const parsed = new Readability(copy, { maxElemsToParse: limit, serializer: el => el, charThreshold: 500 }).parse();
             if (parsed && parsed.content) {
               const root = parsed.content;
               cleanArticle(root, title);
               article = {
-                html: root.innerHTML,
-                length: root.textContent.replace(/\s+/g, ' ').trim().length,
+                html: dom.innerHTML(root),
+                length: dom.textContent(root).replace(/\s+/g, ' ').trim().length,
                 lang: parsed.lang || null,
                 dir: parsed.dir || null,
               };
@@ -163,7 +198,7 @@ enum PageAnalyzer {
           }
         } catch (e) {}
         let mail = false;
-        try { mail = mailColumn(document.body) !== null; } catch (e) {}
+        try { mail = mailColumns(dom.body(document)).length > 0; } catch (e) {}
         return { mail, article };
         """#
 

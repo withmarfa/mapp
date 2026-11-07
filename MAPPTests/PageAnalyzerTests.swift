@@ -1,6 +1,7 @@
 @testable import MAPP
 import Foundation
 import Testing
+import WebKit
 
 /// The analysis runs Mozilla's Readability over a copy of the document in a sealed page of its own, so each test here
 /// loads a real document and reads what the script found.
@@ -168,6 +169,103 @@ import Testing
         await #expect(throws: CancellationError.self) { try await task.value }
     }
 
+    // MARK: Documents that name their elements after the page's methods
+
+    /// A form's controls, and a document's images, objects, embeds and frames, are reachable by their `name` as properties
+    /// of the form or the document, and they win over the built-in ones: `form.children` is then a control.
+    private let loopingForms = "<html><head><title>The cliff path</title></head><body><fieldset form=\"f\" name=\"children\"><form id=\"f\">"
+
+    @MainActor private final class ScriptRun {
+        var answer: Any?
+        var finished = false
+    }
+
+    private func runningTheScript(on html: String) async throws -> (answer: Any?, answeredAgain: Bool) {
+        let sealed = try await SealedWebPage.make(runsScripts: false)
+        try await sealed.show(Data(html.utf8))
+        let readability = try #require(PageAnalyzer.readability)
+        let page = sealed.page
+        let title = title
+        let run = ScriptRun()
+        let call = Task {
+            run.answer = try? await page.callJavaScript(
+                readability + PageAnalyzer.script, arguments: ["title": title, "limit": PageAnalyzer.maxElements], contentWorld: SealedWebPage.world)
+            run.finished = true
+        }
+        defer { call.cancel() }
+        let answeredInTime = await eventually(within: .seconds(20)) { run.finished }
+        // A process still busy with the script answers nothing else.
+        var again = false
+        if answeredInTime { again = (try? await page.callJavaScript("return 1")) as? Int == 1 }
+        return (run.answer, again)
+    }
+
+    @Test func aFormThatHidesItsChildrenDoesNotKeepThePageBusy() async throws {
+        let html = loopingForms + longProse() + "</form></fieldset></body></html>"
+        let (answer, answeredAgain) = try await runningTheScript(on: html)
+        #expect(answeredAgain, "the script ended; the page's process is free")
+        #expect(PageAnalysis(javaScript: answer).article != nil)
+        let analysis = try await analyze(html)
+        #expect(analysis.article?.html.contains("Seven miles of chalk") == true, "the analysis answered with the article, not with its time limit")
+    }
+
+    @Test func aMailInsideAFormThatHidesItsChildrenIsStillAMail() async throws {
+        let html = "<html><body><form><input type=\"hidden\" name=\"children\"><input type=\"hidden\" name=\"parentElement\">" +
+            "\(mailColumn)\(prose())</td></tr></table></td></tr></table></form></body></html>"
+        let (_, answeredAgain) = try await runningTheScript(on: html)
+        #expect(answeredAgain)
+        #expect(try await analyze(html).isMail)
+    }
+
+    @Test func elementsNamedAfterTheDocumentsMethodsDoNotBreakTheAnalysis() async throws {
+        let names = ["cloneNode", "querySelectorAll", "querySelector", "createElement", "createTreeWalker", "createRange", "body", "documentElement", "getElementsByTagName"]
+        let clobbers = names.map { "<img name=\"\($0)\" width=\"1\" height=\"1\" src=\"https://example.com/\($0).gif\">" }.joined()
+        let formNames = ["children", "parentElement", "matches", "closest", "getAttribute", "getAttributeNames", "removeAttribute", "querySelectorAll", "style", "classList"]
+        let controls = formNames.map { "<input type=\"hidden\" name=\"\($0)\" value=\"1\">" }.joined()
+        let body = clobbers + "<form>" + controls + "</form>" + prose()
+        let article = try #require(try await analyze(page(body: body)).article)
+        #expect(article.html.contains("Seven miles of chalk"))
+        #expect(!article.html.contains(" name=\""), "a name stays out of the article, where it would hide a property of its form or document")
+    }
+
+    @Test func aLegacyAnchorKeepsItsName() async throws {
+        let article = try #require(try await analyze(page(body: "<p><a name=\"top\"></a>" + Self.sentences[0] + "</p>" + prose())).article)
+        #expect(article.html.contains("name=\"top\""))
+    }
+
+    // MARK: What the cleaner leaves out of the article
+
+    @Test func documentMarkupNeverReachesTheArticle() async throws {
+        let shadow = "<div><template shadowrootmode=\"open\"></template><template shadowrootmode=\"open\"><style>:host{position:fixed;inset:0}</style>" +
+            "<link rel=\"stylesheet\" href=\"https://example.com/a.css\"><iframe src=\"about:blank\"></iframe></template></div>"
+        let body = prose() + shadow + "<meta http-equiv=\"refresh\" content=\"0;url=https://example.com/\"><base href=\"https://evil.example/\">" +
+            "<form action=\"https://evil.example/\"><input name=\"q\"><button>Go</button></form>" +
+            "<video src=\"https://example.com/v.mp4\" controls></video><audio src=\"https://example.com/a.mp3\" controls></audio>" +
+            "<svg style=\"position:fixed;inset:0\"><style>svg{position:fixed}</style><text>x</text></svg>"
+        let html = try #require(try await analyze(page(body: body)).article).html
+        for markup in ["<template", "<style", "<link", "<iframe", "<meta", "<base", "<form", "<input", "<button", "<video", "<audio", "position"] {
+            #expect(!html.contains(markup), "\(markup) is in the article")
+        }
+        #expect(html.contains("Seven miles of chalk"))
+    }
+
+    @Test func aLinkOrPictureGoesToAnAddressOnlyIfItsSchemeIsOneThatIsSafeToShow() async throws {
+        let links = [
+            "<a href=\"javascript:steal(1)\">plain</a>", "<a href=\"java&#9;script:steal(2)\">tab</a>", "<a href=\"&#10;JaVaScRiPt:steal(3)\">newline</a>",
+            "<a href=\" \u{1}javascript:steal(4)\">control</a>", "<a href=\"vbscript:steal(5)\">vb</a>", "<a href=\"data:text/html,steal(6)\">data</a>",
+            "<a href=\"file:///etc/hosts\">file</a>", "<svg><a xlink:href=\"javascript:steal(7)\"><text>x</text></a></svg>",
+            "<img src=\"javascript:steal(8)\">", "<img src=\"data:text/html,steal(9)\">",
+        ].joined()
+        let fine = "<a href=\"https://example.com/ok\">fine</a><a href=\"mailto:a@example.com\">mail</a><a href=\"#part\">part</a><a href=\"/relative\">relative</a>" +
+            "<img src=\"data:image/png;base64,iVBORw0KGgo=\"><img src=\"https://example.com/p.png\">"
+        let html = try #require(try await analyze(page(body: prose() + "<p>" + links + fine + "</p>")).article).html
+        #expect(!html.contains("steal"), "an address with a script scheme, however it is spelled, is gone")
+        #expect(!html.contains("file:") && !html.contains("data:text"))
+        for kept in ["https://example.com/ok", "mailto:a@example.com", "#part", "/relative", "data:image/png", "https://example.com/p.png"] {
+            #expect(html.contains(kept), "\(kept)")
+        }
+    }
+
     // MARK: Mail
 
     private let mailColumn = """
@@ -201,5 +299,30 @@ import Testing
         let html = "<html><body>\(mailColumn)\(longProse())</td></tr></table></td></tr></table></body></html>"
         let analysis = try await analyze(html)
         #expect(analysis.isMail && analysis.offersReader)
+    }
+
+    @Test func aMailLaidOutAsSiblingTablesOfOneWidthIsOneColumn() async throws {
+        // The usual template: a header, a body and a footer, each its own table of the same width. No one of them holds
+        // nine tenths of the text.
+        let header = "<table width=\"600\"><tr><td><p>\(Self.sentences[0])</p></td></tr></table>"
+        let content = "<table width=\"600\"><tr><td>\(prose(4))</td></tr></table>"
+        let footer = "<table width=\"600\"><tr><td><p>\(Self.sentences[1])</p></td></tr></table>"
+        let html = "<html><body><table width=\"100%\" bgcolor=\"#eeeeee\"><tr><td align=\"center\">\(header)\(content)\(footer)</td></tr></table></body></html>"
+        #expect(try await analyze(html).isMail)
+        let mixed = "<html><body><table width=\"100%\"><tr><td align=\"center\">\(header)\(content)<table width=\"400\"><tr><td>\(prose(4))</td></tr></table></td></tr></table></body></html>"
+        #expect(try await analyze(mixed).isMail == false, "tables of different widths are not one template")
+    }
+
+    @Test func anEssayInATableBesideAPictureIsNotAMail() async throws {
+        // A page from the nineties web: a table with a picture down the side and the essay in a table of 435 pixels.
+        let html = """
+            <html><head><title>\(title)</title></head><body bgcolor="#ffffff" text="#000000"><table border="0" cellspacing="0" cellpadding="0"><tr valign="top">
+            <td width="335"><img src="https://example.com/side.gif" width="69" height="357"></td>
+            <td><img src="https://example.com/banner.gif" width="410" height="45"><br><br>
+            <table border="0" cellspacing="0" cellpadding="0" width="435"><tr valign="top"><td width="435">\(longProse())</td></tr></table></td></tr></table></body></html>
+            """
+        let analysis = try await analyze(html)
+        #expect(analysis.isMail == false)
+        #expect(analysis.offersReader, "so the essay opens in Reader")
     }
 }

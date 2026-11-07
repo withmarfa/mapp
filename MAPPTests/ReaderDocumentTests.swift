@@ -31,6 +31,32 @@ import WebKit
         #expect(try await page.page.callJavaScript("return window.ran === undefined") as? Bool == true)
     }
 
+    @Test func theDocumentLoadsNothingButItsOwnPicturesAndTakesNoBaseOrForm() {
+        let document = ReaderDocument.html(for: article())
+        for directive in ["default-src 'none'", "img-src data: \(SealedPictures.scheme):", "style-src 'unsafe-inline'", "base-uri 'none'", "form-action 'none'", "frame-src 'none'"] {
+            #expect(document.contains(directive), "\(directive)")
+        }
+    }
+
+    @Test func aBaseElementDoesNotMoveTheDocumentsAddress() async throws {
+        let hostile = article("<p>Words.</p><base href=\"https://evil.example/\">")
+        let page = try await SealedWebPage.make(runsScripts: true)
+        try await page.show(Data(ReaderDocument.html(for: hostile).utf8), encoding: .utf8)
+        #expect(try await page.page.callJavaScript("return document.baseURI") as? String == "about:blank")
+    }
+
+    @Test func aPictureHeldInTheDocumentStillLoadsUnderThePolicy() async throws {
+        let png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+        let page = try await SealedWebPage.make(runsScripts: false)
+        try await page.show(
+            Data(ReaderDocument.html(for: article("<p>Words.</p><img id=\"i\" src=\"\(png)\">")).utf8), encoding: .utf8,
+            look: SourceLook(mode: .reader, isMail: false, page: PageStyle()))
+        let loaded = try await eventuallyAsking {
+            (try await page.page.callJavaScript("return document.getElementById('i').naturalWidth") as? Int) == 1
+        }
+        #expect(loaded)
+    }
+
     @Test func thePicturesAreTheAppsToGiveLikeAnyOtherDocuments() throws {
         let item = ItemID("item")
         let document = ReaderDocument.html(for: article("<figure class=\"mapp-lead\"><img src=\"https://example.com/lead.jpg\"></figure>"))
