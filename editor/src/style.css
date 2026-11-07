@@ -381,10 +381,9 @@ body[data-text='none'] #editor {
   background: var(--tone-chip);
 }
 
-/* A linked item is its mark in color and its title, with no fill. */
+/* A linked item is its mark in color and its title on the chip's grey fill: a tint means a type. */
 .item-chip[data-kind='link'] {
-  padding-inline: 0;
-  background: none;
+  padding-inline-start: var(--c-type-start);
 }
 
 .item-chip[data-kind='link']:not(:disabled):hover .item-chip-text {

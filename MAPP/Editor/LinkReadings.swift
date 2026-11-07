@@ -11,11 +11,12 @@ nonisolated struct LinkReading: Equatable, Sendable {
     }
 
     var missing: Bool
-    /// Nil for a link to no note and for one that does not name exactly one, which the page draws without a mark.
+    /// Nil for a link to no note, which the page draws without a mark.
     var type: LinkedType?
 
-    /// A link drawn as a live one with no mark: what the page assumes when the library cannot say.
-    static let plain = LinkReading(missing: false, type: nil)
+    /// A live link that names no one note yet, or that the library cannot say anything about. It takes a neutral mark,
+    /// because the look's underline may show only under the pointer and the mark is then all that says it is a link.
+    static let plain = LinkReading(missing: false, type: .init(icon: "lucide:link", tone: TypeTone.neutral))
 }
 
 extension ItemLibrary {

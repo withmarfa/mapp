@@ -26,7 +26,7 @@ export interface HeaderPin {
   tone?: string | null
 }
 
-/** An item a row links to: drawn as its type's mark in the item's own tone and its title with no fill, or, for a person,
+/** An item a row links to: drawn as its type's mark in the item's own tone and its title on a grey fill, or, for a person,
  *  as initials and the name. The app chooses the kind and the tone. */
 export interface HeaderItem {
   title: string
