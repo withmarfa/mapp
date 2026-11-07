@@ -55,7 +55,7 @@ struct PageChip: View {
             }
         }
         .font(.system(size: looks.textSize * scale))
-        .foregroundStyle(.primary)
+        .foregroundStyle(textStyle(looks: looks))
         .padding(.leading, start(looks: looks) * scale)
         .padding(.trailing, looks.padding * scale)
         .frame(height: looks.height * scale)
@@ -68,6 +68,11 @@ struct PageChip: View {
         }
     }
 
+    /// A type's name takes its ink, as a list row's does; every other chip's text is the label color.
+    private func textStyle(looks: ChipLooks) -> AnyShapeStyle {
+        if case .type(let icon) = kind { AnyShapeStyle(TypeTone(icon: icon).ink(looks, for: scheme)) } else { AnyShapeStyle(.primary) }
+    }
+
     private func start(looks: ChipLooks) -> CGFloat {
         switch kind {
         case .type, .status, .link: looks.typePaddingStart
@@ -78,7 +83,7 @@ struct PageChip: View {
 
     private func fill(looks: ChipLooks) -> Color {
         switch kind {
-        case .type(let icon): TypeTone(icon: icon).fill(looks.typeTintOpacity, for: scheme)
+        case .type(let icon): TypeTone(icon: icon).fill(scheme == .dark ? looks.typeTintOpacityDark : looks.typeTintOpacity, for: scheme)
         case .status: looks.statusFill(for: scheme)
         case .link, .option, .plain: looks.optionFill(for: scheme)
         case .tag: looks.tagFill(for: scheme)
@@ -91,7 +96,7 @@ struct PageChip: View {
             Image(typeGlyph: icon)
                 .resizable()
                 .scaledToFit()
-                .foregroundStyle(TypeTone(icon: icon).ink(looks.inkDepth, for: scheme))
+                .foregroundStyle(TypeTone(icon: icon).ink(looks, for: scheme))
                 .frame(width: looks.chipMarkSize * scale, height: looks.chipMarkSize * scale)
                 .accessibilityHidden(true)
         case .status(let mark, _):
@@ -170,7 +175,7 @@ struct PagePerson: View {
                 .truncationMode(.tail)
         }
         .font(.system(size: looks.textSize * scale))
-        .foregroundStyle(.primary)
+        .foregroundStyle(textStyle(looks: looks))
         .padding(.trailing, 2 * scale)
         .frame(height: looks.height * scale)
     }

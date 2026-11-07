@@ -32,7 +32,7 @@ struct TypeMark: View {
                 Image(typeGlyph: icon)
                     .resizable()
                     .scaledToFit()
-                    .foregroundStyle(tone.ink(ChipLooks.current.inkDepth, for: scheme))
+                    .foregroundStyle(tone.ink(ChipLooks.current, for: scheme))
                     .frame(width: metrics.icon, height: metrics.icon)
             }
             .accessibilityHidden(true)
@@ -57,10 +57,10 @@ struct TypePill: View {
                 .accessibilityHidden(true)
             Text(verbatim: label).lineLimit(1)
         }
-        .foregroundStyle(tone.ink(ChipLooks.current.inkDepth, for: scheme))
+        .foregroundStyle(tone.ink(ChipLooks.current, for: scheme))
         .padding(.leading, 4)
         .padding(.trailing, 6)
         .padding(.vertical, 1.5)
-        .background(tone.fill(ChipLooks.current.typeTintOpacity, for: scheme), in: .rect(cornerRadius: 4, style: .continuous))
+        .background(tone.fill(scheme == .dark ? ChipLooks.current.typeTintOpacityDark : ChipLooks.current.typeTintOpacity, for: scheme), in: .rect(cornerRadius: 4, style: .continuous))
     }
 }

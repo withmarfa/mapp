@@ -27,12 +27,20 @@ struct TypeToneTests {
     @MainActor @Test func anIconSitsDarkerThanItsTintInLightAndLighterInDark() {
         var looks = ChipLooks()
         looks.inkDepth = 0.22
+        looks.inkDepthDark = 0.08
         let light = TypeTone.cssColors(for: .blue, dark: false, looks: looks)
         let dark = TypeTone.cssColors(for: .blue, dark: true, looks: looks)
         #expect(light["--tone"] == "rgb(0, 122, 255)")
         #expect(light["--tone-ink"] == "rgb(0, 95, 199)")
         #expect(dark["--tone"] == "rgb(43, 149, 255)")
-        #expect(dark["--tone-ink"] == "rgb(90, 172, 255)")
+        #expect(dark["--tone-ink"] == "rgb(60, 157, 255)")
+    }
+
+    @MainActor @Test func aBrightToneDimsInDarkToSitLevelWithTheOthers() {
+        let looks = ChipLooks()
+        let dark = TypeTone.cssColors(for: .yellow, dark: true, looks: looks)
+        #expect(dark["--tone"] == "rgb(255, 212, 38)")
+        #expect(dark["--tone-ink"] == "rgb(187, 158, 41)")
     }
 
     @Test(arguments: builtInIcons)
