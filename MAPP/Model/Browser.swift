@@ -103,6 +103,15 @@ final class Browser {
         return fields
     }
 
+    /// Sets the date field the timeline shows. The field the timeline starts on stays unset unless the place is a
+    /// view that opened on another, so choosing it again is no change from the view and writes no day grouping.
+    func setTimelineField(_ key: String, in library: any ItemLibrary) {
+        let fallback = ItemTimelineLayout.selectedField(nil, fields: timelineFieldChoices(in: library))
+        var seeded: String?
+        if case .view(let id) = item { seeded = viewSeeds[id]?.timelineDate }
+        timelineFields[item] = key == fallback && seeded == nil ? nil : key
+    }
+
     private func fieldsKey(in library: any ItemLibrary) -> (key: FieldsKey, items: [Item]?) {
         let listed = isSearching || isViewPlace ? items(in: library) : nil
         let key = FieldsKey(
@@ -421,9 +430,8 @@ final class Browser {
         if case .column = options.grouping { grouped = true }
         let arranged = options.sort != nil || grouped
         guard arranged || options.isFiltering else { return nil }
-        var shape = options
+        var shape = options.settled
         shape.collapsed = nil
-        shape.pageSize = .standard
         if !arranged {
             shape.sort = nil
             shape.grouping = .automatic
@@ -438,7 +446,8 @@ final class Browser {
         guard shape.arranged, !ordersByRelevance else {
             return sectionsUnmeasured(of: content.kept.map(\.item), order: order, now: now)
         }
-        guard content.grouping != nil else {
+        // The table groups a place by status on its own; the list does only what a view or the person asked for.
+        guard case .column = shape.options.grouping, content.grouping != nil else {
             return content.rows.isEmpty ? [] : [NoteSection(group: nil, items: content.rows.map(\.item))]
         }
         return content.groups.map { NoteSection(group: .custom(id: $0.id, title: $0.title), items: $0.rows.map(\.item)) }
@@ -466,9 +475,7 @@ final class Browser {
     /// a command about it, until the items, the place's options or the search change. Reading it does not depend on
     /// the selection, so a selection never makes it again.
     func tableContent(in library: any ItemLibrary) -> ItemTableContent {
-        var keyed = tableOptions[item] ?? ItemTableOptions()
-        // A page size never changes the rows, so it does not make them again.
-        keyed.pageSize = .standard
+        let keyed = (tableOptions[item] ?? ItemTableOptions()).settled
         let derived = derivedKey(in: library)
         let key = TableKey(derived: derived.key, options: keyed)
         if let held = tableMemo, held.key == key { return held.content }

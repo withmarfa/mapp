@@ -47,12 +47,14 @@ struct ColumnFilterMenu: View {
 }
 
 /// What the Filter menu holds: each column that can be filtered, as a submenu (`ColumnFilterMenu`), and Clear
-/// Filters. The toolbar's Filter, the View menu and the chip row's + chip all show it.
+/// Filters. The toolbar's Filter, the View menu and the chip row's + chip all show it. It works the place's table
+/// out only when its items are drawn, which a menu does when it opens, so a list that nobody filters builds none.
 struct FilterMenuItems: View {
+    @CurrentLibrary private var library
     @Bindable var browser: Browser
-    let content: ItemTableContent
 
     var body: some View {
+        let content = browser.tableContent(in: library)
         ForEach(content.categoricalColumns) { column in
             Menu(column.label) { ColumnFilterMenu(browser: browser, column: column, rows: content.allRows) }
         }
@@ -82,7 +84,7 @@ struct FilterChipRow: View {
                             FilterChip(browser: browser, content: content, column: column, options: options)
                         }
                         Menu {
-                            FilterMenuItems(browser: browser, content: content)
+                            FilterMenuItems(browser: browser)
                         } label: {
                             Label("Add Filter", systemImage: "plus").labelStyle(.iconOnly)
                         }

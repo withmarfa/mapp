@@ -269,6 +269,15 @@ nonisolated struct ItemTableOptions: Hashable, Sendable {
         }
     }
 
+    /// The options as far as the rows and their groups depend on them: a page size never changes the rows, a column
+    /// left in `negated` after its filter went changes none.
+    var settled: ItemTableOptions {
+        var options = self
+        options.pageSize = .standard
+        options.negated = negated.filter(isNegated)
+        return options
+    }
+
     /// Whether any column is filtered.
     var isFiltering: Bool { filters.values.contains { !$0.isEmpty } }
 

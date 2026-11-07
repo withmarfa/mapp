@@ -87,6 +87,36 @@ struct BrowserViewSeedTests {
         #expect(browser.hasViewChanges)
     }
 
+    @Test func pickingTheDateFieldTheTimelineAlreadyShowsIsNoChange() throws {
+        let event = TypeID("test.event")
+        let eventType = ItemTypeInfo(
+            id: event, label: "Event", fields: [
+                .init(key: "starts_at", label: "Starts at", kind: .date(includesTime: true), declaredBy: event),
+                .init(key: "ends_at", label: "Ends at", kind: .date(includesTime: true), declaredBy: event),
+            ], titleField: "title", bodyField: "body", parent: nil)
+        let (browser, library) = Self.opened()
+        library.catalogue = Catalogue(
+            itemTypes: Array(FakeItemLibrary.testCatalogue.itemTypes.values) + [eventType],
+            edgeTypes: Array(FakeItemLibrary.testCatalogue.edgeTypes.values))
+        let item = Item(
+            id: ItemID("e1"), type: event, title: "E", titleRule: .property("title"), version: ItemVersion(1), created: .distantPast,
+            modified: .distantPast)
+        library.items = [item]
+        library.viewMembers[Self.view().id] = [item.id]
+        browser.viewMode = .timeline
+        let fallback = try #require(browser.timelineFieldChoices(in: library).first?.key)
+        // Picking the date it already shows keeps the view as it was, and so no group to write.
+        browser.setTimelineField(fallback, in: library)
+        #expect(!browser.hasViewChanges)
+        // Another date is a change, and picking the first again takes it back.
+        let other = try #require(browser.timelineFieldChoices(in: library).last?.key)
+        #expect(other != fallback)
+        browser.setTimelineField(other, in: library)
+        #expect(browser.hasViewChanges)
+        browser.setTimelineField(fallback, in: library)
+        #expect(!browser.hasViewChanges)
+    }
+
     @Test func revertingPutsTheWindowBackToTheViewInEveryLayout() {
         let (browser, library) = Self.opened()
         browser.viewMode = .board
