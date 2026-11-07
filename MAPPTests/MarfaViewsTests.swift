@@ -261,6 +261,24 @@ struct MarfaViewsTests {
         #expect(library.previewItems(ofView: Self.planning.id, query: Self.widened).map(\.id) == [F.n1])
     }
 
+    @Test func anOlderQueryAnsweringLateIsNotTheLastPreviewOfTheNewer() async throws {
+        let F = LibraryFixture.self
+        let (library, source) = try await Self.loaded(views: [Self.planning])
+        source.viewMembers.withLock { $0[Self.planning.id] = [F.n1] }
+        source.previewAnswers.withLock { $0 = [Self.widened: [F.n1, F.n2], Self.narrowed: [F.n2]] }
+        source.previewHolds.withLock { $0 = [Self.widened, Self.narrowed] }
+        _ = library.previewItems(ofView: Self.planning.id, query: Self.widened)
+        _ = library.previewItems(ofView: Self.planning.id, query: Self.narrowed)
+        #expect(await eventually { source.previewQueries.withLock { $0.count } == 2 })
+        // The older answer arrives while the newer is still being read.
+        source.previewHolds.withLock { $0 = [Self.narrowed] }
+        #expect(await eventually { Set(library.previewItems(ofView: Self.planning.id, query: Self.widened).map(\.id)) == [F.n1, F.n2] })
+        // Until the newer answers, the view's own list stands for it, not the older query's answer.
+        #expect(library.previewItems(ofView: Self.planning.id, query: Self.narrowed).map(\.id) == [F.n1])
+        source.previewHolds.withLock { $0 = [] }
+        #expect(await eventually { library.previewItems(ofView: Self.planning.id, query: Self.narrowed).map(\.id) == [F.n2] })
+    }
+
     @Test func aPreviewOfAViewGoneReadsNothing() async throws {
         let (library, source) = try await Self.loaded(views: [Self.planning])
         source.send(.views([]))

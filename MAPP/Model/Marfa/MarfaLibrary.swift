@@ -85,6 +85,8 @@ import Observation
     @ObservationIgnored private var previewOrder: [PreviewKey] = []
     /// The latest answer of any preview of a view, listed while another query of it is read.
     @ObservationIgnored private var lastPreview: [ItemID: [ItemID]] = [:]
+    /// The query of each view whose read began last, so an older read that answers late is not taken for the newest.
+    @ObservationIgnored private var newestPreviewRead: [ItemID: PreviewKey] = [:]
     /// Views whose preview was refused, told once until one is read again.
     @ObservationIgnored private var previewsFailing: Set<ItemID> = []
     /// Text writes the source has not answered, by item. While any wait, the text the person gave is what the
@@ -587,6 +589,7 @@ import Observation
         previews = previews.filter { ids.contains($0.key.view) }
         previewOrder.removeAll { previews[$0] == nil }
         lastPreview = lastPreview.filter { ids.contains($0.key) }
+        newestPreviewRead = newestPreviewRead.filter { ids.contains($0.key) }
         previewsFailing.formIntersection(ids)
         viewRevision += 1
     }
@@ -1093,6 +1096,7 @@ import Observation
 
     private func startPreviewRead(_ key: PreviewKey, at revision: Int) {
         previews[key, default: Preview(revision: revision, hits: nil, running: true)].running = true
+        newestPreviewRead[key.view] = key
         Task { [weak self, source] in
             let found: Result<[ItemID], any Error>
             do {
@@ -1105,7 +1109,7 @@ import Observation
             switch found {
             case .success(let hits):
                 previews[key] = Preview(revision: revision, hits: hits, running: false)
-                lastPreview[key.view] = hits
+                if newestPreviewRead[key.view] == key { lastPreview[key.view] = hits }
                 previewsFailing.remove(key.view)
             case .failure(let error):
                 previews[key] = Preview(revision: revision, hits: held.hits, running: false, refused: true)
