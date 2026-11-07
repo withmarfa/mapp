@@ -102,7 +102,7 @@ import os
         sidebarLayouts.update(sidebarLayoutKey, change)
     }
 
-    /// Hands every open page's last edit to the library it came from, and returns once each library keeps its
+    /// Ends the open value panel and hands every open page's last edit to the library it came from, and returns once each library keeps its
     /// writes on this Mac, never waiting on a server. Run before anything changes which library the windows read,
     /// and before quitting.
     @discardableResult
