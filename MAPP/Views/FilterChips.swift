@@ -15,7 +15,7 @@ struct ColumnFilterMenu: View {
         Toggle("Is", isOn: Binding { !isNegated } set: { if $0 { setNegated(false) } })
         Toggle("Is Not", isOn: Binding { isNegated } set: { if $0 { setNegated(true) } })
         Divider()
-        ForEach(ItemTableLayout.categories(of: rows, by: column), id: \.id) { category in
+        ForEach(ItemTableLayout.offered(in: rows, by: column, keeping: options.filters[column.id] ?? []), id: \.id) { category in
             Toggle(isOn: binding(for: category.id)) {
                 ItemTableMenuLabel(
                     column: column, value: category.id.isEmpty ? nil : category.id, title: "\(category.title)  \(category.rows.count)")
@@ -128,7 +128,7 @@ private struct FilterChip: View {
     /// The column and what it keeps: "Status: Done", "Status is not: Done, Open" and, past two values, "Status: Done +2".
     private var summary: String {
         let kept = options.filters[column.id] ?? []
-        let titles = ItemTableLayout.categories(of: content.allRows, by: column).filter { kept.contains($0.id) }.map(\.title)
+        let titles = ItemTableLayout.offered(in: content.allRows, by: column, keeping: kept).filter { kept.contains($0.id) }.map(\.title)
         let shown = titles.prefix(2).joined(separator: ", ")
         let rest = titles.count - 2
         let values = rest > 0 ? String(localized: "\(shown) +\(rest)") : shown
