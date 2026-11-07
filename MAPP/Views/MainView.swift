@@ -315,13 +315,17 @@ struct MainView: View {
         .onChange(of: library.isLoaded, initial: true) {
             browser.adopt(library, undoManager: undoManager)
             guard library.isLoaded else { return }
-            if restoresWindow { browser.restore(from: storedBrowser, in: library, order: order) }
-            #if DEBUG
-            if SampleLibrary.isRequested, SampleLibrary.withCollections {
-                browser.sidebarItem = .itemType("core.task")
-                browser.set(layout: .board)
+            // After this update, not in it: chosen while the window's customizable toolbars are first mounted, the page
+            // can miss the selection and stay on No Item Selected.
+            Task {
+                if restoresWindow { browser.restore(from: storedBrowser, in: library, order: order) }
+                #if DEBUG
+                if SampleLibrary.isRequested, SampleLibrary.withCollections {
+                    browser.sidebarItem = .itemType("core.task")
+                    browser.set(layout: .board)
+                }
+                #endif
             }
-            #endif
         }
         // A new item reaches a server's library when its source says so, which the window waits for to open it.
         .onChange(of: newItemIsSettled) {
