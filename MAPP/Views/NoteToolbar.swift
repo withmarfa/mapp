@@ -106,7 +106,7 @@ private struct ExtraToolbarItems: CustomizableToolbarContent {
             .defaultCustomization(.hidden)
         ToolbarItem(id: "openInNewWindow") { tools.command(.openInNewWindow) }
             .defaultCustomization(.hidden)
-        ToolbarItem(id: "versionHistory") { tools.withUndo { VersionHistoryButton(ids: tools.ids, details: tools.details, undoManager: $0) } }
+        ToolbarItem(id: "versionHistory") { VersionHistoryButton(ids: tools.ids, details: tools.details) }
             .defaultCustomization(.hidden)
         ToolbarItem(id: "customizeLayout") { CustomizeLayoutButton(ids: tools.ids, details: tools.details) }
             .defaultCustomization(.hidden)
