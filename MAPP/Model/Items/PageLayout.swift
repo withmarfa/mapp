@@ -79,6 +79,15 @@ nonisolated struct PageLayout: Equatable, Sendable {
         return moved
     }
 
+    /// Lists a row of the page before another of them, or last where `other` is nil. Nil for anything else, such as a
+    /// pin the page shows in the property block because an event's time took its place.
+    func moving(_ id: String, before other: String?) -> PageLayout? {
+        guard group(of: id) == .page else { return nil }
+        guard let other else { return moving(id, to: .page) }
+        guard let index = page.filter({ $0.id != id }).firstIndex(where: { $0.id == other }) else { return nil }
+        return moving(id, to: .page, at: index)
+    }
+
     /// Moves the row up (negative) or down within its group. Nil at either end, or for a row not listed.
     func moved(_ id: String, by offset: Int) -> PageLayout? {
         guard let group = self.group(of: id), let from = rows(in: group).firstIndex(where: { $0.id == id }) else { return nil }

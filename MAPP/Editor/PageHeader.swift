@@ -238,6 +238,8 @@ enum PageHeaderEvent {
     /// Hide from Page was chosen in the menu over a row of the property block, or Linked From: the row's
     /// identifier (`PagePlacement`) and the item the header was showing.
     case hideFromPage(row: String, ItemID)
+    /// A row of the property block was dragged by its key: the row it now comes before, or nil for the end.
+    case moveRow(row: String, before: String?, ItemID)
     /// Customize Layout in the row above the title was pressed.
     case toggleLayout
     /// Linked From in the row above the title was pressed, to see what links here.
@@ -264,6 +266,9 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
     /// The symbols of the row above the title: Linked From and Customize Layout.
     static let titleToolSymbols = ["arrow.down.left", "rectangle.split.2x1"]
 
+    /// What a row's key shows under the pointer, to say it can be dragged.
+    static let rowGripSymbol = "line.3.horizontal"
+
     /// The symbols at the size the pins' 12 point text gives them, following the interface's text size, and the
     /// icons of `typeIcons` (Iconify IDs), which the Swift SDK draws.
     @MainActor
@@ -276,7 +281,7 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
         self.plus = plus
         self.indicator = indicator
         var symbols: [String: Icon] = [:]
-        for name in PropertyRow.Value.symbols + [Self.pictureSymbol] + Self.titleToolSymbols {
+        for name in PropertyRow.Value.symbols + [Self.pictureSymbol, Self.rowGripSymbol] + Self.titleToolSymbols {
             symbols[name] = Self.symbol(name, size: size, weight: .regular)
         }
         for name in typeIcons {

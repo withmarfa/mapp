@@ -68,6 +68,8 @@ export type EditorMessage =
   | { type: 'openEmbed'; embed: EmbedRequest }
   | { type: 'embedMenu'; embed: EmbedRequest | null; opens: boolean }
   | { type: 'rowMenu'; row: { item: string; row: string } | null }
+  /** A row of the property block was dragged: the row it now comes before, or null for the end. */
+  | { type: 'moveRow'; item: string; row: string; before: string | null }
   | ({ type: 'openNote'; item: string } & LinkRef)
   | ({ type: 'find' } & FindState)
 

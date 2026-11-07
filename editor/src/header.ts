@@ -1,4 +1,8 @@
 import { openLink, postToHost } from './bridge'
+import { dragRows } from './row-drag'
+
+/** The symbol a row's key shows under the pointer, a key of `HeaderIcons.symbols`. */
+const rowGrip = 'line.3.horizontal'
 
 /** How a status pin draws its mark: the color the status carries (a tone's name, or `neutral` for the text's own
  *  color) and how the ring is filled. */
@@ -445,6 +449,7 @@ export class ItemHeader {
     this.statusPin.setAttribute('aria-label', this.labels.status)
     this.parentPin = this.menuPin('ItemParentPin', 'parent', buttons)
     this.properties = element('dl', 'item-props', root)
+    dragRows(this.properties, (row, before) => this.moveRow(row, before))
     this.properties.setAttribute('aria-label', this.labels.properties)
     this.moreProperties = this.moreButton(root, () => {
       this.expanded.properties = !this.expanded.properties
@@ -756,15 +761,16 @@ export class ItemHeader {
   }
 
   /** A symbol the app drew, as a mask in the text's secondary color; nothing for one it did not draw. */
-  private glyph(name: string, parent: HTMLElement, scale = 1): void {
+  private glyph(name: string, parent: HTMLElement, scale = 1): HTMLElement {
     const icon = this.symbols[name]
     const node = element('span', 'item-glyph', parent)
     node.setAttribute('aria-hidden', 'true')
-    if (!icon) return
+    if (!icon) return node
     node.style.width = `${icon.width * scale}px`
     node.style.height = `${icon.height * scale}px`
     node.style.setProperty('-webkit-mask-image', `url("${icon.url}")`)
     node.style.maskImage = `url("${icon.url}")`
+    return node
   }
 
   private toolButton(id: string, action: () => void): HTMLButtonElement {
@@ -941,7 +947,9 @@ export class ItemHeader {
     const entry = element('div', 'item-prop')
     entry.dataset.row = row.id
     const term = element('dt', 'item-prop-label', entry)
-    this.glyph(row.symbol, term)
+    const symbol = element('span', 'item-prop-symbol', term)
+    this.glyph(row.symbol, symbol)
+    this.glyph(rowGrip, symbol).classList.add('item-prop-grip')
     const name = element('span', 'item-prop-name', term)
     name.textContent = row.label
     name.title = row.label
@@ -1090,6 +1098,21 @@ export class ItemHeader {
   rowAt(target: EventTarget | null): { item: string; row: string } | null {
     const row = (target as Element | null)?.closest?.<HTMLElement>('[data-row]')?.dataset.row
     return this.model && row ? { item: this.model.item, row } : null
+  }
+
+  /** Asks the app to list a row before another. A row dropped last among those shown goes before the first folded away,
+   *  so the folded rows stay where they are. */
+  private moveRow(row: string, before: string | null) {
+    if (!this.model) return
+    const folded = this.expanded.properties
+      ? undefined
+      : this.model.properties[this.model.foldAfter]
+    postToHost({
+      type: 'moveRow',
+      item: this.model.item,
+      row,
+      before: before ?? folded?.id ?? null,
+    })
   }
 
   /** Asks the app for the editor of a row's or a pin's value, with the value's frame as a menu's is. */
