@@ -695,7 +695,10 @@ final class Browser {
         asking confirm: ((Set<ItemID>) -> Void)? = nil
     ) {
         let binned = Set(ids.filter { library.item($0)?.state == .trashed })
-        let moving = ids.subtracting(binned)
+        // Told here, before anything asks the person to confirm items that would be left alone.
+        let plan = library.deletePlan(ids.subtracting(binned))
+        let moving = plan.moving
+        library.tellSkipped(plan.skips, didChange: !moving.isEmpty || !binned.isEmpty, failing: String(localized: "Can’t Delete"))
         if !moving.isEmpty {
             if moving.count > 1, let confirm {
                 confirm(moving)

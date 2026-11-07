@@ -21,6 +21,8 @@ import Testing
         let filling = Mutex(false)
         /// Rows a reread does not find, as when they left the copy after it named them.
         let gone = Mutex<Set<String>>([])
+        /// Rows answered as the server's advice that a connector keeps them, which no write of the person's moves.
+        let readOnly = Mutex<Set<String>>([])
         /// How many rereads fail before one succeeds.
         let failures = Mutex(0)
         /// Each row whose links were asked for.
@@ -52,6 +54,15 @@ import Testing
 
         var holding: Int { gate.withLock { $0.waiting.count } }
 
+        private func advised(_ rows: [Marfa.Item]) -> [Marfa.Item] {
+            let kept = readOnly.withLock { $0 }
+            return rows.map { row in
+                var row = row
+                row.readOnly = kept.contains(row.id)
+                return row
+            }
+        }
+
         private func refuseWhileFilling() throws {
             if filling.withLock({ $0 }) { throw MarfaError.hydrationIncomplete(message: "The copy is not whole") }
         }
@@ -63,7 +74,7 @@ import Testing
         func items() async throws -> Rows<Marfa.Item> {
             wholeReads.withLock { $0 += 1 }
             let rows = try await read.items()
-            return Rows(rows.rows, completeness: filling.withLock { $0 } ? .partial : .complete)
+            return Rows(advised(rows.rows), completeness: filling.withLock { $0 } ? .partial : .complete)
         }
 
         func items(_ ids: [String]) async throws -> Rows<Marfa.Item> {
@@ -82,7 +93,7 @@ import Testing
             if fails { throw MarfaError.invalid(message: "The read failed") }
             let gone = gone.withLock { $0 }
             let rows = try await read.items(ids).rows.filter { !gone.contains($0.id) }
-            return Rows(rows, completeness: filling.withLock { $0 } ? .partial : .complete)
+            return Rows(advised(rows), completeness: filling.withLock { $0 } ? .partial : .complete)
         }
 
         func edges(ofTypes types: [String]) async throws -> [Marfa.Edge] {
@@ -275,6 +286,44 @@ import Testing
         }
         #expect(rows.isEmpty, "\(rows)")
         #expect(scene.reads.whole == whole)
+        await finish(scene)
+    }
+
+    /// Only `read_only` moved: the copy holds the same rows, the catch-up names the ones it changed, and the page
+    /// reads them again without a whole read.
+    @Test func aCatchUpThatMovesOnlyReadOnlyUpdatesTheFlagWithoutAWholeRead() async throws {
+        let scene = try await makeScene()
+        let whole = scene.reads.whole
+        let first = try #require(scene.shown("First"))
+        #expect(!first.readOnly)
+
+        scene.reads.readOnly.withLock { _ = $0.insert(first.id.rawValue) }
+        scene.reads.rewrite.withLock { rewrite in
+            rewrite = { answer in .named(ChangedRows(items: [first.id.rawValue]), next: answer.next) }
+        }
+        await scene.caughtUp()
+        try await scene.wait("the item held read only") { $0.item(titled: "First")?.readOnly == true }
+        #expect(scene.shown("First")?.isEditable == false)
+        #expect(scene.reads.whole == whole, "no whole read")
+
+        scene.reads.readOnly.withLock { $0 = [] }
+        await scene.caughtUp()
+        try await scene.wait("the item released") { $0.item(titled: "First")?.readOnly == false }
+        #expect(scene.shown("First")?.isEditable == true)
+        #expect(scene.reads.whole == whole)
+        await finish(scene)
+    }
+
+    /// A held stream tells the move as a `.server` `item.updated` with no item ID, so the library rereads.
+    @Test func anItemUpdatedWithNoItemIDRereadsAndShowsTheReadOnlyFlag() async throws {
+        let scene = try await makeScene()
+        let first = try #require(scene.shown("First"))
+        scene.reads.readOnly.withLock { _ = $0.insert(first.id.rawValue) }
+        scene.reads.rewrite.withLock { rewrite in
+            rewrite = { answer in .named(ChangedRows(items: [first.id.rawValue]), next: answer.next) }
+        }
+        await scene.source.hear(Change(origin: .server(event: "item.updated", cursor: "c"), itemId: nil, edgeId: nil))
+        try await scene.wait("the item held read only") { $0.item(titled: "First")?.readOnly == true }
         await finish(scene)
     }
 

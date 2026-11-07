@@ -447,7 +447,9 @@ final class FakeItemLibrary: ItemLibrary {
     }
 
     func delete(_ ids: Set<ItemID>, undoManager: UndoManager?) {
-        change(ids) { item in
+        let plan = deletePlan(ids)
+        tellSkipped(plan.skips, didChange: !plan.moving.isEmpty, failing: "Can’t Delete")
+        change(plan.moving) { item in
             item.state = .trashed
             item.trashed = now()
         }

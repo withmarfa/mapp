@@ -352,8 +352,10 @@ extension MarfaLibrary {
     }
 
     func delete(_ ids: Set<ItemID>, undoManager: UndoManager?) {
+        let plan = deletePlan(ids)
         var changes: [ItemID: (from: ItemState, to: ItemState)] = [:]
-        for id in ids { if let item = item(id), item.state != .trashed { changes[id] = (item.state, .trashed) } }
+        for id in plan.moving { if let item = item(id) { changes[id] = (item.state, .trashed) } }
+        tellSkipped(plan.skips, didChange: !changes.isEmpty, failing: String(localized: "Can’t Delete"))
         let name = changes.count == 1 ? String(localized: "Delete Item") : String(localized: "Delete Items")
         setStates(changes, name: name, undoManager: undoManager)
     }

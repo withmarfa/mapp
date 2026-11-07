@@ -833,6 +833,13 @@
     "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items can’t be changed right now." } }
   } } } }
 },
+"%lld items are managed by a connector, so changes made here would be overwritten." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item is managed by a connector, so changes made here would be overwritten." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items are managed by a connector, so changes made here would be overwritten." } }
+  } } } }
+},
 "%lld items are files, which keep their type." : {
   "extractionState" : "manual",
   "localizations" : { "en" : { "variations" : { "plural" : {
@@ -1050,6 +1057,8 @@
 "Can’t Rename View" : { "extractionState" : "manual" },
 "Can’t Update View" : { "extractionState" : "manual" },
 "Can’t Delete View" : { "extractionState" : "manual" },
+"Can’t Delete" : { "extractionState" : "manual" },
+"Read only. A connector manages this item, so changes made here would be overwritten." : { "extractionState" : "manual" },
 "New View…" : { "extractionState" : "manual" },
 "Rename View…" : { "extractionState" : "manual" },
 "Delete View…" : { "extractionState" : "manual" },

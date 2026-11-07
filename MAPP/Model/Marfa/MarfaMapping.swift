@@ -337,7 +337,7 @@ nonisolated enum MarfaMapping {
             created: created, modified: modified, trashed: state == .trashed ? row.trashedDate ?? modified : nil,
             edgesOut: edgesOut,
             sync: sync, problem: damaged ? ItemProblem(message: MarfaProblems.unreadableMessage, withholdsText: true) : nil,
-            boundEmbeds: embeds, source: row.source.isEmpty ? nil : row.source)
+            readOnly: row.readOnly, boundEmbeds: embeds, source: row.source.isEmpty ? nil : row.source)
     }
 
     /// What a link in an item's text names, as the package reads it from the copy.

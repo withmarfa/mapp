@@ -154,6 +154,10 @@ struct ItemInspector: View {
                     Label(message, systemImage: "exclamationmark.triangle")
                         .interfaceFont(.callout).foregroundStyle(.red)
                 }
+                if item.readOnly {
+                    Label("Read only. A connector manages this item, so changes made here would be overwritten.", systemImage: "lock")
+                        .interfaceFont(.callout).foregroundStyle(.secondary)
+                }
                 detailsSection
                 if hasProperties { properties }
                 if hasRelationships { relationshipSection }

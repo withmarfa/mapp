@@ -11,6 +11,8 @@ nonisolated struct BatchSkips: Equatable, Sendable {
         case inBin
         /// Archived, with a problem the library found in it, or its text not yet read.
         case cantChange
+        /// Held read only: a person's connector keeps it and would put back a change made here.
+        case readOnly
         /// A file, which keeps its type.
         case file
         case cantBecomeType
@@ -45,6 +47,7 @@ nonisolated struct BatchSkips: Equatable, Sendable {
         case .gone: String(localized: "\(count) items are no longer in the library.")
         case .inBin: String(localized: "\(count) items are in Recently Deleted.")
         case .cantChange: String(localized: "\(count) items can’t be changed right now.")
+        case .readOnly: String(localized: "\(count) items are managed by a connector, so changes made here would be overwritten.")
         case .file: String(localized: "\(count) items are files, which keep their type.")
         case .cantBecomeType: String(localized: "\(count) items can’t become this type.")
         case .isCollection: String(localized: "\(count) items are collections, which can’t be in another collection.")
@@ -69,7 +72,7 @@ nonisolated extension Item {
 
     /// Why a command that writes the item's tags, properties or links leaves it alone.
     var writeObstacle: BatchSkips.Reason? {
-        stateObstacle ?? (problem == nil ? nil : .cantChange)
+        stateObstacle ?? (problem == nil ? (readOnly ? .readOnly : nil) : .cantChange)
     }
 }
 
@@ -82,7 +85,8 @@ extension ItemLibrary {
     }
 
     /// The items among `ids` that take Favorite or Unfavorite, and why the others do not. An item in the bin keeps
-    /// its tags, so it is left as it is.
+    /// its tags, so it is left as it is. Favorite is a tag in the server's copy, so an item a connector keeps is left
+    /// alone too.
     func favoritePlan(_ ids: Set<ItemID>, _ isFavorite: Bool) -> (changing: Set<ItemID>, skips: BatchSkips) {
         var skips = BatchSkips()
         var changing: Set<ItemID> = []
@@ -91,13 +95,26 @@ extension ItemLibrary {
                 skips.skip(.gone)
                 continue
             }
-            if let reason = item.stateObstacle {
+            if let reason = item.stateObstacle ?? (item.readOnly ? .readOnly : nil) {
                 skips.skip(reason)
             } else if item.isFavorite != isFavorite {
                 changing.insert(id)
             }
         }
         return (changing, skips)
+    }
+
+    /// The items among `ids` that Delete moves to Recently Deleted, and why it leaves the others. An item a connector
+    /// keeps stays: it would be put back on the connector's next run. An item already in the bin or no longer held
+    /// is not skipped, since there is nothing to do for it.
+    func deletePlan(_ ids: Set<ItemID>) -> (moving: Set<ItemID>, skips: BatchSkips) {
+        var skips = BatchSkips()
+        var moving: Set<ItemID> = []
+        for id in ids {
+            guard let item = item(id), item.state != .trashed else { continue }
+            if item.readOnly { skips.skip(.readOnly) } else { moving.insert(id) }
+        }
+        return (moving, skips)
     }
 
     /// The items among `ids` to file in `collection`, less those already in it, and why the others can't be: an
