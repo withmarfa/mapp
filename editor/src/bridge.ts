@@ -47,6 +47,23 @@ export type EditorMessage =
       rect: [number, number, number, number]
       viewportHeight: number
     }
+  /** A property row's or a pin's value asks for its editor under it: the row's identifier (a field key or `#tags`),
+   *  and the value's frame as a menu's is sent. */
+  | {
+      type: 'editValue'
+      item: string
+      row: string
+      rect: [number, number, number, number]
+      viewportHeight: number
+    }
+  /** The value an editor was asked for has moved on the page, to this frame. */
+  | {
+      type: 'valueMoved'
+      item: string
+      row: string
+      rect: [number, number, number, number]
+      viewportHeight: number
+    }
   /** Customize Layout in the row above the title: the app starts or ends it. */
   | { type: 'toggleLayout' }
   /** Linked From in the row above the title: the app shows what links here. */
@@ -59,6 +76,8 @@ export type EditorMessage =
   | { type: 'openEmbed'; embed: EmbedRequest }
   | { type: 'embedMenu'; embed: EmbedRequest | null; opens: boolean }
   | { type: 'rowMenu'; row: { item: string; row: string } | null }
+  /** A row of the property block was dragged: the whole order the page shows after the move, folded rows included. */
+  | { type: 'moveRow'; item: string; row: string; order: string[] }
   | ({ type: 'openNote'; item: string } & LinkRef)
   | ({ type: 'find' } & FindState)
 

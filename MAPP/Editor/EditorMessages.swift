@@ -50,6 +50,11 @@ nonisolated enum EditorMessage: Sendable {
     case titleDiscard(ItemID)
     /// A pin asks for its menu, with the pin's frame in the page's window and the height of that window.
     case headerMenu(PageHeaderMenu, ItemID, CGRect, viewportHeight: Double)
+    /// A property row's or a pin's value asks for its editor under it, with the row's identifier and the value's
+    /// frame, as a pin's is.
+    case editValue(ItemID, row: String, CGRect, viewportHeight: Double)
+    /// The value an editor was asked for moved on the page, to this frame.
+    case valueMoved(ItemID, row: String, CGRect, viewportHeight: Double)
     /// Customize Layout, in the row above the title, was pressed.
     case toggleLayout
     /// Linked From, in the row above the title, was pressed.
@@ -68,6 +73,8 @@ nonisolated enum EditorMessage: Sendable {
     /// The same menu is opening over a row of the property block, or Linked From, or over none when nil: the row's
     /// identifier as `PagePlacement` names it, and the item the header was showing.
     case rowMenu((item: ItemID, row: String)?)
+    /// A row of the property block was dragged: the whole order the page shows after the move, folded rows included.
+    case moveRow(ItemID, row: String, order: [String])
     /// A `[[link]]` to a note was command-clicked in the note `item`.
     case openNote(ItemID, NoteLink)
     case find(FindState)
@@ -133,6 +140,14 @@ nonisolated enum EditorMessage: Sendable {
                   let viewportHeight = (dict["viewportHeight"] as? NSNumber)?.doubleValue, viewportHeight.isFinite
             else { return nil }
             self = .headerMenu(menu, ItemID(item), CGRect(x: rect[0], y: rect[1], width: rect[2], height: rect[3]), viewportHeight: viewportHeight)
+        case "editValue", "valueMoved":
+            guard let item = dict["item"] as? String, let row = dict["row"] as? String, !row.isEmpty,
+                  let rect = (dict["rect"] as? [NSNumber])?.map(\.doubleValue), rect.count == 4, rect.allSatisfy(\.isFinite),
+                  let viewportHeight = (dict["viewportHeight"] as? NSNumber)?.doubleValue, viewportHeight.isFinite
+            else { return nil }
+            let frame = CGRect(x: rect[0], y: rect[1], width: rect[2], height: rect[3])
+            self = type == "editValue" ? .editValue(ItemID(item), row: row, frame, viewportHeight: viewportHeight)
+                : .valueMoved(ItemID(item), row: row, frame, viewportHeight: viewportHeight)
         case "toggleLayout":
             self = .toggleLayout
         case "showLinked":
@@ -156,6 +171,11 @@ nonisolated enum EditorMessage: Sendable {
             } else {
                 self = .rowMenu(nil)
             }
+        case "moveRow":
+            guard let item = dict["item"] as? String, !item.isEmpty, let row = dict["row"] as? String, !row.isEmpty,
+                  let order = dict["order"] as? [String], order.contains(row)
+            else { return nil }
+            self = .moveRow(ItemID(item), row: row, order: order)
         case "openNote":
             guard let item = dict["item"] as? String, !item.isEmpty, let link = NoteLink(page: dict) else { return nil }
             self = .openNote(ItemID(item), link)

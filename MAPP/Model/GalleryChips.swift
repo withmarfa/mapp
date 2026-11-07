@@ -99,7 +99,7 @@ nonisolated struct GalleryChip: Hashable, Sendable {
             return [GalleryChip(text: text.trimmingCharacters(in: .whitespacesAndNewlines), look: .plain)]
         case .boolean(let flag):
             return [GalleryChip(text: flag ? String(localized: "Yes") : String(localized: "No"), look: .plain)]
-        case .status, .parent, .type, .source, .tags, .when:
+        case .status, .parent, .type, .source, .tags, .when, .empty:
             return []
         }
     }

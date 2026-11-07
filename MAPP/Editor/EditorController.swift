@@ -118,6 +118,10 @@ final class EditorController: NSObject {
     private(set) var noteID: ItemID?
     /// An explicit selection can outlive a missing body, so its next update can retry the load.
     @ObservationIgnored var requestedNoteID: ItemID?
+
+    /// Whether the page is showing this item's header, which an item of a type with no text is too: it has no note on
+    /// the page (`noteID`), only its header. What the page sends for any other item is stale.
+    func isShowing(_ id: ItemID) -> Bool { requestedNoteID == id }
     @ObservationIgnored private var markdown = ""
     @ObservationIgnored private var read = ItemVersion(0)
     /// Each load gets a generation, and an edit reports the one it belongs to, so a late edit to the previous
@@ -351,10 +355,10 @@ final class EditorController: NSObject {
         call("setHeader", header.map(json) ?? "null")
     }
 
-    /// Shows a pin's menu under it, as a pop-up button shows its own.
-    func popUpMenu(_ menu: NSMenu, under rect: CGRect) {
-        // Tracking a menu runs its own event loop, which waits until the page's message has been handled.
-        Task { menu.popUp(positioning: nil, at: NSPoint(x: rect.minX, y: rect.maxY + 4), in: container) }
+    /// Opens a value's editor under `rect` of the page.
+    func presentEditor(_ request: ValueEditRequest, under rect: CGRect) {
+        // The page's click is still being handled, and would close an editor opened inside it as a click elsewhere.
+        Task { ValueEditPresenter.shared.present(request, anchor: container, rect: rect) }
     }
 
     /// A rect in the page's window, which starts below whatever covers the web view's top, in the container's
@@ -643,6 +647,13 @@ final class EditorController: NSObject {
             onHeaderEvent(.titleDiscard(item))
         case .headerMenu(let menu, let item, let rect, let viewportHeight):
             onHeaderEvent(.menu(menu, item, containerRect(rect, viewportHeight: viewportHeight)))
+        case .editValue(let item, let row, let rect, let viewportHeight):
+            onHeaderEvent(.edit(row: row, item, containerRect(rect, viewportHeight: viewportHeight)))
+        case .valueMoved(let item, let row, let rect, let viewportHeight):
+            // The value's editor follows it, which is the presenter's to say whether there is one open for it.
+            ValueEditPresenter.shared.valueMoved(item: item, row: row, to: containerRect(rect, viewportHeight: viewportHeight))
+        case .moveRow(let item, let row, let order):
+            onHeaderEvent(.moveRow(row: row, order: order, item))
         case .toggleLayout:
             onHeaderEvent(.toggleLayout)
         case .showLinked:

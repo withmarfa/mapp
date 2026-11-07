@@ -12,6 +12,8 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
             case status([StatusWord])
             /// A list of entries made of members (`ListShape`).
             case list(ListShape)
+            /// A list of plain words, such as labels or sites: an array of strings.
+            case words
             /// A shape the app shows but does not edit, such as an object.
             case other
         }
@@ -32,6 +34,8 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
         /// The bounds a number field declares, which a value must stay within.
         var minimum: Decimal?
         var maximum: Decimal?
+        /// The most entries a list field holds, where it declares one.
+        var maxItems: Int?
         var id: String { key }
     }
 
@@ -103,7 +107,7 @@ nonisolated extension ItemTypeInfo.Field {
         switch kind {
         case .choice(let choices): return choices
         case .status(let words): return words.map(\.value)
-        case .text, .number, .boolean, .date, .list, .other: return []
+        case .text, .number, .boolean, .date, .list, .words, .other: return []
         }
     }
 
@@ -115,10 +119,14 @@ nonisolated extension ItemTypeInfo.Field {
     func accepts(_ value: PropertyValue) -> Bool {
         switch (kind, value) {
         case (.number, .number(let number)): return numberRule.allows(number)
-        case (.list(let shape), .array(let entries)): return entries.allSatisfy(shape.accepts)
+        case (.list(let shape), .array(let entries)): return holds(entries.count) && entries.allSatisfy(shape.accepts)
+        case (.words, .array(let words)): return holds(words.count) && kind.accepts(value)
         default: return kind.accepts(value)
         }
     }
+
+    /// Whether a list field takes this many entries.
+    func holds(_ count: Int) -> Bool { maxItems.map { count <= $0 } ?? true }
 
     /// Whether the field is picked from a list of values rather than typed.
     var isPicked: Bool { !options.isEmpty }

@@ -6,8 +6,8 @@ import Foundation
 /// type, so every item of the type follows it.
 ///
 /// Every row the type offers is listed, with a value or without, so a row can be placed before an item has one. A row
-/// is moved by `moving(_:to:at:)` or `moved(_:by:)`, which return the new layout, or nil where the move is refused:
-/// a fifth pin, or Linked From, which is never pinned.
+/// is moved by `moving(_:to:at:)`, `moved(_:by:)` or, for a drag on the page, `listing(_:moving:)`, which return the
+/// new layout, or nil where the move is refused: a fifth pin, or Linked From, which is never pinned.
 nonisolated struct PageLayout: Equatable, Sendable {
     enum Group: Sendable { case pinned, page, hidden }
 
@@ -77,6 +77,25 @@ nonisolated struct PageLayout: Equatable, Sendable {
         case .hidden: moved.hidden.insert(row, at: Self.clamp(index, moved.hidden.count))
         }
         return moved
+    }
+
+    /// Lists the page's rows in `order`, the order the page drew them in once `id` was dragged, which is not always
+    /// this layout's own (a pin an event's time pushed out is drawn among them, and the default order can differ from
+    /// what was shown). Rows named come first, in that order; page rows it does not name follow as they were; an id
+    /// that is not a page row is ignored. Nil where `id` is not a page row, such as a pin.
+    func listing(_ order: [String], moving id: String) -> PageLayout? {
+        guard group(of: id) == .page else { return nil }
+        let byID = Dictionary(page.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var seen = Set<String>()
+        let named = order.compactMap { name -> Row? in
+            guard let row = byID[name], seen.insert(name).inserted else { return nil }
+            return row
+        }
+        // The named rows take the places named rows held, so a row the page did not draw stays where it was.
+        var listed = self
+        let slots = page.indices.filter { seen.contains(page[$0].id) }
+        for (slot, row) in zip(slots, named) { listed.page[slot] = row }
+        return listed
     }
 
     /// Moves the row up (negative) or down within its group. Nil at either end, or for a row not listed.
@@ -149,7 +168,7 @@ nonisolated extension PageLayout {
     }
 
     /// The symbol of the value a field holds, as the page's rows draw it (`PropertyRow.Value.symbol`).
-    private static func symbol(of field: ItemTypeInfo.Field) -> String {
+    static func symbol(of field: ItemTypeInfo.Field) -> String {
         switch field.kind {
         case .status: "circle.dotted"
         case .boolean: "checkmark.square"
@@ -158,6 +177,7 @@ nonisolated extension PageLayout {
         case .number: "number"
         case .list(let shape): shape.holdsPeople ? "person.2" : "list.bullet"
         case .text: field.format == .url ? "globe" : field.format == .email ? "envelope" : "text.alignleft"
+        case .words: "list.bullet"
         case .other: "text.alignleft"
         }
     }

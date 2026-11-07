@@ -117,8 +117,6 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     var showMore: String
     var showMoreContents: String
     var showMoreLinked: String
-    var propertyRejected: Bool
-    var parentRejected: Bool
     var interfaceTextSize: Int
     /// How many lines the title shows before an ellipsis cuts it, while it is not being edited.
     var titleLines: Int
@@ -145,7 +143,7 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
 }
 
 extension PropertyRow: Encodable {
-    private enum Key: String, CodingKey { case id, label, symbol, kind, text, texts, items, options, people, icon, tone, more, help }
+    private enum Key: String, CodingKey { case id, label, symbol, kind, text, texts, items, options, people, icon, tone, more, help, editable }
     /// What the page draws of an item a row links to: a type chip in the item's own tone, or a person's initials and
     /// name. The tone is one of `TypeTone`'s names; the page never picks a color.
     private struct Link: Encodable {
@@ -182,6 +180,7 @@ extension PropertyRow: Encodable {
         try container.encode(value.symbol, forKey: .symbol)
         switch value {
         case .status: try container.encode("status", forKey: .kind)
+        case .empty: try Self.encode("empty", label, into: &container)
         case .parent: try container.encode("parent", forKey: .kind)
         case .type(let name, let icon):
             try Self.encode("type", name, into: &container)
@@ -212,6 +211,7 @@ extension PropertyRow: Encodable {
         case .text(let text): try Self.encode("text", text, into: &container)
         }
         if more > 0 { try container.encode(more, forKey: .more) }
+        if editable { try container.encode(true, forKey: .editable) }
     }
 
     private static func encode(_ kind: String, _ text: String, into container: inout KeyedEncodingContainer<Key>) throws {
@@ -232,9 +232,14 @@ enum PageHeaderEvent {
     case titleDiscard(ItemID)
     /// A pin asks for its menu, under the pin's frame in the editor's container.
     case menu(PageHeaderMenu, ItemID, CGRect)
+    /// A row's or a pin's value asks for its editor under it, in the editor's container: the row's identifier.
+    case edit(row: String, ItemID, CGRect)
     /// Hide from Page was chosen in the menu over a row of the property block, or Linked From: the row's
     /// identifier (`PagePlacement`) and the item the header was showing.
     case hideFromPage(row: String, ItemID)
+    /// A row of the property block was dragged by its key: the whole order the page shows after the move, folded rows
+    /// included.
+    case moveRow(row: String, order: [String], ItemID)
     /// Customize Layout in the row above the title was pressed.
     case toggleLayout
     /// Linked From in the row above the title was pressed, to see what links here.
@@ -261,6 +266,9 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
     /// The symbols of the row above the title: Linked From and Customize Layout.
     static let titleToolSymbols = ["arrow.down.left", "rectangle.split.2x1"]
 
+    /// What a row's key shows under the pointer, to say it can be dragged.
+    static let rowGripSymbol = "line.3.horizontal"
+
     /// The symbols at the size the pins' 12 point text gives them, following the interface's text size, and the
     /// icons of `typeIcons` (Iconify IDs), which the Swift SDK draws.
     @MainActor
@@ -273,7 +281,7 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
         self.plus = plus
         self.indicator = indicator
         var symbols: [String: Icon] = [:]
-        for name in PropertyRow.Value.symbols + [Self.pictureSymbol] + Self.titleToolSymbols {
+        for name in PropertyRow.Value.symbols + [Self.pictureSymbol, Self.rowGripSymbol] + Self.titleToolSymbols {
             symbols[name] = Self.symbol(name, size: size, weight: .regular)
         }
         for name in typeIcons {

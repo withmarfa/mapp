@@ -83,7 +83,7 @@ struct NotePage: View {
                 // The page runs under the toolbar and any banner, so it starts below them and scrolls beneath.
                 NoteEditor(controller: editor, topInset: proxy.safeAreaInsets.top + bannerHeight)
                     .ignoresSafeArea(.container, edges: .top)
-                    .modifier(ItemPageHeader(item: item, editor: editor, drafts: headerDrafts, containerTop: proxy.safeAreaInsets.top))
+                    .modifier(ItemPageHeader(item: item, editor: editor, drafts: headerDrafts))
                 ToolbarBand(toolbarHeight: proxy.safeAreaInsets.top, isShown: backsToolbar && showsToolbarBackground && editor.isContentUnderToolbar)
                 VStack(spacing: 0) {
                     if item.state == .trashed {

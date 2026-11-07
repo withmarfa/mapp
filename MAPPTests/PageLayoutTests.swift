@@ -25,6 +25,33 @@ struct PageLayoutTests {
         #expect(Self.ids(layout.hidden) == ["#linked"], "Linked From is in the inspector by default")
     }
 
+    @Test func aRowDraggedOnThePageKeepsTheOrderTheCopyShowedApartFromTheMovedRow() throws {
+        // The page drew c, a, b, which is not this layout's own order (a, b, c); a dropped last must leave c first.
+        let layout = Self.layout()
+        #expect(Self.ids(layout.page) == ["a", "b", "c"])
+        let moved = try #require(layout.listing(["c", "b", "a"], moving: "a"))
+        #expect(Self.ids(moved.page) == ["c", "b", "a"], "the shown order, not the default with a moved")
+        var placements = PagePlacements()
+        placements.apply(moved, of: Self.type, in: Self.catalogue)
+        #expect(placements.choices["aic.ticket"]?.rowOrder?.prefix(3) == ["c", "b", "a"])
+    }
+
+    @Test func aRowThePageDidNotDrawKeepsItsPlace() throws {
+        let moved = try #require(Self.layout().listing(["c", "a"], moving: "c"))
+        #expect(Self.ids(moved.page) == ["c", "b", "a"])
+    }
+
+    @Test func aListedOrderIgnoresWhatIsNotAPageRowAndKeepsWhatItDoesNotName() throws {
+        let layout = Self.layout()
+        let moved = try #require(layout.listing(["#type", "b", "gone", "b", "a"], moving: "a"))
+        #expect(Self.ids(moved.page) == ["b", "a", "c"], "a pin, an unknown id and a repeat are ignored; c keeps its place after")
+        #expect(Self.ids(moved.pinned) == Self.ids(layout.pinned))
+        #expect(Self.ids(moved.hidden) == Self.ids(layout.hidden))
+        #expect(layout.listing(["a", "b", "c"], moving: "#type") == nil, "a pin is not a page row")
+        #expect(layout.listing(["a", "b", "c"], moving: "#linked") == nil, "a hidden row is not a page row")
+        #expect(layout.listing(["a", "b", "c"], moving: "z") == nil)
+    }
+
     @Test func aRowMovedBetweenGroupsIsOnOrOffThePageAccordingly() {
         var placements = PagePlacements()
         var layout = Self.layout(Self.rows, placements)

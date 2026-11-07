@@ -45,6 +45,11 @@ final class FakeItemLibrary: ItemLibrary {
     var relationshipsByItem: [ItemID: [ItemRelationship]] = [:]
     /// Whether `changeItemRelationship` takes a write, and the writes it was asked for.
     var acceptsRelationships = false
+    /// The items whose property writes are still on their way, as a library that queues a write reports them.
+    var writingProperties: Set<ItemID> = []
+    /// Whether writes carry a mark that is never settled, as a library's queue does while they wait.
+    var marksPropertyWrites = false
+    var lastPropertyWrite: Int? { marksPropertyWrites ? 1 : nil }
     var relationshipWrites: [(item: ItemID, field: String, adding: [ItemID], removing: [ItemID])] = []
     var syncReport = SyncReport(queueRead: true)
     let now: () -> Date
@@ -359,6 +364,9 @@ final class FakeItemLibrary: ItemLibrary {
     func finish() {}
     func wasRefused(creating id: ItemID) -> Bool { refusedCreations.contains(id) }
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool { false }
+
+    func isWritingProperties(of id: ItemID) -> Bool { writingProperties.contains(id) }
+    func tookPropertyWrite(_ mark: Int) -> Bool { false }
     func changeItemRelationship(_ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?) async -> Bool {
         relationshipWrites.append((id, field, adding, removing))
         return acceptsRelationships
@@ -439,7 +447,9 @@ final class FakeItemLibrary: ItemLibrary {
     }
 
     func delete(_ ids: Set<ItemID>, undoManager: UndoManager?) {
-        change(ids) { item in
+        let plan = deletePlan(ids)
+        tellSkipped(plan.skips, didChange: !plan.moving.isEmpty, failing: "Can’t Delete")
+        change(plan.moving) { item in
             item.state = .trashed
             item.trashed = now()
         }

@@ -1,0 +1,215 @@
+import AppKit
+
+/// One open value editor: the panel under a value. The presenter keeps at most one, whoever asks.
+@MainActor
+protocol ValueEditSession: AnyObject {
+    var request: ValueEditRequest { get }
+    var model: ValueEditModel { get }
+    /// The window the editor draws in, which clicks inside are not "outside".
+    var window: NSWindow? { get }
+    var anchor: NSView { get }
+    /// Shows the editor.
+    func open()
+    /// Puts it away. `restoringFocus` gives the keyboard back to where it was in the window the editor came from.
+    func close(restoringFocus: Bool)
+    /// The anchor's window moved: follow it.
+    func anchorMoved()
+    /// The value the editor is under moved within the anchor, to `rect`: follow it.
+    func valueMoved(to rect: NSRect)
+}
+
+/// Opens a value in an editor under it, for the inspector's rows and the page's property rows alike: each gives what is
+/// edited, a view and a rectangle in it. Nothing differs by caller.
+@MainActor
+final class ValueEditPresenter {
+    static let shared = ValueEditPresenter()
+
+    typealias Factory = @MainActor (ValueEditRequest, NSView, NSRect?) -> any ValueEditSession
+
+    private(set) var session: (any ValueEditSession)?
+    private let makeSession: Factory
+    /// A click on the value while its editor is open closes it as an outside click; the click then asks to open it
+    /// again, which would put it straight back. The value toggles instead.
+    private var closedByClick: (target: String, at: Date)?
+    private var monitors: [Any] = []
+    private var observers: [NSObjectProtocol] = []
+
+    init(makeSession: @escaping Factory = ValueEditPresenter.system) {
+        self.makeSession = makeSession
+    }
+
+    var isOpen: Bool { session != nil }
+
+    /// Opens the editor for `request` under `rect` of `anchor` (its bounds where nil), or closes it where it is the
+    /// editor already open. Nothing opens for a value the item cannot take.
+    func present(_ request: ValueEditRequest, anchor: NSView, rect: NSRect? = nil, now: Date = .now) {
+        let target = request.target
+        if let session {
+            let same = session.request.target == target
+            dismiss()
+            if same { return }
+        }
+        if let closed = closedByClick {
+            closedByClick = nil
+            if closed.target == target, now.timeIntervalSince(closed.at) < 0.4 { return }
+        }
+        guard anchor.window != nil else { return }
+        let new = makeSession(request, anchor, rect)
+        guard new.model.isEditable else { return }
+        new.model.close = { [weak self, weak new] in
+            guard let self, let new, session === new else { return }
+            dismiss()
+        }
+        session = new
+        new.open()
+        watch(new)
+    }
+
+    /// Closes the editor open, if any. What was typed in it is written or handed back (`ValueEditModel.finish`) unless
+    /// the person `cancelled` it, with Escape.
+    func dismiss(restoringFocus: Bool = true, cancelled: Bool = false) {
+        guard let closing = session else { return }
+        session = nil
+        unwatch()
+        closing.model.finish(cancelled: cancelled)
+        closing.close(restoringFocus: restoringFocus)
+    }
+
+    /// The app is quitting or changing library: the editor open ends as it does on a click elsewhere, so what was typed
+    /// in it is written to the library it came from or handed back, never lost.
+    func handOff() { dismiss(restoringFocus: false) }
+
+    /// The value of `row` of `item` moved within the view that anchors its editor, as a page's rows do when one is set
+    /// for the first time. An editor open for another value stays where it is.
+    func valueMoved(item: ItemID, row: String, to rect: NSRect) {
+        guard let session, session.request.target == item.rawValue + "#" + row else { return }
+        session.valueMoved(to: rect)
+    }
+
+    /// The item on show changed: an editor for another item is for a value that is no longer there.
+    func itemChanged(to id: ItemID?) {
+        guard let item = session?.request.item, item != id else { return }
+        dismiss(restoringFocus: false)
+    }
+
+    /// A view that anchored an editor has left its window.
+    func anchorLeft(_ view: NSView) {
+        if session?.anchor === view { dismiss(restoringFocus: false) }
+    }
+
+    // MARK: Watching
+
+    private func watch(_ session: any ValueEditSession) {
+        let center = NotificationCenter.default
+        // A row that moves with its panel open, as a value's row does once it holds a value, takes the panel along. SwiftUI
+        // moves the view that holds the anchor, not the anchor in it, so every view above it is watched too.
+        var ancestor: NSView? = session.anchor
+        while let view = ancestor {
+            view.postsFrameChangedNotifications = true
+            observers.append(center.addObserver(forName: NSView.frameDidChangeNotification, object: view, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.session?.anchorMoved() }
+            })
+            ancestor = view.superview
+        }
+        if let parent = session.anchor.window {
+            observers.append(center.addObserver(forName: NSWindow.didMoveNotification, object: parent, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.session?.anchorMoved() }
+            })
+            for name in [NSWindow.didResizeNotification, NSWindow.willCloseNotification, NSWindow.didEndLiveResizeNotification] {
+                observers.append(center.addObserver(forName: name, object: parent, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.dismiss(restoringFocus: false) }
+                })
+            }
+        }
+        observers.append(center.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.dismiss(restoringFocus: false) }
+        })
+        let outside: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        if let monitor = NSEvent.addLocalMonitorForEvents(matching: outside.union([.scrollWheel, .keyDown]), handler: { [weak self] event in
+            MainActor.assumeIsolated { self?.handle(event) ?? false } ? nil : event
+        }) { monitors.append(monitor) }
+        if let monitor = NSEvent.addGlobalMonitorForEvents(matching: outside, handler: { [weak self] _ in
+            MainActor.assumeIsolated { self?.dismiss(restoringFocus: false) }
+        }) { monitors.append(monitor) }
+    }
+
+    private func unwatch() {
+        monitors.forEach(NSEvent.removeMonitor)
+        monitors = []
+        observers.forEach(NotificationCenter.default.removeObserver)
+        observers = []
+    }
+
+    /// Whether the editor took the event, which then goes no further.
+    private func handle(_ event: NSEvent) -> Bool {
+        guard let session else { return false }
+        let inside = session.window != nil && event.window === session.window
+        switch event.type {
+        case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+            if !inside {
+                closedByClick = (session.request.target, .now)
+                dismiss(restoringFocus: false)
+            }
+        case .scrollWheel:
+            // The list in the panel scrolls itself; the page or sidebar under it takes the editor away.
+            if !inside, event.window === session.anchor.window { dismiss(restoringFocus: true) }
+        case .keyDown where inside:
+            return handleKey(event, in: session)
+        default:
+            break
+        }
+        return false
+    }
+
+    private func handleKey(_ event: NSEvent, in session: any ValueEditSession) -> Bool {
+        let model = session.model
+        if event.keyCode == 53 {
+            dismiss(cancelled: true)
+            return true
+        }
+        if let text = session.window?.firstResponder as? NSTextView, text.hasMarkedText() { return false }
+        let isReturn = event.keyCode == 36 || event.keyCode == 76
+        if model.kind.isTyped {
+            // The field takes every key but Return, which writes; Option or Shift with it starts a new line.
+            guard isReturn, event.modifierFlags.intersection([.shift, .option]).isEmpty else { return false }
+            model.submitTyped()
+            return true
+        }
+        // Once the calendar has the keyboard (Tab reaches it), it takes the arrows and Return itself.
+        if case .date = model.kind, Self.isInCalendar(session.window?.firstResponder) { return false }
+        switch event.keyCode {
+        case 125:
+            model.move(by: 1)
+            return true
+        case 126:
+            model.move(by: -1)
+            return true
+        case _ where isReturn:
+            if case .date = model.kind, model.activeRow == nil { return false }
+            model.submitTyped()
+            return true
+        default:
+            break
+        }
+        let plain = event.modifierFlags.intersection([.command, .control, .option]).isEmpty
+        if plain, !model.hasSearch, let characters = event.charactersIgnoringModifiers, characters.unicodeScalars.allSatisfy({ !$0.properties.isWhitespace && $0.value >= 0x21 && $0.value < 0xF700 }) {
+            model.typeAhead(characters)
+            return true
+        }
+        return false
+    }
+
+    private static func isInCalendar(_ responder: NSResponder?) -> Bool {
+        var view = responder as? NSView
+        while let current = view {
+            if current is NSDatePicker { return true }
+            view = current.superview
+        }
+        return false
+    }
+
+    /// The editor a value opens in: the panel under it.
+    static func system(_ request: ValueEditRequest, anchor: NSView, rect: NSRect?) -> any ValueEditSession {
+        ValueEditPanelSession(request, anchor: anchor, rect: rect)
+    }
+}

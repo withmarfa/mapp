@@ -38,11 +38,16 @@ import os
     /// the real one waits on every page in the process, those of tests running beside it too.
     private let handOverPages: (QuitTrace, @escaping (Bool) -> Void) -> Void
 
+    /// The value panel open, if any, whose typed text is written or handed back before anything else changes.
+    private let valuePanels: ValueEditPresenter
+
     init(
         host: MarfaHost, defaults: UserDefaults = .standard,
-        handOverPages: ((@escaping (Bool) -> Void) -> Void)? = nil
+        handOverPages: ((@escaping (Bool) -> Void) -> Void)? = nil,
+        valuePanels: ValueEditPresenter = .shared
     ) {
         self.host = host
+        self.valuePanels = valuePanels
         self.handOverPages = handOverPages.map { injected in { _, done in injected(done) } }
             ?? { trace, done in EditorController.flushAll(trace: trace, then: done) }
         sidebarLayouts = SidebarLayouts(defaults: defaults)
@@ -97,7 +102,7 @@ import os
         sidebarLayouts.update(sidebarLayoutKey, change)
     }
 
-    /// Hands every open page's last edit to the library it came from, and returns once each library keeps its
+    /// Ends the open value panel and hands every open page's last edit to the library it came from, and returns once each library keeps its
     /// writes on this Mac, never waiting on a server. Run before anything changes which library the windows read,
     /// and before quitting.
     @discardableResult
@@ -106,6 +111,8 @@ import os
     }
 
     private func flushEditors(tracing trace: QuitTrace) async -> Bool {
+        // A value typed in the panel is written, or handed back, before the library is asked to keep its writes.
+        valuePanels.handOff()
         guard await flush(tracing: trace) else { return false }
         // The library may have closed since the flush began; then it holds nothing to wait for.
         guard let library = host.library else {

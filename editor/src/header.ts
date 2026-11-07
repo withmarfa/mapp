@@ -1,4 +1,8 @@
 import { openLink, postToHost } from './bridge'
+import { dragRows } from './row-drag'
+
+/** The symbol a row's key shows under the pointer, a key of `HeaderIcons.symbols`. */
+const rowGrip = 'line.3.horizontal'
 
 /** How a status pin draws its mark: the color the status carries (a tone's name, or `neutral` for the text's own
  *  color) and how the ring is filled. */
@@ -46,11 +50,13 @@ export interface HeaderListedPerson {
 }
 
 /** One row of the property block, or one pin under the title (the app sends both in this shape). The status and parent
- *  rows hold the header's own buttons, which keep their menus; every other value is read only, and a link opens its
- *  item or its address. */
+ *  rows hold the header's own buttons, which keep their menus; a link opens its item or its address. A row the app
+ *  marks `editable` asks the app for its editor under the value; the page never decides which rows are. */
 export interface HeaderRow {
   id: string
   label: string
+  /** Whether the app opens an editor for the value, which the page asks for with `editValue`. */
+  editable?: boolean
   /** The SF Symbol name of the row's icon, a key of `HeaderIcons.symbols`. */
   symbol: string
   kind:
@@ -66,6 +72,7 @@ export interface HeaderRow {
     | 'email'
     | 'phone'
     | 'text'
+    | 'empty'
   text?: string
   /** What a pin's hover says in place of its value's words: an event's time, its zone and how far off it is. */
   help?: string
@@ -168,9 +175,6 @@ export interface HeaderModel {
   showMore: string
   showMoreContents: string
   showMoreLinked: string
-  propertyRejected: boolean
-  /** The app could not remove the parent. */
-  parentRejected: boolean
   /** The interface's text size in points, which the pins and messages follow. */
   interfaceTextSize: number
   /** How many lines the title shows before an ellipsis cuts it, while it is not being edited. */
@@ -197,8 +201,6 @@ export interface HeaderLabels {
   title: string
   status: string
   discardChanges: string
-  propertyRejected: string
-  parentRejected: string
   linkedFrom: string
   customizeLayout: string
   /** What a collection's members are called. */
@@ -219,8 +221,6 @@ const englishLabels: HeaderLabels = {
   title: 'Title',
   status: 'Status',
   discardChanges: 'Discard Changes',
-  propertyRejected: 'The value could not be saved. Please try again.',
-  parentRejected: 'The connection could not be removed.',
   linkedFrom: 'Linked From',
   customizeLayout: 'Customize Layout',
   contents: 'Contents',
@@ -360,6 +360,11 @@ class LinkedSection {
  *
  *  Linked From (a folded section of the items that link to this one) and a collection's Contents are drawn in the
  *  footer, under the text. */
+/** A frame as whole points, which is how far a value has to move before the app is told. */
+function rectKey(rect: DOMRect): string {
+  return [rect.left, rect.top, rect.width, rect.height].map(Math.round).join(',')
+}
+
 export class ItemHeader {
   private model?: HeaderModel
   private readonly labels: HeaderLabels
@@ -387,8 +392,6 @@ export class ItemHeader {
   private expanded = { item: '', properties: false }
   private readonly statusPin: HTMLButtonElement
   private readonly parentPin: HTMLButtonElement
-  private readonly propertyError: HTMLParagraphElement
-  private readonly parentError: HTMLParagraphElement
   /** The item whose title is being edited, so a blur after the page moved to another item commits nothing. */
   private editing?: string
   /** The item whose title is to take the keyboard as soon as the header shows it, since the app may ask before
@@ -443,19 +446,12 @@ export class ItemHeader {
     this.statusPin.setAttribute('aria-label', this.labels.status)
     this.parentPin = this.menuPin('ItemParentPin', 'parent', buttons)
     this.properties = element('dl', 'item-props', root)
+    dragRows(this.properties, (row, shown) => this.moveRow(row, shown))
     this.properties.setAttribute('aria-label', this.labels.properties)
     this.moreProperties = this.moreButton(root, () => {
       this.expanded.properties = !this.expanded.properties
       this.redraw()
     })
-    this.propertyError = element('p', 'item-error', root)
-    this.propertyError.setAttribute('role', 'alert')
-    this.propertyError.textContent = this.labels.propertyRejected
-    this.propertyError.hidden = true
-    this.parentError = element('p', 'item-error', root)
-    this.parentError.setAttribute('role', 'alert')
-    this.parentError.textContent = this.labels.parentRejected
-    this.parentError.hidden = true
     const redraw = () => this.redraw()
     const glyph = (name: string, parent: HTMLElement) => this.glyph(name, parent)
     this.contents = new LinkedSection(footer, 'item-contents', redraw, glyph)
@@ -529,6 +525,7 @@ export class ItemHeader {
     window.addEventListener('resize', () => {
       const had = width
       width = window.innerWidth
+      this.reportValueMoved()
       if (had > 0 || width === 0) return
       this.drawn = ''
       this.redraw()
@@ -606,8 +603,6 @@ export class ItemHeader {
     this.takeWantedTitle()
     this.titleError.hidden = !model.titleRejected
     this.titleRefusal.textContent = model.titleRefusal
-    this.propertyError.hidden = !model.propertyRejected
-    this.parentError.hidden = !model.parentRejected
     this.showPin(this.statusPin, model.status)
     this.showPin(this.parentPin, model.parent)
     if (previous?.item !== model.item) {
@@ -617,6 +612,7 @@ export class ItemHeader {
       this.linked.reset(model.kind === 'person')
     }
     this.redraw()
+    requestAnimationFrame(() => this.reportValueMoved())
     // The status pin is named for what it sets; what it is set to is read after.
     this.statusPin.setAttribute(
       'aria-description',
@@ -754,15 +750,16 @@ export class ItemHeader {
   }
 
   /** A symbol the app drew, as a mask in the text's secondary color; nothing for one it did not draw. */
-  private glyph(name: string, parent: HTMLElement, scale = 1): void {
+  private glyph(name: string, parent: HTMLElement, scale = 1): HTMLElement {
     const icon = this.symbols[name]
     const node = element('span', 'item-glyph', parent)
     node.setAttribute('aria-hidden', 'true')
-    if (!icon) return
+    if (!icon) return node
     node.style.width = `${icon.width * scale}px`
     node.style.height = `${icon.height * scale}px`
     node.style.setProperty('-webkit-mask-image', `url("${icon.url}")`)
     node.style.maskImage = `url("${icon.url}")`
+    return node
   }
 
   private toolButton(id: string, action: () => void): HTMLButtonElement {
@@ -939,12 +936,49 @@ export class ItemHeader {
     const entry = element('div', 'item-prop')
     entry.dataset.row = row.id
     const term = element('dt', 'item-prop-label', entry)
-    this.glyph(row.symbol, term)
+    const symbol = element('span', 'item-prop-symbol', term)
+    this.glyph(row.symbol, symbol)
+    this.glyph(rowGrip, symbol).classList.add('item-prop-grip')
     const name = element('span', 'item-prop-name', term)
     name.textContent = row.label
     name.title = row.label
-    this.value(element('dd', 'item-prop-value', entry), row, model)
+    const value = element('dd', 'item-prop-value', entry)
+    this.value(value, row, model)
+    this.editor(entry, term, value, row, model)
     return entry
+  }
+
+  /** Makes an editable row ask for its editor. The label always does, so a value that is itself a link keeps its click;
+   *  the value does too where it holds no link. The editor opens under the value either way. */
+  private editor(
+    entry: HTMLElement,
+    term: HTMLElement,
+    value: HTMLElement,
+    row: HeaderRow,
+    model: HeaderModel,
+  ) {
+    if (!row.editable) return
+    entry.classList.add('editable')
+    const open = () => this.openEditor(value, row.id)
+    const reach = (node: HTMLElement) => {
+      node.tabIndex = 0
+      node.setAttribute('role', 'button')
+      node.addEventListener('click', open)
+      node.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        open()
+      })
+    }
+    reach(term)
+    term.setAttribute('aria-label', row.label)
+    if (!value.querySelector('a, button')) {
+      reach(value)
+      value.setAttribute(
+        'aria-label',
+        row.kind === 'empty' ? row.label : `${row.label}: ${this.wholeValue(row, model)}`,
+      )
+    }
   }
 
   /** A pin: its key with the row's icon at 11 points, above its value on one line, cut with an ellipsis where it is
@@ -960,6 +994,7 @@ export class ItemHeader {
     const value = element('dd', 'item-pin-value', entry)
     value.title = this.wholeValue(row, model)
     this.value(value, row, model, true)
+    this.editor(entry, key, value, row, model)
     if (row.more) {
       const more = element('span', 'item-pin-more', value)
       more.textContent = `+${row.more}`
@@ -1022,6 +1057,15 @@ export class ItemHeader {
       case 'tags':
         for (const tag of row.texts ?? []) this.chip(value, 'tag', tag)
         break
+      case 'empty': {
+        // A value the item does not have yet: the design's empty chip, a plus and the name, which opens its editor.
+        const chip = this.chip(value, 'empty', row.text ?? row.label)
+        chip.classList.add('empty')
+        const plus = element('span', 'item-pin-icon item-icon-plus')
+        plus.setAttribute('aria-hidden', 'true')
+        chip.prepend(plus)
+        break
+      }
       case 'url': {
         const href = row.text ?? ''
         if (/^https?:\/\//i.test(href)) this.link(value, href, () => openLink(href), href)
@@ -1055,6 +1099,59 @@ export class ItemHeader {
   rowAt(target: EventTarget | null): { item: string; row: string } | null {
     const row = (target as Element | null)?.closest?.<HTMLElement>('[data-row]')?.dataset.row
     return this.model && row ? { item: this.model.item, row } : null
+  }
+
+  /** Asks the app to list the rows in the order the page now shows: those on screen as dragged, then any folded away
+   *  as the page drew them, so the app stores what the person saw and not an order of its own. */
+  private moveRow(row: string, shown: string[]) {
+    if (!this.model) return
+    const kept = new Set(shown)
+    const folded = this.model.properties
+      .map((property) => property.id)
+      .filter((id) => !kept.has(id))
+    postToHost({ type: 'moveRow', item: this.model.item, row, order: [...shown, ...folded] })
+  }
+
+  /** Asks the app for the editor of a row's or a pin's value, with the value's frame as a menu's is. */
+  private openEditor(value: HTMLElement, row: string) {
+    if (!this.model) return
+    const rect = value.getBoundingClientRect()
+    this.openValue = { row, rect: rectKey(rect) }
+    postToHost({
+      type: 'editValue',
+      item: this.model.item,
+      row,
+      rect: [rect.left, rect.top, rect.width, rect.height],
+      viewportHeight: window.innerHeight,
+    })
+  }
+
+  /** The value whose editor the app opened last, and where the app was last told it is. The app ignores a move for an
+   *  editor that is closed or open for another value. */
+  private openValue?: { row: string; rect: string }
+
+  /** A value moves as the page changes under it: a row set for the first time joins the filled ones, and a narrower
+   *  window wraps what it holds. The editor open under it is told where it is now. */
+  private reportValueMoved() {
+    const model = this.model
+    const open = this.openValue
+    if (!model || !open) return
+    const row = JSON.stringify(open.row)
+    const value = this.root.querySelector<HTMLElement>(
+      `[data-row=${row}] .item-prop-value, [data-pin=${row}] .item-pin-value`,
+    )
+    if (!value) return
+    const rect = value.getBoundingClientRect()
+    const key = rectKey(rect)
+    if (key === open.rect) return
+    open.rect = key
+    postToHost({
+      type: 'valueMoved',
+      item: model.item,
+      row: open.row,
+      rect: [rect.left, rect.top, rect.width, rect.height],
+      viewportHeight: window.innerHeight,
+    })
   }
 
   private openMenu(pin: HTMLElement, menu: HeaderMenu) {

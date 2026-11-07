@@ -168,7 +168,14 @@ nonisolated enum MarfaMapping {
             key: field.name, label: field.label, kind: kind(of: field, statusWords: statusWords),
             declaredBy: TypeID(field.declaredBy), required: field.required, description: field.description,
             format: format(of: field), isInteger: field.type == "integer",
-            minimum: bound("minimum", in: field.definition), maximum: bound("maximum", in: field.definition))
+            minimum: bound("minimum", in: field.definition), maximum: bound("maximum", in: field.definition),
+            maxItems: field.type == "array" ? maxItems(in: field.definition) : nil)
+    }
+
+    /// The most entries a list declares (`maxItems`, a whole number of at least 1), nil where it names none.
+    static func maxItems(in definition: JSONObject) -> Int? {
+        guard case .integer(let value)? = definition["maxItems"], value >= 1 else { return nil }
+        return Int(value)
     }
 
     /// A number a definition names, such as a `minimum`.
@@ -270,7 +277,13 @@ nonisolated enum MarfaMapping {
                 .other
             }
         case "array":
-            listShape(of: field).map { .list($0) } ?? .other
+            if let shape = listShape(of: field) {
+                .list(shape)
+            } else if ["string", "url", "email"].contains(field.definition["items_type"]?.string) {
+                .words
+            } else {
+                .other
+            }
         default: .other
         }
     }
@@ -324,7 +337,7 @@ nonisolated enum MarfaMapping {
             created: created, modified: modified, trashed: state == .trashed ? row.trashedDate ?? modified : nil,
             edgesOut: edgesOut,
             sync: sync, problem: damaged ? ItemProblem(message: MarfaProblems.unreadableMessage, withholdsText: true) : nil,
-            boundEmbeds: embeds, source: row.source.isEmpty ? nil : row.source)
+            readOnly: row.readOnly, boundEmbeds: embeds, source: row.source.isEmpty ? nil : row.source)
     }
 
     /// What a link in an item's text names, as the package reads it from the copy.

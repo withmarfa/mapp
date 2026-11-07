@@ -38,8 +38,6 @@ const ticket: HeaderModel = {
   showMore: 'Show 0 More',
   showMoreContents: 'Show 0 More',
   showMoreLinked: 'Show 0 More',
-  propertyRejected: false,
-  parentRejected: false,
   interfaceTextSize: 13,
   titleLines: 2,
 }
@@ -141,24 +139,12 @@ test('a refused title shows why and offers to discard the draft', () => {
     ...ticket,
     draft: 'A/B',
     titleRejected: true,
-    propertyRejected: true,
-    parentRejected: true,
   })
   const error = root.querySelector<HTMLElement>('.item-title-error')!
   expect(error.hidden).toBe(false)
   expect(error.textContent).toContain('The title could not be saved.')
-  expect([...root.querySelectorAll<HTMLElement>('.item-error')].every((e) => !e.hidden)).toBe(true)
   error.querySelector('button')!.click()
   expect(posted).toEqual([{ type: 'titleDiscard', item: 'ticket' }])
-})
-
-test('a parent that could not be removed says so, apart from a refused status', () => {
-  const errors = () => [...root.querySelectorAll<HTMLElement>(':scope > .item-error')]
-  header.set({ ...ticket, parentRejected: true })
-  expect(errors().map((e) => e.hidden)).toEqual([true, false])
-  expect(errors()[1]!.textContent).toBe('The connection could not be removed.')
-  header.set(ticket)
-  expect(errors().every((e) => e.hidden)).toBe(true)
 })
 
 test('typing and Return reach the app for the item the title belongs to', () => {
@@ -443,6 +429,46 @@ test('an item a row links to is a chip in its own tone, with the icon of its typ
   posted = []
   chip.click()
   expect(posted).toEqual([{ type: 'openItem', item: 'other' }])
+})
+
+test('a value the item does not have yet is an empty chip with a plus that opens its editor', () => {
+  header.set({
+    ...ticket,
+    properties: [
+      { id: 'due', label: 'Due', symbol: 'calendar', kind: 'empty', text: 'Due', editable: true },
+    ],
+  })
+  const chip = root.querySelector<HTMLElement>('.item-props .item-chip.empty')!
+  expect(chip.textContent).toBe('Due')
+  expect(chip.querySelector('.item-icon-plus')).not.toBeNull()
+  const value = root.querySelector<HTMLElement>('.item-prop-value')!
+  expect(value.getAttribute('aria-label')).toBe('Due')
+  chip.click()
+  expect(posted.map((message) => message.type)).toEqual(['editValue'])
+  expect(posted[0]).toMatchObject({ item: 'ticket', row: 'due' })
+})
+
+test('the app is told where the value its editor is open under has moved to, once for each move', () => {
+  header.set({
+    ...ticket,
+    properties: [
+      { id: 'due', label: 'Due', symbol: 'calendar', kind: 'empty', text: 'Due', editable: true },
+    ],
+  })
+  const value = root.querySelector<HTMLElement>('.item-prop-value')!
+  let frame = { left: 10, top: 20, width: 100, height: 24 }
+  value.getBoundingClientRect = () => frame as DOMRect
+  window.dispatchEvent(new Event('resize'))
+  expect(posted, 'nothing is open, so nothing is told').toEqual([])
+  root.querySelector<HTMLElement>('.item-chip.empty')!.click()
+  expect(posted.map((message) => message.type)).toEqual(['editValue'])
+  window.dispatchEvent(new Event('resize'))
+  expect(posted, 'it has not moved').toHaveLength(1)
+  frame = { left: 10, top: 60, width: 100, height: 24 }
+  window.dispatchEvent(new Event('resize'))
+  window.dispatchEvent(new Event('resize'))
+  expect(posted.map((message) => message.type)).toEqual(['editValue', 'valueMoved'])
+  expect(posted[1]).toMatchObject({ item: 'ticket', row: 'due', rect: [10, 60, 100, 24] })
 })
 
 test('each kind of value has its own chip, and its text is never read as markup', () => {
@@ -1007,4 +1033,119 @@ test('the row above the title counts what links here and starts or ends Customiz
     root.querySelector<HTMLElement>('.item-tools')!.hidden,
     'a file has nothing to lay out',
   ).toBe(true)
+})
+
+/** Draws three rows of 30 points with a fourth folded away, and returns a drag of the first by its key. */
+function draggable(): { key: HTMLElement; drag: (y: number) => void; drop: () => void } {
+  const rows = ['a', 'b', 'c', 'd'].map((id) => ({
+    id,
+    label: id,
+    symbol: 'text.alignleft',
+    kind: 'text' as const,
+    text: id,
+    editable: true,
+  }))
+  header.set({ ...ticket, properties: rows, foldAfter: 3 })
+  const list = root.querySelector<HTMLElement>('.item-props')!
+  list.getBoundingClientRect = () => ({ top: 0, height: 90 }) as DOMRect
+  ;[...list.children].forEach((row, index) => {
+    row.getBoundingClientRect = () => ({ top: index * 30, height: 30 }) as DOMRect
+  })
+  const key = list.querySelector<HTMLElement>('.item-prop-label')!
+  key.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0, clientY: 15 }))
+  return {
+    key,
+    drag: (y) => window.dispatchEvent(new MouseEvent('pointermove', { clientY: y })),
+    drop: () => window.dispatchEvent(new MouseEvent('pointerup')),
+  }
+}
+
+test('a row dragged by its key sends the whole order the page shows after the move', () => {
+  const { drag, drop } = draggable()
+  drag(50)
+  drop()
+  expect(posted).toEqual([
+    { type: 'moveRow', item: 'ticket', row: 'a', order: ['b', 'a', 'c', 'd'] },
+  ])
+})
+
+test('a row dropped last among those shown stays above the rows folded away', () => {
+  const { drag, drop } = draggable()
+  drag(80)
+  drop()
+  expect(posted).toEqual([
+    { type: 'moveRow', item: 'ticket', row: 'a', order: ['b', 'c', 'a', 'd'] },
+  ])
+})
+
+test('a dragged key opens no editor, and a press that does not move still does', () => {
+  const { key, drag, drop } = draggable()
+  drag(50)
+  drop()
+  key.click()
+  expect(posted.map((message) => message.type)).toEqual(['moveRow'])
+
+  posted = []
+  const press = draggable()
+  press.drag(16)
+  press.drop()
+  press.key.click()
+  expect(posted.map((message) => message.type)).toEqual(['editValue'])
+})
+
+test('Escape puts a dragged row back', () => {
+  const { key, drag, drop } = draggable()
+  drag(50)
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+  drop()
+  expect(posted).toEqual([])
+  expect(key.parentElement!.style.transform).toBe('')
+  expect(root.querySelector('.item-props')!.classList.contains('dragging')).toBe(false)
+})
+
+const tick = () => new Promise((resolve) => setTimeout(resolve))
+
+test('the click from letting go after Escape ended a drag opens no editor, and a later press still does', async () => {
+  const { key, drag } = draggable()
+  drag(50)
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+  // Escape ends the drag with the button still down; the click comes only when it is released.
+  await tick()
+  window.dispatchEvent(new MouseEvent('pointerup'))
+  key.click()
+  expect(posted, 'the release after Escape').toEqual([])
+
+  key.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0, clientY: 15 }))
+  window.dispatchEvent(new MouseEvent('pointerup'))
+  key.click()
+  expect(
+    posted.map((message) => message.type),
+    'the next press',
+  ).toEqual(['editValue'])
+})
+
+test('a drop swallows its own click however late it comes, and nothing after it', async () => {
+  const { key, drag, drop } = draggable()
+  drag(50)
+  drop()
+  await tick()
+  key.click()
+  expect(posted.map((message) => message.type)).toEqual(['moveRow'])
+
+  posted = []
+  key.click()
+  expect(
+    posted.map((message) => message.type),
+    'a second click',
+  ).toEqual(['editValue'])
+})
+
+test('a press that starts after a cancelled drag is not swallowed', () => {
+  const { key, drag } = draggable()
+  drag(50)
+  window.dispatchEvent(new MouseEvent('pointercancel'))
+  key.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0, clientY: 15 }))
+  window.dispatchEvent(new MouseEvent('pointerup'))
+  key.click()
+  expect(posted.map((message) => message.type)).toEqual(['editValue'])
 })

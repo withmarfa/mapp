@@ -2,8 +2,8 @@ import Foundation
 import Marfa
 
 /// One row of the property block an item's page draws under its title, or one pin above it: the label and a value
-/// drawn by the kind of field it came from. The block is for reading at a glance; every value is edited in the
-/// inspector, except the status, and the parent where it is a row, which keep their menus.
+/// drawn by the kind of field it came from. A row the item can take an edit for (`editable`) opens its editor under
+/// the value, as the status and the parent keep their menus; every other value is edited in the inspector.
 nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// An item a row links to.
     struct Target: Hashable, Sendable {
@@ -44,6 +44,9 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         case boolean(Bool)
         /// Text, a choice's label or a number.
         case text(String)
+        /// A value the item does not have yet, drawn as the design's empty chip: a plus and the name. It only opens
+        /// the editor, so it is always `editable`. The symbol is the one a value of the field's kind has.
+        case empty(symbol: String)
 
         /// The SF Symbol that stands for the kind of value beside its label.
         var symbol: String {
@@ -63,6 +66,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
             case .phone: "phone"
             case .boolean: "checkmark.square"
             case .text: "text.alignleft"
+            case .empty(let symbol): symbol
             }
         }
 
@@ -77,6 +81,14 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     var numberToCall: String?
     /// How many values of a list a pin left out, for the "+N" after the first two. Always 0 in the property block.
     var more = 0
+    /// Whether the value opens an editor under it, or for a yes or no flips: any value that can be edited, on an item
+    /// that can take the edit. The app says so; the page never decides it.
+    var editable = false
+
+    /// Whether the row is the empty chip of a value the item does not have yet.
+    var isEmpty: Bool {
+        if case .empty = value { true } else { false }
+    }
 
     /// How many rows show before "Show N more".
     static let foldAfter = 6
@@ -101,13 +113,14 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// and last edit, the type's fields as the catalogue orders them, then the parent if the item has one, then the
     /// item's other relationships, then its tags. A field shows only with a value, except the status, which always
     /// shows where the type has one, since its pill is how a status is set from the page. The keys in `hidden` are what
-    /// the page shows elsewhere, such as the title and the text. An item with no parent has no parent row: the parent
-    /// is set from the inspector, and the row keeps its menu once it has a value. The block and the pins are both
-    /// chosen from these.
+    /// the page shows elsewhere, such as the title and the text. With `offersEmpty`, an editable value the item does not
+    /// have yet is a row too, as an empty chip that opens its editor: that is the page's way to give a value to the
+    /// field, the parent and the tags. Empty rows come after the others in each group, so the fold hides them first. The
+    /// block and the pins are both chosen from these.
     static func candidates(
         of item: Item, type: ItemTypeInfo?, hidden: Set<String>, relationships: [ItemRelationship], parentField: String, format: DateFormat,
         tags: [String], typeLabel: String?, typeIcon: String?, sourceName: String?, now: Date, calendar: Calendar, locale: Locale,
-        icon: (ItemID) -> String?, isPerson: (ItemID) -> Bool
+        offersEmpty: Bool = false, icon: (ItemID) -> String?, isPerson: (ItemID) -> Bool
     ) -> [PropertyRow] {
         var rows: [PropertyRow] = []
         if let typeLabel {
@@ -120,6 +133,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
             id: PagePlacement.updated, label: String(localized: "Updated"),
             value: .date(DateDisplay.text(of: item.modified, place: .list, format: format, now: now, calendar: calendar, locale: locale))))
         var fields: [PropertyRow] = []
+        var empty: [PropertyRow] = []
         let parent = relationships.contains { $0.field == parentField && !$0.targets.isEmpty }
         let status = type?.statusField
         for field in type?.fields ?? [] where !hidden.contains(field.key) {
@@ -127,16 +141,46 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
                 fields.append(PropertyRow(id: field.key, label: field.label, value: .status))
                 if parent { fields.append(parentRow(relationships, parentField)) }
             } else if let value = value(of: field, in: item, format: format) {
-                fields.append(PropertyRow(id: field.key, label: field.label, value: value, numberToCall: numberToCall(of: field, in: item)))
+                fields.append(PropertyRow(
+                    id: field.key, label: field.label, value: value, numberToCall: numberToCall(of: field, in: item),
+                    editable: item.isEditable && isEdited(field)))
+            } else if offersEmpty, item.isEditable, isEdited(field), !InspectorFields.hasValue(item.value(of: field.key)) {
+                empty.append(PropertyRow(id: field.key, label: field.label, value: .empty(symbol: symbol(of: field)), editable: true))
             }
         }
         if parent, !fields.contains(where: { $0.value == .parent }) { fields.insert(parentRow(relationships, parentField), at: 0) }
-        rows += fields
+        if offersEmpty, !parent, item.isEditable, let none = relationships.first(where: { $0.field == parentField && $0.isEditable }) {
+            empty.append(PropertyRow(id: parentField, label: none.label, value: .empty(symbol: "square.stack"), editable: true))
+        }
+        rows += fields + empty
         for relationship in relationships where !relationship.field.hasPrefix("inverse:") && relationship.field != parentField {
             if let row = linkRow(relationship, icon: icon, isPerson: isPerson) { rows.append(row) }
         }
-        if !tags.isEmpty { rows.append(PropertyRow(id: PagePlacement.tags, label: String(localized: "Tags"), value: .tags(tags))) }
+        if !tags.isEmpty {
+            rows.append(PropertyRow(id: PagePlacement.tags, label: String(localized: "Tags"), value: .tags(tags), editable: item.canEditTags))
+        } else if offersEmpty, item.canEditTags {
+            rows.append(PropertyRow(id: PagePlacement.tags, label: String(localized: "Tags"), value: .empty(symbol: "tag"), editable: true))
+        }
         return rows
+    }
+
+    /// Whether the page edits the field's value: in a panel, or for a yes or no with a click.
+    private static func isEdited(_ field: ItemTypeInfo.Field) -> Bool {
+        field.kind == .boolean || ValueEditKind(field: field) != nil
+    }
+
+    /// The symbol a value of the field's kind has beside its name, as `Value.symbol` gives it to the value itself.
+    private static func symbol(of field: ItemTypeInfo.Field) -> String {
+        switch field.kind {
+        case .date: Value.date("").symbol
+        case .boolean: Value.boolean(false).symbol
+        case .list(let shape) where shape.holdsPeople: Value.people([]).symbol
+        case .status: Value.status.symbol
+        case .choice, .words, .list: Value.options([]).symbol
+        case .text where field.format == .url: Value.url("").symbol
+        case .text where field.format == .email: Value.email("").symbol
+        default: Value.text("").symbol
+        }
     }
 
     /// The row of the items a relationship links to, or nil where it links to none the page can open.

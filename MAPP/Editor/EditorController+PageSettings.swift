@@ -110,8 +110,6 @@ extension EditorController {
             "title": String(localized: "Title"),
             "status": String(localized: "Status"),
             "discardChanges": String(localized: "Discard Changes"),
-            "propertyRejected": String(localized: "The value could not be saved. Please try again."),
-            "parentRejected": String(localized: "The connection could not be removed."),
             "linkedFrom": String(localized: "Linked From"),
             "customizeLayout": String(localized: "Customize Layout in the Title Row"),
             "contents": String(localized: "Contents"),

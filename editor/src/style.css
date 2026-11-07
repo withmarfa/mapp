@@ -86,6 +86,7 @@ body {
    interface's text size (the pin measures are the 13 point design scaled). */
 #item-header {
   --interface-text-size: 13px;
+  font-size: var(--interface-text-size);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -108,6 +109,7 @@ body {
 #item-footer {
   --interface-text-size: 13px;
   --step: calc(var(--interface-text-size) * 4 / 13);
+  font-size: var(--interface-text-size);
   padding: calc(var(--step) * 6) var(--inkkit-column-inset) calc(var(--step) * 8);
   font-family: -apple-system, system-ui, sans-serif;
   line-height: normal;
@@ -407,8 +409,7 @@ body[data-text='none'] #editor {
   box-shadow: inset 0 0 0 var(--chip-status-edge-width, 0.5px) var(--chip-edge, var(--separator));
 }
 
-/* An empty status, in a row, has no value yet: a plus and a quiet edge, as the design's empty chip. A pin is never
-   empty; the app leaves it out. */
+/* A value the item does not have yet, in a row or a pin: a plus and a quiet edge, as the design's empty chip. */
 .item-chip.empty {
   background: transparent;
   box-shadow: inset 0 0 0 var(--chip-status-edge-width, 0.5px) var(--chip-edge, var(--separator));
@@ -711,10 +712,82 @@ body[data-text='none'] #editor {
 }
 
 .item-prop-label {
+  box-sizing: border-box;
   flex: none;
+  position: relative;
+  isolation: isolate;
   width: calc(var(--step) * 30);
+  gap: calc(var(--step) * 1.5);
+  padding-block: calc(var(--step) / 2);
+  padding-inline-end: var(--step);
+  min-height: calc(var(--step) * 8);
   color: var(--label-secondary);
   font-weight: 400;
+}
+
+/* Under the pointer a key shows that it can be dragged: its fill runs past it on the left, as a value's does, and the
+   grip takes the symbol's place. Symbols differ in width, so each sits in the same slot and the names line up. */
+.item-prop-label::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 0 calc(var(--step) * -1.5);
+  border-radius: 6px;
+}
+
+.item-prop-symbol {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: calc(var(--step) * 5.5);
+}
+
+.item-prop-symbol > * {
+  grid-area: 1 / 1;
+}
+
+.item-prop-grip {
+  visibility: hidden;
+}
+
+.item-prop:not(:only-child) > .item-prop-label:hover::before,
+.editable > .item-prop-label[role='button']:hover::before,
+.item-prop.dragged > .item-prop-label::before {
+  background: var(--label-quinary);
+}
+
+.item-prop:not(:only-child) > .item-prop-label:hover .item-prop-grip,
+.item-prop.dragged .item-prop-grip {
+  visibility: visible;
+}
+
+.item-prop:not(:only-child) > .item-prop-label:hover .item-glyph:not(.item-prop-grip),
+.item-prop.dragged .item-glyph:not(.item-prop-grip) {
+  visibility: hidden;
+}
+
+.item-prop.dragged {
+  position: relative;
+  z-index: 1;
+}
+
+.item-props.dragging,
+.item-props.dragging * {
+  cursor: grabbing;
+}
+
+.item-props.dragging .editable > .item-prop-value[role='button']:hover {
+  background: none;
+}
+
+.item-props.dragging > .item-prop:not(.dragged) > .item-prop-label::before {
+  background: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .item-props.dragging > .item-prop:not(.dragged) {
+    transition: transform 150ms ease;
+  }
 }
 
 .item-prop-name {
@@ -741,6 +814,29 @@ body[data-text='none'] #editor {
    chip has a fixed height too, and its own `max-width` and ellipsis keep it inside the column. */
 .item-prop-value > :not(.item-chip, .item-person) {
   min-width: 0;
+}
+
+/* A value the app edits in a panel under it: the label and, where it holds no link, the value both open it. The value
+   darkens under the pointer so it reads as something to click, and shows a ring for the keyboard. */
+.editable > [role='button'] {
+  border-radius: 6px;
+}
+
+/* The fill runs past the value on both sides, and the value stays on the column's edge. */
+.editable > .item-prop-value[role='button'],
+.editable > .item-pin-value[role='button'] {
+  margin-inline: calc(var(--step) * -1.5);
+  padding-inline: calc(var(--step) * 1.5);
+}
+
+.editable > .item-prop-value[role='button']:hover,
+.editable > .item-pin-value[role='button']:hover {
+  background: var(--label-quinary);
+}
+
+.editable > [role='button']:focus-visible {
+  outline: 2px solid var(--inkkit-accent-color);
+  outline-offset: 1px;
 }
 
 /* A symbol the app drew, quiet in the secondary color. */

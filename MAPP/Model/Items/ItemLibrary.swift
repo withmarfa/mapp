@@ -172,7 +172,7 @@ protocol ItemLibrary: AnyObject, Observable {
     /// unless there was nothing to change.
     @discardableResult
     func restoreVersion(_ snapshot: ItemSnapshot, of id: ItemID, undoManager: UndoManager?) -> Bool
-    /// In one undoable change. An item in the bin is skipped and told.
+    /// In one undoable change. An item in the bin, or one a connector keeps, is skipped and told.
     func setFavorite(_ ids: Set<ItemID>, _ isFavorite: Bool, undoManager: UndoManager?)
     /// The tags the library sets itself, which the person neither adds nor removes by hand: the favorite tag, which
     /// the Favorite command owns, and any a library keeps for its own use.
@@ -189,7 +189,8 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Removes `tag` from each of the items that hold it. An item that no longer holds it, as when another device
     /// removed it first, is left alone.
     func removeTag(_ tag: String, from ids: Set<ItemID>, undoManager: UndoManager?)
-    /// To Recently Deleted, in one undoable change. An item already there has nothing to change.
+    /// To Recently Deleted, in one undoable change. An item already there has nothing to change, and one a connector
+    /// keeps is skipped and told.
     func delete(_ ids: Set<ItemID>, undoManager: UndoManager?)
     func recover(_ ids: Set<ItemID>, undoManager: UndoManager?)
     /// Not undoable, so the views confirm it first, and only where `reachesServer`.
@@ -340,7 +341,7 @@ extension ItemLibrary {
     /// Whether the item can be filed in a collection: an active item the library can write, of a type the catalogue
     /// lets join one. A collection can't.
     func canJoinCollection(_ item: Item) -> Bool {
-        item.state == .active && item.problem == nil && catalogue.canJoinCollection(item.type)
+        item.writeObstacle == nil && catalogue.canJoinCollection(item.type)
     }
 
     /// The items of the selection that can be filed in a collection, files too: Add to Collection and Remove from

@@ -3,9 +3,9 @@ import Foundation
 /// The properties an item's page pins under its title, resolved to what each shows: the one model for every page that
 /// draws pins, which takes nothing from the editor. The page draws what this returns and decides nothing.
 ///
-/// The person's list (`PagePlacement.pins`) says which properties, in which order. A pin with nothing to show is left
-/// out, with no placeholder: an empty status or parent is set from the inspector. A pin naming something the type or
-/// the item does not have is left out the same way, and stays in the list. A pin never repeats what the header's own
+/// The person's list (`PagePlacement.pins`) says which properties, in which order. A pin with nothing to show is an
+/// empty chip where the page offers one (`offersEmpty`, for a value the person can set) and is left out where it does
+/// not. A pin naming something the type or the item does not have is left out, and stays in the list. A pin never repeats what the header's own
 /// line says (`PageHeaderLead.said`).
 ///
 /// An event's time is its first pin, whatever the person chose. It takes one of the `pinLimit` slots, and a pin it
@@ -22,22 +22,25 @@ nonisolated struct PagePins: Equatable, Sendable {
 
     /// `candidates` are the item's rows before any choice (`PropertyRow.candidates`). A pinned status is the pill the
     /// page draws from its status menu, and stays editable there; a pinned parent is a link that opens it, since
-    /// only the row keeps the parent's menu. Every other pin is read only.
+    /// only the row keeps the parent's menu. Every other pin opens its editor where its row does (`PropertyRow.editable`).
     static func resolve(
         for item: Item, type: ItemTypeInfo?, placement: PagePlacement, lead: PageHeaderLead, relationships: [ItemRelationship],
-        candidates: [PropertyRow], parentField: String = PagePlacement.parent, icon: (ItemID) -> String?,
+        candidates: [PropertyRow], parentField: String = PagePlacement.parent, offersEmpty: Bool = false, icon: (ItemID) -> String?,
         isPerson: (ItemID) -> Bool
     ) -> PagePins {
         let said = lead.said
         let status = type?.statusField
         func row(for id: String) -> PropertyRow? {
             if id == parentField {
-                return relationships.first { $0.field == parentField }.flatMap { PropertyRow.linkRow($0, icon: icon, isPerson: isPerson) }
+                let linked = relationships.first { $0.field == parentField }.flatMap { PropertyRow.linkRow($0, icon: icon, isPerson: isPerson) }
+                return linked ?? candidates.first { $0.id == id && $0.isEmpty }
             }
             guard let row = candidates.first(where: { $0.id == id }) else { return nil }
             if row.value == .status {
-                // The pill shows a status the item has; one it has not is set from the inspector.
-                return status.flatMap { statusValue(of: item, in: $0) } == nil ? nil : row
+                // The pill shows a status the item has; one it has not is an empty chip that opens the status editor.
+                guard let status, statusValue(of: item, in: status) == nil else { return row }
+                return offersEmpty && item.isEditable && status.isPicked
+                    ? PropertyRow(id: row.id, label: row.label, value: .empty(symbol: PropertyRow.Value.status.symbol), editable: true) : nil
             }
             return row
         }
@@ -63,7 +66,7 @@ nonisolated struct PagePins: Equatable, Sendable {
             guard values.count > listLimit else { return row }
             return PropertyRow(
                 id: row.id, label: row.label, value: make(Array(values.prefix(listLimit))), numberToCall: row.numberToCall,
-                more: values.count - listLimit)
+                more: values.count - listLimit, editable: row.editable)
         }
         switch row.value {
         case .items(let values): return cut(values) { .items($0) }

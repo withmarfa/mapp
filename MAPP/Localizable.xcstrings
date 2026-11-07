@@ -10,6 +10,9 @@
     "%@ Copy" : {
 
     },
+    "%@ can hold %lld at most." : {
+
+    },
     "%@ has an entry that isn’t finished. Finish it, or cancel it, to add the item." : {
       "extractionState" : "manual"
     },
@@ -31,7 +34,22 @@
     "Add Filter" : {
 
     },
+    "Add or Find a Tag" : {
+
+    },
+    "Add or Find a Word" : {
+
+    },
+    "Add Person to %@" : {
+
+    },
+    "Add Person…" : {
+
+    },
     "Add Sort" : {
+
+    },
+    "Add “%@”" : {
 
     },
     "Always shown" : {
@@ -39,6 +57,9 @@
     },
     "Approve MAPP With This Code" : {
       "extractionState" : "manual"
+    },
+    "Assigned" : {
+
     },
     "Automatic uses words in lists and tables, such as “Yesterday”, and abbreviated dates elsewhere. Times follow your Mac’s 12 or 24 hour setting." : {
       "extractionState" : "manual"
@@ -54,6 +75,9 @@
     },
     "Copy Code" : {
       "extractionState" : "manual"
+    },
+    "Create “%@”" : {
+
     },
     "Customize Layout…" : {
       "extractionState" : "manual"
@@ -81,6 +105,12 @@
 
     },
     "Filters" : {
+
+    },
+    "Find an Item" : {
+
+    },
+    "Find or Add a Person" : {
 
     },
     "Four Pins at Most" : {
@@ -185,6 +215,9 @@
     "Marfa keeps this condition. This window can’t show it, and saving leaves it as it is." : {
 
     },
+    "Matching" : {
+
+    },
     "More than %lld filter conditions" : {
 
     },
@@ -193,6 +226,9 @@
     },
     "Mark" : {
       "extractionState" : "manual"
+    },
+    "Next Week" : {
+
     },
     "Nothing changed." : {
       "extractionState" : "manual"
@@ -215,6 +251,15 @@
     "Open Page" : {
       "extractionState" : "manual"
     },
+    "Open “%@”" : {
+
+    },
+    "Opens a list of choices" : {
+
+    },
+    "Parent Not Saved" : {
+
+    },
     "Pill" : {
       "extractionState" : "manual"
     },
@@ -234,6 +279,9 @@
       "extractionState" : "manual"
     },
     "Remove Filter" : {
+
+    },
+    "Remove Parent" : {
 
     },
     "Remove Sort" : {
@@ -287,6 +335,9 @@
     "The name always shows." : {
 
     },
+    "The parent could not be saved." : {
+
+    },
     "The view is saved for every app connected to your Marfa server." : {
 
     },
@@ -302,6 +353,9 @@
     "The window can’t show these conditions of the view’s filter, so they stay as they are:" : {
 
     },
+    "This item is no longer available." : {
+
+    },
     "This Mac" : {
 
     },
@@ -314,8 +368,14 @@
     "This view changed elsewhere, so it now shows the view as it is. Your name is still here; make your other changes again." : {
 
     },
+    "Time" : {
+
+    },
     "Tinted Pill" : {
       "extractionState" : "manual"
+    },
+    "Type to narrow the list" : {
+
     },
     "Underline" : {
       "extractionState" : "manual"
@@ -563,6 +623,12 @@
     "Opens a calendar" : {
       "extractionState" : "manual"
     },
+    "Opens a list of words to add to and remove from" : {
+      "extractionState" : "manual"
+    },
+    "Opens a field to type in" : {
+      "extractionState" : "manual"
+    },
     "This value changed while you were editing. Your edit hasn’t been saved." : {
       "extractionState" : "manual"
     },
@@ -765,6 +831,13 @@
   "localizations" : { "en" : { "variations" : { "plural" : {
     "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item can’t be changed right now." } },
     "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items can’t be changed right now." } }
+  } } } }
+},
+"%lld items are managed by a connector, so changes made here would be overwritten." : {
+  "extractionState" : "manual",
+  "localizations" : { "en" : { "variations" : { "plural" : {
+    "one" : { "stringUnit" : { "state" : "translated", "value" : "%lld item is managed by a connector, so changes made here would be overwritten." } },
+    "other" : { "stringUnit" : { "state" : "translated", "value" : "%lld items are managed by a connector, so changes made here would be overwritten." } }
   } } } }
 },
 "%lld items are files, which keep their type." : {
@@ -984,6 +1057,8 @@
 "Can’t Rename View" : { "extractionState" : "manual" },
 "Can’t Update View" : { "extractionState" : "manual" },
 "Can’t Delete View" : { "extractionState" : "manual" },
+"Can’t Delete" : { "extractionState" : "manual" },
+"Read only. A connector manages this item, so changes made here would be overwritten." : { "extractionState" : "manual" },
 "New View…" : { "extractionState" : "manual" },
 "Rename View…" : { "extractionState" : "manual" },
 "Delete View…" : { "extractionState" : "manual" },
@@ -1722,9 +1797,6 @@
     "Caution" : {
 
     },
-    "Change %@…" : {
-
-    },
     "Changes Haven’t Been Sent" : {
       "extractionState" : "manual"
     },
@@ -2386,9 +2458,6 @@
 
     },
     "Open" : {
-
-    },
-    "Open %@" : {
 
     },
     "Open a library to choose what its sidebar shows." : {

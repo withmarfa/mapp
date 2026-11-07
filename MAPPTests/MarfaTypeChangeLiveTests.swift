@@ -49,7 +49,7 @@ extension LiveMarfaTests {
             case .boolean: .bool(true)
             case .date: .string(Marfa.ItemDate.day(Date()))
             case .choice, .status: field.options.first.map(PropertyValue.string)
-            case .other, .list: nil
+            case .other, .list, .words: nil
             }
         }
 

@@ -101,6 +101,19 @@ struct MarfaMappingTests {
         #expect(shown.isEditable && shown.isWritable)
     }
 
+    // MARK: Read only
+
+    @Test func theServersAdviceThatAConnectorKeepsAnItemIsKept() {
+        var kept = Self.row("k")
+        kept.readOnly = true
+        let shown = Self.item(kept)
+        #expect(shown.readOnly)
+        #expect(!shown.isEditable && !shown.isWritable && !shown.canEditTags)
+        #expect(shown.problem == nil, "it is advice, not a fault, so nothing is flagged as wrong")
+        #expect(shown.state == .active && shown.preview == "Body", "and it is read as any other row")
+        #expect(!Self.item(Self.row("w")).readOnly)
+    }
+
     // MARK: The core's name and preview
 
     @Test func anItemIsNamedAndPreviewedAsTheCoreSays() {

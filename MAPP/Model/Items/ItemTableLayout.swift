@@ -339,7 +339,7 @@ nonisolated enum ItemTableLayout {
             let page: Set<String> = [info?.titleKey, info?.bodyKey].compactMap { $0 }.reduce(into: []) { $0.insert($1) }
             for field in info?.fields ?? [] {
                 if hidden.contains(field.key) || page.contains(field.key) || ["title", "body"].contains(field.key) { continue }
-                if case .other = field.kind { continue }
+                if field.kind.isOutsideForms { continue }
                 let fieldStyle = style(of: field, in: type, catalogue: catalogue)
                 if catalogue.isDueDate(field, of: type) { dueDates.insert(field.key) }
                 if let known = fields[field.key] {
@@ -423,7 +423,7 @@ nonisolated enum ItemTableLayout {
         case .choice: return catalogue.isPriority(field, of: type) ? .priority : .choice
         case .text:
             return field.key == "description" || field.key == "notes" ? .longText : .text
-        case .other, .list: return .text
+        case .other, .words, .list: return .text
         }
     }
 

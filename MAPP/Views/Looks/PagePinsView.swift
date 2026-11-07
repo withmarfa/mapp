@@ -75,6 +75,8 @@ struct PagePinsView: View {
                     PageChip(text: tag, kind: .tag)
                         .layoutPriority(index == tags.count - 1 ? 0 : 1)
                 }
+            case .empty:
+                EmptyView()
             case .source(let text), .date(let text), .when(let text, _), .text(let text):
                 plain(text)
             case .boolean(let flag):
@@ -100,7 +102,7 @@ struct PagePinsView: View {
     /// The words of a pin's value, for its help.
     private static func wholeValue(of pin: PropertyRow) -> String {
         switch pin.value {
-        case .status, .parent: ""
+        case .status, .parent, .empty: ""
         case .type(let name, _): name
         case .items(let targets): targets.map(\.title).joined(separator: ", ")
         case .people(let words), .options(let words), .tags(let words): words.joined(separator: ", ")
