@@ -749,6 +749,13 @@ body[data-text='none'] #editor {
   border-radius: 6px;
 }
 
+/* The fill runs past the value on both sides, and the value stays on the column's edge. */
+.editable > .item-prop-value[role='button'],
+.editable > .item-pin-value[role='button'] {
+  margin-inline: calc(var(--step) * -1.5);
+  padding-inline: calc(var(--step) * 1.5);
+}
+
 .editable > .item-prop-value[role='button']:hover,
 .editable > .item-pin-value[role='button']:hover {
   background: var(--label-quinary);
