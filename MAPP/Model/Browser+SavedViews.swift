@@ -11,12 +11,13 @@ extension Browser {
         var id: Self { self }
     }
 
-    /// The order, grouping and filters a view opened with, the date its timeline showed, and the version of the
-    /// view they came from, which a save of them is based on.
+    /// The order, grouping and filters a view opened with, the date its timeline showed, the types it showed as a
+    /// Type filter, and the version of the view they came from, which a save of them is based on.
     struct ViewSeed: Hashable {
         let version: Int64
         let options: ItemTableOptions
         let timelineDate: String?
+        let types: [String]?
     }
 
     /// Shows a view's own order, grouping and filters the first time the window opens it, and again when the view
@@ -35,7 +36,9 @@ extension Browser {
         var options = ViewDraft.options(for: view, catalogue: catalogue)
         let timelineDate = ViewDraft.timelineDate(of: view)
         let collapsed = tableOptions[place]?.collapsed
-        viewSeeds[view.id] = ViewSeed(version: view.version, options: options, timelineDate: timelineDate)
+        viewSeeds[view.id] = ViewSeed(
+            version: view.version, options: options, timelineDate: timelineDate,
+            types: ViewDraft.seededTypes(of: view.query, catalogue: catalogue))
         options.collapsed = collapsed
         tableOptions[place] = options
         timelineFields[place] = timelineDate
@@ -65,8 +68,8 @@ extension Browser {
             return nil
         }
         let update = ViewDraft.change(
-            window, options: tableOptions[item], seed: seed.options, seedTimelineDate: seed.timelineDate, view: view,
-            catalogue: library.catalogue)
+            window, options: tableOptions[item], seed: seed.options, seedTimelineDate: seed.timelineDate, seededTypes: seed.types,
+            view: view, catalogue: library.catalogue)
         return ViewUpdate(view: view, change: update.change, baseVersion: seed.version, unkept: update.unkept, unchanged: update.unchanged)
     }
 

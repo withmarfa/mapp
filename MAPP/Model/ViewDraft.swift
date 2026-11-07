@@ -20,6 +20,10 @@ nonisolated enum ViewDraft {
         var layout: Layout = .table
         /// The date field the person chose for the timeline, which a view keeps as the day its items are grouped by.
         var timelineDate: String?
+        /// The types the view opened with as a Type filter (`seededTypes(of:catalogue:)`), kept from then rather than
+        /// worked out again, since a catalogue that changes while the window is open must not change what the
+        /// filter stood for. Nil where the place is not a view, or its types were not shown as a filter.
+        var seededTypes: [String]?
     }
 
     /// The layout the window shows, which decides the order and grouping the person sees.
@@ -96,7 +100,8 @@ nonisolated enum ViewDraft {
         let filtered: (query: LibraryViewQuery, unkept: [Unkept])
         if case .view = window.place {
             // A view's place shows the view's own filter as the window's filters, so they stand in for it.
-            let replaced = replacing(base, with: choices(of: window), columns: window.columns, catalogue: catalogue)
+            let replaced = replacing(
+                base, with: choices(of: window), columns: window.columns, seededTypes: window.seededTypes, catalogue: catalogue)
             filtered = (replaced.query, replaced.unkept)
         } else {
             filtered = adding(choices(of: window), to: base, columns: window.columns, catalogue: catalogue)
@@ -195,23 +200,7 @@ nonisolated enum ViewDraft {
 
     /// The window's filters with whether each is Is Not.
     static func choices(of window: Window) -> [String: FilterChoice] {
-        choices(window.filters, negated: window.negated)
-    }
-
-    static func choices(_ filters: [String: Set<String>], negated: Set<String>) -> [String: FilterChoice] {
-        filters.reduce(into: [:]) { result, entry in
-            guard !entry.value.isEmpty else { return }
-            result[entry.key] = FilterChoice(values: entry.value, isNegated: negated.contains(entry.key))
-        }
-    }
-
-    /// `base` with the window's filters added: a column's values joined by OR, or by AND where the column is Is Not,
-    /// and the columns by AND, each kept only where the whole expression stays one Marfa filter. A Type filter is
-    /// written as a condition here; `adding(_:to:columns:catalogue:)` puts it in the query's types instead.
-    static func filter(
-        _ base: String?, adding filters: [String: Set<String>], negated: Set<String> = [], columns: [ItemTableColumn]
-    ) -> (filter: String?, unkept: [Unkept]) {
-        filtered(base, adding: choices(filters, negated: negated), columns: columns)
+        ItemTableOptions(filters: window.filters, negated: window.negated).filterChoices
     }
 
     private static func filtered(
@@ -401,7 +390,7 @@ nonisolated enum ViewDraft {
     /// which is kept.
     static func change(
         _ window: Window, options: ItemTableOptions?, seed: ItemTableOptions, seedTimelineDate: String?,
-        view: LibraryView, catalogue: Catalogue
+        seededTypes: [String]?, view: LibraryView, catalogue: Catalogue
     ) -> (change: LibraryViewChange, unkept: [Unkept], unchanged: [String]) {
         let options = options ?? ItemTableOptions()
         var change = LibraryViewChange()
@@ -427,7 +416,13 @@ nonisolated enum ViewDraft {
             } else {
                 change.group = .clear
             }
-            if regrouped { unkept.append(.group(column: window.grouping.map(label(of:)) ?? String(localized: "Group"))) }
+            if regrouped {
+                unkept.append(.group(column: window.grouping.map(label(of:)) ?? String(localized: "Group")))
+            } else if let group = view.group, group.bucket != .day {
+                // The days replace a grouping the view had, which the window did not change but would lose.
+                let shown = columnID(of: group.field).flatMap { id in window.columns.first { $0.id == id } }
+                unkept.append(.group(column: shown.map(label(of:)) ?? String(localized: "Group")))
+            }
         } else if regrouped {
             let group = group(window.grouping)
             change.group = group.group.map { .set($0) } ?? .clear
@@ -435,7 +430,8 @@ nonisolated enum ViewDraft {
             if redated { unkept.append(.group(column: String(localized: "Timeline date"))) }
         }
         if options.filterChoices != seed.filterChoices {
-            let filter = replacing(view.query, with: choices(of: window), columns: window.columns, catalogue: catalogue)
+            let filter = replacing(
+                view.query, with: choices(of: window), columns: window.columns, seededTypes: seededTypes, catalogue: catalogue)
             if filter.query != view.query {
                 change.query = filter.query
                 unchanged = filter.unchanged
@@ -557,12 +553,12 @@ nonisolated enum ViewDraft {
     /// it could not show stay as they are, in order, and are given back as `unchanged`. A window filter the view
     /// cannot hold leaves the query whole, so a filter is never dropped for one the window could not save.
     static func replacing(
-        _ query: LibraryViewQuery, with choices: [String: FilterChoice], columns: [ItemTableColumn], catalogue: Catalogue
+        _ query: LibraryViewQuery, with choices: [String: FilterChoice], columns: [ItemTableColumn], seededTypes: [String]?,
+        catalogue: Catalogue
     ) -> (query: LibraryViewQuery, unkept: [Unkept], unchanged: [String]) {
         let parsed: Parsed
         do { parsed = try terms(of: query.filter) } catch { return (query, [.refused(message(of: error))], []) }
         let filterable = Dictionary(uniqueKeysWithValues: columns.filter(\.isCategorical).map { ($0.id, $0) })
-        let seededTypes = seededTypes(of: query, catalogue: catalogue)
         // Where the view's types stand for the Type filter, its conditions on the type are not the filter's.
         let shown = shownTerms(parsed).filter { seededTypes == nil || $0.column != typeColumnID }
         // A column the window lacks, or one whose filter it writes otherwise, shows none of its conditions.
