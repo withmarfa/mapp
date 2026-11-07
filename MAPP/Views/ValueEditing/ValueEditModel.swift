@@ -397,11 +397,19 @@ final class ValueEditModel {
         let rows = navigable
         guard !rows.isEmpty else { return }
         viaKeyboard = true
-        guard let current = activeRow.flatMap({ id in rows.firstIndex { $0.id == id } }) else {
+        guard let current = activeRow.flatMap({ id in rows.firstIndex { $0.id == id } }) ?? Self.onlyCurrent(in: rows) else {
             highlight = (step > 0 ? rows.first : rows.last)?.id
             return
         }
         highlight = rows[min(max(current + step, 0), rows.count - 1)].id
+    }
+
+    /// Where the keyboard starts when nothing is highlighted yet: the row of the one value the item holds, as a menu
+    /// opens on its checked item. With none, or several (tags, people), or with only Not Set marked because nothing is
+    /// set, the first or last row.
+    static func onlyCurrent(in rows: [ValueListRow]) -> Int? {
+        let held = rows.indices.filter { rows[$0].isCurrent && rows[$0].id != ValueEditOptions.notSetID }
+        return held.count == 1 ? held[0] : nil
     }
 
     func activateHighlighted() {
