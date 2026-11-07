@@ -10,7 +10,7 @@ import Foundation
 ///
 /// The prelude takes each method and getter the scripts use from the prototype once, before any of the document's names
 /// can reach it, and the scripts then call those through `dom`. The scripts run in a world of their own
-/// (`SealedWebPage.world`), whose prototypes the document cannot change; a document's own scripts cannot either.
+/// (`SealedWebPage.world`), whose prototypes neither a document's names nor its scripts can change.
 nonisolated enum SafeDOM {
     /// Defines `dom` for a script. Every function takes the node first: `dom.getAttribute(e, 'href')`.
     static let script = """
@@ -40,14 +40,11 @@ nonisolated enum SafeDOM {
             replaceWith: method(Element, 'replaceWith'),
             classList: getter(Element, 'classList'),
             innerHTML: getter(Element, 'innerHTML'),
-            localName: getter(Element, 'localName'),
             previousElementSibling: getter(Element, 'previousElementSibling'),
             nextElementSibling: getter(Element, 'nextElementSibling'),
             style: getter(HTMLElement, 'style'),
             cloneNode: method(Node, 'cloneNode'),
-            contains: method(Node, 'contains'),
             parentElement: getter(Node, 'parentElement'),
-            parentNode: getter(Node, 'parentNode'),
             childNodes: getter(Node, 'childNodes'),
             nodeType: getter(Node, 'nodeType'),
             nodeValue: getter(Node, 'nodeValue'),

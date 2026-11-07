@@ -45,7 +45,7 @@ nonisolated enum MailColumn {
               parentOf.push(parent);
               own.push(0);
             } else {
-              own[parent] += node.nodeValue.replace(/\s+/g, '').length;
+              own[parent] += dom.nodeValue(node).replace(/\s+/g, '').length;
             }
           }
           // Each element's text is its own and its children's; a child comes after its parent, so one pass back does it.

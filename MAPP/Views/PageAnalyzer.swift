@@ -77,9 +77,9 @@ enum PageAnalyzer {
     /// nothing in its way.
     ///
     /// Of the cleanup of the article, which Reader needs and the original does not:
-    /// - Everything that is not text or a picture is removed: scripts, styles, frames, objects, embeds, templates (whose
+    /// - What can load, run or draw outside the article is removed: scripts, styles, frames, objects, embeds, templates (whose
     ///   content `querySelectorAll` cannot reach, so the whole element goes), `meta` and `base`, media, form controls
-    ///   and SVG's `foreignObject`, `use` and animation. A form or fieldset is unwrapped and keeps its content.
+    ///   and SVG's `foreignObject`, `use`, `animate` and `set`. A form or fieldset is unwrapped and keeps its content.
     /// - Event handlers, inline styles and the attributes that make a request or carry a script are dropped. A `href`,
     ///   `xlink:href` or `src` is kept only if its address, parsed as the web view parses it (which ignores the tabs, line
     ///   breaks and control characters a pattern would miss), is `http`, `https`, `mailto` or `tel`, a relative address, or for
@@ -148,7 +148,7 @@ enum PageAnalyzer {
           for (let node = walker.nextNode(); node; node = walker.nextNode()) {
             const parent = dom.parentElement(node);
             if (parent && dom.closest(parent, 'pre, code, kbd, samp, textarea')) continue;
-            if (node.nodeValue.includes('\\')) node.nodeValue = node.nodeValue.replace(/\\(["'‘’“”])/g, '$1');
+            if (dom.nodeValue(node).includes('\\')) node.nodeValue = dom.nodeValue(node).replace(/\\(["'‘’“”])/g, '$1');
           }
           const words = s => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
           const wanted = words(title);
@@ -161,7 +161,7 @@ enum PageAnalyzer {
             const cut = /(…|\.\.\.)\s*$/.test(title.trim());
             if ((said === wanted || (cut && said.startsWith(wanted))) && words(before.toString()) === '') {
               let gone = heading;
-              const bare = n => n.nodeType === Node.COMMENT_NODE || (n.nodeType === Node.TEXT_NODE && n.nodeValue.trim() === '');
+              const bare = n => dom.nodeType(n) === Node.COMMENT_NODE || (dom.nodeType(n) === Node.TEXT_NODE && dom.nodeValue(n).trim() === '');
               for (let parent = dom.parentElement(gone); parent && parent !== root
                    && Array.from(dom.childNodes(parent)).every(n => n === gone || bare(n)); parent = dom.parentElement(gone)) {
                 gone = parent;

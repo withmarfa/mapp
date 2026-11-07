@@ -311,7 +311,7 @@ private struct WebPageHeader: View {
     let drafts: DetailsPresentation
     let open: (ItemID) -> Void
     @Binding var mode: SourceViewMode
-    /// Whether the page is shown, or is about to be, in Reader, which gives the title and the description the reading header's serif.
+    /// Whether the page is shown, or is about to be, in Reader, which gives the title the reading header's serif.
     let reading: Bool
     /// Whether the page has an article to read, which is the only page the switch is offered for.
     let offersReader: Bool
