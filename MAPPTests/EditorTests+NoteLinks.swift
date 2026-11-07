@@ -84,9 +84,10 @@ extension EditorTests {
         try await page.load("Intro\n")
         let note = try #require(page.editor.noteID)
         let answer = try await resolve(page, note, raw("[[Twin]]", "[[Gone]]"))
-        #expect(answer.links[0].missing == false && answer.links[0].tone == nil, "two notes answer to it, so there is no one type")
+        #expect(answer.links[0].missing == false && answer.links[0].tone == TypeTone.neutral.rawValue, "two notes answer to it, so it takes the neutral mark")
+        #expect(answer.links[0].icon != nil, "its mark is what says it is a link where the underline waits for the pointer")
         #expect(answer.links[1].missing == true && answer.links[1].icon == nil && answer.links[1].tone == nil)
-        #expect(answer.icons.isEmpty)
+        #expect(answer.icons.count == 1)
     }
 
     @Test func anIconThatCannotBeDrawnLeavesTheToneAndAnswersEveryLink() async throws {
@@ -97,11 +98,11 @@ extension EditorTests {
         requests.drawIcon = { _ in nil }
         let links = [NoteLink(linkText: "[[A]]"), nil, NoteLink(linkText: "[[B]]")]
         let reply = await requests.answerLinks(links, in: ItemID("n"))
-        #expect(reply.links.map(\.tone) == ["teal", nil, "teal"])
+        #expect(reply.links.map(\.tone) == ["teal", TypeTone.neutral.rawValue, "teal"])
         #expect(reply.links.allSatisfy { $0.icon == nil } && reply.icons.isEmpty)
         requests.readings = { _, _ in [] }
         let short = await requests.answerLinks(links, in: ItemID("n"))
-        #expect(short.links.count == 3 && short.links.allSatisfy { !$0.missing && $0.tone == nil }, "a count that does not line up marks nothing")
+        #expect(short.links.count == 3 && short.links.allSatisfy { !$0.missing && $0.tone == TypeTone.neutral.rawValue }, "a count that does not line up says nothing of any link")
     }
 
     @Test func linkToNoteWaitsForTheChoiceAndAnswersWithTheLink() async throws {
