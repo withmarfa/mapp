@@ -378,6 +378,7 @@ struct ItemPropertyRow: View {
         switch (definition.kind, value) {
         case (.text, .string), (.boolean, .bool), (.number, .number): valid = true
         case (.choice(let choices), .string(let text)): valid = choices.contains(text)
+        case (.status, .string(let text)): valid = definition.statusGroup(of: text) != nil
         case (.date, .string): valid = definition.kind.accepts(value)
         case (.other, _): valid = true
         case (.list, _): valid = definition.accepts(value)

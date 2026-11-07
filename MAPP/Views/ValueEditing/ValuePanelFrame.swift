@@ -1,8 +1,9 @@
 import CoreGraphics
 
 /// Where a value panel goes for the value it edits, in screen coordinates (origin at the bottom left): under the
-/// value and starting at its leading edge, flipped above where there is no room below, and as tall as the content
-/// unless the room left is shorter, in which case the list scrolls.
+/// value and starting at its leading edge, or ending at its trailing edge where the value is narrower than the panel,
+/// as in the sidebar. It flips above where there is no room below, and is as tall as the content unless the room left
+/// is shorter, in which case the list scrolls.
 nonisolated enum ValuePanelFrame {
     struct Placement: Equatable {
         var frame: CGRect
@@ -16,7 +17,8 @@ nonisolated enum ValuePanelFrame {
         anchor: CGRect, visible: CGRect, contentHeight: CGFloat, floor: CGFloat, ceiling: CGFloat, gap: CGFloat
     ) -> Placement {
         let width = min(max(anchor.width, floor), max(floor, ceiling), visible.width)
-        let x = min(max(anchor.minX, visible.minX), visible.maxX - width)
+        let leading = width > anchor.width ? anchor.maxX - width : anchor.minX
+        let x = min(max(leading, visible.minX), visible.maxX - width)
         let below = anchor.minY - gap - visible.minY
         let above = visible.maxY - (anchor.maxY + gap)
         let wanted = max(contentHeight, 1)

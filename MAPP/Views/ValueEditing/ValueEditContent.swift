@@ -123,6 +123,7 @@ struct ValueEditContent: View {
             } set: { model.setDate($0) }, displayedComponents: model.hasTime ? [.date, .hourAndMinute] : [.date])
                 .datePickerStyle(.graphical)
                 .labelsHidden()
+                .focusEffectDisabled()
                 .frame(maxWidth: .infinity)
                 .accessibilityIdentifier("ItemPropertyDate.\(model.kind.field?.key ?? "")")
             if model.allowsTime {
@@ -212,6 +213,7 @@ private struct ValueEditRow: View {
         .id(row.id)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(row.isCurrent ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAction { model.activate(row.id) }
         .accessibilityIdentifier("ValueEditRow.\(row.id)")
     }
 
