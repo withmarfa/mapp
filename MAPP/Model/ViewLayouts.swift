@@ -69,14 +69,17 @@ nonisolated struct ViewColumns: Codable, Hashable, Sendable {
         shown[column.id] = isShown == column.isShownByDefault ? nil : isShown
     }
 
-    /// Moves a column to sit before another, or last. The name stays first.
+    /// Moves a column to sit before another, or last. The name stays first. The saved place of a column the table
+    /// lacks is kept, since another place's table may have it again, so the move is spliced into the order.
     mutating func move(_ id: String, before other: String?, in columns: [ItemTableColumn]) {
-        let ids = arranged(columns).filter { $0.content != .title }.map(\.id)
-        guard id != other, ids.contains(id) else { return }
-        var moved = ids.filter { $0 != id }
-        let index = other.flatMap { moved.firstIndex(of: $0) } ?? moved.count
-        moved.insert(id, at: index)
-        order = moved == columns.filter({ $0.content != .title }).map(\.id) ? [] : moved
+        let own = columns.filter { $0.content != .title }.map(\.id)
+        guard id != other, own.contains(id) else { return }
+        var seen = Set<String>()
+        var spliced = order.filter { seen.insert($0).inserted }
+        spliced += own.filter { seen.insert($0).inserted }
+        spliced.removeAll { $0 == id }
+        spliced.insert(id, at: other.flatMap { spliced.firstIndex(of: $0) } ?? spliced.count)
+        order = spliced == own ? [] : spliced
     }
 
     /// The columns as the table first lays them out.
