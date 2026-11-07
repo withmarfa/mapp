@@ -191,6 +191,7 @@ nonisolated enum PeopleSuggestions {
     struct Person: Hashable, Sendable {
         let name: String
         let entry: ListEntries.Entry
+        let address: String?
         /// What tells one person from another: the address where the entry has one, else the name. Two people can share
         /// a name, so a name alone would merge them.
         let identity: String
@@ -199,7 +200,7 @@ nonisolated enum PeopleSuggestions {
             guard let name = shape.personName(of: entry) else { return nil }
             self.name = name
             self.entry = entry
-            let address = shape.members.dropFirst().first.flatMap { shape.text(of: $0, in: entry) }
+            address = shape.members.dropFirst().first.flatMap { shape.text(of: $0, in: entry) }
             identity = (address ?? name).lowercased()
         }
 
@@ -297,11 +298,13 @@ nonisolated struct PendingValue: Sendable {
     var value: PropertyValue?
     /// What the copy held before the oldest write still on its way.
     var base: PropertyValue?
+    /// The writes on their way before this one.
+    var earlier: [PropertyValue?] = []
     /// The library's mark for the write (`ItemLibrary.lastPropertyWrite`), nil where it keeps none.
     var mark: Int?
 
     enum State: Sendable {
-        /// The copy does not show the write yet and the library is still writing.
+        /// The library is still writing, and the copy does not show the last write yet.
         case waiting
         /// The copy shows it, or took it.
         case landed
@@ -312,10 +315,12 @@ nonisolated struct PendingValue: Sendable {
     }
 
     func state(stored: PropertyValue?, isWriting: Bool, took: (Int) -> Bool) -> State {
-        if stored == value { return .landed }
         if let mark, took(mark) { return .landed }
-        if stored == base { return isWriting ? .waiting : .refused }
-        return .elsewhere
+        // A write that puts back the value from before looks landed before it is, so only its mark settles it.
+        if stored == value, value != base || mark == nil { return .landed }
+        // While writes are on their way the copy can show any of them, which is not a change made elsewhere.
+        if isWriting, stored == base || earlier.contains(stored) { return .waiting }
+        return stored == base ? .refused : .elsewhere
     }
 }
 

@@ -264,6 +264,19 @@ struct ValueEditingTests {
         #expect(written.all == [Self.list("b", "c"), Self.list("c")])
     }
 
+    @Test func aWordRemovedAgainStaysRemovedWhenTheCopyShowsItsFirstWrite() {
+        let (library, written) = (Self.library([]), Written())
+        library.marksPropertyWrites = true
+        let model = wordsPanel(["red"], in: library, written: written)
+        add("blue", to: model)
+        model.removeToken("blue")
+        add("green", to: model)
+        library.items[0].properties = [Property(key: "labels", value: Self.list("red", "blue"))]
+        #expect(model.heldTokens == ["red", "green"])
+        add("pink", to: model)
+        #expect(written.all.last == Self.list("red", "green", "pink"))
+    }
+
     @Test func aWriteTheCopyRefusedIsNotBuiltOn() {
         let (library, written) = (Self.library([]), Written())
         let model = wordsPanel(["red"], in: library, written: written)

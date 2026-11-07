@@ -228,7 +228,7 @@ final class ValueEditModel {
         let key = RowsKey(
             query: query, value: value, revision: library.contentRevision,
             day: isDate ? request.calendar.startOfDay(for: library.now()) : nil,
-            parent: parentTarget.map { [$0.id, $0.displayTitle] } ?? [])
+            parent: kind == .parent ? parentTarget.map { [$0.id, $0.displayTitle] } ?? [] : [])
         if let rowsCache, rowsCache.key == key { return rowsCache.rows }
         rowsBuilt += 1
         let built = buildRows()
@@ -265,7 +265,7 @@ final class ValueEditModel {
         func mark(_ person: PeopleSuggestions.Person) -> ValueListRow.Mark { .person(initials: PersonInitials.of(person.name) ?? "") }
         // Two people can share a name; their address then tells them apart.
         let names = Dictionary(grouping: held.map(\.person) + matching, by: { $0.name.lowercased() }).mapValues(\.count)
-        func detail(_ person: PeopleSuggestions.Person) -> String? { names[person.name.lowercased(), default: 0] > 1 ? person.identity : nil }
+        func detail(_ person: PeopleSuggestions.Person) -> String? { names[person.name.lowercased(), default: 0] > 1 ? person.address : nil }
         var rows: [ValueListRow] = []
         if !held.isEmpty {
             rows.append(.header(String(localized: "Assigned"), id: "header:held"))
@@ -463,7 +463,7 @@ final class ValueEditModel {
             query = ""
             return
         }
-        if let reason = limitReason(holding: held.count + 1) {
+        if let reason = limitReason(holding: ListEntries.entries(of: value).count + 1) {
             notice = reason
             return
         }
@@ -702,7 +702,9 @@ final class ValueEditModel {
         }
         // The write goes on top of one still on its way, so the value from before the first of them stays the base.
         let before = stored
-        let base = request.item.flatMap { keepsPending ? pendingState(stored: before, of: $0) : nil } == .waiting ? pending?.base : before
+        let onTop = request.item.flatMap { keepsPending ? pendingState(stored: before, of: $0) : nil } == .waiting
+        let base = onTop ? pending?.base : before
+        let earlier = onTop ? (pending?.earlier ?? []) + [pending?.value] : []
         let taken = request.write(new)
         if taken {
             notice = nil
@@ -710,7 +712,7 @@ final class ValueEditModel {
                 local = new
                 hasLocal = true
             } else if keepsPending {
-                pending = PendingValue(value: new, base: base, mark: library.lastPropertyWrite)
+                pending = PendingValue(value: new, base: base, earlier: earlier, mark: library.lastPropertyWrite)
                 writes += 1
             }
         } else {

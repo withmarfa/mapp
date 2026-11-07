@@ -47,6 +47,9 @@ final class FakeItemLibrary: ItemLibrary {
     var acceptsRelationships = false
     /// The items whose property writes are still on their way, as a library that queues a write reports them.
     var writingProperties: Set<ItemID> = []
+    /// Whether writes carry a mark that is never settled, as a library's queue does while they wait.
+    var marksPropertyWrites = false
+    var lastPropertyWrite: Int? { marksPropertyWrites ? 1 : nil }
     var relationshipWrites: [(item: ItemID, field: String, adding: [ItemID], removing: [ItemID])] = []
     var syncReport = SyncReport(queueRead: true)
     let now: () -> Date
@@ -363,6 +366,7 @@ final class FakeItemLibrary: ItemLibrary {
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool { false }
 
     func isWritingProperties(of id: ItemID) -> Bool { writingProperties.contains(id) }
+    func tookPropertyWrite(_ mark: Int) -> Bool { false }
     func changeItemRelationship(_ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?) async -> Bool {
         relationshipWrites.append((id, field, adding, removing))
         return acceptsRelationships
