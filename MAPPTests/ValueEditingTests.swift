@@ -34,11 +34,11 @@ struct ValueEditingTests {
 
     // MARK: Options
 
-    @Test func statusWordsListUnderTheirGroupsInOrderWithAnUndeclaredWordUnderOther() {
+    @Test func statusWordsListUnderTheirGroupsAsTheTypeDeclaresThemWithAnUndeclaredWordUnderOther() {
         let rows = ValueEditOptions.statusRows(field: Self.status, current: "stale")
         let outline = rows.map { $0.role == .header ? "# " + $0.title : $0.role == .separator ? "-" : $0.title }
-        let titles = ["# " + StatusBucket.group(.inProgress).title, "Doing", "# " + StatusBucket.group(.notStarted).title, "Todo",
-                      "# " + StatusBucket.group(.completed).title, "Done", "# " + StatusBucket.other.title, "Stale", "-", "Not Set"]
+        let titles = ["# " + StatusBucket.group(.completed).title, "Done", "# " + StatusBucket.group(.inProgress).title, "Doing",
+                      "# " + StatusBucket.group(.notStarted).title, "Todo", "# " + StatusBucket.other.title, "Stale", "-", "Not Set"]
         #expect(outline == titles)
         #expect(rows.first { $0.title == "Stale" }?.isCurrent == true)
     }
@@ -66,14 +66,15 @@ struct ValueEditingTests {
 
     private static let screen = CGRect(x: 0, y: 0, width: 1000, height: 800)
 
-    @Test func panelOpensBelowTheValueAtItsLeadingEdgeWithinTheWidthLimits() {
+    @Test func panelOpensBelowTheValueAndEndsWithANarrowValueWithinTheWidthLimits() {
         let narrow = ValuePanelFrame.placement(
-            anchor: CGRect(x: 100, y: 500, width: 100, height: 20), visible: Self.screen, contentHeight: 200, floor: 220, ceiling: 320, gap: 4)
-        #expect(narrow.frame == CGRect(x: 100, y: 296, width: 220, height: 200))
+            anchor: CGRect(x: 300, y: 500, width: 100, height: 20), visible: Self.screen, contentHeight: 200, floor: 220, ceiling: 320, gap: 4)
+        #expect(narrow.frame == CGRect(x: 180, y: 296, width: 220, height: 200))
         #expect(!narrow.isAbove)
         let wide = ValuePanelFrame.placement(
             anchor: CGRect(x: 100, y: 500, width: 600, height: 20), visible: Self.screen, contentHeight: 200, floor: 220, ceiling: 320, gap: 4)
         #expect(wide.frame.width == 320)
+        #expect(wide.frame.minX == 100)
     }
 
     @Test func panelFlipsAboveWhenThereIsNoRoomBelowAndStaysOnScreen() {

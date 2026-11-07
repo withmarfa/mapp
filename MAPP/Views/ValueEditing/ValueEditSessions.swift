@@ -95,7 +95,10 @@ final class ValueEditPanelSession: ValueEditSession {
 
     private func layout() {
         guard let panel, let parent, let target = anchor.screenRect(of: rect) else { return }
-        let visible = (parent.screen ?? NSScreen.main)?.visibleFrame ?? target.insetBy(dx: -400, dy: -400)
+        var visible = (parent.screen ?? NSScreen.main)?.visibleFrame ?? target.insetBy(dx: -400, dy: -400)
+        // Sideways a panel stays in its window, which it belongs to; up and down it may leave it, as a menu does.
+        let inside = parent.frame.insetBy(dx: 8, dy: 0)
+        visible = CGRect(x: max(visible.minX, inside.minX), y: visible.minY, width: min(visible.maxX, inside.maxX) - max(visible.minX, inside.minX), height: visible.height)
         let natural = model.naturalHeight > 0 ? model.naturalHeight : estimatedHeight
         let placement = ValuePanelFrame.placement(
             anchor: target, visible: visible, contentHeight: natural, floor: settings.widthFloor, ceiling: settings.widthCeiling,
@@ -169,7 +172,10 @@ final class ValueEditPopoverSession: NSObject, ValueEditSession, NSPopoverDelega
         model.maxHeight = room
         model.layoutChanged = { [weak self] in self?.layout() }
         popover.contentSize = NSSize(width: width, height: model.kind == .tags ? 200 : 160)
-        popover.show(relativeTo: rect ?? anchor.bounds, of: anchor, preferredEdge: anchor.isFlipped ? .maxY : .minY)
+        // A value on the page is as wide as the column; its arrow belongs by the text at the start of it.
+        var target = rect ?? anchor.bounds
+        target.size.width = min(target.width, 120)
+        popover.show(relativeTo: target, of: anchor, preferredEdge: anchor.isFlipped ? .maxY : .minY)
     }
 
     private func layout() {
