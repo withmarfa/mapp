@@ -35,7 +35,7 @@ nonisolated enum PageHeaderKind: String, Encodable, Sendable {
     ]
 }
 
-/// What a kind of header adds to the general page for one item: the block it draws, the line it keeps, and the
+/// What a kind of header adds to the general page for one item: the block or pin it draws, the line it keeps, and the
 /// properties it already shows, which leave the property block and the pins so nothing is shown twice. A general
 /// page has no line of its own: its type, source and last edit are pins.
 nonisolated struct PageHeaderLead: Equatable, Sendable {

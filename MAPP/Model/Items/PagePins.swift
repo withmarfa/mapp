@@ -7,6 +7,9 @@ import Foundation
 /// out, with no placeholder: an empty status or parent is set from the inspector. A pin naming something the type or
 /// the item does not have is left out the same way, and stays in the list. A pin never repeats what the header's own
 /// line says (`PageHeaderLead.said`).
+///
+/// An event's time is its first pin, whatever the person chose. It takes one of the `pinLimit` slots, and a pin it
+/// pushes out goes back to the property block, so nothing the item shows disappears.
 nonisolated struct PagePins: Equatable, Sendable {
     /// Most values of a list a pin shows before "+N".
     static let listLimit = 2
@@ -14,7 +17,7 @@ nonisolated struct PagePins: Equatable, Sendable {
     /// The pins to draw, in order.
     let pins: [PropertyRow]
     /// The rows the property block leaves out: every property pinned, drawn or not, so a pin is never also a row,
-    /// and whatever the header's own line says.
+    /// and whatever the header's own line says. A pin the event's time pushed out stays in the block.
     let leftOutOfBlock: Set<String>
 
     /// `candidates` are the item's rows before any choice (`PropertyRow.candidates`). A pinned status is the pill the
@@ -38,8 +41,15 @@ nonisolated struct PagePins: Equatable, Sendable {
             }
             return row
         }
+        let when = lead.event.map {
+            PropertyRow(id: PagePlacement.when, label: String(localized: "When"), value: .when($0.time, help: $0.help))
+        }
         let drawn = placement.pins.filter { !said.contains($0) }.compactMap(row(for:)).map(capped)
-        return PagePins(pins: lead.refine(drawn), leftOutOfBlock: Set(placement.pins).union(said))
+        let room = PagePlacement.pinLimit - (when == nil ? 0 : 1)
+        let pushedOut = drawn.dropFirst(room).map(\.id)
+        return PagePins(
+            pins: [when].compactMap { $0 } + lead.refine(Array(drawn.prefix(room))),
+            leftOutOfBlock: Set(placement.pins).union(said).subtracting(pushedOut))
     }
 
     /// The status the item holds, if it holds one.

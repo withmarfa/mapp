@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The pencil that opens a view's panel. macOS has no toolbar placement in the title's own area, so it leads the items
+/// The pencil that opens the panel of a view, or of a place that could become one. macOS has no toolbar placement in the title's own area, so it leads the items
 /// after the view's name.
 struct ViewEditItem: CustomizableToolbarContent {
     @CurrentLibrary private var library
@@ -14,7 +14,7 @@ struct ViewEditItem: CustomizableToolbarContent {
         }
         .sharedBackgroundVisibility(.hidden)
         .customizationBehavior(.disabled)
-        .hidden(SavedViews.shown(browser, in: library) == nil || browser.showsViewPanel || !browser.offersViewOptions)
+        .hidden(!SavedViews.canEdit(browser, in: library) || browser.showsViewPanel || !browser.offersViewOptions)
     }
 }
 

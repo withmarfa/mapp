@@ -97,7 +97,6 @@ struct ItemPageHeader: ViewModifier {
             editable: library.canSetTitle(of: item),
             showsTitle: item.titleRule != .firstLine,
             kind: kind,
-            event: lead.event,
             person: lead.person,
             subtitle: lead.subtitle,
             status: status.map { field in

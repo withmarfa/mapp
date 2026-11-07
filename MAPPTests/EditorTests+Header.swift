@@ -12,7 +12,7 @@ extension EditorTests {
     static func header(_ title: String, id: ItemID = ItemID("note"), hidden: Bool = false) -> PageHeader {
         PageHeader(item: id.rawValue, hidden: hidden, title: title, draft: nil, titleRejected: false,
                    titleRefusal: "The title could not be saved.", editable: true,
-                   kind: .general, event: nil, person: nil, subtitle: nil, status: .init(label: "In Progress", enabled: true),
+                   kind: .general, person: nil, subtitle: nil, status: .init(label: "In Progress", enabled: true),
                    parent: .init(label: "Field Research", enabled: true),
                    pins: [PropertyRow(id: PagePlacement.type, label: "Type", value: .type("Task", icon: "lucide:list-checks"))],
                    byline: nil,

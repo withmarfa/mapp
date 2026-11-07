@@ -31,10 +31,7 @@ struct EventHeaderTests {
             "starts_at": .string("2026-10-29T09:00:00Z"), "ends_at": .string("2026-10-29T10:00:00Z"),
             "timezone": .string("Europe/London"),
         ], viewer: "Pacific/Auckland"))
-        #expect(event.month == "OCT")
-        #expect(event.day == "29")
-        #expect(event.weekday == "Thursday")
-        #expect(event.time == "09:00 to 10:00")
+        for part in ["Thu", "29 Oct", "09:00 to 10:00"] { #expect(event.time.contains(part)) }
         // The system's short name for a zone differs between machines.
         #expect(["London time (GMT)", "London time (GMT+0)"].contains(event.zone))
         #expect(event.relative == "in 2 days")
@@ -46,40 +43,39 @@ struct EventHeaderTests {
             "starts_at": .string("2026-10-30T03:30:00Z"), "ends_at": .string("2026-10-30T03:50:00Z"),
             "timezone": .string("America/New_York"),
         ], viewer: "Europe/London"))
-        #expect(event.day == "29")
-        #expect(event.weekday == "Thursday")
-        #expect(event.time == "23:30 to 23:50")
+        for part in ["Thu", "29 Oct", "23:30 to 23:50"] { #expect(event.time.contains(part)) }
     }
 
     @Test func anAllDayEventKeepsItsDateWhateverTheViewersZone() throws {
         let properties: [String: PropertyValue] = ["starts_at": .string("2026-10-29"), "all_day": .bool(true), "timezone": .string("Asia/Tokyo")]
         for viewer in ["Pacific/Auckland", "UTC", "Pacific/Honolulu"] {
             let event = try #require(Self.header(properties, viewer: viewer))
-            #expect(event.day == "29")
-            #expect(event.time == "All day")
+            #expect(event.time.contains("29 Oct"))
+            #expect(event.help.contains("All day"))
             #expect(event.zone == nil)
         }
     }
 
     @Test func anAllDayEventWithNoZoneIsInUTC() throws {
         let event = try #require(Self.header(["starts_at": .string("2026-10-29"), "all_day": .bool(true)], viewer: "Pacific/Honolulu"))
-        #expect(event.day == "29")
+        #expect(event.time.contains("29 Oct"))
     }
 
     @Test func aRunOfDaysEndsAtTheMidnightThatClosesItsLastDay() throws {
         let event = try #require(Self.header([
             "starts_at": .string("2026-10-29"), "ends_at": .string("2026-11-01"), "all_day": .bool(true),
         ]))
-        #expect(event.time == "29 Oct to 31 Oct")
+        for part in ["Thu", "29 Oct", " to ", "Sat", "31 Oct"] { #expect(event.time.contains(part)) }
         let one = try #require(Self.header(["starts_at": .string("2026-10-29"), "ends_at": .string("2026-10-30"), "all_day": .bool(true)]))
-        #expect(one.time == "All day")
+        #expect(!one.time.contains(" to "))
+        #expect(one.help.contains("All day"))
     }
 
     @Test func aDurationStandsInForAnEnd() throws {
         let event = try #require(Self.header([
             "starts_at": .string("2026-10-29T09:00:00Z"), "duration": .number(5_400), "timezone": .string("UTC"),
         ]))
-        #expect(event.time == "09:00 to 10:30")
+        #expect(event.time.hasSuffix("09:00 to 10:30"))
     }
 
     @Test func anEventThatEndsAnotherDayOrZoneSaysSo() throws {
@@ -93,6 +89,22 @@ struct EventHeaderTests {
             "timezone": .string("Europe/London"), "end_timezone": .string("America/New_York"),
         ]))
         #expect(["(GMT-4)", "(EDT)"].contains { flight.time.hasSuffix($0) })
+    }
+
+    @Test func aDateInAnotherYearSaysWhichYear() throws {
+        let event = try #require(Self.header(["starts_at": .string("2025-10-29T09:00:00Z"), "timezone": .string("UTC")]))
+        #expect(event.time.contains("2025"))
+        let thisYear = try #require(Self.header(["starts_at": .string("2026-10-29T09:00:00Z"), "timezone": .string("UTC")]))
+        #expect(!thisYear.time.contains("2026"))
+    }
+
+    @Test func theHelpHoldsTheWholeTimeTheZoneAndHowFarOff() throws {
+        let event = try #require(Self.header([
+            "starts_at": .string("2026-10-29T09:00:00Z"), "ends_at": .string("2026-10-29T10:00:00Z"), "timezone": .string("Europe/London"),
+        ]))
+        #expect(event.help.hasPrefix(event.time + "\n"))
+        #expect(event.help.contains(try #require(event.zone)))
+        #expect(event.help.hasSuffix("in 2 days"))
     }
 
     @Test func aStartWithNoDayToPlaceStaysInThePropertyBlock() {

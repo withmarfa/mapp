@@ -73,7 +73,7 @@ struct SidebarFootRow: View {
             .buttonStyle(.plain)
             .focused($focus, equals: .settings)
             .simultaneousGesture(TapGesture().onEnded { focus = nil })
-            .help("Settings")
+            .help(Self.settingsHelp(Bundle.main.infoDictionary))
             .accessibilityLabel(Text("Settings"))
             .accessibilityIdentifier("SidebarSettings")
         }
@@ -82,6 +82,13 @@ struct SidebarFootRow: View {
         .padding(.trailing, 14)
         .padding(.vertical, 10)
         .accessibilityElement(children: .contain)
+    }
+
+    /// Names the build as well, so a person can quote it in feedback from where they are.
+    static func settingsHelp(_ info: [String: Any]?) -> String {
+        let version = info?["CFBundleShortVersionString"] as? String ?? ""
+        let build = info?["CFBundleVersion"] as? String ?? ""
+        return String(localized: "Settings (\(version), build \(build))")
     }
 
     /// One quiet line, a step below the name, and the small Refresh after it. Where the person has to act the line is

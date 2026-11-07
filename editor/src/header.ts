@@ -67,6 +67,8 @@ export interface HeaderRow {
     | 'phone'
     | 'text'
   text?: string
+  /** What a pin's hover says in place of its value's words: an event's time, its zone and how far off it is. */
+  help?: string
   /** A tag's words, each after a number sign. */
   texts?: string[]
   /** A choice or a list of words, each with the tone of its dot. */
@@ -94,9 +96,8 @@ export interface HeaderLinked {
  * (`PageHeaderKind`). The page draws the shared parts and never decides a kind or names a type.
  *
  * - `general`: the title, the pins, the properties and Linked From.
- * - `event`: adds a calendar tile of one fixed height (month band over the day) with two lines beside it, centered
- *   against it: the time or range, then the weekday, zone and a relative phrase, which wraps as a whole line where
- *   the page is narrow.
+ * - `event`: the general page. The app sends the event's time as its first pin, with the zone and a relative phrase in
+ *   the pin's help.
  * - `person`: adds an avatar, a subtitle and rows whose email and phone values open `mailto:` and `tel:` links, and
  *   calls Linked From "Timeline", open by default.
  * - `reading` (`core.bookmark`, `core.media`): puts the source, published date and reading time above the title
@@ -111,16 +112,6 @@ export interface HeaderLinked {
  * a kind draws leave the property block (`PageHeaderLead.consumed`).
  */
 export type HeaderKind = 'general' | 'event' | 'person' | 'reading'
-
-/** An event's when, worked out by the app (`EventHeader`) in the event's own time zone, never the viewer's. */
-export interface HeaderEvent {
-  month: string
-  day: string
-  weekday: string
-  time: string
-  zone?: string | null
-  relative: string
-}
 
 /** A person's initials, or the picture the item holds inline. */
 export interface HeaderPerson {
@@ -145,7 +136,6 @@ export interface HeaderModel {
    *  from a type. */
   showsTitle?: boolean
   kind: HeaderKind
-  event?: HeaderEvent | null
   person?: HeaderPerson | null
   /** The line under the title: a person's work, or a reading item's description. */
   subtitle?: string | null
@@ -380,7 +370,6 @@ export class ItemHeader {
   private readonly avatar: HTMLSpanElement
   private readonly title: HTMLDivElement
   private readonly subtitle: HTMLParagraphElement
-  private readonly when: HTMLDivElement
   private readonly titleError: HTMLDivElement
   private readonly titleRefusal: HTMLParagraphElement
   private readonly byline: HTMLDivElement
@@ -447,7 +436,6 @@ export class ItemHeader {
       if (this.model) postToHost({ type: 'titleDiscard', item: this.model.item })
     })
     this.byline = element('div', 'item-byline', root)
-    this.when = element('div', 'item-when', root)
     this.pinsBox = element('div', 'item-pins', root)
     this.pins = element('dl', 'item-pin-list', this.pinsBox)
     const buttons = document.createElement('div')
@@ -875,7 +863,6 @@ export class ItemHeader {
     if (!model) return
     const key = JSON.stringify([
       model.kind,
-      model.event,
       model.person,
       model.byline,
       model.pins,
@@ -933,7 +920,7 @@ export class ItemHeader {
     })
   }
 
-  /** What the kind adds above the properties: a person's avatar, an event's calendar block and when. */
+  /** What the kind adds above the properties: a person's avatar. */
   private drawLead(model: HeaderModel) {
     const person = model.kind === 'person' ? model.person : null
     this.avatar.hidden = !person
@@ -946,23 +933,6 @@ export class ItemHeader {
     } else if (person) {
       this.avatar.textContent = person.initials
     }
-
-    const event = model.kind === 'event' ? model.event : null
-    this.when.hidden = !event
-    this.when.replaceChildren()
-    if (!event) return
-    const calendar = element('div', 'item-calendar', this.when)
-    calendar.setAttribute('aria-hidden', 'true')
-    element('span', 'item-calendar-month', calendar).textContent = event.month
-    element('span', 'item-calendar-day', calendar).textContent = event.day
-    const text = element('div', 'item-when-text', this.when)
-    element('p', 'item-when-time', text).textContent = event.time
-    const details = element('p', 'item-when-detail', text)
-    const parts = [event.weekday, event.zone, event.relative].filter(Boolean) as string[]
-    parts.forEach((part, index) => {
-      if (index > 0) element('span', 'item-byline-dot', details).setAttribute('aria-hidden', 'true')
-      element('span', '', details).textContent = part
-    })
   }
 
   private row(row: HeaderRow, model: HeaderModel): HTMLElement {
@@ -1000,6 +970,7 @@ export class ItemHeader {
 
   /** The words of a pin's value, for its help. */
   private wholeValue(row: HeaderRow, model: HeaderModel): string {
+    if (row.help) return row.help
     switch (row.kind) {
       case 'status':
         return model.status?.label ?? ''

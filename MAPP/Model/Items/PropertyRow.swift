@@ -35,6 +35,8 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         case tags([String])
         /// A date or datetime as a person reads it.
         case date(String)
+        /// An event's first pin: when it happens, with its zone and how far off it is in the help.
+        case when(String, help: String)
         case url(String)
         case email(String)
         /// A number to call.
@@ -55,6 +57,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
             case .options: "list.bullet"
             case .tags: "tag"
             case .date: "calendar"
+            case .when: "clock"
             case .url: "globe"
             case .email: "envelope"
             case .phone: "phone"
@@ -64,7 +67,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         }
 
         /// Every symbol a row can show, for a page that draws them as images.
-        static let symbols = ["circle.dotted", "square.stack", "link", "tag", "calendar", "globe", "envelope", "phone", "checkmark.square", "text.alignleft", "list.bullet", "person.2", "square.grid.2x2", "dot.radiowaves.left.and.right"]
+        static let symbols = ["circle.dotted", "square.stack", "link", "tag", "calendar", "globe", "envelope", "phone", "checkmark.square", "text.alignleft", "list.bullet", "person.2", "square.grid.2x2", "dot.radiowaves.left.and.right", "clock"]
     }
 
     let id: String
