@@ -73,8 +73,8 @@ nonisolated enum EditorMessage: Sendable {
     /// The same menu is opening over a row of the property block, or Linked From, or over none when nil: the row's
     /// identifier as `PagePlacement` names it, and the item the header was showing.
     case rowMenu((item: ItemID, row: String)?)
-    /// A row of the property block was dragged: the row it now comes before, or nil for the end.
-    case moveRow(ItemID, row: String, before: String?)
+    /// A row of the property block was dragged: the whole order the page shows after the move, folded rows included.
+    case moveRow(ItemID, row: String, order: [String])
     /// A `[[link]]` to a note was command-clicked in the note `item`.
     case openNote(ItemID, NoteLink)
     case find(FindState)
@@ -172,8 +172,10 @@ nonisolated enum EditorMessage: Sendable {
                 self = .rowMenu(nil)
             }
         case "moveRow":
-            guard let item = dict["item"] as? String, !item.isEmpty, let row = dict["row"] as? String, !row.isEmpty else { return nil }
-            self = .moveRow(ItemID(item), row: row, before: dict["before"] as? String)
+            guard let item = dict["item"] as? String, !item.isEmpty, let row = dict["row"] as? String, !row.isEmpty,
+                  let order = dict["order"] as? [String], order.contains(row)
+            else { return nil }
+            self = .moveRow(ItemID(item), row: row, order: order)
         case "openNote":
             guard let item = dict["item"] as? String, !item.isEmpty, let link = NoteLink(page: dict) else { return nil }
             self = .openNote(ItemID(item), link)

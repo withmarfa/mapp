@@ -237,8 +237,9 @@ enum PageHeaderEvent {
     /// Hide from Page was chosen in the menu over a row of the property block, or Linked From: the row's
     /// identifier (`PagePlacement`) and the item the header was showing.
     case hideFromPage(row: String, ItemID)
-    /// A row of the property block was dragged by its key: the row it now comes before, or nil for the end.
-    case moveRow(row: String, before: String?, ItemID)
+    /// A row of the property block was dragged by its key: the whole order the page shows after the move, folded rows
+    /// included.
+    case moveRow(row: String, order: [String], ItemID)
     /// Customize Layout in the row above the title was pressed.
     case toggleLayout
     /// Linked From in the row above the title was pressed, to see what links here.

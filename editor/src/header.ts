@@ -446,7 +446,7 @@ export class ItemHeader {
     this.statusPin.setAttribute('aria-label', this.labels.status)
     this.parentPin = this.menuPin('ItemParentPin', 'parent', buttons)
     this.properties = element('dl', 'item-props', root)
-    dragRows(this.properties, (row, before) => this.moveRow(row, before))
+    dragRows(this.properties, (row, shown) => this.moveRow(row, shown))
     this.properties.setAttribute('aria-label', this.labels.properties)
     this.moreProperties = this.moreButton(root, () => {
       this.expanded.properties = !this.expanded.properties
@@ -1101,19 +1101,15 @@ export class ItemHeader {
     return this.model && row ? { item: this.model.item, row } : null
   }
 
-  /** Asks the app to list a row before another. A row dropped last among those shown goes before the first folded away,
-   *  so the folded rows stay where they are. */
-  private moveRow(row: string, before: string | null) {
+  /** Asks the app to list the rows in the order the page now shows: those on screen as dragged, then any folded away
+   *  as the page drew them, so the app stores what the person saw and not an order of its own. */
+  private moveRow(row: string, shown: string[]) {
     if (!this.model) return
-    const folded = this.expanded.properties
-      ? undefined
-      : this.model.properties[this.model.foldAfter]
-    postToHost({
-      type: 'moveRow',
-      item: this.model.item,
-      row,
-      before: before ?? folded?.id ?? null,
-    })
+    const kept = new Set(shown)
+    const folded = this.model.properties
+      .map((property) => property.id)
+      .filter((id) => !kept.has(id))
+    postToHost({ type: 'moveRow', item: this.model.item, row, order: [...shown, ...folded] })
   }
 
   /** Asks the app for the editor of a row's or a pin's value, with the value's frame as a menu's is. */

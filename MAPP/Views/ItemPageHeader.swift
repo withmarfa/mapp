@@ -176,14 +176,14 @@ struct ItemPageHeader: ViewModifier {
             case .hideFromPage(let row, let id):
                 guard editor.isShowing(id), let type = library.item(id)?.type else { return }
                 PagePlacements.update { $0.set(false, row: row, of: type) }
-            case .moveRow(let row, let before, let id):
+            case .moveRow(let row, let order, let id):
                 guard editor.isShowing(id), let item = library.item(id) else { return }
                 let rows = PageLayout.rows(
                     of: item, type: library.catalogue.itemTypes[item.type], hidden: library.hiddenPropertyKeys(of: item),
                     relationships: library.relationships(for: item.id), catalogue: library.catalogue)
                 PagePlacements.update { placements in
                     let layout = PageLayout(rows: rows, placement: placements.placement(of: item.type, in: library.catalogue))
-                    if let moved = layout.moving(row, before: before) { placements.apply(moved, of: item.type, in: library.catalogue) }
+                    if let moved = layout.listing(order, moving: row) { placements.apply(moved, of: item.type, in: library.catalogue) }
                 }
             }
         }

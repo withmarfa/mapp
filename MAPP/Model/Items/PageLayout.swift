@@ -79,13 +79,21 @@ nonisolated struct PageLayout: Equatable, Sendable {
         return moved
     }
 
-    /// Lists a row of the page before another of them, or last where `other` is nil. Nil for anything else, such as a
-    /// pin the page shows in the property block because an event's time took its place.
-    func moving(_ id: String, before other: String?) -> PageLayout? {
+    /// Lists the page's rows in `order`, the order the page drew them in once `id` was dragged, which is not always
+    /// this layout's own (a pin an event's time pushed out is drawn among them, and the default order can differ from
+    /// what was shown). Rows named come first, in that order; page rows it does not name follow as they were; an id
+    /// that is not a page row is ignored. Nil where `id` is not a page row, such as a pin.
+    func listing(_ order: [String], moving id: String) -> PageLayout? {
         guard group(of: id) == .page else { return nil }
-        guard let other else { return moving(id, to: .page) }
-        guard let index = page.filter({ $0.id != id }).firstIndex(where: { $0.id == other }) else { return nil }
-        return moving(id, to: .page, at: index)
+        let byID = Dictionary(page.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var seen = Set<String>()
+        let named = order.compactMap { name -> Row? in
+            guard let row = byID[name], seen.insert(name).inserted else { return nil }
+            return row
+        }
+        var listed = self
+        listed.page = named + page.filter { !seen.contains($0.id) }
+        return listed
     }
 
     /// Moves the row up (negative) or down within its group. Nil at either end, or for a row not listed.

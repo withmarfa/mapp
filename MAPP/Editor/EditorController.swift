@@ -652,8 +652,8 @@ final class EditorController: NSObject {
         case .valueMoved(let item, let row, let rect, let viewportHeight):
             // The value's editor follows it, which is the presenter's to say whether there is one open for it.
             ValueEditPresenter.shared.valueMoved(item: item, row: row, to: containerRect(rect, viewportHeight: viewportHeight))
-        case .moveRow(let item, let row, let before):
-            onHeaderEvent(.moveRow(row: row, before: before, item))
+        case .moveRow(let item, let row, let order):
+            onHeaderEvent(.moveRow(row: row, order: order, item))
         case .toggleLayout:
             onHeaderEvent(.toggleLayout)
         case .showLinked:

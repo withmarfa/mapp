@@ -1060,18 +1060,22 @@ function draggable(): { key: HTMLElement; drag: (y: number) => void; drop: () =>
   }
 }
 
-test('a row dragged by its key is listed before the row it was dropped above', () => {
+test('a row dragged by its key sends the whole order the page shows after the move', () => {
   const { drag, drop } = draggable()
   drag(50)
   drop()
-  expect(posted).toEqual([{ type: 'moveRow', item: 'ticket', row: 'a', before: 'c' }])
+  expect(posted).toEqual([
+    { type: 'moveRow', item: 'ticket', row: 'a', order: ['b', 'a', 'c', 'd'] },
+  ])
 })
 
 test('a row dropped last among those shown stays above the rows folded away', () => {
   const { drag, drop } = draggable()
   drag(80)
   drop()
-  expect(posted).toEqual([{ type: 'moveRow', item: 'ticket', row: 'a', before: 'd' }])
+  expect(posted).toEqual([
+    { type: 'moveRow', item: 'ticket', row: 'a', order: ['b', 'c', 'a', 'd'] },
+  ])
 })
 
 test('a dragged key opens no editor, and a press that does not move still does', () => {

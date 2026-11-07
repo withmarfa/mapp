@@ -20,8 +20,8 @@ function swallowNextClick() {
 }
 
 /** Lets a row of `list` be dragged by its key. The other rows make way as it passes. Escape puts it back, and a press
- *  that does not move stays a click. `move` gets the row and the row it now comes before, or null for the end. */
-export function dragRows(list: HTMLElement, move: (row: string, before: string | null) => void) {
+ *  that does not move stays a click. `move` gets the row and the rows' order once it has moved. */
+export function dragRows(list: HTMLElement, move: (row: string, order: string[]) => void) {
   list.addEventListener('pointerdown', (down) => {
     const key = (down.target as Element | null)?.closest?.('.item-prop-label')
     const entry = key?.parentElement
@@ -100,8 +100,13 @@ export function dragRows(list: HTMLElement, move: (row: string, before: string |
 
       if (!drop || target === from) return restore()
       const order = rows.filter((row) => row !== entry)
-      const next = order[target]?.dataset.row ?? null
-      if (entry?.dataset.row) move(entry.dataset.row, next)
+      if (entry?.dataset.row) {
+        order.splice(target, 0, entry)
+        move(
+          entry.dataset.row,
+          order.flatMap((row) => row.dataset.row ?? []),
+        )
+      }
       // The app draws the new order over these rows. Where it refuses the move, they go back.
       setTimeout(restore, settling)
     }
