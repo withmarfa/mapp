@@ -509,6 +509,7 @@ struct ValueEditingTests {
         let anchor: NSView
         var window: NSWindow? { nil }
         private(set) var isOpen = false
+        private(set) var moves = 0
 
         init(_ request: ValueEditRequest, anchor: NSView) {
             self.request = request
@@ -518,7 +519,7 @@ struct ValueEditingTests {
 
         func open() { isOpen = true }
         func close(restoringFocus: Bool) { isOpen = false }
-        func anchorMoved() {}
+        func anchorMoved() { moves += 1 }
     }
 
     private func presenter(_ sessions: Box) -> ValueEditPresenter {
@@ -572,6 +573,26 @@ struct ValueEditingTests {
         presenter.present(Self.request(.status(Self.status), item: item, in: library), anchor: view)
         presenter.present(Self.request(.status(Self.status), item: item, in: library), anchor: view)
         #expect(!presenter.isOpen)
+    }
+
+    @Test func aValueThatMovesWithItsEditorOpenTakesTheEditorAlong() {
+        let item = Self.item()
+        let sessions = Box()
+        let presenter = presenter(sessions)
+        let view = anchor()
+        let row = NSView(frame: NSRect(x: 0, y: 0, width: 100, height: 20))
+        view.addSubview(row)
+        presenter.present(Self.request(.status(Self.status), item: item, in: Self.library([item])), anchor: row)
+        #expect(sessions.all.first?.moves == 0)
+        row.setFrameOrigin(NSPoint(x: 0, y: 40))
+        #expect(sessions.all.first?.moves == 1)
+        // SwiftUI moves a row by moving the view that holds its background, not the background inside it.
+        view.setFrameOrigin(NSPoint(x: 0, y: 40))
+        #expect(sessions.all.first?.moves == 2)
+        presenter.dismiss()
+        row.setFrameOrigin(NSPoint(x: 0, y: 80))
+        view.setFrameOrigin(NSPoint(x: 0, y: 80))
+        #expect(sessions.all.first?.moves == 2)
     }
 
     // MARK: The page

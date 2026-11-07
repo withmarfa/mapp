@@ -92,6 +92,16 @@ final class ValueEditPresenter {
 
     private func watch(_ session: any ValueEditSession) {
         let center = NotificationCenter.default
+        // A row that moves with its panel open, as a value's row does once it holds a value, takes the panel along. SwiftUI
+        // moves the view that holds the anchor, not the anchor in it, so every view above it is watched too.
+        var ancestor: NSView? = session.anchor
+        while let view = ancestor {
+            view.postsFrameChangedNotifications = true
+            observers.append(center.addObserver(forName: NSView.frameDidChangeNotification, object: view, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.session?.anchorMoved() }
+            })
+            ancestor = view.superview
+        }
         if let parent = session.anchor.window {
             observers.append(center.addObserver(forName: NSWindow.didMoveNotification, object: parent, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.session?.anchorMoved() }

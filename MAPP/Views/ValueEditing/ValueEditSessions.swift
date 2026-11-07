@@ -25,6 +25,7 @@ final class ValueEditPanelSession: ValueEditSession {
     private var panel: ValueEditPanel?
     private weak var parent: NSWindow?
     private var savedResponder: NSResponder?
+    private var layoutPending = false
 
     var window: NSWindow? { panel }
 
@@ -53,10 +54,21 @@ final class ValueEditPanelSession: ValueEditSession {
         glass.contentView = host
         panel.contentView = glass
         self.panel = panel
-        model.layoutChanged = { [weak self] in self?.layout() }
+        model.layoutChanged = { [weak self] in self?.layoutSoon() }
         layout()
         parent.addChildWindow(panel, ordered: .above)
         panel.makeKeyAndOrderFront(nil)
+    }
+
+    /// The content reports its height from inside a SwiftUI update, where a window resize leaves the glass at the size it
+    /// had before, so the panel is resized once that update is over, and once for any number of reports.
+    private func layoutSoon() {
+        guard !layoutPending else { return }
+        layoutPending = true
+        DispatchQueue.main.async { [weak self] in
+            self?.layoutPending = false
+            self?.layout()
+        }
     }
 
     private func layout() {
@@ -74,6 +86,8 @@ final class ValueEditPanelSession: ValueEditSession {
             panel.setFrame(placement.frame, display: true)
             panel.invalidateShadow()
         }
+        // A frame the window already has still leaves its content at an older size when the content view was not told.
+        panel.contentView?.frame = NSRect(origin: .zero, size: placement.frame.size)
     }
 
     private var estimatedHeight: CGFloat {
@@ -83,7 +97,7 @@ final class ValueEditPanelSession: ValueEditSession {
         }
     }
 
-    func anchorMoved() { layout() }
+    func anchorMoved() { layoutSoon() }
 
     func close(restoringFocus: Bool) {
         guard let panel else { return }
