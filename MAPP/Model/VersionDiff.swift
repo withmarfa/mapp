@@ -142,6 +142,17 @@ nonisolated struct ReadSpan: Hashable, Sendable {
     var italic = false
     var code = false
     var link: String?
+    /// Whether the span is the shown text of a `[[wiki link]]`, which a version draws as a link but does not follow.
+    var wikiLink = false
+}
+
+/// A table in a version's text. Every row has one cell for each column, and a cell is spans, as a line's are.
+nonisolated struct ReadTable: Hashable, Sendable {
+    enum Alignment: Hashable, Sendable { case leading, center, trailing }
+
+    var alignments: [Alignment]
+    var header: [[ReadSpan]]
+    var rows: [[[ReadSpan]]]
 }
 
 /// One line of a version's text laid out for reading: what kind of line it is, and its spans without the marks that
@@ -156,6 +167,8 @@ nonisolated struct ReadLine: Identifiable, Hashable, Sendable {
         case code
         case rule
         case blank
+        /// A table, from its header row to its last row. The line has no spans of its own.
+        case table(ReadTable)
     }
 
     let id: Int
@@ -182,12 +195,19 @@ nonisolated enum ReadableText {
                 }
             }
         }
+        let rows = raw.map { $0.filter { !$0.0.isNewline } }
         var lines: [ReadLine] = []
         var inFence = false
-        for (index, line) in raw.enumerated() {
-            let characters = line.filter { !$0.0.isNewline }
-            if index == raw.count - 1, characters.isEmpty, index > 0 { continue }
-            lines.append(read(characters, id: index, inFence: &inFence))
+        var index = 0
+        while index < rows.count {
+            if index == rows.count - 1, rows[index].isEmpty, index > 0 { break }
+            if !inFence, let (found, next) = table(in: rows, at: index) {
+                lines.append(ReadLine(id: index, kind: .table(found), spans: []))
+                index = next
+            } else {
+                lines.append(read(rows[index], id: index, inFence: &inFence))
+                index += 1
+            }
         }
         return lines
     }
@@ -229,6 +249,85 @@ nonisolated enum ReadableText {
         return hashes
     }
 
+    // MARK: Tables
+
+    /// The table that starts at row `start`: a row of cells, a row of dashes that sets each column, and every row after
+    /// them that holds a bar. Returns it with the index of the row after it. A row the version dropped stands in the
+    /// table struck through, as a line does.
+    private static func table(in rows: [[(Character, DiffChange)]], at start: Int) -> (ReadTable, Int)? {
+        guard start + 1 < rows.count, isTableRow(rows[start]), isTableRow(rows[start + 1]) else { return nil }
+        let header = cells(of: rows[start])
+        guard let alignments = columnAlignments(of: cells(of: rows[start + 1]), count: header.count) else { return nil }
+        var body: [[[ReadSpan]]] = []
+        var next = start + 2
+        while next < rows.count, isTableRow(rows[next]) {
+            let row = cells(of: rows[next])
+            // A second row of dashes belongs to the version this one replaced, and sets nothing here.
+            if columnAlignments(of: row, count: header.count) == nil { body.append(fit(row, to: header.count)) }
+            next += 1
+        }
+        return (ReadTable(alignments: alignments, header: fit(header, to: header.count), rows: body), next)
+    }
+
+    /// A row of a table holds a bar and does not start a fence.
+    private static func isTableRow(_ row: [(Character, DiffChange)]) -> Bool {
+        let text = String(row.map(\.0)).trimmingCharacters(in: .whitespaces)
+        return text.contains("|") && !text.hasPrefix("```") && !text.hasPrefix("~~~")
+    }
+
+    /// The cells of a row, each as spans. The bars at the ends are not cells; `\|` and a bar inside code are text.
+    private static func cells(of row: [(Character, DiffChange)]) -> [[ReadSpan]] {
+        var cells: [[(Character, DiffChange)]] = [[]]
+        var inCode = false
+        var index = 0
+        while index < row.count {
+            let (character, change) = row[index]
+            if character == "\\", index + 1 < row.count, row[index + 1].0 == "|" {
+                cells[cells.count - 1].append(row[index + 1])
+                index += 2
+                continue
+            }
+            if character == "`" { inCode.toggle() }
+            if character == "|", !inCode {
+                cells.append([])
+            } else {
+                cells[cells.count - 1].append((character, change))
+            }
+            index += 1
+        }
+        func isBlank(_ cell: [(Character, DiffChange)]) -> Bool { cell.allSatisfy { $0.0.isWhitespace } }
+        if let first = cells.first, isBlank(first) { cells.removeFirst() }
+        if let last = cells.last, isBlank(last), !cells.isEmpty { cells.removeLast() }
+        return cells.map { cell in
+            var cell = cell[...]
+            while let first = cell.first, first.0.isWhitespace { cell.removeFirst() }
+            while let last = cell.last, last.0.isWhitespace { cell.removeLast() }
+            return merge(inline(Array(cell)))
+        }
+    }
+
+    /// How each column is set, if the cells are a row of dashes (`---`, `:--`, `:-:`, `--:`) of the table's width.
+    private static func columnAlignments(of cells: [[ReadSpan]], count: Int) -> [ReadTable.Alignment]? {
+        guard cells.count == count, count > 0 else { return nil }
+        var result: [ReadTable.Alignment] = []
+        for cell in cells {
+            let text = cell.map(\.text).joined()
+            let dashes = text.drop { $0 == ":" }.reversed().drop { $0 == ":" }
+            guard !dashes.isEmpty, dashes.allSatisfy({ $0 == "-" }) else { return nil }
+            switch (text.hasPrefix(":"), text.hasSuffix(":")) {
+            case (true, true): result.append(.center)
+            case (false, true): result.append(.trailing)
+            default: result.append(.leading)
+            }
+        }
+        return result
+    }
+
+    /// The row with exactly `count` cells: short rows are filled out empty, and cells past the last column are left out.
+    private static func fit(_ cells: [[ReadSpan]], to count: Int) -> [[ReadSpan]] {
+        Array((cells + Array(repeating: [], count: max(0, count - cells.count))).prefix(count))
+    }
+
     /// The characters after the first `drop`, in spans by mark and by how inline markdown sets them.
     private static func spans(_ characters: [(Character, DiffChange)], drop: Int, marked: Bool = true) -> [ReadSpan] {
         let body = Array(characters.dropFirst(drop))
@@ -236,14 +335,15 @@ nonisolated enum ReadableText {
         return merge(inline(body))
     }
 
-    /// Reads `**bold**`, `*italic*`, `_italic_`, `` `code` `` and `[text](address)`, dropping their marks. A mark with no
+    /// Reads `**bold**`, `*italic*`, `_italic_`, `` `code` ``, `[text](address)` and `[[wiki links]]`, dropping their marks. A mark with no
     /// partner stays as typed. Marks and the text between them keep the change of the characters they came from.
     private static func inline(_ characters: [(Character, DiffChange)]) -> [ReadSpan] {
         var spans: [ReadSpan] = []
         var bold = false, italic = false
         var index = 0
-        func add(_ character: Character, _ change: DiffChange, code: Bool = false, link: String? = nil) {
-            spans.append(ReadSpan(text: String(character), change: change, bold: bold, italic: italic, code: code, link: link))
+        func add(_ character: Character, _ change: DiffChange, code: Bool = false, link: String? = nil, wikiLink: Bool = false) {
+            spans.append(ReadSpan(
+                text: String(character), change: change, bold: bold, italic: italic, code: code, link: link, wikiLink: wikiLink))
         }
         func find(_ marker: [Character], from start: Int) -> Int? {
             var i = start
@@ -266,6 +366,14 @@ nonisolated enum ReadableText {
                       italic ? closesEmphasis(characters, at: index) : opensEmphasis(characters, at: index) {
                 italic.toggle()
                 index += 1
+            } else if character == "[", index + 1 < characters.count, characters[index + 1].0 == "[",
+                      let end = find(["]", "]"], from: index + 2),
+                      !(index + 2..<end).contains(where: { characters[$0].0 == "[" || characters[$0].0 == "]" }) {
+                // `[[target|label]]` shows its label, and `[[target]]` its target, as the note page does.
+                let inside = Array((index + 2)..<end)
+                let shown = inside.firstIndex { characters[$0].0 == "|" }.map { Array(inside[($0 + 1)...]) } ?? inside
+                for i in shown { add(characters[i].0, characters[i].1, wikiLink: true) }
+                index = end + 2
             } else if character == "[", let close = find(["]", "("], from: index + 1), let end = find([")"], from: close + 2) {
                 let address = String(characters[(close + 2)..<end].map(\.0))
                 for i in (index + 1)..<close { add(characters[i].0, characters[i].1, link: address) }
@@ -302,7 +410,7 @@ nonisolated enum ReadableText {
         var merged: [ReadSpan] = []
         for span in spans {
             if var last = merged.last, last.change == span.change, last.bold == span.bold, last.italic == span.italic,
-               last.code == span.code, last.link == span.link {
+               last.code == span.code, last.link == span.link, last.wikiLink == span.wikiLink {
                 last.text += span.text
                 merged[merged.count - 1] = last
             } else {

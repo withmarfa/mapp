@@ -293,6 +293,37 @@ private let english = Locale(identifier: "en_US")
         // The tags, the parent and the source are not kept with a version, so they are never shown from the item as it is now.
         #expect(rows.allSatisfy { ![PagePlacement.tags, PagePlacement.source, PagePlacement.linkedFrom, PagePlacement.parent].contains($0.id) })
     }
+
+    @Test func noFactShowsAPluralAsItsMarkup() {
+        for (added, removed) in [(0, 0), (1, 0), (0, 1), (1, 1), (3, 2)] {
+            #expect(!VersionFacts.describe(additions: added, removals: removed).contains("^["))
+        }
+        #expect(VersionFacts.describe(additions: 1, removals: 0) == "1 addition")
+        #expect(VersionFacts.describe(additions: 3, removals: 0) == "3 additions")
+        #expect(VersionFacts.describe(additions: 1, removals: 2) == "1 addition, 2 removals")
+
+        let current = item(version: 4, created: date(2026, 10, 1), modified: date(2026, 11, 6))
+        let list = VersionList(
+            snapshots: [
+                version(1, body: "one two three", title: "Plan", replaced: date(2026, 10, 2)),
+                version(2, body: "one two four", title: "Plan", replaced: date(2026, 10, 3)),
+                version(3, body: "one two four", title: "Plan", replaced: date(2026, 11, 6)),
+            ],
+            current: current, currentText: "one five four", isComplete: true, in: catalogue)
+        for entry in list.entries {
+            let facts = VersionFacts.make(for: entry, after: list.older(than: entry), current: list.current!, in: catalogue, dateFormat: .automatic)
+            for row in facts.changedHere + facts.changedSince { #expect(!row.value.contains("^["), "\(row.label): \(row.value)") }
+        }
+        let first = list.entry("v2")!
+        let facts = VersionFacts.make(for: first, after: list.older(than: first), current: list.current!, in: catalogue, dateFormat: .automatic)
+        #expect(facts.changedHere.first?.value == "1 addition, 1 removal")
+        #expect(facts.changedSince.first(where: { $0.id == "#text" })?.value == "1 change")
+    }
+
+    @Test func aPluralReadsAsAWordInTheModelsOwnStrings() {
+        #expect(AttributedString(localized: "^[\(1) version](inflect: true)").text == "1 version")
+        #expect(AttributedString(localized: "^[\(3) version](inflect: true)").text == "3 versions")
+    }
 }
 
 /// The words that differ between two versions of a text, and the page they are read on.
@@ -376,6 +407,57 @@ private let english = Locale(identifier: "en_US")
         #expect(marks.contains { $0.change == .removed && $0.text.contains("Old") })
         #expect(marks.contains { $0.change == .added && $0.text.contains("New") })
         #expect(lines.last?.spans.allSatisfy { $0.change == .same } == true)
+    }
+
+    @Test func aTableIsReadAsRowsOfCells() {
+        let text = "Before\n\n| Thing | Value |\n|:--|--:|\n| **Cat** | 3 |\n| Dog | `a|b` |\n\nAfter"
+        let lines = ReadableText.lines([DiffPiece(text: text, change: .same)])
+        guard case .table(let table)? = lines.first(where: { if case .table = $0.kind { true } else { false } })?.kind else {
+            Issue.record("no table read")
+            return
+        }
+        #expect(table.alignments == [.leading, .trailing])
+        #expect(table.header.map { $0.map(\.text).joined() } == ["Thing", "Value"])
+        #expect(table.rows.count == 2)
+        #expect(table.rows[0][0].first?.bold == true && table.rows[0][0].first?.text == "Cat")
+        #expect(table.rows[1][1].map(\.text).joined() == "a|b", "a bar inside code is not a cell edge")
+        #expect(lines.map(\.kind).filter { $0 == .paragraph }.count == 2, "the lines around the table stay as they were")
+        #expect(!lines.contains { $0.spans.contains { $0.text.contains("|") } })
+    }
+
+    @Test func aLineWithABarAndNoSeparatorIsNotATable() {
+        let lines = ReadableText.lines([DiffPiece(text: "a | b\nplain\n", change: .same)])
+        #expect(lines.map(\.kind) == [.paragraph, .paragraph])
+        let single = ReadableText.lines([DiffPiece(text: "Title |\n---\n", change: .same)])
+        #expect(!single.contains { if case .table = $0.kind { true } else { false } })
+    }
+
+    @Test func aTableRowChangedInTheVersionKeepsItsMarksInItsCells() {
+        let pieces = WordDiff.pieces(from: "| A | B |\n|---|---|\n| one | two |\n", to: "| A | B |\n|---|---|\n| one | three |\n")
+        let lines = ReadableText.lines(pieces)
+        guard case .table(let table)? = lines.first?.kind else {
+            Issue.record("no table read")
+            return
+        }
+        let cells = table.rows.flatMap { $0 }.flatMap { $0 }
+        #expect(cells.contains { $0.change == .removed && $0.text == "two" })
+        #expect(cells.contains { $0.change == .added && $0.text == "three" })
+    }
+
+    @Test func aWikiLinkShowsItsLabelAndIsNotFollowed() {
+        let lines = ReadableText.lines([DiffPiece(text: "See [[Plan]] and [[abc-123|the plan]] or [[open", change: .same)])
+        let spans = lines[0].spans
+        #expect(spans.map(\.text) == ["See ", "Plan", " and ", "the plan", " or [[open"])
+        #expect(spans.map(\.wikiLink) == [false, true, false, true, false])
+        #expect(spans.allSatisfy { $0.link == nil })
+    }
+
+    @Test func aWikiLinkKeepsTheMarksOfWhatItShows() {
+        let pieces = WordDiff.pieces(from: "Read [[Old]] now", to: "Read [[New]] now")
+        let spans = ReadableText.lines(pieces).flatMap(\.spans)
+        #expect(spans.contains { $0.wikiLink && $0.change == .added && $0.text == "New" })
+        #expect(spans.contains { $0.wikiLink && $0.change == .removed && $0.text == "Old" })
+        #expect(!spans.contains { $0.text.contains("[") || $0.text.contains("]") })
     }
 
     @Test func aRemovedLineIsRecognisedAsAWholeLineGone() {

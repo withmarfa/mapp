@@ -151,6 +151,8 @@ private struct VersionLineView: View {
             Text(attributed).font(.system(.body, design: .monospaced))
         case .paragraph:
             Text(attributed)
+        case .table(let table):
+            VersionTableView(table: table)
         }
     }
 
@@ -163,9 +165,66 @@ private struct VersionLineView: View {
         }
     }
 
-    private var attributed: AttributedString {
+    private var attributed: AttributedString { line.spans.attributed }
+}
+
+/// A table of a version's text: a header row on a tint, rules between the rows and the columns, and cells that wrap.
+private struct VersionTableView: View {
+    let table: ReadTable
+
+    var body: some View {
+        Grid(alignment: .topLeading, horizontalSpacing: 0, verticalSpacing: 0) {
+            row(table.header, isHeader: true)
+            ForEach(table.rows.indices, id: \.self) { index in
+                Divider()
+                row(table.rows[index], isHeader: false)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(.separator) }
+        .padding(.vertical, 4)
+    }
+
+    private func row(_ cells: [[ReadSpan]], isHeader: Bool) -> some View {
+        GridRow {
+            ForEach(cells.indices, id: \.self) { column in
+                Text(cells[column].attributed)
+                    .fontWeight(isHeader ? .semibold : nil)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .multilineTextAlignment(Self.alignment(of: table.alignments[column]))
+                    .frame(maxWidth: .infinity, alignment: Self.frame(of: table.alignments[column]))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(isHeader ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear))
+                    .overlay(alignment: .leading) {
+                        if column > 0 { Rectangle().fill(.separator).frame(width: 1) }
+                    }
+            }
+        }
+    }
+
+    private static func alignment(of alignment: ReadTable.Alignment) -> TextAlignment {
+        switch alignment {
+        case .leading: .leading
+        case .center: .center
+        case .trailing: .trailing
+        }
+    }
+
+    private static func frame(of alignment: ReadTable.Alignment) -> Alignment {
+        switch alignment {
+        case .leading: .leading
+        case .center: .center
+        case .trailing: .trailing
+        }
+    }
+}
+
+private extension [ReadSpan] {
+    /// The spans as one text: how inline markdown sets them, and what the version added or dropped marked.
+    var attributed: AttributedString {
         var result = AttributedString()
-        for span in line.spans {
+        for span in self {
             var piece = AttributedString(span.text)
             var intent: InlinePresentationIntent = []
             if span.bold { intent.insert(.stronglyEmphasized) }
@@ -174,6 +233,8 @@ private struct VersionLineView: View {
             if !intent.isEmpty { piece.inlinePresentationIntent = intent }
             // A link is marked, not made live: a version is read here, and its addresses are not followed from it.
             if span.link != nil { piece.underlineStyle = .single }
+            // A wiki link is tinted as the note page tints one, and is not followed either.
+            if span.wikiLink { piece.foregroundColor = Color.accentColor }
             switch span.change {
             case .same: break
             case .added: piece.backgroundColor = Color.accentColor.opacity(0.22)
