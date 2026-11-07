@@ -84,6 +84,7 @@ struct AppCommands: Commands {
             .disabled(browser == nil || library == nil)
             Divider()
             command(.toggleSource)
+            command(.toggleReader)
             Divider()
             if let place = browser?.indexPlace {
                 IndexViewOptions(place: place, bindsKeys: true)
@@ -144,7 +145,7 @@ extension AppCommands {
     private func command(_ command: ItemCommand) -> some View {
         ItemCommandButton(
             command: command,
-            context: ItemCommandContext(library: library, ids: notes?.ids ?? [], browser: browser, editor: editor),
+            context: ItemCommandContext(library: library, ids: notes?.ids ?? [], browser: browser, editor: editor, details: details),
             editor: editor, bindsShortcut: true)
     }
 

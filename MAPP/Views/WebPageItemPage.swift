@@ -67,7 +67,8 @@ struct WebPageItemPage: View {
     /// The file that holds the HTML.
     let document: ItemID
     let runsScripts: Bool
-    /// The window's unsaved drafts, where a refused status is kept for the item, as on the note page.
+    /// The window's unsaved drafts, where a refused status is kept for the item, as on the note page. The page also
+    /// gives it the switch between its looks, which the window's toolbar and menus hold.
     let drafts: DetailsPresentation
     /// Shows the item a pinned link names.
     let open: (ItemID) -> Void
@@ -97,23 +98,26 @@ struct WebPageItemPage: View {
     /// articles, so the title does not change type when the page arrives.
     private var headerMode: SourceViewMode { shownMode ?? mode }
 
-    /// What the header's picker shows and sets: the look for this mail, or the one kept for articles.
-    private var pickedMode: Binding<SourceViewMode> {
-        Binding(
-            get: { shownMode ?? mode },
-            set: { chosen in
-                if case .ready(let loaded) = content, loaded.analysis.isMail { mailChoice = chosen } else { mode = chosen }
-            })
+    /// The look to show on the window's switch, while the page has an article to switch from.
+    private var offeredMode: SourceViewMode? {
+        guard case .ready(let loaded) = content, loaded.reader != nil else { return nil }
+        return shownMode
+    }
+
+    /// Sets the look for this mail, or the one kept for articles.
+    private func choose(_ chosen: SourceViewMode) {
+        if case .ready(let loaded) = content, loaded.analysis.isMail { mailChoice = chosen } else { mode = chosen }
+    }
+
+    private func offerLook() {
+        drafts.offerPageLook(offeredMode.map { PageLookSwitch(item: item.id, mode: $0, choose: choose) }, for: item.id)
     }
 
     var body: some View {
         GeometryReader { geometry in
             let inset = style.horizontalInset(for: geometry.size.width)
             VStack(spacing: 0) {
-                WebPageHeader(
-                    item: item, inset: inset, drafts: drafts, open: open, mode: pickedMode, reading: headerMode == .reader,
-                    offersReader: { if case .ready(let loaded) = content { loaded.reader != nil } else { false } }(),
-                    isLoading: { if case .loading = content { true } else { false } }())
+                WebPageHeader(item: item, inset: inset, drafts: drafts, open: open, reading: headerMode == .reader)
                 // The header is inset like the other item pages' and the page draws to its own margin, so the line
                 // sets the page apart as a document under its header.
                 Divider()
@@ -128,6 +132,13 @@ struct WebPageItemPage: View {
             }
         }
         .accessibilityIdentifier("WebPageItemPage")
+        .onAppear { offerLook() }
+        .onDisappear { drafts.offerPageLook(nil, for: item.id) }
+        .onChange(of: offeredMode) { offerLook() }
+        .onChange(of: item.id) { previous, _ in
+            drafts.offerPageLook(nil, for: previous)
+            offerLook()
+        }
         .task(id: Load(id: item.id, document: document, version: library.item(document)?.version, attempt: attempt)) { await load() }
         .onChange(of: shownMode) {
             // The pictures the other look names wait for no one while it is not shown.
@@ -278,27 +289,31 @@ private struct PicturePillStyle: ButtonStyle {
     }
 }
 
+/// A page's switch between its looks, as the window's toolbar and menus reach it.
+struct PageLookSwitch {
+    let item: ItemID
+    let mode: SourceViewMode
+    let choose: (SourceViewMode) -> Void
+}
+
 /// The switch between the reader look and the source's own, remembered for every article; a mail's choice is its own.
 struct SourceViewPicker: View {
-    @Binding var mode: SourceViewMode
+    let details: DetailsPresentation
 
     var body: some View {
-        Picker("View", selection: $mode) {
+        Picker("Reader or Original", selection: Binding(get: { details.pageLook?.mode ?? .standard }, set: { details.pageLook?.choose($0) })) {
             Text("Reader").tag(SourceViewMode.reader)
             Text("Original").tag(SourceViewMode.original)
         }
         .pickerStyle(.segmented)
-        .labelsHidden()
         .fixedSize()
-        .accessibilityLabel("View")
         .accessibilityIdentifier("SourceViewMode")
     }
 }
 
 /// The page's header, drawn in SwiftUI as the note page's is drawn on the web: the title, then the pins, and where the
 /// item's kind has a line of its own (a page for reading) its byline above the title and its description under it. The
-/// same in either look: the look sets only the title's type, so the switch between the reader and the original, at the
-/// trailing edge of the line above the title, never moves the pins or the lines.
+/// same in either look: the look sets only the title's type, so changing it never moves the pins or the lines.
 /// `PageHeaderParts` gives both pages their kind, line and pins, and `PageChip` their looks.
 private struct WebPageHeader: View {
     @CurrentLibrary private var library
@@ -311,13 +326,8 @@ private struct WebPageHeader: View {
     let inset: CGFloat
     let drafts: DetailsPresentation
     let open: (ItemID) -> Void
-    @Binding var mode: SourceViewMode
     /// Whether the page is shown, or is about to be, in Reader, which gives the title the reading header's serif.
     let reading: Bool
-    /// Whether the page has an article to read, which is the only page the switch is offered for.
-    let offersReader: Bool
-    /// Whether the page may yet have an article, so the line holds the switch's place and the title stays where it is.
-    let isLoading: Bool
 
     var body: some View {
         let parts = PageHeaderParts(of: item, in: library, placements: placements, dateFormat: dateFormat)
@@ -326,7 +336,7 @@ private struct WebPageHeader: View {
         let statusField = parts.type?.statusField
         VStack(alignment: .leading, spacing: 10) {
             let byline = [parts.lead.byline?.source, parts.lead.byline?.date, parts.lead.byline?.detail].compactMap { $0 }.filter { !$0.isEmpty }
-            if offersReader || isLoading || !byline.isEmpty { line(byline, step: step) }
+            if !byline.isEmpty { line(byline, step: step) }
             VStack(alignment: .leading, spacing: step) {
                 Text(verbatim: item.displayTitle)
                     .font(reading
@@ -384,8 +394,6 @@ private struct WebPageHeader: View {
             .tracking(CGFloat(interfaceTextSize) * 12 / 13 * 0.02)
             .textCase(.uppercase)
             .foregroundStyle(.secondary)
-            Spacer(minLength: step * 4)
-            if offersReader { SourceViewPicker(mode: $mode) } else { SourceViewPicker(mode: $mode).hidden() }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("WebPageLine")

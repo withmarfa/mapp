@@ -2434,7 +2434,13 @@
     "Reader" : {
 
     },
-    "View" : {
+    "Reader or Original" : {
+
+    },
+    "Show Original" : {
+
+    },
+    "Show Reader" : {
 
     },
     "Page Layout" : {

@@ -5,8 +5,7 @@ import Foundation
 /// Both take their kind, their line and their pins from here, so they cannot disagree about what a header shows.
 ///
 /// A saved web page draws the same header whichever look it is shown in. The look changes the title's type and what the
-/// page below shows, never the pins or the lines: the switch between the looks sits beside them, and a row that came and
-/// went with it would move them.
+/// page below shows, never the pins or the lines.
 struct PageHeaderParts {
     let type: ItemTypeInfo?
     let kind: PageHeaderKind

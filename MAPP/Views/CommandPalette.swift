@@ -365,7 +365,7 @@ struct CommandPalette: View {
             }
         }
         // The same commands, titles and rules as the menu bar and the More menu (`ItemCommand`).
-        let itemContext = ItemCommandContext(library: library, ids: browser.selection, browser: browser, editor: editor)
+        let itemContext = ItemCommandContext(library: library, ids: browser.selection, browser: browser, editor: editor, details: details)
         for command in ItemCommand.allCases where command.isEnabled(in: itemContext) {
             let shortcut = command.shortcut.map { Self.symbols($0.modifiers) + String($0.key.character).uppercased() }
             add(String(localized: command.title(in: itemContext)), command.systemImage, shortcut) {

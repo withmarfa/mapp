@@ -9,12 +9,13 @@ import UniformTypeIdentifiers
 struct WebPageItemPageTests {
     @MainActor @Observable final class Visit {
         var item: Item
+        let details = DetailsPresentation()
         init(_ item: Item) { self.item = item }
     }
 
     struct Host: View {
         let visit: Visit
-        var body: some View { FileItemPage(item: visit.item, drafts: DetailsPresentation(), open: { _ in }) }
+        var body: some View { FileItemPage(item: visit.item, drafts: visit.details, open: { _ in }) }
     }
 
     private static let article = "<html><head><title>The cliff path</title></head><body><article><h1>The cliff path</h1>"
@@ -88,10 +89,14 @@ struct WebPageItemPageTests {
         try Data(Self.article.utf8).write(to: folder.appending(path: "a.html"))
         let library = FakeItemLibrary(items: [item], now: .now)
         library.files[item.id] = folder.appending(path: "a.html")
-        let (window, view) = host(Visit(item), in: library)
+        let visit = Visit(item)
+        let (window, view) = host(visit, in: library)
         defer { window.orderOut(nil); window.contentView = nil; window.close() }
 
-        #expect(try await settled(view) { has(identifier: "SourceViewMode", in: view) })
+        #expect(try await settled(view) { visit.details.pageLook?.mode == .reader })
+        visit.details.pageLook?.choose(.original)
+        #expect(try await settled(view) { visit.details.pageLook?.mode == .original })
+        visit.details.pageLook?.choose(.reader)
     }
 
     /// The title's frame. The page's own identifier replaces the title's, so it is found by what it says.
@@ -111,13 +116,14 @@ struct WebPageItemPageTests {
         try Data(long.utf8).write(to: folder.appending(path: "a.html"))
         let library = FakeItemLibrary(items: [item], now: .now)
         library.files[item.id] = folder.appending(path: "a.html")
-        let (window, view) = host(Visit(item), in: library)
+        let visit = Visit(item)
+        let (window, view) = host(visit, in: library)
         defer { window.orderOut(nil); window.contentView = nil; window.close() }
 
         try #require(await settled(view) { titleFrame(item, in: view) != nil })
         let whileLoading = try #require(titleFrame(item, in: view))
-        try #require(!has(identifier: "SourceViewMode", in: view), "the article has not arrived yet")
-        try #require(await settled(view) { has(identifier: "SourceViewMode", in: view) })
+        try #require(visit.details.pageLook == nil, "the article has not arrived yet")
+        try #require(await settled(view) { visit.details.pageLook != nil })
         #expect(titleFrame(item, in: view)?.origin.y == whileLoading.origin.y)
     }
 
@@ -155,10 +161,10 @@ struct WebPageItemPageTests {
         try #require(await eventually { library.fetches == 3 })
         // The second item has no article, so its page is complete once nothing is loading.
         try #require(await settled(view) { !elements(of: view).contains { answer($0, "accessibilityRole") as? String == "AXProgressIndicator" } })
-        #expect(!has(identifier: "SourceViewMode", in: view))
+        #expect(visit.details.pageLook == nil)
 
         // Time for the first item's article to be analyzed, which nothing signals when it is dropped.
         try await Task.sleep(for: .seconds(8))
-        #expect(!has(identifier: "SourceViewMode", in: view), "the first item's article is on the second item's page")
+        #expect(visit.details.pageLook == nil, "the first item's article is on the second item's page")
     }
 }
