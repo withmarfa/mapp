@@ -55,6 +55,8 @@ struct WebPageItemPage: View {
         let id: ItemID
         let document: ItemID
         let version: ItemVersion?
+        /// Counts Try Again, so a retry is the task's own: it ends with the item's, and a late answer never reaches the next.
+        let attempt: Int
     }
 
     @CurrentLibrary private var library
@@ -79,6 +81,7 @@ struct WebPageItemPage: View {
     @State private var pictures: SealedPictures?
     /// The look the person chose for this mail, which does not follow the choice made for articles.
     @State private var mailChoice: SourceViewMode?
+    @State private var attempt = 0
     @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
 
     /// One step of the callout's spacing, as on the note page.
@@ -89,6 +92,10 @@ struct WebPageItemPage: View {
         guard case .ready(let loaded) = content else { return nil }
         return loaded.mode(choosing: mode, mailChoice: mailChoice)
     }
+
+    /// The look the header is drawn for. While the page loads it is the look it will most likely have, the one kept for
+    /// articles, so the title does not change type when the page arrives.
+    private var headerMode: SourceViewMode { shownMode ?? mode }
 
     /// What the header's picker shows and sets: the look for this mail, or the one kept for articles.
     private var pickedMode: Binding<SourceViewMode> {
@@ -104,7 +111,7 @@ struct WebPageItemPage: View {
             let inset = style.horizontalInset(for: geometry.size.width)
             VStack(spacing: 0) {
                 WebPageHeader(
-                    item: item, inset: inset, drafts: drafts, open: open, mode: pickedMode, reading: shownMode == .reader,
+                    item: item, inset: inset, drafts: drafts, open: open, mode: pickedMode, reading: headerMode == .reader,
                     offersReader: { if case .ready(let loaded) = content { loaded.reader != nil } else { false } }())
                 // The header is inset like the other item pages' and the page draws to its own margin, so the line
                 // sets the page apart as a document under its header.
@@ -120,7 +127,7 @@ struct WebPageItemPage: View {
             }
         }
         .accessibilityIdentifier("WebPageItemPage")
-        .task(id: Load(id: item.id, document: document, version: library.item(document)?.version)) { await load() }
+        .task(id: Load(id: item.id, document: document, version: library.item(document)?.version, attempt: attempt)) { await load() }
         .onChange(of: shownMode) {
             // The pictures the other look names wait for no one while it is not shown.
             if case .ready(let loaded) = content, let shownMode { pictures?.show(loaded.document(for: shownMode).addresses, version: loaded.version) }
@@ -153,7 +160,7 @@ struct WebPageItemPage: View {
             } description: {
                 Text("MAPP couldn’t get the file from the server. Check your connection, then try again.")
             } actions: {
-                Button("Try Again") { Task { await load() } }
+                Button("Try Again") { attempt += 1 }
             }
         case .notHTML:
             ContentUnavailableView {
@@ -288,9 +295,10 @@ struct SourceViewPicker: View {
 }
 
 /// The page's header, drawn in SwiftUI as the note page's is drawn on the web: the title, then the pins, and where the
-/// item's kind has a line of its own (a page for reading) its byline above the title and its description under it.
-/// `PageHeaderParts` gives both pages their kind, line and pins, and `PageChip` their looks. The switch between the
-/// reader and the original sits at the trailing edge of the line above the title, so it never moves the pins.
+/// item's kind has a line of its own (a page for reading) its byline above the title and its description under it. The
+/// same in either look: the look sets only the title's type, so the switch between the reader and the original, at the
+/// trailing edge of the line above the title, never moves the pins or the lines.
+/// `PageHeaderParts` gives both pages their kind, line and pins, and `PageChip` their looks.
 private struct WebPageHeader: View {
     @CurrentLibrary private var library
     @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
@@ -303,18 +311,19 @@ private struct WebPageHeader: View {
     let drafts: DetailsPresentation
     let open: (ItemID) -> Void
     @Binding var mode: SourceViewMode
-    /// Whether the article is shown in Reader, which gives the title and the description the reading header's serif.
+    /// Whether the page is shown, or is about to be, in Reader, which gives the title and the description the reading header's serif.
     let reading: Bool
     /// Whether the page has an article to read, which is the only page the switch is offered for.
     let offersReader: Bool
 
     var body: some View {
-        let parts = PageHeaderParts(of: item, in: library, placements: placements, dateFormat: dateFormat, reading: reading)
+        let parts = PageHeaderParts(of: item, in: library, placements: placements, dateFormat: dateFormat)
         let step = CGFloat(interfaceTextSize) * 4 / 13
         let textSize = CGFloat(style.textSize)
         let statusField = parts.type?.statusField
         VStack(alignment: .leading, spacing: 10) {
-            if offersReader { line(parts.lead.byline, step: step) }
+            let byline = [parts.lead.byline?.source, parts.lead.byline?.date, parts.lead.byline?.detail].compactMap { $0 }.filter { !$0.isEmpty }
+            if offersReader || !byline.isEmpty { line(byline, step: step) }
             VStack(alignment: .leading, spacing: step) {
                 Text(verbatim: item.displayTitle)
                     .font(reading
@@ -327,7 +336,7 @@ private struct WebPageHeader: View {
                     .textSelection(.enabled)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("WebPageTitle")
-                if reading, let dek = parts.lead.subtitle {
+                if let dek = parts.lead.subtitle {
                     Text(verbatim: dek)
                         .font(.system(size: textSize * 1.2, design: .serif))
                         .lineSpacing(textSize * 0.2)
@@ -360,11 +369,9 @@ private struct WebPageHeader: View {
     }
 
     /// Where a page for reading came from, when it was published and how long it takes, as one quiet line, with the
-    /// switch at its trailing edge. The line is drawn only for a page with an article to read, and has the switch alone
-    /// where the byline says nothing.
-    private func line(_ byline: PageByline?, step: CGFloat) -> some View {
-        let parts = [byline?.source, byline?.date, byline?.detail].compactMap { $0 }.filter { !$0.isEmpty }
-        return HStack(spacing: step * 2.5) {
+    /// switch at its trailing edge where the page has an article to read. The line is drawn where it has either.
+    private func line(_ parts: [String], step: CGFloat) -> some View {
+        HStack(spacing: step * 2.5) {
             ForEach(Array(parts.enumerated()), id: \.offset) { index, part in
                 if index > 0 { Circle().fill(.secondary).opacity(0.7).frame(width: 2, height: 2).accessibilityHidden(true) }
                 Text(verbatim: part).lineLimit(1)
@@ -374,7 +381,7 @@ private struct WebPageHeader: View {
             .textCase(.uppercase)
             .foregroundStyle(.secondary)
             Spacer(minLength: step * 4)
-            SourceViewPicker(mode: $mode)
+            if offersReader { SourceViewPicker(mode: $mode) }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("WebPageLine")

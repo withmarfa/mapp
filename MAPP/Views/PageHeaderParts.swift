@@ -4,8 +4,9 @@ import Foundation
 /// sends it to the editor's web page (`ItemPageHeader`), and a saved web page's, drawn in SwiftUI (`WebPageItemPage`).
 /// Both take their kind, their line and their pins from here, so they cannot disagree about what a header shows.
 ///
-/// A saved web page shown as the source's own page, not as an article, draws the header of an item that is not for reading
-/// (`reading` false): the byline and the description belong above the text they describe.
+/// A saved web page draws the same header whichever look it is shown in. The look changes the title's type and what the
+/// page below shows, never the pins or the lines: the switch between the looks sits beside them, and a row that came and
+/// went with it would move them.
 struct PageHeaderParts {
     let type: ItemTypeInfo?
     let kind: PageHeaderKind
@@ -17,15 +18,14 @@ struct PageHeaderParts {
     let candidates: [PropertyRow]
     let pins: PagePins
 
-    init(of item: Item, in library: any ItemLibrary, placements: PagePlacements, dateFormat: DateFormat, reading: Bool = true) {
+    init(of item: Item, in library: any ItemLibrary, placements: PagePlacements, dateFormat: DateFormat) {
         type = library.catalogue.itemTypes[item.type]
         placement = placements.placement(of: item.type, in: library.catalogue)
         relationships = library.relationships(for: item.id)
         now = library.now()
-        let kind = PageHeaderKind.of(item.type, in: library.catalogue)
-        self.kind = !reading && kind == .reading ? .general : kind
+        kind = PageHeaderKind.of(item.type, in: library.catalogue)
         lead = PageHeaderLead(
-            for: item, kind: self.kind, body: self.kind == .reading ? library.body(of: item.id)?.text : nil, now: now, format: dateFormat)
+            for: item, kind: kind, body: kind == .reading ? library.body(of: item.id)?.text : nil, now: now, format: dateFormat)
         let type = type, relationships = relationships
         candidates = PropertyRow.candidates(
             of: item, type: type, hidden: library.hiddenPropertyKeys(of: item).union(lead.consumed), relationships: relationships,
