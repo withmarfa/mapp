@@ -36,14 +36,14 @@ import Testing
         """
     }
 
-    private func analyse(_ html: String, title: String? = nil, encoding: String.Encoding? = nil) async throws -> PageAnalysis {
+    private func analyze(_ html: String, title: String? = nil, encoding: String.Encoding? = nil) async throws -> PageAnalysis {
         try await PageAnalyzer.analyze(Data(html.utf8), encoding: encoding, title: title ?? self.title)
     }
 
     // MARK: Finding the article
 
     @Test func theArticleIsFoundWithoutThePageAroundIt() async throws {
-        let article = try #require(try await analyse(page()).article)
+        let article = try #require(try await analyze(page()).article)
         #expect(article.html.contains("Seven miles of chalk"))
         #expect(!article.html.contains("Subscribe to the newsletter") && !article.html.contains("Slow Walks Home"))
         #expect(article.language == "en")
@@ -52,15 +52,15 @@ import Testing
     @Test func aHeadingThatRepeatsTheItemsTitleIsDropped() async throws {
         // The document's own title differs, so Readability keeps the heading and the cleanup is what drops it.
         let html = page(documentTitle: "Slow Walks routes, maps and the newsletter of an unhurried coast")
-        let article = try #require(try await analyse(html).article)
+        let article = try #require(try await analyze(html).article)
         #expect(!article.html.contains("slow down"), "the title is MAPP's, above the page")
-        let other = try #require(try await analyse(html, title: "Something else").article)
+        let other = try #require(try await analyze(html, title: "Something else").article)
         #expect(other.html.contains("slow down"), "a heading that is not the title stays")
     }
 
     @Test func aHeadingsPermalinkAndEscapedQuotesAreCleaned() async throws {
         let body = prose() + "<h2 id=\"why\">Why it matters<a href=\"#why\">#</a></h2><p>It said \\\"I don't know\\\" and stopped, then walked on.</p><pre>keep \\\"this\\\"</pre>"
-        let html = try #require(try await analyse(page(body: body)).article).html
+        let html = try #require(try await analyze(page(body: body)).article).html
         #expect(html.contains("Why it matters") && !html.contains(">#<"))
         #expect(html.contains("\"I don't know\"") && !html.contains("\\\"I don"))
         #expect(html.contains("keep \\\"this\\\""), "code is left as written")
@@ -68,21 +68,21 @@ import Testing
 
     @Test func aPicturesFixedSizeIsLeftToTheStyles() async throws {
         let body = "<figure><img src=\"https://example.com/a.jpg\" width=\"1200\" height=\"800\"></figure>" + prose()
-        let html = try #require(try await analyse(page(body: body)).article).html
+        let html = try #require(try await analyze(page(body: body)).article).html
         #expect(html.contains("example.com/a.jpg") && !html.contains("width=") && !html.contains("height="))
     }
 
     @Test func theArticleHoldsNoScriptOrEventHandler() async throws {
         let body = prose() + "<p onclick=\"steal()\" onmouseover=\"x()\">Click here to read more of the walk.</p><a href=\"javascript:steal()\">go</a>"
-        let html = try #require(try await analyse(page(body: body)).article).html
+        let html = try #require(try await analyze(page(body: body)).article).html
         #expect(html.contains("Click here") && !html.contains("onclick") && !html.contains("onmouseover") && !html.contains("javascript:"))
     }
 
     @Test func theFirstPictureBeforeAnyTextIsTheLeadPicture() async throws {
         let lead = "<figure><img src=\"https://example.com/lead.jpg\"><figcaption>The path west of Lulworth.</figcaption></figure>"
-        let withLead = try #require(try await analyse(page(body: lead + prose())).article).html
+        let withLead = try #require(try await analyze(page(body: lead + prose())).article).html
         #expect(withLead.contains("mapp-lead"))
-        let later = try #require(try await analyse(page(body: prose() + lead)).article).html
+        let later = try #require(try await analyze(page(body: prose() + lead)).article).html
         #expect(!later.contains("mapp-lead"), "a picture in the middle of the text is part of it")
     }
 
@@ -91,23 +91,23 @@ import Testing
     @Test func aPageOfLinksAndSnippetsIsNoArticle() async throws {
         let products = (1...40).map { "<li><a href=\"/p/\($0)\">Oak worktop \($0)</a> from £\($0 * 10)</li>" }.joined()
         let html = "<html><head><title>Shop</title></head><body><nav><a href=\"/\">Home</a></nav><ul>\(products)</ul></body></html>"
-        #expect(try await analyse(html).article == nil)
+        #expect(try await analyze(html).article == nil)
     }
 
     @Test func aPageWithTooLittleTextIsNoArticle() async throws {
-        let analysis = try await analyse(page(body: "<p>Seven miles of chalk and two steep climbs, walked slowly, in the evening.</p>"))
+        let analysis = try await analyze(page(body: "<p>Seven miles of chalk and two steep climbs, walked slowly, in the evening.</p>"))
         #expect(analysis.article == nil && !analysis.offersReader)
     }
 
     @Test func anEmptyDocumentIsNothing() async throws {
-        #expect(try await analyse("") == .none)
+        #expect(try await analyze("") == .none)
     }
 
     @Test func onlyATableOfDataIsMarkedForTheReadersTableStyling() async throws {
         let data = "<table><tr><th>Stage</th><th>Miles</th></tr>" +
             (1...6).map { "<tr><td>Stage \($0)</td><td>\($0 * 2)</td></tr>" }.joined() + "</table>"
         let layout = "<table role=\"presentation\"><tr><td>" + longProse(2) + "</td></tr><tr><td>" + longProse(2) + "</td></tr></table>"
-        let article = try #require(try await analyse(page(body: longProse(4) + data + layout)).article)
+        let article = try #require(try await analyze(page(body: longProse(4) + data + layout)).article)
         #expect(article.html.contains("class=\"mapp-data\""), "a table of rows and columns keeps its grid")
         #expect(article.html.components(separatedBy: "<table").count == 3)
         #expect(article.html.components(separatedBy: "mapp-data").count == 2, "a layout table is not styled as data")
@@ -118,7 +118,7 @@ import Testing
     @Test func theDocumentsOwnScriptsAreNotRunToFindTheArticle() async throws {
         // A script that would empty the page, then one that throws: neither runs, so the article is as written.
         let head = "<script>document.body.innerHTML = '';</script><script>throw new Error('broken');</script>"
-        let article = try #require(try await analyse(page(head: head)).article)
+        let article = try #require(try await analyze(page(head: head)).article)
         #expect(article.html.contains("Seven miles of chalk") && !article.html.contains("broken"))
     }
 
@@ -127,7 +127,7 @@ import Testing
             "and take the steps up behind the visitor centre, where the crowds thin out within ten minutes. " +
             "By the first waymark you will mostly have the path to yourself, apart from the gulls, the sheep and the odd climber. " +
             "The second climb is the steeper one, but the view back along the coast repays every step. <table><td>Bring water</p></div>" + prose()
-        let analysis = try await analyse(page(body: body))
+        let analysis = try await analyze(page(body: body))
         #expect(analysis.article?.html.contains("Bring water") == true)
     }
 
@@ -142,7 +142,7 @@ import Testing
     @Test func aRightToLeftArticleKeepsItsLanguageAndDirection() async throws {
         let sentence = "هذا نص عربي طويل يصف مسارا على طول الجرف الأبيض، ويستغرق السير فيه ساعات طويلة عند الغروب، فاحمل الماء والمعطف معك."
         let body = (0..<6).map { _ in "<p>\(sentence)</p>" }.joined()
-        let article = try #require(try await analyse(page(body: body, lang: "ar", dir: "dir=\"rtl\"")).article)
+        let article = try #require(try await analyze(page(body: body, lang: "ar", dir: "dir=\"rtl\"")).article)
         #expect(article.direction == .rtl && article.language == "ar")
         #expect(article.html.contains("مسارا"))
     }
@@ -178,28 +178,28 @@ import Testing
 
     @Test func aTableLaidOutAtAFixedWidthIsAMail() async throws {
         let html = "<html><body>\(mailColumn)\(prose())<p><a href=\"https://example.com/u\">Unsubscribe</a></p></td></tr></table></td></tr></table></body></html>"
-        #expect(try await analyse(html).isMail)
+        #expect(try await analyze(html).isMail)
     }
 
     @Test func aFixedWidthInStyleCountsAsMuchAsOneInAnAttribute() async throws {
         let html = "<html><body><table style=\"width:100%;max-width:560px\"><tr><td>\(prose())</td></tr></table></body></html>"
-        #expect(try await analyse(html).isMail)
+        #expect(try await analyze(html).isMail)
     }
 
     @Test func aWebPageIsNotAMailEvenWithAFixedWidthColumn() async throws {
-        #expect(try await analyse(page()).isMail == false)
+        #expect(try await analyze(page()).isMail == false)
         let column = "<html><body><div style=\"max-width:600px;margin:0 auto\">\(prose())</div></body></html>"
-        #expect(try await analyse(column).isMail == false, "a column with no layout table is not a mail's")
+        #expect(try await analyze(column).isMail == false, "a column with no layout table is not a mail's")
     }
 
     @Test func aTableThatSpansThePageIsNotAMail() async throws {
         let html = "<html><body><table width=\"100%\"><tr><td>\(prose())</td></tr></table></body></html>"
-        #expect(try await analyse(html).isMail == false)
+        #expect(try await analyze(html).isMail == false)
     }
 
     @Test func aMailCanAlsoHaveAnArticle() async throws {
         let html = "<html><body>\(mailColumn)\(longProse())</td></tr></table></td></tr></table></body></html>"
-        let analysis = try await analyse(html)
+        let analysis = try await analyze(html)
         #expect(analysis.isMail && analysis.offersReader)
     }
 }

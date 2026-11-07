@@ -2,12 +2,12 @@ import MarfaIcons
 import SwiftUI
 
 /// An item shown as an HTML document: its title and pins in the manner of the note page's header (`WebPageHeader`), then
-/// the HTML filling the rest of the detail area (`WebPageView`). The document is analysed first (`PageAnalyzer`): an
+/// the HTML filling the rest of the detail area (`WebPageView`). The document is analyzed first (`PageAnalyzer`): an
 /// article is read in Reader, the article alone in the note page's text, or shown as it was written; any other page is
-/// shown as it was written, with no Reader to switch to, and a mail sits centred on the surface behind pages. The document is the item's own file, for
-/// a Web Page or an HTML file, or the HTML file attached to it, for a document a connector keeps that way
-/// (`ItemLibrary.pageLayout(of:)`). The body is read only, and the title and properties are not edited on the page,
-/// except a pinned status, which keeps its menu; the inspector shows them all.
+/// shown as it was written, with no Reader to switch to, and a mail sits centered on the surface behind pages. The
+/// document is the item's own file, for a Web Page or an HTML file, or the HTML file attached to it, for a document a
+/// connector keeps that way (`ItemLibrary.pageLayout(of:)`). The body is read only, and the title and properties are
+/// not edited on the page, except a pinned status, which keeps its menu; the inspector shows them all.
 ///
 /// Its pictures are the app's to give (`SealedPictures`), for this item: while some wait for the person, a callout at the
 /// top of the page says how many and loads them, as on a note's page.
@@ -270,7 +270,7 @@ private struct PicturePillStyle: ButtonStyle {
     }
 }
 
-/// The switch between the reader look and the source's own, remembered for every such item.
+/// The switch between the reader look and the source's own, remembered for every article; a mail's choice is its own.
 struct SourceViewPicker: View {
     @Binding var mode: SourceViewMode
 
@@ -303,7 +303,7 @@ private struct WebPageHeader: View {
     let drafts: DetailsPresentation
     let open: (ItemID) -> Void
     @Binding var mode: SourceViewMode
-    /// Whether the article is shown in Reader, which gives the title and the byline the reading header's serif.
+    /// Whether the article is shown in Reader, which gives the title and the description the reading header's serif.
     let reading: Bool
     /// Whether the page has an article to read, which is the only page the switch is offered for.
     let offersReader: Bool

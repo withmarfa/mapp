@@ -23,10 +23,10 @@ nonisolated enum SourceViewMode: String, CaseIterable, Identifiable, Sendable {
 ///   page's text size in a serif, in the text column of a note's page (`PageStyle.horizontalInset`), as CSS so it follows
 ///   the window as it resizes. It sits on the window's own background.
 /// - Original is the document as written, at its own width. Only a document that says nothing about its look, with no
-///   style, colour or background of its own, is given a baseline and the text column, since it has no look to keep;
+///   style, color or background of its own, is given a baseline and the text column, since it has no look to keep;
 ///   everything else keeps its design, and its light background keeps its text readable in dark mode because the
-///   baseline's colours that follow the system are never added to it.
-/// - A mail (`MailColumn`) is Original with its column centred, on the surface behind pages (`isOnSurface`); the column
+///   baseline's colors that follow the system are never added to it.
+/// - A mail (`MailColumn`) is Original with its column centered, on the surface behind pages (`isOnSurface`); the column
 ///   is given white only where the mail paints no background of its own there.
 nonisolated struct SourceLook: Equatable, Sendable {
     var mode: SourceViewMode
@@ -44,7 +44,7 @@ nonisolated struct SourceLook: Equatable, Sendable {
         wide = page.fullWidth
     }
 
-    /// Whether the mail sits on the grey surface that lies behind pages.
+    /// Whether the mail sits on the gray surface that lies behind pages.
     var isOnSurface: Bool { isMail }
 
     /// Whether the web view is to paint no background of its own, so the window's shows (Reader) or the surface's (a mail).
@@ -132,7 +132,7 @@ nonisolated struct SourceLook: Equatable, Sendable {
             const column = mailColumn(document.body);
             if (column) {
               column.setAttribute('data-mapp-mail', '');
-              // A mail's own colour, even from a bgcolor attribute, beats any rule here, so the white is only
+              // A mail's own color, even from a bgcolor attribute, beats any rule here, so the white is only
               // given where the column paints nothing.
               if (getComputedStyle(column).backgroundColor === 'rgba(0, 0, 0, 0)') column.style.backgroundColor = '#fff';
             }

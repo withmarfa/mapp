@@ -34,7 +34,7 @@ import WebKit
     }
 
     @Test func aStyledDocumentIsLeftAsWritten() async throws {
-        // Its own light background must not meet a text colour that follows the system into dark mode.
+        // Its own light background must not meet a text color that follows the system into dark mode.
         for styled in [
             "<html><head><style>body { background: #fff }</style></head><body><p>Words</p></body></html>",
             "<html><body style=\"background:#fff\"><p>Words</p></body></html>",
@@ -59,7 +59,7 @@ import WebKit
         <p>The mail's own words, at the width its sender gave them.</p></td></tr></table></td></tr></table></body></html>
         """
 
-    @Test func theMailsColumnIsMarkedAndCentred() async throws {
+    @Test func theMailsColumnIsMarkedAndCentered() async throws {
         let marked = try await value("return document.querySelector('[data-mapp-mail]')?.id", in: mail, look: look(.original, mail: true))
         #expect(marked as? String == "column")
         let unmarked = try await value("return document.querySelector('[data-mapp-mail]')?.id ?? 'none'", in: mail, look: look(.original))
@@ -72,7 +72,7 @@ import WebKit
         let own = mail.replacingOccurrences(of: "<body>", with: "<body style=\"background:rgb(10, 20, 30)\">")
             .replacingOccurrences(of: "id=\"column\"", with: "id=\"column\" bgcolor=\"#ff0000\"")
         let kept = try await value(backdrop, in: own, look: look(.original, mail: true)) as? String
-        #expect(kept == "rgba(0, 0, 0, 0)|rgb(255, 0, 0)", "the mail's own colour wins on its column; the page behind it is the surface")
+        #expect(kept == "rgba(0, 0, 0, 0)|rgb(255, 0, 0)", "the mail's own color wins on its column; the page behind it is the surface")
     }
 
     @Test func aMailIsNeverRestyledAsReaderIs() async throws {

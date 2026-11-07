@@ -41,4 +41,4 @@ In Xcode Cloud, `ci_scripts/ci_post_clone.sh` writes `Config/Local.xcconfig` fro
 
 ## License
 
-[Apache-2.0](LICENSE). `editor/src/style.css` is adapted from another project and keeps its own MIT notice. `MAPP/Views/Reader/` holds [Mozilla Readability](https://github.com/mozilla/readability) 0.6.0, unmodified and under the Apache-2.0 licence; `READABILITY-NOTICE.txt` there has its notice and how to update it.
+[Apache-2.0](LICENSE). `editor/src/style.css` is adapted from another project and keeps its own MIT notice. `MAPP/Views/Reader/` holds [Mozilla Readability](https://github.com/mozilla/readability) 0.6.0, unmodified and under the Apache-2.0 license; `READABILITY-NOTICE.txt` there has its notice and how to update it.

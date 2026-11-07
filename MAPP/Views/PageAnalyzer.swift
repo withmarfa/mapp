@@ -6,14 +6,13 @@ import WebKit
 /// there is something to read.
 ///
 /// The document is loaded, with none of its scripts, into a sealed page of its own that is thrown away afterwards, and
-/// Mozilla's Readability (vendored under `Reader/`, with its licence) runs over a copy of it in the app's own script
+/// Mozilla's Readability (vendored under `Reader/`, with its license) runs over a copy of it in the app's own script
 /// world. The document cannot reach that world, and what Readability changes is the copy, so neither the page nor the
 /// stored file is touched. Apple gives apps no Reader API. A document whose content its scripts build has no article
 /// here, and is shown as it is.
 ///
 /// A document too large to parse, or one that takes longer than the limit, has no article, so the item shows the
-/// original as it did before Reader existed; nothing waits on the page's thread, since the work is in the web content
-/// process.
+/// original; nothing waits on the page's thread, since the work is in the web content process.
 enum PageAnalyzer {
     /// The longest an analysis may take before the document is taken to have no article.
     static let timeLimit = Duration.seconds(15)
