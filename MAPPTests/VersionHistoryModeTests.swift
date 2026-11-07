@@ -23,11 +23,17 @@ private func page(_ snapshots: [ItemSnapshot]) -> Result<ItemHistoryPage, ItemHi
         return (library, note, source)
     }
 
+    /// The mode, once the open pages have handed over: another test's page in this process can make that wait.
+    private func shown(_ details: DetailsPresentation) async throws -> VersionHistoryMode {
+        try #require(await eventually { details.history != nil })
+        return try #require(details.history)
+    }
+
     @Test func enteringShowsTheModeAndReadsTheVersions() async throws {
         let (library, note, _) = library([page([snapshot(1, body: "First"), snapshot(2, body: "Second")])])
         let details = DetailsPresentation()
         details.showHistory(of: note.id, in: library)
-        let mode = try #require(details.history)
+        let mode = try await shown(details)
         #expect(mode.item == note.id)
         #expect(await eventually { mode.thread.phase == .loaded })
         let list = try #require(mode.list(in: library))
@@ -45,7 +51,7 @@ private func page(_ snapshots: [ItemSnapshot]) -> Result<ItemHistoryPage, ItemHi
         let (library, note, source) = library([page([snapshot(1, body: "First")])])
         let details = DetailsPresentation()
         details.showHistory(of: note.id, in: library)
-        let first = try #require(details.history)
+        let first = try await shown(details)
         #expect(await eventually { first.thread.phase == .loaded })
         details.showHistory(of: note.id, in: library)
         #expect(details.history === first)
@@ -56,7 +62,7 @@ private func page(_ snapshots: [ItemSnapshot]) -> Result<ItemHistoryPage, ItemHi
         let (library, note, _) = library([page([snapshot(1, body: "First")])])
         let details = DetailsPresentation()
         details.showHistory(of: note.id, in: library)
-        #expect(details.history != nil)
+        _ = try await shown(details)
         details.leaveHistory()
         #expect(details.history == nil)
         // Leaving a window that shows no history is nothing.
@@ -68,7 +74,7 @@ private func page(_ snapshots: [ItemSnapshot]) -> Result<ItemHistoryPage, ItemHi
         let (library, note, _) = library(nil)
         let details = DetailsPresentation()
         details.showHistory(of: note.id, in: library)
-        let mode = try #require(details.history)
+        let mode = try await shown(details)
         #expect(await eventually { mode.thread.phase == .failed(.unsupported) })
         #expect(mode.restoreCheck(in: library) == nil)
         #expect(!mode.canRestore(in: library))
@@ -80,7 +86,7 @@ private func page(_ snapshots: [ItemSnapshot]) -> Result<ItemHistoryPage, ItemHi
         let (library, note, source) = library([.failure(.unreachable)])
         let details = DetailsPresentation()
         details.showHistory(of: note.id, in: library)
-        let mode = try #require(details.history)
+        let mode = try await shown(details)
         #expect(await eventually { mode.thread.phase == .failed(.unreachable) })
         source?.set([page([snapshot(1, body: "First")])])
         mode.thread.load()
@@ -92,7 +98,7 @@ private func page(_ snapshots: [ItemSnapshot]) -> Result<ItemHistoryPage, ItemHi
         let (library, note, _) = library([page([snapshot(1, body: "First")])])
         let details = DetailsPresentation()
         details.showHistory(of: note.id, in: library)
-        let mode = try #require(details.history)
+        let mode = try await shown(details)
         #expect(await eventually { mode.thread.phase == .loaded })
         mode.thread.selection = "v1"
         #expect(mode.canRestore(in: library))
@@ -106,7 +112,7 @@ private func page(_ snapshots: [ItemSnapshot]) -> Result<ItemHistoryPage, ItemHi
         let (library, note, _) = library([page([snapshot(1, body: "Agenda"), snapshot(2, body: "Other")])])
         let details = DetailsPresentation()
         details.showHistory(of: note.id, in: library)
-        let mode = try #require(details.history)
+        let mode = try await shown(details)
         #expect(await eventually { mode.thread.phase == .loaded })
         mode.thread.selection = VersionEntry.currentID
         #expect(!mode.canRestore(in: library))
@@ -131,7 +137,7 @@ private func page(_ snapshots: [ItemSnapshot]) -> Result<ItemHistoryPage, ItemHi
         library.history = FakeHistory([page([snapshot(1, body: "Older")])])
         let details = DetailsPresentation()
         details.showHistory(of: gone.id, in: library)
-        let mode = try #require(details.history)
+        let mode = try await shown(details)
         #expect(await eventually { mode.thread.phase == .loaded })
         mode.thread.selection = "v1"
         guard case .unavailable(let reason)? = mode.restoreCheck(in: library) else {
@@ -148,7 +154,7 @@ private func page(_ snapshots: [ItemSnapshot]) -> Result<ItemHistoryPage, ItemHi
         let (library, note, _) = library([page([snapshot(1, body: "First")])])
         let details = DetailsPresentation()
         details.showHistory(of: note.id, in: library)
-        let mode = try #require(details.history)
+        let mode = try await shown(details)
         #expect(await eventually { mode.thread.phase == .loaded })
         #expect(mode.list(in: library) != nil)
         // The window leaves when the list is nil.
