@@ -77,9 +77,9 @@ struct ViewOptionCommand {
                 browser.tableOptions[place, default: .init()].pageSize = size
             })
         }
-        if browser.tableOptions[place]?.filters.isEmpty == false {
+        if browser.tableOptions[place]?.isFiltering == true {
             commands.append(.init(title: String(localized: "Clear Filters"), systemImage: "line.3.horizontal.decrease") {
-                browser.tableOptions[place, default: .init()].filters = [:]
+                browser.tableOptions[place, default: .init()].clearFilters()
             })
         }
         return commands
@@ -88,10 +88,10 @@ struct ViewOptionCommand {
     private static func board(_ browser: Browser, _ library: any ItemLibrary) -> [ViewOptionCommand] {
         let place = browser.item
         let fields = browser.boardFieldChoices(in: library)
-        let field = ItemBoardLayout.selectedField(browser.boardFields[place], available: fields)
+        let field = ItemBoardLayout.selectedField(browser.boardFieldKey(in: place), available: fields)
         var commands = fields.filter { $0.key != field?.key }.map { field in
             ViewOptionCommand(title: String(localized: "Group by \(field.label)"), systemImage: "rectangle.split.3x1") {
-                browser.boardFields[place] = field.key
+                browser.setBoardField(field.key, in: place)
             }
         }
         let compact = browser.compactBoards[place, default: false]

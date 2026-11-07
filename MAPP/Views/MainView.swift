@@ -99,6 +99,8 @@ struct MainView: View {
                     SettingsPageList(browser: browser)
                 } else {
                     NoteList(browser: browser, order: order, pane: $pane).equatable()
+                        .filterChips(browser)
+                        .filteredEmptyState(browser)
                 }
             }
             // The page list is about as wide as the sidebar; each keeps its own width. The split view reads the ideal
@@ -164,16 +166,19 @@ struct MainView: View {
                 } detail: {
                     Group {
                         if browser.showsCollection {
-                            switch browser.viewMode {
-                            case .table:
-                                ItemTable(browser: browser, order: order, pane: $pane)
-                            case .board:
-                                ItemBoard(browser: browser, pane: $pane)
-                            case .timeline:
-                                ItemTimeline(browser: browser, pane: $pane)
-                            case .list, .gallery:
-                                ItemGallery(browser: browser, order: order, pane: $pane)
+                            Group {
+                                switch browser.viewMode {
+                                case .table:
+                                    ItemTable(browser: browser, order: order, pane: $pane)
+                                case .board:
+                                    ItemBoard(browser: browser, pane: $pane)
+                                case .timeline:
+                                    ItemTimeline(browser: browser, pane: $pane)
+                                case .list, .gallery:
+                                    ItemGallery(browser: browser, order: order, pane: $pane)
+                                }
                             }
+                            .filterChips(browser)
                         } else {
                             itemPage
                         }

@@ -13,9 +13,10 @@ struct ItemBoard: View {
     @State private var anchor: ItemID?
 
     var body: some View {
-        let items = browser.items(in: library)
+        let items = browser.filteredItems(in: library)
         let fields = browser.boardFieldChoices(in: library)
-        let field = ItemBoardLayout.selectedField(browser.boardFields[browser.item], available: fields)
+        // The lanes are the place's group (`ItemBoardOptions`), so a saved view's group is its lanes.
+        let field = ItemBoardLayout.selectedField(browser.boardFieldKey(in: browser.item), available: fields)
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
         VStack(spacing: 0) {
             if let field {
@@ -26,6 +27,7 @@ struct ItemBoard: View {
             }
         }
         .searchStatus(browser)
+        .filteredEmptyState(browser)
         .navigationTitle(title)
         .navigationSubtitle(Text("^[\(items.count) item](inflect: true)"))
         .toolbar(removing: browser.isSearchExpanded ? .title : nil)
@@ -168,7 +170,7 @@ struct ItemBoard: View {
         guard !ids.isEmpty else { return }
         // An item the lane doesn't suit is left where it is and counted, so the rest still move.
         let plan = ItemBoardLayout.movePlan(
-            ids, key: key, to: lane, shown: Set(browser.items(in: library).map(\.id)), in: library)
+            ids, key: key, to: lane, shown: Set(browser.filteredItems(in: library).map(\.id)), in: library)
         var skips = plan.skips
         // One undo step for the whole move.
         undoManager?.beginUndoGrouping()
