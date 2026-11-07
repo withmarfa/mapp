@@ -88,9 +88,13 @@ import Testing
         #expect(ids.count == content.allRows.count)
         #expect(Set(ids) == Set(content.allRows.map(\.id)))
 
+        // The gallery filters too: what it shows leads, then what the filters hide.
         browser.viewMode = .gallery
-        #expect(browser.collectionItemIDs(in: library, order: NoteOrder())
-            == browser.sections(in: library, order: NoteOrder(), now: library.now()).flatMap { $0.items.map(\.id) })
+        let shown = browser.sections(in: library, order: NoteOrder(), now: library.now()).flatMap { $0.items.map(\.id) }
+        #expect(shown.count == content.rows.count)
+        let galleryIDs = browser.collectionItemIDs(in: library, order: NoteOrder())
+        #expect(Array(galleryIDs.prefix(shown.count)) == shown)
+        #expect(Set(galleryIDs) == Set(content.allRows.map(\.id)))
         browser.viewMode = .list
         #expect(browser.collectionItemIDs(in: library, order: NoteOrder()).isEmpty)
     }

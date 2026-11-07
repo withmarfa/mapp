@@ -9,6 +9,8 @@ nonisolated enum NoteGroup: Hashable {
     case previous30Days
     case month(year: Int, month: Int)
     case year(Int)
+    /// A group of a saved view or of the table's grouping, by a field's value; `id` is the value.
+    case custom(id: String, title: String)
 
     func title(calendar: Calendar = .current) -> String {
         switch self {
@@ -23,6 +25,7 @@ nonisolated enum NoteGroup: Hashable {
         case .year(let year):
             calendar.date(from: DateComponents(year: year))?
                 .formatted(Date.FormatStyle(locale: calendar.locale ?? .current, calendar: calendar, timeZone: calendar.timeZone).year()) ?? ""
+        case .custom(_, let title): title
         }
     }
 

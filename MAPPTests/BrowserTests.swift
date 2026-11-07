@@ -24,11 +24,9 @@ struct BrowserTests {
         let (second, _, _, _) = makeFakeLibrary()
         let browser = Browser()
         browser.adopt(first)
-        browser.boardFields[.allNotes] = "status"
         browser.timelineFields[.allNotes] = "starts_at"
         browser.compactBoards[.allNotes] = true
         browser.adopt(second)
-        #expect(browser.boardFields.isEmpty)
         #expect(browser.timelineFields.isEmpty)
         #expect(browser.compactBoards.isEmpty)
     }

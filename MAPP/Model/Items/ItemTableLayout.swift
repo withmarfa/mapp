@@ -118,6 +118,10 @@ nonisolated enum ItemTableValue {
 }
 
 nonisolated extension ItemTableColumn {
+    /// Whether Is Not keeps a row with an empty cell. Marfa's `neq` on a property is false for an absent one, and
+    /// true for a parent a row lacks.
+    var negationKeepsEmpty: Bool { content == .parent }
+
     /// The values a categorical column offers, in the order its groups and its sort take them.
     func rank(of value: String) -> Int {
         switch style {
@@ -241,12 +245,57 @@ nonisolated struct ItemTableOptions: Hashable, Sendable {
 
     var grouping = Grouping.automatic
     var sort: [ItemTableComparator]?
-    /// For each column filtered, the categories it keeps; the empty string keeps empty cells.
+    /// For each column filtered, the categories it keeps; the empty string keeps empty cells. A column in `negated`
+    /// keeps the rows outside those categories instead (Is Not).
     var filters: [String: Set<String>] = [:]
+    /// The columns whose filter is Is Not. Only a column with a filter counts (`isNegated`).
+    var negated: Set<String> = []
     var collapsed: Set<String>?
     /// How many rows show at first and each time Load More is chosen. Kept with the place's other choices, not in
     /// a saved view, which has no field for it.
     var pageSize = TablePageSize.standard
+
+    /// Whether the column's filter is Is Not.
+    func isNegated(_ column: String) -> Bool {
+        negated.contains(column) && !(filters[column]?.isEmpty ?? true)
+    }
+
+    /// The filters that keep or hide something, with their Is and Is Not, which a place that differs only in a
+    /// column left in `negated` after its filter went does not change.
+    var filterChoices: [String: FilterChoice] {
+        filters.reduce(into: [:]) { choices, entry in
+            guard !entry.value.isEmpty else { return }
+            choices[entry.key] = FilterChoice(values: entry.value, isNegated: negated.contains(entry.key))
+        }
+    }
+
+    /// Whether any column is filtered.
+    var isFiltering: Bool { filters.values.contains { !$0.isEmpty } }
+
+    /// Removes every filter.
+    mutating func clearFilters() {
+        filters = [:]
+        negated = []
+    }
+
+    /// Removes one column's filter.
+    mutating func clearFilter(_ column: String) {
+        filters[column] = nil
+        negated.remove(column)
+    }
+
+    /// Sets a column's filter, dropping it where `values` is empty.
+    mutating func setFilter(_ column: String, values: Set<String>, negated isNegated: Bool? = nil) {
+        guard !values.isEmpty else { return clearFilter(column) }
+        filters[column] = values
+        if let isNegated { if isNegated { negated.insert(column) } else { negated.remove(column) } }
+    }
+}
+
+/// What one column's filter keeps: some categories, or everything outside them.
+nonisolated struct FilterChoice: Hashable, Sendable {
+    var values: Set<String>
+    var isNegated: Bool
 }
 
 nonisolated struct ItemTableGroup: Identifiable, Hashable, Sendable {
@@ -398,11 +447,24 @@ nonisolated enum ItemTableLayout {
         return sort
     }
 
-    /// The rows the filters keep.
-    static func filter(_ rows: [ItemTableRow], by filters: [String: Set<String>], columns: [ItemTableColumn]) -> [ItemTableRow] {
-        let active = filters.compactMap { id, kept in columns.first { $0.id == id }.map { ($0, kept) } }
+    /// The rows the filters keep. A column in `negated` keeps the rows whose category is none of its values. A
+    /// saved view's Is Not is Marfa's `neq`, which an absent property never satisfies (`exists`), so a column of a
+    /// property drops its empty cells, whereas a parent, which Marfa tests by the absence of a link, keeps them.
+    static func filter(
+        _ rows: [ItemTableRow], by filters: [String: Set<String>], negated: Set<String> = [], columns: [ItemTableColumn]
+    ) -> [ItemTableRow] {
+        let active = filters.compactMap { id, kept in
+            columns.first { $0.id == id }.map { (column: $0, kept: kept, isNegated: negated.contains(id) && !kept.isEmpty) }
+        }
         guard !active.isEmpty else { return rows }
-        return rows.filter { row in active.allSatisfy { column, kept in kept.contains(column.category(of: row) ?? "") } }
+        return rows.filter { row in
+            active.allSatisfy { column, kept, isNegated in
+                let category = column.category(of: row)
+                guard isNegated else { return kept.contains(category ?? "") }
+                guard let category else { return column.negationKeepsEmpty && !kept.contains("") }
+                return !kept.contains(category)
+            }
+        }
     }
 
     static func sorted(_ rows: [ItemTableRow], by sort: [ItemTableComparator]) -> [ItemTableRow] {
