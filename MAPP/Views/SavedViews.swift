@@ -88,13 +88,31 @@ enum SavedViews {
         return settings
     }
 
-    /// Saves what the panel holds, opening the panel first so a save that needs the person's yes can ask.
+    /// Whether a place that is not a view shows something a view could keep, which Save as View offers to.
+    static func hasChoicesToKeep(_ browser: Browser, in library: any ItemLibrary) -> Bool {
+        shown(browser, in: library) == nil && canEdit(browser, in: library)
+            && (browser.tableOptions[browser.item]?.isFiltering == true || browser.listShape?.arranged == true)
+    }
+
+    /// What the panel's Save would keep of the window, in the layout the window shows it.
+    static func panelWindow(_ browser: Browser, in library: any ItemLibrary, order: NoteOrder) -> ViewDraft.Window {
+        browser.viewPanel?.isNew == true ? window(browser, in: library, order: order) : window(browser, in: library)
+    }
+
+    /// Saves what the panel holds. With no panel open the save goes through a quiet one, which shows only if it has to
+    /// ask the person something or say why the save failed.
     static func save(_ browser: Browser, in library: any ItemLibrary, order: NoteOrder, confirmed: Bool = false) {
-        browser.openViewPanel(in: library)
+        if browser.viewPanel == nil {
+            browser.openViewPanel(in: library)
+            browser.viewPanel?.isQuiet = true
+        }
         guard browser.viewPanel != nil else { return }
-        let window = browser.viewPanel?.isNew == true ? window(browser, in: library, order: order) : window(browser, in: library)
+        let window = panelWindow(browser, in: library, order: order)
         let settings = newViewSettings(browser, in: library)
-        Task { await browser.saveViewPanel(window: window, newView: settings, confirmed: confirmed, in: library, order: order) }
+        Task {
+            await browser.saveViewPanel(window: window, newView: settings, confirmed: confirmed, in: library, order: order)
+            if browser.viewPanel?.isQuiet == true { browser.closeViewPanel(in: library) }
+        }
     }
 
     static func describe(_ unkept: ViewDraft.Unkept) -> String {

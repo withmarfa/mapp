@@ -39,9 +39,15 @@ extension Browser {
 
     // MARK: Opening and closing
 
+    /// Whether the right sidebar holds the panel.
+    var showsViewPanel: Bool { viewPanel?.isQuiet == false }
+
     /// Edit View: a view opens its own panel, and any other place that can show a table opens one with no name.
     func openViewPanel(in library: any ItemLibrary) {
-        guard viewPanel == nil else { return }
+        if let viewPanel {
+            viewPanel.isQuiet = false
+            return
+        }
         if case .view(let id) = item, let view = library.views.first(where: { $0.id == id }) {
             followView(in: library)
             viewPanel = ViewPanel(editing: view, notices: library.notices)
