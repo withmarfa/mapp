@@ -173,6 +173,28 @@ enum WindowToolbarLayout {
     static func collection(_ mode: ItemViewMode) -> String { "collection.\(mode)" }
 }
 
+/// Says when the Customize Toolbar tray of this window opens and closes. Menu commands still reach a window under its
+/// tray, so a window holds its shape meanwhile. Only the active window's tray counts: it is where the tray opens from.
+struct ToolbarTrayWatch: ViewModifier {
+    @Environment(\.appearsActive) private var appearsActive
+    @State private var trayWindow: NSWindow?
+    let changed: (Bool) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.willBeginSheetNotification)) { sheet in
+                guard appearsActive, let window = sheet.object as? NSWindow, window.toolbar?.customizationPaletteIsRunning == true else { return }
+                trayWindow = window
+                changed(true)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEndSheetNotification)) { sheet in
+                guard let window = sheet.object as? NSWindow, window === trayWindow else { return }
+                trayWindow = nil
+                changed(false)
+            }
+    }
+}
+
 /// The title of the note on the page, in the toolbar once the page's header has scrolled away.
 struct ScrolledItemTitle: View {
     let title: String

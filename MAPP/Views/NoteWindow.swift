@@ -12,6 +12,8 @@ struct NoteWindow: View {
     @Binding var id: ItemID?
     /// Where the item's file is, once known, for sharing.
     @State private var fileURL: URL?
+    /// Version History waits for Customize Toolbar's tray to close, as replacing a toolbar under its tray crashes.
+    @State private var isToolbarTrayOpen = false
 
     init(id: Binding<ItemID?>) {
         _id = id
@@ -51,12 +53,13 @@ struct NoteWindow: View {
 
     var body: some View {
         Group {
-            if let history = details.history {
+            if let history = details.history, !isToolbarTrayOpen {
                 VersionHistoryWorkspace(mode: history, details: details)
             } else {
                 page
             }
         }
+        .modifier(ToolbarTrayWatch { isToolbarTrayOpen = $0 })
         .focusedSceneValue(\.detailsPresentation, details)
         .environment(details)
         .sheet(item: Binding { details.typeChange } set: { details.typeChange = $0 }) { TypeChangeSheet(request: $0) }

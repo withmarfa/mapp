@@ -23,8 +23,6 @@ struct MainView: View {
     /// commands still reach the window. A change made meanwhile shows once the tray closes.
     @State private var heldPresentation: WorkspacePresentation?
     @State private var heldViewMode: ItemViewMode?
-    /// The window whose tray is open. Other windows hold too, which costs nothing, and only its tray ending lets go.
-    @State private var trayWindow: NSWindow?
     private let restoresWindow: Bool
 
     init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), restoresWindow: Bool = true) {
@@ -63,19 +61,10 @@ struct MainView: View {
         // Release the outgoing providers before mounting that workspace or changing the column count.
         // Browser, editor, drafts, and column preferences remain above this presentation identity.
         dialogsWindow.id(shownPresentation)
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willBeginSheetNotification)) { sheet in
-            if let window = sheet.object as? NSWindow, window.toolbar?.customizationPaletteIsRunning == true {
-                trayWindow = window
-                heldPresentation = workspacePresentation
-                heldViewMode = browser.viewMode
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEndSheetNotification)) { sheet in
-            guard sheet.object as? NSWindow === trayWindow else { return }
-            trayWindow = nil
-            heldPresentation = nil
-            heldViewMode = nil
-        }
+        .modifier(ToolbarTrayWatch { isOpen in
+            heldPresentation = isOpen ? workspacePresentation : nil
+            heldViewMode = isOpen ? browser.viewMode : nil
+        })
         .onChange(of: workspacePresentation) {
             editor.flush()
         }

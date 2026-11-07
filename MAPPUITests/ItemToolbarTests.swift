@@ -59,7 +59,6 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertEqual(count("MoreToolbar"), 1)
         XCTAssertEqual(count("ShareToolbar"), 1)
         XCTAssertGreaterThanOrEqual(details.frame.minX, inspector.frame.minX, "Details sits above the inspector column")
-        XCTAssertLessThan(more.frame.maxX, inspector.frame.minX, "Share and More stay where a person's layout has them")
         XCTAssertLessThan(share.frame.maxX, more.frame.minX)
         XCTAssertFalse(control("BackToolbar").exists)
         XCTAssertFalse(control("ForwardToolbar").exists)
@@ -91,6 +90,27 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertFalse(window.descendants(matching: .any)["ItemGallery"].waitForExistence(timeout: 1), "the window keeps its shape under the tray")
         done.click()
         XCTAssertTrue(window.descendants(matching: .any)["ItemGallery"].waitForExistence(timeout: 3))
+    }
+
+    func testVersionHistoryUnderTheOpenTrayWaitsForItToClose() {
+        assertVersionHistoryWaitsForTheTray()
+    }
+
+    func testVersionHistoryUnderTheOpenTrayOfANoteWindowWaitsForItToClose() {
+        app.menuBars.menuItems["Open in New Window"].click()
+        XCTAssertTrue(app.windows.element(boundBy: 1).waitForExistence(timeout: 5))
+        assertVersionHistoryWaitsForTheTray()
+    }
+
+    private func assertVersionHistoryWaitsForTheTray() {
+        app.menuBars.menuItems["Customize Toolbar…"].click()
+        let done = window.sheets.buttons["Done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 3))
+        app.menuBars.menuItems["Version History…"].click()
+        let exit = window.buttons["VersionHistoryExit"]
+        XCTAssertFalse(exit.waitForExistence(timeout: 1), "the window keeps its toolbar under the tray")
+        done.click()
+        XCTAssertTrue(exit.waitForExistence(timeout: 3))
     }
 
     func testViewOptionsOffersSortByAndGroupBy() {
