@@ -138,10 +138,10 @@ struct ItemPageHeader: ViewModifier {
                 draft.isDirty = false
                 draft.rejected = false
             case .menu(.status, let id, let rect):
-                guard editor.noteID == id, let item = library.item(id), let status = library.catalogue.itemTypes[item.type]?.statusField else { return }
+                guard editor.isShowing(id), let item = library.item(id), let status = library.catalogue.itemTypes[item.type]?.statusField else { return }
                 editor.presentEditor(Self.request(.status(status), of: id, in: library, undoManager: undoManager, editor: editor), under: rect)
             case .menu(.parent, let id, let rect):
-                guard editor.noteID == id, let item = library.item(id) else { return }
+                guard editor.isShowing(id), let item = library.item(id) else { return }
                 // An item that cannot be edited has no panel to change the parent in; the pin then only opens it.
                 guard item.isEditable else {
                     if let target = Self.parent(in: library.relationships(for: id))?.targets.first?.itemID { editor.onOpenNote(target) }
@@ -149,7 +149,7 @@ struct ItemPageHeader: ViewModifier {
                 }
                 editor.presentEditor(Self.request(.parent, of: id, in: library, undoManager: undoManager, editor: editor), under: rect)
             case .edit(let row, let id, let rect):
-                guard editor.noteID == id, let item = library.item(id) else { return }
+                guard editor.isShowing(id), let item = library.item(id) else { return }
                 let kind: ValueEditKind?
                 switch row {
                 case PagePlacement.tags:
@@ -174,10 +174,10 @@ struct ItemPageHeader: ViewModifier {
                 drafts.endLayout()
                 drafts.isPresented = true
             case .hideFromPage(let row, let id):
-                guard editor.noteID == id, let type = library.item(id)?.type else { return }
+                guard editor.isShowing(id), let type = library.item(id)?.type else { return }
                 PagePlacements.update { $0.set(false, row: row, of: type) }
             case .moveRow(let row, let before, let id):
-                guard editor.noteID == id, let item = library.item(id) else { return }
+                guard editor.isShowing(id), let item = library.item(id) else { return }
                 let rows = PageLayout.rows(
                     of: item, type: library.catalogue.itemTypes[item.type], hidden: library.hiddenPropertyKeys(of: item),
                     relationships: library.relationships(for: item.id), catalogue: library.catalogue)

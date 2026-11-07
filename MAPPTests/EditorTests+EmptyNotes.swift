@@ -10,11 +10,11 @@ import WebKit
 extension EditorTests {
     private static let stamp = "2026-10-26T00:00:00Z"
 
-    private static func row(_ id: String, title: String, body: String?) -> Marfa.Item {
-        var properties: JSONObject = ["title": .string(title)]
+    private static func row(_ id: String, title: String, body: String?, type: String = "core.note", titleKey: String = "title") -> Marfa.Item {
+        var properties: JSONObject = [titleKey: .string(title)]
         if let body { properties["body"] = .string(body) }
         return Marfa.Item(
-            id: id, type: "core.note", properties: properties, state: .active, tier: .library, version: 1, schemaVersion: 1,
+            id: id, type: type, properties: properties, state: .active, tier: .library, version: 1, schemaVersion: 1,
             source: "test", sourceId: nil, occurredAt: stamp, createdAt: stamp, updatedAt: stamp, tags: [])
     }
 
@@ -60,6 +60,31 @@ extension EditorTests {
         #expect(Set(saved) == [emptyID])
         #expect(await eventually { library.body(of: emptyID)?.text.contains("X") == true })
         #expect(library.body(of: kitchenID)?.text == kitchen)
+        await source.close()
+    }
+
+    @Test func theHeaderOfAnItemWithNoTextTakesWhatItsPageSends() async throws {
+        let itemTypes = [
+            ItemType(
+                id: "core.entity.person", label: "Person", fields: [TypeField(name: "name", type: "string", declaredBy: "core.entity.person")],
+                titleField: "name", bodyField: nil)
+        ]
+        let person = Self.row("person", title: "Ruth", body: nil, type: "core.entity.person", titleKey: "name")
+        let fake = WorkingCopy.fake(items: [person, Self.row("note", title: "Plain check", body: "")], itemTypes: itemTypes, displays: SampleLibrary.display)
+        let source = MarfaSource(
+            copy: fake.copy, connection: SampleLibrary.connection, reading: MarfaRead(copy: fake.copy), refreshing: Whole(copy: fake.copy))
+        source.events.yield(.paint)
+        let library = MarfaLibrary(source: source, notices: Notices())
+        let personID = ItemID("person"), noteID = ItemID("note")
+        try #require(await eventually { library.isLoaded && library.item(personID) != nil })
+        #expect(library.body(of: personID) == nil, "an item of a type with no text holds none")
+
+        let page = try await Harness(library: library)
+        page.editor.load(try #require(library.item(personID)))
+        #expect(page.editor.isShowing(personID), "its header is on the page, so the page's edits to it are the item's")
+        #expect(!page.editor.isShowing(noteID))
+        page.editor.load(try #require(library.item(noteID)))
+        #expect(!page.editor.isShowing(personID), "once another item is asked for, the last one's events are stale")
         await source.close()
     }
 }

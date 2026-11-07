@@ -118,6 +118,10 @@ final class EditorController: NSObject {
     private(set) var noteID: ItemID?
     /// An explicit selection can outlive a missing body, so its next update can retry the load.
     @ObservationIgnored var requestedNoteID: ItemID?
+
+    /// Whether the page is showing this item's header, which an item of a type with no text is too: it has no note on
+    /// the page (`noteID`), only its header. What the page sends for any other item is stale.
+    func isShowing(_ id: ItemID) -> Bool { requestedNoteID == id }
     @ObservationIgnored private var markdown = ""
     @ObservationIgnored private var read = ItemVersion(0)
     /// Each load gets a generation, and an edit reports the one it belongs to, so a late edit to the previous
