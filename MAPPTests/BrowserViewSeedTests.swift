@@ -29,6 +29,17 @@ struct BrowserViewSeedTests {
         return (browser, library)
     }
 
+    /// Takes the window's layout to be the one the view was saved in, so that the layout alone is no change.
+    private static func take(_ layout: ItemViewMode, in browser: Browser) {
+        let id = view().id
+        guard let seed = browser.viewSeeds[id] else { return }
+        var mac = seed.mac
+        mac.layout = layout
+        browser.viewSeeds[id] = Browser.ViewSeed(
+            version: seed.version, options: seed.options, timelineDate: seed.timelineDate, types: seed.types, mac: mac)
+        browser.viewWorking[id] = nil
+    }
+
     @Test func aViewOpensWithItsOwnOrderAndGrouping() {
         let (browser, library) = Self.opened()
         let options = browser.tableOptions[browser.item]
@@ -56,13 +67,7 @@ struct BrowserViewSeedTests {
             let (browser, _) = Self.opened()
             browser.viewMode = mode
             // The layout alone is a change too; the view is taken to have been saved in it, to see the filter's.
-            if let seed = browser.viewSeeds[Self.view().id] {
-                var mac = seed.mac
-                mac.layout = mode
-                browser.viewSeeds[Self.view().id] = Browser.ViewSeed(
-                    version: seed.version, options: seed.options, timelineDate: seed.timelineDate, types: seed.types, mac: mac)
-            }
-            browser.viewWorking[Self.view().id] = nil
+            Self.take(mode, in: browser)
             browser.tableOptions[browser.item]?.filters = ["field.status": ["todo"]]
             #expect(browser.hasViewChanges, "\(mode) did not count a filter")
             browser.tableOptions[browser.item]?.negated = ["field.status"]
@@ -114,6 +119,7 @@ struct BrowserViewSeedTests {
         library.items = [item]
         library.viewMembers[Self.view().id] = [item.id]
         browser.viewMode = .timeline
+        Self.take(.timeline, in: browser)
         let fallback = try #require(browser.timelineFieldChoices(in: library).first?.key)
         // Picking the date it already shows keeps the view as it was, and so no group to write.
         browser.setTimelineField(fallback, in: library)

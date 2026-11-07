@@ -19,7 +19,7 @@ struct ViewPanelFilters: View {
                     FilterRow(browser: browser, column: column, rows: content.allRows)
                 }
                 Menu {
-                    FilterMenuItems(browser: browser, content: content)
+                    FilterMenuItems(browser: browser)
                 } label: {
                     Label("Add Filter", systemImage: "plus")
                 }
