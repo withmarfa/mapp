@@ -449,6 +449,9 @@
     "Only pictures at secure (https) addresses can be loaded." : {
 
     },
+    "Picture Previews" : {
+      "extractionState" : "manual"
+    },
     "Pictures" : {
 
     },
@@ -1830,6 +1833,9 @@
     },
     "Find…" : {
 
+    },
+    "Finish Customizing" : {
+      "extractionState" : "manual"
     },
     "Finish editing the current note before changing libraries." : {
 

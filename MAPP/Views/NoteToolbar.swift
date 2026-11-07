@@ -111,9 +111,32 @@ struct DetailsToggle: View {
     let details: DetailsPresentation
 
     var body: some View {
-        Toggle("Details", systemImage: "sidebar.right", isOn: Binding { details.isPresented } set: { details.isPresented = $0 })
-            .help("Hide Details")
-            .accessibilityIdentifier("DetailsToggle")
+        if details.isCustomizingLayout {
+            LayoutDoneButton(details: details)
+        } else {
+            Toggle("Details", systemImage: "sidebar.right", isOn: Binding { details.isPresented } set: { details.isPresented = $0 })
+                .help("Hide Details")
+                .accessibilityIdentifier("DetailsToggle")
+        }
+    }
+}
+
+/// Stands in for the Details button while Customize Layout has the right sidebar: the system's prominent button, which
+/// finishes the mode, as Return and Escape do.
+struct LayoutDoneButton: View {
+    let details: DetailsPresentation
+
+    var body: some View {
+        Button("Done") { details.endLayout() }
+            .buttonStyle(.borderedProminent)
+            .keyboardShortcut(.defaultAction)
+            .background {
+                Button("Finish Customizing") { details.endLayout() }
+                    .keyboardShortcut(.cancelAction)
+                    .hidden()
+            }
+            .help("Finish Customizing")
+            .accessibilityIdentifier("LayoutDone")
     }
 }
 
@@ -233,11 +256,15 @@ private struct ItemToolbarActions {
             .accessibilityIdentifier("ShareToolbar")
     }
 
-    var detailsButton: some View {
-        Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
-            .help(details.isPresented ? "Hide Details" : "Show Details")
-            .disabled((browser?.selection.count ?? items.count) != 1)
-            .accessibilityIdentifier("DetailsToggle")
+    @ViewBuilder var detailsButton: some View {
+        if details.isCustomizingLayout {
+            LayoutDoneButton(details: details)
+        } else {
+            Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
+                .help(details.isPresented ? "Hide Details" : "Show Details")
+                .disabled((browser?.selection.count ?? items.count) != 1)
+                .accessibilityIdentifier("DetailsToggle")
+        }
     }
 
     var moreMenu: some View {

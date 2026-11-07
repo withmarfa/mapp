@@ -3,6 +3,8 @@ import SwiftUI
 
 enum InterfaceKey {
     static let textSize = "interfaceTextSize"
+    /// The width the person last gave the right sidebar, kept across layouts and launches.
+    static let inspectorWidth = "inspectorWidth"
     /// Whether the inspector's Details section is open, kept across items and launches.
     static let inspectorDetailsOpen = "inspectorDetailsOpen"
     /// Whether the inspector's Properties, Relationships, Links in This Page, Linked From and Tags sections are open, kept across items

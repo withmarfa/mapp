@@ -425,7 +425,7 @@ test('a saved file coming asks again only about the pictures at its address', as
         expect(labels()).toEqual([
           'gone.example.com: Not found.',
           'slow.example.com: Too slow.',
-          'c',
+          undefined,
         ]),
       )
       asked.length = 0

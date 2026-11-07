@@ -13,6 +13,7 @@ struct NoteList: View, Equatable {
     @State private var daysSeen = 0
     @State private var width = ColumnWidth.list.defaultWidth
     @AppStorage(ListKey.previewLines) private var previewLines = ListKey.defaultPreviewLines
+    @AppStorage(ListKey.showsPictures) private var showsPictures = true
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
 
     static func == (a: NoteList, b: NoteList) -> Bool { a.browser === b.browser && a.order == b.order }
@@ -39,7 +40,7 @@ struct NoteList: View, Equatable {
             ForEach(ListLine.lines(of: sections)) { line in
                 let row = ListLineRow(
                     line: line, order: order, now: now, dateFormat: dateFormat, context: context, previewLines: previewLines,
-                    excerpt: excerpts[line.id])
+                    showsPictures: showsPictures, excerpt: excerpts[line.id])
                 .selectionDisabled(line.isHeading)
                 .listRowSeparator(line.isHeading ? .hidden : .automatic, edges: .top)
                 .listRowSeparator(line.endsSection ? .hidden : .automatic, edges: .bottom)
@@ -136,6 +137,7 @@ struct ItemRow: View {
     let dateLabel: String
     let meta: ItemMeta
     let previewLines: Int
+    var showsPictures = false
     /// The words a search found in the item, in place of its preview.
     var excerpt: SearchExcerpt?
 
@@ -145,7 +147,20 @@ struct ItemRow: View {
         return excerpt
     }
 
+    private var isPicture: Bool {
+        if case .file(let type, _) = item.content { type.conforms(to: .image) } else { false }
+    }
+
     var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            text
+            if showsPictures, isPicture { RowPicture(item: item) }
+        }
+        .padding(.vertical, 6)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var text: some View {
         VStack(alignment: .leading, spacing: 3) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Group {
@@ -181,27 +196,58 @@ struct ItemRow: View {
                     .padding(.top, 1)
             }
         }
-        .padding(.vertical, 6)
-        .accessibilityElement(children: .combine)
     }
 }
 
-/// The pieces that say what an item is, side by side with room between them. A type shows as its colored mark; a
-/// piece with a symbol keeps the symbol. A long label gives way before the mark does.
+/// A small preview of a picture item at the trailing edge of its row. It holds its place until the picture is made, so
+/// a row does not change height as the list scrolls. Made as a gallery card's is, so the two share a picture's cost.
+private struct RowPicture: View {
+    @CurrentLibrary private var library
+    @Environment(\.displayScale) private var displayScale
+    let item: Item
+    @State private var artwork: GalleryArtwork?
+
+    private static let side: CGFloat = 44
+
+    var body: some View {
+        let basis = GalleryArtworkCache.basis(of: item, in: library)
+        let shown = artwork ?? GalleryArtworkCache.peek(basis, width: Self.side)
+        let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
+        shape.fill(.quinary)
+            .frame(width: Self.side, height: Self.side)
+            .overlay {
+                if let shown {
+                    Image(decorative: shown.image, scale: 1).resizable().scaledToFill()
+                }
+            }
+            .clipShape(shape)
+            .accessibilityHidden(true)
+            .task(id: basis) {
+                let made = await GalleryArtworkCache.artwork(for: item, width: Self.side, scale: displayScale, in: library)
+                if !Task.isCancelled { artwork = made }
+            }
+    }
+}
+
+/// The pieces that say what an item is, side by side with room between them. A type shows as a small version of the
+/// page's type chip, its name in its color; a piece with a symbol keeps the symbol. A long label gives way before the
+/// mark does.
 struct ItemMetaLine: View {
     let meta: ItemMeta
 
     var body: some View {
         HStack(spacing: 12) {
             ForEach(meta.pieces) { piece in
-                HStack(spacing: 5) {
-                    switch piece.icon {
-                    case .symbol(let name): Image(systemName: name)
-                    case .type(let id): TypeMark(icon: id, size: .chip)
+                switch piece.icon {
+                case .symbol(let name):
+                    HStack(spacing: 5) {
+                        Image(systemName: name)
+                        Text(piece.label).lineLimit(1)
                     }
-                    Text(piece.label).lineLimit(1)
+                    .foregroundStyle(.secondary)
+                case .type(let id):
+                    TypePill(icon: id, label: piece.label)
                 }
-                .foregroundStyle(.secondary)
             }
         }
         .interfaceFont(.caption)
@@ -229,6 +275,7 @@ private struct ListLineRow: View {
     let dateFormat: DateFormat
     let context: ItemMeta.Context
     let previewLines: Int
+    let showsPictures: Bool
     let excerpt: SearchExcerpt?
 
     var body: some View {
@@ -245,6 +292,7 @@ private struct ListLineRow: View {
                 dateLabel: DateDisplay.text(of: order.sort.date(of: item), place: .list, format: dateFormat, now: now),
                 meta: ItemMeta.make(for: item, in: library, context: context),
                 previewLines: previewLines,
+                showsPictures: showsPictures,
                 excerpt: excerpt
             )
         }

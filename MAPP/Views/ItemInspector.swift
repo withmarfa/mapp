@@ -385,7 +385,7 @@ private struct InspectorDetailCell: View {
     var body: some View {
         InspectorCell(name: name) {
             HStack(spacing: 6) {
-                if let mark { TypeIcon(id: mark).foregroundStyle(.secondary) }
+                if let mark { TypeGlyph(id: mark).foregroundStyle(.secondary) }
                 InspectorText(text: value, keepsOneLine: isDate, lines: InspectorMetrics.cellValueLines)
             }
         }

@@ -40,6 +40,9 @@ final class DetailsPresentation {
     /// It belongs to the window, not to an item: another item shows its own type's rows, and a file, which cannot be
     /// arranged, shows the inspector until a note is back.
     private(set) var isCustomizingLayout = false
+    /// Whether the window shows an item's page, which is what Customize Layout arranges. A gallery, table, board or
+    /// timeline with no item opened has none, nor do Settings and an index.
+    var showsPage = true
     /// Whether ending Customize Layout closes the sidebar, because starting it opened the sidebar.
     @ObservationIgnored private var closesSidebarAtEnd = false
     /// The items the window's Add to Collection sheet is open for.

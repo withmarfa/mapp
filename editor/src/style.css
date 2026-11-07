@@ -375,18 +375,27 @@ body[data-text='none'] #editor {
   outline-offset: 1px;
 }
 
-/* Type, and a linked item, which reads the same: tinted in the type's color, its symbol in color. */
-.item-chip[data-kind='type'],
-.item-chip[data-kind='link'] {
+/* A fill means a type: tinted in the type's color, its symbol in color. */
+.item-chip[data-kind='type'] {
   padding-inline-start: var(--c-type-start);
   background: var(--tone-chip);
+}
+
+/* A linked item is its mark in color and its title, with no fill. */
+.item-chip[data-kind='link'] {
+  padding-inline: 0;
+  background: none;
+}
+
+.item-chip[data-kind='link']:not(:disabled):hover .item-chip-text {
+  text-decoration: underline;
 }
 
 .item-chip-mark {
   flex: none;
   width: var(--c-mark);
   height: var(--c-mark);
-  background: var(--tone);
+  background: var(--tone-ink);
   -webkit-mask: center / contain no-repeat;
   mask: center / contain no-repeat;
 }
@@ -575,12 +584,12 @@ body[data-text='none'] #editor {
   opacity: 0.7;
 }
 
-/* The pins: a key above its value, 20 points apart, 16 under the title and 20 above the property block. They share one
-   row while they fit, then fall to three to a row and then two, by the width of the page's column and not of the
-   window (a container query on the box round the list; the thresholds are the 13 point design's 440 and 320 points in
-   the box's own em, which follows the interface's text size). The status and the type keep their whole words; a list
-   gives way first. */
+/* The pins: a key above its value, 16 points under the title and 20 above the property block. Each sits in a slot of a
+   fixed width, 150 points in the 13 point design, so a pin stays where it is from page to page. Four slots share a row
+   while they fit and then two do, by the width of the page's column and not of the window (a container query on the box
+   round the list, in the box's own em, which follows the interface's text size). */
 .item-pins {
+  --pin-slot: calc(var(--interface-text-size) * 150 / 13);
   container-type: inline-size;
   align-self: stretch;
   margin-top: calc(var(--step) * 1.5);
@@ -592,85 +601,66 @@ body[data-text='none'] #editor {
 }
 
 .item-pin-list {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: flex-start;
-  gap: calc(var(--step) * 4) calc(var(--step) * 5);
+  display: grid;
+  grid-template-columns: repeat(4, var(--pin-slot));
+  align-items: start;
+  gap: calc(var(--step) * 4) 0;
   margin: 0;
   padding: 0;
 }
 
 .item-pin-item {
+  box-sizing: border-box;
   display: flex;
-  flex: 0 1 auto;
   flex-direction: column;
   gap: calc(var(--step) * 1.25);
   min-width: 0;
-  max-width: 50%;
+  padding-inline-end: calc(var(--step) * 2);
 }
 
-.item-pin-item[data-kind='status'],
-.item-pin-item[data-kind='type'] {
-  flex-shrink: 0;
-}
-
-.item-pin-item[data-kind='items'],
-.item-pin-item[data-kind='people'],
-.item-pin-item[data-kind='options'],
-.item-pin-item[data-kind='tags'] {
-  flex-shrink: 3;
-}
-
-@container (max-width: 33.85em) {
+@container (max-width: 46.15em) {
   .item-pin-list {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .item-pin-item {
-    max-width: none;
-  }
-}
-
-@container (max-width: 24.6em) {
-  .item-pin-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, var(--pin-slot)));
   }
 }
 
 .item-pin-key {
-  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: var(--step);
+  min-width: 0;
   margin: 0;
   color: var(--label-secondary);
   font-size: calc(var(--interface-text-size) * 12 / 13);
   line-height: calc(var(--step) * 3.75);
+}
+
+.item-pin-name {
+  overflow: hidden;
+  min-width: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* A value keeps to two lines: a list wraps its chips onto a second line at most, and a text is cut after two. */
+/* A value keeps to one line: a list's last chip gives way, and a text is cut. */
 .item-pin-value {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: calc(var(--step) * 1.5) calc(var(--step) * 2);
+  gap: calc(var(--step) * 2);
   min-width: 0;
   min-height: calc(var(--step) * 6);
   margin: 0;
-  max-height: calc(var(--c-height) * 2 + var(--step) * 1.5);
   overflow: hidden;
   color: var(--label-primary);
   font-size: var(--interface-text-size);
+  white-space: nowrap;
 }
 
 .item-pin-value > .item-text,
 .item-pin-value > .item-link {
-  display: -webkit-box;
   min-width: 0;
   overflow: hidden;
-  overflow-wrap: anywhere;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  text-overflow: ellipsis;
 }
 
 .item-pin-more {
@@ -718,7 +708,7 @@ body[data-text='none'] #editor {
 
 .item-prop-label {
   flex: none;
-  width: calc(var(--step) * 36);
+  width: calc(var(--step) * 30);
   color: var(--label-secondary);
   font-weight: 400;
 }

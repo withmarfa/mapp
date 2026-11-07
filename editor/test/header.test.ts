@@ -437,6 +437,7 @@ test('an item a row links to is a chip in its own tone, with the icon of its typ
   const chip = root.querySelector<HTMLElement>('.item-prop-value .item-chip')!
   expect(chip.dataset.kind).toBe('link')
   expect(chip.style.getPropertyValue('--tone')).toBe('var(--tone-blue)')
+  expect(chip.style.getPropertyValue('--tone-ink')).toBe('var(--tone-blue-ink)')
   expect(chip.querySelector('.item-chip-mark')).not.toBeNull()
   expect(chip.querySelector('.item-chip-text')!.textContent).toBe('Ship it')
   posted = []
@@ -916,9 +917,11 @@ test('pins are drawn in the order sent, each with its key above its value and no
     'Epic',
     'Updated',
   ])
-  expect(root.querySelector('.item-pin-key .item-glyph')).toBeNull()
+  expect(root.querySelector('.item-pin-key .item-glyph')).not.toBeNull()
   expect(entries[0]!.querySelector('dd #ItemTypePin .item-chip-mark')).not.toBeNull()
   expect(entries[3]!.querySelector('dd')!.textContent).toBe('Today')
+  expect(entries[3]!.querySelector('dd')!.title).toBe('Today')
+  expect(entries[2]!.querySelector('dt')!.title).toBe('Epic')
   // The key is above the value in the document, which the stylesheet stacks.
   expect(entries[3]!.firstElementChild!.tagName).toBe('DT')
 })

@@ -13,7 +13,7 @@ struct CustomizeLayoutButton: View {
     var body: some View {
         Button("Customize Layout…", systemImage: "slider.horizontal.3") { details?.beginLayout() }
             .disabled(
-                details == nil || details?.isCustomizingLayout == true || ids.count != 1
+                details == nil || details?.isCustomizingLayout == true || details?.showsPage == false || ids.count != 1
                     || !PageCustomization.isAvailable(for: ids.first.flatMap { library.item($0) }))
     }
 }

@@ -67,7 +67,10 @@ struct NoteOrganizeActions: View {
             .disabled(active.isEmpty)
             AddTagButton(ids: ids, details: details, undoManager: undoManager)
             TypeChangeButton(ids: ids, details: details, undoManager: undoManager)
-            CustomizeLayoutButton(ids: ids, details: details)
+            // A right click on a card with no page open has nothing to arrange; the menus keep the item in place.
+            if details?.showsPage != false || inMenuBar || keepsPlace {
+                CustomizeLayoutButton(ids: ids, details: details)
+            }
             VersionHistoryButton(ids: ids, details: details, undoManager: undoManager)
         }
     }

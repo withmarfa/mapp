@@ -159,6 +159,7 @@ extension Tuning {
             size("Person initials", \.personInitialsSize, in: 6...12, step: 0.5),
             opacity("Type tint", \.typeTintOpacity),
             opacity("Mark tint", \.markOpacity),
+            opacity("Icon depth", \.inkDepth),
             size("Status edge width", \.statusEdgeWidth, in: 0...2, step: 0.25),
             opacity("Edge light", \.edgeOpacityLight),
             opacity("Edge dark", \.edgeOpacityDark),

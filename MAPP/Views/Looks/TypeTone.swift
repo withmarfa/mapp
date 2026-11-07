@@ -16,6 +16,10 @@ nonisolated enum TypeTone: String, CaseIterable, Sendable {
         "lucide:square-check-big": .blue,
         "lucide:message-square": .blue,  // guess: the design's envelope
         "lucide:calendar": .red,
+        "lucide:terminal": .indigo,
+        "lucide:scroll-text": .gray,
+        "lucide:signpost": .orange,
+        "lucide:briefcase": .blue,
         "lucide:book-open": .orange,
         "lucide:library-big": .orange,  // guess: a shelf of the design's closed book
         "lucide:bookmark": .teal,
@@ -52,8 +56,15 @@ nonisolated enum TypeTone: String, CaseIterable, Sendable {
         color(for: scheme).opacity(opacity)
     }
 
-    /// The tone as CSS custom properties for the web page: `--tone`, and `--tone-mark` and `--tone-chip` for the pale
-    /// fills at the opacities in force.
+    /// The color of an icon or a name on the tone's tint, a step apart from it: `depth` of the way to black in light
+    /// and to white in dark, where the tint is the darker of the two.
+    func ink(_ depth: Double, for scheme: ColorScheme) -> Color {
+        let (r, g, b) = inkComponents(depth, dark: scheme == .dark)
+        return Color(.sRGB, red: r, green: g, blue: b)
+    }
+
+    /// The tone as CSS custom properties for the web page: `--tone`, `--tone-ink` for an icon on its tint, and
+    /// `--tone-mark` and `--tone-chip` for the pale fills at the opacities in force.
     @MainActor static func cssColors(for icon: String?, dark: Bool, looks: ChipLooks = .current) -> [String: String] {
         cssColors(for: TypeTone(icon: icon), dark: dark, looks: looks)
     }
@@ -62,8 +73,11 @@ nonisolated enum TypeTone: String, CaseIterable, Sendable {
     @MainActor static func cssColors(for tone: TypeTone, dark: Bool, looks: ChipLooks = .current) -> [String: String] {
         let (r, g, b) = tone.components(dark: dark)
         let (red, green, blue) = (Int((r * 255).rounded()), Int((g * 255).rounded()), Int((b * 255).rounded()))
+        let ink = tone.inkComponents(looks.inkDepth, dark: dark)
+        let inkBytes = [ink.0, ink.1, ink.2].map { String(Int(($0 * 255).rounded())) }.joined(separator: ", ")
         return [
             "--tone": "rgb(\(red), \(green), \(blue))",
+            "--tone-ink": "rgb(\(inkBytes))",
             "--tone-mark": "rgba(\(red), \(green), \(blue), \(String(format: "%g", looks.markOpacity)))",
             "--tone-chip": "rgba(\(red), \(green), \(blue), \(String(format: "%g", looks.typeTintOpacity)))",
         ]
@@ -72,6 +86,12 @@ nonisolated enum TypeTone: String, CaseIterable, Sendable {
     private func components(dark: Bool) -> (Double, Double, Double) {
         let hex = dark ? darkHex : lightHex
         return (Double((hex >> 16) & 0xFF) / 255, Double((hex >> 8) & 0xFF) / 255, Double(hex & 0xFF) / 255)
+    }
+
+    private func inkComponents(_ depth: Double, dark: Bool) -> (Double, Double, Double) {
+        let (r, g, b) = components(dark: dark)
+        let target = dark ? 1.0 : 0.0
+        return (r + (target - r) * depth, g + (target - g) * depth, b + (target - b) * depth)
     }
 
     private var lightHex: Int {

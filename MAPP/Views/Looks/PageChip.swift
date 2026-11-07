@@ -8,7 +8,8 @@ struct PageChip: View {
     enum Kind {
         /// The type's name, tinted in its tone, with its icon in color.
         case type(icon: String?)
-        /// An item a row links to, which reads the same as a type.
+        /// An item a row links to: its mark in color and its title with no fill, since a fill means a type. The title
+        /// is underlined under the pointer.
         case link(icon: String?)
         /// A status: its group's mark in a chip with a fine edge, and a chevron where it opens a menu.
         case status(PageHeader.Mark, chevron: Bool)
@@ -23,6 +24,11 @@ struct PageChip: View {
 
     @Environment(\.colorScheme) private var scheme
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
+    @State private var isHovering = false
+
+    private var isLink: Bool {
+        if case .link = kind { true } else { false }
+    }
 
     var body: some View {
         let looks = ChipLooks.current
@@ -31,6 +37,7 @@ struct PageChip: View {
         HStack(spacing: looks.gap * scale) {
             leading(looks: looks, scale: scale)
             Text(verbatim: text)
+                .underline(isLink && isHovering)
                 .lineLimit(1)
                 .truncationMode(.tail)
             if case .status(_, true) = kind {
@@ -44,9 +51,10 @@ struct PageChip: View {
         .font(.system(size: looks.textSize * scale))
         .foregroundStyle(.primary)
         .padding(.leading, start(looks: looks) * scale)
-        .padding(.trailing, looks.padding * scale)
+        .padding(.trailing, (isLink ? 0 : looks.padding) * scale)
         .frame(height: looks.height * scale)
         .background(fill(looks: looks), in: shape)
+        .onHover { isHovering = isLink && $0 }
         .overlay {
             if case .status = kind {
                 shape.strokeBorder(looks.edge(for: scheme), lineWidth: looks.statusEdgeWidth)
@@ -56,7 +64,8 @@ struct PageChip: View {
 
     private func start(looks: ChipLooks) -> CGFloat {
         switch kind {
-        case .type, .link, .status: looks.typePaddingStart
+        case .type, .status: looks.typePaddingStart
+        case .link: 0
         case .tag: looks.tagPaddingStart
         case .option: looks.padding
         }
@@ -64,7 +73,8 @@ struct PageChip: View {
 
     private func fill(looks: ChipLooks) -> Color {
         switch kind {
-        case .type(let icon), .link(let icon): TypeTone(icon: icon).fill(looks.typeTintOpacity, for: scheme)
+        case .type(let icon): TypeTone(icon: icon).fill(looks.typeTintOpacity, for: scheme)
+        case .link: .clear
         case .status: looks.statusFill(for: scheme)
         case .option: looks.optionFill(for: scheme)
         case .tag: looks.tagFill(for: scheme)
@@ -74,10 +84,10 @@ struct PageChip: View {
     @ViewBuilder private func leading(looks: ChipLooks, scale: CGFloat) -> some View {
         switch kind {
         case .type(let icon), .link(let icon):
-            Image(typeIcon: icon)
+            Image(typeGlyph: icon)
                 .resizable()
                 .scaledToFit()
-                .foregroundStyle(TypeTone(icon: icon).color(for: scheme))
+                .foregroundStyle(TypeTone(icon: icon).ink(looks.inkDepth, for: scheme))
                 .frame(width: looks.chipMarkSize * scale, height: looks.chipMarkSize * scale)
                 .accessibilityHidden(true)
         case .status(let mark, _):
