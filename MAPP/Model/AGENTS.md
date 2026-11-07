@@ -38,6 +38,7 @@ The data model, free of SwiftUI: the `ItemLibrary` protocol, `MarfaLibrary` over
 - `PictureAddressPolicy` checks every address and redirect before a request: `https` only, no sign-in, and no private, local or reserved address by name or by any resolved answer. `PictureFetcher` offers no identity or password and tells a picture's kind by its bytes, never SVG.
 - **Known limit: DNS rebinding.** `URLSession` resolves the name again when it connects, so a server that answers the check with a public address and the connection with a private one is not stopped. Do not claim more than this in the interface or the docs.
 - A sealed web page (`SealedWebPage`) has no network, stored data or WebRTC, and reaches only its own pictures.
+- `PageAnalyzer` loads a document into a sealed page of its own, with none of the document's scripts, and runs the vendored Readability over a copy in the app's script world (`SealedWebPage.world`). It never changes the page that is shown or the stored file; a failure or a timeout is a document with no article, and a cancelled analysis throws, so a late answer never reaches the next item.
 
 ## Changing libraries and quitting
 
