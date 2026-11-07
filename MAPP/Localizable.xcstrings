@@ -31,7 +31,19 @@
     "Add Filter" : {
 
     },
+    "Add or Find a Tag" : {
+
+    },
+    "Add Person to %@" : {
+
+    },
+    "Add Person…" : {
+
+    },
     "Add Sort" : {
+
+    },
+    "Add “%@”" : {
 
     },
     "Always shown" : {
@@ -39,6 +51,9 @@
     },
     "Approve MAPP With This Code" : {
       "extractionState" : "manual"
+    },
+    "Assigned" : {
+
     },
     "Automatic uses words in lists and tables, such as “Yesterday”, and abbreviated dates elsewhere. Times follow your Mac’s 12 or 24 hour setting." : {
       "extractionState" : "manual"
@@ -54,6 +69,9 @@
     },
     "Copy Code" : {
       "extractionState" : "manual"
+    },
+    "Create “%@”" : {
+
     },
     "Customize Layout…" : {
       "extractionState" : "manual"
@@ -81,6 +99,9 @@
 
     },
     "Filters" : {
+
+    },
+    "Find or Add a Person" : {
 
     },
     "Four Pins at Most" : {
@@ -185,6 +206,9 @@
     "Marfa keeps this condition. This window can’t show it, and saving leaves it as it is." : {
 
     },
+    "Matching" : {
+
+    },
     "More than %lld filter conditions" : {
 
     },
@@ -193,6 +217,9 @@
     },
     "Mark" : {
       "extractionState" : "manual"
+    },
+    "Next Week" : {
+
     },
     "Nothing changed." : {
       "extractionState" : "manual"
@@ -214,6 +241,9 @@
     },
     "Open Page" : {
       "extractionState" : "manual"
+    },
+    "Opens a list of choices" : {
+
     },
     "Pill" : {
       "extractionState" : "manual"
@@ -312,6 +342,9 @@
 
     },
     "This view changed elsewhere, so it now shows the view as it is. Your name is still here; make your other changes again." : {
+
+    },
+    "Time" : {
 
     },
     "Tinted Pill" : {
