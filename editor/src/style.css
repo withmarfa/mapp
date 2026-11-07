@@ -86,6 +86,7 @@ body {
    interface's text size (the pin measures are the 13 point design scaled). */
 #item-header {
   --interface-text-size: 13px;
+  font-size: var(--interface-text-size);
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -108,6 +109,7 @@ body {
 #item-footer {
   --interface-text-size: 13px;
   --step: calc(var(--interface-text-size) * 4 / 13);
+  font-size: var(--interface-text-size);
   padding: calc(var(--step) * 6) var(--inkkit-column-inset) calc(var(--step) * 8);
   font-family: -apple-system, system-ui, sans-serif;
   line-height: normal;
@@ -723,10 +725,82 @@ body[data-text='none'] #editor {
 }
 
 .item-prop-label {
+  box-sizing: border-box;
   flex: none;
+  position: relative;
+  isolation: isolate;
   width: calc(var(--step) * 30);
+  gap: calc(var(--step) * 1.5);
+  padding-block: calc(var(--step) / 2);
+  padding-inline-end: var(--step);
+  min-height: calc(var(--step) * 8);
   color: var(--label-secondary);
   font-weight: 400;
+}
+
+/* Under the pointer a key shows that it can be dragged: its fill runs past it on the left, as a value's does, and the
+   grip takes the symbol's place. Symbols differ in width, so each sits in the same slot and the names line up. */
+.item-prop-label::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 0 calc(var(--step) * -1.5);
+  border-radius: 6px;
+}
+
+.item-prop-symbol {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: calc(var(--step) * 5.5);
+}
+
+.item-prop-symbol > * {
+  grid-area: 1 / 1;
+}
+
+.item-prop-grip {
+  visibility: hidden;
+}
+
+.item-prop:not(:only-child) > .item-prop-label:hover::before,
+.editable > .item-prop-label[role='button']:hover::before,
+.item-prop.dragged > .item-prop-label::before {
+  background: var(--label-quinary);
+}
+
+.item-prop:not(:only-child) > .item-prop-label:hover .item-prop-grip,
+.item-prop.dragged .item-prop-grip {
+  visibility: visible;
+}
+
+.item-prop:not(:only-child) > .item-prop-label:hover .item-glyph:not(.item-prop-grip),
+.item-prop.dragged .item-glyph:not(.item-prop-grip) {
+  visibility: hidden;
+}
+
+.item-prop.dragged {
+  position: relative;
+  z-index: 1;
+}
+
+.item-props.dragging,
+.item-props.dragging * {
+  cursor: grabbing;
+}
+
+.item-props.dragging .editable > .item-prop-value[role='button']:hover {
+  background: none;
+}
+
+.item-props.dragging > .item-prop:not(.dragged) > .item-prop-label::before {
+  background: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .item-props.dragging > .item-prop:not(.dragged) {
+    transition: transform 150ms ease;
+  }
 }
 
 .item-prop-name {

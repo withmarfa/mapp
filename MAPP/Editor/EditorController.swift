@@ -651,6 +651,8 @@ final class EditorController: NSObject {
             onHeaderEvent(.menu(menu, item, containerRect(rect, viewportHeight: viewportHeight)))
         case .editValue(let item, let row, let rect, let viewportHeight):
             onHeaderEvent(.edit(row: row, item, containerRect(rect, viewportHeight: viewportHeight)))
+        case .moveRow(let item, let row, let before):
+            onHeaderEvent(.moveRow(row: row, before: before, item))
         case .toggleLayout:
             onHeaderEvent(.toggleLayout)
         case .showLinked:

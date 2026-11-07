@@ -1008,3 +1008,67 @@ test('the row above the title counts what links here and starts or ends Customiz
     'a file has nothing to lay out',
   ).toBe(true)
 })
+
+/** Draws three rows of 30 points with a fourth folded away, and returns a drag of the first by its key. */
+function draggable(): { key: HTMLElement; drag: (y: number) => void; drop: () => void } {
+  const rows = ['a', 'b', 'c', 'd'].map((id) => ({
+    id,
+    label: id,
+    symbol: 'text.alignleft',
+    kind: 'text' as const,
+    text: id,
+    editable: true,
+  }))
+  header.set({ ...ticket, properties: rows, foldAfter: 3 })
+  const list = root.querySelector<HTMLElement>('.item-props')!
+  list.getBoundingClientRect = () => ({ top: 0, height: 90 }) as DOMRect
+  ;[...list.children].forEach((row, index) => {
+    row.getBoundingClientRect = () => ({ top: index * 30, height: 30 }) as DOMRect
+  })
+  const key = list.querySelector<HTMLElement>('.item-prop-label')!
+  key.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0, clientY: 15 }))
+  return {
+    key,
+    drag: (y) => window.dispatchEvent(new MouseEvent('pointermove', { clientY: y })),
+    drop: () => window.dispatchEvent(new MouseEvent('pointerup')),
+  }
+}
+
+test('a row dragged by its key is listed before the row it was dropped above', () => {
+  const { drag, drop } = draggable()
+  drag(50)
+  drop()
+  expect(posted).toEqual([{ type: 'moveRow', item: 'ticket', row: 'a', before: 'c' }])
+})
+
+test('a row dropped last among those shown stays above the rows folded away', () => {
+  const { drag, drop } = draggable()
+  drag(80)
+  drop()
+  expect(posted).toEqual([{ type: 'moveRow', item: 'ticket', row: 'a', before: 'd' }])
+})
+
+test('a dragged key opens no editor, and a press that does not move still does', () => {
+  const { key, drag, drop } = draggable()
+  drag(50)
+  drop()
+  key.click()
+  expect(posted.map((message) => message.type)).toEqual(['moveRow'])
+
+  posted = []
+  const press = draggable()
+  press.drag(16)
+  press.drop()
+  press.key.click()
+  expect(posted.map((message) => message.type)).toEqual(['editValue'])
+})
+
+test('Escape puts a dragged row back', () => {
+  const { key, drag, drop } = draggable()
+  drag(50)
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+  drop()
+  expect(posted).toEqual([])
+  expect(key.parentElement!.style.transform).toBe('')
+  expect(root.querySelector('.item-props')!.classList.contains('dragging')).toBe(false)
+})

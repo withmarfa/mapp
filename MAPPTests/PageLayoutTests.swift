@@ -25,6 +25,15 @@ struct PageLayoutTests {
         #expect(Self.ids(layout.hidden) == ["#linked"], "Linked From is in the inspector by default")
     }
 
+    @Test func aRowDraggedOnThePageGoesBeforeTheRowItWasDroppedOn() throws {
+        let layout = Self.layout()
+        #expect(Self.ids(try #require(layout.moving("c", before: "a")).page) == ["c", "a", "b"])
+        #expect(Self.ids(try #require(layout.moving("a", before: "c")).page) == ["b", "a", "c"])
+        #expect(Self.ids(try #require(layout.moving("a", before: nil)).page) == ["b", "c", "a"])
+        #expect(layout.moving("#type", before: "a") == nil, "a pin stays a pin")
+        #expect(layout.moving("a", before: "#type") == nil, "a row is placed among the page's rows only")
+    }
+
     @Test func aRowMovedBetweenGroupsIsOnOrOffThePageAccordingly() {
         var placements = PagePlacements()
         var layout = Self.layout(Self.rows, placements)
