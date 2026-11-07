@@ -61,8 +61,8 @@ private struct SortRow: View {
             }
             .labelsHidden()
             .pickerStyle(.menu)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityIdentifier("ViewPanelSortColumn")
-            Spacer(minLength: 0)
             Picker("Direction", selection: Binding { key.order } set: { order in
                 replace(ItemTableComparator(column: key.column, order: order))
             }) {
