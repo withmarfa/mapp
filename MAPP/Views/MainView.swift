@@ -23,6 +23,8 @@ struct MainView: View {
     /// commands still reach the window. A change made meanwhile shows once the tray closes.
     @State private var heldPresentation: WorkspacePresentation?
     @State private var heldViewMode: ItemViewMode?
+    /// The window whose tray is open. Other windows hold too, which costs nothing, and only its tray ending lets go.
+    @State private var trayWindow: NSWindow?
     private let restoresWindow: Bool
 
     init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), restoresWindow: Bool = true) {
@@ -62,12 +64,15 @@ struct MainView: View {
         // Browser, editor, drafts, and column preferences remain above this presentation identity.
         dialogsWindow.id(shownPresentation)
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.willBeginSheetNotification)) { sheet in
-            if (sheet.object as? NSWindow)?.toolbar?.customizationPaletteIsRunning == true {
+            if let window = sheet.object as? NSWindow, window.toolbar?.customizationPaletteIsRunning == true {
+                trayWindow = window
                 heldPresentation = workspacePresentation
                 heldViewMode = browser.viewMode
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEndSheetNotification)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEndSheetNotification)) { sheet in
+            guard sheet.object as? NSWindow === trayWindow else { return }
+            trayWindow = nil
             heldPresentation = nil
             heldViewMode = nil
         }
@@ -146,7 +151,7 @@ struct MainView: View {
     /// Only the three-column split has a list column to measure.
     private var hasListColumn: Bool { shownPresentation == .list || shownPresentation == .settings }
 
-    private var activeListColumn: ColumnWidth { browser.showsSettings ? .settings : .list }
+    private var activeListColumn: ColumnWidth { shownPresentation == .settings ? .settings : .list }
 
     private var sidebarColumn: some View {
         VStack(spacing: 0) {
