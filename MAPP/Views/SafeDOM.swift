@@ -31,6 +31,7 @@ nonisolated enum SafeDOM {
             query: method(Element, 'querySelector'),
             matches: method(Element, 'matches'),
             closest: method(Element, 'closest'),
+            checkVisibility: method(Element, 'checkVisibility'),
             getAttribute: method(Element, 'getAttribute'),
             getAttributeNames: method(Element, 'getAttributeNames'),
             setAttribute: method(Element, 'setAttribute'),

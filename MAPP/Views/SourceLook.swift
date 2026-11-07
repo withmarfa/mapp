@@ -28,7 +28,8 @@ nonisolated enum SourceViewMode: String, CaseIterable, Identifiable, Sendable {
 ///   baseline's colors that follow the system are never added to it.
 /// - A mail (`MailColumn`) is Original with its column centered, on the surface behind pages (`isOnSurface`). It keeps
 ///   its own colors: a mail that paints its page, its body or its column paints it still, and a column that nothing
-///   paints is given white only if its text is dark.
+///   paints is given white only if its text is dark. A fully transparent color paints nothing, and neither does a picture
+///   at a web address, which the seal blocks. The color that counts is the one most of the text is written in.
 nonisolated struct SourceLook: Equatable, Sendable {
     var mode: SourceViewMode
     var isMail: Bool
@@ -126,22 +127,53 @@ nonisolated struct SourceLook: Equatable, Sendable {
         let text = css;
         if (!reader) {
           if (mail) {
+            // A pixel reads every color the engine computes, such as oklch(). The black comes first because a color
+            // the canvas refused must read as dark: read as light, it would leave dark text on the dark surface.
+            const pixel = dom.createElement(document, 'canvas').getContext('2d', { willReadFrequently: true });
+            const channels = color => {
+              pixel.clearRect(0, 0, 1, 1);
+              pixel.fillStyle = '#000';
+              pixel.fillStyle = color;
+              pixel.fillRect(0, 0, 1, 1);
+              return pixel.getImageData(0, 0, 1, 1).data;
+            };
             const luminance = color => {
-              const m = /^rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/.exec(color);
-              return m ? (0.2126 * m[1] + 0.7152 * m[2] + 0.0722 * m[3]) / 255 : 1;
+              const [red, green, blue] = channels(color);
+              return (0.2126 * red + 0.7152 * green + 0.0722 * blue) / 255;
             };
             // A mail's own color, from a bgcolor attribute or a style sheet, is what the person is to see; the
             // surface behind the pages shows only where nothing paints, and white is only given there to text that
-            // is dark, since light text was written for a page of its own.
+            // is dark, since light text was written for a page of its own. The seal blocks a picture at a web address,
+            // so only a gradient or a picture the document holds stands behind the text.
             const paints = e => {
               const style = getComputedStyle(e);
-              return style.backgroundColor !== 'rgba(0, 0, 0, 0)' || style.backgroundImage !== 'none';
+              return channels(style.backgroundColor)[3] > 0 || /gradient\\(|url\\("?data:/i.test(style.backgroundImage);
+            };
+            // The column's own color says nothing of text written in another: in a document that follows the system
+            // the column's is light in dark mode, whatever color its paragraphs are given.
+            const textColor = column => {
+              const held = new Map();
+              const walker = dom.createTreeWalker(document, column, NodeFilter.SHOW_TEXT);
+              let read = 0;
+              for (let node = walker.nextNode(); node && read < 500; node = walker.nextNode()) {
+                const length = dom.nodeValue(node).trim().length;
+                const parent = dom.parentElement(node);
+                if (!length || !parent || !dom.checkVisibility(parent, { opacityProperty: true, visibilityProperty: true })) continue;
+                read++;
+                const color = getComputedStyle(parent).color;
+                held.set(color, (held.get(color) || 0) + length);
+              }
+              return Array.from(held).sort((a, b) => b[1] - a[1])[0]?.[0] ?? getComputedStyle(column).color;
             };
             for (const column of mailColumns(dom.body(document))) {
               dom.setAttribute(column, 'data-mapp-mail', '');
               let painted = false;
               for (let e = column; e && !painted; e = dom.parentElement(e)) painted = paints(e);
-              if (!painted && luminance(getComputedStyle(column).color) < 0.5) dom.style(column).backgroundColor = '#fff';
+              if (!painted && luminance(textColor(column)) < 0.5) {
+                dom.style(column).backgroundColor = '#fff';
+                // Text with no color of its own still follows the system, and would be light on the white.
+                if (luminance(getComputedStyle(column).color) >= 0.5) dom.style(column).color = '#000';
+              }
             }
           }
           if (!dom.queryInDocument(document, '\(styled)')) text += '\\n' + plain;

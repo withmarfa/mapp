@@ -1,5 +1,7 @@
 @testable import MAPP
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 import WebKit
 
@@ -129,6 +131,67 @@ import WebKit
         let html = "<html><head><style>p { color: #222222 }</style></head><body><table id=\"column\" width=\"600\"><tr><td><p>Words in a dark color.</p></td></tr></table></body></html>"
         let colors = try await value(paint, in: html, look: look(.original, mail: true)) as? String
         #expect(colors == "rgb(255, 255, 255)|rgba(0, 0, 0, 0)")
+    }
+
+    // MARK: A mail in dark mode
+
+    /// What a script finds once the mail is shown in dark mode, where a page's own text color may follow the system.
+    private func inDarkMode(_ script: String, of html: String) async throws -> String? {
+        let sealed = try await SealedWebPage.make(runsScripts: false)
+        let window = TestWindow(contentRect: NSRect(x: -4000, y: 200, width: 900, height: 700), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.contentView = NSHostingView(rootView: WebView(sealed.page))
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil) }
+        try #require(try await eventuallyAsking {
+            try await sealed.page.callJavaScript("return matchMedia('(prefers-color-scheme: dark)').matches") as? Bool == true
+        })
+        try await sealed.show(Data(html.utf8), look: look(.original, mail: true))
+        return try await sealed.page.callJavaScript(script) as? String
+    }
+
+    private func columnInDarkMode(_ html: String) async throws -> String? {
+        try await inDarkMode("return getComputedStyle(document.getElementById('column')).backgroundColor", of: html)
+    }
+
+    private nonisolated static func column(_ words: String = "<p style=\"color:#333333\">Words in a dark color.</p>") -> String {
+        "<table id=\"column\" width=\"600\"><tr><td>\(words)</td></tr></table>"
+    }
+
+    @Test(arguments: [
+        "<html><body>\(column())</body></html>",
+        "<!doctype html><html><head><meta name=\"color-scheme\" content=\"light dark\"></head><body>\(column())</body></html>",
+        "<!doctype html><html><head><style>:root{color-scheme:light dark}</style></head><body>\(column())</body></html>",
+        "<html><body background=\"https://example.com/bg.png\">\(column())</body></html>",
+        "<html><head><style>body{background:url(https://example.com/bg.png)}</style></head><body>\(column())</body></html>",
+        "<html><body><table width=\"100%\"><tr><td background=\"https://example.com/bg.png\" align=\"center\">\(column())</td></tr></table></body></html>",
+        "<html><body style=\"background-color:rgba(255,255,255,0)\">\(column())</body></html>",
+        "<html><head><style>body{background:#ffffff00}</style></head><body>\(column())</body></html>",
+        "<html><head><style>body{color:oklch(0.2 0 0)}</style></head><body>\(column("<p>Words in a dark color.</p>"))</body></html>",
+    ]) func darkTextWithNothingBehindItIsPaintedWhiteInDarkMode(_ html: String) async throws {
+        #expect(try await columnInDarkMode(html) == "rgb(255, 255, 255)")
+    }
+
+    @Test func textWithNoColorOfItsOwnStaysReadableOnTheWhite() async throws {
+        let words = "<p style=\"color:#333333\">Most of the words in this mail are written in a dark color.</p><p id=\"plain\">A few are not.</p>"
+        let html = "<!doctype html><html><head><style>:root{color-scheme:light dark}</style></head><body>\(Self.column(words))</body></html>"
+        #expect(try await inDarkMode("return getComputedStyle(document.getElementById('plain')).color", of: html) == "rgb(0, 0, 0)")
+    }
+
+    @Test func hiddenTextDoesNotDecideTheColor() async throws {
+        let words = "<div style=\"display:none;color:#ffffff\">\(String(repeating: "Preview text no one sees. ", count: 40))</div><p style=\"color:#333333\">Words in a dark color.</p>"
+        #expect(try await columnInDarkMode("<html><body>\(Self.column(words))</body></html>") == "rgb(255, 255, 255)")
+    }
+
+    @Test(arguments: [
+        "<html><body bgcolor=\"#111111\" text=\"#eeeeee\">\(column("<p>Words.</p>"))</body></html>",
+        "<html><head><style>body{background:#111111;color:#eeeeee}</style></head><body>\(column("<p>Words.</p>"))</body></html>",
+        "<html><body style=\"background:linear-gradient(#111111,#222222);color:#eeeeee\">\(column("<p>Words.</p>"))</body></html>",
+        "<html><body style=\"background:url(data:image/gif;base64,R0lGODlhAQABAAAAACw=);color:#333333\">\(column("<p>Words.</p>"))</body></html>",
+        "<html><body style=\"color:oklch(0.95 0 0)\">\(column("<p>Words.</p>"))</body></html>",
+        "<!doctype html><html><head><style>:root{color-scheme:light dark}</style></head><body>\(column("<p>Words that follow the system.</p>"))</body></html>",
+    ]) func whatPaintsItselfOrIsLightIsNotPaintedWhiteInDarkMode(_ html: String) async throws {
+        #expect(try await columnInDarkMode(html) != "rgb(255, 255, 255)")
     }
 
     // MARK: Documents that name their elements after the page's methods
