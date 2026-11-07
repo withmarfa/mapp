@@ -187,14 +187,18 @@ nonisolated extension Item {
 
     /// Whether its properties and relationships can be changed. A file, a deleted item or one with a problem is read
     /// only.
-    var isEditable: Bool { state == .active && problem == nil && !isFile }
+    var isEditable: Bool { allowsChanges && !isFile }
 
     /// Whether its text can be written in: text the library could not read is not shown, so nothing typed over the
     /// empty page is written.
     var isWritable: Bool { state == .active && !isFile && problem?.withholdsText != true }
 
     /// Whether its tags can be changed: a file can be tagged, a deleted item or one with a problem cannot.
-    var canEditTags: Bool { state == .active && problem == nil }
+    var canEditTags: Bool { allowsChanges }
+
+    /// The one place that decides an item takes changes to its values and tags, which every editor on the page and in
+    /// the inspector asks through `isEditable` and `canEditTags`. An item the server marks read only joins here.
+    private var allowsChanges: Bool { state == .active && problem == nil }
 
     var isFile: Bool {
         if case .file = content { true } else { false }
