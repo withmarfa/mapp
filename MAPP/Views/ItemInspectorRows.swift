@@ -368,6 +368,15 @@ struct InspectorRow<Value: View>: View {
     let name: Text
     let help: String
     @ViewBuilder let value: Value
+    private var nameAction: (() -> Void)?
+
+    /// Makes a click on the name do `action`, as it does on the page, where a value that holds a link is changed from
+    /// its name. Nil leaves the name as text.
+    func onNameTap(_ action: (() -> Void)?) -> Self {
+        var row = self
+        row.nameAction = action
+        return row
+    }
 
     init(name: LocalizedStringResource, @ViewBuilder value: () -> Value) {
         self.name = Text(name)
@@ -398,6 +407,7 @@ struct InspectorRow<Value: View>: View {
                 .truncationMode(.tail)
                 .fixedSize(horizontal: false, vertical: true)
                 .help(help)
+                .onTapGesture { nameAction?() }
                 .containerRelativeFrame(.horizontal, alignment: .leading) { width, _ in
                     InspectorMetrics.nameColumn(longest: sharedNameWidth, fallback: InspectorMetrics.nameWidth * scale, available: width)
                 }

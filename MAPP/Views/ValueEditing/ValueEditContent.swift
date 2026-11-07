@@ -5,7 +5,7 @@ import SwiftUI
 struct ValueEditContent: View {
     let model: ValueEditModel
     @Environment(\.interfaceTextSize) private var textSize
-    @FocusState private var searchFocused: Bool
+    @FocusState private var fieldFocused: Bool
 
     private var scale: CGFloat { InterfaceStyle.scale(for: textSize) }
 
@@ -20,7 +20,7 @@ struct ValueEditContent: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { model.measure(.total, $0) }
         .task {
             await Task.yield()
-            searchFocused = true
+            fieldFocused = true
         }
     }
 
@@ -28,16 +28,16 @@ struct ValueEditContent: View {
 
     @ViewBuilder private var searchArea: some View {
         VStack(alignment: .leading, spacing: 6 * scale) {
-            if model.kind == .tags, !model.heldTags.isEmpty {
+            if !model.heldTokens.isEmpty {
                 TagFlowLayout(spacing: 4 * scale) {
-                    ForEach(model.heldTags, id: \.self) { tag in tagToken(tag) }
+                    ForEach(model.heldTokens, id: \.self) { token in tokenView(token) }
                 }
             }
             HStack(spacing: 6 * scale) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
-                TextField(model.kind == .tags ? "Add or Find a Tag" : "Find or Add a Person", text: Bindable(model).query)
+                TextField(model.searchPrompt, text: Bindable(model).query)
                     .textFieldStyle(.plain)
-                    .focused($searchFocused)
+                    .focused($fieldFocused)
                     .accessibilityIdentifier("ValueEditSearch")
             }
             .padding(.horizontal, 8 * scale)
@@ -47,14 +47,14 @@ struct ValueEditContent: View {
         .padding(.bottom, 4 * scale)
     }
 
-    private func tagToken(_ tag: String) -> some View {
+    private func tokenView(_ token: String) -> some View {
         HStack(spacing: 3 * scale) {
-            Text(verbatim: tag).lineLimit(1)
-            Button { model.removeTag(tag) } label: {
+            Text(verbatim: token).lineLimit(1)
+            Button { model.removeToken(token) } label: {
                 Image(systemName: "xmark").font(.system(size: 8 * scale, weight: .bold))
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Remove \(tag)")
+            .accessibilityLabel("Remove \(token)")
         }
         .font(.system(size: 11 * scale))
         .padding(.horizontal, 7 * scale)
@@ -67,6 +67,8 @@ struct ValueEditContent: View {
     @ViewBuilder private var listArea: some View {
         if case .date = model.kind {
             dateList
+        } else if model.kind.isTyped {
+            typedField
         } else {
             let height = scrollHeight
             ScrollViewReader { proxy in
@@ -79,6 +81,8 @@ struct ValueEditContent: View {
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { model.measure(.list, $0) }
                 .onChange(of: model.activeRow) { _, id in if let id, model.viaKeyboard { proxy.scrollTo(id) } }
             }
+            .disabled(model.isSaving)
+            .opacity(model.isSaving ? 0.5 : 1)
         }
     }
 
@@ -108,6 +112,28 @@ struct ValueEditContent: View {
             }
         }
         .accessibilityElement(children: .contain)
+    }
+
+    // MARK: Typed
+
+    /// The field a text or a number is typed into. A text grows with what is typed and scrolls past eight lines.
+    private var typedField: some View {
+        let field = model.kind.field
+        let isNumber = model.kind.isNumber
+        return TextField(field?.label ?? "", text: Bindable(model).typed, prompt: Text("None"), axis: isNumber ? .horizontal : .vertical)
+            .textFieldStyle(.plain)
+            .lineLimit(isNumber ? 1...1 : 1...8)
+            .font(.system(size: ValueEditMetrics.textSize * scale))
+            .focused($fieldFocused)
+            .padding(.horizontal, 8 * scale)
+            .padding(.vertical, 4 * scale)
+            .frame(maxWidth: .infinity, minHeight: ValueEditMetrics.rowHeight * scale, alignment: .leading)
+            .accessibilityLabel(field?.label ?? "")
+            .accessibilityIdentifier("ValueEditText")
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                model.measure(.rows, height)
+                model.measure(.list, height)
+            }
     }
 
     // MARK: Date
@@ -161,6 +187,18 @@ struct ValueEditContent: View {
                 .padding(.horizontal, 8 * scale)
                 .padding(.bottom, 2 * scale)
                 .accessibilityIdentifier("ValueEditNotice")
+            if model.hasConflict {
+                HStack(spacing: 12 * scale) {
+                    Button("Keep My Edit") { model.keepEdit() }
+                        .accessibilityIdentifier("ValueEditKeepEdit")
+                    Button("Use Current Value") { model.useCurrentValue() }
+                        .accessibilityIdentifier("ValueEditUseCurrent")
+                }
+                .buttonStyle(.borderless)
+                .font(.system(size: 11 * scale))
+                .padding(.horizontal, 8 * scale)
+                .padding(.bottom, 2 * scale)
+            }
         }
     }
 }

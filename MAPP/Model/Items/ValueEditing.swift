@@ -2,14 +2,22 @@ import Foundation
 import Marfa
 
 /// The values that open in a panel under them, in the inspector and on the page: what the field is, whatever it is
-/// called. A text, a number, a yes or no and every other list stay in the inspector's own controls.
+/// called. A yes or no is a checkbox in both places, and a list of anything but people or words stays in the inspector's
+/// own list editor.
 nonisolated enum ValueEditKind: Hashable, Sendable {
     case status(ItemTypeInfo.Field)
     case choice(ItemTypeInfo.Field)
     case date(ItemTypeInfo.Field)
     case people(ItemTypeInfo.Field, ListShape)
+    /// A text of any format, which may run to many lines.
+    case text(ItemTypeInfo.Field)
+    case number(ItemTypeInfo.Field)
+    /// A list of words, such as labels.
+    case words(ItemTypeInfo.Field)
     /// The item's own tags, which no field holds.
     case tags
+    /// The item's parent, which no field holds: a link to another item.
+    case parent
 
     /// How the field is edited in a panel, or nil where it is not.
     init?(field: ItemTypeInfo.Field) {
@@ -18,22 +26,49 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
         case .choice where field.isPicked: self = .choice(field)
         case .date: self = .date(field)
         case .list(let shape) where shape.holdsPeople: self = .people(field, shape)
+        case .text: self = .text(field)
+        case .number: self = .number(field)
+        case .words: self = .words(field)
         default: return nil
         }
     }
 
     var field: ItemTypeInfo.Field? {
         switch self {
-        case .status(let field), .choice(let field), .date(let field), .people(let field, _): field
-        case .tags: nil
+        case .status(let field), .choice(let field), .date(let field), .people(let field, _), .text(let field), .number(let field),
+             .words(let field):
+            field
+        case .tags, .parent: nil
+        }
+    }
+
+    /// The row's identifier on the page (`PagePlacement`): the field's key, or the one the tags and the parent have.
+    var rowID: String {
+        switch self {
+        case .tags: PagePlacement.tags
+        case .parent: PagePlacement.parent
+        default: field?.key ?? ""
+        }
+    }
+
+    var isNumber: Bool {
+        if case .number = self { true } else { false }
+    }
+
+    /// Whether the value is typed into a field in the panel and written when the person is done, rather than chosen
+    /// from a list.
+    var isTyped: Bool {
+        switch self {
+        case .text, .number: true
+        default: false
         }
     }
 
     /// Whether choosing a value is the whole of the edit, so the panel closes on it.
     var closesOnChoice: Bool {
         switch self {
-        case .status, .choice: true
-        case .date, .people, .tags: false
+        case .status, .choice, .parent: true
+        case .date, .people, .tags, .text, .number, .words: false
         }
     }
 }
@@ -209,5 +244,20 @@ nonisolated enum PeopleSuggestions {
             entry[name.key] = .string(text)
         }
         return entry
+    }
+}
+
+/// The words a list of words can offer: those other items hold in the same field, most often held first.
+nonisolated enum WordSuggestions {
+    static func pool(from lists: [PropertyValue?]) -> [String] {
+        var counts: [String: (word: String, count: Int)] = [:]
+        for list in lists {
+            for word in ListEntries.entries(of: list).compactMap(\.string) where !word.isEmpty {
+                counts[word.lowercased(), default: (word, 0)].count += 1
+            }
+        }
+        return counts.values
+            .sorted { $0.count != $1.count ? $0.count > $1.count : $0.word.localizedStandardCompare($1.word) == .orderedAscending }
+            .map(\.word)
     }
 }

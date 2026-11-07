@@ -38,8 +38,6 @@ const ticket: HeaderModel = {
   showMore: 'Show 0 More',
   showMoreContents: 'Show 0 More',
   showMoreLinked: 'Show 0 More',
-  propertyRejected: false,
-  parentRejected: false,
   interfaceTextSize: 13,
   titleLines: 2,
 }
@@ -141,24 +139,12 @@ test('a refused title shows why and offers to discard the draft', () => {
     ...ticket,
     draft: 'A/B',
     titleRejected: true,
-    propertyRejected: true,
-    parentRejected: true,
   })
   const error = root.querySelector<HTMLElement>('.item-title-error')!
   expect(error.hidden).toBe(false)
   expect(error.textContent).toContain('The title could not be saved.')
-  expect([...root.querySelectorAll<HTMLElement>('.item-error')].every((e) => !e.hidden)).toBe(true)
   error.querySelector('button')!.click()
   expect(posted).toEqual([{ type: 'titleDiscard', item: 'ticket' }])
-})
-
-test('a parent that could not be removed says so, apart from a refused status', () => {
-  const errors = () => [...root.querySelectorAll<HTMLElement>(':scope > .item-error')]
-  header.set({ ...ticket, parentRejected: true })
-  expect(errors().map((e) => e.hidden)).toEqual([true, false])
-  expect(errors()[1]!.textContent).toBe('The connection could not be removed.')
-  header.set(ticket)
-  expect(errors().every((e) => e.hidden)).toBe(true)
 })
 
 test('typing and Return reach the app for the item the title belongs to', () => {
@@ -443,6 +429,23 @@ test('an item a row links to is a chip in its own tone, with the icon of its typ
   posted = []
   chip.click()
   expect(posted).toEqual([{ type: 'openItem', item: 'other' }])
+})
+
+test('a value the item does not have yet is an empty chip with a plus that opens its editor', () => {
+  header.set({
+    ...ticket,
+    properties: [
+      { id: 'due', label: 'Due', symbol: 'calendar', kind: 'empty', text: 'Due', editable: true },
+    ],
+  })
+  const chip = root.querySelector<HTMLElement>('.item-props .item-chip.empty')!
+  expect(chip.textContent).toBe('Due')
+  expect(chip.querySelector('.item-icon-plus')).not.toBeNull()
+  const value = root.querySelector<HTMLElement>('.item-prop-value')!
+  expect(value.getAttribute('aria-label')).toBe('Due')
+  chip.click()
+  expect(posted.map((message) => message.type)).toEqual(['editValue'])
+  expect(posted[0]).toMatchObject({ item: 'ticket', row: 'due' })
 })
 
 test('each kind of value has its own chip, and its text is never read as markup', () => {

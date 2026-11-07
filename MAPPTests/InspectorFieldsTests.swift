@@ -151,25 +151,6 @@ struct InspectorFieldsTests {
         #expect(PagePins.statusValue(of: Self.item("aic.ticket.task", properties: [Property(key: "status", value: .string(""))]), in: status) == nil)
     }
 
-    @MainActor @Test func aRefusedRemoveParentIsToldAndAnAcceptedOneClearsTheTelling() async throws {
-        let child = Self.item("aic.ticket.task")
-        let target = ItemRelationshipTarget(title: "Field Research", itemID: ItemID("10000000-0000-0000-0000-000000000009"), resolution: .resolved(ItemID("10000000-0000-0000-0000-000000000009")))
-        let parent = ItemRelationship(field: "child-of", label: "Parent", targets: [target], isEditable: true, allowsMultiple: false)
-        let library = FakeItemLibrary(items: [child])
-        library.catalogue = Catalogue(itemTypes: [Self.task])
-        library.relationshipsByItem[child.id] = [parent]
-        let drafts = DetailsPresentation()
-
-        await ItemPageHeader.removeParent(parent, of: child.id, in: library, drafts: drafts, undoManager: nil)
-        #expect(library.relationshipWrites.map(\.removing) == [[ItemID("10000000-0000-0000-0000-000000000009")]])
-        #expect(library.relationshipWrites.map(\.adding) == [[]])
-        #expect(ItemPageHeader.header(of: child.id, in: library, drafts: drafts)?.parentRejected == true)
-
-        library.acceptsRelationships = true
-        await ItemPageHeader.removeParent(parent, of: child.id, in: library, drafts: drafts, undoManager: nil)
-        #expect(ItemPageHeader.header(of: child.id, in: library, drafts: drafts)?.parentRejected == false)
-    }
-
     // MARK: The inspector's fields
 
     @MainActor private static func marfa(_ items: [MAPP.Item], types: [ItemTypeInfo]) async throws -> MarfaLibrary {

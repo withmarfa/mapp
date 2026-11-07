@@ -72,6 +72,7 @@ export interface HeaderRow {
     | 'email'
     | 'phone'
     | 'text'
+    | 'empty'
   text?: string
   /** What a pin's hover says in place of its value's words: an event's time, its zone and how far off it is. */
   help?: string
@@ -174,9 +175,6 @@ export interface HeaderModel {
   showMore: string
   showMoreContents: string
   showMoreLinked: string
-  propertyRejected: boolean
-  /** The app could not remove the parent. */
-  parentRejected: boolean
   /** The interface's text size in points, which the pins and messages follow. */
   interfaceTextSize: number
   /** How many lines the title shows before an ellipsis cuts it, while it is not being edited. */
@@ -203,8 +201,6 @@ export interface HeaderLabels {
   title: string
   status: string
   discardChanges: string
-  propertyRejected: string
-  parentRejected: string
   linkedFrom: string
   customizeLayout: string
   /** What a collection's members are called. */
@@ -225,8 +221,6 @@ const englishLabels: HeaderLabels = {
   title: 'Title',
   status: 'Status',
   discardChanges: 'Discard Changes',
-  propertyRejected: 'The value could not be saved. Please try again.',
-  parentRejected: 'The connection could not be removed.',
   linkedFrom: 'Linked From',
   customizeLayout: 'Customize Layout',
   contents: 'Contents',
@@ -393,8 +387,6 @@ export class ItemHeader {
   private expanded = { item: '', properties: false }
   private readonly statusPin: HTMLButtonElement
   private readonly parentPin: HTMLButtonElement
-  private readonly propertyError: HTMLParagraphElement
-  private readonly parentError: HTMLParagraphElement
   /** The item whose title is being edited, so a blur after the page moved to another item commits nothing. */
   private editing?: string
   /** The item whose title is to take the keyboard as soon as the header shows it, since the app may ask before
@@ -455,14 +447,6 @@ export class ItemHeader {
       this.expanded.properties = !this.expanded.properties
       this.redraw()
     })
-    this.propertyError = element('p', 'item-error', root)
-    this.propertyError.setAttribute('role', 'alert')
-    this.propertyError.textContent = this.labels.propertyRejected
-    this.propertyError.hidden = true
-    this.parentError = element('p', 'item-error', root)
-    this.parentError.setAttribute('role', 'alert')
-    this.parentError.textContent = this.labels.parentRejected
-    this.parentError.hidden = true
     const redraw = () => this.redraw()
     const glyph = (name: string, parent: HTMLElement) => this.glyph(name, parent)
     this.contents = new LinkedSection(footer, 'item-contents', redraw, glyph)
@@ -613,8 +597,6 @@ export class ItemHeader {
     this.takeWantedTitle()
     this.titleError.hidden = !model.titleRejected
     this.titleRefusal.textContent = model.titleRefusal
-    this.propertyError.hidden = !model.propertyRejected
-    this.parentError.hidden = !model.parentRejected
     this.showPin(this.statusPin, model.status)
     this.showPin(this.parentPin, model.parent)
     if (previous?.item !== model.item) {
@@ -985,7 +967,10 @@ export class ItemHeader {
     term.setAttribute('aria-label', row.label)
     if (!value.querySelector('a, button')) {
       reach(value)
-      value.setAttribute('aria-label', `${row.label}: ${this.wholeValue(row, model)}`)
+      value.setAttribute(
+        'aria-label',
+        row.kind === 'empty' ? row.label : `${row.label}: ${this.wholeValue(row, model)}`,
+      )
     }
   }
 
@@ -1065,6 +1050,15 @@ export class ItemHeader {
       case 'tags':
         for (const tag of row.texts ?? []) this.chip(value, 'tag', tag)
         break
+      case 'empty': {
+        // A value the item does not have yet: the design's empty chip, a plus and the name, which opens its editor.
+        const chip = this.chip(value, 'empty', row.text ?? row.label)
+        chip.classList.add('empty')
+        const plus = element('span', 'item-pin-icon item-icon-plus')
+        plus.setAttribute('aria-hidden', 'true')
+        chip.prepend(plus)
+        break
+      }
       case 'url': {
         const href = row.text ?? ''
         if (/^https?:\/\//i.test(href)) this.link(value, href, () => openLink(href), href)

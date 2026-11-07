@@ -3,8 +3,8 @@ import SwiftUI
 
 /// The page owns its title; the inspector is reserved for the rest of the item's details. The page draws the
 /// title and pinned properties above the note, so they scroll with it as one surface, and this carries out what
-/// the person does there: the title is saved as the item's property, and the status and the parent row open native
-/// menus. Applied to the editor's view, whose container the menus' frames arrive in.
+/// the person does there: the title is saved as the item's property, and every other value opens in the panel under
+/// it (`ValueEditPresenter`). Applied to the editor's view, whose container the panel's frames arrive in.
 struct ItemPageHeader: ViewModifier {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
@@ -15,30 +15,12 @@ struct ItemPageHeader: ViewModifier {
     let item: Item
     let editor: EditorController
     let drafts: DetailsPresentation
-    /// How far the editor's container reaches above the view's own frame: SwiftUI anchors a popover in the frame
-    /// the safe area leaves, while the container runs up under the toolbar.
-    let containerTop: CGFloat
-    /// The parent row's frame while its chooser is open.
-    @State private var choosingParent: CGRect?
-
     func body(content: Content) -> some View {
         content
-            .popover(isPresented: Binding { choosingParent != nil } set: { if !$0 { choosingParent = nil } },
-                     attachmentAnchor: .rect(.rect((choosingParent ?? .zero).offsetBy(dx: 0, dy: -containerTop))), arrowEdge: .bottom) {
-                if let parent = Self.parent(of: item.id, in: library) {
-                    ItemRelationshipPicker(owner: item.id, relationship: parent, candidates: library.relationshipCandidates(for: item.id, field: parent.field)) {
-                        await library.changeItemRelationship(item.id, field: parent.field, adding: $0, removing: $1, undoManager: undoManager)
-                    }
-                }
-            }
             // The action may run on an earlier copy of this view, so it takes what changed from the change itself.
             .onChange(of: item.id, initial: true) { old, id in
                 if old != id {
                     drafts.saveTitle(of: old, in: library, undoManager: undoManager)
-                    // A refused status belongs to the visit, as the page showed it before.
-                    if let key = Self.statusKey(of: old, in: library) { drafts.draft(for: old, key: key).rejected = false }
-                    drafts.draft(for: old, key: PagePlacement.parent).rejected = false
-                    choosingParent = nil
                 }
                 ValueEditPresenter.shared.itemChanged(to: id)
                 editor.onHeaderEvent = handler
@@ -66,7 +48,7 @@ struct ItemPageHeader: ViewModifier {
     ) -> PageHeader? {
         guard let item = library.item(id) else { return nil }
         let draft = drafts.draft(for: item.id, key: "title")
-        let parts = PageHeaderParts(of: item, in: library, placements: placements, dateFormat: dateFormat)
+        let parts = PageHeaderParts(of: item, in: library, placements: placements, dateFormat: dateFormat, offersEmpty: true)
         let (type, placement, relationships, now, kind, lead, pins) =
             (parts.type, parts.placement, parts.relationships, parts.now, parts.kind, parts.lead, parts.pins)
         let status = type?.statusField
@@ -120,8 +102,6 @@ struct ItemPageHeader: ViewModifier {
             showMore: String(localized: "Show \(max(0, properties.count - PropertyRow.foldAfter)) More"),
             showMoreContents: String(localized: "Show \(max(0, contents.count - LinkedItem.foldAfter)) More"),
             showMoreLinked: String(localized: "Show \(max(0, linked.count - LinkedItem.foldAfter)) More"),
-            propertyRejected: status.map { drafts.draft(for: item.id, key: $0.key).rejected } ?? false,
-            parentRejected: parent.map { drafts.draft(for: item.id, key: $0.field).rejected } ?? false,
             interfaceTextSize: UserDefaults.standard.object(forKey: InterfaceKey.textSize) as? Int ?? InterfaceStyle.defaultTextSize,
             titleLines: titleLines,
             chips: .init(),
@@ -134,7 +114,6 @@ struct ItemPageHeader: ViewModifier {
     /// is kept for it, but a menu is only for the item on the page now.
     private var handler: (PageHeaderEvent) -> Void {
         let library = library, drafts = drafts, undoManager = undoManager
-        let choosingParent = $choosingParent
         // The editor keeps this, so it holds the editor weakly; otherwise neither would ever be released.
         return { [weak editor] event in
             guard let editor else { return }
@@ -160,17 +139,34 @@ struct ItemPageHeader: ViewModifier {
                 draft.rejected = false
             case .menu(.status, let id, let rect):
                 guard editor.noteID == id, let item = library.item(id), let status = library.catalogue.itemTypes[item.type]?.statusField else { return }
-                editor.presentEditor(Self.request(.status(status), of: id, in: library, drafts: drafts, undoManager: undoManager), under: rect)
+                editor.presentEditor(Self.request(.status(status), of: id, in: library, undoManager: undoManager, editor: editor), under: rect)
+            case .menu(.parent, let id, let rect):
+                guard editor.noteID == id, let item = library.item(id) else { return }
+                // An item that cannot be edited has no panel to change the parent in; the pin then only opens it.
+                guard item.isEditable else {
+                    if let target = Self.parent(in: library.relationships(for: id))?.targets.first?.itemID { editor.onOpenNote(target) }
+                    return
+                }
+                editor.presentEditor(Self.request(.parent, of: id, in: library, undoManager: undoManager, editor: editor), under: rect)
             case .edit(let row, let id, let rect):
                 guard editor.noteID == id, let item = library.item(id) else { return }
                 let kind: ValueEditKind?
-                if row == PagePlacement.tags {
+                switch row {
+                case PagePlacement.tags:
                     kind = item.canEditTags ? .tags : nil
-                } else {
-                    kind = library.catalogue.itemTypes[item.type]?.fields.first { $0.key == row }.flatMap(ValueEditKind.init(field:))
+                case PagePlacement.parent:
+                    kind = item.isEditable ? .parent : nil
+                default:
+                    let field = library.catalogue.itemTypes[item.type]?.fields.first { $0.key == row }
+                    // A yes or no is a toggle, not a panel.
+                    if let field, field.kind == .boolean, item.isEditable {
+                        library.setItemProperty(id, key: row, value: .bool(!InspectorFields.isYes(item.value(of: row))), undoManager: undoManager)
+                        return
+                    }
+                    kind = field.flatMap(ValueEditKind.init(field:))
                 }
                 guard let kind else { return }
-                editor.presentEditor(Self.request(kind, of: id, in: library, drafts: drafts, undoManager: undoManager), under: rect)
+                editor.presentEditor(Self.request(kind, of: id, in: library, undoManager: undoManager, editor: editor), under: rect)
             case .toggleLayout:
                 drafts.toggleLayout()
             case .showLinked:
@@ -189,64 +185,28 @@ struct ItemPageHeader: ViewModifier {
                     let layout = PageLayout(rows: rows, placement: placements.placement(of: item.type, in: library.catalogue))
                     if let moved = layout.moving(row, before: before) { placements.apply(moved, of: item.type, in: library.catalogue) }
                 }
-            case .menu(.parent, let id, let rect):
-                guard editor.noteID == id, let parent = Self.parent(of: id, in: library) else { return }
-                guard let target = parent.targets.first else { return }
-                let menu = NSMenu()
-                menu.autoenablesItems = false
-                let open = actionItem(String(localized: "Open \(target.displayTitle)")) { [weak editor] in
-                    if let id = target.itemID { editor?.onOpenNote(id) }
-                }
-                open.isEnabled = target.itemID.map { library.item($0) != nil } ?? false
-                menu.addItem(open)
-                let change = actionItem(String(localized: "Change \(parent.label)…")) { choosingParent.wrappedValue = rect }
-                change.isEnabled = parent.isEditable
-                menu.addItem(change)
-                menu.addItem(.separator())
-                let remove = actionItem(String(localized: "Remove \(parent.label)")) {
-                    Task { await Self.removeParent(parent, of: id, in: library, drafts: drafts, undoManager: undoManager) }
-                }
-                remove.isEnabled = parent.isEditable
-                menu.addItem(remove)
-                editor.popUpMenu(menu, under: rect)
             }
         }
     }
 
     /// The editor for one of the item's values, which writes as the property row in the inspector does: through the
-    /// library, and marking the value rejected when it refuses.
+    /// library. The panel says why a write is refused.
     private static func request(
-        _ kind: ValueEditKind, of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation, undoManager: UndoManager?
+        _ kind: ValueEditKind, of id: ItemID, in library: any ItemLibrary, undoManager: UndoManager?, editor: EditorController
     ) -> ValueEditRequest {
-        ValueEditRequest(kind: kind, library: library, item: id, undoManager: undoManager) { value in
+        var request = ValueEditRequest(kind: kind, library: library, item: id, undoManager: undoManager)
+        request.write = { value in
             guard let key = kind.field?.key else { return false }
-            let taken = library.setItemProperty(id, key: key, value: value, undoManager: undoManager)
-            drafts.draft(for: id, key: key).rejected = !taken
-            return taken
+            return library.setItemProperty(id, key: key, value: value, undoManager: undoManager)
         }
-    }
-
-    /// Takes the item out of its parent, the one the person saw. A library that refuses leaves the parent as it was,
-    /// and the page says so until the next try or the next item.
-    static func removeParent(
-        _ parent: ItemRelationship, of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation, undoManager: UndoManager?
-    ) async {
-        drafts.draft(for: id, key: parent.field).rejected = !(await library.changeItemRelationship(id, field: parent.field, adding: [], removing: parent.targets.compactMap(\.itemID), undoManager: undoManager))
-    }
-
-    /// The key of the field the item's status is kept in, if its type has one.
-    private static func statusKey(of id: ItemID, in library: any ItemLibrary) -> String? {
-        library.item(id).flatMap { library.catalogue.itemTypes[$0.type]?.statusField?.key }
+        request.open = { [weak editor] in editor?.onOpenNote($0) }
+        return request
     }
 
     /// What the status menu offers: the catalogue's values, and the item's own if it holds one the catalogue does
     /// not list, so the menu always shows what is set.
     static func statusChoices(of item: Item, in field: ItemTypeInfo.Field) -> [String] {
         field.options(including: PagePins.statusValue(of: item, in: field))
-    }
-
-    private static func parent(of id: ItemID, in library: any ItemLibrary) -> ItemRelationship? {
-        parent(in: library.relationships(for: id))
     }
 
     private static func parent(in relationships: [ItemRelationship]) -> ItemRelationship? {
@@ -257,21 +217,4 @@ struct ItemPageHeader: ViewModifier {
     static func localized(_ key: String) -> String {
         Bundle.main.localizedString(forKey: key, value: key, table: nil)
     }
-}
-
-/// Runs a menu item's action, for menus built for the page. The item holds it, since a target is not retained.
-private final class MenuAction: NSObject {
-    private let run: () -> Void
-
-    init(_ run: @escaping () -> Void) { self.run = run }
-
-    @objc func runAction() { run() }
-}
-
-private func actionItem(_ title: String, _ run: @escaping () -> Void) -> NSMenuItem {
-    let action = MenuAction(run)
-    let item = NSMenuItem(title: title, action: #selector(MenuAction.runAction), keyEquivalent: "")
-    item.target = action
-    item.representedObject = action
-    return item
 }

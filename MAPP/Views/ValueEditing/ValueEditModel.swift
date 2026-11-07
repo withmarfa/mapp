@@ -1,6 +1,7 @@
 import Foundation
 import Marfa
 import Observation
+import SwiftUI
 
 /// What is edited, and how the edit is written. The sidebar's row and the page each make one; the panel, the menu and
 /// the popover read only this, so nothing differs by caller.
@@ -11,12 +12,14 @@ struct ValueEditRequest {
     var item: ItemID?
     var heldValue: PropertyValue?
     var undoManager: UndoManager?
-    /// Writes the field, and says whether it was taken. The caller marks the value rejected when it was not.
-    let write: (PropertyValue?) -> Bool
+    /// Writes the field, and says whether it was taken. The parent is no field, so it has none.
+    var write: (PropertyValue?) -> Bool = { _ in false }
     var calendar = Calendar.current
+    /// Opens the item the parent row names, for the parent's panel.
+    var open: (ItemID) -> Void = { _ in }
 
     /// One editor at a time is open; this says which value it is for.
-    var target: String { (item?.rawValue ?? "new") + "#" + (kind.field?.key ?? "tags") }
+    var target: String { (item?.rawValue ?? "new") + "#" + kind.rowID }
 }
 
 /// The state of one open editor: what is typed, which row the keyboard is on, and why a write was refused. Closing is
@@ -40,15 +43,38 @@ final class ValueEditModel {
     @ObservationIgnored private var hasLocal = false
     @ObservationIgnored private let pool: [PeopleSuggestions.Person]
     @ObservationIgnored private var typedAhead = (text: "", at: Date.distantPast)
+    @ObservationIgnored private let wordPool: [String]
+    /// What is typed into a text or a number, with the value it began from, so a change made elsewhere meanwhile is
+    /// never written over.
+    @ObservationIgnored let draft = ItemPropertyDraft()
+    /// Whether the value changed under what was typed, which the person then settles.
+    private(set) var hasConflict = false
+    /// A change to the parent that has not been answered yet.
+    private(set) var isSaving = false
+    @ObservationIgnored private var isFinished = false
 
     init(_ request: ValueEditRequest) {
         self.request = request
-        if case .people(let field, let shape) = request.kind {
-            pool = PeopleSuggestions.pool(from: request.library.items(in: .allNotes).map { $0.value(of: field.key) }, shape: shape)
-        } else {
+        let items = request.library.items(in: .allNotes)
+        switch request.kind {
+        case .people(let field, let shape):
+            pool = PeopleSuggestions.pool(from: items.map { $0.value(of: field.key) }, shape: shape)
+            wordPool = []
+        case .words(let field):
             pool = []
+            wordPool = WordSuggestions.pool(from: items.map { $0.value(of: field.key) })
+        default:
+            pool = []
+            wordPool = []
+        }
+        if let field = request.kind.field, request.kind.isTyped {
+            draft.field = field
+            draft.text = Self.text(of: request.item.flatMap(request.library.item)?.value(of: field.key) ?? request.heldValue)
+            draft.base = draft.text
         }
     }
+
+    private static func text(of value: PropertyValue?) -> String { value.map(ItemValueText.editing) ?? "" }
 
     var kind: ValueEditKind { request.kind }
     private var library: any ItemLibrary { request.library }
@@ -69,7 +95,37 @@ final class ValueEditModel {
         return kind == .tags ? item.canEditTags : item.isEditable
     }
 
-    var heldTags: [String] { request.item.flatMap(library.item).map(library.tags(of:)) ?? [] }
+    /// What the field in a text or a number panel holds, as the person types it.
+    var typed: String {
+        get { draft.text }
+        set {
+            guard newValue != draft.text else { return }
+            if !draft.isDirty { draft.base = currentText }
+            draft.text = newValue
+            draft.isDirty = true
+            draft.rejected = false
+            hasConflict = false
+            notice = nil
+        }
+    }
+
+    private var currentText: String { Self.text(of: value) }
+
+    /// The tags or the words the panel shows as removable tokens above its search field.
+    var heldTokens: [String] {
+        switch kind {
+        case .tags: request.item.flatMap(library.item).map(library.tags(of:)) ?? []
+        case .words: heldWords
+        default: []
+        }
+    }
+
+    private var heldWords: [String] { ListEntries.entries(of: value).compactMap(\.string) }
+
+    /// The parent the item has now, if any.
+    private var parentTarget: ItemRelationshipTarget? {
+        request.item.flatMap { library.relationships(for: $0).first { $0.field == PagePlacement.parent }?.targets.first }
+    }
 
     private var isDate: Bool {
         if case .date = kind { true } else { false }
@@ -77,8 +133,18 @@ final class ValueEditModel {
 
     var hasSearch: Bool {
         switch kind {
-        case .people, .tags: true
-        case .status, .choice, .date: false
+        case .people, .tags, .words, .parent: true
+        case .status, .choice, .date, .text, .number: false
+        }
+    }
+
+    /// What the search field asks for.
+    var searchPrompt: LocalizedStringKey {
+        switch kind {
+        case .tags: "Add or Find a Tag"
+        case .words: "Add or Find a Word"
+        case .parent: "Find an Item"
+        default: "Find or Add a Person"
         }
     }
 
@@ -91,6 +157,9 @@ final class ValueEditModel {
         case .date: quickRows
         case .people(_, let shape): peopleRows(shape)
         case .tags: tagRows
+        case .words: wordRows
+        case .parent: parentRows
+        case .text, .number: []
         }
     }
 
@@ -126,7 +195,7 @@ final class ValueEditModel {
     }
 
     private var tagRows: [ValueListRow] {
-        let held = heldTags
+        let held = heldTokens
         let matching = library.tagSuggestions(matching: query, excluding: held)
         var rows: [ValueListRow] = []
         if !matching.isEmpty {
@@ -140,6 +209,60 @@ final class ValueEditModel {
         return rows
     }
 
+    private var wordRows: [ValueListRow] {
+        let held = Set(heldWords.map { $0.lowercased() })
+        let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let matching = wordPool.filter { word in
+            !held.contains(word.lowercased()) && (typed.isEmpty || word.localizedStandardContains(typed))
+        }
+        var rows: [ValueListRow] = []
+        if !matching.isEmpty {
+            rows.append(.header(String(localized: "Matching"), id: "header:matching"))
+            rows += matching.prefix(30).map { ValueListRow(id: "word:" + $0, role: .option, title: $0, mark: .tag) }
+        }
+        let known = held.contains(typed.lowercased()) || wordPool.contains { $0.lowercased() == typed.lowercased() }
+        if !typed.isEmpty, !known {
+            rows.append(ValueListRow(id: "create", role: .create, title: String(localized: "Add “\(typed)”"), detail: "↩", mark: .symbol("plus")))
+        }
+        return rows
+    }
+
+    /// The most items the parent's list shows before the person narrows it by typing.
+    static let parentLimit = 50
+    static let openID = "open"
+    static let removeID = "remove"
+
+    private var parentRows: [ValueListRow] {
+        var rows: [ValueListRow] = []
+        let current = parentTarget
+        if let current, let id = current.itemID, current.isOpenable {
+            rows.append(ValueListRow(id: Self.openID, role: .option, title: String(localized: "Open “\(current.displayTitle)”"), mark: .symbol("arrow.up.right")))
+            rows.append(.separator)
+            rows.append(ValueListRow(id: "parent:" + id.rawValue, role: .option, title: current.displayTitle, isCurrent: true))
+        }
+        let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let currentID = current?.itemID
+        let matching = parentCandidates.filter { $0.id != currentID && (typed.isEmpty || $0.title.localizedStandardContains(typed)) }
+        if !matching.isEmpty {
+            rows.append(.header(String(localized: "Items"), id: "header:items"))
+            rows += matching.prefix(Self.parentLimit).map {
+                ValueListRow(id: "parent:" + $0.id.rawValue, role: .option, title: $0.displayTitle, detail: library.catalogue.label(for: $0.type))
+            }
+            if matching.count > Self.parentLimit {
+                rows.append(.header(String(localized: "Type to narrow the list"), id: "header:more"))
+            }
+        }
+        if current != nil {
+            rows.append(.separator)
+            rows.append(ValueListRow(id: Self.removeID, role: .option, title: String(localized: "Remove Parent"), mark: .symbol("xmark")))
+        }
+        return rows
+    }
+
+    /// The items the parent could be, read once for the panel.
+    @ObservationIgnored private lazy var parentCandidates: [Item] =
+        request.item.map { library.relationshipCandidates(for: $0, field: PagePlacement.parent) } ?? []
+
     // MARK: Keyboard
 
     private var navigable: [ValueListRow] { rows.filter { $0.role == .option || $0.role == .create } }
@@ -149,8 +272,11 @@ final class ValueEditModel {
         let rows = navigable
         if let highlight, rows.contains(where: { $0.id == highlight }) { return highlight }
         guard hasSearch, !query.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
-        if kind == .tags { return rows.first { $0.role == .create }?.id ?? rows.first?.id }
-        return rows.first { $0.id.hasPrefix("person:") }?.id ?? rows.first?.id
+        switch kind {
+        case .tags, .words: return rows.first { $0.role == .create }?.id ?? rows.first?.id
+        case .people: return rows.first { $0.id.hasPrefix("person:") }?.id ?? rows.first?.id
+        default: return rows.first { $0.id.hasPrefix("parent:") }?.id ?? rows.first?.id
+        }
     }
 
     func hover(_ id: String?) {
@@ -191,7 +317,7 @@ final class ValueEditModel {
 
     /// Typing in a plain list jumps to the option that starts with it, as a menu does.
     func typeAhead(_ characters: String, now: Date = .now) {
-        guard !hasSearch, !isDate else { return }
+        guard !hasSearch, !isDate, !kind.isTyped else { return }
         let text = (now.timeIntervalSince(typedAhead.at) < 1 ? typedAhead.text : "") + characters.lowercased()
         typedAhead = (text, now)
         if let match = navigable.first(where: { $0.role == .option && $0.title.lowercased().hasPrefix(text) }) {
@@ -214,6 +340,9 @@ final class ValueEditModel {
             if notice == nil { close() }
         case .people(_, let shape): activatePerson(id, shape)
         case .tags: activateTag(id)
+        case .words: activateWord(id)
+        case .parent: activateParent(id)
+        case .text, .number: break
         }
     }
 
@@ -257,14 +386,159 @@ final class ValueEditModel {
         }
     }
 
-    func removeTag(_ tag: String) {
-        guard let item = request.item, isEditable else { return }
-        library.removeTag(tag, from: [item], undoManager: request.undoManager)
+    private func activateWord(_ id: String) {
+        let word = id == "create" ? query.trimmingCharacters(in: .whitespacesAndNewlines) : String(id.dropFirst("word:".count))
+        guard !word.isEmpty else { return }
+        guard !heldWords.contains(where: { $0.lowercased() == word.lowercased() }) else {
+            query = ""
+            return
+        }
+        if commitWords(heldWords + [word]) {
+            query = ""
+            highlight = nil
+        }
     }
 
-    /// Return in the tag field with nothing highlighted adds what was typed, as the tag field always has.
+    private func activateParent(_ id: String) {
+        guard !isSaving, let item = request.item else { return }
+        let current = parentTarget
+        switch id {
+        case Self.openID:
+            if let target = current?.itemID { request.open(target) }
+            close()
+        case Self.removeID:
+            changeParent(of: item, adding: nil, removing: current?.itemID)
+        default:
+            let target = ItemID(String(id.dropFirst("parent:".count)))
+            if target == current?.itemID { close() } else { changeParent(of: item, adding: target, removing: current?.itemID) }
+        }
+    }
+
+    /// Replaces the parent. The library judges the link, and may have to ask the server, so the panel waits without
+    /// holding anything up and says why when the change is refused. A change that is answered after the panel has
+    /// closed is told as a notice instead.
+    private func changeParent(of item: ItemID, adding: ItemID?, removing: ItemID?) {
+        isSaving = true
+        notice = nil
+        let (library, undoManager) = (library, request.undoManager)
+        let label = adding.flatMap(library.item)?.displayTitle ?? parentTarget?.displayTitle ?? ""
+        Task { [weak self] in
+            var refusal: String?
+            if let adding, case .refused(let message) = await library.relationshipVerdict(for: item, field: PagePlacement.parent, to: adding) {
+                refusal = message
+            }
+            let taken: Bool
+            if refusal == nil {
+                taken = await library.changeItemRelationship(
+                    item, field: PagePlacement.parent, adding: adding.map { [$0] } ?? [], removing: removing.map { [$0] } ?? [], undoManager: undoManager)
+            } else {
+                taken = false
+            }
+            guard let self else {
+                if !taken { library.notices.notKept(String(localized: "Parent Not Saved"), text: label, reason: refusal ?? String(localized: "The parent could not be saved.")) }
+                return
+            }
+            isSaving = false
+            if taken {
+                close()
+            } else if isFinished {
+                library.notices.notKept(String(localized: "Parent Not Saved"), text: label, reason: refusal ?? String(localized: "The parent could not be saved."))
+            } else {
+                notice = refusal ?? String(localized: "The parent could not be saved.")
+            }
+        }
+    }
+
+    /// Removes one tag or word from the tokens above the field.
+    func removeToken(_ token: String) {
+        guard isEditable else { return }
+        switch kind {
+        case .tags:
+            if let item = request.item { library.removeTag(token, from: [item], undoManager: request.undoManager) }
+        case .words:
+            commitWords(heldWords.filter { $0 != token })
+        default:
+            break
+        }
+    }
+
+    /// Return in a tag or word field with nothing highlighted adds what was typed, as the tag field always has. In a
+    /// text or a number it writes what was typed.
     func submitTyped() {
-        if activeRow != nil { activateHighlighted() } else if kind == .tags, !ItemTag.normalized(query).isEmpty { activate("create") }
+        if kind.isTyped {
+            commitText()
+        } else if activeRow != nil {
+            activateHighlighted()
+        } else if kind == .tags, !ItemTag.normalized(query).isEmpty {
+            activate("create")
+        } else if case .words = kind, !query.trimmingCharacters(in: .whitespaces).isEmpty {
+            activate("create")
+        }
+    }
+
+    // MARK: Typed values
+
+    /// Writes what was typed, and closes on success. A refusal keeps the text and the panel and says why; a value that
+    /// changed under the text waits for the person to say which they mean.
+    func commitText(overwriting: Bool = false) {
+        guard let field = kind.field else { return }
+        guard isEditable else {
+            close()
+            return
+        }
+        switch draft.commit(as: field.kind, rule: field.numberRule, current: currentText, overwriting: overwriting) {
+        case .unchanged:
+            close()
+        case .alreadyCurrent:
+            draft.discard(toMatch: currentText)
+            close()
+        case .conflict:
+            hasConflict = true
+            notice = String(localized: "This value changed while you were editing. Your edit hasn’t been saved.")
+        case .invalid:
+            draft.rejected = true
+            notice = field.numberRule.requirement ?? String(localized: "The value isn’t a number.")
+        case .outOfRange:
+            draft.rejected = true
+            notice = field.numberRule.requirement ?? PropertyLoss.outOfRange.reason
+        case .write(let new):
+            if request.write(new) {
+                draft.isDirty = false
+                draft.base = Self.text(of: new)
+                close()
+            } else {
+                draft.rejected = true
+                notice = refusalReason(String(localized: "The value could not be saved. Your input has been kept."))
+            }
+        }
+    }
+
+    /// The person chose to keep their text over the value that changed.
+    func keepEdit() { commitText(overwriting: true) }
+
+    /// The person chose the value that changed over their text.
+    func useCurrentValue() {
+        draft.discard(toMatch: currentText)
+        hasConflict = false
+        notice = nil
+    }
+
+    /// Why a write was refused: the item is gone or can no longer be edited, else `fallback`.
+    private func refusalReason(_ fallback: String) -> String {
+        guard let id = request.item else { return fallback }
+        guard let item = library.item(id) else { return String(localized: "This item is no longer available.") }
+        return (kind == .tags ? item.canEditTags : item.isEditable) ? fallback : PropertyLoss.notEditable.reason
+    }
+
+    /// The editor is ending. A text or number the person typed is written or handed back unless they cancelled it
+    /// themselves; ending the panel any other way (a click elsewhere, a resized window, another item) never loses it.
+    func finish(cancelled: Bool) {
+        isFinished = true
+        guard !cancelled else { return }
+        guard kind.isTyped, let field = kind.field else { return }
+        draft.handOff(
+            label: field.label, as: field.kind, rule: field.numberRule, current: currentText, isEditable: isEditable,
+            write: request.write, to: library.notices)
     }
 
     // MARK: Dates
@@ -291,6 +565,11 @@ final class ValueEditModel {
     // MARK: Writing
 
     @discardableResult
+    private func commitWords(_ words: [String]) -> Bool {
+        commit(words.isEmpty ? nil : .array(words.map { .string($0) }), failure: String(localized: "The list could not be saved."))
+    }
+
+    @discardableResult
     private func commit(_ new: PropertyValue?, failure: String = String(localized: "The value could not be saved.")) -> Bool {
         guard isEditable else {
             close()
@@ -305,7 +584,7 @@ final class ValueEditModel {
             }
         } else {
             // What was typed stays where it is, and the panel stays open.
-            notice = failure
+            notice = refusalReason(failure)
         }
         return taken
     }

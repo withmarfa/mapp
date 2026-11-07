@@ -1,12 +1,11 @@
 import Marfa
 import SwiftUI
 
-/// One property of an item as a row of the inspector, drawn with the system's own controls so they behave as they do
-/// everywhere else: a text or number value is a borderless text field that looks like plain text until it is used, a
-/// choice, a status, a date and a list of people open in a panel under the value (`ValueEditPresenter`), and a yes/no
-/// is a checkbox. Each row keeps unfinished input until
-/// it is committed; unrelated inspector updates do not replace it, and a change made elsewhere meanwhile is never
-/// written over silently.
+/// One property of an item as a row of the inspector. The value of an item's property opens in a panel under it
+/// (`ValueEditPresenter`), as it does on the page: a text, a number, a choice, a status, a date, a list of words and a
+/// list of people. A yes/no is a checkbox. A row for a value no item holds yet (a form's) types a text or a number into
+/// a borderless field that looks like plain text until it is used; it keeps unfinished input until it is committed, and
+/// a change made elsewhere meanwhile is never written over silently.
 struct ItemPropertyRow: View {
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     let definition: ItemTypeInfo.Field
@@ -54,6 +53,7 @@ struct ItemPropertyRow: View {
                 if lostEdit { lostEditNotice }
             }
         }
+        .onNameTap(panelKind != nil && isEditable ? { openEditor() } : nil)
         .contextMenu { menu }
         .onAppear {
             input.field = definition
@@ -88,14 +88,14 @@ struct ItemPropertyRow: View {
             }
         } else if definition.kind == .boolean {
             checkbox
+        } else if isEditable, let kind = panelKind {
+            // A link is followed from its text and changed from its name.
+            if link != nil { linkText } else { editorButton(kind) }
         } else if isEditable {
             switch definition.kind {
-            case .choice, .status: editorButton(placeholder: "Choose", hint: "Opens a list of choices")
-            case .date: editorButton(placeholder: "None", hint: "Opens a calendar", oneLine: true)
             case .text, .number:
                 if link != nil, !editing, !input.isDirty { linkText } else { textField }
-            case .other, .list: plain
-            case .boolean: EmptyView()
+            default: plain
             }
         } else if link != nil {
             linkText
@@ -162,12 +162,12 @@ struct ItemPropertyRow: View {
         .truncationMode(.tail)
     }
 
-    /// A choice or a date at rest: its text, or what stands for none.
-    @ViewBuilder private func choiceLabel(_ text: Text?, placeholder: LocalizedStringKey, oneLine: Bool = false) -> some View {
+    /// A value at rest in the row that opens its panel: its text, cut at `lines`, or what stands for none.
+    @ViewBuilder private func choiceLabel(_ text: Text?, placeholder: LocalizedStringKey, lines: Int) -> some View {
         if isStatus {
             statusLabel(text)
         } else if let text {
-            text.lineLimit(oneLine ? 1 : 2).truncationMode(.tail).fixedSize(horizontal: false, vertical: true)
+            text.lineLimit(lines).truncationMode(.tail).fixedSize(horizontal: false, vertical: true)
         } else {
             InspectorPlaceholder(text: placeholder)
         }
@@ -197,7 +197,7 @@ struct ItemPropertyRow: View {
                 .accessibilityIdentifier("ItemPropertyCopy.\(definition.key)")
         }
         if isEditable, link != nil {
-            Button("Edit") { beginTextEdit() }.accessibilityIdentifier("ItemPropertyEdit.\(definition.key)")
+            Button("Edit") { panelKind == nil ? beginTextEdit() : openEditor() }.accessibilityIdentifier("ItemPropertyEdit.\(definition.key)")
         }
         if onShowOnPage != nil || canClear { Divider() }
         if let onShowOnPage { ShowOnPageMenu(isShown: shownOnPage, onChange: onShowOnPage) }
@@ -254,12 +254,9 @@ struct ItemPropertyRow: View {
 
     private var rejectedNotice: some View {
         VStack(alignment: .leading, spacing: 2) {
-            // A picked date is never held back as input, so only the other rows have anything kept.
             Group {
-                if definition.kind.isDate {
-                    Text("The date couldn’t be saved.")
-                } else if definition.kind == .number, let requirement = definition.numberRule.requirement,
-                          PropertyNumber.parse(input.text, rule: definition.numberRule) == nil {
+                if definition.kind == .number, let requirement = definition.numberRule.requirement,
+                   PropertyNumber.parse(input.text, rule: definition.numberRule) == nil {
                     Text(requirement)
                 } else {
                     Text("The value could not be saved. Your input has been kept.")
@@ -267,10 +264,8 @@ struct ItemPropertyRow: View {
             }
             .interfaceFont(.caption)
             .foregroundStyle(.red)
-            if !definition.kind.isDate {
-                Button("Discard Changes") { input.discard(toMatch: currentText); editing = false }
-                    .interfaceFont(.caption)
-            }
+            Button("Discard Changes") { input.discard(toMatch: currentText); editing = false }
+                .interfaceFont(.caption)
         }
     }
 
@@ -291,7 +286,7 @@ struct ItemPropertyRow: View {
 
     private func beginEditing() async {
         await Task.yield()
-        if editKind != nil {
+        if panelKind != nil {
             openEditor()
             return
         }
@@ -306,24 +301,29 @@ struct ItemPropertyRow: View {
     /// How the value is edited in a panel under it, or nil where it is edited in the row.
     private var editKind: ValueEditKind? { ValueEditKind(field: definition) }
 
+    /// The panel the value opens in. A row for a value no item holds yet types a text or a number into the row, since a
+    /// panel writes what was typed to its item.
+    private var panelKind: ValueEditKind? { editKind.flatMap { item == nil && $0.isTyped ? nil : $0 } }
+
     private func openEditor() {
-        guard isEditable, let kind = editKind, let library, let view = anchor.view else { return }
-        let request = ValueEditRequest(
-            kind: kind, library: library, item: item, heldValue: value, undoManager: undoManager,
-            write: { [input] new in
-                let taken = onChange(new)
-                if !isList { input.rejected = !taken }
-                return taken
-            })
+        guard isEditable, let kind = panelKind, let library, let view = anchor.view else { return }
+        let request = ValueEditRequest(kind: kind, library: library, item: item, heldValue: value, undoManager: undoManager, write: onChange)
         ValueEditPresenter.shared.present(request, anchor: view)
     }
 
-    /// The value at rest, which a click opens in its panel: a choice, a status or a date. It reads as a person writes a
-    /// date, and changes only through the panel, so what is stored is always one of the forms Marfa takes.
-    private func editorButton(placeholder: LocalizedStringKey, hint: LocalizedStringKey, oneLine: Bool = false) -> some View {
-        let text = definition.kind.isDate ? dateText : value?.string.map { ItemTypeInfo.Field.label(ofOption: $0) }
+    /// The value at rest, which a click opens in its panel. It reads as a person writes it, and changes only through the
+    /// panel, so what is stored is always one of the forms Marfa takes.
+    private func editorButton(_ kind: ValueEditKind) -> some View {
+        let text = restingText
+        let hint: LocalizedStringKey = switch kind {
+        case .date: "Opens a calendar"
+        case .status, .choice: "Opens a list of choices"
+        case .words: "Opens a list of words to add to and remove from"
+        default: "Opens a field to type in"
+        }
+        let placeholder: LocalizedStringKey = kind.closesOnChoice ? "Choose" : "None"
         return Button { openEditor() } label: {
-            choiceLabel(text.map { Text(verbatim: $0) }, placeholder: placeholder, oneLine: oneLine)
+            choiceLabel(text.map { Text(verbatim: $0) }, placeholder: placeholder, lines: kind.isTyped || isWords ? 3 : 1)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(.rect)
         }
@@ -332,6 +332,18 @@ struct ItemPropertyRow: View {
         .accessibilityValue(text.map { Text(verbatim: $0) } ?? Text("Not Set"))
         .accessibilityHint(hint)
         .accessibilityIdentifier("ItemProperty.\(definition.key)")
+    }
+
+    private var isWords: Bool { definition.kind == .words }
+
+    /// What the value reads at rest, or nil where there is none.
+    private var restingText: String? {
+        switch definition.kind {
+        case .date: dateText
+        case .status, .choice: value?.string.map { ItemTypeInfo.Field.label(ofOption: $0) }
+        case .words: ListEntries.entries(of: value).compactMap(\.string).joined(separator: ", ").nilIfEmpty
+        default: currentText.nilIfEmpty
+        }
     }
 
     /// Where the value links to, if it is a web or mail address.
@@ -381,7 +393,7 @@ struct ItemPropertyRow: View {
         case (.status, .string(let text)): valid = definition.statusGroup(of: text) != nil
         case (.date, .string): valid = definition.kind.accepts(value)
         case (.other, _): valid = true
-        case (.list, _): valid = definition.accepts(value)
+        case (.list, _), (.words, _): valid = definition.accepts(value)
         default: valid = false
         }
         return valid ? nil : String(localized: "Unrecognized value: \(ItemValueText.string(value)). It is preserved until you replace it.")
@@ -426,6 +438,10 @@ struct ItemPropertyRow: View {
             if !input.rejected { input.isDirty = false }
         }
     }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 
 /// Displaying unfamiliar values is intentionally independent of their editable schema.

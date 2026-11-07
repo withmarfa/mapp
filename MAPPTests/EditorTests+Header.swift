@@ -17,7 +17,7 @@ extension EditorTests {
                    pins: [PropertyRow(id: PagePlacement.type, label: "Type", value: .type("Task", icon: "lucide:list-checks"))],
                    byline: nil,
                    properties: [PropertyRow(id: "status", label: "Status", value: .status), PropertyRow(id: "child-of", label: "Parent", value: .parent)],
-                   contents: [], linked: [], showsText: true, showMore: "Show 0 More", showMoreContents: "Show 0 More", showMoreLinked: "Show 0 More", propertyRejected: false, parentRejected: false, interfaceTextSize: 13, titleLines: 2, chips: .init(looks: .defaults))
+                   contents: [], linked: [], showsText: true, showMore: "Show 0 More", showMoreContents: "Show 0 More", showMoreLinked: "Show 0 More", interfaceTextSize: 13, titleLines: 2, chips: .init(looks: .defaults))
     }
 
     static func json(_ value: some Encodable) -> String {

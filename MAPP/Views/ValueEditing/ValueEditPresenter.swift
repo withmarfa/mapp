@@ -63,11 +63,13 @@ final class ValueEditPresenter {
         watch(new)
     }
 
-    /// Closes the editor open, if any.
-    func dismiss(restoringFocus: Bool = true) {
+    /// Closes the editor open, if any. What was typed in it is written or handed back (`ValueEditModel.finish`) unless
+    /// the person `cancelled` it, with Escape.
+    func dismiss(restoringFocus: Bool = true, cancelled: Bool = false) {
         guard let closing = session else { return }
         session = nil
         unwatch()
+        closing.model.finish(cancelled: cancelled)
         closing.close(restoringFocus: restoringFocus)
     }
 
@@ -139,12 +141,19 @@ final class ValueEditPresenter {
     private func handleKey(_ event: NSEvent, in session: any ValueEditSession) -> Bool {
         let model = session.model
         if event.keyCode == 53 {
-            dismiss()
+            dismiss(cancelled: true)
             return true
         }
-        // A date's calendar takes the arrows and Return itself.
-        if case .date = model.kind { return false }
         if let text = session.window?.firstResponder as? NSTextView, text.hasMarkedText() { return false }
+        let isReturn = event.keyCode == 36 || event.keyCode == 76
+        if model.kind.isTyped {
+            // The field takes every key but Return, which writes; Option or Shift with it starts a new line.
+            guard isReturn, event.modifierFlags.intersection([.shift, .option]).isEmpty else { return false }
+            model.submitTyped()
+            return true
+        }
+        // Once the calendar has the keyboard (Tab reaches it), it takes the arrows and Return itself.
+        if case .date = model.kind, Self.isInCalendar(session.window?.firstResponder) { return false }
         switch event.keyCode {
         case 125:
             model.move(by: 1)
@@ -152,7 +161,8 @@ final class ValueEditPresenter {
         case 126:
             model.move(by: -1)
             return true
-        case 36, 76:
+        case _ where isReturn:
+            if case .date = model.kind, model.activeRow == nil { return false }
             model.submitTyped()
             return true
         default:
@@ -162,6 +172,15 @@ final class ValueEditPresenter {
         if plain, !model.hasSearch, let characters = event.charactersIgnoringModifiers, characters.unicodeScalars.allSatisfy({ !$0.properties.isWhitespace && $0.value >= 0x21 && $0.value < 0xF700 }) {
             model.typeAhead(characters)
             return true
+        }
+        return false
+    }
+
+    private static func isInCalendar(_ responder: NSResponder?) -> Bool {
+        var view = responder as? NSView
+        while let current = view {
+            if current is NSDatePicker { return true }
+            view = current.superview
         }
         return false
     }

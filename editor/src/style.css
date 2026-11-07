@@ -409,8 +409,7 @@ body[data-text='none'] #editor {
   box-shadow: inset 0 0 0 var(--chip-status-edge-width, 0.5px) var(--chip-edge, var(--separator));
 }
 
-/* An empty status, in a row, has no value yet: a plus and a quiet edge, as the design's empty chip. A pin is never
-   empty; the app leaves it out. */
+/* A value the item does not have yet, in a row or a pin: a plus and a quiet edge, as the design's empty chip. */
 .item-chip.empty {
   background: transparent;
   box-shadow: inset 0 0 0 var(--chip-status-edge-width, 0.5px) var(--chip-edge, var(--separator));

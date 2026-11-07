@@ -117,8 +117,6 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     var showMore: String
     var showMoreContents: String
     var showMoreLinked: String
-    var propertyRejected: Bool
-    var parentRejected: Bool
     var interfaceTextSize: Int
     /// How many lines the title shows before an ellipsis cuts it, while it is not being edited.
     var titleLines: Int
@@ -182,6 +180,7 @@ extension PropertyRow: Encodable {
         try container.encode(value.symbol, forKey: .symbol)
         switch value {
         case .status: try container.encode("status", forKey: .kind)
+        case .empty: try Self.encode("empty", label, into: &container)
         case .parent: try container.encode("parent", forKey: .kind)
         case .type(let name, let icon):
             try Self.encode("type", name, into: &container)
