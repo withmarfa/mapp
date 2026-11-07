@@ -2,6 +2,23 @@ const threshold = 4
 /** How long a dropped row waits for the app's new order before it goes back where it was. */
 const settling = 300
 
+/** Stops the click that ends the press a drag began in. A drop is followed by that click at once, but Escape ends the
+ *  drag while the button is still down, so its click comes only when the person lets go. Either way the swallow lasts
+ *  until that click, or until the next press starts, since a press cancelled or released outside the page has no
+ *  click, and a timer would end it before a late release. */
+function swallowNextClick() {
+  const lift = () => {
+    window.removeEventListener('click', swallow, true)
+    window.removeEventListener('pointerdown', lift, true)
+  }
+  const swallow = (event: Event) => {
+    event.stopPropagation()
+    lift()
+  }
+  window.addEventListener('click', swallow, true)
+  window.addEventListener('pointerdown', lift, true)
+}
+
 /** Lets a row of `list` be dragged by its key. The other rows make way as it passes. Escape puts it back, and a press
  *  that does not move stays a click. `move` gets the row and the row it now comes before, or null for the end. */
 export function dragRows(list: HTMLElement, move: (row: string, before: string | null) => void) {
@@ -79,9 +96,7 @@ export function dragRows(list: HTMLElement, move: (row: string, before: string |
       entry?.classList.remove('dragged')
 
       // The release must not also open the row's editor.
-      const swallow = (event: Event) => event.stopPropagation()
-      window.addEventListener('click', swallow, { capture: true, once: true })
-      setTimeout(() => window.removeEventListener('click', swallow, true))
+      swallowNextClick()
 
       if (!drop || target === from) return restore()
       const order = rows.filter((row) => row !== entry)

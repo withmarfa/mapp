@@ -1075,3 +1075,50 @@ test('Escape puts a dragged row back', () => {
   expect(key.parentElement!.style.transform).toBe('')
   expect(root.querySelector('.item-props')!.classList.contains('dragging')).toBe(false)
 })
+
+const tick = () => new Promise((resolve) => setTimeout(resolve))
+
+test('the click from letting go after Escape ended a drag opens no editor, and a later press still does', async () => {
+  const { key, drag } = draggable()
+  drag(50)
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+  // Escape ends the drag with the button still down; the click comes only when it is released.
+  await tick()
+  window.dispatchEvent(new MouseEvent('pointerup'))
+  key.click()
+  expect(posted, 'the release after Escape').toEqual([])
+
+  key.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0, clientY: 15 }))
+  window.dispatchEvent(new MouseEvent('pointerup'))
+  key.click()
+  expect(
+    posted.map((message) => message.type),
+    'the next press',
+  ).toEqual(['editValue'])
+})
+
+test('a drop swallows its own click however late it comes, and nothing after it', async () => {
+  const { key, drag, drop } = draggable()
+  drag(50)
+  drop()
+  await tick()
+  key.click()
+  expect(posted.map((message) => message.type)).toEqual(['moveRow'])
+
+  posted = []
+  key.click()
+  expect(
+    posted.map((message) => message.type),
+    'a second click',
+  ).toEqual(['editValue'])
+})
+
+test('a press that starts after a cancelled drag is not swallowed', () => {
+  const { key, drag } = draggable()
+  drag(50)
+  window.dispatchEvent(new MouseEvent('pointercancel'))
+  key.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0, clientY: 15 }))
+  window.dispatchEvent(new MouseEvent('pointerup'))
+  key.click()
+  expect(posted.map((message) => message.type)).toEqual(['editValue'])
+})
