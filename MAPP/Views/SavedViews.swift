@@ -110,3 +110,10 @@ enum SavedViews {
     }
 }
 
+
+extension Text {
+    /// A window subtitle that says the view it counts has changes nothing has saved.
+    func editedSubtitle(_ isEdited: Bool) -> Text {
+        isEdited ? Text("\(self), edited") : self
+    }
+}
