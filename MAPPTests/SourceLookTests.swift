@@ -1,84 +1,251 @@
 @testable import MAPP
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 import WebKit
 
 @Suite(.hangLimit)
 @MainActor struct SourceLookTests {
-    private let title = "CaMeL offers a promising new direction for mitigating prompt injection attacks"
-
-    private var article: Data {
-        Data("""
-            <html><body><h1>CaMeL offers a promising new direction for mitigating prompt injection attacks</h1>
-            <p>It said \\"I don't know\\" and stopped.</p>
-            <h2 id="why">Why it matters<a href="#why">#</a></h2>
-            <p>Body. <a href="https://example.com/x">A link</a></p>
-            <pre>keep \\"this\\"</pre>
-            <h2>Second heading</h2></body></html>
-            """.utf8)
+    private func look(_ mode: SourceViewMode, mail: Bool = false, page: PageStyle = PageStyle()) -> SourceLook {
+        SourceLook(mode: mode, isMail: mail, page: page)
     }
 
-    private func text(of look: SourceLook) async throws -> String {
+    private func value(_ script: String, in html: String, look: SourceLook, runsScripts: Bool = false) async throws -> Any? {
+        let page = try await SealedWebPage.make(runsScripts: runsScripts)
+        try await page.show(Data(html.utf8), look: look)
+        return try await page.page.callJavaScript(script)
+    }
+
+    private let plain = "<html><body><p>Some words in a document that says nothing about how it looks.</p></body></html>"
+
+    // MARK: The column
+
+    @Test func theTextColumnFollowsThePagesWidthSetting() {
+        #expect(look(.reader).inset.contains("100vw - 702px"))
+        var full = PageStyle()
+        full.fullWidth = true
+        #expect(look(.reader, page: full).inset == "39px")
+    }
+
+    // MARK: A document that says nothing about its look
+
+    @Test func aPlainDocumentGetsTheBaselineInTheTextColumn() async throws {
+        let size = try await value("return getComputedStyle(document.body).fontSize + ' ' + getComputedStyle(document.documentElement).colorScheme", in: plain, look: look(.original))
+        #expect(size as? String == "13px light dark")
+    }
+
+    @Test func aStyledDocumentIsLeftAsWritten() async throws {
+        // Its own light background must not meet a text color that follows the system into dark mode.
+        for styled in [
+            "<html><head><style>body { background: #fff }</style></head><body><p>Words</p></body></html>",
+            "<html><body style=\"background:#fff\"><p>Words</p></body></html>",
+            "<html><body bgcolor=\"#ffffff\"><p>Words</p></body></html>",
+            "<html><head><link rel=\"stylesheet\" href=\"data:text/css,body%7Bbackground%3A%23fff%7D\"></head><body><p>Words</p></body></html>",
+        ] {
+            let scheme = try await value("return getComputedStyle(document.documentElement).colorScheme + ' ' + getComputedStyle(document.body).fontSize", in: styled, look: look(.original))
+            #expect(scheme as? String == "normal 16px", "\(styled)")
+        }
+    }
+
+    @Test func aDocumentWhoseOnlyStylesAreOnTheWebStillGetsTheBaseline() async throws {
+        // The sheet is blocked like everything else that is not in the file, so the document is as bare as without it.
+        let html = "<html><head><link rel=\"stylesheet\" href=\"https://example.com/site.css\"></head><body><p>Words</p></body></html>"
+        let size = try await value("return getComputedStyle(document.body).fontSize + ' ' + getComputedStyle(document.documentElement).colorScheme", in: html, look: look(.original))
+        #expect(size as? String == "13px light dark")
+    }
+
+    @Test func theOriginalLookKeepsEverythingTheSourceWrote() async throws {
+        let html = "<html><head><style>p { color: rgb(1, 2, 3) }</style></head><body><h1>Title</h1><p>It said \\\"hi\\\"<a href=\"#x\">#</a></p></body></html>"
+        let text = try #require(try await value("return document.body.innerText + '|' + getComputedStyle(document.querySelector('p')).color", in: html, look: look(.original)) as? String)
+        #expect(text.contains("Title") && text.contains("It said \\\"hi\\\"#") && text.hasSuffix("|rgb(1, 2, 3)"))
+    }
+
+    // MARK: A mail
+
+    private let mail = """
+        <html><body><table width="100%"><tr><td align="center"><table id="column" width="600"><tr><td>\
+        <p>The mail's own words, at the width its sender gave them.</p></td></tr></table></td></tr></table></body></html>
+        """
+
+    @Test func theMailsColumnIsMarkedAndCentered() async throws {
+        let marked = try await value("return document.querySelector('[data-mapp-mail]')?.id", in: mail, look: look(.original, mail: true))
+        #expect(marked as? String == "column")
+        let unmarked = try await value("return document.querySelector('[data-mapp-mail]')?.id ?? 'none'", in: mail, look: look(.original))
+        #expect(unmarked as? String == "none")
+    }
+
+    @Test func aMailSitsOnTheSurfaceBehindItUnlessItPaintsItsOwn() async throws {
+        let backdrop = "return getComputedStyle(document.documentElement).backgroundColor + '|' + getComputedStyle(document.getElementById('column')).backgroundColor"
+        #expect(try await value(backdrop, in: mail, look: look(.original, mail: true)) as? String == "rgba(0, 0, 0, 0)|rgb(255, 255, 255)")
+        let own = mail.replacingOccurrences(of: "<body>", with: "<body style=\"background:rgb(10, 20, 30)\">")
+            .replacingOccurrences(of: "id=\"column\"", with: "id=\"column\" bgcolor=\"#ff0000\"")
+        let kept = try await value(backdrop, in: own, look: look(.original, mail: true)) as? String
+        #expect(kept == "rgba(0, 0, 0, 0)|rgb(255, 0, 0)", "the mail's own color wins on its column; the page behind it is the surface")
+    }
+
+    @Test func aMailIsNeverRestyledAsReaderIs() async throws {
+        let font = try await value("return getComputedStyle(document.querySelector('p')).fontFamily", in: mail, look: look(.original, mail: true))
+        #expect(!((font as? String) ?? "").contains("New York"))
+        #expect(look(.original, mail: true).css.contains("data-mapp-mail"))
+    }
+
+    @Test func theSurfaceIsAskedForOnlyWhereTheLookNeedsIt() {
+        #expect(look(.original, mail: true).isOnSurface)
+        #expect(!look(.original).isOnSurface)
+        #expect(!look(.reader, mail: true).isOnSurface, "a mail read in Reader is an article like any other")
+        #expect(look(.reader).leavesBackground && look(.original, mail: true).leavesBackground)
+        #expect(!look(.original).leavesBackground, "a page paints its own background")
+    }
+
+    // MARK: A mail that paints its own page
+
+    /// The column's own background, then the page behind it, as the document computes them.
+    private let paint = "return getComputedStyle(document.getElementById('column')).backgroundColor + '|' + getComputedStyle(document.body).backgroundColor"
+
+    @Test func aDarkMailKeepsItsDarkPageAndItsLightText() async throws {
+        let table = "<table id=\"column\" width=\"600\"><tr><td><p>Words that are light on a dark page.</p></td></tr></table>"
+        let darkMails: [(String, String)] = [
+            ("a body with bgcolor and text", "<html><body bgcolor=\"#111111\" text=\"#eeeeee\">\(table)</body></html>"),
+            ("a body in an inline style", "<html><body style=\"background:#111111;color:#eeeeee\">\(table)</body></html>"),
+            ("a body in a style sheet", "<html><head><style>body { background: #111111; color: #eeeeee }</style></head><body>\(table)</body></html>"),
+            ("a table that spans the page", "<html><body><table width=\"100%\" bgcolor=\"#111111\"><tr><td align=\"center\">" +
+                "<table id=\"column\" width=\"600\"><tr><td><font color=\"#eeeeee\">Words that are light on a dark page.</font></td></tr></table></td></tr></table></body></html>"),
+        ]
+        for (name, html) in darkMails {
+            let marked = try await value("return document.getElementById('column').hasAttribute('data-mapp-mail')", in: html, look: look(.original, mail: true))
+            try #require(marked as? Bool == true, "\(name): the column is found")
+            let colors = try await value(paint, in: html, look: look(.original, mail: true)) as? String ?? ""
+            #expect(!colors.hasPrefix("rgb(255, 255, 255)"), "\(name) was painted white: \(colors)")
+        }
+    }
+
+    @Test func aMailWithLightTextAndNoPageOfItsOwnIsNotPaintedWhite() async throws {
+        // White under light text is unreadable; the surface behind the page shows instead.
+        let html = "<html><body text=\"#eeeeee\"><table id=\"column\" width=\"600\"><tr><td><p>Words in a light color.</p></td></tr></table></body></html>"
+        let colors = try await value(paint, in: html, look: look(.original, mail: true)) as? String
+        #expect(colors == "rgba(0, 0, 0, 0)|rgba(0, 0, 0, 0)")
+    }
+
+    @Test func aMailWithDarkTextAndNoPageOfItsOwnIsPaintedWhite() async throws {
+        let html = "<html><head><style>p { color: #222222 }</style></head><body><table id=\"column\" width=\"600\"><tr><td><p>Words in a dark color.</p></td></tr></table></body></html>"
+        let colors = try await value(paint, in: html, look: look(.original, mail: true)) as? String
+        #expect(colors == "rgb(255, 255, 255)|rgba(0, 0, 0, 0)")
+    }
+
+    // MARK: A mail in dark mode
+
+    /// What a script finds once the mail is shown in dark mode, where a page's own text color may follow the system.
+    private func inDarkMode(_ script: String, of html: String) async throws -> String? {
+        let sealed = try await SealedWebPage.make(runsScripts: false)
+        let window = TestWindow(contentRect: NSRect(x: -4000, y: 200, width: 900, height: 700), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.contentView = NSHostingView(rootView: WebView(sealed.page))
+        window.orderFrontRegardless()
+        defer { window.orderOut(nil) }
+        try #require(try await eventuallyAsking {
+            try await sealed.page.callJavaScript("return matchMedia('(prefers-color-scheme: dark)').matches") as? Bool == true
+        })
+        try await sealed.show(Data(html.utf8), look: look(.original, mail: true))
+        return try await sealed.page.callJavaScript(script) as? String
+    }
+
+    private func columnInDarkMode(_ html: String) async throws -> String? {
+        try await inDarkMode("return getComputedStyle(document.getElementById('column')).backgroundColor", of: html)
+    }
+
+    private nonisolated static func column(_ words: String = "<p style=\"color:#333333\">Words in a dark color.</p>") -> String {
+        "<table id=\"column\" width=\"600\"><tr><td>\(words)</td></tr></table>"
+    }
+
+    @Test(arguments: [
+        "<html><body>\(column())</body></html>",
+        "<!doctype html><html><head><meta name=\"color-scheme\" content=\"light dark\"></head><body>\(column())</body></html>",
+        "<!doctype html><html><head><style>:root{color-scheme:light dark}</style></head><body>\(column())</body></html>",
+        "<html><body background=\"https://example.com/bg.png\">\(column())</body></html>",
+        "<html><head><style>body{background:url(https://example.com/bg.png)}</style></head><body>\(column())</body></html>",
+        "<html><body><table width=\"100%\"><tr><td background=\"https://example.com/bg.png\" align=\"center\">\(column())</td></tr></table></body></html>",
+        "<html><body style=\"background-color:rgba(255,255,255,0)\">\(column())</body></html>",
+        "<html><head><style>body{background:#ffffff00}</style></head><body>\(column())</body></html>",
+        "<html><head><style>body{color:oklch(0.2 0 0)}</style></head><body>\(column("<p>Words in a dark color.</p>"))</body></html>",
+    ]) func darkTextWithNothingBehindItIsPaintedWhiteInDarkMode(_ html: String) async throws {
+        #expect(try await columnInDarkMode(html) == "rgb(255, 255, 255)")
+    }
+
+    @Test func textWithNoColorOfItsOwnStaysReadableOnTheWhite() async throws {
+        let words = "<p style=\"color:#333333\">Most of the words in this mail are written in a dark color.</p><p id=\"plain\">A few are not.</p>"
+        let html = "<!doctype html><html><head><style>:root{color-scheme:light dark}</style></head><body>\(Self.column(words))</body></html>"
+        #expect(try await inDarkMode("return getComputedStyle(document.getElementById('plain')).color", of: html) == "rgb(0, 0, 0)")
+    }
+
+    @Test func hiddenTextDoesNotDecideTheColor() async throws {
+        let words = "<div style=\"display:none;color:#ffffff\">\(String(repeating: "Preview text no one sees. ", count: 40))</div><p style=\"color:#333333\">Words in a dark color.</p>"
+        #expect(try await columnInDarkMode("<html><body>\(Self.column(words))</body></html>") == "rgb(255, 255, 255)")
+    }
+
+    @Test(arguments: [
+        "<html><body bgcolor=\"#111111\" text=\"#eeeeee\">\(column("<p>Words.</p>"))</body></html>",
+        "<html><head><style>body{background:#111111;color:#eeeeee}</style></head><body>\(column("<p>Words.</p>"))</body></html>",
+        "<html><body style=\"background:linear-gradient(#111111,#222222);color:#eeeeee\">\(column("<p>Words.</p>"))</body></html>",
+        "<html><body style=\"background:url(data:image/gif;base64,R0lGODlhAQABAAAAACw=);color:#333333\">\(column("<p>Words.</p>"))</body></html>",
+        "<html><body style=\"color:oklch(0.95 0 0)\">\(column("<p>Words.</p>"))</body></html>",
+        "<!doctype html><html><head><style>:root{color-scheme:light dark}</style></head><body>\(column("<p>Words that follow the system.</p>"))</body></html>",
+    ]) func whatPaintsItselfOrIsLightIsNotPaintedWhiteInDarkMode(_ html: String) async throws {
+        #expect(try await columnInDarkMode(html) != "rgb(255, 255, 255)")
+    }
+
+    // MARK: Documents that name their elements after the page's methods
+
+    @Test func aDocumentWhoseImagesAreNamedAfterItsMethodsIsStillGivenItsLook() async throws {
+        let names = ["querySelector", "createElement", "body", "head", "documentElement", "createTreeWalker"]
+        let clobbers = names.map { "<img name=\"\($0)\" width=\"1\" height=\"1\">" }.joined()
+        let html = "<html><body>\(clobbers)<form><input name=\"children\"><input name=\"parentElement\"><input name=\"matches\"></form><p>Some words in a document that says nothing about how it looks.</p></body></html>"
+        // The probe reads the document through the prototypes too, since the names hide the document's own.
+        let q = "const q = s => Document.prototype.querySelector.call(document, s);"
+        let size = try await value(q + "return getComputedStyle(q('body')).fontSize + ' ' + getComputedStyle(q('html')).colorScheme", in: html, look: look(.original))
+        #expect(size as? String == "13px light dark")
+        let reader = try await value(q + "return getComputedStyle(q('p')).fontFamily", in: html, look: look(.reader))
+        #expect((reader as? String)?.contains("New York") == true)
+    }
+
+    @Test func aMailInsideAFormThatNamesItsControlsAfterItsPropertiesIsStillFound() async throws {
+        let html = "<html><body><form><input type=\"hidden\" name=\"children\"><input type=\"hidden\" name=\"parentElement\"><input type=\"hidden\" name=\"style\">" +
+            "<table width=\"100%\"><tr><td align=\"center\"><table id=\"column\" width=\"600\"><tr><td><p>The mail's own words, at the width its sender gave them.</p></td></tr></table></td></tr></table></form></body></html>"
+        let marked = try await value("return document.querySelector('[data-mapp-mail]')?.id", in: html, look: look(.original, mail: true))
+        #expect(marked as? String == "column")
+    }
+
+    // MARK: Documents that would keep the page busy
+
+    @MainActor private final class Showing {
+        var shown = false
+    }
+
+    @Test func aPageWhoseFormsHideTheirChildrenIsShownAtOnce() async throws {
+        // `form.children` is the fieldset that belongs to the form, which holds the form: a walk down the children
+        // never ends. The page's process stays busy with it for as long as the app runs, so the look must not walk that way.
+        let html = "<html><body><fieldset form=\"f\" name=\"children\"><form id=\"f\"><table width=\"600\"><tr><td><p>The mail's own words, at the width its sender gave them.</p></td></tr></table></form></fieldset></body></html>"
         let page = try await SealedWebPage.make(runsScripts: false)
-        try await page.show(article, look: look)
-        return try #require(try await page.page.callJavaScript("return document.body.innerText") as? String)
+        let showing = Showing()
+        let task = Task {
+            try await page.show(Data(html.utf8), look: look(.original, mail: true))
+            showing.shown = true
+        }
+        defer { task.cancel() }
+        let ended = await eventually(within: .seconds(20)) { showing.shown }
+        #expect(ended, "the look ended")
+        guard ended else { return }
+        let answered = try? await page.page.callJavaScript("return 1") as? Int
+        #expect(answered == 1, "the page answers")
     }
 
-    private func look(_ mode: SourceViewMode, wide: Bool = false, title: String? = nil) -> SourceLook {
-        SourceLook(mode: mode, title: title ?? self.title, page: PageStyle(), originalWide: wide)
-    }
+    // MARK: Reader
 
-    @Test func theReaderViewDropsTheRepeatedTitleAndTheSourcesArtifacts() async throws {
-        let text = try await text(of: look(.reader))
-        #expect(!text.contains("CaMeL"), "the heading that repeats the title is gone")
-        #expect(text.contains("Why it matters") && !text.contains("Why it matters#"), "the # link is gone")
-        #expect(text.contains("\"I don't know\"") && !text.contains("\\\"I don"), "escaped quotes are plain")
-        #expect(text.contains("keep \\\"this\\\""), "code is left as written")
-        #expect(text.contains("A link"))
-    }
-
-    @Test func aHeadingThatIsNotTheTitleStays() async throws {
-        #expect(try await text(of: look(.reader, title: "Something else")).contains("CaMeL offers"))
-    }
-
-    @Test func theOriginalViewKeepsTheSourcesOwnContent() async throws {
-        let text = try await text(of: look(.original))
-        #expect(text.contains("CaMeL offers") && text.contains("Why it matters#") && text.contains("\\\"I don't know"))
-    }
-
-    @Test func theWideSettingFreesOnlyTheOriginalViewFromTheColumn() {
-        #expect(look(.original, wide: true).inset == "39px")
-        #expect(look(.original, wide: false).inset.contains("100vw - 702px"))
-        // The reader view follows the page's own width setting, not the original's.
-        #expect(look(.reader, wide: true).inset.contains("100vw - 702px"))
-    }
-
-    private func text(of html: String, title: String, mode: SourceViewMode = .reader) async throws -> String {
-        let page = try await SealedWebPage.make(runsScripts: false)
-        try await page.show(Data("<html><body>\(html)</body></html>".utf8), look: look(mode, title: title))
-        return try #require(try await page.page.callJavaScript("return document.body.innerText") as? String)
-    }
-
-    @Test func removingTheTitleKeepsAContainersOtherContent() async throws {
-        let text = try await text(of: "<section><h1>Title</h1><pre>=== --- +++</pre></section>", title: "Title")
-        #expect(text.contains("=== --- +++") && !text.contains("Title"))
-    }
-
-    @Test func onlyAHeadingsPermalinkIsRemoved() async throws {
-        let text = try await text(
-            of: "<p>The <a href=\"https://example.com/hash\">#</a> character.</p><h2 id=\"a\">Head <a href=\"#a\">#</a></h2>",
-            title: "Other")
-        #expect(text.contains("The # character") && text.contains("Head") && !text.contains("Head #"))
-    }
-
-    @Test func keyboardAndSampleTextKeepTheirBackslashes() async throws {
-        let text = try await text(of: "<p><kbd>echo \\\"hi\\\"</kbd> <samp>a\\'b</samp></p>", title: "Other")
-        #expect(text.contains("echo \\\"hi\\\"") && text.contains("a\\'b"))
-    }
-
-    @Test func aHeadingThatOnlyBeginsLikeTheTitleStays() async throws {
-        let html = "<h2>Understanding security</h2><p>Body</p>"
-        #expect(try await text(of: html, title: "Understanding security boundaries").contains("Understanding security"))
-        #expect(!(try await text(of: html, title: "Understanding security\u{2026}")).contains("Understanding security"))
+    @Test func theReaderLookIsNamedByItsSettings() {
+        var page = PageStyle()
+        page.textSize = 16
+        let reader = look(.reader, page: page)
+        #expect(reader.css.contains("18.0px"), "the prose is 14.6 for every 13 of the page's text size")
+        #expect(reader != look(.reader))
     }
 }

@@ -1,0 +1,29 @@
+Mozilla Readability
+
+Readability.js and Readability-readerable.js in this folder are copies, unmodified, of @mozilla/readability 0.6.0
+(https://github.com/mozilla/readability), published under the Apache License, Version 2.0. They are the scripts MAPP
+runs, in a world of its own that a document cannot reach, to find the article in a saved web page.
+
+Package:    @mozilla/readability 0.6.0
+Integrity:  sha512-juG5VWh4qAivzTAeMzvY9xs9HY5rAcr2E4I7tiSSCokRFi7XIZCAu92ZkSTsIj1OPceCifL3cpfteP3pDT9/QQ==
+SHA-256:    34dcab3d0832d0019f02990eed6b6124e029e8c32b9f0c6f2550544ff8dff174  Readability.js
+            a98d28805804c1986ceed470678a3f409f150ee7f1d227f8c8239c005d21de65  Readability-readerable.js
+
+To update, replace both files from one published version and change the lines above and the hashes in
+MAPPTests/ReadabilityScriptTests.swift together.
+
+----------------------------------------------------------------------------------------------------
+
+Copyright (c) 2010 Arc90 Inc
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.

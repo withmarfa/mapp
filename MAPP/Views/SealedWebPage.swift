@@ -11,7 +11,7 @@ import WebKit
 /// policy decision replaces the load: WebKit then drops the replaced load without finishing or failing it, so the new
 /// document would never appear. A page that has held no document has no script that could start one.
 ///
-/// The seal has four parts, each of which holds in every page without the others:
+/// The seal has four parts, and each covers what the others cannot:
 /// - A content rule list blocks every load but `data:`, `blob:` and `about:`, which cover only what the document holds
 ///   itself, and the app's own picture scheme (`SealedPictures`), which the app answers from what it holds or what the
 ///   Remote Pictures setting lets it fetch. It applies to images, scripts, styles, `fetch`, XHR, WebSockets and frames
@@ -19,9 +19,10 @@ import WebKit
 /// - A navigation decider cancels every navigation of the main frame but the one this type starts, so a link, a form
 ///   submission, `location` and a redirect go nowhere. Frames the document builds for itself (`about:`, `data:`, `blob:`)
 ///   are allowed, and nothing else.
-/// - A script that runs before the document's own, in every frame, removes WebRTC and media devices. A content rule
-///   governs resource loads and never sees a STUN or ICE datagram, and WebKit has no public setting that turns WebRTC
-///   off, so the interfaces that could send one are not there.
+/// - A script that runs before the document's own, in every frame, ends every click and removes WebRTC and media
+///   devices. WebKit opens a connection to the address of a link that activates before it asks the decider, and a
+///   content rule sees neither that connection nor a STUN or ICE datagram; WebKit has no public setting that turns
+///   either off.
 /// - The page keeps its data in memory (`WKWebsiteDataStore.nonPersistent()`), has no script message handler, and has
 ///   no bridge to the app but the picture scheme, which answers only the pictures its document was found to name.
 ///
@@ -30,6 +31,16 @@ import WebKit
 ///
 /// Links do nothing. A document from a file in someone's library is not a page to browse from; a link that opened the
 /// browser would be the document choosing where the person goes.
+///
+/// No script can see inside a closed shadow root, so the seal ends every click rather than looking for links, and a
+/// document loses what clicks do for it:
+/// - A click does nothing by default: a button or label does not act, and a checkbox or radio button does not change.
+///   The script opens a `<details>` element itself, so a disclosure still works.
+/// - The document's own click handlers still run, and find the click canceled.
+/// - A scripted click does not happen: `click()` does nothing and a dispatched `click` or `auxclick` is dropped, so a
+///   saved page that drives its own buttons that way loses them.
+/// - WebKit runs no listener in a frame sandboxed without `allow-scripts`, so the seal makes that frame inert: it
+///   shows, but takes no click, focus or selection.
 @MainActor @Observable final class SealedWebPage {
     /// The page that holds the document shown last.
     private(set) var page: WebPage
@@ -102,9 +113,7 @@ import WebKit
         // Before the page is swapped in, so the person never sees the document unstyled. A look that fails to apply
         // leaves the document as it loaded.
         if let look {
-            _ = try? await next.callJavaScript(
-                SourceLook.script, arguments: ["css": look.css, "reader": look.mode == .reader, "title": look.title],
-                contentWorld: Self.world)
+            _ = try? await next.callJavaScript(SourceLook.script, arguments: look.arguments, contentWorld: Self.world)
             // The await above is a suspension: a newer call may have started, or this one been cancelled.
             try Task.checkCancellation()
             guard call == shows else { throw CancellationError() }
@@ -127,24 +136,66 @@ import WebKit
         _ = try? await page.callJavaScript(Self.redraw, arguments: ["version": String(version)], contentWorld: Self.world)
     }
 
-    private static let world = WKContentWorld.world(name: "MAPPSealedPictures")
+    /// The world the app's own scripts run in: its globals are not the document's, so the document cannot see or change
+    /// them, while the DOM is shared.
+    static let world = WKContentWorld.world(name: "MAPPSealedPictures")
 
-    nonisolated static let redraw = """
-        for (const img of document.querySelectorAll('img[src^="\(SealedPictures.scheme):"]')) {
-          img.setAttribute('src', img.getAttribute('src').replace(/([?&]v=)\\d+/, '$1' + version));
+    nonisolated static let redraw = SafeDOM.script + """
+
+        for (const img of dom.queryAllInDocument(document, 'img[src^="\(SealedPictures.scheme):"]')) {
+          dom.setAttribute(img, 'src', dom.getAttribute(img, 'src').replace(/([?&]v=)\\d+/, '$1' + version));
         }
         """
 
     /// Runs at the start of every document in every frame, `about:blank` and `srcdoc` frames included, each of which has
     /// a realm of its own and gets the script before any page script runs.
     ///
-    /// WebKit opens a connection to the address of a clicked link or a submitted form before it judges the navigation,
-    /// so the rules cannot stop that; the first part ends the click and the submission first. The second part removes
-    /// the interfaces through which a page could send UDP to a host it picks, which would show the Mac's address.
+    /// The first part keeps a link from activating, by a person or a script, with or without a document or a window
+    /// around it: a click that reaches no window never meets the listeners, so the script also takes away the ways to
+    /// start one. The second part removes the interfaces through which a page could send UDP to a host it picks, which
+    /// would show the Mac's address.
     nonisolated static let lockdown = """
-        addEventListener('click', e => { if (e.target instanceof Element && e.target.closest('a[href], area[href]')) e.preventDefault(); }, true);
-        addEventListener('submit', e => e.preventDefault(), true);
-        for (const name of ['submit', 'requestSubmit']) Object.defineProperty(HTMLFormElement.prototype, name, { value() {}, writable: false, configurable: false });
+        (() => {
+          // Taken now, before the document's own scripts run, so neither they nor a name in the document can replace them.
+          const call = Function.prototype.call;
+          const stop = call.bind(Event.prototype.preventDefault);
+          const kind = call.bind(Object.getOwnPropertyDescriptor(Event.prototype, 'type').get);
+          const path = call.bind(Event.prototype.composedPath);
+          const send = call.bind(EventTarget.prototype.dispatchEvent);
+          const closest = call.bind(Element.prototype.closest);
+          const toggle = call.bind(Element.prototype.toggleAttribute);
+          const has = call.bind(Element.prototype.hasAttribute);
+          const set = call.bind(Element.prototype.setAttribute);
+          const root = call.bind(Object.getOwnPropertyDescriptor(Document.prototype, 'documentElement').get);
+          const observe = call.bind(MutationObserver.prototype.observe);
+          const Observer = MutationObserver;
+          const page = document;
+          addEventListener('click', e => {
+            stop(e);
+            try {
+              const summary = closest(path(e)[0], 'details > summary:first-of-type');
+              if (summary) toggle(closest(summary, 'details'), 'open');
+            } catch (x) {}
+          }, true);
+          addEventListener('auxclick', e => stop(e), true);
+          addEventListener('submit', e => stop(e), true);
+          // A sandbox without allow-scripts lets this script run but none of its listeners. The observer does run, and
+          // keeps a same-origin parent from undoing the inert state.
+          let listens = false;
+          const test = new EventTarget();
+          test.addEventListener('test', () => { listens = true; });
+          send(test, new Event('test'));
+          if (!listens) {
+            const hold = () => { const element = root(page); if (element && !has(element, 'inert')) set(element, 'inert', ''); };
+            hold();
+            observe(new Observer(hold), page, { subtree: true, childList: true, attributes: true, attributeFilter: ['inert'] });
+          }
+          const replace = (type, name, value) => Object.defineProperty(type.prototype, name, { value, writable: false, configurable: false });
+          replace(HTMLElement, 'click', function () {});
+          replace(EventTarget, 'dispatchEvent', function (e) { const name = kind(e); return name === 'click' || name === 'auxclick' ? true : send(this, e); });
+          replace(HTMLFormElement, 'submit', function () {});
+          replace(HTMLFormElement, 'requestSubmit', function () {});
+        })();
         for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnection', 'RTCDataChannel', 'RTCSessionDescription', 'RTCIceCandidate', 'RTCPeerConnectionIceEvent', 'RTCDataChannelEvent', 'RTCRtpSender', 'RTCRtpReceiver', 'RTCRtpTransceiver', 'RTCSctpTransport', 'RTCDtlsTransport', 'RTCIceTransport', 'RTCCertificate']) delete window[name];
         delete Navigator.prototype.mediaDevices;
         """

@@ -221,6 +221,17 @@ nonisolated final class DatagramProbe: @unchecked Sendable {
         #expect(sent, "the control sent no datagram, so the test above shows nothing")
     }
 
+    @Test func thePicturesAreRedrawnInADocumentWhoseImagesAreNamedAfterItsMethods() async throws {
+        let page = try await SealedWebPage.make(runsScripts: false)
+        let source = "\(SealedPictures.scheme):picture?v=1"
+        try await page.show(Data("""
+            <html><body><img name="querySelectorAll" src="\(source)"><img name="getAttribute" src="\(source)"></body></html>
+            """.utf8))
+        await page.redrawPictures(version: 7)
+        let sources = try await page.page.callJavaScript("return Array.from(document.getElementsByTagName('img')).map(i => Element.prototype.getAttribute.call(i, 'src')).join(' ')")
+        #expect(sources as? String == "\(SealedPictures.scheme):picture?v=7 \(SealedPictures.scheme):picture?v=7")
+    }
+
     @Test func theGateLetsThroughOnlyTheLoadItWasToldAbout() {
         let gate = SealedWebPage.NavigationGate()
         let elsewhere = URL(string: "http://127.0.0.1:9/")

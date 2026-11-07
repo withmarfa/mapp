@@ -2,18 +2,20 @@ import MarfaIcons
 import SwiftUI
 
 /// An item shown as an HTML document: its title and pins in the manner of the note page's header (`WebPageHeader`), then
-/// the HTML filling the rest of the detail area, shown as it was written (`WebPageView`). The document is the item's own file, for
-/// a Web Page or an HTML file, or the HTML file attached to it, for a document a connector keeps that way
-/// (`ItemLibrary.pageLayout(of:)`). The body is read only, and the title and properties are not edited on the page,
-/// except a pinned status, which keeps its menu; the inspector shows them all.
+/// the HTML filling the rest of the detail area (`WebPageView`). The document is analyzed first (`PageAnalyzer`): an
+/// article is read in Reader, the article alone in the note page's text, or shown as it was written; any other page is
+/// shown as it was written, with no Reader to switch to, and a mail sits centered on the surface behind pages. The
+/// document is the item's own file, for a Web Page or an HTML file, or the HTML file attached to it, for a document a
+/// connector keeps that way (`ItemLibrary.pageLayout(of:)`). The body is read only, and the title and properties are
+/// not edited on the page, except a pinned status, which keeps its menu; the inspector shows them all.
 ///
 /// Its pictures are the app's to give (`SealedPictures`), for this item: while some wait for the person, a callout at the
 /// top of the page says how many and loads them, as on a note's page.
 struct WebPageItemPage: View {
     private enum Content: Equatable {
         case loading
-        /// The document with its pictures pointed at the app, and the encoding to read it in.
-        case ready(Data, String.Encoding)
+        /// The document in each look it has, with its pictures pointed at the app.
+        case ready(Loaded)
         /// The library has no file for the item.
         case unavailable
         /// The library has one but could not get it.
@@ -22,17 +24,45 @@ struct WebPageItemPage: View {
         case notHTML
     }
 
+    /// What a file turned out to be, and the document to show for each look. Both are written with the pictures'
+    /// `version` of the time, which the page redraws to the current one (`SealedPictures.show`).
+    private nonisolated struct Loaded: Equatable, Sendable {
+        nonisolated struct Document: Equatable, Sendable {
+            let html: Data
+            let encoding: String.Encoding
+            let addresses: [URL]
+
+            init(_ rewritten: SealedPictureRewrite.Result) {
+                html = rewritten.html
+                encoding = rewritten.encoding
+                addresses = rewritten.addresses
+            }
+        }
+
+        let analysis: PageAnalysis
+        let original: Document
+        /// The article's document, where the page has an article.
+        let reader: Document?
+        let version: Int
+
+        func mode(choosing chosen: SourceViewMode, mailChoice: SourceViewMode?) -> SourceViewMode {
+            reader == nil ? .original : analysis.mode(choosing: chosen, mailChoice: mailChoice)
+        }
+        func document(for mode: SourceViewMode) -> Document { mode == .reader ? reader ?? original : original }
+    }
+
     private struct Load: Hashable {
         let id: ItemID
         let document: ItemID
         let version: ItemVersion?
+        /// Counts Try Again, so a retry is the task's own: it ends with the item's, and a late answer never reaches the next.
+        let attempt: Int
     }
 
     @CurrentLibrary private var library
     @StoredPageStyle private var style
     @AppStorage(RemotePictureSetting.key) private var remotePictures = RemotePictureSetting.standard
     @AppStorage(SourceViewMode.key) private var mode = SourceViewMode.standard
-    @AppStorage(SourceViewMode.wideKey) private var originalWide = SourceViewMode.wideStandard
     let item: Item
     /// The file that holds the HTML.
     let document: ItemID
@@ -49,16 +79,41 @@ struct WebPageItemPage: View {
     @State private var content = Content.loading
     @State private var shownID: ItemID?
     @State private var pictures: SealedPictures?
+    /// The look the person chose for this mail, which does not follow the choice made for articles.
+    @State private var mailChoice: SourceViewMode?
+    @State private var attempt = 0
     @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
 
     /// One step of the callout's spacing, as on the note page.
     private var calloutGap: CGFloat { CGFloat(interfaceTextSize) * 4 / 13 * 4 }
 
+    /// The look the page is in, once it is known.
+    private var shownMode: SourceViewMode? {
+        guard case .ready(let loaded) = content else { return nil }
+        return loaded.mode(choosing: mode, mailChoice: mailChoice)
+    }
+
+    /// The look the header is drawn for. While the page loads it is the look it will most likely have, the one kept for
+    /// articles, so the title does not change type when the page arrives.
+    private var headerMode: SourceViewMode { shownMode ?? mode }
+
+    /// What the header's picker shows and sets: the look for this mail, or the one kept for articles.
+    private var pickedMode: Binding<SourceViewMode> {
+        Binding(
+            get: { shownMode ?? mode },
+            set: { chosen in
+                if case .ready(let loaded) = content, loaded.analysis.isMail { mailChoice = chosen } else { mode = chosen }
+            })
+    }
+
     var body: some View {
         GeometryReader { geometry in
             let inset = style.horizontalInset(for: geometry.size.width)
             VStack(spacing: 0) {
-                WebPageHeader(item: item, inset: inset, drafts: drafts, open: open, mode: $mode)
+                WebPageHeader(
+                    item: item, inset: inset, drafts: drafts, open: open, mode: pickedMode, reading: headerMode == .reader,
+                    offersReader: { if case .ready(let loaded) = content { loaded.reader != nil } else { false } }(),
+                    isLoading: { if case .loading = content { true } else { false } }())
                 // The header is inset like the other item pages' and the page draws to its own margin, so the line
                 // sets the page apart as a document under its header.
                 Divider()
@@ -73,7 +128,11 @@ struct WebPageItemPage: View {
             }
         }
         .accessibilityIdentifier("WebPageItemPage")
-        .task(id: Load(id: item.id, document: document, version: library.item(document)?.version)) { await load() }
+        .task(id: Load(id: item.id, document: document, version: library.item(document)?.version, attempt: attempt)) { await load() }
+        .onChange(of: shownMode) {
+            // The pictures the other look names wait for no one while it is not shown.
+            if case .ready(let loaded) = content, let shownMode { pictures?.show(loaded.document(for: shownMode).addresses, version: loaded.version) }
+        }
         .onChange(of: remotePictures) { pictures?.redraw() }
         .onChange(of: library.savedPictureStates(of: item.id)) { pictures?.redraw() }
     }
@@ -82,10 +141,12 @@ struct WebPageItemPage: View {
         switch content {
         case .loading:
             ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
-        case .ready(let html, let encoding):
+        case .ready(let loaded):
+            let shown = loaded.mode(choosing: mode, mailChoice: mailChoice)
+            let document = loaded.document(for: shown)
             WebPageView(
-                html: html, encoding: encoding, pictures: pictures, runsScripts: runsScripts,
-                look: SourceLook(mode: mode, title: item.displayTitle, page: style, originalWide: originalWide))
+                html: document.html, encoding: document.encoding, pictures: pictures, runsScripts: runsScripts,
+                look: SourceLook(mode: shown, isMail: loaded.analysis.isMail, page: style))
                 // Each item's pictures are answered by a page made for it.
                 .id(pictures.map(ObjectIdentifier.init))
         case .unavailable:
@@ -100,7 +161,7 @@ struct WebPageItemPage: View {
             } description: {
                 Text("MAPP couldn’t get the file from the server. Check your connection, then try again.")
             } actions: {
-                Button("Try Again") { Task { await load() } }
+                Button("Try Again") { attempt += 1 }
             }
         case .notHTML:
             ContentUnavailableView {
@@ -116,6 +177,7 @@ struct WebPageItemPage: View {
         // A change to the same item's file is shown over the page it replaces, not a blank one.
         if shownID != item.id {
             content = .loading
+            mailChoice = nil
             let id = item.id
             pictures = SealedPictures(
                 item: id, pictures: .standard, inFeed: { [library] in library.item(id)?.tier == .feed },
@@ -137,14 +199,22 @@ struct WebPageItemPage: View {
             // The file of an item that is itself a file is the item; a document attached to one is not, so the item
             // shares and opens as it would without it.
             if document == item.id { onResolved(url) }
-            let (item, version) = (item.id, pictures.version)
+            let (item, version, title) = (item.id, pictures.version, item.displayTitle)
             do {
-                let rewritten = try await Task.detached(priority: .userInitiated) {
-                    SealedPictureRewrite.rewrite(try Data(contentsOf: url), item: item, version: version)
+                let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: url) }.value
+                // A cancelled analysis throws, so an answer for an item the person has left never reaches the next.
+                let analysis = try await PageAnalyzer.analyze(data, title: title)
+                let loaded = await Task.detached(priority: .userInitiated) {
+                    Loaded(
+                        analysis: analysis, original: .init(SealedPictureRewrite.rewrite(data, item: item, version: version)),
+                        reader: analysis.article.map {
+                            .init(SealedPictureRewrite.rewrite(Data(ReaderDocument.html(for: $0).utf8), item: item, version: version))
+                        },
+                        version: version)
                 }.value
                 guard !Task.isCancelled else { return }
-                pictures.show(rewritten.addresses, version: version)
-                content = .ready(rewritten.html, rewritten.encoding)
+                pictures.show(loaded.document(for: loaded.mode(choosing: mode, mailChoice: mailChoice)).addresses, version: version)
+                content = .ready(loaded)
             } catch {
                 guard !Task.isCancelled else { return }
                 content = .failed
@@ -208,7 +278,7 @@ private struct PicturePillStyle: ButtonStyle {
     }
 }
 
-/// The switch between the reader look and the source's own, remembered for every such item.
+/// The switch between the reader look and the source's own, remembered for every article; a mail's choice is its own.
 struct SourceViewPicker: View {
     @Binding var mode: SourceViewMode
 
@@ -226,9 +296,10 @@ struct SourceViewPicker: View {
 }
 
 /// The page's header, drawn in SwiftUI as the note page's is drawn on the web: the title, then the pins, and where the
-/// item's kind has a line of its own (a page for reading) its byline above the title and its description under it.
-/// `PageHeaderParts` gives both pages their kind, line and pins, and `PageChip` their looks. The switch between the
-/// reader and the original sits at the trailing edge of the line above the title, so it never moves the pins.
+/// item's kind has a line of its own (a page for reading) its byline above the title and its description under it. The
+/// same in either look: the look sets only the title's type, so the switch between the reader and the original, at the
+/// trailing edge of the line above the title, never moves the pins or the lines.
+/// `PageHeaderParts` gives both pages their kind, line and pins, and `PageChip` their looks.
 private struct WebPageHeader: View {
     @CurrentLibrary private var library
     @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
@@ -241,15 +312,21 @@ private struct WebPageHeader: View {
     let drafts: DetailsPresentation
     let open: (ItemID) -> Void
     @Binding var mode: SourceViewMode
+    /// Whether the page is shown, or is about to be, in Reader, which gives the title the reading header's serif.
+    let reading: Bool
+    /// Whether the page has an article to read, which is the only page the switch is offered for.
+    let offersReader: Bool
+    /// Whether the page may yet have an article, so the line holds the switch's place and the title stays where it is.
+    let isLoading: Bool
 
     var body: some View {
         let parts = PageHeaderParts(of: item, in: library, placements: placements, dateFormat: dateFormat)
         let step = CGFloat(interfaceTextSize) * 4 / 13
-        let reading = parts.kind == .reading
         let textSize = CGFloat(style.textSize)
         let statusField = parts.type?.statusField
         VStack(alignment: .leading, spacing: 10) {
-            line(parts.lead.byline, step: step)
+            let byline = [parts.lead.byline?.source, parts.lead.byline?.date, parts.lead.byline?.detail].compactMap { $0 }.filter { !$0.isEmpty }
+            if offersReader || isLoading || !byline.isEmpty { line(byline, step: step) }
             VStack(alignment: .leading, spacing: step) {
                 Text(verbatim: item.displayTitle)
                     .font(reading
@@ -262,7 +339,7 @@ private struct WebPageHeader: View {
                     .textSelection(.enabled)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("WebPageTitle")
-                if reading, let dek = parts.lead.subtitle {
+                if let dek = parts.lead.subtitle {
                     Text(verbatim: dek)
                         .font(.system(size: textSize * 1.2, design: .serif))
                         .lineSpacing(textSize * 0.2)
@@ -295,10 +372,10 @@ private struct WebPageHeader: View {
     }
 
     /// Where a page for reading came from, when it was published and how long it takes, as one quiet line, with the
-    /// switch at its trailing edge. Every other kind has the switch alone.
-    private func line(_ byline: PageByline?, step: CGFloat) -> some View {
-        let parts = [byline?.source, byline?.date, byline?.detail].compactMap { $0 }.filter { !$0.isEmpty }
-        return HStack(spacing: step * 2.5) {
+    /// switch at its trailing edge where the page has an article to read. The line is drawn where it has either, and while
+    /// the page loads. The switch is always there, hidden where it is not offered, so the line keeps its height.
+    private func line(_ parts: [String], step: CGFloat) -> some View {
+        HStack(spacing: step * 2.5) {
             ForEach(Array(parts.enumerated()), id: \.offset) { index, part in
                 if index > 0 { Circle().fill(.secondary).opacity(0.7).frame(width: 2, height: 2).accessibilityHidden(true) }
                 Text(verbatim: part).lineLimit(1)
@@ -308,7 +385,7 @@ private struct WebPageHeader: View {
             .textCase(.uppercase)
             .foregroundStyle(.secondary)
             Spacer(minLength: step * 4)
-            SourceViewPicker(mode: $mode)
+            if offersReader { SourceViewPicker(mode: $mode) } else { SourceViewPicker(mode: $mode).hidden() }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("WebPageLine")
