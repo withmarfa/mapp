@@ -55,13 +55,13 @@ struct ViewModeMenu: View {
             if modes.contains(.timeline) { named("as Timeline", .timeline) }
         }
         .pickerStyle(.menu)
-        .labelStyle(.iconOnly)
+        .frame(width: 58)
         .help("View As")
         .accessibilityIdentifier("ViewModeMenu")
     }
 
     private func named(_ title: LocalizedStringKey, _ mode: ItemViewMode) -> some View {
-        Label(title, systemImage: mode.symbol).labelStyle(.titleAndIcon).tag(mode)
+        Label(title, systemImage: mode.symbol).tag(mode)
     }
 }
 
