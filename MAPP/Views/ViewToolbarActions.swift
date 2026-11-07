@@ -14,7 +14,7 @@ struct ViewEditItem: CustomizableToolbarContent {
         }
         .sharedBackgroundVisibility(.hidden)
         .customizationBehavior(.disabled)
-        .hidden(SavedViews.shown(browser, in: library) == nil || browser.showsViewPanel || !browser.offersViewOptions)
+        .hidden(!SavedViews.canEdit(browser, in: library) || browser.showsViewPanel || !browser.offersViewOptions)
     }
 }
 

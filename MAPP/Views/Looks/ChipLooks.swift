@@ -7,7 +7,8 @@ struct ChipLooks: Equatable, Sendable {
     /// Every chip is this tall, so chips side by side always line up.
     var height = 22.0
     var cornerRadius = 6.0
-    var textSize = 12.0
+    /// The page's own text size at 13 points, so a value reads at one size whatever its kind.
+    var textSize = 13.0
     /// Space at each side of a chip's content, between its parts, and the extra start space of each kind.
     var padding = 8.0
     var gap = 5.0

@@ -179,36 +179,33 @@ extension EditorTests {
         #expect(measured[7] <= 64, "a short value stays one line, not \(measured[7]) points tall")
     }
 
-    @Test func anEventsDetailLineWrapsOnANarrowPageAndStaysBesideItsCalendarTile() async throws {
+    @Test func anEventsTimeTakesTheRoomItNeedsOnAWidePageAndStaysInsideANarrowOne() async throws {
         let page = try await Page()
         try await page.load("A note.\n")
         var header = Self.header("A meeting")
         header.item = try #require(page.editor.noteID).rawValue
         header.kind = .event
-        let item = MAPP.Item(
-            id: ItemID("10000000-0000-0000-0000-000000000002"), type: TypeID("core.event"), title: "A meeting", titleRule: .property("title"),
-            properties: [
-                Property(key: "starts_at", value: .string("2027-04-29T09:00:00Z")), Property(key: "ends_at", value: .string("2027-04-29T10:00:00Z")),
-                Property(key: "timezone", value: .string("Pacific/Auckland")),
-            ], version: ItemVersion(1), created: .distantPast, modified: .distantPast)
-        header.event = try #require(EventHeader(item: item, now: Date()))
+        let time = "Thu 29 Apr 2027, 09:00 to Fri 30 Apr 2027, 10:00"
+        header.pins = [
+            PropertyRow(id: PagePlacement.when, label: "When", value: .when(time, help: time + "\nAuckland time (NZST), in 2 days")),
+            PropertyRow(id: PagePlacement.type, label: "Type", value: .type("Event", icon: nil)),
+        ]
         page.editor.setHeader(header)
-        let window = try await Self.show(page, width: 260)
-        defer { window.orderOut(nil); window.contentView = nil; window.close() }
-        // Whether the detail line is cut off, and how far its tile's middle is from the middle of the two lines.
-        let measured = try #require(try await settle(page.editor, """
+        // How far the time is cut off in its slot, and how far the page runs past what it shows.
+        let measure = """
             (() => {
-              const detail = document.querySelector('.item-when-detail')
-              const text = document.querySelector('.item-when-text')
-              const tile = document.querySelector('.item-calendar')
-              if (!detail || !text || !tile || !detail.textContent) return null
-              const middle = rect => rect.top + rect.height / 2
-              return [detail.scrollWidth - detail.clientWidth, Math.round(Math.abs(middle(text.getBoundingClientRect()) - middle(tile.getBoundingClientRect()))),
-                      document.documentElement.scrollWidth - document.documentElement.clientWidth]
+              const value = document.querySelector("[data-pin='#when'] .item-text")
+              if (!value) return null
+              return [value.scrollWidth - value.clientWidth, document.documentElement.scrollWidth - document.documentElement.clientWidth]
             })()
-            """, as: [Int].self) { $0?.count == 3 })
-        #expect(measured[0] <= 0, "the detail line is cut off by \(measured[0]) points instead of wrapping")
-        #expect(measured[1] <= 1, "the tile is \(measured[1]) points off the middle of the text beside it")
-        #expect(measured[2] <= 0, "the page is \(measured[2]) points wider than it shows")
+            """
+        let wide = try await Self.show(page, width: 760)
+        defer { wide.orderOut(nil); wide.contentView = nil; wide.close() }
+        let onWide = try #require(try await settle(page.editor, measure, as: [Int].self) { $0?.count == 2 })
+        #expect(onWide[0] <= 0, "the time is cut off by \(onWide[0]) points with room to spare")
+        wide.setContentSize(NSSize(width: 260, height: wide.frame.height))
+        _ = try await eventuallyAsking { try await page.editor.webView.evaluateJavaScript("innerWidth") as? Int == 260 }
+        let onNarrow = try #require(try await settle(page.editor, measure, as: [Int].self) { $0?.count == 2 })
+        #expect(onNarrow[1] <= 0, "the page is \(onNarrow[1]) points wider than it shows")
     }
 }

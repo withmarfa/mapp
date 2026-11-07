@@ -154,36 +154,6 @@ struct SidebarBlocksTests {
         return browser
     }
 
-    @Test func theRowOfChipsStandsAboveItemsInALayoutThatSpansTheWindow() {
-        for mode in [ItemViewMode.gallery, .table, .board, .timeline] {
-            #expect(browser(.allNotes, mode: mode).offersNewItemChips)
-        }
-        #expect(!browser(.allNotes, mode: .list).offersNewItemChips)
-    }
-
-    @Test func theRowOfChipsStandsAboveTheSourcesAndCollectionsIndexes() {
-        #expect(browser(.sources, mode: .list).offersNewItemChips)
-        #expect(browser(.collections, mode: .gallery).offersNewItemChips)
-    }
-
-    @Test func theRowOfChipsLeavesWhenAnItemOpensOrAnotherPlaceShows() {
-        let items = browser(.allNotes, mode: .gallery)
-        items.isCollectionItemPresented = true
-        #expect(!items.offersNewItemChips)
-        items.returnToCollection()
-        #expect(items.offersNewItemChips)
-        #expect(!browser(.recents, mode: .gallery).offersNewItemChips)
-        #expect(!browser(.itemType("core.note"), mode: .table).offersNewItemChips)
-    }
-
-    @Test func settingsHasNoRowOfChips() {
-        let items = browser(.allNotes, mode: .gallery)
-        items.showSettings()
-        #expect(!items.offersNewItemChips)
-        items.leaveSettings()
-        #expect(items.offersNewItemChips)
-    }
-
     @Test func choosingItemsMovesAWindowOnTheListToTheGalleryAndLeavesAnotherLayoutBe() {
         let library = FakeItemLibrary(items: [FakeItemLibrary.note("One", modified: .now)])
         let onList = browser(.recents, mode: .list)
@@ -193,24 +163,6 @@ struct SidebarBlocksTests {
         let onTable = browser(.recents, mode: .table)
         onTable.choose(.allNotes, in: library, order: NoteOrder())
         #expect(onTable.viewMode == .table)
-        #expect(onTable.offersNewItemChips)
-    }
-
-    // MARK: Chips
-
-    private func option(_ id: String) -> ItemTypeOption { ItemTypeOption(id: TypeID(id), label: id, icon: nil) }
-
-    @Test func chipsLeadWithTheTypesHeldMostAndFillUpFromTheRest() {
-        let options = ["a", "b", "c", "d", "e", "f"].map(option)
-        let split = NewItemChips.split(options, usedMost: [TypeID("e"), TypeID("c"), TypeID("zzz")], limit: 4)
-        #expect(split.shown.map(\.label) == ["e", "c", "a", "b"])
-        #expect(split.more.map(\.label) == ["d", "f"])
-    }
-
-    @Test func fewerTypesThanChipsLeavesNothingUnderMore() {
-        let split = NewItemChips.split([option("a")], usedMost: [])
-        #expect(split.shown.map(\.label) == ["a"])
-        #expect(split.more.isEmpty)
     }
 
     // MARK: Places

@@ -91,7 +91,6 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     var showsTitle = true
     /// Which header the page draws, chosen from the core type the item's type builds on.
     var kind: PageHeaderKind
-    var event: EventHeader?
     var person: PersonHeader?
     /// The line under the title: a person's work, or a reading item's description.
     var subtitle: String?
@@ -146,7 +145,7 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
 }
 
 extension PropertyRow: Encodable {
-    private enum Key: String, CodingKey { case id, label, symbol, kind, text, texts, items, options, people, icon, tone, more }
+    private enum Key: String, CodingKey { case id, label, symbol, kind, text, texts, items, options, people, icon, tone, more, help }
     /// What the page draws of an item a row links to: a type chip in the item's own tone, or a person's initials and
     /// name. The tone is one of `TypeTone`'s names; the page never picks a color.
     private struct Link: Encodable {
@@ -202,6 +201,9 @@ extension PropertyRow: Encodable {
             try container.encode("tags", forKey: .kind)
             try container.encode(tags, forKey: .texts)
         case .date(let text): try Self.encode("date", text, into: &container)
+        case .when(let text, let help):
+            try Self.encode("date", text, into: &container)
+            try container.encode(help, forKey: .help)
         case .url(let text): try Self.encode("url", text, into: &container)
         case .email(let text): try Self.encode("email", text, into: &container)
         case .phone(let text): try Self.encode("phone", text, into: &container)

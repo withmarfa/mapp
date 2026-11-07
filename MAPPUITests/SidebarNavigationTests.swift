@@ -95,11 +95,10 @@ final class SidebarNavigationTests: XCTestCase {
         app.typeKey(.escape, modifierFlags: [])
     }
 
-    func testChoosingItemsFromAnotherPlaceOpensTheGalleryUnderTheMakeSomethingNewRow() {
+    func testChoosingItemsFromAnotherPlaceOpensTheGallery() {
         sidebarText("Inbox").click()
         sidebarText("Items").click()
-        XCTAssertTrue(element("MakeSomethingNew").waitForExistence(timeout: 3))
-        XCTAssertFalse(list.exists, "Items opens in the gallery, which spans the window")
+        XCTAssertTrue(list.waitForNonExistence(timeout: 3), "Items opens in the gallery, which spans the window")
     }
 
     func testTheCogOpensSettingsWithNoMenu() {

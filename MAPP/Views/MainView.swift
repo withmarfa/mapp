@@ -173,7 +173,6 @@ struct MainView: View {
                     sidebarColumn
                 } detail: {
                     SidebarIndex(browser: browser, order: order)
-                        .newItemChips(browser)
                         .toolbar(id: WindowToolbarLayout.index) { windowToolbar() }
                 }
             } else if shownPresentation == .collection {
@@ -199,7 +198,6 @@ struct MainView: View {
                             itemPage
                         }
                     }
-                    .newItemChips(browser)
                     .modifier(itemInspector(WindowToolbarLayout.collection(shownViewMode)))
                     .toolbar(id: WindowToolbarLayout.collection(shownViewMode)) { windowToolbar() }
                 }

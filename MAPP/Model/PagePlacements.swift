@@ -152,6 +152,8 @@ nonisolated struct PagePlacement: Equatable, Sendable {
     static let type = "#type"
     static let source = "#source"
     static let updated = "#updated"
+    /// An event's time. It leads the pins and is no person's choice, so it is in no placement.
+    static let when = "#when"
     static let tags = "#tags"
     static let linkedFrom = "#linked"
     /// The relationship the parent is held in.

@@ -719,6 +719,8 @@
 "All day" : { "extractionState" : "manual" },
 "Happening now" : { "extractionState" : "manual" },
 "%@ to %@" : { "extractionState" : "manual" },
+"Settings (%@, build %@)" : { "extractionState" : "manual" },
+"When" : { "extractionState" : "manual" },
 "%@ time (%@)" : { "extractionState" : "manual" },
 "%lld items are collections, which can’t be in another collection." : {
   "extractionState" : "manual",
@@ -3216,9 +3218,6 @@
 
     },
     "Show More" : {
-
-    },
-    "Make something new" : {
 
     },
     "Go" : {

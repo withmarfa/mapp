@@ -718,36 +718,31 @@ test('an item nothing links to has no Linked From section', () => {
 
 const phone = { id: 'tel', label: 'Phone', symbol: 'phone', kind: 'phone' as const }
 
-test('an event shows its calendar block and its time, and keeps its status among the rows', () => {
+test('an event draws no tile: its time is its first pin, with the rest in the hover', () => {
   header.set({
     ...ticket,
     kind: 'event',
     status: { label: 'Confirmed', enabled: true, empty: false },
+    pins: [
+      {
+        id: '#when',
+        label: 'When',
+        symbol: 'clock',
+        kind: 'date' as const,
+        text: 'Thu 29 Oct, 10:00 to 11:00',
+        help: 'Thu 29 Oct, 10:00 to 11:00\nLondon time (BST), in 2 days',
+      },
+    ],
     properties: [{ id: 'status', label: 'Status', symbol: 'circle', kind: 'status' as const }],
-    event: {
-      month: 'OCT',
-      day: '29',
-      weekday: 'Thursday',
-      time: '10:00 to 11:00',
-      zone: 'London time (BST)',
-      relative: 'in 2 days',
-    },
   })
-  const when = root.querySelector<HTMLElement>('.item-when')!
-  expect(when.hidden).toBe(false)
-  expect(when.querySelector('.item-calendar-month')!.textContent).toBe('OCT')
-  expect(when.querySelector('.item-calendar-day')!.textContent).toBe('29')
-  expect(when.querySelector('.item-when-time')!.textContent).toBe('10:00 to 11:00')
-  expect(when.querySelector('.item-when-detail')!.textContent).toBe(
-    'ThursdayLondon time (BST)in 2 days',
-  )
-  expect(when.contains(pin('ItemStatusPin'))).toBe(false)
+  expect(root.querySelector('.item-calendar, .item-when')).toBeNull()
+  const when = root.querySelector<HTMLElement>('[data-pin="#when"]')!
+  expect(root.querySelector('.item-pin-item')).toBe(when)
+  const value = when.querySelector<HTMLElement>('.item-pin-value')!
+  expect(value.textContent).toBe('Thu 29 Oct, 10:00 to 11:00')
+  expect(value.title).toBe('Thu 29 Oct, 10:00 to 11:00\nLondon time (BST), in 2 days')
   expect(root.querySelector('.item-prop')!.contains(pin('ItemStatusPin'))).toBe(true)
   expect(root.dataset.kind).toBe('event')
-
-  header.set({ ...ticket, kind: 'general' })
-  expect(when.hidden).toBe(true)
-  expect(when.children.length).toBe(0)
 })
 
 test('a person shows initials or a picture, a subtitle, and a timeline that starts open', () => {
@@ -987,25 +982,9 @@ test('a pin is not a row: no pin carries the data-row that Hide from Page reads'
   expect(header.rowAt(pinned('#updated').querySelector('dd'))).toBeNull()
 })
 
-test('a header with no pins draws none, and the pins follow what an event shows', () => {
+test('a header with no pins draws none', () => {
   header.set(ticket)
   expect(root.querySelector<HTMLElement>('.item-pins')!.hidden).toBe(true)
-  header.set({
-    ...ticket,
-    kind: 'event',
-    pins: pinRows,
-    event: {
-      month: 'OCT',
-      day: '29',
-      weekday: 'Thursday',
-      time: '10:00',
-      zone: null,
-      relative: 'in 2 days',
-    },
-  })
-  const order = [...root.children].map((child) => child.className)
-  expect(order.indexOf('item-pins')).toBeGreaterThan(order.indexOf('item-when'))
-  expect(root.querySelector<HTMLElement>('.item-byline')!.hidden).toBe(true)
 })
 
 test('the row above the title counts what links here and starts or ends Customize Layout, lit while it is on', () => {

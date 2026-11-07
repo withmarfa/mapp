@@ -156,14 +156,31 @@ struct PagePinsTests {
 
     // MARK: Kinds with a line of their own
 
-    @Test func anEventKeepsItsWhenAndStillPinsTheRest() {
+    @Test func anEventsTimeIsItsFirstPinAndTheRestFollow() throws {
         let item = Self.item(["starts_at": .string("2026-10-29T10:00:00Z")], type: "core.event")
         let drawn = Self.resolve(item)
-        #expect(drawn.pins.pins.map(\.id) == ["#type", "#updated"])
-        #expect(!drawn.pins.leftOutOfBlock.contains("starts_at") || EventHeader.keys.contains("starts_at"))
+        #expect(drawn.pins.pins.map(\.id) == [PagePlacement.when, "#type", "#updated"])
+        let when = try #require(drawn.pins.pins.first)
+        guard case .when(let text, let help) = when.value else { Issue.record("the first pin is not a when"); return }
+        #expect(help.hasPrefix(text), "the help keeps the whole of a time a narrow page cuts")
+        #expect(drawn.pins.leftOutOfBlock.isSuperset(of: EventHeader.keys))
         var placements = PagePlacements()
         placements.setPins(["starts_at", "#type"], of: TypeID("core.event"))
-        #expect(Self.resolve(item, placements: placements).pins.pins.map(\.id) == ["#type"], "the when is not pinned again")
+        #expect(Self.resolve(item, placements: placements).pins.pins.map(\.id) == [PagePlacement.when, "#type"], "the when is not pinned again")
+    }
+
+    @Test func anEventWithNoDayToPlaceHasNoTimePin() {
+        let item = Self.item(["starts_at": .string("soon")], type: "core.event")
+        #expect(!Self.resolve(item).pins.pins.map(\.id).contains(PagePlacement.when))
+    }
+
+    @Test func aPinTheEventsTimePushesOutGoesBackToThePropertyBlock() {
+        let item = Self.item(["starts_at": .string("2026-10-29T10:00:00Z")], type: "core.event")
+        var placements = PagePlacements()
+        placements.setPins(["#type", "#updated", "child-of", "#tags"], of: TypeID("core.event"))
+        let drawn = Self.resolve(item, placements: placements, tags: ["a"], relationships: [Self.parent()])
+        #expect(drawn.pins.pins.map(\.id) == [PagePlacement.when, "#type", "#updated", "child-of"])
+        #expect(drawn.block.map(\.id) == ["#tags"])
     }
 
     @Test func aReadingItemRepeatsNeitherItsTypeNorItsSourceNorItsDay() {
