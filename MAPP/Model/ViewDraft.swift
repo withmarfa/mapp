@@ -289,6 +289,8 @@ nonisolated enum ViewDraft {
 
     /// The most conditions a Marfa filter holds.
     static let maxConditions = 10
+    /// How many sort keys a window keeps, in the panel and in the table's header.
+    static let maxSortKeys = 10
 
     /// The field a table column filters, where a filter can express it.
     private static func filterField(of column: ItemTableColumn) -> FilterField? {
@@ -354,6 +356,17 @@ nonisolated enum ViewDraft {
         options.filters = choices.mapValues(\.values)
         options.negated = Set(choices.filter(\.value.isNegated).keys)
         return options
+    }
+
+    /// The conditions of a view's filter the window has no filter for, as Marfa writes them. Saving a change of filters
+    /// leaves them as they are, and the panel lists them so they are not a surprise.
+    static func unshownConditions(of query: LibraryViewQuery, catalogue: Catalogue) -> [String] {
+        guard let parsed = try? terms(of: query.filter) else { return [] }
+        let types = seededTypes(of: query, catalogue: catalogue)
+        let shown = Set(shownTerms(parsed).map(\.condition))
+        return parsed.terms.filter { term in
+            !shown.contains(term.condition) && !(types != nil && term.column == typeColumnID)
+        }.map(\.text)
     }
 
     /// The date field a view's days are grouped by, which a timeline shows its items by.
