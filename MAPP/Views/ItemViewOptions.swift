@@ -46,7 +46,8 @@ struct ViewModeMenu: View {
     var body: some View {
         let modes = browser.availableViewModes(in: library)
         // A picker, not a menu: it says the button chooses one of several, as Finder's does, with the double chevron.
-        // Icon only is for the button; the labels inside keep their names, or the menu would list bare icons.
+        // No `labelStyle(.iconOnly)`: on a menu picker it strips the names from the menu's rows too. The toolbar already
+        // shows only the icon on the button, but it sizes the button for the longest name, so the width is fixed.
         Picker("View As", systemImage: browser.viewMode.symbol, selection: $browser.viewMode) {
             if modes.contains(.list) { named("as List", .list) }
             if modes.contains(.gallery) { named("as Gallery", .gallery) }
