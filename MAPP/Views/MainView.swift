@@ -275,7 +275,7 @@ struct MainView: View {
             details.handOffProperties(in: library, undoManager: nil)
             browser.quickAdd.handOff(to: library.notices, because: changed ? .libraryChanged : .closed, in: library)
             browser.giveUpNewItem(because: .windowLeft)
-            browser.viewPanel?.form?.handOff(because: changed ? .libraryChanged : .closed)
+            browser.viewPanel?.handOff(because: changed ? .libraryChanged : .closed)
         }
         .onAppear {
             if restoresWindow { details.isPresented = storedDetailsPresented }
@@ -308,7 +308,7 @@ struct MainView: View {
             #if DEBUG
             if SampleLibrary.isRequested, SampleLibrary.withCollections {
                 browser.sidebarItem = .itemType("core.task")
-                browser.viewMode = .board
+                browser.set(layout: .board)
             }
             #endif
         }

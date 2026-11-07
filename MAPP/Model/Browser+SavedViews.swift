@@ -16,6 +16,12 @@ extension Browser {
         /// the view's own list stands for them.
         let preview: LibraryViewQuery?
         let mac: ViewMacSettings
+        /// The layout the window showed when it took the seed, which stands for one the Mac holds none of: the view
+        /// follows the window, so a layout the person chose is a change from it, and Revert goes back to it.
+        let windowLayout: ItemViewMode
+
+        /// The layout a Revert puts back and a choice is compared with.
+        var ownLayout: ItemViewMode { mac.layout ?? windowLayout }
     }
 
     /// Shows a view's own order, grouping and filters the first time the window opens it, and again when the view
@@ -37,12 +43,11 @@ extension Browser {
         var options = ViewDraft.options(for: view, catalogue: catalogue)
         let timelineDate = ViewDraft.timelineDate(of: view)
         let collapsed = tableOptions[place]?.collapsed
-        var mac = ViewLayouts.stored(in: defaults).settings(for: view.id) ?? ViewMacSettings()
-        if mac.layout == nil { mac.layout = viewMode }
+        let mac = ViewLayouts.stored(in: defaults).settings(for: view.id) ?? ViewMacSettings()
         let types = ViewDraft.seededTypes(of: view.query, catalogue: catalogue)
         viewSeeds[view.id] = ViewSeed(
             version: view.version, options: options, timelineDate: timelineDate, types: types,
-            preview: ViewDraft.previewQuery(of: view.query, seededTypes: types, catalogue: catalogue), mac: mac)
+            preview: ViewDraft.previewQuery(of: view.query, seededTypes: types, catalogue: catalogue), mac: mac, windowLayout: viewMode)
         viewWorking[view.id] = nil
         options.collapsed = collapsed
         tableOptions[place] = options
@@ -105,10 +110,11 @@ extension Browser {
         viewWorking[id] = settings
     }
 
-    /// Takes the person's own change of layout, in a view, for an unsaved one.
+    /// Takes the person's own change of layout, in a view, for an unsaved one. Back in the layout the view opened in,
+    /// where the Mac holds none for it, is no change.
     func recordLayout() {
-        guard !isApplyingLayout, case .view(let id) = item, viewSeeds[id] != nil else { return }
-        changeViewSettings(id) { $0.layout = viewMode }
+        guard !isApplyingLayout, case .view(let id) = item, let seed = viewSeeds[id] else { return }
+        changeViewSettings(id) { $0.layout = seed.mac.layout == nil && viewMode == seed.windowLayout ? nil : viewMode }
     }
 
     /// Keeps the table's column widths as the person drags them, at once: a width is not a choice a Save waits for.
@@ -159,23 +165,28 @@ extension Browser {
     /// A save refused because the view changed elsewhere, or a revert, puts the window back to the view as the
     /// library holds it (its next version when that arrives), in the layout the Mac keeps for it.
     func viewRefused(_ id: ItemID, in library: any ItemLibrary) {
-        if case .view(id) = item, let layout = viewSeeds[id]?.mac.layout, layout != viewMode { set(layout: layout) }
+        if case .view(id) = item, let layout = viewSeeds[id]?.ownLayout, layout != viewMode { set(layout: layout) }
         viewSeeds[id] = nil
         viewWorking[id] = nil
         followView(in: library)
     }
 
-    /// Forgets a view the library no longer holds, and what the Mac kept for it.
+    /// Forgets a view this window deleted, and what the Mac kept for it. Only a delete from here forgets the Mac's
+    /// settings: a view missing from a list proves nothing, since a read that failed publishes an empty one.
     func forgetView(_ id: ItemID) {
         viewSeeds[id] = nil
         viewWorking[id] = nil
         ViewLayouts.update(in: defaults) { $0.forget(id) }
     }
 
-    /// Deletes the view for good, once the person confirmed. Nothing of it stays on this Mac.
+    /// Deletes the view for good, once the person confirmed. Nothing of it stays on this Mac, and its panel closes
+    /// with nothing said: the person did this.
     func deleteView(_ id: ItemID, in library: any ItemLibrary) async {
         deletingView = nil
+        viewsBeingDeleted.insert(id)
+        defer { viewsBeingDeleted.remove(id) }
         guard await library.deleteView(id) else { return }
+        if viewPanel?.viewID == id { viewPanel = nil }
         forgetView(id)
     }
 }

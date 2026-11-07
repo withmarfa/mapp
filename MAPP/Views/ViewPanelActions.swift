@@ -29,6 +29,7 @@ struct ViewPanelActions: View {
                 case .ready, .blocked:
                     Button("Cancel") { browser.cancelViewPanel(in: library) }
                         .keyboardShortcut(.cancelAction)
+                        .disabled(panel.isSaving)
                         .accessibilityIdentifier("ViewPanelCancel")
                     Spacer(minLength: 0)
                     Button("Save") { SavedViews.save(browser, in: library, order: order) }
