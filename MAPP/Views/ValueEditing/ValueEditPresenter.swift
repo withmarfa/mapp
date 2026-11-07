@@ -1,11 +1,11 @@
 import AppKit
 
-/// One open value editor: a panel under the value, a popover or a menu. The presenter keeps at most one, whoever asks.
+/// One open value editor: the panel under a value. The presenter keeps at most one, whoever asks.
 @MainActor
 protocol ValueEditSession: AnyObject {
     var request: ValueEditRequest { get }
     var model: ValueEditModel { get }
-    /// The window the editor draws in, which clicks inside are not "outside"; nil for a menu, which tracks its own.
+    /// The window the editor draws in, which clicks inside are not "outside".
     var window: NSWindow? { get }
     var anchor: NSView { get }
     /// Shows the editor.
@@ -22,7 +22,7 @@ protocol ValueEditSession: AnyObject {
 final class ValueEditPresenter {
     static let shared = ValueEditPresenter()
 
-    typealias Factory = @MainActor (ValueEditRequest, NSView, NSRect?, ValueEditSettings) -> any ValueEditSession
+    typealias Factory = @MainActor (ValueEditRequest, NSView, NSRect?) -> any ValueEditSession
 
     private(set) var session: (any ValueEditSession)?
     private let makeSession: Factory
@@ -40,7 +40,7 @@ final class ValueEditPresenter {
 
     /// Opens the editor for `request` under `rect` of `anchor` (its bounds where nil), or closes it where it is the
     /// editor already open. Nothing opens for a value the item cannot take.
-    func present(_ request: ValueEditRequest, anchor: NSView, rect: NSRect? = nil, settings: ValueEditSettings = .current, now: Date = .now) {
+    func present(_ request: ValueEditRequest, anchor: NSView, rect: NSRect? = nil, now: Date = .now) {
         let target = request.target
         if let session {
             let same = session.request.target == target
@@ -52,7 +52,7 @@ final class ValueEditPresenter {
             if closed.target == target, now.timeIntervalSince(closed.at) < 0.4 { return }
         }
         guard anchor.window != nil else { return }
-        let new = makeSession(request, anchor, rect, settings)
+        let new = makeSession(request, anchor, rect)
         guard new.model.isEditable else { return }
         new.model.close = { [weak self, weak new] in
             guard let self, let new, session === new else { return }
@@ -166,16 +166,8 @@ final class ValueEditPresenter {
         return false
     }
 
-    /// The editor the variant in the Tuning panel asks for.
-    static func system(_ request: ValueEditRequest, anchor: NSView, rect: NSRect?, settings: ValueEditSettings) -> any ValueEditSession {
-        switch settings.variant {
-        case .designed: ValueEditPanelSession(request, anchor: anchor, rect: rect, settings: settings, surface: .designed)
-        case .blend: ValueEditPanelSession(request, anchor: anchor, rect: rect, settings: settings, surface: .glass)
-        case .popover: ValueEditPopoverSession(request, anchor: anchor, rect: rect, settings: settings, metrics: .designed)
-        case .system:
-            request.kind.closesOnChoice
-                ? ValueEditMenuSession(request, anchor: anchor, rect: rect, settings: settings)
-                : ValueEditPopoverSession(request, anchor: anchor, rect: rect, settings: settings, metrics: .menu)
-        }
+    /// The editor a value opens in: the panel under it.
+    static func system(_ request: ValueEditRequest, anchor: NSView, rect: NSRect?) -> any ValueEditSession {
+        ValueEditPanelSession(request, anchor: anchor, rect: rect)
     }
 }

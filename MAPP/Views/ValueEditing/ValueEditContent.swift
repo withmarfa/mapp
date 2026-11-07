@@ -1,11 +1,9 @@
 import Marfa
 import SwiftUI
 
-/// What a value panel, a menu-like popover and the designed panel all hold: the same rows for every kind, drawn with
-/// the metrics the variant gives. A variant changes the surface and `ValueEditMetrics`, never this.
+/// What a value panel holds: the rows for the kind of value, drawn with `ValueEditMetrics`.
 struct ValueEditContent: View {
     let model: ValueEditModel
-    let metrics: ValueEditMetrics
     @Environment(\.interfaceTextSize) private var textSize
     @FocusState private var searchFocused: Bool
 
@@ -17,7 +15,7 @@ struct ValueEditContent: View {
             listArea
             if let notice = model.notice { noticeArea(notice) }
         }
-        .padding(metrics.padding * scale)
+        .padding(ValueEditMetrics.padding * scale)
         .frame(maxWidth: .infinity, alignment: .topLeading)
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { model.measure(.total, $0) }
         .task {
@@ -43,7 +41,7 @@ struct ValueEditContent: View {
                     .accessibilityIdentifier("ValueEditSearch")
             }
             .padding(.horizontal, 8 * scale)
-            .frame(height: metrics.rowHeight * scale)
+            .frame(height: ValueEditMetrics.rowHeight * scale)
             Divider()
         }
         .padding(.bottom, 4 * scale)
@@ -86,9 +84,9 @@ struct ValueEditContent: View {
 
     /// The rows' own height until the room runs out, with a row's worth shown at the very least.
     private var scrollHeight: CGFloat {
-        let wanted = model.rowsHeight > 0 ? model.rowsHeight : CGFloat(model.rows.count) * metrics.rowHeight * scale
+        let wanted = model.rowsHeight > 0 ? model.rowsHeight : CGFloat(model.rows.count) * ValueEditMetrics.rowHeight * scale
         let chrome = max(0, model.totalHeight - model.listHeight)
-        return min(wanted, max(model.maxHeight - chrome, metrics.rowHeight * scale))
+        return min(wanted, max(model.maxHeight - chrome, ValueEditMetrics.rowHeight * scale))
     }
 
     private var rows: some View {
@@ -100,12 +98,12 @@ struct ValueEditContent: View {
                         .font(.system(size: 11 * scale, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 8 * scale)
-                        .frame(maxWidth: .infinity, minHeight: metrics.headerHeight * scale, alignment: .leading)
+                        .frame(maxWidth: .infinity, minHeight: ValueEditMetrics.headerHeight * scale, alignment: .leading)
                         .accessibilityAddTraits(.isHeader)
                 case .separator:
                     Divider().padding(.vertical, 5 * scale)
                 case .option, .create:
-                    ValueEditRow(row: row, model: model, metrics: metrics, scale: scale)
+                    ValueEditRow(row: row, model: model, scale: scale)
                 }
             }
         }
@@ -116,7 +114,7 @@ struct ValueEditContent: View {
 
     private var dateList: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(model.rows) { row in ValueEditRow(row: row, model: model, metrics: metrics, scale: scale) }
+            ForEach(model.rows) { row in ValueEditRow(row: row, model: model, scale: scale) }
             Divider().padding(.vertical, 5 * scale)
             DatePicker("Choose Date", selection: Binding {
                 model.storedDate?.date ?? model.request.library.now()
@@ -171,40 +169,33 @@ struct ValueEditContent: View {
 private struct ValueEditRow: View {
     let row: ValueListRow
     let model: ValueEditModel
-    let metrics: ValueEditMetrics
     let scale: CGFloat
 
     private var isActive: Bool { model.activeRow == row.id }
-    private var isAccent: Bool { isActive && (metrics.hoverIsAccent || model.activeIsKeyboard) }
 
     var body: some View {
         HStack(spacing: 7 * scale) {
-            if metrics.hoverIsAccent {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 11 * scale, weight: .semibold))
-                    .opacity(row.isCurrent ? 1 : 0)
-                    .frame(width: 12 * scale)
-                    .accessibilityHidden(true)
-            }
+            Image(systemName: "checkmark")
+                .font(.system(size: 11 * scale, weight: .semibold))
+                .opacity(row.isCurrent ? 1 : 0)
+                .frame(width: 12 * scale)
+                .accessibilityHidden(true)
             mark
             Text(verbatim: row.title).lineLimit(1).truncationMode(.tail)
             Spacer(minLength: 8 * scale)
             if let detail = row.detail {
                 Text(verbatim: detail)
-                    .foregroundStyle(isAccent ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.secondary))
-            }
-            if row.isCurrent, !metrics.hoverIsAccent {
-                Image(systemName: "checkmark").font(.system(size: 11 * scale, weight: .semibold)).accessibilityHidden(true)
+                    .foregroundStyle(isActive ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.secondary))
             }
         }
-        .font(.system(size: metrics.textSize * scale))
-        .foregroundStyle(isAccent ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+        .font(.system(size: ValueEditMetrics.textSize * scale))
+        .foregroundStyle(isActive ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
         .padding(.horizontal, 8 * scale)
-        .frame(height: metrics.rowHeight * scale)
+        .frame(height: ValueEditMetrics.rowHeight * scale)
         .background {
             if isActive {
-                RoundedRectangle(cornerRadius: metrics.rowRadius * scale, style: .continuous)
-                    .fill(isAccent ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary))
+                RoundedRectangle(cornerRadius: ValueEditMetrics.rowRadius * scale, style: .continuous)
+                    .fill(Color.accentColor)
             }
         }
         .contentShape(.rect)
@@ -230,9 +221,9 @@ private struct ValueEditRow: View {
                 .background(.quaternary, in: .circle)
                 .foregroundStyle(.primary)
         case .tag:
-            Image(systemName: "tag").font(.system(size: 11 * scale)).foregroundStyle(isAccent ? .white : .secondary)
+            Image(systemName: "tag").font(.system(size: 11 * scale)).foregroundStyle(isActive ? .white : .secondary)
         case .symbol(let name):
-            Image(systemName: name).font(.system(size: 11 * scale)).foregroundStyle(isAccent ? .white : .secondary)
+            Image(systemName: name).font(.system(size: 11 * scale)).foregroundStyle(isActive ? .white : .secondary)
         }
     }
 }

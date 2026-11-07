@@ -135,7 +135,7 @@ struct ValueEditingTests {
     }
 
     private func presenter(_ sessions: Box) -> ValueEditPresenter {
-        ValueEditPresenter { request, anchor, _, _ in
+        ValueEditPresenter { request, anchor, _ in
             let session = FakeSession(request, anchor: anchor)
             sessions.all.append(session)
             return session

@@ -27,8 +27,7 @@ final class ValueEditModel {
     var query = ""
     var notice: String?
     private var highlight: String?
-    /// Whether the highlighted row was reached with the keyboard, which a designed panel draws in the accent color
-    /// where a hovered one is quiet.
+    /// Whether the highlighted row was reached with the keyboard, which the list then scrolls to.
     private(set) var viaKeyboard = false
     /// The room the panel has, which a list taller than it scrolls within.
     var maxHeight = CGFloat.infinity
@@ -153,9 +152,6 @@ final class ValueEditModel {
         if kind == .tags { return rows.first { $0.role == .create }?.id ?? rows.first?.id }
         return rows.first { $0.id.hasPrefix("person:") }?.id ?? rows.first?.id
     }
-
-    /// Whether the active row is the keyboard's: the one Return takes when nothing has been hovered.
-    var activeIsKeyboard: Bool { viaKeyboard || highlight == nil }
 
     func hover(_ id: String?) {
         highlight = id
