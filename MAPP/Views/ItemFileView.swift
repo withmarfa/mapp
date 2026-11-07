@@ -91,10 +91,14 @@ struct FileItemPage: View {
     /// Shows the item a link in the page names.
     let open: (ItemID) -> Void
     var onResolved: (URL?) -> Void = { _ in }
+    /// Whether a web page backs the toolbar with a band while it is scrolled under it (`WebPageItemPage`).
+    var backsToolbar = true
 
     var body: some View {
         if case .webPage(let document, let runsScripts) = library.pageLayout(of: item) {
-            WebPageItemPage(item: item, document: document, runsScripts: runsScripts, drafts: drafts, open: open, onResolved: onResolved)
+            WebPageItemPage(
+                item: item, document: document, runsScripts: runsScripts, drafts: drafts, open: open, onResolved: onResolved,
+                backsToolbar: backsToolbar)
         } else {
             ItemFileView(id: item.id, onResolved: onResolved)
         }

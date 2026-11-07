@@ -75,6 +75,9 @@ struct WebPageItemPage: View {
     /// Told where the item's file is once it is, and nil when it is not, so the window can share it and open it in a
     /// browser. Never told of a document attached to the item.
     var onResolved: (URL?) -> Void = { _ in }
+    /// Whether the page backs the toolbar with a band while the page is under it, as the note page does. A window whose
+    /// toolbar draws its own background has no need.
+    var backsToolbar = true
 
     @State private var loader = ItemFileLoader()
     @State private var content = Content.loading
@@ -83,6 +86,13 @@ struct WebPageItemPage: View {
     /// The look the person chose for this mail, which does not follow the choice made for articles.
     @State private var mailChoice: SourceViewMode?
     @State private var attempt = 0
+    /// How far the page has scrolled, which the header follows. Read only by the views that move with it, so a scroll
+    /// redraws them and not the page.
+    @State private var headerScroll = HeaderScroll()
+    /// The height of the title and pins, and with the callout under them, which the page starts below.
+    @State private var headerHeight: CGFloat = 0
+    @State private var blockHeight: CGFloat = 0
+    @AppStorage(InterfaceKey.showsPageToolbarBackground) private var showsToolbarBackground = true
     @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
 
     /// One step of the callout's spacing, as on the note page.
@@ -116,28 +126,49 @@ struct WebPageItemPage: View {
     var body: some View {
         GeometryReader { geometry in
             let inset = style.horizontalInset(for: geometry.size.width)
-            VStack(spacing: 0) {
-                WebPageHeader(item: item, inset: inset, drafts: drafts, open: open, reading: headerMode == .reader)
-                // The header is inset like the other item pages' and the page draws to its own margin, so the line
-                // sets the page apart as a document under its header.
-                Divider()
-                // At the top of the page, clearly further from the header than from the text it belongs to.
-                if let pictures, pictures.waitingCount > 0 {
-                    PicturesWaitingCallout(count: pictures.waitingCount) { pictures.loadWaiting() }
-                        .padding(.horizontal, inset)
-                        .padding(.top, calloutGap * 2)
-                        .padding(.bottom, calloutGap * 0.75)
+            // The page runs under the toolbar and starts below the header, which is drawn over the space it leaves and
+            // moves up with the page as it scrolls, as a note's header does inside its page.
+            ZStack(alignment: .top) {
+                pageBody(toolbarHeight: geometry.safeAreaInsets.top)
+                ScrollingHeader(scroll: headerScroll) {
+                    VStack(spacing: 0) {
+                        WebPageHeader(item: item, inset: inset, drafts: drafts, open: open, reading: headerMode == .reader)
+                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
+                        // At the top of the page, clearly further from the header than from the text it belongs to.
+                        if let pictures, pictures.waitingCount > 0 {
+                            PicturesWaitingCallout(count: pictures.waitingCount) { pictures.loadWaiting() }
+                                .padding(.horizontal, inset)
+                                .padding(.top, calloutGap * 2)
+                                .padding(.bottom, calloutGap * 0.75)
+                        }
+                    }
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { blockHeight = $0 }
+                    // Above the block too, so a page pulled past its start shows the window's color there and not the
+                    // page's own.
+                    .background { Color(nsColor: .windowBackgroundColor).padding(.top, -Self.overscroll) }
                 }
-                pageBody
+                ScrollingToolbarBand(scroll: headerScroll, toolbarHeight: geometry.safeAreaInsets.top, isEnabled: backsToolbar && showsToolbarBackground)
             }
         }
         .accessibilityIdentifier("WebPageItemPage")
         .onAppear { offerLook() }
-        .onDisappear { drafts.offerPageLook(nil, for: item.id) }
+        .onDisappear {
+            drafts.offerPageLook(nil, for: item.id)
+            drafts.headerScrolled(away: false, for: item.id)
+        }
         .onChange(of: offeredMode) { offerLook() }
         .onChange(of: item.id) { previous, _ in
             drafts.offerPageLook(nil, for: previous)
+            drafts.headerScrolled(away: false, for: previous)
+            headerScroll.reset()
             offerLook()
+        }
+        .onChange(of: headerHeight) { feedAway() }
+        // Only a shown page scrolls, so a header is never left away over an error or a page on its way.
+        .onChange(of: isShowingPage) { _, showing in
+            guard !showing else { return }
+            headerScroll.reset()
+            feedAway()
         }
         .task(id: Load(id: item.id, document: document, version: library.item(document)?.version, attempt: attempt)) { await load() }
         .onChange(of: shownMode) {
@@ -148,16 +179,35 @@ struct WebPageItemPage: View {
         .onChange(of: library.savedPictureStates(of: item.id)) { pictures?.redraw() }
     }
 
-    @ViewBuilder private var pageBody: some View {
+    /// How far a page pulled past its start can show above the header.
+    private static let overscroll: CGFloat = 1_000
+
+    private var isShowingPage: Bool {
+        if case .ready = content { true } else { false }
+    }
+
+    /// The page has moved to `offset` from its start, which is also where the header is.
+    private func scrolled(_ offset: CGFloat) {
+        headerScroll.scrolled(to: offset, isShowingPage: isShowingPage)
+        feedAway()
+    }
+
+    private func feedAway() {
+        drafts.headerScrolled(away: headerScroll.isAway(headerHeight: headerHeight), for: item.id)
+    }
+
+    @ViewBuilder private func pageBody(toolbarHeight: CGFloat) -> some View {
         switch content {
         case .loading:
-            ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
+            ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity).padding(.top, blockHeight)
         case .ready(let loaded):
             let shown = loaded.mode(choosing: mode, mailChoice: mailChoice)
             let document = loaded.document(for: shown)
             WebPageView(
                 html: document.html, encoding: document.encoding, pictures: pictures, runsScripts: runsScripts,
-                look: SourceLook(mode: shown, isMail: loaded.analysis.isMail, page: style))
+                look: SourceLook(mode: shown, isMail: loaded.analysis.isMail, page: style),
+                topInset: toolbarHeight + blockHeight, scrolled: scrolled)
+                .ignoresSafeArea(.container, edges: .top)
                 // Each item's pictures are answered by a page made for it.
                 .id(pictures.map(ObjectIdentifier.init))
         case .unavailable:
@@ -166,6 +216,7 @@ struct WebPageItemPage: View {
             } description: {
                 Text("The file for this page isn’t in Marfa.")
             }
+            .padding(.top, blockHeight)
         case .failed:
             ContentUnavailableView {
                 Label("Can’t Get This File", systemImage: "exclamationmark.icloud")
@@ -174,12 +225,14 @@ struct WebPageItemPage: View {
             } actions: {
                 Button("Try Again") { attempt += 1 }
             }
+            .padding(.top, blockHeight)
         case .notHTML:
             ContentUnavailableView {
                 Label("Can’t Show This Page", systemImage: "doc.questionmark")
             } description: {
                 Text("This file isn’t an HTML page.")
             }
+            .padding(.top, blockHeight)
         }
     }
 
@@ -231,6 +284,48 @@ struct WebPageItemPage: View {
                 content = .failed
             }
         }
+    }
+}
+
+/// How far a web page has scrolled, for the header over its start to follow, and what that says of the toolbar.
+@Observable final class HeaderScroll {
+    /// The distance the page has moved from its start.
+    private(set) var offset: CGFloat = 0
+
+    /// The page has moved to `offset`. A page that is not shown (one still loading, or an error) has not moved, whatever
+    /// a document on its way out reports.
+    func scrolled(to offset: CGFloat, isShowingPage: Bool) { self.offset = isShowingPage ? offset : 0 }
+
+    func reset() { offset = 0 }
+
+    func isAway(headerHeight: CGFloat) -> Bool { Self.isAway(scrolled: offset, headerHeight: headerHeight) }
+
+    /// Whether the header, which the page starts below, has gone under the toolbar, as the note page's has once it
+    /// scrolls as far as the header is tall. Until the header has a height there is nothing to have gone.
+    nonisolated static func isAway(scrolled: CGFloat, headerHeight: CGFloat) -> Bool {
+        headerHeight > 0 && scrolled >= headerHeight
+    }
+
+    /// Whether the page is under the toolbar: it moves more than the point that a trackpad's settling can account for.
+    nonisolated static func isUnderToolbar(scrolled: CGFloat) -> Bool { scrolled > 1 }
+}
+
+/// Moves its content up with the page, so the header scrolls as the rest of the page does. A scroll redraws only this.
+private struct ScrollingHeader<Content: View>: View {
+    let scroll: HeaderScroll
+    @ViewBuilder let content: Content
+
+    var body: some View { content.offset(y: -scroll.offset) }
+}
+
+/// The band behind the toolbar once the page is under it. It reads the offset itself, so a scroll redraws only this.
+private struct ScrollingToolbarBand: View {
+    let scroll: HeaderScroll
+    let toolbarHeight: CGFloat
+    let isEnabled: Bool
+
+    var body: some View {
+        ToolbarBand(toolbarHeight: toolbarHeight, isShown: isEnabled && HeaderScroll.isUnderToolbar(scrolled: scroll.offset))
     }
 }
 
