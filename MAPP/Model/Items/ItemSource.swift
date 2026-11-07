@@ -101,6 +101,9 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     /// The items the view lists that the copy holds, in the view's order. Throws where the copy cannot answer the
     /// view, such as one whose filter needs links the copy does not hold whole.
     func items(inView view: ItemID) async throws -> [ItemID]
+    /// The items the copy holds that a view with this query would list, which is how a window shows a view's filter
+    /// changed but not saved. Throws where the copy cannot answer the query, as for `items(inView:)`. Reads only.
+    func items(matching query: LibraryViewQuery) async throws -> [ItemID]
     /// What the copy's own search finds in `target`, best match first, at most `SearchResults.limit`.
     func search(_ text: String, in target: SearchTarget) async throws -> SourceSearch
 

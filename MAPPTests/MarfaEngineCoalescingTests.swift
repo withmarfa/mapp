@@ -93,6 +93,7 @@ import Testing
 
         func views() async throws -> Rows<LibraryView> { try await read.views() }
         func items(inView id: String) async throws -> [Marfa.Item] { try await read.items(inView: id) }
+        func items(matching filters: ListFilters) async throws -> [Marfa.Item] { try await read.items(matching: filters) }
 
         /// What the copy would answer for a row's links, which the fake copy cannot: set by a test, else the copy's.
         let answers = Mutex<(@Sendable (String) -> BodyLinks?)?>(nil)

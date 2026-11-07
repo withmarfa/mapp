@@ -356,6 +356,7 @@ private nonisolated struct SampleServer: MarfaReading, MarfaRefreshing {
     }
     func views() async throws -> Rows<LibraryView> { try await MarfaRead(copy: copy).views() }
     func items(inView id: String) async throws -> [Marfa.Item] { try await MarfaRead(copy: copy).items(inView: id) }
+    func items(matching filters: ListFilters) async throws -> [Marfa.Item] { try await MarfaRead(copy: copy).items(matching: filters) }
     func links(in id: String) async throws -> BodyLinks { try await MarfaRead(copy: copy).links(in: id) }
     func links(in ids: [String]) async throws -> [String: BodyLinks] { try await MarfaRead(copy: copy).links(in: ids) }
 

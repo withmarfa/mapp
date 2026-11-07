@@ -69,6 +69,11 @@ nonisolated final class FakeItemSource: ItemSource {
     let viewMembers = Mutex<[ItemID: [ItemID]]>([:])
     let viewReads = Mutex(0)
     let viewFails = Mutex(false)
+    /// What `items(matching:)` answers for each query a test names; any other lists nothing.
+    let previewAnswers = Mutex<[LibraryViewQuery: [ItemID]]>([:])
+    /// Every query `items(matching:)` was asked, in order.
+    let previewQueries = Mutex<[LibraryViewQuery]>([])
+    let previewFails = Mutex(false)
     let resolved = Mutex<[SyncAction]>([])
     let queues = Mutex(0)
     /// While set, `queueSubmitted` waits, as an engine busy with a long step would.
@@ -255,6 +260,12 @@ nonisolated final class FakeItemSource: ItemSource {
         viewReads.withLock { $0 += 1 }
         if viewFails.withLock({ $0 }) { throw SourceFailure(kind: .failed, message: "The view asks for a type the copy does not hold.") }
         return viewMembers.withLock { $0[view] ?? [] }
+    }
+
+    func items(matching query: LibraryViewQuery) async throws -> [ItemID] {
+        previewQueries.withLock { $0.append(query) }
+        if previewFails.withLock({ $0 }) { throw SourceFailure(kind: .failed, message: "The query asks for a link the copy does not hold.") }
+        return previewAnswers.withLock { $0[query] ?? [] }
     }
 
     func queueSubmitted() async {

@@ -200,6 +200,84 @@ struct MarfaViewsTests {
         #expect(library.items(in: .view(Self.planning.id)).map(\.id) == [F.n1])
     }
 
+    // MARK: A view's changed filters, read before they are saved
+
+    private static let widened = LibraryViewQuery(states: [.active])
+    private static let narrowed = LibraryViewQuery(states: [.active], filter: #"tags contains "x""#)
+
+    @Test func aPreviewListsWhatTheCopyAnswersToItsQueryAndNotTheViewsOwnList() async throws {
+        let F = LibraryFixture.self
+        let (library, source) = try await Self.loaded(views: [Self.planning])
+        source.viewMembers.withLock { $0[Self.planning.id] = [F.n1] }
+        source.previewAnswers.withLock { $0[Self.widened] = [F.n1, F.n2, F.t1, ItemID("not-held")] }
+        // Until the copy answers, the view's own list stands.
+        #expect(library.previewItems(ofView: Self.planning.id, query: Self.widened).map(\.id).count <= 1)
+        #expect(await eventually { Set(library.previewItems(ofView: Self.planning.id, query: Self.widened).map(\.id)) == [F.n1, F.n2, F.t1] })
+        // The view's own list is untouched.
+        #expect(await eventually { library.items(in: .view(Self.planning.id)).map(\.id) == [F.n1] })
+        #expect(source.previewQueries.withLock { $0 }.allSatisfy { $0 == Self.widened })
+    }
+
+    @Test func aPreviewIsReadAgainWhenTheItemsChange() async throws {
+        let F = LibraryFixture.self
+        let (library, source) = try await Self.loaded(views: [Self.planning])
+        source.previewAnswers.withLock { $0[Self.widened] = [F.n1] }
+        #expect(await eventually { library.previewItems(ofView: Self.planning.id, query: Self.widened).map(\.id) == [F.n1] })
+        source.previewAnswers.withLock { $0[Self.widened] = [F.n2] }
+        var renamed = try #require(library.item(F.n2))
+        renamed.title = "Other"
+        source.send(.upserted([renamed]))
+        #expect(await eventually { library.previewItems(ofView: Self.planning.id, query: Self.widened).map(\.id) == [F.n2] })
+    }
+
+    @Test func twoQueriesOfOneViewKeepTheirOwnAnswers() async throws {
+        let F = LibraryFixture.self
+        let (library, source) = try await Self.loaded(views: [Self.planning])
+        source.previewAnswers.withLock { $0 = [Self.widened: [F.n1, F.n2], Self.narrowed: [F.n2]] }
+        #expect(await eventually { Set(library.previewItems(ofView: Self.planning.id, query: Self.widened).map(\.id)) == [F.n1, F.n2] })
+        #expect(await eventually { library.previewItems(ofView: Self.planning.id, query: Self.narrowed).map(\.id) == [F.n2] })
+        #expect(Set(library.previewItems(ofView: Self.planning.id, query: Self.widened).map(\.id)) == [F.n1, F.n2])
+    }
+
+    @Test func aPreviewTheCopyRefusesKeepsItsLastListAndSaysSoOnce() async throws {
+        let F = LibraryFixture.self
+        let (library, source) = try await Self.loaded(views: [Self.planning])
+        source.previewAnswers.withLock { $0[Self.widened] = [F.n1] }
+        #expect(await eventually { library.previewItems(ofView: Self.planning.id, query: Self.widened).map(\.id) == [F.n1] })
+
+        source.previewFails.withLock { $0 = true }
+        for title in ["Other", "Another"] {
+            var renamed = try #require(library.item(F.n2))
+            renamed.title = title
+            let reads = source.previewQueries.withLock { $0.count }
+            source.send(.upserted([renamed]))
+            #expect(await eventually {
+                _ = library.previewItems(ofView: Self.planning.id, query: Self.widened)
+                return source.previewQueries.withLock { $0.count } > reads
+            })
+        }
+        #expect(await eventually { library.notices.waiting.count == 1 })
+        #expect(library.notices.waiting.first?.title == String(localized: "Can’t Show This View"))
+        #expect(library.previewItems(ofView: Self.planning.id, query: Self.widened).map(\.id) == [F.n1])
+    }
+
+    @Test func aPreviewOfAViewGoneReadsNothing() async throws {
+        let (library, source) = try await Self.loaded(views: [Self.planning])
+        source.send(.views([]))
+        #expect(await eventually { library.views.isEmpty })
+        #expect(library.previewItems(ofView: Self.planning.id, query: Self.widened).isEmpty)
+        #expect(source.previewQueries.withLock { $0.isEmpty })
+    }
+
+    @Test func aPreviewReadsWithNoServerAndWritesNothing() async throws {
+        let F = LibraryFixture.self
+        let (library, source) = try await Self.loaded(views: [Self.planning])
+        source.previewAnswers.withLock { $0[Self.widened] = [F.n1] }
+        #expect(await eventually { library.previewItems(ofView: Self.planning.id, query: Self.widened).map(\.id) == [F.n1] })
+        #expect(source.resolved.withLock { $0.isEmpty })
+        #expect(library.views == [Self.planning])
+    }
+
     // MARK: The window
 
     @Test func aViewRemovedWhileSelectedFallsBackToItems() {
@@ -259,6 +337,7 @@ private nonisolated struct ViewReads: MarfaReading, MarfaRefreshing {
         let ids = views.members.withLock { $0[id] ?? [] }
         return try await read.items().rows.filter { ids.contains($0.id) }
     }
+    func items(matching filters: ListFilters) async throws -> [Marfa.Item] { try await read.items(matching: filters) }
 
     func readStatus() async throws -> Status {
         Status(sliceTypes: MarfaSync.slice, sliceTier: .all, sliceEdgeTypes: MarfaSync.sliceEdgeTypes, hydration: .complete)

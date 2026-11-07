@@ -69,6 +69,7 @@ nonisolated final class FakeMarfaSource: MAPP.ItemSource {
     func fileURL(of item: ItemID) async throws -> URL { throw SourceFailure(kind: .missing, message: "") }
     func search(_ text: String, in target: SearchTarget) async throws -> SourceSearch { SourceSearch() }
     func items(inView view: ItemID) async throws -> [ItemID] { [] }
+    func items(matching query: LibraryViewQuery) async throws -> [ItemID] { [] }
 
     func createView(_ settings: LibraryViewSettings, idempotencyKey: String) async throws -> LibraryView {
         throw ViewWriteFailure(kind: .refused, message: "This source saves no views.")

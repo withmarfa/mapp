@@ -59,6 +59,7 @@ import Testing
         func links(in id: String) async throws -> BodyLinks { try await read.links(in: id) }
         func links(in ids: [String]) async throws -> [String: BodyLinks] { try await read.links(in: ids) }
         func items(inView id: String) async throws -> [Marfa.Item] { try await read.items(inView: id) }
+        func items(matching filters: ListFilters) async throws -> [Marfa.Item] { try await read.items(matching: filters) }
 
         func refuseUntilWhole() throws {
             if !whole.withLock({ $0 }) { throw notWhole }

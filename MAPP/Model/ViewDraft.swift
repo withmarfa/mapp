@@ -443,6 +443,36 @@ nonisolated enum ViewDraft {
 
     // MARK: A view's filter as the window's
 
+    /// The query to read a view's items with while the window's filters differ from the view's: the view's own with
+    /// the conditions the window shows as filters taken out, and the types it shows as a Type filter. The window's
+    /// filters then narrow what is read, so a value unchecked in one brings its items back, and a filter added and
+    /// saved lists what the window showed. The conditions the window cannot show, those on a field no type declares, the tier and the states stay.
+    /// Nil where the view's filter is one the core refuses, since nothing can be taken out of it.
+    static func previewQuery(of query: LibraryViewQuery, seededTypes: [String]?, catalogue: Catalogue) -> LibraryViewQuery? {
+        let parsed: Parsed
+        do { parsed = try terms(of: query.filter) } catch { return nil }
+        // A condition the window shows as written: a bare bool is a Yes/No column's, and any other is not.
+        let shown = shownTerms(parsed).filter { term in
+            if seededTypes != nil, term.column == typeColumnID { return false }
+            guard let column = term.column, column.hasPrefix("field.") else { return true }
+            let key = column.dropFirst("field.".count)
+            let declared = catalogue.itemTypes.values.flatMap(\.fields).filter { $0.key == key }
+            // A field no type declares has no column to narrow by, so the read keeps its condition.
+            guard !declared.isEmpty else { return false }
+            return declared.contains { $0.kind == .boolean } == term.isBare
+        }
+        let shownConditions = Set(shown.map(\.condition))
+        let kept = parsed.terms.filter { !shownConditions.contains($0.condition) }
+        var result = query
+        if seededTypes != nil { result.types = [] }
+        do {
+            result.filter = kept.isEmpty ? nil : try FilterExpression(join: parsed.join, conditions: kept.map(\.condition)).encoded()
+        } catch {
+            return nil
+        }
+        return result
+    }
+
     /// One condition of a view's filter, and the window filter it stands for where it is one.
     struct Term: Hashable {
         var condition: FilterCondition
