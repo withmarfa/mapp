@@ -114,11 +114,16 @@ struct NotePage: View {
             editor.insertImages(urls.map(PastedImages.Source.file))
         }
         .onChange(of: style, initial: true) { _, style in editor.setStyle(style) }
-        .onChange(of: item.id, initial: true) { _, id in
+        .onChange(of: item.id, initial: true) { old, id in
+            if old != id { headerDrafts.headerScrolled(away: false, for: old) }
             guard let item = library.item(id) else { return }
             // Returning from Settings reattaches the same editor without resetting its scroll position or undo.
             editor.select(item)
+            feedHeaderScroll()
         }
+        .onChange(of: editor.isHeaderScrolledAway) { feedHeaderScroll() }
+        .onChange(of: editor.noteID) { feedHeaderScroll() }
+        .onDisappear { headerDrafts.headerScrolled(away: false, for: item.id) }
         // The editor takes in only a change to the note's text or to whether it can be written in. A change the
         // server has taken takes a new version, but the copy shows a delete, a recovery or a problem before then,
         // and a server that keeps its own text over the person's changes the text without one. The action may run
@@ -126,6 +131,12 @@ struct NotePage: View {
         .onChange(of: item.version) { noteChanged() }
         .onChange(of: item.isWritable) { noteChanged() }
         .onChange(of: library.body(of: item.id)) { noteChanged() }
+    }
+
+    /// Tells the window whether this item's header is away. The editor may still hold the note before, whose header it
+    /// reports on, so only its own item's counts.
+    private func feedHeaderScroll() {
+        headerDrafts.headerScrolled(away: editor.noteID == item.id && editor.isHeaderScrolledAway, for: item.id)
     }
 
     private func noteChanged() {

@@ -34,6 +34,10 @@ final class DetailsPresentation {
     var isPresented = false
     /// The Reader and Original switch of the page showing, while it has an article. The toolbar and the menus hold it.
     private(set) var pageLook: PageLookSwitch?
+    /// The item whose page has scrolled its header away, which the toolbar then names. Both kinds of page feed it: the
+    /// note's page from the editor, a web page from its web view. It names the item, not a flag, so a page that is
+    /// still reporting for the item before cannot show that item's title for the next.
+    private(set) var itemWithHeaderAway: ItemID?
     /// The items the window's Change Type sheet is open for.
     var typeChange: TypeChangeRequest?
     /// Version History, while the window shows it in place of its page.
@@ -70,6 +74,17 @@ final class DetailsPresentation {
     func offerPageLook(_ look: PageLookSwitch?, for item: ItemID) {
         if look != nil || pageLook?.item == item { pageLook = look }
     }
+
+    /// Says whether `item`'s page has scrolled its header away. Saying so for one item never changes another's.
+    func headerScrolled(away: Bool, for item: ItemID) {
+        if away {
+            if itemWithHeaderAway != item { itemWithHeaderAway = item }
+        } else if itemWithHeaderAway == item {
+            itemWithHeaderAway = nil
+        }
+    }
+
+    func isHeaderAway(of item: ItemID) -> Bool { itemWithHeaderAway == item }
 
     /// Every window's presentation, so a quit can reach the drafts each holds.
     private static let open = NSHashTable<DetailsPresentation>.weakObjects()
