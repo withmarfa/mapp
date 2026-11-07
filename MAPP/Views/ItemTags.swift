@@ -227,12 +227,15 @@ private struct TagChip: View {
 }
 
 /// Rows of views that wrap to the width given, as a list of tags does. A view wider than the width takes a row to
-/// itself, and is cut to it.
+/// itself, and is cut to it. With `maxRows` it reports the height of that many rows; the views after them are placed
+/// below, for the caller to clip.
 struct TagFlowLayout: Layout {
     var spacing: CGFloat = 6
+    var maxRows: Int?
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let rows = rows(in: proposal.width ?? .infinity, subviews: subviews)
+        var rows = rows(in: proposal.width ?? .infinity, subviews: subviews)
+        if let maxRows { rows = Array(rows.prefix(maxRows)) }
         return CGSize(width: rows.map(\.width).max() ?? 0, height: rows.last.map { $0.y + $0.height } ?? 0)
     }
 

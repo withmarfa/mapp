@@ -649,6 +649,7 @@ final class Browser {
         viewPanel?.handOff(because: .libraryChanged)
         viewPanel = nil
         viewWorking = [:]
+        placeCards = [:]
         compactBoards = [:]
         timelineFields = [:]
         selection = []
@@ -739,8 +740,12 @@ final class Browser {
     /// Views this window is deleting, whose absence from the library is its own doing and not news from elsewhere.
     @ObservationIgnored var viewsBeingDeleted: Set<ItemID> = []
 
-    /// The layout, columns and empty groups the person changed in each view and has not saved (`Browser+SavedViews`).
+    /// The layout, columns, empty groups and cards the person changed in each view and has not saved (`Browser+SavedViews`).
     var viewWorking: [ItemID: ViewMacSettings] = [:]
+
+    /// What the gallery draws on each card in a place that is not a saved view, kept for this window only, as the
+    /// window keeps that place's other choices (`Browser+SavedViews`).
+    var placeCards: [SidebarItem: ViewCards] = [:]
 
     /// Where this Mac's settings for views are kept. A test gives its own.
     @ObservationIgnored var defaults: UserDefaults = .standard

@@ -1,7 +1,7 @@
 import Foundation
 
 /// What MAPP keeps on this Mac about each saved view, which Marfa does not keep: the layout it opens in, the
-/// table's columns, and whether the board hides empty groups. One value in the defaults, by view identifier, never
+/// table's columns, whether the board hides empty groups, and what the gallery's cards show. One value in the defaults, by view identifier, never
 /// written to Marfa. A view's name, query, sort and group are Marfa's (`ViewDraft`).
 nonisolated struct ViewLayouts: Equatable, Sendable {
     static let key = "viewLayouts"
@@ -95,15 +95,21 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
     var columns = ViewColumns()
     /// Whether the board leaves out a group with no items. The table's groups are made from its rows, so none is empty.
     var hidesEmptyGroups = false
+    /// What the gallery draws on each card.
+    var cards = ViewCards()
     /// The table's column widths as the table keeps them (`TableColumnCustomization`), which the person's drag of a
     /// divider records at once and Save does not wait for. Opaque: SwiftUI exposes no way to read or write a
     /// width alone.
     var widths: Data?
 
-    init(layout: ItemViewMode? = nil, columns: ViewColumns = ViewColumns(), hidesEmptyGroups: Bool = false, widths: Data? = nil) {
+    init(
+        layout: ItemViewMode? = nil, columns: ViewColumns = ViewColumns(), hidesEmptyGroups: Bool = false,
+        cards: ViewCards = ViewCards(), widths: Data? = nil
+    ) {
         self.layout = layout
         self.columns = columns
         self.hidesEmptyGroups = hidesEmptyGroups
+        self.cards = cards
         self.widths = widths
     }
 
@@ -113,12 +119,14 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
         layout = try? container.decodeIfPresent(ItemViewMode.self, forKey: .layout)
         columns = (try? container.decodeIfPresent(ViewColumns.self, forKey: .columns)) ?? ViewColumns()
         hidesEmptyGroups = (try? container.decodeIfPresent(Bool.self, forKey: .hidesEmptyGroups)) ?? false
+        cards = (try? container.decodeIfPresent(ViewCards.self, forKey: .cards)) ?? ViewCards()
         widths = try? container.decodeIfPresent(Data.self, forKey: .widths)
     }
 
     /// Whether the choices a Save keeps are the same, leaving the widths out, which are kept as they are dragged.
     func sameChoices(as other: ViewMacSettings) -> Bool {
         layout == other.layout && columns == other.columns && hidesEmptyGroups == other.hidesEmptyGroups
+            && cards == other.cards
     }
 
     /// Takes the choices of another and keeps its own widths.
@@ -126,6 +134,7 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
         layout = other.layout
         columns = other.columns
         hidesEmptyGroups = other.hidesEmptyGroups
+        cards = other.cards
     }
 }
 

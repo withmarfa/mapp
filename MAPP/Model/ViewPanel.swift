@@ -33,6 +33,8 @@ final class ViewPanel {
         let columns: Data?
         /// The settings held for the view, where the place is one.
         let working: ViewMacSettings?
+        /// What the window drew on each card for the place, where it is not a view.
+        let cards: ViewCards?
     }
 
     private(set) var purpose: Purpose

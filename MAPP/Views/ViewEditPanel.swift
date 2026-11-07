@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The right sidebar while a view is edited (`ViewPanel`): its name, layout, filters, sort, group and columns. Each
+/// The right sidebar while a view is edited (`ViewPanel`): its name, layout, filters, sort, group, and the table's columns or the gallery's cards. Each
 /// change shows at once in the window beside it, and none is kept until Save (`ViewPanelActions`). A type's list and
 /// the other places that can become a view get the same panel without a name, and offer Save as View.
 struct ViewEditPanel: View {
@@ -32,6 +32,8 @@ struct ViewEditPanel: View {
                 ViewPanelGroup(browser: browser, content: content)
                 if browser.viewMode == .table {
                     ViewPanelColumns(browser: browser, panel: panel, content: content)
+                } else if browser.viewMode == .gallery {
+                    ViewPanelCards(browser: browser, panel: panel, content: content)
                 }
             }
             .padding(.horizontal, 16)

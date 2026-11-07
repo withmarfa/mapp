@@ -59,8 +59,9 @@ struct GalleryEventDate: Equatable {
 }
 
 /// One item in the gallery: a thumbnail, then its title and a line about it below, as Finder's icon view and the
-/// Notes gallery lay it out. It takes only its own inputs and compares by them, so a selection that moves, or
-/// another card's change, leaves its body alone; the selection ring (`GalleryRing`) reads the selection itself.
+/// Notes gallery lay it out, then the properties the view chose as chips. It takes only its own inputs, the view's
+/// choices (`cards`) and the chips worked out for them as plain values, and compares by them, so a selection that
+/// moves, or another card's change, leaves its body alone; the selection ring (`GalleryRing`) reads the selection itself.
 struct GalleryCard: View, Equatable {
     @CurrentLibrary private var library
     let item: Item
@@ -72,38 +73,95 @@ struct GalleryCard: View, Equatable {
     let dateFormat: DateFormat
     /// The thumbnail's width in points, which sets the scale of the miniature page.
     let width: CGFloat
+    /// What the view chose to draw on each card. The defaults draw the card as the gallery always has.
+    let cards: ViewCards
+    /// The chips for the properties the view chose, worked out by the gallery from the item and the catalogue so that
+    /// a change to either, such as the title of the item a chip links to, is a change of this input.
+    let chips: [GalleryChip]
+
+    static let radius: CGFloat = 10
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.item == rhs.item && lhs.browser === rhs.browser && lhs.order == rhs.order && lhs.day == rhs.day && lhs.dateFormat == rhs.dateFormat && lhs.width == rhs.width
+            && lhs.cards == rhs.cards && lhs.chips == rhs.chips
     }
 
     var body: some View {
         let facts = GalleryCardFacts(of: item, in: library)
         VStack(alignment: .leading, spacing: 10) {
-            GalleryThumbnail(item: item, browser: browser, facts: facts, width: width)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.displayTitle)
-                    .interfaceFont(.subheadline.weight(.semibold))
-                    // Two lines held for every title, so the cards of a row are the same height.
-                    .lineLimit(2, reservesSpace: true)
-                    .multilineTextAlignment(.leading)
+            if cards.preview == .none {
+                words(facts)
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                    .background(Color(nsColor: .textBackgroundColor), in: .rect(cornerRadius: Self.radius, style: .continuous))
+                    .overlay { RoundedRectangle(cornerRadius: Self.radius, style: .continuous).strokeBorder(.separator, lineWidth: 1) }
+                    .shadow(color: .black.opacity(0.07), radius: 6, y: 2)
+                    .overlay { GalleryRing(browser: browser, id: item.id, radius: Self.radius + 3) }
+            } else {
+                GalleryThumbnail(item: item, browser: browser, facts: facts, width: width, cards: cards)
+                words(facts).padding(.horizontal, 4)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    /// The title, the line about the item and its chosen properties.
+    private func words(_ facts: GalleryCardFacts) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(item.displayTitle)
+                .interfaceFont(.subheadline.weight(.semibold))
+                // Two lines held for every title, so the cards of a row are the same height.
+                .lineLimit(2, reservesSpace: true)
+                .multilineTextAlignment(.leading)
+            if cards.subtext != .none {
                 HStack(spacing: 5) {
-                    TypeGlyph(id: facts.icon)
-                    Text(DateDisplay.text(of: order.sort.date(of: item), place: .list, format: dateFormat, now: library.now())).lineLimit(1)
+                    if cards.subtext.showsType { TypeGlyph(id: facts.icon) }
+                    Text(subtext).lineLimit(2).multilineTextAlignment(.leading)
                     if item.isFavorite { Image(systemName: "star.fill") }
                 }
                 .interfaceFont(.caption)
                 .foregroundStyle(.secondary)
             }
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 4)
+            if !chips.isEmpty {
+                TagFlowLayout(spacing: 4, maxRows: 2) {
+                    ForEach(Array(chips.enumerated()), id: \.offset) { _, chip in GalleryChipView(chip: chip) }
+                }
+                .clipped()
+                .padding(.top, 4)
+            }
         }
-        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .foregroundStyle(.primary)
+    }
+
+    /// What follows the type's mark: the date the list is sorted by, else the type's name.
+    private var subtext: String {
+        if cards.subtext.showsDate {
+            DateDisplay.text(of: order.sort.date(of: item), place: .list, format: dateFormat, now: library.now())
+        } else {
+            library.catalogue.label(for: item.type)
+        }
+    }
+}
+
+/// One chip of a card, in the app's value chips.
+private struct GalleryChipView: View {
+    let chip: GalleryChip
+
+    var body: some View {
+        switch chip.look {
+        case .plain: PageChip(text: chip.text, kind: .plain)
+        case .option: PageChip(text: chip.text, kind: .option(OptionTone.tone(for: chip.text)))
+        case .tag: PageChip(text: chip.text, kind: .tag)
+        case .status(let mark): PageChip(text: chip.text, kind: .status(mark, chevron: false))
+        case .link(let icon): PageChip(text: chip.text, kind: .link(icon: icon))
+        }
     }
 }
 
 /// The picture on top of a card, 4 to 3 with a hairline edge and a soft shadow. The page is on the editor's own
-/// background so a note's miniature reads as the note.
+/// background so a note's miniature reads as the note. What fills it is the view's choice of preview: the item's
+/// picture or else a miniature of the page, either alone, and a picture cut to fill or shown whole. An item with no
+/// picture, or one that fails to load, under Picture alone leaves the card's plain ground.
 private struct GalleryThumbnail: View {
     @CurrentLibrary private var library
     @Environment(\.displayScale) private var displayScale
@@ -111,14 +169,21 @@ private struct GalleryThumbnail: View {
     let browser: Browser
     let facts: GalleryCardFacts
     let width: CGFloat
+    let cards: ViewCards
     @State private var artwork: GalleryArtwork?
 
-    private static let radius: CGFloat = 10
+    private static let radius = GalleryCard.radius
+
+    private struct Loading: Hashable {
+        let basis: GalleryArtworkCache.Basis
+        let loads: Bool
+    }
 
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: Self.radius, style: .continuous)
         let basis = facts.basis
-        let shown = artwork ?? GalleryArtworkCache.peek(basis, width: width)
+        let loads = cards.preview.showsPicture
+        let shown = loads ? (artwork ?? GalleryArtworkCache.peek(basis, width: width)) : nil
         Color(nsColor: .textBackgroundColor)
             .aspectRatio(4 / 3, contentMode: .fit)
             .overlay { content(shown) }
@@ -126,8 +191,9 @@ private struct GalleryThumbnail: View {
             .overlay { shape.strokeBorder(.separator, lineWidth: 1) }
             .shadow(color: .black.opacity(0.07), radius: 6, y: 2)
             .overlay { GalleryRing(browser: browser, id: item.id, radius: Self.radius + 3) }
-            .task(id: basis) {
+            .task(id: Loading(basis: basis, loads: loads)) {
                 artwork = nil
+                guard loads else { return }
                 let made = await GalleryArtworkCache.artwork(for: item, width: width, scale: displayScale, in: library)
                 if !Task.isCancelled { artwork = made }
             }
@@ -138,11 +204,14 @@ private struct GalleryThumbnail: View {
         let unit = min(1.6, max(0.85, width / 220))
         ZStack(alignment: .topLeading) {
             if let shown {
-                Color.clear.overlay(alignment: shown.isDocument ? .top : .center) {
-                    Image(decorative: shown.image, scale: displayScale).resizable().scaledToFill()
+                Color.clear.overlay(alignment: shown.isDocument && !cards.fitsPicture ? .top : .center) {
+                    let image = Image(decorative: shown.image, scale: displayScale).resizable()
+                    if cards.fitsPicture { image.scaledToFit() } else { image.scaledToFill() }
                 }
                 .clipped()
-            } else if case .file(let type) = kind {
+            } else if cards.preview == .picture {
+                EmptyView()
+            } else if cards.preview == .pictureOrText, case .file(let type) = kind {
                 FileGlyph(type: type)
             } else {
                 PageMiniature(item: item, kind: kind, unit: unit)

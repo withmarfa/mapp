@@ -17,6 +17,8 @@ struct PageChip: View {
         case option(TypeTone)
         /// One of the item's tags, grey, after a number sign.
         case tag
+        /// A word with no mark of its own, on the fill a choice has: a date, a number or a person's name.
+        case plain
     }
 
     let text: String
@@ -26,6 +28,10 @@ struct PageChip: View {
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
     @State private var isHovering = false
 
+    private var isPlain: Bool {
+        if case .plain = kind { true } else { false }
+    }
+
     private var isLink: Bool {
         if case .link = kind { true } else { false }
     }
@@ -34,7 +40,7 @@ struct PageChip: View {
         let looks = ChipLooks.current
         let scale = CGFloat(textSize) / 13
         let shape = RoundedRectangle(cornerRadius: looks.cornerRadius * scale)
-        HStack(spacing: looks.gap * scale) {
+        HStack(spacing: isPlain ? 0 : looks.gap * scale) {
             leading(looks: looks, scale: scale)
             Text(verbatim: text)
                 .underline(isLink && isHovering)
@@ -67,7 +73,7 @@ struct PageChip: View {
         case .type, .status: looks.typePaddingStart
         case .link: 0
         case .tag: looks.tagPaddingStart
-        case .option: looks.padding
+        case .option, .plain: looks.padding
         }
     }
 
@@ -76,7 +82,7 @@ struct PageChip: View {
         case .type(let icon): TypeTone(icon: icon).fill(looks.typeTintOpacity, for: scheme)
         case .link: .clear
         case .status: looks.statusFill(for: scheme)
-        case .option: looks.optionFill(for: scheme)
+        case .option, .plain: looks.optionFill(for: scheme)
         case .tag: looks.tagFill(for: scheme)
         }
     }
@@ -103,6 +109,8 @@ struct PageChip: View {
                 // The number sign sits closer to the word than the chip's other parts.
                 .padding(.trailing, -2 * scale)
                 .accessibilityHidden(true)
+        case .plain:
+            EmptyView()
         }
     }
 }
