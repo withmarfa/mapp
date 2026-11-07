@@ -58,6 +58,22 @@ final class ValueEditPanelSession: ValueEditSession {
         layout()
         parent.addChildWindow(panel, ordered: .above)
         panel.makeKeyAndOrderFront(nil)
+        if case .date = model.kind { releaseCalendarFocus() }
+    }
+
+    /// The calendar takes the first key view when the panel opens, and then keeps the arrows and Return for itself, so the
+    /// quick dates above it were out of reach of the keyboard. The panel holds the keys until a click or Tab gives them to the calendar.
+    private func releaseCalendarFocus() {
+        guard let panel else { return }
+        panel.makeFirstResponder(nil)
+        DispatchQueue.main.async { [weak panel] in
+            guard let panel, panel.isVisible, panel.firstResponder is NSView else { return }
+            var view = panel.firstResponder as? NSView
+            while let current = view {
+                if current is NSDatePicker { panel.makeFirstResponder(nil); return }
+                view = current.superview
+            }
+        }
     }
 
     /// The content reports its height from inside a SwiftUI update, where a window resize leaves the glass at the size it
