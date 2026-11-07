@@ -95,7 +95,7 @@ struct FilterChipRow: View {
                         .help("Add a filter")
                         .accessibilityIdentifier("FilterChipAdd")
                     }
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, browser.viewMode == .table ? ItemTable.leadingEdge : 12)
                     .padding(.vertical, 6)
                 }
                 .scrollIndicators(.hidden)

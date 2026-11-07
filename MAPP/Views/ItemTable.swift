@@ -21,6 +21,10 @@ struct ItemTable: View {
     @State private var hover = ItemTableHover()
     @State private var placeTrace = TablePlaceTrace()
 
+    /// Where the table's first column starts: the inset style's own margin, measured from the table's edge. The filter
+    /// chips, the group names and Load More line up here, so the table reads as one left edge.
+    static let leadingEdge: CGFloat = 16
+
     var body: some View {
         let _ = daysSeen
         let _ = placeTrace.bodyRan(for: browser.item)
@@ -142,7 +146,7 @@ struct ItemTable: View {
         Section {
             ForEach([ItemTableRow]()) { TableRow($0) }
         } header: {
-            ItemTableLoadMore(remaining: remaining, indented: group != nil) { browser.loadMoreTableRows(group: group) }
+            ItemTableLoadMore(remaining: remaining) { browser.loadMoreTableRows(group: group) }
         }
     }
 
@@ -294,21 +298,24 @@ extension ItemTableColumn {
     }
 }
 
-/// A group's header row: its mark and name, how many it holds, and a chevron that folds it away.
+/// A group's header row: its mark and name, how many it holds, and a chevron that folds it away. The name starts at the
+/// table's left edge, where the rows' marks do, and the chevron hangs in the margin to its left.
 private struct ItemTableGroupHeader: View {
     let group: ItemTableGroup
     let column: ItemTableColumn
     let isCollapsed: Bool
     let toggle: () -> Void
 
+    private static let gap: CGFloat = 4
+
     var body: some View {
         Button(action: toggle) {
-            HStack(spacing: 8) {
+            HStack(spacing: Self.gap) {
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.tertiary)
                     .rotationEffect(.degrees(isCollapsed ? 0 : 90))
-                    .frame(width: 10)
+                    .frame(width: ItemTable.leadingEdge - Self.gap)
                 ItemTableCategory(column: column, value: group.value, title: group.title, isGroup: true)
                     .fontWeight(.semibold)
                 Text(group.rows.count, format: .number)
@@ -316,6 +323,8 @@ private struct ItemTableGroupHeader: View {
                     .monospacedDigit()
                 Spacer(minLength: 0)
             }
+            // The cell starts at the edge, so the chevron's width and gap bring it back to the table's own.
+            .padding(.leading, -ItemTable.leadingEdge)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -358,8 +367,6 @@ private struct Pages {
 /// does, and is a button, so the keyboard and VoiceOver can reach it.
 private struct ItemTableLoadMore: View {
     let remaining: Int
-    /// A group's row lines up with the group's name, after its chevron.
-    let indented: Bool
     let action: () -> Void
 
     var body: some View {
@@ -371,7 +378,6 @@ private struct ItemTableLoadMore: View {
                     .monospacedDigit()
                 Spacer(minLength: 0)
             }
-            .padding(.leading, indented ? 18 : 0)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
