@@ -66,12 +66,14 @@ struct PagePinsView: View {
                     PagePerson(name: name, initials: PersonInitials.of(name))
                 }
             case .options(let words):
-                ForEach(Array(words.enumerated()), id: \.offset) { _, word in
+                ForEach(Array(words.enumerated()), id: \.offset) { index, word in
                     PageChip(text: word, kind: .option(OptionTone.tone(for: word)))
+                        .layoutPriority(index == words.count - 1 ? 0 : 1)
                 }
             case .tags(let tags):
-                ForEach(Array(tags.enumerated()), id: \.offset) { _, tag in
+                ForEach(Array(tags.enumerated()), id: \.offset) { index, tag in
                     PageChip(text: tag, kind: .tag)
+                        .layoutPriority(index == tags.count - 1 ? 0 : 1)
                 }
             case .source(let text), .date(let text), .text(let text):
                 plain(text)

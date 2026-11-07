@@ -54,7 +54,7 @@ struct PageChip: View {
         .padding(.trailing, (isLink ? 0 : looks.padding) * scale)
         .frame(height: looks.height * scale)
         .background(fill(looks: looks), in: shape)
-        .onHover { isHovering = isLink && $0 }
+        .onHover { if isLink { isHovering = $0 } }
         .overlay {
             if case .status = kind {
                 shape.strokeBorder(looks.edge(for: scheme), lineWidth: looks.statusEdgeWidth)

@@ -100,7 +100,7 @@ struct InspectorToolbar: ToolbarContent {
             }
             ToolbarSpacer(.fixed)
             ToolbarItem {
-                DetailsToggle(details: details)
+                DetailsToggle(details: details, editor: editor)
             }
         }
     }
@@ -109,10 +109,11 @@ struct InspectorToolbar: ToolbarContent {
 /// The Details button of a toolbar above the inspector: on, because the inspector is open.
 struct DetailsToggle: View {
     let details: DetailsPresentation
+    let editor: EditorController?
 
     var body: some View {
         if details.isCustomizingLayout {
-            LayoutDoneButton(details: details)
+            LayoutDoneButton(details: details, editor: editor)
         } else {
             Toggle("Details", systemImage: "sidebar.right", isOn: Binding { details.isPresented } set: { details.isPresented = $0 })
                 .help("Hide Details")
@@ -122,14 +123,15 @@ struct DetailsToggle: View {
 }
 
 /// Stands in for the Details button while Customize Layout has the right sidebar: the system's prominent button, which
-/// finishes the mode, as Return and Escape do.
+/// finishes the mode, as Escape does and Return does unless the page has the keyboard: the page can still be typed in.
 struct LayoutDoneButton: View {
     let details: DetailsPresentation
+    let editor: EditorController?
 
     var body: some View {
         Button("Done") { details.endLayout() }
             .buttonStyle(.borderedProminent)
-            .keyboardShortcut(.defaultAction)
+            .keyboardShortcut(editor?.isFocused == true ? nil : .defaultAction)
             .background {
                 Button("Finish Customizing") { details.endLayout() }
                     .keyboardShortcut(.cancelAction)
@@ -258,7 +260,7 @@ private struct ItemToolbarActions {
 
     @ViewBuilder var detailsButton: some View {
         if details.isCustomizingLayout {
-            LayoutDoneButton(details: details)
+            LayoutDoneButton(details: details, editor: editor)
         } else {
             Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
                 .help(details.isPresented ? "Hide Details" : "Show Details")
