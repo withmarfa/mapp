@@ -46,17 +46,22 @@ struct ViewModeMenu: View {
     var body: some View {
         let modes = browser.availableViewModes(in: library)
         // A picker, not a menu: it says the button chooses one of several, as Finder's does, with the double chevron.
+        // Icon only is for the button; the labels inside keep their names, or the menu would list bare icons.
         Picker("View As", systemImage: browser.viewMode.symbol, selection: $browser.viewMode) {
-            if modes.contains(.list) { Label("as List", systemImage: ItemViewMode.list.symbol).tag(ItemViewMode.list) }
-            if modes.contains(.gallery) { Label("as Gallery", systemImage: ItemViewMode.gallery.symbol).tag(ItemViewMode.gallery) }
-            if modes.contains(.table) { Label("as Table", systemImage: ItemViewMode.table.symbol).tag(ItemViewMode.table) }
-            if modes.contains(.board) { Label("as Board", systemImage: ItemViewMode.board.symbol).tag(ItemViewMode.board) }
-            if modes.contains(.timeline) { Label("as Timeline", systemImage: ItemViewMode.timeline.symbol).tag(ItemViewMode.timeline) }
+            if modes.contains(.list) { named("as List", .list) }
+            if modes.contains(.gallery) { named("as Gallery", .gallery) }
+            if modes.contains(.table) { named("as Table", .table) }
+            if modes.contains(.board) { named("as Board", .board) }
+            if modes.contains(.timeline) { named("as Timeline", .timeline) }
         }
         .pickerStyle(.menu)
         .labelStyle(.iconOnly)
         .help("View As")
         .accessibilityIdentifier("ViewModeMenu")
+    }
+
+    private func named(_ title: LocalizedStringKey, _ mode: ItemViewMode) -> some View {
+        Label(title, systemImage: mode.symbol).labelStyle(.titleAndIcon).tag(mode)
     }
 }
 
