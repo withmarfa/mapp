@@ -297,8 +297,7 @@ final class QuickAdd {
         guard !isFile(typeID, in: catalogue), let info = catalogue.itemTypes[TypeID(typeID)] else { return [] }
         return info.fields.filter { field in
             guard field.key != info.titleKey, field.key != info.bodyKey else { return false }
-            if case .other = field.kind { return false }
-            return true
+            return !field.kind.isOutsideForms
         }
     }
 

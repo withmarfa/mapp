@@ -95,7 +95,7 @@ nonisolated struct TypeChange: Hashable, Sendable {
             if field.key == new.bodyKey, field.kind == .text {
                 set[field.key] = .string("")
                 result[field.key] = .string("")
-            } else if case .other = field.kind {
+            } else if field.kind.isOutsideForms {
                 return .failure(.cannotFill(field))
             } else if let value = filling[field.key], field.accepts(value),
                       field.key != new.titleKey || !NoteName.trimmed(value.string ?? "").isEmpty {
@@ -109,7 +109,7 @@ nonisolated struct TypeChange: Hashable, Sendable {
         // A value that fit the old type's field may not fit the new one's, which the server would refuse.
         for field in new.fields {
             guard let value = result[field.key], value != .null else { continue }
-            if case .other = field.kind { continue }
+            if field.kind.isOutsideForms { continue }
             if let before = old?.fields.first(where: { $0.key == field.key }), before.kind == field.kind, before.numberRule == field.numberRule,
                set[field.key] == nil { continue }
             if !field.accepts(value) { return .failure(.valueDoesNotFit(field)) }

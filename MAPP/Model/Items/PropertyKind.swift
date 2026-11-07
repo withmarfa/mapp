@@ -14,6 +14,16 @@ nonisolated extension ItemTypeInfo.Field.Kind {
             string.isEmpty || ItemDate.parse(string).map { includesTime || !$0.hasTime } == true
         case (.boolean, .bool), (.number, .number): true
         case (.list, .array): true
+        case (.words, .array(let words)): words.allSatisfy { $0.string != nil }
+        default: false
+        }
+    }
+
+    /// A shape the forms that fill a new or changed item (Quick Add, Change Type) and the table's columns leave alone:
+    /// an object, or a list of words, which only the item's own value panel edits.
+    var isOutsideForms: Bool {
+        switch self {
+        case .other, .words: true
         default: false
         }
     }

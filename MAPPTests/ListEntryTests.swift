@@ -46,10 +46,11 @@ struct ListEntryTests {
         #expect(required.member("label")?.required == false)
     }
 
-    @Test func anArrayWithNoMembersIsNotAList() {
+    @Test func anArrayOfStringsIsAListOfWordsAndOneOfAnythingElseIsLeftAlone() {
         let tags = TypeField(name: "tags", type: "array", declaredBy: "t", definition: ["items_type": "string"])
-        let mapped = MarfaMapping.itemType(ItemType(id: "t", label: "T", fields: [tags])).fields.first
-        #expect(mapped?.kind == .other)
+        #expect(MarfaMapping.itemType(ItemType(id: "t", label: "T", fields: [tags])).fields.first?.kind == .words)
+        let numbers = TypeField(name: "sizes", type: "array", declaredBy: "t", definition: ["items_type": "number"])
+        #expect(MarfaMapping.itemType(ItemType(id: "t", label: "T", fields: [numbers])).fields.first?.kind == .other)
     }
 
     @Test func aMemberTheAppCannotReadLeavesTheListUntouchedRatherThanEditedBlind() {

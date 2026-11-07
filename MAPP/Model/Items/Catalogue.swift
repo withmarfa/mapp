@@ -12,6 +12,8 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
             case status([StatusWord])
             /// A list of entries made of members (`ListShape`).
             case list(ListShape)
+            /// A list of plain words, such as labels or sites: an array of strings.
+            case words
             /// A shape the app shows but does not edit, such as an object.
             case other
         }
@@ -103,7 +105,7 @@ nonisolated extension ItemTypeInfo.Field {
         switch kind {
         case .choice(let choices): return choices
         case .status(let words): return words.map(\.value)
-        case .text, .number, .boolean, .date, .list, .other: return []
+        case .text, .number, .boolean, .date, .list, .words, .other: return []
         }
     }
 

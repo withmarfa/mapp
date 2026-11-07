@@ -167,6 +167,7 @@ nonisolated extension PageLayout {
         case .number: "number"
         case .list(let shape): shape.holdsPeople ? "person.2" : "list.bullet"
         case .text: field.format == .url ? "globe" : field.format == .email ? "envelope" : "text.alignleft"
+        case .words: "list.bullet"
         case .other: "text.alignleft"
         }
     }

@@ -270,7 +270,13 @@ nonisolated enum MarfaMapping {
                 .other
             }
         case "array":
-            listShape(of: field).map { .list($0) } ?? .other
+            if let shape = listShape(of: field) {
+                .list(shape)
+            } else if ["string", "url", "email"].contains(field.definition["items_type"]?.string) {
+                .words
+            } else {
+                .other
+            }
         default: .other
         }
     }
