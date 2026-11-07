@@ -408,9 +408,8 @@ body[data-text='none'] #editor {
 }
 
 /* An empty status, in a row, has no value yet: a plus and a quiet edge, as the design's empty chip. A pin is never
-   empty; the app leaves it out. Its plus and chevron sit a little further from the word than a filled chip's mark. */
+   empty; the app leaves it out. */
 .item-chip.empty {
-  gap: calc(var(--c-gap) * 1.5);
   background: transparent;
   box-shadow: inset 0 0 0 var(--chip-status-edge-width, 0.5px) var(--chip-edge, var(--separator));
   color: var(--label-secondary);
