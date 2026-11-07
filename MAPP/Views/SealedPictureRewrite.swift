@@ -7,8 +7,9 @@ import Foundation
 /// Each `img` is drawn from its `src`, or its `data-src` where it has no `src`, as the connectors read a document's
 /// pictures. An `http` or `https` address becomes a `SealedPictures` URL for the item; any other `src` (a `data:` picture
 /// the document holds, or a relative address, which resolves against nothing) is left as written. Every `srcset`, on an
-/// `img` or on a `<picture>`'s `<source>`, is dropped, so only `src` is drawn. The seal blocks whatever this misses, so a
-/// picture it does not reach is a missing picture, never a request.
+/// `img` or on a `<picture>`'s `<source>`, is dropped, so only `src` is drawn. An `img`'s `crossorigin` is dropped too,
+/// since the app's answer gives no such permission and the picture would not be drawn. The seal blocks whatever this
+/// misses, so a picture it does not reach is a missing picture, never a request.
 ///
 /// The scan follows the HTML tokenizer's rules for what matters here: comments, the text of `script`, `style` and the
 /// other raw-text elements, quoted and unquoted attribute values and character references. Everything else is copied
@@ -141,7 +142,7 @@ nonisolated enum SealedPictureRewrite {
             let lazy = attributes.first { $0.name == "data-src" }?.value.map(Self.trimmed)
             let chosen = source.flatMap { $0.isEmpty ? nil : $0 } ?? lazy
             let address = chosen.flatMap(Self.webAddress)
-            var kept = attributes.filter { $0.name != "srcset" }
+            var kept = attributes.filter { $0.name != "srcset" && $0.name != "crossorigin" }
             if address != nil { kept.removeAll { $0.name == "src" } }
             output.append(contentsOf: bytes[name])
             for attribute in kept {

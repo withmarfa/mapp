@@ -160,6 +160,19 @@ import WebKit
         return (widths ?? []).compactMap { ($0 as? NSNumber)?.intValue }
     }
 
+    @Test func aPictureThatAsksForCrossOriginPermissionIsDrawn() async throws {
+        let (kept, _) = served()
+        try saved(from: kept, width: 5)
+        let pictures = pictures()
+        let page = try await SealedWebPage.make(pictures: pictures, runsScripts: false)
+        let document = SealedPictureRewrite.rewrite(
+            Data(#"<html><body><img crossorigin="anonymous" src="\#(kept.absoluteString)"></body></html>"#.utf8), item: note, version: pictures.version)
+        pictures.show(document.addresses, version: 0)
+        try await page.show(document.html)
+
+        #expect(try await eventuallyAsking { try await images(on: page).first == 5 })
+    }
+
     @Test func aReaderPageDrawsItsSavedPicturesAndLoadsTheRestWhenChosen() async throws {
         let (kept, keptRequests) = served()
         try saved(from: kept, width: 5)

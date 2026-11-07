@@ -51,6 +51,13 @@ struct SealedPictureRewriteTests {
         #expect(html.contains(#"<source type="image/webp" media="(min-width: 1px)">"#))
     }
 
+    @Test func aPictureNeedsNoCrossOriginPermissionFromTheApp() {
+        let (html, addresses) = rewrite(#"<img crossorigin="anonymous" src="https://example.com/a.png"><IMG CROSSORIGIN src="https://example.com/b.png">"#)
+
+        #expect(addresses == ["https://example.com/a.png", "https://example.com/b.png"])
+        #expect(!html.localizedCaseInsensitiveContains("crossorigin"))
+    }
+
     @Test func aQueryIsReadWithItsCharacterReferences() {
         let (html, addresses) = rewrite(#"<img src="https://example.com/a.png?w=1&amp;h=2&#38;fit=crop">"#)
 
