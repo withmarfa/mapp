@@ -299,14 +299,12 @@ struct InspectorEditingTests {
         #expect(text.contains("Assignee: one") && text.contains("Assignee: two"))
     }
 
-    @Test func titlesAndTagsAreNotPropertyDrafts() {
+    @Test func titlesAreNotPropertyDrafts() {
         let id = ItemID.mint()
         let presentation = DetailsPresentation()
-        for key in ["title", "new-tag"] {
-            let draft = presentation.draft(for: id, key: key)
-            draft.text = "x"
-            draft.isDirty = true
-        }
+        let draft = presentation.draft(for: id, key: "title")
+        draft.text = "x"
+        draft.isDirty = true
         #expect(presentation.unsavedProperties().isEmpty)
         #expect(presentation.unsavedTitles == [id])
     }

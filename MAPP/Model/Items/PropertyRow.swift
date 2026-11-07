@@ -2,8 +2,8 @@ import Foundation
 import Marfa
 
 /// One row of the property block an item's page draws under its title, or one pin above it: the label and a value
-/// drawn by the kind of field it came from. The block is for reading at a glance; every value is edited in the
-/// inspector, except the status, and the parent where it is a row, which keep their menus.
+/// drawn by the kind of field it came from. A row the item can take an edit for (`editable`) opens its editor under
+/// the value, as the status and the parent keep their menus; every other value is edited in the inspector.
 nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// An item a row links to.
     struct Target: Hashable, Sendable {
@@ -77,6 +77,9 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     var numberToCall: String?
     /// How many values of a list a pin left out, for the "+N" after the first two. Always 0 in the property block.
     var more = 0
+    /// Whether the value opens an editor under it: a choice, a date, a list of people or the tags, on an item that can
+    /// take the edit. The app says so; the page never decides it.
+    var editable = false
 
     /// How many rows show before "Show N more".
     static let foldAfter = 6
@@ -127,7 +130,9 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
                 fields.append(PropertyRow(id: field.key, label: field.label, value: .status))
                 if parent { fields.append(parentRow(relationships, parentField)) }
             } else if let value = value(of: field, in: item, format: format) {
-                fields.append(PropertyRow(id: field.key, label: field.label, value: value, numberToCall: numberToCall(of: field, in: item)))
+                fields.append(PropertyRow(
+                    id: field.key, label: field.label, value: value, numberToCall: numberToCall(of: field, in: item),
+                    editable: item.isEditable && ValueEditKind(field: field) != nil))
             }
         }
         if parent, !fields.contains(where: { $0.value == .parent }) { fields.insert(parentRow(relationships, parentField), at: 0) }
@@ -135,7 +140,9 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         for relationship in relationships where !relationship.field.hasPrefix("inverse:") && relationship.field != parentField {
             if let row = linkRow(relationship, icon: icon, isPerson: isPerson) { rows.append(row) }
         }
-        if !tags.isEmpty { rows.append(PropertyRow(id: PagePlacement.tags, label: String(localized: "Tags"), value: .tags(tags))) }
+        if !tags.isEmpty {
+            rows.append(PropertyRow(id: PagePlacement.tags, label: String(localized: "Tags"), value: .tags(tags), editable: item.canEditTags))
+        }
         return rows
     }
 

@@ -145,7 +145,7 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
 }
 
 extension PropertyRow: Encodable {
-    private enum Key: String, CodingKey { case id, label, symbol, kind, text, texts, items, options, people, icon, tone, more, help }
+    private enum Key: String, CodingKey { case id, label, symbol, kind, text, texts, items, options, people, icon, tone, more, help, editable }
     /// What the page draws of an item a row links to: a type chip in the item's own tone, or a person's initials and
     /// name. The tone is one of `TypeTone`'s names; the page never picks a color.
     private struct Link: Encodable {
@@ -212,6 +212,7 @@ extension PropertyRow: Encodable {
         case .text(let text): try Self.encode("text", text, into: &container)
         }
         if more > 0 { try container.encode(more, forKey: .more) }
+        if editable { try container.encode(true, forKey: .editable) }
     }
 
     private static func encode(_ kind: String, _ text: String, into container: inout KeyedEncodingContainer<Key>) throws {
@@ -232,6 +233,8 @@ enum PageHeaderEvent {
     case titleDiscard(ItemID)
     /// A pin asks for its menu, under the pin's frame in the editor's container.
     case menu(PageHeaderMenu, ItemID, CGRect)
+    /// A row's or a pin's value asks for its editor under it, in the editor's container: the row's identifier.
+    case edit(row: String, ItemID, CGRect)
     /// Hide from Page was chosen in the menu over a row of the property block, or Linked From: the row's
     /// identifier (`PagePlacement`) and the item the header was showing.
     case hideFromPage(row: String, ItemID)

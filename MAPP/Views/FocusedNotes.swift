@@ -182,7 +182,7 @@ final class DetailsPresentation {
     }
 
     /// The property drafts the person typed and has not saved, for `itemID` or for every item, in a steady order. The
-    /// title and the new tag have homes of their own.
+    /// title has a home of its own.
     func unsavedProperties(of itemID: ItemID? = nil) -> [(item: ItemID, key: String, draft: ItemPropertyDraft)] {
         drafts.filter { itemID == nil || $0.key == itemID }
             .sorted { $0.key.rawValue < $1.key.rawValue }

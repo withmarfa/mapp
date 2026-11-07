@@ -47,6 +47,15 @@ export type EditorMessage =
       rect: [number, number, number, number]
       viewportHeight: number
     }
+  /** A property row's or a pin's value asks for its editor under it: the row's identifier (a field key or `#tags`),
+   *  and the value's frame as a menu's is sent. */
+  | {
+      type: 'editValue'
+      item: string
+      row: string
+      rect: [number, number, number, number]
+      viewportHeight: number
+    }
   /** Customize Layout in the row above the title: the app starts or ends it. */
   | { type: 'toggleLayout' }
   /** Linked From in the row above the title: the app shows what links here. */
