@@ -2,7 +2,9 @@ import MarfaIcons
 import SwiftUI
 
 /// An item shown as an HTML document: its title and pins in the manner of the note page's header (`WebPageHeader`), then
-/// the HTML filling the rest of the detail area, shown as it was written (`WebPageView`). The document is the item's own file, for
+/// the HTML filling the rest of the detail area (`WebPageView`). The document is analysed first (`PageAnalyzer`): an
+/// article is read in Reader, the article alone in the note page's text, or shown as it was written; any other page is
+/// shown as it was written, with no Reader to switch to, and a mail sits centred on the surface behind pages. The document is the item's own file, for
 /// a Web Page or an HTML file, or the HTML file attached to it, for a document a connector keeps that way
 /// (`ItemLibrary.pageLayout(of:)`). The body is read only, and the title and properties are not edited on the page,
 /// except a pinned status, which keeps its menu; the inspector shows them all.
@@ -12,14 +14,39 @@ import SwiftUI
 struct WebPageItemPage: View {
     private enum Content: Equatable {
         case loading
-        /// The document with its pictures pointed at the app, and the encoding to read it in.
-        case ready(Data, String.Encoding)
+        /// The document in each look it has, with its pictures pointed at the app.
+        case ready(Loaded)
         /// The library has no file for the item.
         case unavailable
         /// The library has one but could not get it.
         case failed
         /// The file is not an HTML page.
         case notHTML
+    }
+
+    /// What a file turned out to be, and the document to show for each look. Both are written with the pictures'
+    /// `version` of the time, which the page redraws to the current one (`SealedPictures.show`).
+    private nonisolated struct Loaded: Equatable, Sendable {
+        nonisolated struct Document: Equatable, Sendable {
+            let html: Data
+            let encoding: String.Encoding
+            let addresses: [URL]
+
+            init(_ rewritten: SealedPictureRewrite.Result) {
+                html = rewritten.html
+                encoding = rewritten.encoding
+                addresses = rewritten.addresses
+            }
+        }
+
+        let analysis: PageAnalysis
+        let original: Document
+        /// The article's document, where the page has an article.
+        let reader: Document?
+        let version: Int
+
+        func mode(choosing chosen: SourceViewMode) -> SourceViewMode { reader == nil ? .original : analysis.mode(choosing: chosen) }
+        func document(for mode: SourceViewMode) -> Document { mode == .reader ? reader ?? original : original }
     }
 
     private struct Load: Hashable {
@@ -32,7 +59,6 @@ struct WebPageItemPage: View {
     @StoredPageStyle private var style
     @AppStorage(RemotePictureSetting.key) private var remotePictures = RemotePictureSetting.standard
     @AppStorage(SourceViewMode.key) private var mode = SourceViewMode.standard
-    @AppStorage(SourceViewMode.wideKey) private var originalWide = SourceViewMode.wideStandard
     let item: Item
     /// The file that holds the HTML.
     let document: ItemID
@@ -54,11 +80,19 @@ struct WebPageItemPage: View {
     /// One step of the callout's spacing, as on the note page.
     private var calloutGap: CGFloat { CGFloat(interfaceTextSize) * 4 / 13 * 4 }
 
+    /// The look the page is in, once it is known.
+    private var shownMode: SourceViewMode? {
+        guard case .ready(let loaded) = content else { return nil }
+        return loaded.mode(choosing: mode)
+    }
+
     var body: some View {
         GeometryReader { geometry in
             let inset = style.horizontalInset(for: geometry.size.width)
             VStack(spacing: 0) {
-                WebPageHeader(item: item, inset: inset, drafts: drafts, open: open, mode: $mode)
+                WebPageHeader(
+                    item: item, inset: inset, drafts: drafts, open: open, mode: $mode, reading: shownMode == .reader,
+                    offersReader: { if case .ready(let loaded) = content { loaded.reader != nil } else { false } }())
                 // The header is inset like the other item pages' and the page draws to its own margin, so the line
                 // sets the page apart as a document under its header.
                 Divider()
@@ -74,6 +108,10 @@ struct WebPageItemPage: View {
         }
         .accessibilityIdentifier("WebPageItemPage")
         .task(id: Load(id: item.id, document: document, version: library.item(document)?.version)) { await load() }
+        .onChange(of: shownMode) {
+            // The pictures the other look names wait for no one while it is not shown.
+            if case .ready(let loaded) = content, let shownMode { pictures?.show(loaded.document(for: shownMode).addresses, version: loaded.version) }
+        }
         .onChange(of: remotePictures) { pictures?.redraw() }
         .onChange(of: library.savedPictureStates(of: item.id)) { pictures?.redraw() }
     }
@@ -82,10 +120,12 @@ struct WebPageItemPage: View {
         switch content {
         case .loading:
             ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
-        case .ready(let html, let encoding):
+        case .ready(let loaded):
+            let shown = loaded.mode(choosing: mode)
+            let document = loaded.document(for: shown)
             WebPageView(
-                html: html, encoding: encoding, pictures: pictures, runsScripts: runsScripts,
-                look: SourceLook(mode: mode, title: item.displayTitle, page: style, originalWide: originalWide))
+                html: document.html, encoding: document.encoding, pictures: pictures, runsScripts: runsScripts,
+                look: SourceLook(mode: shown, isMail: loaded.analysis.isMail, page: style))
                 // Each item's pictures are answered by a page made for it.
                 .id(pictures.map(ObjectIdentifier.init))
         case .unavailable:
@@ -137,14 +177,22 @@ struct WebPageItemPage: View {
             // The file of an item that is itself a file is the item; a document attached to one is not, so the item
             // shares and opens as it would without it.
             if document == item.id { onResolved(url) }
-            let (item, version) = (item.id, pictures.version)
+            let (item, version, title) = (item.id, pictures.version, item.displayTitle)
             do {
-                let rewritten = try await Task.detached(priority: .userInitiated) {
-                    SealedPictureRewrite.rewrite(try Data(contentsOf: url), item: item, version: version)
+                let data = try await Task.detached(priority: .userInitiated) { try Data(contentsOf: url) }.value
+                // A cancelled analysis throws, so an answer for an item the person has left never reaches the next.
+                let analysis = try await PageAnalyzer.analyze(data, title: title)
+                let loaded = await Task.detached(priority: .userInitiated) {
+                    Loaded(
+                        analysis: analysis, original: .init(SealedPictureRewrite.rewrite(data, item: item, version: version)),
+                        reader: analysis.article.map {
+                            .init(SealedPictureRewrite.rewrite(Data(ReaderDocument.html(for: $0).utf8), item: item, version: version))
+                        },
+                        version: version)
                 }.value
                 guard !Task.isCancelled else { return }
-                pictures.show(rewritten.addresses, version: version)
-                content = .ready(rewritten.html, rewritten.encoding)
+                pictures.show(loaded.document(for: loaded.mode(choosing: mode)).addresses, version: version)
+                content = .ready(loaded)
             } catch {
                 guard !Task.isCancelled else { return }
                 content = .failed
@@ -241,15 +289,18 @@ private struct WebPageHeader: View {
     let drafts: DetailsPresentation
     let open: (ItemID) -> Void
     @Binding var mode: SourceViewMode
+    /// Whether the article is shown in Reader, which gives the title and the byline the reading header's serif.
+    let reading: Bool
+    /// Whether the page has an article to read, which is the only page the switch is offered for.
+    let offersReader: Bool
 
     var body: some View {
-        let parts = PageHeaderParts(of: item, in: library, placements: placements, dateFormat: dateFormat)
+        let parts = PageHeaderParts(of: item, in: library, placements: placements, dateFormat: dateFormat, reading: reading)
         let step = CGFloat(interfaceTextSize) * 4 / 13
-        let reading = parts.kind == .reading
         let textSize = CGFloat(style.textSize)
         let statusField = parts.type?.statusField
         VStack(alignment: .leading, spacing: 10) {
-            line(parts.lead.byline, step: step)
+            if offersReader { line(parts.lead.byline, step: step) }
             VStack(alignment: .leading, spacing: step) {
                 Text(verbatim: item.displayTitle)
                     .font(reading
@@ -295,7 +346,8 @@ private struct WebPageHeader: View {
     }
 
     /// Where a page for reading came from, when it was published and how long it takes, as one quiet line, with the
-    /// switch at its trailing edge. Every other kind has the switch alone.
+    /// switch at its trailing edge. The line is drawn only for a page with an article to read, and has the switch alone
+    /// where the byline says nothing.
     private func line(_ byline: PageByline?, step: CGFloat) -> some View {
         let parts = [byline?.source, byline?.date, byline?.detail].compactMap { $0 }.filter { !$0.isEmpty }
         return HStack(spacing: step * 2.5) {

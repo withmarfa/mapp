@@ -1,8 +1,10 @@
 import SwiftUI
 import WebKit
 
-/// An HTML document shown as it was written, in a page that can reach nothing outside it (`SealedWebPage`). It draws
-/// no header, border or other chrome; the place that shows it decides what goes around. Its pictures come from
+/// An HTML document shown in a page that can reach nothing outside it (`SealedWebPage`), as it was written or, with a
+/// `look`, restyled. It draws no header, border or other chrome; the place that shows it decides what goes around, but a
+/// look that asks for it (`SourceLook.isOnSurface`) is placed on the surface behind pages, as Mail places a message,
+/// and one that leaves the background unpainted lets the window's show through. Its pictures come from
 /// `pictures`, once `SealedPictureRewrite` has pointed them there; the page it was first shown with keeps answering, so a
 /// place that shows another item's document gives it a view of its own.
 struct WebPageView: View {
@@ -38,6 +40,7 @@ struct WebPageView: View {
                     .webViewBackForwardNavigationGestures(.disabled)
                     .webViewMagnificationGestures(.disabled)
                     .webViewLinkPreviews(.disabled)
+                    .webViewContentBackground(look?.leavesBackground == true ? .hidden : .automatic)
                     // Each document has a page of its own, so a new one gets a new web view, which lets go of the
                     // page that held the last document and stops its scripts.
                     .id(ObjectIdentifier(sealed.page))
@@ -45,6 +48,7 @@ struct WebPageView: View {
                 ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+        .background(look?.isOnSurface == true ? Color(nsColor: .underPageBackgroundColor) : .clear)
         .accessibilityIdentifier("WebPageView")
         .task(id: Reload(html: html, look: look)) { await load() }
         .onChange(of: pictures?.version) { _, version in

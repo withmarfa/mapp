@@ -112,7 +112,6 @@ private struct EditorSettings: View {
             Section("Page Layout") {
                 PageWidthOptions()
                 ReadingWidthOptions()
-                SourceViewWidthOption()
                 TitleLinesOption()
             }
             Section("Text") { TextOptions() }
@@ -133,16 +132,6 @@ private struct EditorSettings: View {
         }
         .labelStyle(.titleOnly)
         .settingsForm()
-    }
-}
-
-/// Whether the original look of an item from a source runs the window's full width; its default is the text column.
-private struct SourceViewWidthOption: View {
-    @AppStorage(SourceViewMode.wideKey) private var wide = SourceViewMode.wideStandard
-
-    var body: some View {
-        Toggle("Show Original Pages Wide", isOn: $wide)
-            .accessibilityIdentifier("SourceOriginalWide")
     }
 }
 

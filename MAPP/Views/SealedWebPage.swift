@@ -102,9 +102,7 @@ import WebKit
         // Before the page is swapped in, so the person never sees the document unstyled. A look that fails to apply
         // leaves the document as it loaded.
         if let look {
-            _ = try? await next.callJavaScript(
-                SourceLook.script, arguments: ["css": look.css, "reader": look.mode == .reader, "title": look.title],
-                contentWorld: Self.world)
+            _ = try? await next.callJavaScript(SourceLook.script, arguments: look.arguments, contentWorld: Self.world)
             // The await above is a suspension: a newer call may have started, or this one been cancelled.
             try Task.checkCancellation()
             guard call == shows else { throw CancellationError() }
@@ -127,7 +125,9 @@ import WebKit
         _ = try? await page.callJavaScript(Self.redraw, arguments: ["version": String(version)], contentWorld: Self.world)
     }
 
-    private static let world = WKContentWorld.world(name: "MAPPSealedPictures")
+    /// The world the app's own scripts run in: its globals are not the document's, so the document cannot see or change
+    /// them, while the DOM is shared.
+    static let world = WKContentWorld.world(name: "MAPPSealedPictures")
 
     nonisolated static let redraw = """
         for (const img of document.querySelectorAll('img[src^="\(SealedPictures.scheme):"]')) {

@@ -3,6 +3,9 @@ import Foundation
 /// What an item page's header draws of the item, resolved once for every page that draws one: the note page's, which
 /// sends it to the editor's web page (`ItemPageHeader`), and a saved web page's, drawn in SwiftUI (`WebPageItemPage`).
 /// Both take their kind, their line and their pins from here, so they cannot disagree about what a header shows.
+///
+/// A saved web page shown as the source's own page, not as an article, draws the header of an item that is not for reading
+/// (`reading` false): the byline and the description belong above the text they describe.
 struct PageHeaderParts {
     let type: ItemTypeInfo?
     let kind: PageHeaderKind
@@ -14,14 +17,15 @@ struct PageHeaderParts {
     let candidates: [PropertyRow]
     let pins: PagePins
 
-    init(of item: Item, in library: any ItemLibrary, placements: PagePlacements, dateFormat: DateFormat) {
+    init(of item: Item, in library: any ItemLibrary, placements: PagePlacements, dateFormat: DateFormat, reading: Bool = true) {
         type = library.catalogue.itemTypes[item.type]
         placement = placements.placement(of: item.type, in: library.catalogue)
         relationships = library.relationships(for: item.id)
         now = library.now()
-        kind = PageHeaderKind.of(item.type, in: library.catalogue)
+        let kind = PageHeaderKind.of(item.type, in: library.catalogue)
+        self.kind = !reading && kind == .reading ? .general : kind
         lead = PageHeaderLead(
-            for: item, kind: kind, body: kind == .reading ? library.body(of: item.id)?.text : nil, now: now, format: dateFormat)
+            for: item, kind: self.kind, body: self.kind == .reading ? library.body(of: item.id)?.text : nil, now: now, format: dateFormat)
         let type = type, relationships = relationships
         candidates = PropertyRow.candidates(
             of: item, type: type, hidden: library.hiddenPropertyKeys(of: item).union(lead.consumed), relationships: relationships,
