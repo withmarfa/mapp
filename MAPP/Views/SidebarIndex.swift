@@ -134,5 +134,3 @@ private struct IndexContent: View {
         }
     }
 }
-
-/// Search and the page's options, as the gallery and the table have them at the toolbar's trailing side.
