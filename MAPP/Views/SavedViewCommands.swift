@@ -21,10 +21,16 @@ enum SavedViews {
         let content = browser.tableContent(in: library)
         let options = browser.tableOptions[browser.item] ?? ItemTableOptions()
         let search = browser.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        // The table's own grouping by status is not one the list or the gallery shows.
+        var grouping = content.grouping
+        if (browser.viewMode == .list || browser.viewMode == .gallery), case .automatic = options.grouping { grouping = nil }
+        var seededTypes: [String]?
+        if case .view(let id) = browser.item { seededTypes = browser.viewSeeds[id]?.types }
         return ViewDraft.Window(
-            place: browser.item, columns: content.columns, sort: content.sort, grouping: content.grouping,
+            place: browser.item, columns: content.columns, sort: content.sort, grouping: grouping,
             filters: options.filters, negated: options.negated, search: search.isEmpty ? nil : search,
-            layout: layout(of: browser, in: library, order: nil), timelineDate: browser.timelineFields[browser.item])
+            layout: layout(of: browser, in: library, order: nil), timelineDate: browser.timelineFields[browser.item],
+            seededTypes: seededTypes)
     }
 
     /// What the window shows in the layout it shows it in, with that layout's own order and grouping, so a new

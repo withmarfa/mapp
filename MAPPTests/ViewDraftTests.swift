@@ -32,6 +32,15 @@ struct ViewDraftTests {
             layout: layout, timelineDate: timelineDate)
     }
 
+    /// A filter added to `base` as a place's filter, through the same call a new view's draft makes.
+    private static func filter(
+        _ base: String?, adding filters: [String: Set<String>], negated: Set<String> = [], columns: [ItemTableColumn]
+    ) -> (filter: String?, unkept: [ViewDraft.Unkept]) {
+        let choices = ItemTableOptions(filters: filters, negated: negated).filterChoices
+        let result = ViewDraft.adding(choices, to: LibraryViewQuery(filter: base), columns: columns, catalogue: catalogue)
+        return (result.query.filter, result.unkept)
+    }
+
     private static func draft(_ window: ViewDraft.Window, views: [LibraryView] = []) -> ViewDraft.Draft? {
         ViewDraft.draft(window, catalogue: catalogue, views: views)
     }
@@ -172,55 +181,54 @@ struct ViewDraftTests {
     // MARK: Filters
 
     @Test func filtersJoinAColumnsValuesByOrAndColumnsByAnd() {
-        let one = ViewDraft.filter(nil, adding: ["field.status": ["todo", "done"]], columns: Self.columns)
+        let one = Self.filter(nil, adding: ["field.status": ["todo", "done"]], columns: Self.columns)
         #expect(one.filter == #"properties.status eq "done" OR properties.status eq "todo""#)
         #expect(one.unkept.isEmpty)
 
-        let both = ViewDraft.filter(nil, adding: ["field.status": ["todo"], "field.done": ["false"]], columns: Self.columns)
+        let both = Self.filter(nil, adding: ["field.status": ["todo"], "field.done": ["false"]], columns: Self.columns)
         #expect(both.filter == #"properties.status eq "todo" AND properties.done eq false"#)
 
         // Two columns of two values each would need both joiners.
-        let mixed = ViewDraft.filter(nil, adding: ["field.status": ["todo", "done"], "field.done": ["false"]], columns: Self.columns)
+        let mixed = Self.filter(nil, adding: ["field.status": ["todo", "done"], "field.done": ["false"]], columns: Self.columns)
         #expect(mixed.filter == nil)
         #expect(mixed.unkept == [.mixedFilters])
     }
 
     @Test func filtersAddToTheViewsOwnWhereTheJoinerAgrees() {
         let added = ["field.status": Set(["todo"])]
-        #expect(ViewDraft.filter(#"type eq "core.task""#, adding: added, columns: Self.columns).filter
+        #expect(Self.filter(#"type eq "core.task""#, adding: added, columns: Self.columns).filter
             == #"type eq "core.task" AND properties.status eq "todo""#)
         // A filter of ORs cannot take an AND, nor a filter of one condition two values by OR.
         let ors = #"tags contains "a" OR tags contains "b""#
-        #expect(ViewDraft.filter(ors, adding: added, columns: Self.columns) == (ors, [.mixedFilters]))
-        #expect(ViewDraft.filter(#"type eq "core.task""#, adding: ["field.status": ["todo", "done"]], columns: Self.columns).unkept
+        #expect(Self.filter(ors, adding: added, columns: Self.columns) == (ors, [.mixedFilters]))
+        #expect(Self.filter(#"type eq "core.task""#, adding: ["field.status": ["todo", "done"]], columns: Self.columns).unkept
             == [.mixedFilters])
     }
 
-    @Test func emptyCellsParentsAndTypesBecomeConditions() {
-        let filter = ViewDraft.filter(
-            nil, adding: ["field.status": [""], "parent": ["p1"], "type": ["core.task"]], columns: Self.columns)
-        #expect(filter.filter == #"properties.status not_exists AND backref[parent-of] eq "p1" AND type eq "core.task""#)
-        #expect(ViewDraft.filter(nil, adding: ["parent": [""]], columns: Self.columns).filter == "backref[parent-of] not_exists")
+    @Test func emptyCellsAndParentsBecomeConditions() {
+        let filter = Self.filter(nil, adding: ["field.status": [""], "parent": ["p1"]], columns: Self.columns)
+        #expect(filter.filter == #"properties.status not_exists AND backref[parent-of] eq "p1""#)
+        #expect(Self.filter(nil, adding: ["parent": [""]], columns: Self.columns).filter == "backref[parent-of] not_exists")
     }
 
     @Test func valuesAreQuotedByTheCoreAndABackslashIsKept() throws {
-        let quoted = ViewDraft.filter(nil, adding: ["field.status": [#"say "hi""#]], columns: Self.columns)
+        let quoted = Self.filter(nil, adding: ["field.status": [#"say "hi""#]], columns: Self.columns)
         #expect(quoted.filter == #"properties.status eq "say \"hi\"""#)
         for value in [#"a\"#, #"C:\temp\"#, #"\""#, #"x\y"#] {
-            let kept = ViewDraft.filter(nil, adding: ["field.status": [value]], columns: Self.columns)
+            let kept = Self.filter(nil, adding: ["field.status": [value]], columns: Self.columns)
             #expect(kept.unkept.isEmpty, "\(value) was not kept")
             let text = try #require(kept.filter)
             let view = LibraryView(id: ItemID("v"), title: "V", query: LibraryViewQuery(filter: text))
             #expect(ViewDraft.options(for: view, catalogue: Self.catalogue).filters == ["field.status": [value]], "\(value) did not come back")
         }
         // A field Marfa cannot name has no condition it can express.
-        #expect(ViewDraft.filter(nil, adding: ["field.due-date": ["c"]], columns: Self.columns).unkept == [.filter(column: "Due")])
+        #expect(Self.filter(nil, adding: ["field.due-date": ["c"]], columns: Self.columns).unkept == [.filter(column: "Due")])
     }
 
     @Test func aFilterIsMeasuredByTheCoreInUTF16UnitsNotCharacters() throws {
         // Each 🎉 is one character and two UTF-16 units: 1,000 of them fit in 2,048 units and 1,100 do not.
         func filter(_ count: Int) -> (filter: String?, unkept: [ViewDraft.Unkept]) {
-            ViewDraft.filter(nil, adding: ["field.status": [String(repeating: "🎉", count: count)]], columns: Self.columns)
+            Self.filter(nil, adding: ["field.status": [String(repeating: "🎉", count: count)]], columns: Self.columns)
         }
         let fits = filter(1_000)
         #expect(fits.unkept.isEmpty)
@@ -233,16 +241,16 @@ struct ViewDraftTests {
 
     @Test func moreConditionsThanTheCoreTakesAreToldWithItsMessage() {
         let values = Set((1...11).map { "v\($0)" })
-        let filter = ViewDraft.filter(nil, adding: ["field.status": values], columns: Self.columns)
+        let filter = Self.filter(nil, adding: ["field.status": values], columns: Self.columns)
         #expect(filter.filter == nil)
         #expect(filter.unkept == [.tooManyFilters])
         // Ten conditions are the most a filter holds.
-        #expect(ViewDraft.filter(nil, adding: ["field.status": Set((1...10).map { "v\($0)" })], columns: Self.columns).unkept.isEmpty)
+        #expect(Self.filter(nil, adding: ["field.status": Set((1...10).map { "v\($0)" })], columns: Self.columns).unkept.isEmpty)
         // The view's own conditions count too.
         let held = (1...5).map { #"tags contains "t\#($0)""# }.joined(separator: " AND ")
-        let beside = ViewDraft.filter(held, adding: ["field.status": ["a"], "field.done": ["true"]], columns: Self.columns)
+        let beside = Self.filter(held, adding: ["field.status": ["a"], "field.done": ["true"]], columns: Self.columns)
         #expect(beside.unkept.isEmpty)
-        let over = ViewDraft.filter(held + " AND " + held, adding: ["field.status": ["a"]], columns: Self.columns)
+        let over = Self.filter(held + " AND " + held, adding: ["field.status": ["a"]], columns: Self.columns)
         #expect(over.unkept == [.tooManyFilters])
     }
 
@@ -253,7 +261,7 @@ struct ViewDraftTests {
         #expect(seed.filters.isEmpty)
         var options = seed
         options.filters = ["field.status": ["todo"]]
-        let update = ViewDraft.change(Self.window(.view(view.id), filters: options.filters), options: options, seed: seed, seedTimelineDate: nil, view: view, catalogue: Self.catalogue)
+        let update = ViewDraft.change(Self.window(.view(view.id), filters: options.filters), options: options, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
         #expect(update.change.query == nil, "a filter that could not be read is not replaced")
         guard case .refused(let message)? = update.unkept.first else { Issue.record("not refused: \(update.unkept)"); return }
         #expect(!message.isEmpty)
@@ -288,19 +296,19 @@ struct ViewDraftTests {
 
         var grouped = seed
         grouped.grouping = .none
-        let ungroup = ViewDraft.change(Self.window(.view(view.id), sort: seed.sort ?? []), options: grouped, seed: seed, seedTimelineDate: nil, view: view, catalogue: Self.catalogue)
+        let ungroup = ViewDraft.change(Self.window(.view(view.id), sort: seed.sort ?? []), options: grouped, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
         #expect(ungroup.change == LibraryViewChange(group: .clear))
 
         var filtered = seed
         filtered.filters = ["field.status": ["todo"]]
         let filter = ViewDraft.change(
-            Self.window(.view(view.id), filters: filtered.filters), options: filtered, seed: seed, seedTimelineDate: nil, view: view, catalogue: Self.catalogue)
+            Self.window(.view(view.id), filters: filtered.filters), options: filtered, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
         #expect(filter.change == LibraryViewChange(
             query: LibraryViewQuery(types: [Self.task], filter: #"tags exists AND properties.status eq "todo""#)))
 
         var resorted = seed
         resorted.sort = [ItemTableComparator(column: .title)]
-        let sort = ViewDraft.change(Self.window(.view(view.id), sort: [ItemTableComparator(column: .title)]), options: resorted, seed: seed, seedTimelineDate: nil, view: view, catalogue: Self.catalogue)
+        let sort = ViewDraft.change(Self.window(.view(view.id), sort: [ItemTableComparator(column: .title)]), options: resorted, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
         #expect(sort.change == LibraryViewChange(sort: [LibraryViewSort(field: "title", ascending: true)]))
     }
 
@@ -336,16 +344,16 @@ struct ViewDraftTests {
     }
 
     @Test func isNotValuesJoinByAndAndIsValuesByOr() throws {
-        let not = ViewDraft.filter(nil, adding: ["field.status": ["todo", "done"]], negated: ["field.status"], columns: Self.columns)
+        let not = Self.filter(nil, adding: ["field.status": ["todo", "done"]], negated: ["field.status"], columns: Self.columns)
         #expect(not.filter == #"properties.status neq "done" AND properties.status neq "todo""#)
         #expect(not.unkept.isEmpty)
-        let single = ViewDraft.filter(nil, adding: ["field.done": ["true"]], negated: ["field.done"], columns: Self.columns)
+        let single = Self.filter(nil, adding: ["field.done": ["true"]], negated: ["field.done"], columns: Self.columns)
         #expect(single.filter == "properties.done neq true")
         // Is Not on the empty cell asks that the property exist.
-        #expect(ViewDraft.filter(nil, adding: ["field.status": [""]], negated: ["field.status"], columns: Self.columns).filter
+        #expect(Self.filter(nil, adding: ["field.status": [""]], negated: ["field.status"], columns: Self.columns).filter
             == "properties.status exists")
         // Is Not with several values beside Is with several would need both joiners.
-        let mixed = ViewDraft.filter(
+        let mixed = Self.filter(
             nil, adding: ["field.status": ["a", "b"], "parent": ["p1", "p2"]], negated: ["field.status"], columns: Self.columns)
         #expect(mixed.unkept == [.mixedFilters])
         // Written and read back, it is the same filter.
@@ -397,8 +405,8 @@ struct ViewDraftTests {
             var options = seed
             options.filters = filters
             return ViewDraft.change(
-                Self.window(.view(view.id), filters: filters), options: options, seed: seed, seedTimelineDate: nil, view: view,
-                catalogue: Self.catalogue)
+                Self.window(.view(view.id), filters: filters), options: options, seed: seed, seedTimelineDate: nil,
+                seededTypes: ViewDraft.seededTypes(of: view.query, catalogue: Self.catalogue), view: view, catalogue: Self.catalogue)
         }
         #expect(update(seed.filters).change.query == nil)
         #expect(update(["type": ["core.task"]]).change.query?.types == [Self.task])
@@ -420,8 +428,50 @@ struct ViewDraftTests {
         #expect(ViewDraft.differs(seed, timelineDate: "starts_at", from: seed, seedTimelineDate: "due_at"))
         #expect(!ViewDraft.differs(seed, timelineDate: "due_at", from: seed, seedTimelineDate: "due_at"))
         let timeline = Self.window(.view(view.id), layout: .timeline(key: "starts_at", label: "Starts"), timelineDate: "starts_at")
-        let update = ViewDraft.change(timeline, options: seed, seed: seed, seedTimelineDate: "due_at", view: view, catalogue: Self.catalogue)
+        let update = ViewDraft.change(timeline, options: seed, seed: seed, seedTimelineDate: "due_at", seededTypes: nil, view: view, catalogue: Self.catalogue)
         #expect(update.change == LibraryViewChange(group: .set(LibraryViewGroup(field: "properties.starts_at", bucket: .day))))
+    }
+
+    @Test func aTimelineDateThatReplacesAnotherGroupingNamesTheGroupItReplaces() {
+        // The view is grouped by status, which is not a day: a new date would replace it.
+        let view = LibraryView(id: ItemID("v"), title: "V", version: 2, group: LibraryViewGroup(field: "properties.status"))
+        let seed = ViewDraft.options(for: view, catalogue: Self.catalogue)
+        let timeline = Self.window(
+            .view(view.id), grouping: Self.statusColumn, layout: .timeline(key: "starts_at", label: "Starts"), timelineDate: "starts_at")
+        let update = ViewDraft.change(timeline, options: seed, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
+        #expect(update.change.group == .set(LibraryViewGroup(field: "properties.starts_at", bucket: .day)))
+        #expect(update.unkept == [.group(column: "Status")])
+        // A group by month is not a day either, and no column of the window shows it.
+        let monthly = LibraryView(id: ItemID("v"), title: "V", group: LibraryViewGroup(field: "properties.due_at", bucket: .month))
+        let months = ViewDraft.change(timeline, options: seed, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: monthly, catalogue: Self.catalogue)
+        #expect(months.unkept == [.group(column: "Group")])
+        // A day group moving to another date loses nothing.
+        let dated = LibraryView(id: ItemID("v"), title: "V", group: LibraryViewGroup(field: "properties.due_at", bucket: .day))
+        let moved = ViewDraft.change(timeline, options: seed, seed: seed, seedTimelineDate: "due_at", seededTypes: nil, view: dated, catalogue: Self.catalogue)
+        #expect(moved.unkept.isEmpty)
+        // A view with no group loses nothing either.
+        let plain = LibraryView(id: ItemID("v"), title: "V")
+        let none = ViewDraft.change(timeline, options: ItemTableOptions(), seed: ItemTableOptions(), seedTimelineDate: nil, seededTypes: nil, view: plain, catalogue: Self.catalogue)
+        #expect(none.unkept.isEmpty)
+    }
+
+    @Test func aCatalogueChangeWhileEditingNeverWidensAViewsTypes() {
+        // Ticket has a subtype when the view opens, so its types are not shown as a Type filter...
+        let view = LibraryView(
+            id: ItemID("v"), title: "V", version: 2, query: LibraryViewQuery(types: [Self.ticket, TypeID("core.note")]))
+        let seed = ViewDraft.options(for: view, catalogue: Self.catalogue)
+        #expect(seed.filters.isEmpty)
+        // ...and the subtype goes away from the catalogue before the filter on Status is saved.
+        let later = Catalogue(itemTypes: [
+            ItemTypeInfo(id: Self.task, label: "Task", fields: [Self.status, Self.done], titleField: "title", bodyField: "body", parent: nil),
+            ItemTypeInfo(id: Self.ticket, label: "Ticket", fields: [], titleField: "title", bodyField: "body", parent: nil),
+        ])
+        var options = seed
+        options.filters = ["field.status": ["todo"]]
+        let update = ViewDraft.change(
+            Self.window(.view(view.id), filters: options.filters), options: options, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view,
+            catalogue: later)
+        #expect((update.change.query?.types ?? view.query.types) == view.query.types)
     }
 
     @Test func anUpdateReplacesTheFiltersTheWindowShows() throws {
@@ -433,7 +483,7 @@ struct ViewDraftTests {
         func update(_ filters: [String: Set<String>]) -> (change: LibraryViewChange, unkept: [ViewDraft.Unkept], unchanged: [String]) {
             var options = seed
             options.filters = filters
-            return ViewDraft.change(Self.window(.view(view.id), filters: filters), options: options, seed: seed, seedTimelineDate: nil, view: view, catalogue: Self.catalogue)
+            return ViewDraft.change(Self.window(.view(view.id), filters: filters), options: options, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
         }
 
         // Removing the filter in the window removes it from the view; what the window cannot show stays.
@@ -461,7 +511,7 @@ struct ViewDraftTests {
         var options = seed
         options.filters = [:]
         let window = ViewDraft.Window(place: .view(view.id), columns: Self.columns, sort: [], grouping: nil, filters: [:])
-        let update = ViewDraft.change(window, options: options, seed: seed, seedTimelineDate: nil, view: view, catalogue: Self.catalogue)
+        let update = ViewDraft.change(window, options: options, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
         #expect(update.change.query?.filter == #"properties.owner eq "ann""#)
         #expect(update.unchanged == [#"properties.owner eq "ann""#])
     }
