@@ -72,8 +72,8 @@ export interface LinkRef {
   alias?: string
 }
 
-/** What the page asks of the app's notes: names to offer after `[[`, which note the person links to, and which
- *  names the links of a note use that no note answers to. */
+/** What the page asks of the app's notes: names to offer after `[[`, which note the person links to, and what each
+ *  link of a note names. */
 export type NoteRequest =
   | { type: 'suggest'; query: string; item: string }
   | { type: 'pick'; item: string }
@@ -114,7 +114,7 @@ declare global {
           postMessage(request: EmbedRequest): Promise<EmbeddedFile | UnavailableFile | null>
         }
         /** Answers a `suggest` with note names, a `pick` with the link the person chose, or null, and a
-         *  `resolve` with whether each name is missing. */
+         *  `resolve` with what each name is (`LinkAnswers`). */
         notes?: { postMessage(request: NoteRequest): Promise<unknown> }
         /** Answers a question about a picture at a web address, or null when the app has no answer. The page
          *  fetches nothing itself: this is the only way such a picture reaches it. */
@@ -153,19 +153,54 @@ export async function pickNote(item: string): Promise<string | undefined> {
   return typeof link === 'string' ? link : undefined
 }
 
-/** Whether each link of the item names no note, in the order asked; null when the app does not answer, so the
- *  page assumes nothing. */
-export async function askMissing(item: string, links: LinkRef[]): Promise<boolean[] | null> {
-  const answer = await window.webkit?.messageHandlers?.notes?.postMessage({
+/** What the app says of one link of the item: whether it names no note, and otherwise, when it names exactly
+ *  one, the icon of that note's type (a key of `LinkAnswers.icons`, absent for a type with none) and the name of
+ *  the type's tone. */
+export interface LinkAnswer {
+  missing: boolean
+  icon?: string
+  tone?: string
+}
+
+/** The answers to a `resolve`, one for each link asked in the order asked, and the image of each icon they name,
+ *  sent once however many links name it: a data URL of an image the page draws as a mask. */
+export interface LinkAnswers {
+  links: LinkAnswer[]
+  icons: Map<string, string>
+}
+
+const isWord = (value: unknown): value is string =>
+  typeof value === 'string' && /^[a-z]+$/.test(value)
+
+/** What the app says of each link of the item, in the order asked; null when the app does not answer or the
+ *  answer is not one the page can draw from, so the page assumes nothing. */
+export async function askLinks(item: string, links: LinkRef[]): Promise<LinkAnswers | null> {
+  const answer: unknown = await window.webkit?.messageHandlers?.notes?.postMessage({
     type: 'resolve',
     item,
     links,
   })
-  return Array.isArray(answer) &&
-    answer.length === links.length &&
-    answer.every((missing) => typeof missing === 'boolean')
-    ? answer
-    : null
+  if (!answer || typeof answer !== 'object') return null
+  const { links: answers, icons } = answer as Partial<Record<keyof LinkAnswers, unknown>>
+  if (!Array.isArray(answers) || answers.length !== links.length) return null
+  if (!icons || typeof icons !== 'object') return null
+  const drawn = new Map<string, string>()
+  for (const [key, url] of Object.entries(icons)) {
+    if (typeof url === 'string' && url.startsWith('data:image/')) drawn.set(key, url)
+  }
+  const read: LinkAnswer[] = []
+  for (const entry of answers as unknown[]) {
+    if (!entry || typeof entry !== 'object') return null
+    const { missing, icon, tone } = entry as Record<string, unknown>
+    if (typeof missing !== 'boolean') return null
+    read.push({
+      missing,
+      // A name that is not a word, or an icon never sent, is left out rather than guessed at.
+      ...(typeof icon === 'string' && drawn.has(icon) ? { icon } : {}),
+      ...(isWord(tone) ? { tone } : {}),
+    })
+  }
+  return { links: read, icons: drawn }
 }
 
 /** What the app says of the picture at a web address, or null when it does not answer. */

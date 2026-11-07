@@ -299,18 +299,32 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
 
     @MainActor private static var drawn = Drawn()
 
-    /// A type's icon as the page's mask: drawn black, since only its shape matters.
+    /// A type's icon as the page's mask: drawn black, since only its shape matters. With `square`, it is centered in a
+    /// square of its longer side, so the page can scale it without distorting it. Shared by the header and the links
+    /// in a note, so a type's icon is drawn one way.
     @MainActor
-    private static func typeIcon(_ name: String?, size: CGFloat) -> Icon? {
-        Cost.measure(.iconDraw) { drawTypeIcon(name, size: size) }
+    static func typeIcon(_ name: String?, size: CGFloat, square: Bool = false) -> Icon? {
+        Cost.measure(.iconDraw) { drawTypeIcon(name, size: size, square: square) }
     }
 
     @MainActor
-    private static func drawTypeIcon(_ name: String?, size: CGFloat) -> Icon? {
-        let renderer = ImageRenderer(content: TypeGlyph(id: name).font(.system(size: size)).foregroundStyle(.black))
+    private static func drawTypeIcon(_ name: String?, size: CGFloat, square: Bool) -> Icon? {
+        func glyph() -> some View { TypeGlyph(id: name).font(.system(size: size)).foregroundStyle(.black) }
         // Three times its size, as the symbols are.
-        renderer.scale = 3
-        guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,
+        func render(_ content: some View) -> NSImage? {
+            let renderer = ImageRenderer(content: content)
+            renderer.scale = 3
+            return renderer.nsImage
+        }
+        let image: NSImage?
+        if square {
+            guard let natural = render(glyph())?.size, natural.width > 0, natural.height > 0 else { return nil }
+            let side = max(natural.width, natural.height).rounded(.up)
+            image = render(glyph().frame(width: side, height: side))
+        } else {
+            image = render(glyph())
+        }
+        guard let image, let tiff = image.tiffRepresentation,
               let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
         else { return nil }
         return Icon(url: "data:image/png;base64," + png.base64EncodedString(),

@@ -8,6 +8,7 @@ import {
   type Keymap,
 } from './editor'
 import { ItemHeader, type HeaderIcons, type HeaderModel } from './header'
+import { LinkStyle } from './link-style'
 import { InkKitError, normalizeLinkAddress } from '@aicayzer/inkkit'
 import '@aicayzer/inkkit/style.css'
 import './style.css'
@@ -62,6 +63,7 @@ declare global {
       setReadingWidth(ems: number): void
       setHeader(model: HeaderModel | null): void
       setHeaderIcons(icons: HeaderIcons): void
+      setLinkStyle(variables: Record<string, string>): void
       setSpellcheck(spellcheck: boolean): void
     }
   }
@@ -213,6 +215,8 @@ surroundObserver.observe(headerRoot)
 surroundObserver.observe(pictureBar)
 surroundObserver.observe(footerRoot)
 
+const linkStyle = new LinkStyle(document.documentElement.style)
+
 function setPageProperty(name: string, value: string): void {
   const style = document.documentElement.style
   if (style.getPropertyValue(name) === value) return
@@ -304,6 +308,10 @@ window.editor = {
   setTextSize: (points) => setPageProperty('font-size', `${points}px`),
   setSpellcheck: (spellcheck) => editor.setSpellcheck(spellcheck),
   setReadingWidth: (ems) => setPageProperty('--reading-width', `${ems}rem`),
+  // Padding and corners move the text, so the find marks are measured again.
+  setLinkStyle: (variables) => {
+    if (linkStyle.set(variables)) editor.invalidateFindGeometry()
+  },
   setHeader: (model) => {
     header.set(model)
     if (model) pictureBar.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)

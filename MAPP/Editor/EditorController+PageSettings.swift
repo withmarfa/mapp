@@ -3,7 +3,7 @@ import WebKit
 
 /// What the page is told when it loads: how it is set out, the accent, its own words and its keys.
 extension EditorController {
-    /// How the page is set out: its width, its text size and whether spelling is checked.
+    /// How the page is set out: its width, its text size, whether spelling is checked and how links look.
     func setStyle(_ style: PageStyle) {
         self.style = style
         if isReady { applyStyle() }
@@ -14,6 +14,7 @@ extension EditorController {
         call("setTextSize", String(style.textSize))
         call("setReadingWidth", String(style.readingWidth))
         call("setSpellcheck", String(style.checksSpelling))
+        call("setLinkStyle", json(style.linkLook.cssVariables()))
     }
 
     // MARK: Matching the system

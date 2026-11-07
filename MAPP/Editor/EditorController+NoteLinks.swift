@@ -99,6 +99,8 @@ extension EditorController {
         isWatchingLinks = true
         withObservationTracking {
             _ = library.items(in: .allNotes)
+            // A type given another icon or tone changes the mark of every link to its notes.
+            _ = library.membershipRevision
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .milliseconds(300))

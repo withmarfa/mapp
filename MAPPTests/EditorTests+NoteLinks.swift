@@ -36,8 +36,72 @@ extension EditorTests {
         let note = try #require(page.editor.noteID)
         // Inkkit read `[[Plan\]] and [[B]]` as one link with an escape; the core finds two in the text it is posted.
         let links = "[{ raw: \(json("[[Plan\\]] and [[B]]")) }, { raw: \(json("[[Plan]]")) }, { raw: \(json("[[Nowhere]]")) }]"
-        let answer = try await ask(page, "{ type: 'resolve', item: \(json(note.rawValue)), links: \(links) }") as? [Bool]
-        #expect(answer == [false, false, true], "one answer for each link posted, the unreadable one not marked missing")
+        let answer = try await resolve(page, note, links)
+        #expect(answer.links.map(\.missing) == [false, false, true], "one answer for each link posted, the unreadable one not marked missing")
+    }
+
+    /// The `resolve` reply: an entry for each link posted, and the icon images those entries name.
+    private struct Resolved {
+        struct Entry { var missing: Bool; var icon: String?; var tone: String? }
+        var links: [Entry]
+        var icons: [String: String]
+    }
+
+    private func resolve(_ page: Page, _ note: ItemID, _ links: String) async throws -> Resolved {
+        let reply = try #require(try await ask(page, "{ type: 'resolve', item: \(json(note.rawValue)), links: \(links) }") as? [String: Any])
+        let entries = try #require(reply["links"] as? [[String: Any]])
+        let icons = try #require(reply["icons"] as? [String: String])
+        return Resolved(
+            links: entries.map { Resolved.Entry(missing: $0["missing"] as? Bool ?? false, icon: $0["icon"] as? String, tone: $0["tone"] as? String) },
+            icons: icons)
+    }
+
+    private func raw(_ texts: String...) -> String { "[" + texts.map { "{ raw: \(json($0)) }" }.joined(separator: ", ") + "]" }
+
+    @Test func aLinkAnswerNamesTheTypeIconAndToneOfTheNoteItBinds() async throws {
+        let page = try await Page()
+        let ids = addNotes(["Plan", "Errands", "Chores"], to: page)
+        for id in ids.dropFirst() { page.library.items[page.library.items.firstIndex { $0.id == id }!].type = TypeID("core.task") }
+        try await page.load("Intro\n")
+        let note = try #require(page.editor.noteID)
+        let icon = TypeIconKey.value(for: "lucide:list-checks")
+        let answer = try await resolve(page, note, raw("[[Plan]]", "[[Errands]]", "[[Chores]]", "[[Nowhere]]"))
+        #expect(answer.links.map(\.missing) == [false, false, false, true])
+        #expect(answer.links[0].icon == TypeIconKey.value(for: nil), "a type with no icon of its own gets the glyph every list gives it")
+        #expect(answer.links[0].tone == TypeTone.neutral.rawValue)
+        #expect(answer.links[1].icon == icon && answer.links[2].icon == icon)
+        #expect(answer.links[1].tone == TypeTone(icon: "lucide:list-checks").rawValue)
+        #expect(answer.links[3].icon == nil && answer.links[3].tone == nil, "a missing link names no type")
+        #expect(answer.icons.count == 2, "each icon's image goes once however many links name it")
+        #expect(answer.icons[icon]?.hasPrefix("data:image/png;base64,") == true)
+    }
+
+    @Test func aLinkToAnAmbiguousUnresolvedOrBinnedNoteNamesNoType() async throws {
+        let page = try await Page()
+        let twins = addNotes(["Twin", "Twin", "Gone"], to: page)
+        let gone = try #require(page.library.items.firstIndex { $0.id == twins[2] })
+        page.library.items[gone].state = .trashed
+        try await page.load("Intro\n")
+        let note = try #require(page.editor.noteID)
+        let answer = try await resolve(page, note, raw("[[Twin]]", "[[Gone]]"))
+        #expect(answer.links[0].missing == false && answer.links[0].tone == nil, "two notes answer to it, so there is no one type")
+        #expect(answer.links[1].missing == true && answer.links[1].icon == nil && answer.links[1].tone == nil)
+        #expect(answer.icons.isEmpty)
+    }
+
+    @Test func anIconThatCannotBeDrawnLeavesTheToneAndAnswersEveryLink() async throws {
+        let requests = NoteRequests()
+        requests.readings = { links, _ in
+            links.map { _ in LinkReading(missing: false, type: .init(icon: "lucide:list-checks", tone: .teal)) }
+        }
+        requests.drawIcon = { _ in nil }
+        let links = [NoteLink(linkText: "[[A]]"), nil, NoteLink(linkText: "[[B]]")]
+        let reply = await requests.answerLinks(links, in: ItemID("n"))
+        #expect(reply.links.map(\.tone) == ["teal", nil, "teal"])
+        #expect(reply.links.allSatisfy { $0.icon == nil } && reply.icons.isEmpty)
+        requests.readings = { _, _ in [] }
+        let short = await requests.answerLinks(links, in: ItemID("n"))
+        #expect(short.links.count == 3 && short.links.allSatisfy { !$0.missing && $0.tone == nil }, "a count that does not line up marks nothing")
     }
 
     @Test func linkToNoteWaitsForTheChoiceAndAnswersWithTheLink() async throws {

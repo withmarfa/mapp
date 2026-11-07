@@ -187,10 +187,10 @@ final class EditorController: NSObject {
             return await current.noteNames(matching: query, in: source, using: self.noteTitles)
         }
         noteRequests.pick = { [weak self] note in await self?.chooseNoteToLink(from: note) }
-        noteRequests.missing = { [weak self] links, source in
-            let answers = await self?.library?.linkAnswers(of: links.map(\.raw), in: source)
-            guard let answers, answers.count == links.count else { return links.map { _ in false } }
-            return answers.map(\.isMissing)
+        noteRequests.readings = { [weak self] links, source in
+            let readings = await self?.library?.linkReadings(of: links.map(\.raw), in: source)
+            guard let readings, readings.count == links.count else { return links.map { _ in .plain } }
+            return readings
         }
         configuration.userContentController.addScriptMessageHandler(noteRequests, contentWorld: .page, name: "notes")
         pictureRequests.inFeed = { [weak self] item in self?.library?.item(item)?.tier == .feed }

@@ -11,7 +11,7 @@ import {
   type ReadableTextSnapshot,
 } from '@aicayzer/inkkit'
 import {
-  askMissing,
+  askLinks,
   pickNote,
   postToHost,
   suggestNotes,
@@ -235,7 +235,7 @@ export class NoteEditor {
   ): Promise<NoteEditor> {
     const host = new NoteEditor(events)
     const described = new Map<string, EmbeddedFile>()
-    host.links = new NoteLinkStatus(askMissing, (targets) => host.drawLinksAgain(targets))
+    host.links = new NoteLinkStatus(askLinks, (targets) => host.drawLinksAgain(targets))
     host.pictures = new WebPictures(
       words,
       (addresses) => host.drawLinksAgain(addresses),

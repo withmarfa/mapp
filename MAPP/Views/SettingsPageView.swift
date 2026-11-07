@@ -117,6 +117,13 @@ private struct EditorSettings: View {
             }
             Section("Text") { TextOptions() }
             Section {
+                LinkLookOption()
+            } header: {
+                Text("Links")
+            } footer: {
+                Text("How a link to another item looks in a note. A link to an item that doesn’t exist keeps its dashed line in every look.")
+            }
+            Section {
                 RemotePictureOptions()
             } header: {
                 Text("Pictures")

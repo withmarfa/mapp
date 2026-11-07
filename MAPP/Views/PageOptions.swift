@@ -7,7 +7,8 @@ enum PageKey {
     static let checksSpelling = "checksSpelling"
     static let readingWidth = "readingWidth"
     static let titleLines = "titleLines"
-    static let all = [fullWidth, textSize, checksSpelling, readingWidth, titleLines]
+    static let linkLook = LinkLook.key
+    static let all = [fullWidth, textSize, checksSpelling, readingWidth, titleLines, linkLook]
 }
 
 /// How many lines an item page's title shows before an ellipsis cuts it, while the title is not being edited.
@@ -36,6 +37,8 @@ nonisolated struct PageStyle: Equatable {
     /// How wide the text runs when not full width, in ems of the note's text, so it holds about as many words
     /// whatever the text size.
     var readingWidth = 54
+    /// How a link to another item reads in the text.
+    var linkLook = LinkLook.standard
 
     /// Matches the editor's three-rem minimum margins and chosen reading width.
     func horizontalInset(for width: CGFloat) -> CGFloat {
@@ -53,11 +56,14 @@ struct StoredPageStyle: DynamicProperty {
     @AppStorage(PageKey.textSize) private var textSize = PageStyle().textSize
     @AppStorage(PageKey.checksSpelling) private var checksSpelling = PageStyle().checksSpelling
     @AppStorage(PageKey.readingWidth) private var readingWidth = PageStyle().readingWidth
+    @AppStorage(PageKey.linkLook) private var linkLook = PageStyle().linkLook
 
     init() {}
 
     var wrappedValue: PageStyle {
-        PageStyle(fullWidth: fullWidth, textSize: textSize, checksSpelling: checksSpelling, readingWidth: readingWidth)
+        PageStyle(
+            fullWidth: fullWidth, textSize: textSize, checksSpelling: checksSpelling, readingWidth: readingWidth,
+            linkLook: linkLook)
     }
 }
 
@@ -130,5 +136,26 @@ struct TitleLinesOption: View {
             }
         }
         .accessibilityIdentifier("TitleLines")
+    }
+}
+
+/// How a link to another item reads in a note's text, set in Settings.
+struct LinkLookOption: View {
+    @AppStorage(PageKey.linkLook) private var look = LinkLook.standard
+
+    var body: some View {
+        Picker("Look", selection: $look) {
+            ForEach(LinkLook.allCases) { option in
+                switch option {
+                case .mark: Text("Mark")
+                case .underline: Text("Underline")
+                case .tintedPill: Text("Tinted Pill")
+                case .pill: Text("Pill")
+                case .quiet: Text("Quiet")
+                case .text: Text("Text")
+                }
+            }
+        }
+        .accessibilityIdentifier("LinkLook")
     }
 }

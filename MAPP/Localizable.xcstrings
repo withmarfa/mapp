@@ -113,6 +113,9 @@
     "is not" : {
 
     },
+    "How a link to another item looks in a note. A link to an item that doesn’t exist keeps its dashed line in every look." : {
+      "extractionState" : "manual"
+    },
     "It will be sent once you sign in again. Do that in Settings." : {
       "extractionState" : "manual"
     },
@@ -123,6 +126,9 @@
       "extractionState" : "manual"
     },
     "%lld of %lld" : {
+      "extractionState" : "manual"
+    },
+    "Links" : {
       "extractionState" : "manual"
     },
     "Long" : {
@@ -182,6 +188,12 @@
     "More than %lld filter conditions" : {
 
     },
+    "Look" : {
+      "extractionState" : "manual"
+    },
+    "Mark" : {
+      "extractionState" : "manual"
+    },
     "Nothing changed." : {
       "extractionState" : "manual"
     },
@@ -203,10 +215,16 @@
     "Open Page" : {
       "extractionState" : "manual"
     },
+    "Pill" : {
+      "extractionState" : "manual"
+    },
     "Pin" : {
       "extractionState" : "manual"
     },
     "Pinned" : {
+      "extractionState" : "manual"
+    },
+    "Quiet" : {
       "extractionState" : "manual"
     },
     "Relative" : {
@@ -286,6 +304,12 @@
     },
     "This view changed elsewhere, so it now shows the view as it is. Your name is still here; make your other changes again." : {
 
+    },
+    "Tinted Pill" : {
+      "extractionState" : "manual"
+    },
+    "Underline" : {
+      "extractionState" : "manual"
     },
     "Unpin" : {
       "extractionState" : "manual"
