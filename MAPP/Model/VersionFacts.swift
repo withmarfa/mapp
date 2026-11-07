@@ -6,6 +6,8 @@ nonisolated struct VersionFactRow: Identifiable, Hashable, Sendable {
     let id: String
     let label: String
     let value: String
+    /// The symbol of a pin's key, as the item's page draws it. The sidebar's rows have none.
+    var symbol: String?
 }
 
 /// What the right sidebar says of the version chosen: who wrote it and when, what it changed from the version before,
@@ -131,19 +133,20 @@ nonisolated extension VersionContent {
         for pin in placement.pins {
             switch pin {
             case PagePlacement.type:
-                rows.append(VersionFactRow(id: pin, label: String(localized: "Type"), value: info?.label ?? type.rawValue))
+                rows.append(VersionFactRow(id: pin, label: String(localized: "Type"), value: info?.label ?? type.rawValue, symbol: "square.grid.2x2"))
             case PagePlacement.updated:
                 if let saved {
                     rows.append(VersionFactRow(
                         id: pin, label: String(localized: "Updated"),
-                        value: ItemDate.text(of: saved, hasTime: false, format: format, now: now, locale: locale, calendar: calendar)))
+                        value: ItemDate.text(of: saved, hasTime: false, format: format, now: now, locale: locale, calendar: calendar),
+                        symbol: "calendar"))
                 }
             case PagePlacement.source, PagePlacement.tags, PagePlacement.linkedFrom, PagePlacement.parent:
                 continue
             default:
                 guard let field = info?.fields.first(where: { $0.key == pin }), let value = fields[pin], value != .null else { continue }
                 let text = VersionFacts.text(of: value, field: field, format: format, now: now, calendar: calendar, locale: locale)
-                if !text.isEmpty { rows.append(VersionFactRow(id: pin, label: field.label, value: text)) }
+                if !text.isEmpty { rows.append(VersionFactRow(id: pin, label: field.label, value: text, symbol: PageLayout.symbol(of: field))) }
             }
         }
         return rows
