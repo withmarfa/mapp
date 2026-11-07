@@ -36,7 +36,7 @@ private func page(_ versions: [Int], next: String? = nil) -> Result<ItemHistoryP
     .success(ItemHistoryPage(snapshots: versions.map { snapshot($0) }, next: next))
 }
 
-/// What the Version History sheet lists, and when a version can be put back.
+/// What Version History lists, and when a version can be put back.
 @MainActor
 @Suite(.hangLimit) struct VersionHistoryTests {
     private static let id = ItemID("launch")
@@ -48,33 +48,50 @@ private func page(_ versions: [Int], next: String? = nil) -> Result<ItemHistoryP
         return model
     }
 
+    /// Waits until the model has read what it will read without being asked again.
+    private func settled(_ model: ItemHistoryModel) async {
+        _ = await eventually { model.phase != .loading && !model.isLoadingMore }
+    }
+
     @Test func versionsWithGapsAreListedOldestFirstAndNeverRepeated() async {
         let source = FakeHistory([page([7, 3], next: "a"), page([], next: "b"), page([7, 12], next: nil)])
         let model = await loaded(source)
-        // An empty page with a cursor is followed without the person asking again.
-        model.loadMore()
-        _ = await eventually { !model.hasMore && !model.isLoadingMore }
+        // Pages, empty ones included, are followed without the person asking again.
+        await settled(model)
         #expect(model.snapshots.map(\.version) == [3, 7, 12])
         #expect(source.cursors.withLock { $0 } == [nil, "a", "b"])
+        #expect(model.isComplete)
     }
 
-    @Test func aLongHistoryIsReadOnePageAtATime() async {
-        let source = FakeHistory([page([1, 2], next: "more")])
-        let model = await loaded(source)
-        #expect(model.hasMore)
-        #expect(source.cursors.withLock { $0.count } == 1)
-
-        source.set([page([3], next: nil)])
-        model.loadMore()
-        #expect(await eventually { !model.hasMore })
+    @Test func theThreadGrowsAsEachPageArrives() async {
+        let source = FakeHistory([page([1, 2], next: "more"), page([3], next: nil)])
+        let model = ItemHistoryModel(id: Self.id, source: source)
+        model.load()
+        #expect(await eventually { model.phase == .loaded })
+        await settled(model)
         #expect(model.snapshots.map(\.version) == [1, 2, 3])
+        #expect(!model.hasMore)
+    }
+
+    @Test func aVeryLongHistoryStopsAfterTenPagesAndLoadMoreReadsOn() async {
+        let pages = (0..<12).map { page([$0 * 2 + 1, $0 * 2 + 2], next: "p\($0)") }
+        let source = FakeHistory(pages)
+        let model = await loaded(source)
+        await settled(model)
+        #expect(source.cursors.withLock { $0.count } == ItemHistoryModel.autoPages)
+        #expect(model.hasMore && !model.isComplete)
+        #expect(model.snapshots.count == ItemHistoryModel.autoPages * 2)
+
+        source.set([page([99], next: nil)])
+        model.loadMore()
+        #expect(await eventually { model.isComplete })
+        #expect(model.snapshots.last?.version == 99)
     }
 
     @Test func aCursorThatLeadsBackToItselfEndsTheList() async {
         let source = FakeHistory([page([1], next: "a"), page([], next: "a")])
         let model = await loaded(source)
-        model.loadMore()
-        _ = await eventually { !model.isLoadingMore && !model.hasMore }
+        await settled(model)
         #expect(!model.hasMore)
         #expect(model.snapshots.count == 1)
     }
@@ -95,14 +112,19 @@ private func page(_ versions: [Int], next: String? = nil) -> Result<ItemHistoryP
         #expect(model.snapshots.map(\.version) == [4])
     }
 
-    @Test func aFailedLoadMoreKeepsTheVersionsAlreadyListed() async {
-        let source = FakeHistory([page([1], next: "more")])
+    @Test func aFailureAfterTheFirstPageKeepsTheVersionsAlreadyListed() async {
+        let source = FakeHistory([page([1], next: "more"), .failure(.unreachable)])
         let model = await loaded(source)
-        source.set([.failure(.unreachable)])
-        model.loadMore()
         #expect(await eventually { model.moreFailure == .unreachable })
         #expect(model.snapshots.count == 1)
         #expect(model.phase == .loaded)
+        #expect(!model.isLoadingMore)
+
+        source.set([page([2], next: nil)])
+        model.loadMore()
+        #expect(await eventually { model.isComplete })
+        #expect(model.snapshots.map(\.version) == [1, 2])
+        #expect(model.moreFailure == nil)
     }
 
     @Test func aLibraryWithNoHistoryHasNothingToLoad() async {
@@ -131,7 +153,7 @@ private func page(_ versions: [Int], next: String? = nil) -> Result<ItemHistoryP
         // A version of a kind with no text or title MAPP edits can be read, not restored.
         let unknown = snapshot(1, body: nil, type: TypeID("elsewhere.kind"))
         if case .unavailable = library.restoreCheck(of: unknown, for: note.id) {} else { Issue.record("restorable without text") }
-        // An item deleted elsewhere while the sheet was open.
+        // An item deleted elsewhere while Version History was open.
         if case .unavailable = library.restoreCheck(of: snapshot(1), for: ItemID("missing")) {} else { Issue.record("restorable when gone") }
     }
 

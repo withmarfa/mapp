@@ -262,8 +262,8 @@ nonisolated enum ReadableText {
                       bold || find(["*", "*"], from: index + 2) != nil {
                 bold.toggle()
                 index += 2
-            } else if character == "*" || character == "_", italic || find([character], from: index + 1) != nil,
-                      isEmphasisBoundary(characters, at: index, character: character, closing: italic) {
+            } else if character == "*" || character == "_",
+                      italic ? closesEmphasis(characters, at: index) : opensEmphasis(characters, at: index) {
                 italic.toggle()
                 index += 1
             } else if character == "[", let close = find(["]", "("], from: index + 1), let end = find([")"], from: close + 2) {
@@ -278,12 +278,24 @@ nonisolated enum ReadableText {
         return spans
     }
 
-    /// A `_` inside a word is a letter of it, as in `snake_case`.
-    private static func isEmphasisBoundary(_ characters: [(Character, DiffChange)], at index: Int, character: Character, closing: Bool) -> Bool {
-        guard character == "_" else { return true }
-        let before = index > 0 ? characters[index - 1].0 : " "
-        let after = index + 1 < characters.count ? characters[index + 1].0 : " "
-        return closing ? !after.isLetter && !after.isNumber : !before.isLetter && !before.isNumber
+    /// A mark opens emphasis when text follows it, a later mark of its kind closes it, and (for `_`) it does not sit
+    /// inside a word, as in `snake_case`. A lone `*` between spaces, as in `2 * 3`, is a star.
+    private static func opensEmphasis(_ characters: [(Character, DiffChange)], at index: Int) -> Bool {
+        let mark = characters[index].0
+        guard index + 1 < characters.count, characters[index + 1].0 != mark, !characters[index + 1].0.isWhitespace else { return false }
+        if mark == "_", index > 0, characters[index - 1].0.isLetter || characters[index - 1].0.isNumber { return false }
+        return ((index + 2)..<max(characters.count, index + 2)).contains { closesEmphasis(characters, at: $0) && characters[$0].0 == mark }
+    }
+
+    private static func closesEmphasis(_ characters: [(Character, DiffChange)], at index: Int) -> Bool {
+        let mark = characters[index].0
+        guard mark == "*" || mark == "_", index > 0, !characters[index - 1].0.isWhitespace, characters[index - 1].0 != mark else { return false }
+        if index + 1 < characters.count {
+            let after = characters[index + 1].0
+            if after == mark { return false }
+            if mark == "_", after.isLetter || after.isNumber { return false }
+        }
+        return true
     }
 
     private static func merge(_ spans: [ReadSpan]) -> [ReadSpan] {

@@ -29,7 +29,7 @@ nonisolated struct ItemHistoryPage: Hashable, Sendable {
     var next: String?
 }
 
-/// Why an item's history could not be read, in terms the sheet can word for a person.
+/// Why an item's history could not be read, in terms Version History can word for a person.
 nonisolated enum ItemHistoryFailure: Error, Hashable, Sendable {
     /// The server could not be reached. The package reports a refused plain-http address the same way as a network
     /// that is down, so the wording does not say which.
@@ -116,8 +116,8 @@ nonisolated extension PropertyValue {
     }
 }
 
-/// How much of a version's text the sheet lays out. A long note is cut here, for the person to read the start of it
-/// and to see that it was cut, rather than the sheet laying out a text of any length.
+/// How much of a version's text Version History lays out. A long note is cut here, for the person to read the start of it
+/// and to see that it was cut, rather than laying out a text of any length.
 nonisolated struct TextExcerpt: Hashable, Sendable {
     static let limit = 20_000
 
