@@ -97,8 +97,8 @@ struct MarfaEdgeCheckTests {
         #expect(await scene.library.relationshipVerdict(for: scene.id("child"), field: "child-of", to: scene.id("b")) == .taken)
         // A second parent beside the first is the core's to refuse, in words naming the item that holds one already.
         #expect(await scene.library.changeItemRelationship(scene.id("child"), field: "child-of", adding: [scene.id("b")], removing: [], undoManager: nil) == false)
-        #expect(scene.library.notices.waiting.last?.title == String(localized: "Can’t Change This Relationship"))
-        #expect(scene.library.notices.waiting.last?.message == fullMessage("child"))
+        // The fake copy's background reads can add a notice of their own after this one.
+        #expect(scene.library.notices.waiting.contains { $0.title == String(localized: "Can’t Change This Relationship") && $0.message == fullMessage("child") })
         #expect(try await scene.fake.copy.queue.all().count == queued, "a refused change queued a write")
         #expect(Self.holds("child", "child-of", in: scene) == [scene.id("a")])
         // Replacing it is one move.
