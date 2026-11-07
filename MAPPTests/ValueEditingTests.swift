@@ -12,8 +12,11 @@ struct ValueEditingTests {
     ]
     private static let status = ItemTypeInfo.Field(key: "status", label: "Status", kind: .status(words), declaredBy: task)
     private static let priority = ItemTypeInfo.Field(key: "priority", label: "Priority", kind: .choice(["low", "high"]), declaredBy: task)
+    private static let note = ItemTypeInfo.Field(key: "note", label: "Note", kind: .text, declaredBy: task)
+    private static let points = ItemTypeInfo.Field(key: "points", label: "Points", kind: .number, declaredBy: task)
+    private static let labels = ItemTypeInfo.Field(key: "labels", label: "Labels", kind: .words, declaredBy: task)
     private static let catalogue = Catalogue(itemTypes: [
-        ItemTypeInfo(id: task, label: "Task", fields: [status, priority], titleField: "title", bodyField: "body", parent: nil)
+        ItemTypeInfo(id: task, label: "Task", fields: [status, priority, note, points, labels], titleField: "title", bodyField: "body", parent: nil)
     ])
 
     private static func item(_ properties: [String: PropertyValue] = [:], id: String = "10000000-0000-0000-0000-000000000001") -> Item {
@@ -112,6 +115,125 @@ struct ValueEditingTests {
         model.activate(ValueEditOptions.optionID("doing"))
         #expect(closed)
         #expect(model.notice == nil)
+    }
+
+    // MARK: Kinds
+
+    @Test func everyKindOfValueThePanelEditsIsFoundByTheFieldsKindAndNotItsName() {
+        #expect(ValueEditKind(field: Self.note) == .text(Self.note))
+        #expect(ValueEditKind(field: Self.points)?.isNumber == true)
+        #expect(ValueEditKind(field: Self.labels) == .words(Self.labels))
+        #expect(ValueEditKind(field: ItemTypeInfo.Field(key: "done", label: "Done", kind: .boolean, declaredBy: Self.task)) == nil)
+        #expect([ValueEditKind.tags, .parent, .text(Self.note)].map(\.rowID) == [PagePlacement.tags, PagePlacement.parent, "note"])
+    }
+
+    // MARK: Typed values
+
+    @Test func aRefusedTextKeepsWhatWasTypedAndTheCancelledPanelHandsNothingOver() {
+        let item = Self.item(["note": .string("old")])
+        let library = Self.library([item])
+        let model = ValueEditModel(Self.request(.text(Self.note), item: item, in: library))
+        var closed = false
+        model.close = { closed = true }
+        model.typed = "new"
+        model.submitTyped()
+        #expect(!closed && model.typed == "new" && model.notice != nil)
+        model.finish(cancelled: true)
+        #expect(library.notices.waiting.isEmpty)
+    }
+
+    @Test func aPanelEndedByAClickElsewhereGivesBackTheTextItCouldNotWrite() {
+        let item = Self.item(["note": .string("old")])
+        let library = Self.library([item])
+        let model = ValueEditModel(Self.request(.text(Self.note), item: item, in: library))
+        model.typed = "my careful words"
+        model.finish(cancelled: false)
+        #expect(library.notices.waiting.first?.text == "Note: my careful words")
+    }
+
+    @Test func aTextTheItemHoldsAlreadyIsNotWrittenAndClosesThePanel() {
+        let item = Self.item(["note": .string("same")])
+        var writes = 0
+        let model = ValueEditModel(Self.request(.text(Self.note), item: item, in: Self.library([item]), write: { _ in writes += 1; return true }))
+        var closed = false
+        model.close = { closed = true }
+        model.typed = "same"
+        model.submitTyped()
+        #expect(closed && writes == 0)
+    }
+
+    @Test func aNumberThatIsNotOneIsNotWrittenAndSaysSo() {
+        let item = Self.item()
+        var writes = 0
+        let model = ValueEditModel(Self.request(.number(Self.points), item: item, in: Self.library([item]), write: { _ in writes += 1; return true }))
+        model.typed = "twelve"
+        model.submitTyped()
+        #expect(writes == 0 && model.notice != nil && model.typed == "twelve")
+    }
+
+    @Test func aValueChangedUnderWhatWasTypedWaitsForThePersonToChoose() {
+        let item = Self.item(["note": .string("old")])
+        let library = Self.library([item])
+        var written: [PropertyValue?] = []
+        let model = ValueEditModel(Self.request(.text(Self.note), item: item, in: library, write: { written.append($0); return true }))
+        model.typed = "mine"
+        library.items[0].properties = [Property(key: "note", value: .string("theirs"))]
+        model.submitTyped()
+        #expect(model.hasConflict && written.isEmpty)
+        model.keepEdit()
+        #expect(written == [.string("mine")])
+    }
+
+    // MARK: Words and the parent
+
+    @Test func aWordIsAddedToTheListAndANewOneIsOfferedWhileTyping() {
+        let item = Self.item(["labels": .array([.string("red")])])
+        var written: [PropertyValue?] = []
+        let model = ValueEditModel(Self.request(.words(Self.labels), item: item, in: Self.library([item]), write: { written.append($0); return true }))
+        #expect(model.heldTokens == ["red"])
+        model.query = "blue"
+        #expect(model.rows.contains { $0.role == .create })
+        model.activate("create")
+        #expect(written == [.array([.string("red"), .string("blue")])])
+        #expect(model.query.isEmpty)
+    }
+
+    @Test func aParentTheLibraryRefusesStaysOpenWithTheReason() async {
+        let (child, other) = (Self.item(), Self.item(id: "10000000-0000-0000-0000-000000000002"))
+        let library = Self.library([child, other])
+        library.refusals[child.id] = [other.id: "That would make a loop."]
+        library.acceptsRelationships = true
+        let model = ValueEditModel(Self.request(.parent, item: child, in: library))
+        var closed = false
+        model.close = { closed = true }
+        model.activate("parent:" + other.id.rawValue)
+        while model.isSaving { await Task.yield() }
+        #expect(!closed && model.notice == "That would make a loop." && library.relationshipWrites.isEmpty)
+    }
+
+    @Test func aParentTheLibraryTakesClosesThePanel() async {
+        let (child, other) = (Self.item(), Self.item(id: "10000000-0000-0000-0000-000000000002"))
+        let library = Self.library([child, other])
+        library.acceptsRelationships = true
+        let model = ValueEditModel(Self.request(.parent, item: child, in: library))
+        var closed = false
+        model.close = { closed = true }
+        model.activate("parent:" + other.id.rawValue)
+        while model.isSaving { await Task.yield() }
+        #expect(closed && library.relationshipWrites.map(\.adding) == [[other.id]])
+    }
+
+    // MARK: Keyboard
+
+    @Test func arrowsMoveThroughTheQuickDatesAndReturnChoosesTheOneTheyReached() {
+        let item = Self.item()
+        let field = ItemTypeInfo.Field(key: "due", label: "Due", kind: .date(includesTime: false), declaredBy: Self.task)
+        var written: [PropertyValue?] = []
+        let model = ValueEditModel(Self.request(.date(field), item: item, in: Self.library([item]), write: { written.append($0); return true }))
+        model.move(by: 1)
+        model.move(by: 1)
+        model.activateHighlighted()
+        #expect(written.count == 1)
     }
 
     // MARK: One at a time

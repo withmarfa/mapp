@@ -85,13 +85,15 @@ final class ItemJourneyTests: XCTestCase {
         title.typeKey(.return, modifierFlags: [])
         let row = app.outlines["NoteList"].staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Body Focus Saved Task")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
-        // A new task has no status, and a page shows no pin for one that is empty: it is set from the inspector.
+        // A new task has no status, so its pin is an empty chip; the inspector sets the status in the same panel.
         app.descendants(matching: .any)["DetailsToggle"].click()
         let inspectorStatus = app.descendants(matching: .any)["ItemProperty.status"]
         XCTAssertTrue(inspectorStatus.waitForExistence(timeout: 3))
         inspectorStatus.click()
-        app.menuItems["Completed"].click()
-        // The status is then pinned under the title, where it opens the same menu.
+        let completed = app.descendants(matching: .any)["ValueEditRow.option:completed"]
+        XCTAssertTrue(completed.waitForExistence(timeout: 3))
+        completed.click()
+        // The status is then pinned under the title, where it opens the same panel.
         let status = app.itemStatusPin
         XCTAssertTrue(status.waitForExistence(timeout: 3))
         XCTAssertTrue(status.label.contains("Completed") || status.value as? String == "Completed")

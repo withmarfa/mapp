@@ -34,6 +34,9 @@
     "Add or Find a Tag" : {
 
     },
+    "Add or Find a Word" : {
+
+    },
     "Add Person to %@" : {
 
     },
@@ -99,6 +102,9 @@
 
     },
     "Filters" : {
+
+    },
+    "Find an Item" : {
 
     },
     "Find or Add a Person" : {
@@ -242,7 +248,13 @@
     "Open Page" : {
       "extractionState" : "manual"
     },
+    "Open “%@”" : {
+
+    },
     "Opens a list of choices" : {
+
+    },
+    "Parent Not Saved" : {
 
     },
     "Pill" : {
@@ -264,6 +276,9 @@
       "extractionState" : "manual"
     },
     "Remove Filter" : {
+
+    },
+    "Remove Parent" : {
 
     },
     "Remove Sort" : {
@@ -317,6 +332,9 @@
     "The name always shows." : {
 
     },
+    "The parent could not be saved." : {
+
+    },
     "The view is saved for every app connected to your Marfa server." : {
 
     },
@@ -330,6 +348,9 @@
 
     },
     "The window can’t show these conditions of the view’s filter, so they stay as they are:" : {
+
+    },
+    "This item is no longer available." : {
 
     },
     "This Mac" : {
@@ -349,6 +370,9 @@
     },
     "Tinted Pill" : {
       "extractionState" : "manual"
+    },
+    "Type to narrow the list" : {
+
     },
     "Underline" : {
       "extractionState" : "manual"
@@ -1755,9 +1779,6 @@
     "Caution" : {
 
     },
-    "Change %@…" : {
-
-    },
     "Changes Haven’t Been Sent" : {
       "extractionState" : "manual"
     },
@@ -2419,9 +2440,6 @@
 
     },
     "Open" : {
-
-    },
-    "Open %@" : {
 
     },
     "Open a library to choose what its sidebar shows." : {

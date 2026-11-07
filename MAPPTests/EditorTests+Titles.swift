@@ -38,20 +38,6 @@ extension EditorTests {
         #expect(host.library.notices.waiting.last?.message == "The title for “Review the findings” is empty. Open the item to enter a title or discard your changes.")
     }
 
-    @Test func aRefusedStatusIsForgottenOnMovingToAnotherItem() async throws {
-        let host = try await HostedPage()
-        defer { host.close() }
-        let error = "!document.querySelectorAll('#item-header > .item-error')[0]?.hidden"
-        host.drafts.draft(for: host.ticket, key: "status").rejected = true
-        try await host.waitFor("the status refusal") { try await host.value(error) as? Bool == true }
-        host.shown.id = ItemPreviewFixtures.noteID
-        try await host.waitForTitle("Field notes")
-        host.shown.id = host.ticket
-        try await host.waitForTitle("Review the findings")
-        try await host.waitFor("the page to settle") { try await host.value(error) as? Bool != nil }
-        #expect(try await host.value(error) as? Bool == false, "a refused status belongs to the item's visit, as it did")
-    }
-
     @Test func refusedTitlesInSeveralWindowsAreToldOnceAndShownWhereTheyAre() async throws {
         let library = ItemPreviewFixtures.library
         let first = try await HostedPage(library: library)

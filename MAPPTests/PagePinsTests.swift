@@ -50,7 +50,7 @@ struct PagePinsTests {
 
     private static func resolve(
         _ item: MAPP.Item, placements: PagePlacements = PagePlacements(), tags: [String] = [], relationships: [ItemRelationship] = [],
-        kind: PageHeaderKind? = nil
+        kind: PageHeaderKind? = nil, offersEmpty: Bool = false
     ) -> Drawn {
         let type = catalogue.itemTypes[item.type]
         let placement = placements.placement(of: item.type, in: catalogue)
@@ -59,10 +59,10 @@ struct PagePinsTests {
         let candidates = PropertyRow.candidates(
             of: item, type: type, hidden: Set(["title", "body"]).union(lead.consumed), relationships: relationships, parentField: "child-of",
             format: .automatic, tags: tags, typeLabel: type?.label, typeIcon: type?.icon, sourceName: item.source, now: now,
-            calendar: .current, locale: Locale(identifier: "en_GB"), icon: { _ in nil }, isPerson: { _ in false })
+            calendar: .current, locale: Locale(identifier: "en_GB"), offersEmpty: offersEmpty, icon: { _ in nil }, isPerson: { _ in false })
         let pins = PagePins.resolve(
             for: item, type: type, placement: placement, lead: lead, relationships: relationships, candidates: candidates,
-            icon: { _ in nil }, isPerson: { _ in false })
+            offersEmpty: offersEmpty, icon: { _ in nil }, isPerson: { _ in false })
         return Drawn(pins: pins, block: PropertyRow.block(candidates, placement: placement, excluding: pins.leftOutOfBlock))
     }
 
@@ -120,6 +120,26 @@ struct PagePinsTests {
         let placements = try #require(PagePlacements(rawValue: ##"{"aic.ticket":{"rows":{},"pins":["#type","#source","#updated","priority","state"]}}"##))
         let drawn = Self.resolve(Self.item(["state": .string("pending"), "priority": .string("low")], source: "folder"), placements: placements)
         #expect(drawn.pins.pins.map(\.id) == ["#type", "#source", "#updated", "priority"])
+    }
+
+    // MARK: Empty values
+
+    @Test func whereEmptiesAreOfferedAValueTheItemLacksIsAnEditableEmptyChip() {
+        let drawn = Self.resolve(Self.item(), relationships: [Self.parent(nil)], offersEmpty: true)
+        let empty = Dictionary(uniqueKeysWithValues: (drawn.pins.pins + drawn.block).filter(\.isEmpty).map { ($0.id, $0) })
+        #expect(Set(empty.keys) == ["state", "child-of", "priority", "mobiles", "#tags"])
+        #expect(empty.values.allSatisfy { $0.editable })
+        #expect(empty["state"]?.value == .empty(symbol: PropertyRow.Value.status.symbol))
+        #expect(drawn.pins.pins.map(\.id) == ["#type", "state", "child-of", "#updated"])
+    }
+
+    @Test func emptiesAreNotOfferedByDefaultNorOnAnItemThatCannotBeEdited() {
+        let plain = Self.resolve(Self.item(), relationships: [Self.parent(nil)])
+        #expect((plain.pins.pins + plain.block).allSatisfy { !$0.isEmpty })
+        var trashed = Self.item()
+        trashed.state = .trashed
+        let readOnly = Self.resolve(trashed, relationships: [Self.parent(nil)], offersEmpty: true)
+        #expect((readOnly.pins.pins + readOnly.block).allSatisfy { !$0.isEmpty })
     }
 
     // MARK: Values
