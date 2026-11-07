@@ -36,6 +36,11 @@ struct PageLayoutTests {
         #expect(placements.choices["aic.ticket"]?.rowOrder?.prefix(3) == ["c", "b", "a"])
     }
 
+    @Test func aRowThePageDidNotDrawKeepsItsPlace() throws {
+        let moved = try #require(Self.layout().listing(["c", "a"], moving: "c"))
+        #expect(Self.ids(moved.page) == ["c", "b", "a"])
+    }
+
     @Test func aListedOrderIgnoresWhatIsNotAPageRowAndKeepsWhatItDoesNotName() throws {
         let layout = Self.layout()
         let moved = try #require(layout.listing(["#type", "b", "gone", "b", "a"], moving: "a"))

@@ -705,7 +705,7 @@ final class Browser {
             } else {
                 library.delete(moving, undoManager: undoManager)
             }
-        } else if !binned.isEmpty {
+        } else if !binned.isEmpty, ids.subtracting(binned).isEmpty {
             if library.reachesServer { library.notesToPurge = binned } else { library.tellCannotPurge() }
         }
     }

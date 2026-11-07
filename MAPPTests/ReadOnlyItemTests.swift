@@ -10,7 +10,7 @@ import Testing
 
     static let holiday = MarfaCollectionsTests.holiday
 
-    /// The collections fixture with Feed note, Beta and Old note held read only, Old note in the bin.
+    /// The collections fixture with Feed note, Beta and Old note held read only; Old album is in the bin.
     private static var items: [Item] {
         MarfaCollectionsTests.items.map { item in
             var item = item
@@ -126,6 +126,13 @@ import Testing
         #expect(source.writes.isEmpty)
         #expect(library.notices.waiting.last?.title == String(localized: "Can’t Delete"))
         #expect(library.notices.waiting.last?.message == skips(.readOnly, .readOnly))
+    }
+
+    @Test func aReadOnlyItemBesideItemsInTheBinErasesNothing() async throws {
+        let (library, source) = try await loaded()
+        Browser.delete([F.n2, MarfaCollectionsTests.oldAlbum], in: library, undoManager: nil)
+        #expect(library.notesToPurge.isEmpty, "a selection with a live item in it never erases anything")
+        #expect(source.writes.isEmpty)
     }
 
     @Test func aMixedDeleteAsksAboutOnlyTheItemsItWillMove() async throws {

@@ -6,8 +6,8 @@ import Foundation
 /// type, so every item of the type follows it.
 ///
 /// Every row the type offers is listed, with a value or without, so a row can be placed before an item has one. A row
-/// is moved by `moving(_:to:at:)` or `moved(_:by:)`, which return the new layout, or nil where the move is refused:
-/// a fifth pin, or Linked From, which is never pinned.
+/// is moved by `moving(_:to:at:)`, `moved(_:by:)` or, for a drag on the page, `listing(_:moving:)`, which return the
+/// new layout, or nil where the move is refused: a fifth pin, or Linked From, which is never pinned.
 nonisolated struct PageLayout: Equatable, Sendable {
     enum Group: Sendable { case pinned, page, hidden }
 
@@ -91,8 +91,10 @@ nonisolated struct PageLayout: Equatable, Sendable {
             guard let row = byID[name], seen.insert(name).inserted else { return nil }
             return row
         }
+        // The named rows take the places named rows held, so a row the page did not draw stays where it was.
         var listed = self
-        listed.page = named + page.filter { !seen.contains($0.id) }
+        let slots = page.indices.filter { seen.contains(page[$0].id) }
+        for (slot, row) in zip(slots, named) { listed.page[slot] = row }
         return listed
     }
 
