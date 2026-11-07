@@ -147,8 +147,7 @@ struct WebPageItemPage: View {
                     // page's own.
                     .background { Color(nsColor: .windowBackgroundColor).padding(.top, -Self.overscroll) }
                 }
-                ToolbarBand(
-                    toolbarHeight: geometry.safeAreaInsets.top, isShown: backsToolbar && showsToolbarBackground && HeaderScroll.isUnderToolbar(scrolled: headerScroll.offset))
+                ScrollingToolbarBand(scroll: headerScroll, toolbarHeight: geometry.safeAreaInsets.top, isEnabled: backsToolbar && showsToolbarBackground)
             }
         }
         .accessibilityIdentifier("WebPageItemPage")
@@ -161,10 +160,16 @@ struct WebPageItemPage: View {
         .onChange(of: item.id) { previous, _ in
             drafts.offerPageLook(nil, for: previous)
             drafts.headerScrolled(away: false, for: previous)
-            headerScroll.offset = 0
+            headerScroll.reset()
             offerLook()
         }
         .onChange(of: headerHeight) { feedAway() }
+        // Only a shown page scrolls, so a header is never left away over an error or a page on its way.
+        .onChange(of: isShowingPage) { _, showing in
+            guard !showing else { return }
+            headerScroll.reset()
+            feedAway()
+        }
         .task(id: Load(id: item.id, document: document, version: library.item(document)?.version, attempt: attempt)) { await load() }
         .onChange(of: shownMode) {
             // The pictures the other look names wait for no one while it is not shown.
@@ -177,14 +182,18 @@ struct WebPageItemPage: View {
     /// How far a page pulled past its start can show above the header.
     private static let overscroll: CGFloat = 1_000
 
+    private var isShowingPage: Bool {
+        if case .ready = content { true } else { false }
+    }
+
     /// The page has moved to `offset` from its start, which is also where the header is.
     private func scrolled(_ offset: CGFloat) {
-        headerScroll.offset = offset
+        headerScroll.scrolled(to: offset, isShowingPage: isShowingPage)
         feedAway()
     }
 
     private func feedAway() {
-        drafts.headerScrolled(away: HeaderScroll.isAway(scrolled: headerScroll.offset, headerHeight: headerHeight), for: item.id)
+        drafts.headerScrolled(away: headerScroll.isAway(headerHeight: headerHeight), for: item.id)
     }
 
     @ViewBuilder private func pageBody(toolbarHeight: CGFloat) -> some View {
@@ -281,7 +290,15 @@ struct WebPageItemPage: View {
 /// How far a web page has scrolled, for the header over its start to follow, and what that says of the toolbar.
 @Observable final class HeaderScroll {
     /// The distance the page has moved from its start.
-    var offset: CGFloat = 0
+    private(set) var offset: CGFloat = 0
+
+    /// The page has moved to `offset`. A page that is not shown (one still loading, or an error) has not moved, whatever
+    /// a document on its way out reports.
+    func scrolled(to offset: CGFloat, isShowingPage: Bool) { self.offset = isShowingPage ? offset : 0 }
+
+    func reset() { offset = 0 }
+
+    func isAway(headerHeight: CGFloat) -> Bool { Self.isAway(scrolled: offset, headerHeight: headerHeight) }
 
     /// Whether the header, which the page starts below, has gone under the toolbar, as the note page's has once it
     /// scrolls as far as the header is tall. Until the header has a height there is nothing to have gone.
@@ -299,6 +316,17 @@ private struct ScrollingHeader<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View { content.offset(y: -scroll.offset) }
+}
+
+/// The band behind the toolbar once the page is under it. It reads the offset itself, so a scroll redraws only this.
+private struct ScrollingToolbarBand: View {
+    let scroll: HeaderScroll
+    let toolbarHeight: CGFloat
+    let isEnabled: Bool
+
+    var body: some View {
+        ToolbarBand(toolbarHeight: toolbarHeight, isShown: isEnabled && HeaderScroll.isUnderToolbar(scrolled: scroll.offset))
+    }
 }
 
 /// At the top of the page while some of its pictures wait for the person, in the words and the look of the callout on a

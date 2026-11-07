@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import Testing
 @testable import MAPP
@@ -57,5 +58,99 @@ struct HeaderScrollTests {
         #expect(details.itemWithHeaderAway == first)
         details.headerScrolled(away: false, for: second)
         #expect(details.itemWithHeaderAway == first)
+    }
+
+    @Test func aPageThatIsNotShownHasNotScrolled() {
+        let scroll = HeaderScroll()
+        scroll.scrolled(to: 300, isShowingPage: true)
+        #expect(scroll.offset == 300)
+        #expect(scroll.isAway(headerHeight: 120))
+        // A document on its way out can still report after an error has replaced it.
+        scroll.scrolled(to: 300, isShowingPage: false)
+        #expect(scroll.offset == 0)
+        #expect(!scroll.isAway(headerHeight: 120))
+    }
+
+    @Test func aResetPutsTheHeaderBackAtTheStart() {
+        let scroll = HeaderScroll()
+        scroll.scrolled(to: 300, isShowingPage: true)
+        scroll.reset()
+        #expect(scroll.offset == 0)
+        #expect(!HeaderScroll.isUnderToolbar(scrolled: scroll.offset))
+    }
+
+    @Test func aNoteWithNoTitleThatHasScrolledAwayStillBringsItsToolbarItem() {
+        let library = FakeItemLibrary()
+        let untitled = FakeItemLibrary.note("", modified: .now)
+        library.items = [untitled]
+        let details = DetailsPresentation()
+        let tools = { ItemToolbarActions(library: library, browser: nil, items: [untitled], editor: nil, details: details) }
+        #expect(tools().hasScrollingHeader)
+        #expect(!tools().hasHeaderAway)
+        details.headerScrolled(away: true, for: untitled.id)
+        #expect(tools().hasHeaderAway)
+        #expect(tools().scrolledTitle.isEmpty)
+    }
+
+    @Test func aNotesToolbarTitleIsItsTextOnceItsHeaderHasScrolledAway() {
+        let library = FakeItemLibrary()
+        let note = FakeItemLibrary.note("Cliff path", modified: .now)
+        library.items = [note]
+        let details = DetailsPresentation()
+        let tools = { ItemToolbarActions(library: library, browser: nil, items: [note], editor: nil, details: details) }
+        #expect(tools().scrolledTitle.isEmpty)
+        details.headerScrolled(away: true, for: note.id)
+        #expect(tools().scrolledTitle == "Cliff path")
+        details.headerScrolled(away: true, for: ItemID("other"))
+        #expect(tools().scrolledTitle.isEmpty)
+    }
+}
+
+/// The header takes the wheel over the top of a web page, which the page then gets through the window's monitor.
+final class WheelGestureTests {
+    private var gesture = WheelGesture()
+
+    private func forwards(_ phase: NSEvent.Phase, _ momentum: NSEvent.Phase = [], overHeader: Bool) -> Bool {
+        gesture.forwards(phase: phase, momentumPhase: momentum, overHeader: overHeader)
+    }
+
+    @Test func aMouseWheelGoesWhereThePointerIs() {
+        #expect(forwards([], overHeader: true))
+        #expect(!forwards([], overHeader: false))
+        #expect(forwards([], overHeader: true))
+    }
+
+    @Test func aTrackpadGestureThatBeganOverTheHeaderStaysWithThePageToItsEndAndItsMomentum() {
+        #expect(forwards(.mayBegin, overHeader: true))
+        #expect(forwards(.began, overHeader: true))
+        // The page scrolls under the pointer, so the pointer is soon over the page.
+        #expect(forwards(.changed, overHeader: false))
+        #expect(forwards(.ended, overHeader: false))
+        #expect(forwards([], .began, overHeader: false))
+        #expect(forwards([], .changed, overHeader: false))
+        #expect(forwards([], .ended, overHeader: false))
+        // The gesture is over, and the next one began over the page.
+        #expect(!forwards(.began, overHeader: false))
+    }
+
+    @Test func aGestureThatBeganOverThePageIsLeftToTheWindowUntilItMovesOverTheHeader() {
+        #expect(!forwards(.began, overHeader: false))
+        #expect(!forwards(.changed, overHeader: false))
+        #expect(forwards(.changed, overHeader: true))
+        #expect(!forwards(.changed, overHeader: false))
+        #expect(!forwards([], .changed, overHeader: false))
+    }
+
+    @Test func aNewGestureDuringMomentumDecidesForItself() {
+        #expect(forwards(.began, overHeader: true))
+        #expect(forwards([], .changed, overHeader: false))
+        #expect(!forwards(.began, overHeader: false))
+        #expect(!forwards(.changed, overHeader: false))
+    }
+
+    @Test func aCancelledMomentumEndsTheGesture() {
+        #expect(forwards(.began, overHeader: true))
+        #expect(forwards([], .cancelled, overHeader: false))
+        #expect(!forwards([], .changed, overHeader: false))
     }
 }

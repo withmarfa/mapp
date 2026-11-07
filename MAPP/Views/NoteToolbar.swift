@@ -53,7 +53,7 @@ struct WindowToolbar: CustomizableToolbarContent {
             .sharedBackgroundVisibility(.hidden)
             .customizationBehavior(.disabled)
             .hidden(!showsScrolledTitle || !tools.hasScrollingHeader || browser?.showsCollection == true)
-        } else if opensFromCollection, showsScrolledTitle, !tools.scrolledTitle.isEmpty {
+        } else if opensFromCollection, showsScrolledTitle, tools.hasHeaderAway {
             ToolbarItem(id: "scrolledTitle", placement: .navigation) {
                 ScrolledItemTitle(title: tools.scrolledTitle)
             }
@@ -287,7 +287,7 @@ struct LayoutDoneButton: View {
     }
 }
 
-private struct ItemToolbarActions {
+struct ItemToolbarActions {
     let library: any ItemLibrary
     let browser: Browser?
     let items: [Item]
@@ -327,6 +327,10 @@ private struct ItemToolbarActions {
     }
 
     var hasScrollingHeader: Bool { itemWithScrollingHeader != nil }
+
+    /// Whether that item's page has scrolled its header away, whatever the title says: a note with no title still
+    /// brings its toolbar item, with no text.
+    var hasHeaderAway: Bool { itemWithScrollingHeader.map { details.isHeaderAway(of: $0.id) } == true }
 
     /// The title the toolbar shows: the item's once its page has scrolled the header away, and nothing before. A
     /// note's is the text it would be written with, as its header shows it; any other page's is the name it shows.
