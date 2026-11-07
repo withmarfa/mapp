@@ -1,23 +1,32 @@
 import SwiftUI
 
-/// The table's Filter, on its toolbar just after Search and in the View menu. It reads the table as the table reads
-/// itself (`ItemTableContent`), and what it keeps is the place's, for the window.
+/// The Filter, on the toolbar just after Search and in the View menu. It reads the place as the table reads it
+/// (`ItemTableContent`), and what it keeps is the place's, for the window, in every layout.
 struct ItemTableFilterMenu: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
 
     var body: some View {
         let content = browser.tableContent(in: library)
-        Controls(browser: browser, content: content, customization: .constant(.init())).filterMenu
-            .menuIndicator(.hidden)
+        let isFiltering = browser.tableOptions[browser.item]?.isFiltering == true
+        Menu {
+            FilterMenuItems(browser: browser, content: content)
+        } label: {
+            Label("Filter", systemImage: isFiltering ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease")
+        }
+        .menuIndicator(.hidden)
+        .help("Show only some items")
+        .accessibilityIdentifier("ItemTableFilter")
     }
 }
 
 /// The table's part of View Options (`CurrentViewOptions`): Sort, Group and the columns shown. Sort and Group are the
-/// place's, for the window; the columns shown are kept for the place (`ItemTableColumnLayouts`).
+/// place's, for the window; the columns shown are kept for the place (`ItemTableColumnLayouts`). A saved view's list
+/// and gallery take its Sort and Group too, without the table's rows at a time and columns (`columns` false).
 struct ItemTableViewOptions: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
+    var columns = true
     @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
 
     var body: some View {
@@ -30,18 +39,18 @@ struct ItemTableViewOptions: View {
         controls.sortPicker
         Divider()
         controls.groupPicker
-        Divider()
-        controls.pageSizePicker
-        Divider()
-        controls.columnsMenu
+        if columns {
+            Divider()
+            controls.pageSizePicker
+            Divider()
+            controls.columnsMenu
+        }
     }
 }
 
 private struct Controls {
     @Binding var options: ItemTableOptions
     let columns: [ItemTableColumn]
-    /// Every row before the filters, so a filter can offer values it is hiding.
-    let rows: [ItemTableRow]
     let sort: [ItemTableComparator]
     let grouping: ItemTableColumn?
     @Binding var customization: TableColumnCustomization<ItemTableRow>
@@ -49,7 +58,6 @@ private struct Controls {
     init(browser: Browser, content: ItemTableContent, customization: Binding<TableColumnCustomization<ItemTableRow>>) {
         _options = Binding { browser.tableOptions[browser.item] ?? ItemTableOptions() } set: { browser.tableOptions[browser.item] = $0 }
         columns = content.columns
-        rows = content.allRows
         sort = content.sort
         grouping = content.grouping
         categorical = content.categoricalColumns
@@ -60,46 +68,6 @@ private struct Controls {
     private let categorical: [ItemTableColumn]
     /// Whether the rows are in search order, where the window searches; nil where it does not.
     private let relevance: Binding<Bool>?
-
-    // MARK: Filter
-
-    var filterMenu: some View {
-        Menu {
-            ForEach(categorical) { column in
-                Menu(column.label) {
-                    ForEach(categories(of: column), id: \.value) { category in
-                        Toggle(isOn: filterBinding(column, category.value)) {
-                            ItemTableMenuLabel(column: column, value: category.value.isEmpty ? nil : category.value,
-                                               title: "\(category.title)  \(category.count)")
-                        }
-                    }
-                }
-            }
-            if !options.filters.isEmpty {
-                Divider()
-                Button("Clear Filters") { options.filters = [:] }
-            }
-        } label: {
-            Label("Filter", systemImage: options.filters.isEmpty ? "line.3.horizontal.decrease" : "line.3.horizontal.decrease.circle.fill")
-        }
-        .help("Show only some items")
-        .accessibilityIdentifier("ItemTableFilter")
-    }
-
-    /// A column's values with how many rows hold each, in its groups' order, then the empty cells.
-    private func categories(of column: ItemTableColumn) -> [(value: String, title: String, count: Int)] {
-        ItemTableLayout.categories(of: rows, by: column).map { ($0.id, $0.title, $0.rows.count) }
-    }
-
-    private func filterBinding(_ column: ItemTableColumn, _ value: String) -> Binding<Bool> {
-        Binding {
-            options.filters[column.id]?.contains(value) ?? false
-        } set: { isOn in
-            var kept = options.filters[column.id] ?? []
-            if isOn { kept.insert(value) } else { kept.remove(value) }
-            options.filters[column.id] = kept.isEmpty ? nil : kept
-        }
-    }
 
     // MARK: Sort
 

@@ -9,7 +9,7 @@ struct ItemTimeline: View {
 
     var body: some View {
         let _ = daysSeen
-        let items = browser.items(in: library)
+        let items = browser.filteredItems(in: library)
         let fields = browser.timelineFieldChoices(in: library)
         // Chosen in the toolbar's View Options (`ItemTimelineOptions`).
         let field = ItemTimelineLayout.selectedField(browser.timelineFields[browser.item], fields: fields)
@@ -28,6 +28,7 @@ struct ItemTimeline: View {
                 }
             }
         }
+        .filteredEmptyState(browser)
         .navigationTitle(title)
         // The timeline only shows items; it changes none of them.
         .navigationSubtitle(Text("\(Text("^[\(items.count) item](inflect: true)")), Read Only"))

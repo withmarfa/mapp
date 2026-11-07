@@ -51,6 +51,7 @@ struct ItemGallery: View {
                 } else { EmptyState(browser.item == .files ? "No Files" : "No Items") }
             }
         }
+        .filteredEmptyState(browser)
         .navigationTitle(title)
         .navigationSubtitle(browser.isSearching ? Text("^[\(ids.count) result](inflect: true)") : Text("^[\(ids.count) item](inflect: true)"))
         .toolbar(removing: browser.isSearchExpanded ? .title : nil)
