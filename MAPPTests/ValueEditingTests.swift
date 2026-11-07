@@ -96,6 +96,35 @@ struct ValueEditingTests {
         #expect(placement.frame.minY >= 0 && placement.frame.maxY <= Self.screen.maxY)
     }
 
+    @Test func panelNeverLeavesTheVisibleFrameWhateverTheRoomOnEitherSide() {
+        let visible = CGRect(x: 0, y: 80, width: 1000, height: 720)
+        for anchorY in stride(from: CGFloat(60), through: 820, by: 20) {
+            for content in [CGFloat(40), 180, 600, 4000] {
+                let placement = ValuePanelFrame.placement(
+                    anchor: CGRect(x: 400, y: anchorY, width: 120, height: 20), visible: visible, contentHeight: content, floor: 220, ceiling: 320, gap: 4)
+                #expect(visible.contains(placement.frame), "anchor at \(anchorY), content \(content): \(placement.frame)")
+            }
+        }
+    }
+
+    @Test func aTallPanelNearTheBottomOpensAboveAndOneNearTheTopBelowWithTheListCapped() {
+        let nearBottom = ValuePanelFrame.placement(
+            anchor: CGRect(x: 400, y: 120, width: 120, height: 20), visible: Self.screen, contentHeight: 500, floor: 220, ceiling: 320, gap: 4)
+        #expect(nearBottom.isAbove)
+        #expect(nearBottom.frame.height == 500 && nearBottom.frame.minY == 144, "room above takes it whole")
+        let nearTop = ValuePanelFrame.placement(
+            anchor: CGRect(x: 400, y: 740, width: 120, height: 20), visible: Self.screen, contentHeight: 900, floor: 220, ceiling: 320, gap: 4)
+        #expect(!nearTop.isAbove)
+        #expect(nearTop.frame.height == 736, "capped to the room below, the list scrolling")
+        #expect(nearTop.frame.minY == 0)
+    }
+
+    @Test func aPanelWithLessRoomThanTheLeastHeightOnItsSideStaysOnScreen() {
+        let placement = ValuePanelFrame.placement(
+            anchor: CGRect(x: 400, y: 770, width: 120, height: 20), visible: Self.screen, contentHeight: 3000, floor: 220, ceiling: 320, gap: 4)
+        #expect(Self.screen.contains(placement.frame))
+    }
+
     // MARK: Writing
 
     @Test func aRefusedWriteKeepsThePanelOpenAndSaysWhy() {
@@ -499,6 +528,27 @@ struct ValueEditingTests {
         model.move(by: 1)
         model.activateHighlighted()
         #expect(written.count == 1)
+    }
+
+    @Test func theFirstArrowInAChoiceStartsFromTheRowOfTheValueItHolds() {
+
+        let item = Self.item(["status": .string("doing")])
+        let model = ValueEditModel(Self.request(.status(Self.status), item: item, in: Self.library([item])))
+        model.move(by: 1)
+        #expect(model.activeRow.flatMap { id in model.rows.first { $0.id == id }?.title } == "Todo", "Down from Doing, as a menu goes")
+        let upward = ValueEditModel(Self.request(.status(Self.status), item: item, in: Self.library([item])))
+        upward.move(by: -1)
+        #expect(upward.activeRow.flatMap { id in upward.rows.first { $0.id == id }?.title } == "Done")
+    }
+
+    @Test func theFirstArrowWithNothingSetStartsFromTheEndsNotFromNotSet() {
+        let item = Self.item()
+        let down = ValueEditModel(Self.request(.status(Self.status), item: item, in: Self.library([item])))
+        down.move(by: 1)
+        #expect(down.activeRow.flatMap { id in down.rows.first { $0.id == id }?.title } == "Done", "the first option, though Not Set is marked")
+        let up = ValueEditModel(Self.request(.status(Self.status), item: item, in: Self.library([item])))
+        up.move(by: -1)
+        #expect(up.activeRow == ValueEditOptions.notSetID)
     }
 
     // MARK: One at a time
