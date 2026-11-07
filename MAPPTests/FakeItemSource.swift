@@ -74,6 +74,8 @@ nonisolated final class FakeItemSource: ItemSource {
     /// Every query `items(matching:)` was asked, in order.
     let previewQueries = Mutex<[LibraryViewQuery]>([])
     let previewFails = Mutex(false)
+    /// Queries `items(matching:)` does not answer until a test lets them go.
+    let previewHolds = Mutex<Set<LibraryViewQuery>>([])
     let resolved = Mutex<[SyncAction]>([])
     let queues = Mutex(0)
     /// While set, `queueSubmitted` waits, as an engine busy with a long step would.
@@ -264,6 +266,7 @@ nonisolated final class FakeItemSource: ItemSource {
 
     func items(matching query: LibraryViewQuery) async throws -> [ItemID] {
         previewQueries.withLock { $0.append(query) }
+        while previewHolds.withLock({ $0.contains(query) }) { try await Task.sleep(for: .milliseconds(10)) }
         if previewFails.withLock({ $0 }) { throw SourceFailure(kind: .failed, message: "The query asks for a link the copy does not hold.") }
         return previewAnswers.withLock { $0[query] ?? [] }
     }
