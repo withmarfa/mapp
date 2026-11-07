@@ -493,18 +493,8 @@ final class EditorController: NSObject {
                 closeDelegate = EditorCloseDelegate(editor: self, window: window)
             }
             if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle, caret: requested.caret) }
-            showAgainIfNeverPainted()
         }
         sendHostActivation()
-    }
-
-    /// A note handed to the page whose first frame never came back, as when the page left its window while the note was
-    /// being handed over (Version History takes the page's place), is handed over again now the page can draw. A page
-    /// that has painted, or is not showing a note, is left as it is.
-    private func showAgainIfNeverPainted() {
-        guard let open = opening, isReady, isPresented, let noteID, let item = library?.item(noteID) else { return }
-        show(item, as: "load")
-        opening = (generation, open.interval)
     }
 
     @objc private func windowActivationChanged(_ notification: Notification) {
