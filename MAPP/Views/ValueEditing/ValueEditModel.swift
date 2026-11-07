@@ -41,6 +41,14 @@ final class ValueEditModel {
     @ObservationIgnored var layoutChanged: () -> Void = {}
     @ObservationIgnored private var local: PropertyValue?
     @ObservationIgnored private var hasLocal = false
+    /// What the panel last wrote to a date or a list that the library's copy may not show yet. Read as the value is
+    /// (`value`), which settles it once the copy shows it, refuses it or has changed elsewhere.
+    @ObservationIgnored private var pending: PendingValue?
+    /// Counts the panel's writes, so a view that shows the value redraws when one is made, before the copy shows it.
+    private var writes = 0
+    @ObservationIgnored private var rowsCache: (key: RowsKey, rows: [ValueListRow])?
+    /// How many times the rows were built, so a test can tell a cached read from a rebuild.
+    @ObservationIgnored private(set) var rowsBuilt = 0
     @ObservationIgnored private let pool: [PeopleSuggestions.Person]
     @ObservationIgnored private var typedAhead = (text: "", at: Date.distantPast)
     @ObservationIgnored private let wordPool: [String]
@@ -81,11 +89,67 @@ final class ValueEditModel {
 
     // MARK: Item
 
-    /// The value the field holds now, read from the library so a change made elsewhere shows.
+    /// The value the field holds now, read from the library so a change made elsewhere shows. For a date or a list it
+    /// is the panel's own last write while the library still has it on its way, and, where the list changed elsewhere
+    /// meanwhile, the list with both changes.
     var value: PropertyValue? {
         guard let key = kind.field?.key else { return nil }
-        if let id = request.item { return library.item(id)?.value(of: key) }
-        return hasLocal ? local : request.heldValue
+        guard let id = request.item else { return hasLocal ? local : request.heldValue }
+        _ = writes
+        return settle(library.item(id)?.value(of: key), of: id)
+    }
+
+    /// What the library's copy holds for the field, whatever the panel wrote.
+    private var stored: PropertyValue? {
+        guard let id = request.item, let key = kind.field?.key else { return nil }
+        return library.item(id)?.value(of: key)
+    }
+
+    private var keepsPending: Bool {
+        switch kind {
+        case .date, .people, .words: true
+        default: false
+        }
+    }
+
+    private func pendingState(stored: PropertyValue?, of id: ItemID) -> PendingValue.State? {
+        pending?.state(stored: stored, isWriting: library.isWritingProperties(of: id), took: { library.tookPropertyWrite($0) })
+    }
+
+    private func settle(_ stored: PropertyValue?, of id: ItemID) -> PropertyValue? {
+        guard keepsPending, let held = pending, let state = pendingState(stored: stored, of: id) else { return stored }
+        switch state {
+        case .waiting:
+            return held.value
+        case .landed, .refused:
+            pending = nil
+            return stored
+        case .elsewhere:
+            guard isList else {
+                pending = nil
+                return stored
+            }
+            return ListRebase.merge(base: held.base, mine: held.value, theirs: stored, same: sameEntry)
+        }
+    }
+
+    private var isList: Bool {
+        switch kind {
+        case .people, .words: true
+        default: false
+        }
+    }
+
+    /// Whether two entries of the list are one: a person is one by their identity, a word by its text.
+    private var sameEntry: (PropertyValue, PropertyValue) -> Bool {
+        guard case .people(_, let shape) = kind else { return { $0 == $1 } }
+        func identity(_ entry: PropertyValue) -> String? {
+            ListEntries.object(entry).flatMap { PeopleSuggestions.Person(entry: $0, shape: shape)?.identity }
+        }
+        return { first, second in
+            if let first = identity(first), let second = identity(second) { return first == second }
+            return first == second
+        }
     }
 
     /// Whether the item can still take the edit. An editor for an item that cannot closes itself.
@@ -150,7 +214,29 @@ final class ValueEditModel {
 
     // MARK: Rows
 
+    /// What decides the rows, so a read that finds them unchanged builds nothing: the rows are read once for each row
+    /// drawn and for each key pressed.
+    private struct RowsKey: Equatable {
+        let query: String
+        let value: PropertyValue?
+        let revision: Int
+        let day: Date?
+        let parent: [String]
+    }
+
     var rows: [ValueListRow] {
+        let key = RowsKey(
+            query: query, value: value, revision: library.contentRevision,
+            day: isDate ? request.calendar.startOfDay(for: library.now()) : nil,
+            parent: parentTarget.map { [$0.id, $0.displayTitle] } ?? [])
+        if let rowsCache, rowsCache.key == key { return rowsCache.rows }
+        rowsBuilt += 1
+        let built = buildRows()
+        rowsCache = (key, built)
+        return built
+    }
+
+    private func buildRows() -> [ValueListRow] {
         switch kind {
         case .status(let field): ValueEditOptions.statusRows(field: field, current: value?.string)
         case .choice(let field): ValueEditOptions.choiceRows(field: field, current: value?.string)
@@ -177,17 +263,24 @@ final class ValueEditModel {
         let held = PeopleSuggestions.held(in: value, shape: shape)
         let matching = PeopleSuggestions.matching(query, in: pool, excluding: held)
         func mark(_ person: PeopleSuggestions.Person) -> ValueListRow.Mark { .person(initials: PersonInitials.of(person.name) ?? "") }
+        // Two people can share a name; their address then tells them apart.
+        let names = Dictionary(grouping: held.map(\.person) + matching, by: { $0.name.lowercased() }).mapValues(\.count)
+        func detail(_ person: PeopleSuggestions.Person) -> String? { names[person.name.lowercased(), default: 0] > 1 ? person.identity : nil }
         var rows: [ValueListRow] = []
         if !held.isEmpty {
             rows.append(.header(String(localized: "Assigned"), id: "header:held"))
-            rows += held.map { ValueListRow(id: "held:" + $0.identity, role: .option, title: $0.name, mark: mark($0), isCurrent: true) }
+            rows += held.map {
+                ValueListRow(id: $0.id, role: .option, title: $0.person.name, detail: detail($0.person), mark: mark($0.person), isCurrent: true)
+            }
         }
         if !matching.isEmpty {
             rows.append(.header(String(localized: "Matching"), id: "header:matching"))
-            rows += matching.prefix(30).map { ValueListRow(id: "person:" + $0.identity, role: .option, title: $0.name, mark: mark($0)) }
+            rows += matching.prefix(30).map {
+                ValueListRow(id: "person:" + $0.identity, role: .option, title: $0.name, detail: detail($0), mark: mark($0))
+            }
         }
         let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let known = (held + pool).contains { $0.identity == typed.lowercased() }
+        let known = (held.map(\.person) + pool).contains { $0.isNamed(typed) }
         if !typed.isEmpty, !known {
             rows.append(ValueListRow(id: "create", role: .create, title: String(localized: "Add “\(typed)”"), detail: "↩", mark: .symbol("plus")))
         }
@@ -336,7 +429,7 @@ final class ValueEditModel {
             if id == ValueEditOptions.notSetID || new != nil, commit(new), kind.closesOnChoice { close() }
         case .date:
             guard let entry = quickDates.first(where: { "quick:" + $0.id == id }) else { return }
-            setDate(entry.date)
+            chooseDay(entry.date)
             if notice == nil { close() }
         case .people(_, let shape): activatePerson(id, shape)
         case .tags: activateTag(id)
@@ -348,13 +441,10 @@ final class ValueEditModel {
 
     private func activatePerson(_ id: String, _ shape: ListShape) {
         let held = PeopleSuggestions.held(in: value, shape: shape)
-        if id.hasPrefix("held:") {
+        if id.hasPrefix(PeopleSuggestions.Held.prefix) {
             // The index is the entry's place in the stored list, which holds entries `held` cannot read too.
-            guard let person = held.first(where: { "held:" + $0.identity == id }),
-                  let index = ListEntries.entries(of: value).firstIndex(where: {
-                      ListEntries.object($0).flatMap(shape.personName(of:))?.lowercased() == person.identity
-                  }) else { return }
-            _ = commit(ListEntries.removing(at: index, from: value), failure: String(localized: "The list could not be saved."))
+            guard let person = held.first(where: { $0.id == id }) else { return }
+            _ = commit(ListEntries.removing(at: person.index, from: value), failure: String(localized: "The list could not be saved."))
             return
         }
         let entry: ListEntries.Entry?
@@ -368,10 +458,27 @@ final class ValueEditModel {
             notice = refusal
             return
         }
+        // A tap on a row that was held by the last one is not a second person.
+        if let person = PeopleSuggestions.Person(entry: entry, shape: shape), held.contains(where: { $0.person.identity == person.identity }) {
+            query = ""
+            return
+        }
+        if let reason = limitReason(holding: held.count + 1) {
+            notice = reason
+            return
+        }
         if commit(ListEntries.appending(entry, to: value), failure: String(localized: "The list could not be saved.")) {
             query = ""
             highlight = nil
         }
+    }
+
+    /// Why the list cannot take `count` entries, in the person's words, or nil where its field takes them. Only a
+    /// limit the catalogue declares is judged here; the server judges each entry's form (a web or mail address) and
+    /// the library tells its reason when it refuses the write, as it does for any queued edit.
+    private func limitReason(holding count: Int) -> String? {
+        guard let field = kind.field, !field.holds(count), let limit = field.maxItems else { return nil }
+        return String(localized: "\(field.label) can hold \(limit) at most.")
     }
 
     private func activateTag(_ id: String) {
@@ -389,11 +496,16 @@ final class ValueEditModel {
     private func activateWord(_ id: String) {
         let word = id == "create" ? query.trimmingCharacters(in: .whitespacesAndNewlines) : String(id.dropFirst("word:".count))
         guard !word.isEmpty else { return }
-        guard !heldWords.contains(where: { $0.lowercased() == word.lowercased() }) else {
+        let held = heldWords
+        guard !held.contains(where: { $0.lowercased() == word.lowercased() }) else {
             query = ""
             return
         }
-        if commitWords(heldWords + [word]) {
+        if let reason = limitReason(holding: held.count + 1) {
+            notice = reason
+            return
+        }
+        if commitWords(held + [word]) {
             query = ""
             highlight = nil
         }
@@ -552,10 +664,23 @@ final class ValueEditModel {
 
     var hasTime: Bool { allowsTime && (storedDate?.hasTime ?? false) }
 
-    func setDate(_ selected: Date, includingTime: Bool? = nil) {
-        let withTime = includingTime ?? hasTime
-        let day = withTime ? QuickDates.moment(on: selected, keepingTimeOf: storedDate?.date, calendar: request.calendar) : selected
-        _ = commit(.string(withTime ? ItemDate.instant(day) : ItemDate.day(day)), failure: String(localized: "The date couldn’t be saved."))
+    /// The person chose a date and, where the value has a time, a time in the picker: what it shows is what is written.
+    func setDate(_ selected: Date) { write(selected, withTime: hasTime) }
+
+    /// The person chose a day from the quick dates, which keeps the time the value already has.
+    func chooseDay(_ day: Date) {
+        write(hasTime ? QuickDates.moment(on: day, keepingTimeOf: storedDate?.date, calendar: request.calendar) : day, withTime: hasTime)
+    }
+
+    /// The person turned the time on or off. Turning it on keeps the day, and gives a value with none today.
+    func setIncludesTime(_ included: Bool) {
+        guard allowsTime else { return }
+        write(storedDate?.date ?? library.now(), withTime: included)
+    }
+
+    private func write(_ date: Date, withTime: Bool) {
+        let text = withTime ? ItemDate.instant(date) : ItemDate.day(date, calendar: request.calendar)
+        _ = commit(.string(text), failure: String(localized: "The date couldn’t be saved."))
     }
 
     func clearDate() {
@@ -575,12 +700,18 @@ final class ValueEditModel {
             close()
             return false
         }
+        // The write goes on top of one still on its way, so the value from before the first of them stays the base.
+        let before = stored
+        let base = request.item.flatMap { keepsPending ? pendingState(stored: before, of: $0) : nil } == .waiting ? pending?.base : before
         let taken = request.write(new)
         if taken {
             notice = nil
             if request.item == nil {
                 local = new
                 hasLocal = true
+            } else if keepsPending {
+                pending = PendingValue(value: new, base: base, mark: library.lastPropertyWrite)
+                writes += 1
             }
         } else {
             // What was typed stays where it is, and the panel stays open.

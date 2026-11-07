@@ -151,9 +151,7 @@ struct ValueEditContent: View {
                 .frame(maxWidth: .infinity)
                 .accessibilityIdentifier("ItemPropertyDate.\(model.kind.field?.key ?? "")")
             if model.allowsTime {
-                Toggle("Time", isOn: Binding { model.hasTime } set: { include in
-                    model.setDate(model.storedDate?.date ?? model.request.library.now(), includingTime: include)
-                })
+                Toggle("Time", isOn: Binding { model.hasTime } set: { model.setIncludesTime($0) })
                 .toggleStyle(.switch)
                 .controlSize(.small)
                 .padding(.horizontal, 8 * scale)

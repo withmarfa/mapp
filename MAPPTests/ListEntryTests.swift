@@ -53,6 +53,16 @@ struct ListEntryTests {
         #expect(MarfaMapping.itemType(ItemType(id: "t", label: "T", fields: [numbers])).fields.first?.kind == .other)
     }
 
+    @Test func aListFieldCarriesItsLimitAndTakesNoMoreThanItDeclares() throws {
+        let tags = TypeField(name: "sites", type: "array", declaredBy: "t", definition: ["items_type": "url", "maxItems": 2])
+        let field = try #require(MarfaMapping.itemType(ItemType(id: "t", label: "T", fields: [tags])).fields.first)
+        #expect(field.maxItems == 2)
+        #expect(field.accepts(.array([.string("a"), .string("b")])))
+        #expect(!field.accepts(.array([.string("a"), .string("b"), .string("c")])))
+        let free = TypeField(name: "sites", type: "array", declaredBy: "t", definition: ["items_type": "url"])
+        #expect(MarfaMapping.itemType(ItemType(id: "t", label: "T", fields: [free])).fields.first?.maxItems == nil)
+    }
+
     @Test func aMemberTheAppCannotReadLeavesTheListUntouchedRatherThanEditedBlind() {
         let odd = Self.listField("odd", ["value": ["type": "string"], "blob": ["type": "geometry"]])
         let mapped = MarfaMapping.itemType(ItemType(id: "t", label: "T", fields: [odd])).fields.first

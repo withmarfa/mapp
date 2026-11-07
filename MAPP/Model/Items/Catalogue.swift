@@ -34,6 +34,8 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
         /// The bounds a number field declares, which a value must stay within.
         var minimum: Decimal?
         var maximum: Decimal?
+        /// The most entries a list field holds, where it declares one.
+        var maxItems: Int?
         var id: String { key }
     }
 
@@ -117,10 +119,14 @@ nonisolated extension ItemTypeInfo.Field {
     func accepts(_ value: PropertyValue) -> Bool {
         switch (kind, value) {
         case (.number, .number(let number)): return numberRule.allows(number)
-        case (.list(let shape), .array(let entries)): return entries.allSatisfy(shape.accepts)
+        case (.list(let shape), .array(let entries)): return holds(entries.count) && entries.allSatisfy(shape.accepts)
+        case (.words, .array(let words)): return holds(words.count) && kind.accepts(value)
         default: return kind.accepts(value)
         }
     }
+
+    /// Whether a list field takes this many entries.
+    func holds(_ count: Int) -> Bool { maxItems.map { count <= $0 } ?? true }
 
     /// Whether the field is picked from a list of values rather than typed.
     var isPicked: Bool { !options.isEmpty }

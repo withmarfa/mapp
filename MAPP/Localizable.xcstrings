@@ -10,6 +10,9 @@
     "%@ Copy" : {
 
     },
+    "%@ can hold %lld at most." : {
+
+    },
     "%@ has an entry that isn’t finished. Finish it, or cancel it, to add the item." : {
       "extractionState" : "manual"
     },

@@ -191,9 +191,32 @@ nonisolated enum PeopleSuggestions {
     struct Person: Hashable, Sendable {
         let name: String
         let entry: ListEntries.Entry
+        /// What tells one person from another: the address where the entry has one, else the name. Two people can share
+        /// a name, so a name alone would merge them.
+        let identity: String
 
-        /// Two entries are the same person when their words match, whatever else the entry carries.
-        var identity: String { name.lowercased() }
+        init?(entry: ListEntries.Entry, shape: ListShape) {
+            guard let name = shape.personName(of: entry) else { return nil }
+            self.name = name
+            self.entry = entry
+            let address = shape.members.dropFirst().first.flatMap { shape.text(of: $0, in: entry) }
+            identity = (address ?? name).lowercased()
+        }
+
+        /// Whether typed text names this person, by name or by address.
+        func isNamed(_ typed: String) -> Bool {
+            let typed = typed.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return typed == name.lowercased() || typed == identity
+        }
+    }
+
+    /// A person a list holds, with the entry's place in the stored list and a row identifier that is the person's own
+    /// even when the list holds the same person twice.
+    struct Held: Identifiable, Hashable, Sendable {
+        static let prefix = "held:"
+        let person: Person
+        let index: Int
+        let id: String
     }
 
     /// The distinct people in the lists, most often named first, then by name.
@@ -201,8 +224,7 @@ nonisolated enum PeopleSuggestions {
         var counts: [String: (person: Person, count: Int)] = [:]
         for list in lists {
             for case let entry? in ListEntries.entries(of: list).map(ListEntries.object) {
-                guard let name = shape.personName(of: entry) else { continue }
-                let person = Person(name: name, entry: entry)
+                guard let person = Person(entry: entry, shape: shape) else { continue }
                 counts[person.identity, default: (person, 0)].count += 1
             }
         }
@@ -212,20 +234,24 @@ nonisolated enum PeopleSuggestions {
     }
 
     /// The people to offer for what is typed: those whose name or any member contains it, less those already held.
-    static func matching(_ typed: String, in pool: [Person], excluding held: [Person]) -> [Person] {
+    static func matching(_ typed: String, in pool: [Person], excluding held: [Held]) -> [Person] {
         let typed = typed.trimmingCharacters(in: .whitespacesAndNewlines)
-        let taken = Set(held.map(\.identity))
+        let taken = Set(held.map(\.person.identity))
         return pool.filter { person in
             !taken.contains(person.identity)
                 && (typed.isEmpty || person.entry.values.contains { $0.string?.localizedStandardContains(typed) == true })
         }
     }
 
-    /// The people a list already holds.
-    static func held(in list: PropertyValue?, shape: ListShape) -> [Person] {
-        ListEntries.entries(of: list).compactMap { value in
-            guard let entry = ListEntries.object(value), let name = shape.personName(of: entry) else { return nil }
-            return Person(name: name, entry: entry)
+    /// The people a list already holds, each with its place in the stored list, which also holds entries that are no
+    /// person.
+    static func held(in list: PropertyValue?, shape: ListShape) -> [Held] {
+        var seen: [String: Int] = [:]
+        return ListEntries.entries(of: list).enumerated().compactMap { index, value in
+            guard let entry = ListEntries.object(value), let person = Person(entry: entry, shape: shape) else { return nil }
+            let occurrence = seen[person.identity, default: 0]
+            seen[person.identity] = occurrence + 1
+            return Held(person: person, index: index, id: "\(Held.prefix)\(person.identity)#\(occurrence)")
         }
     }
 
@@ -259,5 +285,70 @@ nonisolated enum WordSuggestions {
         return counts.values
             .sorted { $0.count != $1.count ? $0.count > $1.count : $0.word.localizedStandardCompare($1.word) == .orderedAscending }
             .map(\.word)
+    }
+}
+
+/// A value the panel wrote that the library's copy may not show yet. A library can take a write after it is made
+/// (`MarfaLibrary` queues it), so the panel builds its next change on this, not on a copy that still shows the value
+/// from before; otherwise two quick taps would each start from the same stored list and the second would undo the
+/// first.
+nonisolated struct PendingValue: Sendable {
+    /// What the panel wrote.
+    var value: PropertyValue?
+    /// What the copy held before the oldest write still on its way.
+    var base: PropertyValue?
+    /// The library's mark for the write (`ItemLibrary.lastPropertyWrite`), nil where it keeps none.
+    var mark: Int?
+
+    enum State: Sendable {
+        /// The copy does not show the write yet and the library is still writing.
+        case waiting
+        /// The copy shows it, or took it.
+        case landed
+        /// The copy still shows the value from before and the library is not writing: the write was refused.
+        case refused
+        /// The copy shows neither, so it changed elsewhere meanwhile.
+        case elsewhere
+    }
+
+    func state(stored: PropertyValue?, isWriting: Bool, took: (Int) -> Bool) -> State {
+        if stored == value { return .landed }
+        if let mark, took(mark) { return .landed }
+        if stored == base { return isWriting ? .waiting : .refused }
+        return .elsewhere
+    }
+}
+
+/// Three-way change of a list of entries: what the panel changed against the list it started from, applied to the list
+/// the copy holds now, so neither change is lost.
+nonisolated enum ListRebase {
+    /// `theirs` without the entries `mine` removed from `base`, then the entries `mine` added, in order, that `theirs`
+    /// does not hold. `same` says whether two entries are one (an entry of a person is, by the person). Nil where
+    /// none is left, so the field is unset rather than holding `[]`.
+    static func merge(
+        base: PropertyValue?, mine: PropertyValue?, theirs: PropertyValue?,
+        same: (PropertyValue, PropertyValue) -> Bool = { $0 == $1 }
+    ) -> PropertyValue? {
+        let (base, mine) = (ListEntries.entries(of: base), ListEntries.entries(of: mine))
+        var result = ListEntries.entries(of: theirs)
+        for entry in difference(base, mine, same: same) {
+            if let at = result.firstIndex(where: { same($0, entry) }) { result.remove(at: at) }
+        }
+        for entry in difference(mine, base, same: same) where !result.contains(where: { same($0, entry) }) {
+            result.append(entry)
+        }
+        return result.isEmpty ? nil : .array(result)
+    }
+
+    /// The entries of `first` that `second` does not hold, counting repeats.
+    private static func difference(
+        _ first: [PropertyValue], _ second: [PropertyValue], same: (PropertyValue, PropertyValue) -> Bool
+    ) -> [PropertyValue] {
+        var rest = second
+        return first.filter { entry in
+            guard let at = rest.firstIndex(where: { same($0, entry) }) else { return true }
+            rest.remove(at: at)
+            return false
+        }
     }
 }

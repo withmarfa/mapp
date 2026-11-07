@@ -168,7 +168,14 @@ nonisolated enum MarfaMapping {
             key: field.name, label: field.label, kind: kind(of: field, statusWords: statusWords),
             declaredBy: TypeID(field.declaredBy), required: field.required, description: field.description,
             format: format(of: field), isInteger: field.type == "integer",
-            minimum: bound("minimum", in: field.definition), maximum: bound("maximum", in: field.definition))
+            minimum: bound("minimum", in: field.definition), maximum: bound("maximum", in: field.definition),
+            maxItems: field.type == "array" ? maxItems(in: field.definition) : nil)
+    }
+
+    /// The most entries a list declares (`maxItems`, a whole number of at least 1), nil where it names none.
+    static func maxItems(in definition: JSONObject) -> Int? {
+        guard case .integer(let value)? = definition["maxItems"], value >= 1 else { return nil }
+        return Int(value)
     }
 
     /// A number a definition names, such as a `minimum`.

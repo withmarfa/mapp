@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import struct Marfa.ItemDate
 import Testing
 @testable import MAPP
 
@@ -221,6 +222,257 @@ struct ValueEditingTests {
         model.activate("parent:" + other.id.rawValue)
         while model.isSaving { await Task.yield() }
         #expect(closed && library.relationshipWrites.map(\.adding) == [[other.id]])
+    }
+
+    // MARK: Lists written quickly
+
+    /// A words panel over an item holding `items`, with every write it makes collected in `written`.
+    private func wordsPanel(
+        _ items: [String], limit: Int? = nil, writing: Bool = true, in library: FakeItemLibrary, written: Written
+    ) -> ValueEditModel {
+        var field = Self.labels
+        field.maxItems = limit
+        let item = Self.item(["labels": .array(items.map { .string($0) })])
+        library.items = [item]
+        if writing { library.writingProperties = [item.id] }
+        return ValueEditModel(Self.request(.words(field), item: item, in: library, write: { written.all.append($0); return true }))
+    }
+
+    private final class Written { var all: [PropertyValue?] = [] }
+
+    private static func list(_ words: String...) -> PropertyValue { .array(words.map { .string($0) }) }
+
+    private func add(_ word: String, to model: ValueEditModel) {
+        model.query = word
+        model.activate("create")
+    }
+
+    @Test func twoQuickTapsBuildOnWhatThePanelLastWroteNotOnTheCopyThatHasNotCaughtUp() {
+        let (library, written) = (Self.library([]), Written())
+        let model = wordsPanel(["red"], in: library, written: written)
+        add("blue", to: model)
+        add("green", to: model)
+        #expect(written.all == [Self.list("red", "blue"), Self.list("red", "blue", "green")])
+        #expect(model.heldTokens == ["red", "blue", "green"])
+    }
+
+    @Test func twoQuickRemovalsBuildOnEachOther() {
+        let (library, written) = (Self.library([]), Written())
+        let model = wordsPanel(["a", "b", "c"], in: library, written: written)
+        model.removeToken("a")
+        model.removeToken("b")
+        #expect(written.all == [Self.list("b", "c"), Self.list("c")])
+    }
+
+    @Test func aWriteTheCopyRefusedIsNotBuiltOn() {
+        let (library, written) = (Self.library([]), Written())
+        let model = wordsPanel(["red"], in: library, written: written)
+        add("blue", to: model)
+        #expect(model.heldTokens == ["red", "blue"])
+        // The library has finished and the copy still holds the list from before: the write was refused.
+        library.writingProperties = []
+        #expect(model.heldTokens == ["red"])
+        add("green", to: model)
+        #expect(written.all.last == Self.list("red", "green"))
+    }
+
+    @Test func aChangeMadeElsewhereMeanwhileKeepsBothChanges() {
+        let (library, written) = (Self.library([]), Written())
+        let model = wordsPanel(["red"], in: library, written: written)
+        add("blue", to: model)
+        // The copy holds a word the panel never saw, and not yet the panel's own.
+        library.items[0].properties = [Property(key: "labels", value: Self.list("red", "yellow"))]
+        #expect(model.heldTokens == ["red", "yellow", "blue"])
+        add("green", to: model)
+        #expect(written.all.last == Self.list("red", "yellow", "blue", "green"))
+    }
+
+    @Test func aWriteThatLandedIsNoLongerHeldAndTheCopyIsReadAgain() {
+        let (library, written) = (Self.library([]), Written())
+        let model = wordsPanel(["red"], in: library, written: written)
+        add("blue", to: model)
+        library.items[0].properties = [Property(key: "labels", value: Self.list("red", "blue"))]
+        library.writingProperties = []
+        #expect(model.heldTokens == ["red", "blue"])
+        library.items[0].properties = [Property(key: "labels", value: Self.list("red"))]
+        #expect(model.heldTokens == ["red"])
+    }
+
+    // MARK: Limits
+
+    @Test func aListAtItsLimitSaysSoAndWritesNothingMore() {
+        let (library, written) = (Self.library([]), Written())
+        let model = wordsPanel(["a", "b"], limit: 2, in: library, written: written)
+        add("c", to: model)
+        #expect(written.all.isEmpty)
+        #expect(model.notice == "Labels can hold 2 at most.")
+        model.removeToken("a")
+        add("c", to: model)
+        #expect(written.all == [Self.list("b"), Self.list("b", "c")] && model.notice == nil)
+    }
+
+    // MARK: People
+
+    private static let people = ListShape(members: [
+        .init(key: "name", label: "Name", kind: .text(nil)), .init(key: "email", label: "Email", kind: .text(.email)),
+    ])
+    private static let assignees = ItemTypeInfo.Field(key: "assignees", label: "Assignees", kind: .list(people), declaredBy: task)
+
+    private static func person(_ name: String, _ email: String? = nil) -> PropertyValue {
+        var entry: [String: PropertyValue] = ["name": .string(name)]
+        if let email { entry["email"] = .string(email) }
+        return .object(entry)
+    }
+
+    /// A people panel over an item holding `entries`, with other items in the library holding `others`.
+    private func peoplePanel(_ entries: [PropertyValue], others: [PropertyValue] = [], writing: Bool = false, written: Written) -> ValueEditModel {
+        let library = Self.library([])
+        let item = Self.item(["assignees": .array(entries)])
+        let more = others.enumerated().map { index, entry in
+            Self.item(["assignees": .array([entry])], id: "10000000-0000-0000-0000-00000000010\(index)")
+        }
+        library.items = [item] + more
+        if writing { library.writingProperties = [item.id] }
+        return ValueEditModel(Self.request(.people(Self.assignees, Self.people), item: item, in: library, write: { written.all.append($0); return true }))
+    }
+
+    @Test func twoPeopleWithOneNameAreTwoRowsAndRemovingOneKeepsTheOther() throws {
+        let (sam, other, written) = (Self.person("Sam", "one@example.com"), Self.person("Sam", "two@example.com"), Written())
+        let model = peoplePanel([sam, other], written: written)
+        let held = model.rows.filter(\.isCurrent)
+        #expect(held.count == 2 && Set(held.map(\.id)).count == 2)
+        #expect(held.map(\.detail) == ["one@example.com", "two@example.com"])
+        model.activate(try #require(held.last).id)
+        #expect(written.all == [PropertyValue.array([sam])])
+    }
+
+    @Test func peopleWithNoAddressAreToldByNameAndTheSameNameTwiceStillHasTwoRows() {
+        let model = peoplePanel([Self.person("Ana"), Self.person("Ana")], written: Written())
+        let held = model.rows.filter(\.isCurrent)
+        #expect(held.count == 2 && Set(held.map(\.id)).count == 2)
+    }
+
+    @Test func aSameNamedPersonWithAnotherAddressIsStillOfferedAndAddable() throws {
+        let (one, two, written) = (Self.person("Sam", "one@example.com"), Self.person("Sam", "two@example.com"), Written())
+        let model = peoplePanel([one], others: [two], written: written)
+        let offered = model.rows.filter { $0.id.hasPrefix("person:") }
+        #expect(offered.map(\.title) == ["Sam"])
+        model.activate(try #require(offered.first).id)
+        #expect(written.all == [PropertyValue.array([one, two])])
+    }
+
+    @Test func aSecondTapOnThePersonJustAddedAddsNobodyAgain() {
+        let (two, written) = (Self.person("Sam", "two@example.com"), Written())
+        let model = peoplePanel([], others: [two], writing: true, written: written)
+        model.activate("person:two@example.com")
+        model.activate("person:two@example.com")
+        #expect(written.all == [PropertyValue.array([two])])
+    }
+
+    // MARK: Dates
+
+    private static let due = ItemTypeInfo.Field(key: "due", label: "Due", kind: .date(includesTime: true), declaredBy: task)
+    private static let dayOnly = ItemTypeInfo.Field(key: "day", label: "Day", kind: .date(includesTime: false), declaredBy: task)
+
+    private static let utc: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }()
+
+    private static func moment(_ day: Int, _ hour: Int, _ minute: Int) -> Date {
+        utc.date(from: DateComponents(year: 2026, month: 11, day: day, hour: hour, minute: minute))!
+    }
+
+    private func datePanel(_ field: ItemTypeInfo.Field, holding value: String?, written: Written) -> ValueEditModel {
+        let item = Self.item(value.map { [field.key: .string($0)] } ?? [:])
+        var request = Self.request(.date(field), item: item, in: Self.library([item]), write: { written.all.append($0); return true })
+        request.calendar = Self.utc
+        return ValueEditModel(request)
+    }
+
+    @Test func theTimeThePickerShowsIsTheTimeWritten() {
+        let written = Written()
+        let model = datePanel(Self.due, holding: "2026-11-07T09:30:00Z", written: written)
+        #expect(model.hasTime)
+        model.setDate(Self.moment(7, 14, 45))
+        #expect(written.all == [PropertyValue.string(ItemDate.instant(Self.moment(7, 14, 45)))])
+    }
+
+    @Test func aDayOnlyValueGainsATimeAndLosesItAgain() throws {
+        let written = Written()
+        let model = datePanel(Self.due, holding: "2026-11-07", written: written)
+        #expect(model.allowsTime && !model.hasTime)
+        model.setIncludesTime(true)
+        let timed = try #require(written.all.last??.string)
+        #expect(ItemDate.parse(timed)?.hasTime == true)
+        let back = datePanel(Self.due, holding: timed, written: written)
+        back.setIncludesTime(false)
+        let day = try #require(written.all.last??.string)
+        #expect(ItemDate.parse(day)?.hasTime == false)
+    }
+
+    @Test func aQuickDateKeepsTheTimeTheValueHasAndAFieldWithoutTimesNeverGainsOne() {
+        let written = Written()
+        datePanel(Self.due, holding: "2026-11-07T09:30:00Z", written: written).chooseDay(Self.moment(9, 0, 0))
+        #expect(written.all == [PropertyValue.string(ItemDate.instant(Self.moment(9, 9, 30)))])
+        let plain = datePanel(Self.dayOnly, holding: "2026-11-07", written: written)
+        plain.setIncludesTime(true)
+        plain.setDate(Self.moment(9, 14, 45))
+        #expect(written.all.last == PropertyValue.string(ItemDate.day(Self.moment(9, 14, 45), calendar: Self.utc)))
+    }
+
+    // MARK: Rows
+
+    @Test func rowsAreBuiltOnceUntilWhatTheyShowChanges() {
+        let library = Self.library([])
+        let model = wordsPanel(["red"], writing: false, in: library, written: Written())
+        _ = model.rows
+        _ = model.rows
+        _ = model.activeRow
+        #expect(model.rowsBuilt == 1)
+        model.query = "bl"
+        _ = model.rows
+        _ = model.rows
+        #expect(model.rowsBuilt == 2)
+        library.items[0].properties = [Property(key: "labels", value: Self.list("red", "blue"))]
+        _ = model.rows
+        _ = model.rows
+        #expect(model.rowsBuilt == 3)
+    }
+
+    // MARK: Quitting
+
+    private func libraries(_ bench: HostBench, _ presenter: ValueEditPresenter) throws -> Libraries {
+        let defaults = try #require(UserDefaults(suiteName: "ValueEditingTests-\(UUID().uuidString)"))
+        return Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) }, valuePanels: presenter)
+    }
+
+    @Test func quittingOrChangingLibraryHandsBackTextTypedInTheOpenPanel() async throws {
+        let item = Self.item(["note": .string("old")])
+        let library = Self.library([item])
+        let sessions = Box()
+        let presenter = presenter(sessions)
+        presenter.present(Self.request(.text(Self.note), item: item, in: library), anchor: anchor())
+        sessions.all[0].model.typed = "my careful words"
+        let bench = try HostBench()
+        let kept = try libraries(bench, presenter)
+        #expect(await kept.flushEditors())
+        #expect(!presenter.isOpen)
+        #expect(library.notices.waiting.first?.text == "Note: my careful words")
+    }
+
+    @Test func aTextTheLibraryTakesWhenThePanelIsHandedOffIsWrittenNotTold() async throws {
+        let item = Self.item(["note": .string("old")])
+        let library = Self.library([item])
+        let (sessions, written) = (Box(), Written())
+        let presenter = presenter(sessions)
+        presenter.present(Self.request(.text(Self.note), item: item, in: library, write: { written.all.append($0); return true }), anchor: anchor())
+        sessions.all[0].model.typed = "kept"
+        let bench = try HostBench()
+        let kept = try libraries(bench, presenter)
+        #expect(await kept.flushEditors(within: .seconds(5)))
+        #expect(written.all == [PropertyValue.string("kept")] && library.notices.waiting.isEmpty)
     }
 
     // MARK: Keyboard

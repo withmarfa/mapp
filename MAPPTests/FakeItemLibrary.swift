@@ -45,6 +45,8 @@ final class FakeItemLibrary: ItemLibrary {
     var relationshipsByItem: [ItemID: [ItemRelationship]] = [:]
     /// Whether `changeItemRelationship` takes a write, and the writes it was asked for.
     var acceptsRelationships = false
+    /// The items whose property writes are still on their way, as a library that queues a write reports them.
+    var writingProperties: Set<ItemID> = []
     var relationshipWrites: [(item: ItemID, field: String, adding: [ItemID], removing: [ItemID])] = []
     var syncReport = SyncReport(queueRead: true)
     let now: () -> Date
@@ -359,6 +361,8 @@ final class FakeItemLibrary: ItemLibrary {
     func finish() {}
     func wasRefused(creating id: ItemID) -> Bool { refusedCreations.contains(id) }
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool { false }
+
+    func isWritingProperties(of id: ItemID) -> Bool { writingProperties.contains(id) }
     func changeItemRelationship(_ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?) async -> Bool {
         relationshipWrites.append((id, field, adding, removing))
         return acceptsRelationships
