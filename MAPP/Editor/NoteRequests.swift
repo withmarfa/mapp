@@ -7,8 +7,8 @@ nonisolated enum NoteRequest: Equatable, Sendable {
     case suggest(String, in: ItemID?)
     /// The Link to Note command, from the note it was typed in.
     case pick(ItemID)
-    /// Which of a note's links name no note. A link the core does not read as the one link the page posted is nil, and
-    /// keeps its place so the answer lines up with the page's links.
+    /// What each of a note's links names: no note, or a note of some type. A link the core does not read as the one link
+    /// the page posted is nil, and keeps its place so the answer lines up with the page's links.
     case resolve([NoteLink?], in: ItemID)
 
     init?(body: Any) {
@@ -36,8 +36,10 @@ final class NoteRequests: NSObject, WKScriptMessageHandlerWithReply {
     var suggest: (String, ItemID?) async -> [String] = { _, _ in [] }
     /// The link the person chose from the note, which may take as long as they do; nil if they chose none.
     var pick: (ItemID) async -> String? = { _ in nil }
-    /// Whether each link of the note names no note.
-    var missing: ([NoteLink], ItemID) async -> [Bool] = { links, _ in links.map { _ in false } }
+    /// What each link of the note names.
+    var readings: ([NoteLink], ItemID) async -> [LinkReading] = { links, _ in links.map { _ in .plain } }
+    /// The image of a type's icon as a data URL, nil where it cannot be drawn.
+    var drawIcon: (String?) -> String? = { LinkIcons.dataURL(for: $0) }
 
     func userContentController(
         _ controller: WKUserContentController,
@@ -49,20 +51,20 @@ final class NoteRequests: NSObject, WKScriptMessageHandlerWithReply {
             switch request {
             case .suggest(let query, let source): replyHandler(await suggest(query, source), nil)
             case .pick(let item): replyHandler(await pick(item), nil)
-            case .resolve(let links, let source): replyHandler(await answerMissing(links, in: source), nil)
+            case .resolve(let links, let source): replyHandler(await answerLinks(links, in: source).propertyList, nil)
             }
         }
     }
 
     /// One answer for each link the page posted. A link the core does not read as one link is not asked about and
-    /// is answered as not missing, so the page draws it as a live link rather than a red one it cannot vouch for;
-    /// the note's other links keep their marks.
-    func answerMissing(_ links: [NoteLink?], in source: ItemID) async -> [Bool] {
+    /// is answered as live with no type, so the page draws it as a live link rather than a red one it cannot vouch for;
+    /// the note's other links keep their marks. Each type icon is drawn and sent once, however many links name it.
+    func answerLinks(_ links: [NoteLink?], in source: ItemID) async -> LinkReply {
         let readable = links.compactMap { $0 }
-        let answers = readable.isEmpty ? [] : await missing(readable, source)
-        guard answers.count == readable.count else { return links.map { _ in false } }
+        let answers = readable.isEmpty ? [] : await readings(readable, source)
+        guard answers.count == readable.count else { return LinkReply(links.map { _ in .plain }, draw: drawIcon) }
         var next = answers.makeIterator()
-        return links.map { $0 == nil ? false : next.next() ?? false }
+        return LinkReply(links.map { $0 == nil ? .plain : next.next() ?? .plain }, draw: drawIcon)
     }
 }
 
