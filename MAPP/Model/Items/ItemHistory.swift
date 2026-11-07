@@ -15,8 +15,9 @@ nonisolated struct ItemSnapshot: Identifiable, Hashable, Sendable {
     /// The type the item had at this version, which may not be the type it has now.
     let type: TypeID
     let properties: [String: PropertyValue]
-    /// When this version was written; nil where the library did not say or the time could not be read.
-    let written: Date?
+    /// When the write that replaced this version happened, which is when the next version was saved; nil where the
+    /// library did not say. A version's own save time is its predecessor's `replaced`.
+    let replaced: Date?
     /// Nil where the library does not know who wrote it.
     let writer: Writer?
 }
@@ -148,6 +149,10 @@ nonisolated enum RestoreCheck: Hashable, Sendable {
     case unchanged
     /// Why this version can't be restored, in the person's words.
     case unavailable(String)
+
+    var isReady: Bool {
+        if case .ready = self { true } else { false }
+    }
 }
 
 extension ItemLibrary {

@@ -380,9 +380,16 @@ struct CommandPalette: View {
             }
         }
 
-        if let details, selected.count == 1, let only = selected.first {
+        if let details, details.history != nil {
+            add(String(localized: "Exit Version History"), "xmark") { details.leaveHistory() }
+            if details.history?.canRestore(in: library) == true {
+                add(String(localized: "Restore Version"), "arrow.uturn.backward") {
+                    details.restoreFromHistory(in: library, undoManager: undoManager)
+                }
+            }
+        } else if let details, selected.count == 1, let only = selected.first {
             add(String(localized: "Version History…"), "clock.arrow.circlepath") {
-                details.history = VersionHistoryRequest(item: only.id, undoManager: undoManager)
+                details.showHistory(of: only.id, in: library)
             }
         }
         if let details, details.isCustomizingLayout {

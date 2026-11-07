@@ -60,6 +60,46 @@ struct NoteWindow: View {
 
     var body: some View {
         Group {
+            if let history = details.history {
+                VersionHistoryWorkspace(mode: history, details: details)
+            } else {
+                page
+            }
+        }
+        .focusedSceneValue(\.detailsPresentation, details)
+        .environment(details)
+        .sheet(item: Binding { details.typeChange } set: { details.typeChange = $0 }) { TypeChangeSheet(request: $0) }
+        .sheet(item: Binding { details.collectionPick } set: { details.collectionPick = $0 }) { CollectionPickerSheet(request: $0) }
+        .sheet(item: Binding { details.tagRequest } set: { details.tagRequest = $0 }) { TagSheet(request: $0) }
+        .onChange(of: details.isPresentedByPerson) { storedDetailsPresented = details.isPresentedByPerson }
+        // Closing the sidebar by hand finishes Customize Layout, which has nowhere else to show.
+        .onChange(of: details.isPresented) { if !details.isPresented { details.endLayout() } }
+        .onAppear {
+            details.isPresented = storedDetailsPresented
+        }
+        .onChange(of: library.isGone(id), initial: true) {
+            if library.isGone(id) { dismiss() }
+        }
+        // Another server is another library, which does not hold this window's note.
+        .onChange(of: ObjectIdentifier(library)) { dismiss() }
+        // The note followed from a link is another item, which Version History is not of.
+        .onChange(of: id) { details.leaveHistory() }
+        // The page goes when its library does, as when the window waits while the server's copy opens again, and
+        // the window's undo would act on the library left.
+        .onDisappear { [library] in
+            // What was typed in the inspector goes to the library it was typed for, or back to the person.
+            details.handOffProperties(in: library, undoManager: nil)
+            // A window that never showed a note made no editor.
+            editorSlot.made?.flush()
+            editorSlot.made?.windowWent()
+            undoManager?.removeAllActions()
+        }
+        .libraryDialogs()
+    }
+
+    /// The item's page with its inspector, which Version History takes the place of.
+    private var page: some View {
+        Group {
             if let item, let editor {
                 NotePage(item: item, editor: editor, headerDrafts: details, backsToolbar: false)
                     .navigationTitle(item.displayTitle)
@@ -84,34 +124,6 @@ struct NoteWindow: View {
                     .toolbar { inspectorToolbar }
             }
         }
-        .focusedSceneValue(\.detailsPresentation, details)
-        .environment(details)
-        .sheet(item: Binding { details.typeChange } set: { details.typeChange = $0 }) { TypeChangeSheet(request: $0) }
-        .sheet(item: Binding { details.history } set: { details.history = $0 }) { VersionHistorySheet(request: $0) }
-        .sheet(item: Binding { details.collectionPick } set: { details.collectionPick = $0 }) { CollectionPickerSheet(request: $0) }
-        .sheet(item: Binding { details.tagRequest } set: { details.tagRequest = $0 }) { TagSheet(request: $0) }
-        .onChange(of: details.isPresentedByPerson) { storedDetailsPresented = details.isPresentedByPerson }
-        // Closing the sidebar by hand finishes Customize Layout, which has nowhere else to show.
-        .onChange(of: details.isPresented) { if !details.isPresented { details.endLayout() } }
-        .onAppear {
-            details.isPresented = storedDetailsPresented
-        }
-        .onChange(of: library.isGone(id), initial: true) {
-            if library.isGone(id) { dismiss() }
-        }
-        // Another server is another library, which does not hold this window's note.
-        .onChange(of: ObjectIdentifier(library)) { dismiss() }
-        // The page goes when its library does, as when the window waits while the server's copy opens again, and
-        // the window's undo would act on the library left.
-        .onDisappear { [library] in
-            // What was typed in the inspector goes to the library it was typed for, or back to the person.
-            details.handOffProperties(in: library, undoManager: nil)
-            // A window that never showed a note made no editor.
-            editorSlot.made?.flush()
-            editorSlot.made?.windowWent()
-            undoManager?.removeAllActions()
-        }
-        .libraryDialogs()
     }
 }
 

@@ -53,6 +53,7 @@ struct AppCommands: Commands {
                     .environment(\.library, library)
                     .environment(details)
             }
+            VersionHistoryCommands(details: details, library: library, undoManager: notes?.undoManager)
         }
 
         // Print has ⌘P, as everywhere; the print panel sets the paper.

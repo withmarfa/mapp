@@ -34,8 +34,8 @@ final class DetailsPresentation {
     var isPresented = false
     /// The items the window's Change Type sheet is open for.
     var typeChange: TypeChangeRequest?
-    /// The item the window's Version History sheet is open for.
-    var history: VersionHistoryRequest?
+    /// Version History, while the window shows it in place of its page.
+    private(set) var history: VersionHistoryMode?
     /// Whether the window's right sidebar is arranging the page's layout (Customize Layout) in place of the inspector.
     /// It belongs to the window, not to an item: another item shows its own type's rows, and a file, which cannot be
     /// arranged, shows the inspector until a note is back.
@@ -68,6 +68,36 @@ final class DetailsPresentation {
     }
 
     func expandLinks(_ group: LinkGroup) { expandedLinks.insert(group) }
+
+    /// Shows the item's versions in place of the window's page, once every open page has handed over what was just
+    /// typed, so the version shown as current is the text the person sees. Nothing happens while one is shown.
+    func showHistory(of id: ItemID, in library: any ItemLibrary) {
+        guard history == nil else { return }
+        EditorController.flushAll(leaving: false) { [weak self] kept in
+            guard let self, history == nil else { return }
+            guard kept else {
+                library.notices.tell(String(localized: "Can’t Open Version History"), String(localized: "Finish editing the current note, then try again."))
+                return
+            }
+            let mode = VersionHistoryMode(item: id, source: library.history)
+            history = mode
+            mode.start()
+        }
+    }
+
+    /// Restores the chosen version, and goes back to the item once the library has taken it. A restore the library
+    /// refuses leaves Version History open, with the notice that says why.
+    func restoreFromHistory(in library: any ItemLibrary, undoManager: UndoManager?) {
+        history?.restore(in: library, undoManager: undoManager) { [weak self] restored in
+            if restored { self?.leaveHistory() }
+        }
+    }
+
+    /// Goes back to the window's page.
+    func leaveHistory() {
+        history?.stop()
+        history = nil
+    }
 
     /// Starts or ends Customize Layout.
     func toggleLayout() {

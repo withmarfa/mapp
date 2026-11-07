@@ -155,7 +155,7 @@ struct ItemBoard: View {
             }
             AddTagButton(ids: acting, details: details, undoManager: undoManager)
             TypeChangeButton(ids: acting, details: details, undoManager: undoManager)
-            VersionHistoryButton(ids: [item.id], details: details, undoManager: undoManager)
+            VersionHistoryButton(ids: [item.id], details: details)
         }
         .draggable(containerItemID: item.id)
     }

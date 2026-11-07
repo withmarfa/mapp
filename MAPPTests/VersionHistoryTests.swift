@@ -29,7 +29,7 @@ private func snapshot(
     var properties: [String: PropertyValue] = [:]
     if let body { properties["body"] = .string(body) }
     if let title { properties["title"] = .string(title) }
-    return ItemSnapshot(id: "v\(version)", version: version, type: type, properties: properties, written: nil, writer: nil)
+    return ItemSnapshot(id: "v\(version)", version: version, type: type, properties: properties, replaced: nil, writer: nil)
 }
 
 private func page(_ versions: [Int], next: String? = nil) -> Result<ItemHistoryPage, ItemHistoryFailure> {

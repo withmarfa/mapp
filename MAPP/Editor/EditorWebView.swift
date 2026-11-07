@@ -179,8 +179,8 @@ final class EditorWebView: WKWebView {
     }
 
     @objc private func versionHistory(_ sender: NSMenuItem) {
-        guard let controller, let id = controller.noteID else { return }
-        controller.titleDrafts?.history = VersionHistoryRequest(item: id, undoManager: windowUndoManager)
+        guard let controller, let id = controller.noteID, let library = controller.library else { return }
+        controller.titleDrafts?.showHistory(of: id, in: library)
     }
 
     /// Version History, for the note on the page, from the window the editor belongs to.

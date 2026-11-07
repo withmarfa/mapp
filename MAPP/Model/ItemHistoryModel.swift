@@ -1,8 +1,9 @@
 import Foundation
 import Observation
 
-/// The versions of one item that the Version History sheet lists: read a page at a time from the library's source,
-/// oldest first as the server gives them, never all at once.
+/// The versions of one item that Version History lists. The server gives them oldest first and no other way, while the
+/// thread reads newest first, so the pages are read one after another until the end (up to `autoPages` of them),
+/// and the thread grows as each arrives. A history longer than that stops with Load More.
 @Observable final class ItemHistoryModel {
     enum Phase: Equatable {
         case idle
@@ -14,10 +15,10 @@ import Observation
     }
 
     /// How many snapshots one request asks for. The server allows 200.
-    static let pageSize = 100
-    /// Empty pages followed in a row before the list stops and offers Load More, so a server that answers only
-    /// empty pages with a cursor never keeps the sheet busy.
-    private static let emptyPagesFollowed = 20
+    static let pageSize = 200
+    /// How many pages one read follows before it stops and offers Load More: 2,000 versions, more than the server
+    /// keeps by default, so a server that answers only empty pages with a cursor never keeps the thread busy.
+    static let autoPages = 10
 
     let id: ItemID
     @ObservationIgnored private let source: (any ItemHistorySource)?
@@ -28,7 +29,7 @@ import Observation
     private(set) var isLoadingMore = false
     /// Why the last Load More failed. The versions listed stay.
     private(set) var moreFailure: ItemHistoryFailure?
-    var selection: ItemSnapshot.ID?
+    var selection: String?
 
     @ObservationIgnored private var cursor: String?
     @ObservationIgnored private var loading: Task<Void, Never>?
@@ -37,6 +38,9 @@ import Observation
         self.id = id
         self.source = source
     }
+
+    /// Whether every version the server holds has been read, so the thread is whole.
+    var isComplete: Bool { phase == .loaded && !hasMore }
 
     var selected: ItemSnapshot? {
         selection.flatMap { id in snapshots.first { $0.id == id } }
@@ -66,25 +70,26 @@ import Observation
         loading = Task { await self.fetch(from: source, first: false) }
     }
 
-    /// Stops a read still under way, as the sheet closes.
+    /// Stops a read still under way, as Version History closes.
     func cancel() {
         loading?.cancel()
         loading = nil
     }
 
     private func fetch(from source: any ItemHistorySource, first: Bool) async {
-        var empty = 0
+        var pages = 0
         while !Task.isCancelled {
             let page: ItemHistoryPage
             do {
                 page = try await source.page(of: id, after: cursor, limit: Self.pageSize)
             } catch {
                 guard !Task.isCancelled else { return }
-                if first { phase = .failed(error) } else { moreFailure = error }
+                if first && pages == 0 { phase = .failed(error) } else { moreFailure = error }
                 isLoadingMore = false
                 return
             }
             guard !Task.isCancelled else { return }
+            pages += 1
             // Versions are not contiguous, since the server thins old ones, so they are told apart by number alone.
             let held = Set(snapshots.map(\.version))
             let fresh = page.snapshots.filter { !held.contains($0.version) }
@@ -94,14 +99,11 @@ import Observation
             cursor = next
             hasMore = next != nil
             phase = .loaded
-            isLoadingMore = false
-            if fresh.isEmpty && next != nil {
-                empty += 1
-                guard empty < Self.emptyPagesFollowed else { return }
-                isLoadingMore = true
-                continue
+            guard next != nil, pages < Self.autoPages else {
+                isLoadingMore = false
+                return
             }
-            return
+            isLoadingMore = true
         }
     }
 }
