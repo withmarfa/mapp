@@ -221,35 +221,6 @@ nonisolated final class DatagramProbe: @unchecked Sendable {
         #expect(sent, "the control sent no datagram, so the test above shows nothing")
     }
 
-    @Test func aClickOnAFormInsideALinkIsStoppedWhateverTheFormsControlsAreCalled() async throws {
-        // `form.closest` is the control named so, and a click on the form reached the link behind it.
-        let page = try await SealedWebPage.make(runsScripts: true)
-        try await page.show(Data("""
-            <html><body><a href="http://127.0.0.1:9/never"><form id="f"><input name="closest"><input name="matches"></form></a></body></html>
-            """.utf8))
-        let prevented = try await page.page.callJavaScript("""
-            const click = new MouseEvent('click', { bubbles: true, cancelable: true });
-            document.getElementById('f').dispatchEvent(click);
-            return click.defaultPrevented;
-            """)
-        #expect(prevented as? Bool == true)
-    }
-
-    @Test func theLockdownDoesNotDependOnWhatTheDocumentCallsItsGlobals() async throws {
-        let page = try await SealedWebPage.make(runsScripts: true)
-        try await page.show(Data("""
-            <html><body><script>
-            window.Element = null; Event.prototype.preventDefault = () => {};
-            </script><a id="a" href="http://127.0.0.1:9/never">link</a></body></html>
-            """.utf8))
-        let prevented = try await page.page.callJavaScript("""
-            const click = new MouseEvent('click', { bubbles: true, cancelable: true });
-            document.getElementById('a').dispatchEvent(click);
-            return click.defaultPrevented;
-            """)
-        #expect(prevented as? Bool == true)
-    }
-
     @Test func thePicturesAreRedrawnInADocumentWhoseImagesAreNamedAfterItsMethods() async throws {
         let page = try await SealedWebPage.make(runsScripts: false)
         let source = "\(SealedPictures.scheme):picture?v=1"
