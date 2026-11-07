@@ -3,14 +3,12 @@ import SwiftUI
 /// The Filter, on the toolbar just after Search and in the View menu. It reads the place as the table reads it
 /// (`ItemTableContent`), and what it keeps is the place's, for the window, in every layout.
 struct ItemTableFilterMenu: View {
-    @CurrentLibrary private var library
     @Bindable var browser: Browser
 
     var body: some View {
-        let content = browser.tableContent(in: library)
         let isFiltering = browser.tableOptions[browser.item]?.isFiltering == true
         Menu {
-            FilterMenuItems(browser: browser, content: content)
+            FilterMenuItems(browser: browser)
         } label: {
             Label("Filter", systemImage: isFiltering ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease")
         }

@@ -110,7 +110,7 @@ struct ViewOptionCommand {
         let field = ItemTimelineLayout.selectedField(browser.timelineFields[place], fields: fields)
         return fields.filter { $0.key != field }.map { field in
             ViewOptionCommand(title: String(localized: "Date Field: \(field.label)"), systemImage: "calendar") {
-                browser.timelineFields[place] = field.key
+                browser.setTimelineField(field.key, in: library)
             }
         }
     }
