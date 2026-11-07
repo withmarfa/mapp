@@ -56,10 +56,11 @@ nonisolated enum TypeTone: String, CaseIterable, Sendable {
         color(for: scheme).opacity(opacity)
     }
 
-    /// The color of an icon or a name on the tone's tint, a step apart from it: `depth` of the way to black in light
-    /// and to white in dark, where the tint is the darker of the two.
-    func ink(_ depth: Double, for scheme: ColorScheme) -> Color {
-        let (r, g, b) = inkComponents(depth, dark: scheme == .dark)
+    /// The color of an icon or a name on the tone's tint, a step apart from it: `inkDepth` of the way to black in light.
+    /// In dark, where the tint is the darker of the two, it goes `inkDepthDark` of the way to white, then dims to
+    /// `inkCeilingDark` if that leaves it brighter.
+    func ink(_ looks: ChipLooks, for scheme: ColorScheme) -> Color {
+        let (r, g, b) = inkComponents(looks, dark: scheme == .dark)
         return Color(.sRGB, red: r, green: g, blue: b)
     }
 
@@ -73,13 +74,13 @@ nonisolated enum TypeTone: String, CaseIterable, Sendable {
     @MainActor static func cssColors(for tone: TypeTone, dark: Bool, looks: ChipLooks = .current) -> [String: String] {
         let (r, g, b) = tone.components(dark: dark)
         let (red, green, blue) = (Int((r * 255).rounded()), Int((g * 255).rounded()), Int((b * 255).rounded()))
-        let ink = tone.inkComponents(looks.inkDepth, dark: dark)
+        let ink = tone.inkComponents(looks, dark: dark)
         let inkBytes = [ink.0, ink.1, ink.2].map { String(Int(($0 * 255).rounded())) }.joined(separator: ", ")
         return [
             "--tone": "rgb(\(red), \(green), \(blue))",
             "--tone-ink": "rgb(\(inkBytes))",
             "--tone-mark": "rgba(\(red), \(green), \(blue), \(String(format: "%g", looks.markOpacity)))",
-            "--tone-chip": "rgba(\(red), \(green), \(blue), \(String(format: "%g", looks.typeTintOpacity)))",
+            "--tone-chip": "rgba(\(red), \(green), \(blue), \(String(format: "%g", dark ? looks.typeTintOpacityDark : looks.typeTintOpacity)))",
         ]
     }
 
@@ -88,10 +89,20 @@ nonisolated enum TypeTone: String, CaseIterable, Sendable {
         return (Double((hex >> 16) & 0xFF) / 255, Double((hex >> 8) & 0xFF) / 255, Double(hex & 0xFF) / 255)
     }
 
-    private func inkComponents(_ depth: Double, dark: Bool) -> (Double, Double, Double) {
+    private func inkComponents(_ looks: ChipLooks, dark: Bool) -> (Double, Double, Double) {
         let (r, g, b) = components(dark: dark)
-        let target = dark ? 1.0 : 0.0
-        return (r + (target - r) * depth, g + (target - g) * depth, b + (target - b) * depth)
+        guard dark else { return (r * (1 - looks.inkDepth), g * (1 - looks.inkDepth), b * (1 - looks.inkDepth)) }
+        let lift = looks.inkDepthDark
+        let ink = (r + (1 - r) * lift, g + (1 - g) * lift, b + (1 - b) * lift)
+        let luminance = Self.luminance(ink)
+        guard luminance > looks.inkCeilingDark else { return ink }
+        let dimming = pow(looks.inkCeilingDark / luminance, 1 / 2.2)
+        return (ink.0 * dimming, ink.1 * dimming, ink.2 * dimming)
+    }
+
+    /// Relative luminance, with sRGB read as a plain 2.2 gamma: near enough to compare tones.
+    private static func luminance(_ color: (Double, Double, Double)) -> Double {
+        0.2126 * pow(color.0, 2.2) + 0.7152 * pow(color.1, 2.2) + 0.0722 * pow(color.2, 2.2)
     }
 
     private var lightHex: Int {
