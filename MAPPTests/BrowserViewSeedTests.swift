@@ -15,10 +15,13 @@ struct BrowserViewSeedTests {
             sort: [LibraryViewSort(field: "updated_at", ascending: false)], group: LibraryViewGroup(field: group, bucket: bucket))
     }
 
-    private static func opened(_ view: LibraryView = view()) -> (Browser, FakeItemLibrary) {
+    /// A window on the view, whose layout is `layout` as the Mac kept it, so a layout is not itself a change.
+    private static func opened(_ view: LibraryView = view(), layout: ItemViewMode = .table) -> (Browser, FakeItemLibrary) {
         let library = FakeItemLibrary()
         library.views = [view]
         let browser = Browser()
+        browser.defaults = ViewPanelTests.defaults()
+        ViewLayouts.update(in: browser.defaults) { $0.set(ViewMacSettings(layout: layout), for: view.id) }
         browser.adopt(library)
         browser.sidebarItem = .view(view.id)
         browser.viewMode = .table
@@ -52,6 +55,14 @@ struct BrowserViewSeedTests {
         for mode in ItemViewMode.allCases {
             let (browser, _) = Self.opened()
             browser.viewMode = mode
+            // The layout alone is a change too; the view is taken to have been saved in it, to see the filter's.
+            if let seed = browser.viewSeeds[Self.view().id] {
+                var mac = seed.mac
+                mac.layout = mode
+                browser.viewSeeds[Self.view().id] = Browser.ViewSeed(
+                    version: seed.version, options: seed.options, timelineDate: seed.timelineDate, types: seed.types, mac: mac)
+            }
+            browser.viewWorking[Self.view().id] = nil
             browser.tableOptions[browser.item]?.filters = ["field.status": ["todo"]]
             #expect(browser.hasViewChanges, "\(mode) did not count a filter")
             browser.tableOptions[browser.item]?.negated = ["field.status"]
@@ -79,8 +90,7 @@ struct BrowserViewSeedTests {
     }
 
     @Test func aChangedTimelineDateIsAChange() {
-        let (browser, _) = Self.opened(Self.view(group: "properties.due_at", bucket: .day))
-        browser.viewMode = .timeline
+        let (browser, _) = Self.opened(Self.view(group: "properties.due_at", bucket: .day), layout: .timeline)
         #expect(browser.timelineFields[browser.item] == "due_at")
         #expect(!browser.hasViewChanges)
         browser.timelineFields[browser.item] = "starts_at"
@@ -181,12 +191,16 @@ struct BrowserViewSeedTests {
     @Test func anotherLibraryStartsWithNoSeeds() {
         // The first library is kept, so the second is not made at its address and taken for it.
         let (browser, first) = Self.opened()
-        browser.viewEditing = .rename(Self.view().id)
+        browser.deletingView = Self.view().id
+        browser.openViewPanel(in: first)
+        browser.changeViewSettings(Self.view().id) { $0.hidesEmptyGroups = true }
         let second = FakeItemLibrary()
         browser.adopt(second)
         withExtendedLifetime(first) {}
         #expect(browser.viewSeeds.isEmpty)
-        #expect(browser.viewEditing == nil)
+        #expect(browser.deletingView == nil)
+        #expect(browser.viewPanel == nil)
+        #expect(browser.viewWorking.isEmpty)
     }
 
     @Test func aChangedOrderOrGroupingIsOfferedInEveryLayout() {

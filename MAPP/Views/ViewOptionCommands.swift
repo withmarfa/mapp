@@ -22,7 +22,6 @@ struct ViewOptionCommand {
     private static func table(_ browser: Browser, _ library: any ItemLibrary, _ storedColumns: Binding<Data>) -> [ViewOptionCommand] {
         let place = browser.item
         let content = browser.tableContent(in: library)
-        let layout = ItemTableColumnLayouts.layout(for: place, in: storedColumns.wrappedValue)
         let first = content.sort.first
         var commands: [ViewOptionCommand] = []
         if browser.isSearching, !browser.ordersByRelevance {
@@ -30,7 +29,7 @@ struct ViewOptionCommand {
                 browser.orderSearch(byRelevance: true)
             })
         }
-        for column in content.columns where layout.shows(column) && column.id != first?.column.id {
+        for column in content.columns where browser.showsColumn(column, stored: storedColumns.wrappedValue) && column.id != first?.column.id {
             commands.append(.init(title: String(localized: "Sort by \(column.label)"), systemImage: "arrow.up.arrow.down") {
                 browser.orderSearch(byRelevance: false)
                 browser.tableOptions[place, default: .init()].sort = [ItemTableComparator(column: column, order: column.firstOrder)]
@@ -57,14 +56,12 @@ struct ViewOptionCommand {
             })
         }
         for column in content.columns where column.content != .title {
-            let shown = layout.shows(column)
+            let shown = browser.showsColumn(column, stored: storedColumns.wrappedValue)
             commands.append(.init(
                 title: shown ? String(localized: "Hide \(column.label) Column") : String(localized: "Show \(column.label) Column"),
                 systemImage: "tablecells"
             ) {
-                var changed = ItemTableColumnLayouts.layout(for: place, in: storedColumns.wrappedValue)
-                changed[visibility: column.id] = shown ? .hidden : .visible
-                storedColumns.wrappedValue = ItemTableColumnLayouts.storing(changed, for: place, in: storedColumns.wrappedValue)
+                browser.setColumn(column, shown: !shown, stored: storedColumns)
             })
         }
         if browser.tableRowsNotLoaded(in: content) > 0 {

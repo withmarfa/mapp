@@ -1,18 +1,12 @@
 import Foundation
 
-/// Following the saved view a window shows: its order, grouping, filters and timeline date, and saving the window's changes to it.
+/// Following the saved view a window shows: its order, grouping, filters and timeline date from Marfa, and its
+/// layout and columns from this Mac (`ViewLayouts`). Whatever the person changes is held for the window until Save
+/// keeps it (`Browser+ViewPanel`) or Revert drops it.
 extension Browser {
-    /// A saved view the window is about to save, rename, update or delete, which asks the person first.
-    nonisolated enum ViewEditing: Hashable, Identifiable {
-        case new
-        case rename(ItemID)
-        case update(ItemID)
-        case delete(ItemID)
-        var id: Self { self }
-    }
-
     /// The order, grouping and filters a view opened with, the date its timeline showed, the types it showed as a
-    /// Type filter, and the version of the view they came from, which a save of them is based on.
+    /// Type filter, the version of the view they came from, which a save of them is based on, and the settings the Mac
+    /// held for it.
     struct ViewSeed: Hashable {
         let version: Int64
         let options: ItemTableOptions
@@ -21,17 +15,21 @@ extension Browser {
         /// What to read the view's items with while the window's filters differ from these (`previewQuery`); nil where
         /// the view's own list stands for them.
         let preview: LibraryViewQuery?
+        let mac: ViewMacSettings
     }
 
     /// Shows a view's own order, grouping and filters the first time the window opens it, and again when the view
     /// changes, unless the person has changed them since: those stay, and a save of them is based on what they
-    /// changed. Every layout shows them.
+    /// changed. Every layout shows them, and the view opens in the layout held for it or kept on this Mac.
     func followView(in library: any ItemLibrary) {
         guard case .view(let id) = item, let view = library.views.first(where: { $0.id == id }) else { return }
-        if let seed = viewSeeds[id] {
-            guard seed.version != view.version, !differs(from: seed) else { return }
+        guard let seed = viewSeeds[id] else {
+            apply(layout: ViewLayouts.stored(in: defaults).settings(for: id)?.layout, in: library)
+            return self.seed(view, catalogue: library.catalogue)
         }
-        seed(view, catalogue: library.catalogue)
+        apply(layout: viewWorking[id]?.layout ?? seed.mac.layout, in: library)
+        guard seed.version != view.version, !differs(id, from: seed) else { return }
+        self.seed(view, catalogue: library.catalogue)
     }
 
     private func seed(_ view: LibraryView, catalogue: Catalogue) {
@@ -39,24 +37,41 @@ extension Browser {
         var options = ViewDraft.options(for: view, catalogue: catalogue)
         let timelineDate = ViewDraft.timelineDate(of: view)
         let collapsed = tableOptions[place]?.collapsed
+        var mac = ViewLayouts.stored(in: defaults).settings(for: view.id) ?? ViewMacSettings()
+        if mac.layout == nil { mac.layout = viewMode }
         let types = ViewDraft.seededTypes(of: view.query, catalogue: catalogue)
         viewSeeds[view.id] = ViewSeed(
             version: view.version, options: options, timelineDate: timelineDate, types: types,
-            preview: ViewDraft.previewQuery(of: view.query, seededTypes: types, catalogue: catalogue))
+            preview: ViewDraft.previewQuery(of: view.query, seededTypes: types, catalogue: catalogue), mac: mac)
+        viewWorking[view.id] = nil
         options.collapsed = collapsed
         tableOptions[place] = options
         timelineFields[place] = timelineDate
     }
 
-    private func differs(from seed: ViewSeed) -> Bool {
-        ViewDraft.differs(tableOptions[item], timelineDate: timelineFields[item], from: seed.options, seedTimelineDate: seed.timelineDate)
+    private func differs(_ id: ItemID, from seed: ViewSeed) -> Bool {
+        let place = SidebarItem.view(id)
+        return ViewDraft.differs(tableOptions[place], timelineDate: timelineFields[place], from: seed.options, seedTimelineDate: seed.timelineDate)
+            || viewWorking[id].map { !$0.sameChoices(as: seed.mac) } == true
     }
 
-    /// Whether the window's filters, order, grouping or timeline date differ from those of the view it shows, in
-    /// whichever layout it shows them.
+    /// Shows the layout without taking it for a change of the person's, which only the person's own choice is.
+    private func apply(layout: ItemViewMode?, in library: any ItemLibrary) {
+        guard let layout, layout != viewMode, availableViewModes(in: library).contains(layout) else { return }
+        set(layout: layout)
+    }
+
+    func set(layout: ItemViewMode) {
+        isApplyingLayout = true
+        defer { isApplyingLayout = false }
+        viewMode = layout
+    }
+
+    /// Whether the window's filters, order, grouping, timeline date, layout, columns or empty groups differ from
+    /// those of the view it shows, in whichever layout it shows them.
     var hasViewChanges: Bool {
         guard case .view(let id) = item, let seed = viewSeeds[id] else { return false }
-        return differs(from: seed)
+        return differs(id, from: seed)
     }
 
     /// The query the window reads the view's items with while its filters differ from the view's own, and nil while
@@ -67,6 +82,46 @@ extension Browser {
               (tableOptions[item] ?? ItemTableOptions()).filterChoices != seed.options.filterChoices else { return nil }
         return (id, query)
     }
+
+    // MARK: This Mac's settings for a view
+
+    /// The layout, columns and empty groups the window shows for a view: what the person has changed and not saved,
+    /// else what the Mac holds.
+    func macSettings(for id: ItemID) -> ViewMacSettings {
+        viewWorking[id] ?? viewSeeds[id]?.mac ?? ViewLayouts.stored(in: defaults).settings(for: id) ?? ViewMacSettings()
+    }
+
+    /// Whether the board leaves out a lane with no items: a saved view's choice, held until Save.
+    var hidesEmptyGroups: Bool {
+        guard case .view(let id) = item else { return false }
+        return macSettings(for: id).hidesEmptyGroups
+    }
+
+    /// Changes the window's settings for a view, which stay unsaved until Save.
+    func changeViewSettings(_ id: ItemID, _ change: (inout ViewMacSettings) -> Void) {
+        var settings = macSettings(for: id)
+        change(&settings)
+        guard settings != macSettings(for: id) else { return }
+        viewWorking[id] = settings
+    }
+
+    /// Takes the person's own change of layout, in a view, for an unsaved one.
+    func recordLayout() {
+        guard !isApplyingLayout, case .view(let id) = item, viewSeeds[id] != nil else { return }
+        changeViewSettings(id) { $0.layout = viewMode }
+    }
+
+    /// Keeps the table's column widths as the person drags them, at once: a width is not a choice a Save waits for.
+    func keepWidths(_ widths: Data?, of id: ItemID) {
+        ViewLayouts.update(in: defaults) {
+            var settings = $0.settings(for: id) ?? ViewMacSettings()
+            guard settings.widths != widths else { return }
+            settings.widths = widths
+            $0.set(settings, for: id)
+        }
+    }
+
+    // MARK: Reverting and saving
 
     /// Puts the window back to the view as the library holds it, dropping what the person changed.
     func revertView(in library: any ItemLibrary) {
@@ -101,10 +156,26 @@ extension Browser {
         seed(view, catalogue: library.catalogue)
     }
 
-    /// A save refused because the view changed elsewhere puts the window back to the view as the library holds
-    /// it, and to its next version when that arrives.
+    /// A save refused because the view changed elsewhere, or a revert, puts the window back to the view as the
+    /// library holds it (its next version when that arrives), in the layout the Mac keeps for it.
     func viewRefused(_ id: ItemID, in library: any ItemLibrary) {
+        if case .view(id) = item, let layout = viewSeeds[id]?.mac.layout, layout != viewMode { set(layout: layout) }
         viewSeeds[id] = nil
+        viewWorking[id] = nil
         followView(in: library)
+    }
+
+    /// Forgets a view the library no longer holds, and what the Mac kept for it.
+    func forgetView(_ id: ItemID) {
+        viewSeeds[id] = nil
+        viewWorking[id] = nil
+        ViewLayouts.update(in: defaults) { $0.forget(id) }
+    }
+
+    /// Deletes the view for good, once the person confirmed. Nothing of it stays on this Mac.
+    func deleteView(_ id: ItemID, in library: any ItemLibrary) async {
+        deletingView = nil
+        guard await library.deleteView(id) else { return }
+        forgetView(id)
     }
 }

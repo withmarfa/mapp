@@ -19,7 +19,8 @@ struct ItemTableFilterMenu: View {
 }
 
 /// The table's part of View Options (`CurrentViewOptions`): Sort, Group and the columns shown. Sort and Group are the
-/// place's, for the window; the columns shown are kept for the place (`ItemTableColumnLayouts`). A saved view's list
+/// place's, for the window; the columns shown are kept for the place (`ItemTableColumnLayouts`), or held for a saved
+/// view until Save (`Browser.setColumn`). A saved view's list
 /// and gallery take its Sort and Group too, without the table's rows at a time and columns (`columns` false).
 struct ItemTableViewOptions: View {
     @CurrentLibrary private var library
@@ -29,11 +30,7 @@ struct ItemTableViewOptions: View {
 
     var body: some View {
         let content = browser.tableContent(in: library)
-        let controls = Controls(browser: browser, content: content, customization: Binding {
-            ItemTableColumnLayouts.layout(for: browser.item, in: storedColumns)
-        } set: {
-            storedColumns = ItemTableColumnLayouts.storing($0, for: browser.item, in: storedColumns)
-        })
+        let controls = Controls(browser: browser, content: content, stored: $storedColumns)
         controls.sortPicker
         Divider()
         controls.groupPicker
@@ -51,16 +48,18 @@ private struct Controls {
     let columns: [ItemTableColumn]
     let sort: [ItemTableComparator]
     let grouping: ItemTableColumn?
-    @Binding var customization: TableColumnCustomization<ItemTableRow>
+    let browser: Browser
+    @Binding var stored: Data
 
-    init(browser: Browser, content: ItemTableContent, customization: Binding<TableColumnCustomization<ItemTableRow>>) {
+    init(browser: Browser, content: ItemTableContent, stored: Binding<Data>) {
+        self.browser = browser
         _options = Binding { browser.tableOptions[browser.item] ?? ItemTableOptions() } set: { browser.tableOptions[browser.item] = $0 }
         columns = content.columns
         sort = content.sort
         grouping = content.grouping
         categorical = content.categoricalColumns
         relevance = browser.isSearching ? Binding { browser.ordersByRelevance } set: { browser.orderSearch(byRelevance: $0) } : nil
-        _customization = customization
+        _stored = stored
     }
 
     private let categorical: [ItemTableColumn]
@@ -128,17 +127,17 @@ private struct Controls {
 
     // MARK: Columns
 
-    private var shownColumns: [ItemTableColumn] { columns.filter(customization.shows) }
+    private var shownColumns: [ItemTableColumn] { browser.shownColumns(columns, stored: stored) }
 
     var columnsMenu: some View {
         Menu("Columns", systemImage: "tablecells") {
             ForEach(columns.filter { $0.content != .title }) { column in
-                Toggle(column.label, isOn: Binding { customization.shows(column) } set: {
-                    customization[visibility: column.id] = $0 ? .visible : .hidden
+                Toggle(column.label, isOn: Binding { browser.showsColumn(column, stored: stored) } set: {
+                    browser.setColumn(column, shown: $0, stored: $stored)
                 })
             }
             Divider()
-            Button("Reset Columns") { customization = TableColumnCustomization() }
+            Button("Reset Columns") { browser.resetColumns(stored: $stored) }
         }
         .accessibilityIdentifier("ItemTableColumns")
     }

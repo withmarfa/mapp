@@ -7,6 +7,9 @@
     "%@ at %@" : {
       "extractionState" : "manual"
     },
+    "%@ Copy" : {
+
+    },
     "%@ has an entry that isn’t finished. Finish it, or cancel it, to add the item." : {
       "extractionState" : "manual"
     },
@@ -28,6 +31,12 @@
     "Add Filter" : {
 
     },
+    "Add Sort" : {
+
+    },
+    "Always shown" : {
+
+    },
     "Approve MAPP With This Code" : {
       "extractionState" : "manual"
     },
@@ -36,6 +45,9 @@
     },
     "Can’t Keep the Sign-In" : {
       "extractionState" : "manual"
+    },
+    "Condition" : {
+
     },
     "Connect to a Marfa server to read and edit its items here. MAPP opens the server’s own page to sign in and never sees your password." : {
       "extractionState" : "manual"
@@ -56,23 +68,56 @@
     "Dates" : {
       "extractionState" : "manual"
     },
+    "Direction" : {
+
+    },
     "Disconnected, but MAPP Is Still Approved" : {
       "extractionState" : "manual"
+    },
+    "Duplicate View" : {
+
+    },
+    "Edit View" : {
+
+    },
+    "Filters" : {
+
     },
     "Four Pins at Most" : {
       "extractionState" : "manual"
     },
+    "Group" : {
+
+    },
     "Hidden" : {
       "extractionState" : "manual"
     },
+    "Hide %lld Hidden" : {
+
+    },
+    "Hide Column" : {
+
+    },
+    "Hide Empty Groups" : {
+
+    },
     "Is" : {
+
+    },
+    "is" : {
 
     },
     "Is Not" : {
 
     },
+    "is not" : {
+
+    },
     "It will be sent once you sign in again. Do that in Settings." : {
       "extractionState" : "manual"
+    },
+    "Layout" : {
+
     },
     "Layout Options" : {
       "extractionState" : "manual"
@@ -82,6 +127,9 @@
     },
     "Long" : {
       "extractionState" : "manual"
+    },
+    "Make a view of what this window shows" : {
+
     },
     "MAPP can’t tell whether this copy holds changes that haven’t reached a server." : {
       "extractionState" : "manual"
@@ -128,6 +176,9 @@
     "MAPP’s sign-in isn’t allowed to read this item’s history. Ask whoever runs the server to allow it." : {
       "extractionState" : "manual"
     },
+    "Marfa keeps this condition. This window can’t show it, and saving leaves it as it is." : {
+
+    },
     "More than %lld filter conditions" : {
 
     },
@@ -142,6 +193,9 @@
     },
     "Nothing Pinned" : {
       "extractionState" : "manual"
+    },
+    "Only a board has empty groups." : {
+
     },
     "Open %@ on any device, sign in and type the code. It stops working at %@." : {
       "extractionState" : "manual"
@@ -161,17 +215,29 @@
     "Remove Filter" : {
 
     },
+    "Remove Sort" : {
+
+    },
     "Revert View" : {
 
     },
     "Save as View…" : {
 
     },
+    "Save Changes to “%@”?" : {
+
+    },
     "Save “%@”?" : {
+
+    },
+    "Saving the name, filters, sort or group of a view needs your Marfa server. Changes to the layout and columns can be saved without it." : {
 
     },
     "Short" : {
       "extractionState" : "manual"
+    },
+    "Show Column" : {
+
     },
     "Sign In" : {
       "extractionState" : "manual"
@@ -188,14 +254,44 @@
     "Sign in to this server again to see them." : {
       "extractionState" : "manual"
     },
+    "Sort" : {
+
+    },
+    "The name always shows." : {
+
+    },
     "The view is saved for every app connected to your Marfa server." : {
+
+    },
+    "The view was deleted elsewhere, so its panel closed." : {
+
+    },
+    "The view wasn’t saved. Your name is still here." : {
+
+    },
+    "The view’s filter keeps these conditions as they are:" : {
 
     },
     "The window can’t show these conditions of the view’s filter, so they stay as they are:" : {
 
     },
+    "This Mac" : {
+
+    },
+    "This place can’t be saved as a view." : {
+
+    },
+    "This view changed elsewhere, so it now shows the view as it is. Make your changes again." : {
+
+    },
     "Unpin" : {
       "extractionState" : "manual"
+    },
+    "View Deleted" : {
+
+    },
+    "View Name" : {
+
     },
     "Your Sign-In" : {
       "extractionState" : "manual"
