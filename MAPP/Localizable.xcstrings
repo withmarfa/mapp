@@ -112,6 +112,7 @@
     },
     "is not" : {
 
+    },
     "How a link to another item looks in a note. A link to an item that doesn’t exist keeps its dashed line in every look." : {
       "extractionState" : "manual"
     },
@@ -186,6 +187,7 @@
     },
     "More than %lld filter conditions" : {
 
+    },
     "Mark" : {
       "extractionState" : "manual"
     },
@@ -299,6 +301,7 @@
     },
     "This view changed elsewhere, so it now shows the view as it is. Your name is still here; make your other changes again." : {
 
+    },
     "Tinted Pill" : {
       "extractionState" : "manual"
     },
