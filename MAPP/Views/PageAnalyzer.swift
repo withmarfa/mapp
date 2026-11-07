@@ -76,6 +76,7 @@ enum PageAnalyzer {
     /// - A backslash before a quote is removed in text, except in code, keyboard input and sample output, where it may be the code.
     /// - The first heading is removed when nothing readable comes before it and it says exactly the title, ignoring case,
     ///   punctuation and spacing, or extends a title that ends in an ellipsis. Only an ancestor left with nothing else goes with it.
+    /// - A table Readability found to hold data is marked `mapp-data`, so Reader draws a grid only for those.
     /// - A picture's fixed size is dropped, so the styles size it to the column.
     /// - Event handlers and `javascript:` addresses are dropped. The document that shows the article allows no script
     ///   either, so this is the second of two.
@@ -94,6 +95,8 @@ enum PageAnalyzer {
             }
             if (e.matches('img, video, svg, canvas')) { e.removeAttribute('width'); e.removeAttribute('height'); }
           }
+          // Readability has already told a table of data from one a mail or page lays itself out in.
+          for (const t of root.querySelectorAll('table')) if (t._readabilityDataTable) t.classList.add('mapp-data');
           const permalink = 'a.anchor, a.heading-anchor, a.header-anchor, a.headerlink, a.permalink, a[aria-label*="ermalink" i]';
           const headings = 'h1, h2, h3, h4, h5, h6';
           for (const a of root.querySelectorAll('a')) {

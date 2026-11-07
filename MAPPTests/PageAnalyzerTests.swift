@@ -103,6 +103,16 @@ import Testing
         #expect(try await analyse("") == .none)
     }
 
+    @Test func onlyATableOfDataIsMarkedForTheReadersTableStyling() async throws {
+        let data = "<table><tr><th>Stage</th><th>Miles</th></tr>" +
+            (1...6).map { "<tr><td>Stage \($0)</td><td>\($0 * 2)</td></tr>" }.joined() + "</table>"
+        let layout = "<table role=\"presentation\"><tr><td>" + longProse(2) + "</td></tr><tr><td>" + longProse(2) + "</td></tr></table>"
+        let article = try #require(try await analyse(page(body: longProse(4) + data + layout)).article)
+        #expect(article.html.contains("class=\"mapp-data\""), "a table of rows and columns keeps its grid")
+        #expect(article.html.components(separatedBy: "<table").count == 3)
+        #expect(article.html.components(separatedBy: "mapp-data").count == 2, "a layout table is not styled as data")
+    }
+
     // MARK: Documents that go wrong
 
     @Test func theDocumentsOwnScriptsAreNotRunToFindTheArticle() async throws {

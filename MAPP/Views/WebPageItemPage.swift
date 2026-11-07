@@ -45,7 +45,9 @@ struct WebPageItemPage: View {
         let reader: Document?
         let version: Int
 
-        func mode(choosing chosen: SourceViewMode) -> SourceViewMode { reader == nil ? .original : analysis.mode(choosing: chosen) }
+        func mode(choosing chosen: SourceViewMode, mailChoice: SourceViewMode?) -> SourceViewMode {
+            reader == nil ? .original : analysis.mode(choosing: chosen, mailChoice: mailChoice)
+        }
         func document(for mode: SourceViewMode) -> Document { mode == .reader ? reader ?? original : original }
     }
 
@@ -75,6 +77,8 @@ struct WebPageItemPage: View {
     @State private var content = Content.loading
     @State private var shownID: ItemID?
     @State private var pictures: SealedPictures?
+    /// The look the person chose for this mail, which does not follow the choice made for articles.
+    @State private var mailChoice: SourceViewMode?
     @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
 
     /// One step of the callout's spacing, as on the note page.
@@ -83,7 +87,16 @@ struct WebPageItemPage: View {
     /// The look the page is in, once it is known.
     private var shownMode: SourceViewMode? {
         guard case .ready(let loaded) = content else { return nil }
-        return loaded.mode(choosing: mode)
+        return loaded.mode(choosing: mode, mailChoice: mailChoice)
+    }
+
+    /// What the header's picker shows and sets: the look for this mail, or the one kept for articles.
+    private var pickedMode: Binding<SourceViewMode> {
+        Binding(
+            get: { shownMode ?? mode },
+            set: { chosen in
+                if case .ready(let loaded) = content, loaded.analysis.isMail { mailChoice = chosen } else { mode = chosen }
+            })
     }
 
     var body: some View {
@@ -91,7 +104,7 @@ struct WebPageItemPage: View {
             let inset = style.horizontalInset(for: geometry.size.width)
             VStack(spacing: 0) {
                 WebPageHeader(
-                    item: item, inset: inset, drafts: drafts, open: open, mode: $mode, reading: shownMode == .reader,
+                    item: item, inset: inset, drafts: drafts, open: open, mode: pickedMode, reading: shownMode == .reader,
                     offersReader: { if case .ready(let loaded) = content { loaded.reader != nil } else { false } }())
                 // The header is inset like the other item pages' and the page draws to its own margin, so the line
                 // sets the page apart as a document under its header.
@@ -121,7 +134,7 @@ struct WebPageItemPage: View {
         case .loading:
             ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
         case .ready(let loaded):
-            let shown = loaded.mode(choosing: mode)
+            let shown = loaded.mode(choosing: mode, mailChoice: mailChoice)
             let document = loaded.document(for: shown)
             WebPageView(
                 html: document.html, encoding: document.encoding, pictures: pictures, runsScripts: runsScripts,
@@ -156,6 +169,7 @@ struct WebPageItemPage: View {
         // A change to the same item's file is shown over the page it replaces, not a blank one.
         if shownID != item.id {
             content = .loading
+            mailChoice = nil
             let id = item.id
             pictures = SealedPictures(
                 item: id, pictures: .standard, inFeed: { [library] in library.item(id)?.tier == .feed },
@@ -191,7 +205,7 @@ struct WebPageItemPage: View {
                         version: version)
                 }.value
                 guard !Task.isCancelled else { return }
-                pictures.show(loaded.document(for: loaded.mode(choosing: mode)).addresses, version: version)
+                pictures.show(loaded.document(for: loaded.mode(choosing: mode, mailChoice: mailChoice)).addresses, version: version)
                 content = .ready(loaded)
             } catch {
                 guard !Task.isCancelled else { return }

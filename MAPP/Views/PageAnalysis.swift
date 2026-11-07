@@ -30,8 +30,13 @@ nonisolated struct PageAnalysis: Equatable, Sendable {
     /// Reader is offered only for an article; any other document is shown as it is.
     var offersReader: Bool { article != nil }
 
-    /// The look to show: the person's choice, or the original where the document has no article to read.
-    func mode(choosing chosen: SourceViewMode) -> SourceViewMode { offersReader ? chosen : .original }
+    /// The look to show: the person's choice, or the original where the document has no article to read. A mail is a
+    /// designed document, so it opens as its sender made it whatever look the person last chose for articles, and
+    /// is read in Reader only when the person asks for it on that mail (`mailChoice`).
+    func mode(choosing chosen: SourceViewMode, mailChoice: SourceViewMode? = nil) -> SourceViewMode {
+        guard offersReader else { return .original }
+        return isMail ? mailChoice ?? .original : chosen
+    }
 
     init(article: Article?, isMail: Bool) {
         self.article = article

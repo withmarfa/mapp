@@ -60,4 +60,12 @@ struct PageAnalysisTests {
         let article = PageAnalysis(javaScript: answer())
         #expect(article.mode(choosing: .reader) == .reader && article.mode(choosing: .original) == .original)
     }
+
+    @Test func aMailOpensAsItsSenderMadeItUntilTheyAskForReader() {
+        let mail = PageAnalysis(javaScript: answer(mail: true))
+        #expect(mail.mode(choosing: .reader) == .original)
+        #expect(mail.mode(choosing: .reader, mailChoice: .reader) == .reader)
+        #expect(mail.mode(choosing: .reader, mailChoice: .original) == .original)
+        #expect(PageAnalysis(article: nil, isMail: true).mode(choosing: .reader, mailChoice: .reader) == .original)
+    }
 }

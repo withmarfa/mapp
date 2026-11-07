@@ -111,8 +111,9 @@ nonisolated struct SourceLook: Equatable, Sendable {
             pre, code { font: 0.77em ui-monospace, Menlo, monospace; }
             pre { padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, CanvasText 7%, transparent); white-space: pre-wrap; }
             :not(pre) > code { padding: 1px 4px; border-radius: 4px; background: color-mix(in srgb, CanvasText 7%, transparent); }
-            table { display: block; overflow-x: auto; border-collapse: collapse; font-size: 0.86em; }
-            th, td { border: 1px solid color-mix(in srgb, CanvasText 18%, transparent); padding: 7px 12px; text-align: start; vertical-align: top; }
+            table.mapp-data { display: block; overflow-x: auto; border-collapse: collapse; font-size: 0.86em; }
+            .mapp-data th, .mapp-data td { border: 1px solid color-mix(in srgb, CanvasText 18%, transparent); padding: 7px 12px; text-align: start; vertical-align: top; }
+            table:not(.mapp-data), table:not(.mapp-data) :is(thead, tbody, tfoot, tr, th, td) { display: block; width: auto; max-width: 100%; padding: 0; }
             hr { border: 0; border-top: 1px solid color-mix(in srgb, CanvasText 18%, transparent); margin: 2em 0; }
             """
     }
