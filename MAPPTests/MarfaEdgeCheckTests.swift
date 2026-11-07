@@ -85,6 +85,11 @@ struct MarfaEdgeCheckTests {
         scene.library.relationships(for: scene.id(name)).first { $0.field == field }?.targets.map(\.itemID) ?? []
     }
 
+    /// Whether a notice with `message` is waiting. The fake copy's background reads can add a notice of their own after it.
+    private static func tells(_ message: String, in scene: Scene) -> Bool {
+        scene.library.notices.waiting.contains { $0.message == message }
+    }
+
     private func fullMessage(_ name: String) -> String {
         String(localized: "“\(name)” can hold only one link of this kind, and already holds it.")
     }
@@ -97,15 +102,15 @@ struct MarfaEdgeCheckTests {
         #expect(await scene.library.relationshipVerdict(for: scene.id("child"), field: "child-of", to: scene.id("b")) == .taken)
         // A second parent beside the first is the core's to refuse, in words naming the item that holds one already.
         #expect(await scene.library.changeItemRelationship(scene.id("child"), field: "child-of", adding: [scene.id("b")], removing: [], undoManager: nil) == false)
-        // The fake copy's background reads can add a notice of their own after this one.
-        #expect(scene.library.notices.waiting.contains { $0.title == String(localized: "Can’t Change This Relationship") && $0.message == fullMessage("child") })
+        #expect(scene.library.notices.waiting.contains { $0.title == String(localized: "Can’t Change This Relationship") })
+        #expect(Self.tells(fullMessage("child"), in: scene))
         #expect(try await scene.fake.copy.queue.all().count == queued, "a refused change queued a write")
         #expect(Self.holds("child", "child-of", in: scene) == [scene.id("a")])
         // Replacing it is one move.
         scene.library.notices.answerAll()
         #expect(await scene.library.changeItemRelationship(scene.id("child"), field: "child-of", adding: [scene.id("b")], removing: [scene.id("a")], undoManager: nil))
         try #require(await eventually { Self.holds("child", "child-of", in: scene) == [scene.id("b")] })
-        #expect(scene.library.notices.waiting.isEmpty)
+        #expect(!scene.library.notices.waiting.contains { $0.title == String(localized: "Can’t Change This Relationship") })
         await scene.source.close()
     }
 
@@ -115,7 +120,7 @@ struct MarfaEdgeCheckTests {
         let queued = try await scene.fake.copy.queue.all().count
         #expect(await scene.library.changeItemRelationship(
             scene.id("child"), field: "child-of", adding: [scene.id("b"), scene.id("c")], removing: [], undoManager: nil) == false)
-        #expect(scene.library.notices.waiting.last?.message == fullMessage("child"))
+        #expect(Self.tells(fullMessage("child"), in: scene))
         #expect(try await scene.fake.copy.queue.all().count == queued)
         // Chosen under a parent that has the child already, from either end, is not a new link.
         #expect(await scene.library.changeItemRelationship(scene.id("a"), field: "inverse:parent-of", adding: [scene.id("child")], removing: [], undoManager: nil))
@@ -143,27 +148,26 @@ struct MarfaEdgeCheckTests {
 
         // A second link beside the one `x` holds is refused naming `x`.
         #expect(await scene.library.changeItemRelationship(scene.id("x"), field: "supersedes", adding: [scene.id("v")], removing: [], undoManager: nil) == false)
-        #expect(scene.library.notices.waiting.last?.message == fullMessage("x"))
+        #expect(Self.tells(fullMessage("x"), in: scene))
         // Replacing `y` by `w`, whose superseder is `z`'s link, is never taken from `z`.
         scene.library.notices.answerAll()
         #expect(await scene.library.changeItemRelationship(scene.id("x"), field: "supersedes", adding: [scene.id("w")], removing: [scene.id("y")], undoManager: nil) == false)
-        #expect(scene.library.notices.waiting.last?.message
-            == String(localized: "“\("z")” already holds this link to “\("w")”. Remove it there first."))
+        #expect(Self.tells(String(localized: "“\("z")” already holds this link to “\("w")”. Remove it there first."), in: scene))
         // `y`'s superseder `x` replaced by `z`, which already supersedes `w`, would leave `z` with two.
         scene.library.notices.answerAll()
         #expect(await scene.library.changeItemRelationship(scene.id("y"), field: "inverse:supersedes", adding: [scene.id("z")], removing: [scene.id("x")], undoManager: nil) == false)
-        #expect(scene.library.notices.waiting.last?.message == fullMessage("z"))
+        #expect(Self.tells(fullMessage("z"), in: scene))
         // Taken from the other end it is the same: `z`'s link would move onto `y`, which has one.
         scene.library.notices.answerAll()
         #expect(await scene.library.changeItemRelationship(scene.id("y"), field: "inverse:supersedes", adding: [scene.id("z")], removing: [], undoManager: nil) == false)
-        #expect(scene.library.notices.waiting.last?.message == fullMessage("y"))
+        #expect(Self.tells(fullMessage("y"), in: scene))
         #expect(try await scene.fake.copy.queue.all().count == queued, "a refused change queued a write")
 
         // `y` replaced by `v`, which holds none, is one move.
         scene.library.notices.answerAll()
         #expect(await scene.library.changeItemRelationship(scene.id("x"), field: "supersedes", adding: [scene.id("v")], removing: [scene.id("y")], undoManager: nil))
         try #require(await eventually { Self.holds("x", "supersedes", in: scene) == [scene.id("v")] })
-        #expect(scene.library.notices.waiting.isEmpty)
+        #expect(!scene.library.notices.waiting.contains { $0.title == String(localized: "Can’t Change This Relationship") })
         #expect(Self.holds("y", "inverse:supersedes", in: scene).isEmpty)
         await scene.source.close()
     }
