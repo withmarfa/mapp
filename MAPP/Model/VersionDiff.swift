@@ -216,6 +216,8 @@ nonisolated enum ReadableText {
         let text = String(characters.map(\.0))
         let trimmed = text.trimmingCharacters(in: .whitespaces)
         if trimmed.isEmpty { return ReadLine(id: id, kind: .blank, spans: spans(characters, drop: 0, marked: false)) }
+        // The editor writes an empty paragraph as a lone break, which the note page shows as an empty line.
+        if !inFence, ["<br>", "<br/>", "<br />"].contains(trimmed) { return ReadLine(id: id, kind: .blank, spans: []) }
         if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
             inFence.toggle()
             return ReadLine(id: id, kind: .code, spans: spans(characters, drop: 0, marked: false))

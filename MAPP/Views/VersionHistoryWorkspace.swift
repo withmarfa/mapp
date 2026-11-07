@@ -15,10 +15,10 @@ struct VersionHistoryWorkspace: View {
         let list = mode.list(in: library)
         NavigationSplitView(columnVisibility: .constant(.all)) {
             VersionThreadColumn(mode: mode, list: list, now: now)
-                .navigationSplitViewColumnWidth(min: 260, ideal: 288, max: 360)
                 // The thread is the mode's whole left side, so there is nothing to hide it for. Removed in the column,
                 // where the split view adds the toggle.
                 .toolbar(removing: .sidebarToggle)
+                .navigationSplitViewColumnWidth(min: 260, ideal: 288, max: 360)
         } detail: {
             VersionPageColumn(mode: mode, list: list)
                 .inspector(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
@@ -47,6 +47,8 @@ struct VersionHistoryWorkspace: View {
 
     @ToolbarContentBuilder private var toolbar: some ToolbarContent {
         let check = mode.restoreCheck(in: library)
+        // With the title gone nothing else pushes the buttons to the right of the page.
+        ToolbarSpacer(.flexible)
         ToolbarItem(placement: .primaryAction) {
             Button("Exit") { details.leaveHistory() }
                 .keyboardShortcut(.cancelAction)
