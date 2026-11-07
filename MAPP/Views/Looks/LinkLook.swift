@@ -4,7 +4,7 @@ import Foundation
 /// colors, is here and nowhere else; the page holds none of them. A link to a note that is missing keeps its dashed
 /// line in every look.
 nonisolated enum LinkLook: String, CaseIterable, Identifiable, Sendable {
-    /// The linked item's type icon in the type's color, then the title underlined.
+    /// The linked item's type icon in the type's color, then the title, underlined under the pointer.
     case mark
     /// The title underlined, with no icon.
     case underline
@@ -98,7 +98,7 @@ nonisolated enum LinkLook: String, CaseIterable, Identifiable, Sendable {
             // The tint is already the tone's chip fill, so a tinted pill takes it whole.
             if self == .tintedPill { all[prefix + "tint-strength"] = "100%" }
         } else {
-            all[prefix + "underline"] = "underline"
+            all[prefix + "underline"] = self == .mark ? "none" : "underline"
             all[prefix + "underline-thickness"] = Measure.underlineThickness
             all[prefix + "underline-offset"] = self == .quiet ? Measure.quietUnderlineOffset : Measure.underlineOffset
             if self == .quiet {

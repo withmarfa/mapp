@@ -57,4 +57,10 @@ import Testing
         defaults.set("tintedPill", forKey: LinkLook.key)
         #expect(LinkLook.stored(in: defaults) == .tintedPill)
     }
+
+    @Test func aMarkLinkIsUnderlinedOnlyUnderThePointerAndAnUnderlineLinkAlways() {
+        #expect(LinkLook.mark.cssVariables()["--inkkit-wiki-link-underline"] == "none")
+        #expect(LinkLook.mark.cssVariables()["--inkkit-wiki-link-hover-underline"] == nil, "Inkkit underlines a link under the pointer")
+        #expect(LinkLook.underline.cssVariables()["--inkkit-wiki-link-underline"] == "underline")
+    }
 }

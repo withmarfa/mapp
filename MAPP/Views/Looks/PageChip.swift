@@ -8,7 +8,7 @@ struct PageChip: View {
     enum Kind {
         /// The type's name, tinted in its tone, with its icon in color.
         case type(icon: String?)
-        /// An item a row links to: its mark in color and its title with no fill, since a fill means a type. The title
+        /// An item a row links to: its mark in color and its title on a grey fill, since a tint means a type. The title
         /// is underlined under the pointer.
         case link(icon: String?)
         /// A status: its group's mark in a chip with a fine edge, and a chevron where it opens a menu.
@@ -57,7 +57,7 @@ struct PageChip: View {
         .font(.system(size: looks.textSize * scale))
         .foregroundStyle(.primary)
         .padding(.leading, start(looks: looks) * scale)
-        .padding(.trailing, (isLink ? 0 : looks.padding) * scale)
+        .padding(.trailing, looks.padding * scale)
         .frame(height: looks.height * scale)
         .background(fill(looks: looks), in: shape)
         .onHover { if isLink { isHovering = $0 } }
@@ -70,8 +70,7 @@ struct PageChip: View {
 
     private func start(looks: ChipLooks) -> CGFloat {
         switch kind {
-        case .type, .status: looks.typePaddingStart
-        case .link: 0
+        case .type, .status, .link: looks.typePaddingStart
         case .tag: looks.tagPaddingStart
         case .option, .plain: looks.padding
         }
@@ -80,9 +79,8 @@ struct PageChip: View {
     private func fill(looks: ChipLooks) -> Color {
         switch kind {
         case .type(let icon): TypeTone(icon: icon).fill(looks.typeTintOpacity, for: scheme)
-        case .link: .clear
         case .status: looks.statusFill(for: scheme)
-        case .option, .plain: looks.optionFill(for: scheme)
+        case .link, .option, .plain: looks.optionFill(for: scheme)
         case .tag: looks.tagFill(for: scheme)
         }
     }
