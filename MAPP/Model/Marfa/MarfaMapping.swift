@@ -107,6 +107,16 @@ nonisolated enum MarfaMapping {
             filter: query.filter, beneath: query.beneath?.rawValue)
     }
 
+    /// What the copy is asked to list for a view's query read as the copy lists items. A view with no states lists
+    /// active and archived items, while a list with none lists the active ones, so they are named here.
+    static func listFilters(_ query: LibraryViewQuery) -> ListFilters {
+        ListFilters(
+            types: query.types.isEmpty ? nil : Set(query.types.map(\.rawValue)),
+            states: Set((query.states ?? [.active, .archived]).map(marfaState)),
+            tier: query.tier.map { $0 == .feed ? Marfa.Tier.feed : .library },
+            filter: query.filter, beneath: query.beneath?.rawValue)
+    }
+
     private static func viewSort(_ sort: LibraryViewSort) -> ViewSort {
         ViewSort(by: sort.field, direction: sort.ascending ? .ascending : .descending)
     }

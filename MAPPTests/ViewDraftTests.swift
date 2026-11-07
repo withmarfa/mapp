@@ -515,4 +515,52 @@ struct ViewDraftTests {
         #expect(update.change.query?.filter == #"properties.owner eq "ann""#)
         #expect(update.unchanged == [#"properties.owner eq "ann""#])
     }
+
+    // MARK: A window's changed filters, read at once
+
+    private static func preview(_ query: LibraryViewQuery) -> LibraryViewQuery? {
+        ViewDraft.previewQuery(
+            of: query, seededTypes: ViewDraft.seededTypes(of: query, catalogue: catalogue), catalogue: catalogue)
+    }
+
+    @Test func aPreviewTakesOutTheConditionsTheWindowShowsAsChips() {
+        let states: Set<ItemState> = [.active]
+        let base = LibraryViewQuery(types: [Self.task], tier: .library, states: states, filter: #"properties.status neq "done""#)
+        // The one type stays a type: it is the view's place, not a chip.
+        #expect(Self.preview(base) == LibraryViewQuery(types: [Self.task], tier: .library, states: states, filter: nil))
+        let both = LibraryViewQuery(states: states, filter: #"properties.status neq "done" AND properties.status neq "todo""#)
+        #expect(Self.preview(both) == LibraryViewQuery(states: states, filter: nil))
+        // A bare yes/no is the Yes/No column's chip.
+        #expect(Self.preview(LibraryViewQuery(filter: "properties.done eq true"))?.filter == nil)
+    }
+
+    @Test func aPreviewKeepsWhatTheWindowCannotShow() {
+        let kept = Self.preview(LibraryViewQuery(filter: #"tags contains "x" AND properties.status eq "todo""#))
+        #expect(kept?.filter == #"tags contains "x""#)
+        // A field no type declares has no column, so its condition stays in the read.
+        #expect(Self.preview(LibraryViewQuery(filter: #"properties.owner eq "ann""#))?.filter == #"properties.owner eq "ann""#)
+        // Several values of one column joined by OR are one chip.
+        #expect(Self.preview(LibraryViewQuery(filter: #"properties.status eq "a" OR properties.status eq "b""#))?.filter == nil)
+        // Different columns joined by OR are no chip, so the whole filter stays.
+        let mixed = #"properties.status eq "a" OR properties.done eq true"#
+        #expect(Self.preview(LibraryViewQuery(filter: mixed))?.filter == mixed)
+    }
+
+    @Test func aPreviewOfSeveralTypesDropsThemForTheTypeChip() {
+        let query = LibraryViewQuery(types: [Self.task, TypeID("core.note")], filter: #"properties.status eq "todo""#)
+        #expect(ViewDraft.seededTypes(of: query, catalogue: Self.catalogue) != nil)
+        #expect(Self.preview(query)?.types == [])
+        // A type with subtypes cannot be told from them, so the types stay in the read.
+        let nested = LibraryViewQuery(types: [Self.task, Self.ticket])
+        #expect(Self.preview(nested)?.types == [Self.task, Self.ticket])
+    }
+
+    @Test func aFilterTheCoreRefusesHasNoPreview() {
+        #expect(Self.preview(LibraryViewQuery(filter: "not a filter ((")) == nil)
+    }
+
+    @Test func aViewWithNoFilterPreviewsAsItself() {
+        let query = LibraryViewQuery(types: [Self.task], tier: .feed, states: [.active, .archived])
+        #expect(Self.preview(query) == query)
+    }
 }

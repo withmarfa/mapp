@@ -344,6 +344,15 @@ nonisolated final class MarfaSource: ItemSource {
         }
     }
 
+    func items(matching query: LibraryViewQuery) async throws -> [ItemID] {
+        do {
+            return try await MarfaEngine.asking { try await engine.reading.items(matching: MarfaMapping.listFilters(query)) }
+                .filter(MarfaMapping.isLibraryItem).map { ItemID($0.id) }
+        } catch {
+            throw MarfaEngine.failure(error)
+        }
+    }
+
     func createView(_ settings: LibraryViewSettings, idempotencyKey: String) async throws -> LibraryView {
         try await writingView {
             try await copy.createView(MarfaMapping.viewSettings(settings), idempotencyKey: idempotencyKey)

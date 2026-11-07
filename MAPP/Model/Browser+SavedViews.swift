@@ -18,6 +18,9 @@ extension Browser {
         let options: ItemTableOptions
         let timelineDate: String?
         let types: [String]?
+        /// What to read the view's items with while the window's filters differ from these (`previewQuery`); nil where
+        /// the view's own list stands for them.
+        let preview: LibraryViewQuery?
     }
 
     /// Shows a view's own order, grouping and filters the first time the window opens it, and again when the view
@@ -36,9 +39,10 @@ extension Browser {
         var options = ViewDraft.options(for: view, catalogue: catalogue)
         let timelineDate = ViewDraft.timelineDate(of: view)
         let collapsed = tableOptions[place]?.collapsed
+        let types = ViewDraft.seededTypes(of: view.query, catalogue: catalogue)
         viewSeeds[view.id] = ViewSeed(
-            version: view.version, options: options, timelineDate: timelineDate,
-            types: ViewDraft.seededTypes(of: view.query, catalogue: catalogue))
+            version: view.version, options: options, timelineDate: timelineDate, types: types,
+            preview: ViewDraft.previewQuery(of: view.query, seededTypes: types, catalogue: catalogue))
         options.collapsed = collapsed
         tableOptions[place] = options
         timelineFields[place] = timelineDate
@@ -53,6 +57,15 @@ extension Browser {
     var hasViewChanges: Bool {
         guard case .view(let id) = item, let seed = viewSeeds[id] else { return false }
         return differs(from: seed)
+    }
+
+    /// The query the window reads the view's items with while its filters differ from the view's own, and nil while
+    /// they do not: the view's list is then the library's own reading of the saved view. A window that opened the
+    /// view keeps the query of that version, whatever the view has since become elsewhere, as it keeps its filters.
+    var viewPreview: (view: ItemID, query: LibraryViewQuery)? {
+        guard case .view(let id) = item, let seed = viewSeeds[id], let query = seed.preview,
+              (tableOptions[item] ?? ItemTableOptions()).filterChoices != seed.options.filterChoices else { return nil }
+        return (id, query)
     }
 
     /// Puts the window back to the view as the library holds it, dropping what the person changed.

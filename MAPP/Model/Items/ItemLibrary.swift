@@ -43,6 +43,10 @@ protocol ItemLibrary: AnyObject, Observable {
     var membershipRevision: Int { get }
     func item(_ id: ItemID) -> Item?
     func items(in place: SidebarItem) -> [Item]
+    /// The items the saved view `view` would list with `query` in place of its own, which a window shows while it
+    /// has changed the view's filters and not saved them. It reads the library's own copy, so it works offline, and
+    /// writes nothing. Two windows on one view ask for their own queries and never share an answer.
+    func previewItems(ofView view: ItemID, query: LibraryViewQuery) -> [Item]
     /// What the library's own search finds for `query` in `scope`, best match first: the items not deleted, the
     /// excerpt of each that has one, and whether the search may be missing items because the copy is still filling.
     /// Nothing is found for a query with no words.

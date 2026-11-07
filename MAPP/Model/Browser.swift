@@ -360,6 +360,7 @@ final class Browser {
 
     /// What the open place lists. A type lists its own items, and its subtypes' too while it is stacked.
     func placeItems(in library: any ItemLibrary) -> [Item] {
+        if let preview = viewPreview { return library.previewItems(ofView: preview.view, query: preview.query) }
         guard stacksSubtypes(in: library), case .itemType(let type) = item else { return library.items(in: item) }
         return library.items(inTypeAndSubtypes: type)
     }

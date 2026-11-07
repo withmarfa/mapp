@@ -20,6 +20,10 @@ final class FakeItemLibrary: ItemLibrary {
     var views: [LibraryView] = []
     /// What each view lists, by view.
     var viewMembers: [ItemID: [ItemID]] = [:]
+    /// What a preview of a view lists for each query; a query not named lists what the view lists.
+    var previewMembers: [LibraryViewQuery: [ItemID]] = [:]
+    /// Every preview asked for, in order.
+    @ObservationIgnored private(set) var previewsAsked: [LibraryViewQuery] = []
     var reachesServer = true
     /// What the next icon choice answers: nil keeps it, a failure refuses it.
     var iconFailure: TypeIconFailure?
@@ -143,6 +147,12 @@ final class FakeItemLibrary: ItemLibrary {
             case .recentlyDeleted: item.state == .trashed
             }
         }
+    }
+
+    func previewItems(ofView view: ItemID, query: LibraryViewQuery) -> [Item] {
+        previewsAsked.append(query)
+        let members = previewMembers[query] ?? viewMembers[view] ?? []
+        return items.filter { $0.state == .active && members.contains($0.id) }
     }
 
     func search(_ query: String, in scope: SearchScope) -> SearchResults {
