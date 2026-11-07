@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// What the window shows as a view would hold, and what a view's panel and commands read of the window. Saving,
+/// What the window shows as a view would hold, and what a view's panel and commands read of the window. Making,
 /// duplicating and deleting a view need the server, so they are offered only while the library can reach it
-/// (`ItemLibrary.reachesServer`); editing one in the panel is not.
+/// (`ItemLibrary.reachesServer`); editing one in the panel is not, nor is saving a change of its layout, columns or cards.
 enum SavedViews {
     /// Whether the window's place can be saved as a view: Recents, Recently Deleted, the indexes, a single favorite
     /// and a collection cannot.
