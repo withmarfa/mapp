@@ -356,7 +356,7 @@ class LinkedSection {
  *  `foldAfter` rows with "Show N More" expanding in place, and "Show Less" once expanded. The status, in a pin or a
  *  row, and the parent, in a row, are one button each, moved into place with its menu unchanged. A link value posts
  *  `openItem` or `openLink`; nothing else here is edited. A pin that is a list shows what the app sent, and its
- *  "+N". The layout of the pins follows the width of the page's column, by container query (`style.css`).
+ *  "+N". The pins wrap by the width of the page's column (`style.css`).
  *
  *  Linked From (a folded section of the items that link to this one) and a collection's Contents are drawn in the
  *  footer, under the text. */

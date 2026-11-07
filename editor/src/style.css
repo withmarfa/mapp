@@ -586,8 +586,7 @@ body[data-text='none'] #editor {
 
 /* The pins: a key above its value, 16 points under the title and 20 above the property block. Each sits in a slot of a
    fixed width, 150 points in the 13 point design, so a pin stays where it is from page to page. The slots fill a row
-   while another fits and wrap only when none does, by the width of the page's column and not of the window (the
-   list is a flex row that wraps, in the box round it, which is a container so its width is the column's). The app
+   while another fits and wrap only when none does, by the width of the page's column and not of the window. The app
    sends at most four pins. */
 .item-pins {
   --pin-slot: calc(var(--interface-text-size) * 150 / 13);
