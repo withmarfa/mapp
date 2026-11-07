@@ -375,10 +375,11 @@ body[data-text='none'] #editor {
   outline-offset: 1px;
 }
 
-/* A fill means a type: tinted in the type's color, its symbol in color. */
+/* A fill means a type: tinted in the type's color, its symbol and name in its ink. */
 .item-chip[data-kind='type'] {
   padding-inline-start: var(--c-type-start);
   background: var(--tone-chip);
+  color: var(--tone-ink);
 }
 
 /* A linked item is its mark in color and its title, with no fill. */
