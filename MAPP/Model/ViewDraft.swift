@@ -458,8 +458,8 @@ nonisolated enum ViewDraft {
 
     /// The query to read a view's items with while the window's filters differ from the view's: the view's own with
     /// the conditions the window shows as filters taken out, and the types it shows as a Type filter. The window's
-    /// filters then narrow what is read, so a value unchecked in one brings its items back, and a filter added and
-    /// saved lists what the window showed. The conditions the window cannot show, those on a field no type declares, the tier and the states stay.
+    /// filters then narrow what is read, so a value unchecked in one brings its items back. The conditions the window
+    /// cannot show (those on a field no type declares), the tier and the states stay.
     /// Nil where the view's filter is one the core refuses, since nothing can be taken out of it.
     static func previewQuery(of query: LibraryViewQuery, seededTypes: [String]?, catalogue: Catalogue) -> LibraryViewQuery? {
         let parsed: Parsed
