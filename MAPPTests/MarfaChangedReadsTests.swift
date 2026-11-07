@@ -111,6 +111,7 @@ import Testing
 
         func views() async throws -> Rows<LibraryView> { try await read.views() }
         func items(inView id: String) async throws -> [Marfa.Item] { try await read.items(inView: id) }
+        func items(matching filters: ListFilters) async throws -> [Marfa.Item] { try await read.items(matching: filters) }
         func links(in ids: [String]) async throws -> [String: BodyLinks] {
             linksAsked.withLock { $0 += ids }
             try failLinkRead()

@@ -20,12 +20,16 @@ struct ItemGallery: View {
     private static let spacing: CGFloat = 20
     private static let inset: CGFloat = 24
 
-    private var columnCount: Int {
-        max(1, Int((width - 2 * Self.inset + Self.spacing) / (190 * InterfaceStyle.scale(for: textSize) + Self.spacing)))
+    /// What the view chose for its cards and the grid it makes: a larger card means fewer columns across the same width.
+    private struct Plan {
+        let cards: ViewCards
+        let columns: Int
+        let thumbnailWidth: CGFloat
     }
 
-    private var thumbnailWidth: CGFloat {
-        (width - 2 * Self.inset - CGFloat(columnCount - 1) * Self.spacing) / CGFloat(columnCount)
+    private func plan(for cards: ViewCards) -> Plan {
+        let columns = max(1, Int((width - 2 * Self.inset + Self.spacing) / (cards.size.columnWidth * InterfaceStyle.scale(for: textSize) + Self.spacing)))
+        return Plan(cards: cards, columns: columns, thumbnailWidth: (width - 2 * Self.inset - CGFloat(columns - 1) * Self.spacing) / CGFloat(columns))
     }
 
     var body: some View {
@@ -33,7 +37,7 @@ struct ItemGallery: View {
         let sections = browser.sections(in: library, order: order, now: library.now())
         let ids = Cost.measure(.galleryBody) { sections.flatMap { $0.items.map(\.id) } }
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
-        keyboardCollection(sections, ids: ids)
+        keyboardCollection(sections, ids: ids, plan: plan(for: browser.cards))
         .searchStatus(browser)
         .accessibilityLabel(title)
         .onChange(of: browser.isSearchExpanded) {
@@ -51,8 +55,11 @@ struct ItemGallery: View {
                 } else { EmptyState(browser.item == .files ? "No Files" : "No Items") }
             }
         }
+        .filteredEmptyState(browser)
         .navigationTitle(title)
-        .navigationSubtitle(browser.isSearching ? Text("^[\(ids.count) result](inflect: true)") : Text("^[\(ids.count) item](inflect: true)"))
+        .navigationSubtitle(
+            (browser.isSearching ? Text("^[\(ids.count) result](inflect: true)") : Text("^[\(ids.count) item](inflect: true)"))
+                .editedSubtitle(browser.hasViewChanges))
         .toolbar(removing: browser.isSearchExpanded ? .title : nil)
         .task {
             for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
@@ -61,12 +68,12 @@ struct ItemGallery: View {
         .dragsSelection(of: browser)
     }
 
-    private func collection(_ sections: [NoteSection], ids: [ItemID]) -> some View {
+    private func collection(_ sections: [NoteSection], ids: [ItemID], plan: Plan) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 28) {
                     ForEach(sections) { section in
-                        sectionGrid(section, ids: ids)
+                        sectionGrid(section, ids: ids, plan: plan)
                     }
                 }
                 .padding(Self.inset)
@@ -102,7 +109,7 @@ struct ItemGallery: View {
         }
     }
 
-    private func sectionGrid(_ section: NoteSection, ids: [ItemID]) -> some View {
+    private func sectionGrid(_ section: NoteSection, ids: [ItemID], plan: Plan) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             if let group = section.group {
                 Text(group.title())
@@ -110,9 +117,9 @@ struct ItemGallery: View {
                     .foregroundStyle(.secondary)
                     .accessibilityAddTraits(.isHeader)
             }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Self.spacing), count: columnCount), spacing: Self.spacing + 4) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Self.spacing), count: plan.columns), spacing: Self.spacing + 4) {
                 ForEach(section.items) { item in
-                    card(item, ids: ids).id(item.id)
+                    card(item, ids: ids, plan: plan).id(item.id)
                 }
             }
             .accessibilityElement(children: .contain)
@@ -120,13 +127,13 @@ struct ItemGallery: View {
         }
     }
 
-    private func keyboardCollection(_ sections: [NoteSection], ids: [ItemID]) -> some View {
-        collection(sections, ids: ids)
+    private func keyboardCollection(_ sections: [NoteSection], ids: [ItemID], plan: Plan) -> some View {
+        collection(sections, ids: ids, plan: plan)
         .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow], phases: .down) { key in
             let current = cursor ?? ids.first(where: browser.selection.contains)
             let destination: ItemID?
             if key.key == .upArrow || key.key == .downArrow {
-                destination = GallerySelection.movingVertically(from: current, sections: sections.map { $0.items.map(\.id) }, columns: columnCount, down: key.key == .downArrow)
+                destination = GallerySelection.movingVertically(from: current, sections: sections.map { $0.items.map(\.id) }, columns: plan.columns, down: key.key == .downArrow)
             } else {
                 destination = GallerySelection.moving(from: current, among: ids, by: key.key == .leftArrow ? -1 : 1)
             }
@@ -159,9 +166,14 @@ struct ItemGallery: View {
         .onCommand(#selector(NSResponder.deleteToBeginningOfLine(_:)), perform: deleteSelection)
     }
 
-    private func card(_ item: Item, ids: [ItemID]) -> some View {
-        GalleryCell(
-            item: item, browser: browser, order: order, day: daysSeen, dateFormat: dateFormat, width: thumbnailWidth, pane: pane,
+    private func card(_ item: Item, ids: [ItemID], plan: Plan) -> some View {
+        let now = library.now()
+        let chips = plan.cards.properties.flatMap {
+            GalleryChip.chips(for: $0, of: item, in: library, format: dateFormat, now: now)
+        }
+        return GalleryCell(
+            item: item, browser: browser, order: order, day: daysSeen, dateFormat: dateFormat, width: plan.thumbnailWidth,
+            cards: plan.cards, chips: chips, pane: pane,
             select: { id, extending, toggling in select(id, ids: ids, extending: extending, toggling: toggling) })
     }
 
@@ -190,6 +202,8 @@ private struct GalleryCell: View {
     let day: Int
     let dateFormat: DateFormat
     let width: CGFloat
+    let cards: ViewCards
+    let chips: [GalleryChip]
     var pane: FocusState<Browser.Pane?>.Binding
     let select: (ItemID, _ extending: Bool, _ toggling: Bool) -> Void
 
@@ -201,7 +215,7 @@ private struct GalleryCell: View {
             select(item.id, modifiers.contains(.shift), modifiers.contains(.command))
             pane.wrappedValue = .list
         } label: {
-            GalleryCard(item: item, browser: browser, order: order, day: day, dateFormat: dateFormat, width: width)
+            GalleryCard(item: item, browser: browser, order: order, day: day, dateFormat: dateFormat, width: width, cards: cards, chips: chips)
                 .equatable()
         }
         .buttonStyle(.plain)

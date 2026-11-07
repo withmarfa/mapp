@@ -99,6 +99,8 @@ struct MainView: View {
                     SettingsPageList(browser: browser)
                 } else {
                     NoteList(browser: browser, order: order, pane: $pane).equatable()
+                        .filterChips(browser)
+                        .filteredEmptyState(browser)
                 }
             }
             // The page list is about as wide as the sidebar; each keeps its own width. The split view reads the ideal
@@ -164,16 +166,19 @@ struct MainView: View {
                 } detail: {
                     Group {
                         if browser.showsCollection {
-                            switch browser.viewMode {
-                            case .table:
-                                ItemTable(browser: browser, order: order, pane: $pane)
-                            case .board:
-                                ItemBoard(browser: browser, pane: $pane)
-                            case .timeline:
-                                ItemTimeline(browser: browser, pane: $pane)
-                            case .list, .gallery:
-                                ItemGallery(browser: browser, order: order, pane: $pane)
+                            Group {
+                                switch browser.viewMode {
+                                case .table:
+                                    ItemTable(browser: browser, order: order, pane: $pane)
+                                case .board:
+                                    ItemBoard(browser: browser, pane: $pane)
+                                case .timeline:
+                                    ItemTimeline(browser: browser, pane: $pane)
+                                case .list, .gallery:
+                                    ItemGallery(browser: browser, order: order, pane: $pane)
+                                }
                             }
+                            .filterChips(browser)
                         } else {
                             itemPage
                         }
@@ -270,7 +275,7 @@ struct MainView: View {
             details.handOffProperties(in: library, undoManager: nil)
             browser.quickAdd.handOff(to: library.notices, because: changed ? .libraryChanged : .closed, in: library)
             browser.giveUpNewItem(because: .windowLeft)
-            browser.viewTitleForm?.handOff(because: changed ? .libraryChanged : .closed)
+            browser.viewPanel?.handOff(because: changed ? .libraryChanged : .closed)
         }
         .onAppear {
             if restoresWindow { details.isPresented = storedDetailsPresented }
@@ -283,8 +288,8 @@ struct MainView: View {
                 }
             }
             editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
-            editor.onEscape = { [browser, details] in
-                if details.isCustomizingLayout { details.endLayout() } else { browser.focusRequest = .list }
+            editor.onEscape = { [browser, details, library] in
+                if details.isEditingView { browser.cancelViewPanel(in: library) } else if details.isCustomizingLayout { details.endLayout() } else { browser.focusRequest = .list }
             }
             editor.onOpenNote = { [browser, library, order] id in
                 if let item = library.item(id) { browser.open(linked: item, in: library, order: order) }
@@ -303,7 +308,7 @@ struct MainView: View {
             #if DEBUG
             if SampleLibrary.isRequested, SampleLibrary.withCollections {
                 browser.sidebarItem = .itemType("core.task")
-                browser.viewMode = .board
+                browser.set(layout: .board)
             }
             #endif
         }
@@ -330,7 +335,7 @@ struct MainView: View {
         .libraryDialogs()
         .handlesFiles(in: browser, order: order)
         .deleteConfirmation(for: details)
-        .savedViewDialogs(browser: browser, order: order)
+        .savedViewDialogs(browser: browser, details: details)
     }
 
     private var newItemIsSettled: Bool { browser.isNewItemSettled(in: library) }

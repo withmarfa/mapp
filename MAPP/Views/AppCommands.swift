@@ -104,7 +104,7 @@ struct AppCommands: Commands {
                 if library != nil, let browser {
                     // A table, board or timeline with an item page open has no view options to offer.
                     if browser.offersViewOptions, !browser.showsSidebarIndex {
-                        if browser.viewMode == .table { ItemTableFilterMenu(browser: browser) }
+                        ItemTableFilterMenu(browser: browser)
                         CurrentViewOptions(browser: browser)
                     }
                 } else {

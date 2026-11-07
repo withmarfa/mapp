@@ -40,6 +40,94 @@ struct BrowserDerivedCacheTests {
         #expect(library.placeReads == reads)
     }
 
+    @Test func theFilteredSectionsAreKeptAndKeyOnTheFilters() {
+        let library = library()
+        let browser = Browser()
+        let before = browser.sections(in: library, order: NoteOrder(), now: date).flatMap { $0.items.map(\.id) }
+        #expect(before.count == 5)
+        browser.tableOptions[.allNotes] = ItemTableOptions(filters: ["title": ["Note 1"]])
+        let filtered = browser.sections(in: library, order: NoteOrder(), now: date).flatMap { $0.items.map(\.id) }
+        #expect(filtered.count < before.count)
+        let reads = library.placeReads
+        _ = browser.sections(in: library, order: NoteOrder(), now: date)
+        #expect(library.placeReads == reads)
+        browser.tableOptions[.allNotes] = nil
+        #expect(browser.sections(in: library, order: NoteOrder(), now: date).flatMap { $0.items.map(\.id) } == before)
+    }
+
+    @Test func anUnfilteredPlaceBuildsNoTableForTheList() {
+        let library = library()
+        let browser = Browser()
+        _ = browser.sections(in: library, order: NoteOrder(), now: date)
+        #expect(!browser.holdsTableContent)
+        browser.tableOptions[.allNotes] = ItemTableOptions(sort: [ItemTableComparator(column: .title)])
+        _ = browser.sections(in: library, order: NoteOrder(), now: date)
+        #expect(browser.holdsTableContent)
+    }
+
+    /// Three tickets with a status, which the table groups by on its own.
+    private func tasks() -> FakeItemLibrary {
+        let ticket = TypeID("test.ticket")
+        let status = ItemTypeInfo.Field(
+            key: "status", label: "Status",
+            kind: .status([StatusWord(value: "todo", group: .notStarted), StatusWord(value: "done", group: .completed)]), declaredBy: ticket)
+        let library = FakeItemLibrary(items: ["todo", "done", "todo"].enumerated().map { index, status in
+            Item(
+                id: ItemID("t\(index)"), type: ticket, title: "Task \(index)", name: "Task \(index)", titleRule: .firstLine,
+                properties: [Property(key: "status", value: .string(status))], version: ItemVersion(1), created: date, modified: date)
+        }, now: date)
+        library.catalogue = Catalogue(
+            itemTypes: Array(FakeItemLibrary.testCatalogue.itemTypes.values)
+                + [ItemTypeInfo(id: ticket, label: "Ticket", fields: [status], titleField: "title", bodyField: "body", parent: nil)],
+            edgeTypes: Array(FakeItemLibrary.testCatalogue.edgeTypes.values))
+        return library
+    }
+
+    @Test func aSortAloneOrdersTheListAndDoesNotGroupItByStatus() {
+        let library = tasks()
+        let browser = Browser()
+        // The table groups this place by status on its own.
+        #expect(browser.tableContent(in: library).grouping != nil)
+        browser.tableOptions[.allNotes] = ItemTableOptions(sort: [ItemTableComparator(column: .title, order: .reverse)])
+        let sections = browser.sections(in: library, order: NoteOrder(), now: date)
+        #expect(sections.count == 1)
+        #expect(sections.first?.group == nil)
+        #expect(sections.flatMap { $0.items.map(\.title) } == ["Task 2", "Task 1", "Task 0"])
+        // A grouping the person chose still groups.
+        browser.tableOptions[.allNotes]?.grouping = .column("field.status")
+        #expect(browser.sections(in: library, order: NoteOrder(), now: date).count == 2)
+    }
+
+    @Test func aNewViewFromASortedListKeepsNoGroupingTheListDoesNotShow() {
+        let library = tasks()
+        let browser = Browser()
+        browser.tableOptions[.allNotes] = ItemTableOptions(sort: [ItemTableComparator(column: .title)])
+        browser.viewMode = .table
+        #expect(SavedViews.window(browser, in: library, order: NoteOrder()).grouping != nil)
+        for mode in [ItemViewMode.list, .gallery] {
+            browser.viewMode = mode
+            #expect(SavedViews.window(browser, in: library, order: NoteOrder()).grouping == nil, "\(mode) kept the table's grouping")
+        }
+        browser.tableOptions[.allNotes]?.grouping = .column("field.status")
+        browser.viewMode = .list
+        #expect(SavedViews.window(browser, in: library, order: NoteOrder()).grouping != nil)
+    }
+
+    @Test func aNegationOnAColumnWithNoFilterMakesNeitherTheTableNorTheSectionsAgain() {
+        let library = library()
+        let browser = Browser()
+        browser.tableOptions[.allNotes] = ItemTableOptions(sort: [ItemTableComparator(column: .title)])
+        let table = browser.tableContent(in: library)
+        let sections = browser.sections(in: library, order: NoteOrder(), now: date)
+        // Is Not on a column that holds no values changes nothing the rows depend on.
+        browser.tableOptions[.allNotes]?.negated = ["field.status"]
+        #expect(browser.tableContent(in: library) === table)
+        let reads = library.placeReads
+        _ = browser.sections(in: library, order: NoteOrder(), now: date)
+        #expect(library.placeReads == reads)
+        #expect(browser.sections(in: library, order: NoteOrder(), now: date).map { $0.items.map(\.id) } == sections.map { $0.items.map(\.id) })
+    }
+
     @Test func aSearchKeepsKeyingOnWhatItFinds() {
         let library = library()
         let browser = Browser()

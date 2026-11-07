@@ -201,6 +201,7 @@ nonisolated final class FailingSearchSource: MAPP.ItemSource {
         throw SourceFailure(kind: .failed, message: "fts5: syntax error")
     }
     func items(inView view: ItemID) async throws -> [ItemID] { try await inner.items(inView: view) }
+    func items(matching query: LibraryViewQuery) async throws -> [ItemID] { try await inner.items(matching: query) }
 
     func createView(_ settings: LibraryViewSettings, idempotencyKey: String) async throws -> LibraryView {
         throw ViewWriteFailure(kind: .refused, message: "This source saves no views.")

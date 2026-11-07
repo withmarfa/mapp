@@ -14,10 +14,16 @@ struct ItemTable: View {
     var pane: FocusState<Browser.Pane?>.Binding
     /// Each place's columns as the person arranged them: shown or hidden, in their order, at their widths.
     @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
+    /// What this Mac keeps for each saved view, whose column widths the table records (`Browser.keepWidths`).
+    @AppStorage(ViewLayouts.key) private var viewLayouts = ViewLayouts()
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     @State private var daysSeen = 0
     @State private var hover = ItemTableHover()
     @State private var placeTrace = TablePlaceTrace()
+
+    /// Where the table's first column starts: the inset style's own margin, measured from the table's edge. The filter
+    /// chips, the group names and Load More line up here, so the table reads as one left edge.
+    static let leadingEdge: CGFloat = 16
 
     var body: some View {
         let _ = daysSeen
@@ -38,12 +44,12 @@ struct ItemTable: View {
                     }
                 } else if rows.isEmpty {
                     EmptyState(title: Text("No Matching Items"), detail: Text("No items match the filters.")) {
-                        Button("Clear Filters") { browser.tableOptions[browser.item, default: .init()].filters = [:] }
+                        Button("Clear Filters") { browser.tableOptions[browser.item, default: .init()].clearFilters() }
                     }
                 }
             }
             .navigationTitle(title)
-            .navigationSubtitle(subtitle(shown: rows.count, of: allRows.count))
+            .navigationSubtitle(subtitle(shown: rows.count, of: allRows.count).editedSubtitle(browser.hasViewChanges))
             .toolbar(removing: browser.isSearchExpanded ? .title : nil)
             .onChange(of: browser.isSearchExpanded) {
                 if !browser.isSearchExpanded { browser.focusRequest = .list }
@@ -59,17 +65,18 @@ struct ItemTable: View {
     private func table(
         columns: [ItemTableColumn], pages: Pages, grouping: ItemTableColumn?, collapsed: Set<String>
     ) -> some View {
-        let layout = ItemTableColumnLayouts.layout(for: browser.item, in: storedColumns)
-        return Table(of: ItemTableRow.self, selection: $browser.selection, sortOrder: sortBinding(columns), columnCustomization: customization) {
+        let isView = viewID != nil
+        return Table(of: ItemTableRow.self, selection: $browser.selection, sortOrder: sortBinding(columns), columnCustomization: customization(columns)) {
             // Only the columns showing. SwiftUI adds and hides every column it is given on live rows when the place
             // changes, which for the many columns of a mixed place costs far more than the few it shows.
-            TableColumnForEach(ItemTableColumnLayouts.shown(columns, in: layout)) { column in
+            TableColumnForEach(browser.shownColumns(columns, stored: storedColumns)) { column in
                 TableColumn(Text(verbatim: column.label), sortUsing: ItemTableComparator(column: column, order: column.firstOrder)) { row in
                     ItemTableCell(library: library, row: row, column: column, browser: browser, order: order, dateFormat: dateFormat, hover: hover)
                 }
                 .width(min: column.widths.min, ideal: column.widths.ideal, max: column.widths.max)
                 .customizationID(column.id)
-                .disabledCustomizationBehavior(column.content == .title ? .visibility : [])
+                // A view's order is the panel's to change, since the header cannot hold an arrangement Save waits for.
+                .disabledCustomizationBehavior(Self.disabledCustomization(of: column, inView: isView))
             }
         } rows: {
             if let grouping {
@@ -139,7 +146,7 @@ struct ItemTable: View {
         Section {
             ForEach([ItemTableRow]()) { TableRow($0) }
         } header: {
-            ItemTableLoadMore(remaining: remaining, indented: group != nil) { browser.loadMoreTableRows(group: group) }
+            ItemTableLoadMore(remaining: remaining) { browser.loadMoreTableRows(group: group) }
         }
     }
 
@@ -155,6 +162,16 @@ struct ItemTable: View {
         browser.tableOptions[browser.item, default: .init()].collapsed = next
     }
 
+    /// What the header may not do with a column: the name always shows, and a view's order is the panel's to change,
+    /// since the header cannot hold an arrangement Save waits for. One call sets the whole set, as a second would
+    /// replace the first.
+    static func disabledCustomization(of column: ItemTableColumn, inView isView: Bool) -> TableColumnCustomizationBehavior {
+        var disabled: TableColumnCustomizationBehavior = []
+        if column.content == .title { disabled.insert(.visibility) }
+        if isView { disabled.insert(.reorder) }
+        return disabled
+    }
+
     /// How many items show, and of how many once a filter hides some.
     private func subtitle(shown: Int, of count: Int) -> Text {
         if browser.isSearching { return Text("^[\(count) result](inflect: true)") }
@@ -168,19 +185,37 @@ struct ItemTable: View {
                 browser.tableOptions[browser.item] ?? ItemTableOptions(), columns: columns, keepsGivenOrder: browser.keepsPlaceOrder)
         } set: { sort in
             if !sort.isEmpty { browser.orderSearch(byRelevance: false) }
-            browser.tableOptions[browser.item, default: .init()].sort = Array(sort.prefix(3))
+            browser.tableOptions[browser.item, default: .init()].sort = Array(sort.prefix(ViewDraft.maxSortKeys))
         }
     }
 
     // MARK: Column layouts
 
-    /// The place's stored layout, which the table reads and writes directly, so the Columns menu and the table's own
-    /// header always agree and a change of place never shows the previous place's columns.
-    private var customization: Binding<TableColumnCustomization<ItemTableRow>> {
+    private var viewID: ItemID? {
+        if case .view(let id) = browser.item { id } else { nil }
+    }
+
+    /// The table's column widths, which a place keeps for itself and a saved view keeps on its own. The table reads and
+    /// writes it directly, so a change of place never shows the previous place's columns. A saved view's shown
+    /// columns and their order are the window's (`ViewColumns`), so a header that hides one is routed there, and what is
+    /// left for the table to keep is the widths alone.
+    private func customization(_ columns: [ItemTableColumn]) -> Binding<TableColumnCustomization<ItemTableRow>> {
         Binding {
-            ItemTableColumnLayouts.layout(for: browser.item, in: storedColumns)
-        } set: {
-            storedColumns = ItemTableColumnLayouts.storing($0, for: browser.item, in: storedColumns)
+            guard let id = viewID else { return ItemTableColumnLayouts.layout(for: browser.item, in: storedColumns) }
+            return viewLayouts.settings(for: id)?.widths.flatMap { try? JSONDecoder().decode(TableColumnCustomization<ItemTableRow>.self, from: $0) }
+                ?? .init()
+        } set: { next in
+            guard let id = viewID else {
+                storedColumns = ItemTableColumnLayouts.storing(next, for: browser.item, in: storedColumns)
+                return
+            }
+            var widths = next
+            for column in columns where column.content != .title && widths[visibility: column.id] == .hidden {
+                browser.changeViewSettings(id) { $0.columns.setShown(column, false) }
+                widths[visibility: column.id] = .automatic
+            }
+            widths.resetOrder()
+            browser.keepWidths(try? JSONEncoder().encode(widths), of: id)
         }
     }
 }
@@ -263,21 +298,24 @@ extension ItemTableColumn {
     }
 }
 
-/// A group's header row: its mark and name, how many it holds, and a chevron that folds it away.
+/// A group's header row: its mark and name, how many it holds, and a chevron that folds it away. The name starts at the
+/// table's left edge, where the rows' marks do, and the chevron hangs in the margin to its left.
 private struct ItemTableGroupHeader: View {
     let group: ItemTableGroup
     let column: ItemTableColumn
     let isCollapsed: Bool
     let toggle: () -> Void
 
+    private static let gap: CGFloat = 4
+
     var body: some View {
         Button(action: toggle) {
-            HStack(spacing: 8) {
+            HStack(spacing: Self.gap) {
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.tertiary)
                     .rotationEffect(.degrees(isCollapsed ? 0 : 90))
-                    .frame(width: 10)
+                    .frame(width: ItemTable.leadingEdge - Self.gap)
                 ItemTableCategory(column: column, value: group.value, title: group.title, isGroup: true)
                     .fontWeight(.semibold)
                 Text(group.rows.count, format: .number)
@@ -285,6 +323,8 @@ private struct ItemTableGroupHeader: View {
                     .monospacedDigit()
                 Spacer(minLength: 0)
             }
+            // The cell starts at the edge, so the chevron's width and gap bring it back to the table's own.
+            .padding(.leading, -ItemTable.leadingEdge)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -327,8 +367,6 @@ private struct Pages {
 /// does, and is a button, so the keyboard and VoiceOver can reach it.
 private struct ItemTableLoadMore: View {
     let remaining: Int
-    /// A group's row lines up with the group's name, after its chevron.
-    let indented: Bool
     let action: () -> Void
 
     var body: some View {
@@ -340,7 +378,6 @@ private struct ItemTableLoadMore: View {
                     .monospacedDigit()
                 Spacer(minLength: 0)
             }
-            .padding(.leading, indented ? 18 : 0)
             .contentShape(.rect)
         }
         .buttonStyle(.plain)

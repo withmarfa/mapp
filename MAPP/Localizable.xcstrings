@@ -1,17 +1,41 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ +%lld" : {
+
+    },
     "%@ at %@" : {
       "extractionState" : "manual"
     },
+    "%@ Copy" : {
+
+    },
     "%@ has an entry that isn’t finished. Finish it, or cancel it, to add the item." : {
       "extractionState" : "manual"
+    },
+    "%@ is not: %@" : {
+
     },
     "%@ is required." : {
       "extractionState" : "manual"
     },
     "%@ isn’t a valid value." : {
       "extractionState" : "manual"
+    },
+    "%@: %@" : {
+
+    },
+    "Add a filter" : {
+
+    },
+    "Add Filter" : {
+
+    },
+    "Add Sort" : {
+
+    },
+    "Always shown" : {
+
     },
     "Approve MAPP With This Code" : {
       "extractionState" : "manual"
@@ -21,6 +45,9 @@
     },
     "Can’t Keep the Sign-In" : {
       "extractionState" : "manual"
+    },
+    "Condition" : {
+
     },
     "Connect to a Marfa server to read and edit its items here. MAPP opens the server’s own page to sign in and never sees your password." : {
       "extractionState" : "manual"
@@ -41,17 +68,56 @@
     "Dates" : {
       "extractionState" : "manual"
     },
+    "Direction" : {
+
+    },
     "Disconnected, but MAPP Is Still Approved" : {
       "extractionState" : "manual"
+    },
+    "Duplicate View" : {
+
+    },
+    "Edit View" : {
+
+    },
+    "Filters" : {
+
     },
     "Four Pins at Most" : {
       "extractionState" : "manual"
     },
+    "Group" : {
+
+    },
     "Hidden" : {
       "extractionState" : "manual"
     },
+    "Hide %lld Hidden" : {
+
+    },
+    "Hide Column" : {
+
+    },
+    "Hide Empty Groups" : {
+
+    },
+    "Is" : {
+
+    },
+    "is" : {
+
+    },
+    "Is Not" : {
+
+    },
+    "is not" : {
+
+    },
     "It will be sent once you sign in again. Do that in Settings." : {
       "extractionState" : "manual"
+    },
+    "Layout" : {
+
     },
     "Layout Options" : {
       "extractionState" : "manual"
@@ -61,6 +127,9 @@
     },
     "Long" : {
       "extractionState" : "manual"
+    },
+    "Make a view of what this window shows" : {
+
     },
     "MAPP can’t tell whether this copy holds changes that haven’t reached a server." : {
       "extractionState" : "manual"
@@ -107,6 +176,12 @@
     "MAPP’s sign-in isn’t allowed to read this item’s history. Ask whoever runs the server to allow it." : {
       "extractionState" : "manual"
     },
+    "Marfa keeps this condition. This window can’t show it, and saving leaves it as it is." : {
+
+    },
+    "More than %lld filter conditions" : {
+
+    },
     "Nothing changed." : {
       "extractionState" : "manual"
     },
@@ -118,6 +193,9 @@
     },
     "Nothing Pinned" : {
       "extractionState" : "manual"
+    },
+    "Only a board has empty groups." : {
+
     },
     "Open %@ on any device, sign in and type the code. It stops working at %@." : {
       "extractionState" : "manual"
@@ -134,8 +212,32 @@
     "Relative" : {
       "extractionState" : "manual"
     },
+    "Remove Filter" : {
+
+    },
+    "Remove Sort" : {
+
+    },
+    "Revert View" : {
+
+    },
+    "Save as View…" : {
+
+    },
+    "Save Changes to “%@”?" : {
+
+    },
+    "Save “%@”?" : {
+
+    },
+    "Saving the name, filters, sort or group of a view needs your Marfa server. Changes to the layout and columns can be saved without it." : {
+
+    },
     "Short" : {
       "extractionState" : "manual"
+    },
+    "Show Column" : {
+
     },
     "Sign In" : {
       "extractionState" : "manual"
@@ -152,8 +254,47 @@
     "Sign in to this server again to see them." : {
       "extractionState" : "manual"
     },
+    "Sort" : {
+
+    },
+    "The name always shows." : {
+
+    },
+    "The view is saved for every app connected to your Marfa server." : {
+
+    },
+    "The view was deleted elsewhere, so its panel closed." : {
+
+    },
+    "The view wasn’t saved. Your name is still here." : {
+
+    },
+    "The view’s filter keeps these conditions as they are:" : {
+
+    },
+    "The window can’t show these conditions of the view’s filter, so they stay as they are:" : {
+
+    },
+    "This Mac" : {
+
+    },
+    "This place can’t be saved as a view." : {
+
+    },
+    "This view changed elsewhere, so it now shows the view as it is. Make your changes again." : {
+
+    },
+    "This view changed elsewhere, so it now shows the view as it is. Your name is still here; make your other changes again." : {
+
+    },
     "Unpin" : {
       "extractionState" : "manual"
+    },
+    "View Deleted" : {
+
+    },
+    "View Name" : {
+
     },
     "Your Sign-In" : {
       "extractionState" : "manual"
@@ -809,7 +950,6 @@
 "Can’t Update View" : { "extractionState" : "manual" },
 "Can’t Delete View" : { "extractionState" : "manual" },
 "New View…" : { "extractionState" : "manual" },
-"Update View" : { "extractionState" : "manual" },
 "Rename View…" : { "extractionState" : "manual" },
 "Delete View…" : { "extractionState" : "manual" },
 "New View" : { "extractionState" : "manual", "generatesSymbol" : false },
@@ -821,17 +961,18 @@
 "The view is deleted for every app connected to your Marfa server. You can’t undo this action." : { "extractionState" : "manual" },
 "Delete the view “%@”?" : { "extractionState" : "manual" },
 "The list’s sections by date" : { "extractionState" : "manual" },
-"The table can’t show these conditions of the view’s filter, so they stay as they are:" : { "extractionState" : "manual" },
 "View Not Saved" : { "extractionState" : "manual" },
 "View Not Renamed" : { "extractionState" : "manual" },
 "The window closed before the view was saved." : { "extractionState" : "manual" },
 "The window closed before the view was renamed." : { "extractionState" : "manual" },
+"The panel closed before the view was saved." : { "extractionState" : "manual" },
+"The panel closed before the view was renamed." : { "extractionState" : "manual" },
+"The view was deleted before it was renamed." : { "extractionState" : "manual" },
+"%@, edited" : { "extractionState" : "manual" },
 "The window changed to another library before the view was saved." : { "extractionState" : "manual" },
 "The window changed to another library before the view was renamed." : { "extractionState" : "manual" },
-"The view is updated for every app connected to your Marfa server." : { "extractionState" : "manual" },
 "The view won’t keep:" : { "extractionState" : "manual" },
 "• %@" : { "extractionState" : "manual", "generatesSymbol" : false },
-"Update “%@”?" : { "extractionState" : "manual" },
 "The search for “%@”" : { "extractionState" : "manual" },
 "The filter on %@" : { "extractionState" : "manual" },
 "Filters that would join conditions with both “and” and “or”" : { "extractionState" : "manual" },
@@ -3055,6 +3196,45 @@
     },
     "The sidebar lists the first six types and keeps the rest under Show More. New types appear here automatically." : {
 
+    },
+    "Under the Card" : {
+      "extractionState" : "manual"
+    },
+    "Preview" : {
+      "extractionState" : "manual"
+    },
+    "Picture or Text" : {
+      "extractionState" : "manual"
+    },
+    "Picture" : {
+      "extractionState" : "manual"
+    },
+    "Fit Picture" : {
+      "extractionState" : "manual"
+    },
+    "Small" : {
+      "extractionState" : "manual"
+    },
+    "Large" : {
+      "extractionState" : "manual"
+    },
+    "Subtext" : {
+      "extractionState" : "manual"
+    },
+    "Type and Date" : {
+      "extractionState" : "manual"
+    },
+    "Hide Property" : {
+      "extractionState" : "manual"
+    },
+    "Show Property" : {
+      "extractionState" : "manual"
+    },
+    "The title always shows." : {
+      "extractionState" : "manual"
+    },
+    "Only a card with a picture can fit it." : {
+      "extractionState" : "manual"
     }
   },
   "version" : "1.1"

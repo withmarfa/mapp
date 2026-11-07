@@ -89,6 +89,7 @@ private nonisolated final class StatusCounting: MarfaReading {
     func edges(_ ids: [String]) async throws -> [Marfa.Edge] { try await read.edges(ids) }
     func views() async throws -> Rows<LibraryView> { try await read.views() }
     func items(inView id: String) async throws -> [Marfa.Item] { try await read.items(inView: id) }
+    func items(matching filters: ListFilters) async throws -> [Marfa.Item] { try await read.items(matching: filters) }
     func links(in ids: [String]) async throws -> [String: BodyLinks] { try await read.links(in: ids) }
     func links(in id: String) async throws -> BodyLinks { try await read.links(in: id) }
     func changes(since cursor: ChangeCursor?, most: Int) async throws -> CopyChanges {

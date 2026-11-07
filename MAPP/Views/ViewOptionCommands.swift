@@ -22,7 +22,6 @@ struct ViewOptionCommand {
     private static func table(_ browser: Browser, _ library: any ItemLibrary, _ storedColumns: Binding<Data>) -> [ViewOptionCommand] {
         let place = browser.item
         let content = browser.tableContent(in: library)
-        let layout = ItemTableColumnLayouts.layout(for: place, in: storedColumns.wrappedValue)
         let first = content.sort.first
         var commands: [ViewOptionCommand] = []
         if browser.isSearching, !browser.ordersByRelevance {
@@ -30,7 +29,7 @@ struct ViewOptionCommand {
                 browser.orderSearch(byRelevance: true)
             })
         }
-        for column in content.columns where layout.shows(column) && column.id != first?.column.id {
+        for column in content.columns where browser.showsColumn(column, stored: storedColumns.wrappedValue) && column.id != first?.column.id {
             commands.append(.init(title: String(localized: "Sort by \(column.label)"), systemImage: "arrow.up.arrow.down") {
                 browser.orderSearch(byRelevance: false)
                 browser.tableOptions[place, default: .init()].sort = [ItemTableComparator(column: column, order: column.firstOrder)]
@@ -57,14 +56,12 @@ struct ViewOptionCommand {
             })
         }
         for column in content.columns where column.content != .title {
-            let shown = layout.shows(column)
+            let shown = browser.showsColumn(column, stored: storedColumns.wrappedValue)
             commands.append(.init(
                 title: shown ? String(localized: "Hide \(column.label) Column") : String(localized: "Show \(column.label) Column"),
                 systemImage: "tablecells"
             ) {
-                var changed = ItemTableColumnLayouts.layout(for: place, in: storedColumns.wrappedValue)
-                changed[visibility: column.id] = shown ? .hidden : .visible
-                storedColumns.wrappedValue = ItemTableColumnLayouts.storing(changed, for: place, in: storedColumns.wrappedValue)
+                browser.setColumn(column, shown: !shown, stored: storedColumns)
             })
         }
         if browser.tableRowsNotLoaded(in: content) > 0 {
@@ -77,9 +74,9 @@ struct ViewOptionCommand {
                 browser.tableOptions[place, default: .init()].pageSize = size
             })
         }
-        if browser.tableOptions[place]?.filters.isEmpty == false {
+        if browser.tableOptions[place]?.isFiltering == true {
             commands.append(.init(title: String(localized: "Clear Filters"), systemImage: "line.3.horizontal.decrease") {
-                browser.tableOptions[place, default: .init()].filters = [:]
+                browser.tableOptions[place, default: .init()].clearFilters()
             })
         }
         return commands
@@ -88,10 +85,10 @@ struct ViewOptionCommand {
     private static func board(_ browser: Browser, _ library: any ItemLibrary) -> [ViewOptionCommand] {
         let place = browser.item
         let fields = browser.boardFieldChoices(in: library)
-        let field = ItemBoardLayout.selectedField(browser.boardFields[place], available: fields)
+        let field = ItemBoardLayout.selectedField(browser.boardFieldKey(in: place), available: fields)
         var commands = fields.filter { $0.key != field?.key }.map { field in
             ViewOptionCommand(title: String(localized: "Group by \(field.label)"), systemImage: "rectangle.split.3x1") {
-                browser.boardFields[place] = field.key
+                browser.setBoardField(field.key, in: place)
             }
         }
         let compact = browser.compactBoards[place, default: false]
@@ -110,7 +107,7 @@ struct ViewOptionCommand {
         let field = ItemTimelineLayout.selectedField(browser.timelineFields[place], fields: fields)
         return fields.filter { $0.key != field }.map { field in
             ViewOptionCommand(title: String(localized: "Date Field: \(field.label)"), systemImage: "calendar") {
-                browser.timelineFields[place] = field.key
+                browser.setTimelineField(field.key, in: library)
             }
         }
     }

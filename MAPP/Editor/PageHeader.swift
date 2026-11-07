@@ -9,7 +9,7 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     /// A status's ring: its color and how it is filled. The catalogue holds neither, so they follow the group the
     /// type puts it in, and a status no group claims gets the plain ring. A tone is one of `TypeTone`'s names, or
     /// `neutral` for the ring in the text's own color.
-    struct Mark: Encodable, Equatable, Sendable {
+    struct Mark: Encodable, Hashable, Sendable {
         enum Tone: String, Encodable, Sendable { case neutral, blue, green, red, gray }
         enum Fill: String, Encodable, Sendable { case none, half, full, slash }
         var tone: Tone

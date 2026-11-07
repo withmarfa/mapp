@@ -94,7 +94,12 @@ struct CurrentViewOptions: View {
         case .timeline: if let browser { ItemTimelineOptions(browser: browser) }
         // A collection keeps the order Marfa gives its members, so the app's order does not apply there.
         case .list, .gallery, nil:
-            OrderOptions(browser: browser).disabled(browser?.keepsPlaceOrder == true)
+            // A saved view has its own sort and group, which the list and the gallery take as the table does.
+            if let browser, browser.isViewPlace {
+                ItemTableViewOptions(browser: browser, columns: false)
+            } else {
+                OrderOptions(browser: browser).disabled(browser?.keepsPlaceOrder == true)
+            }
             if let browser {
                 Divider()
                 IncludeSubtypesOption(browser: browser)
@@ -110,9 +115,9 @@ struct ItemBoardOptions: View {
 
     var body: some View {
         let fields = browser.boardFieldChoices(in: library)
-        let field = ItemBoardLayout.selectedField(browser.boardFields[browser.item], available: fields)
+        let field = ItemBoardLayout.selectedField(browser.boardFieldKey(in: browser.item), available: fields)
         Picker("Group by", systemImage: "rectangle.split.3x1", selection: Binding { field?.key ?? "" } set: {
-            browser.boardFields[browser.item] = $0
+            browser.setBoardField($0, in: browser.item)
         }) {
             ForEach(fields) { Text(verbatim: $0.label).tag($0.key) }
         }
@@ -141,7 +146,7 @@ struct ItemTimelineOptions: View {
         let fields = browser.timelineFieldChoices(in: library)
         let field = ItemTimelineLayout.selectedField(browser.timelineFields[browser.item], fields: fields)
         Picker("Date Field", systemImage: "calendar", selection: Binding { field ?? "" } set: {
-            browser.timelineFields[browser.item] = $0
+            browser.setTimelineField($0, in: library)
         }) {
             ForEach(fields) { Text(verbatim: $0.label).tag($0.key) }
         }

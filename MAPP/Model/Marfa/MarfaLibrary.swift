@@ -78,6 +78,17 @@ import Observation
     @ObservationIgnored private var viewsFailing: Set<ItemID> = []
     /// Bumped when the views change, so a read begun before is dropped.
     @ObservationIgnored private var viewsGeneration = 0
+    /// What a view's items were last read to be for a query other than its own, which a window asks for while it
+    /// shows a filter of the view changed and not saved (`previewItems(ofView:query:)`). Keyed by the query, so two
+    /// windows on one view, each with its own changes, never share an answer. The latest few are kept.
+    @ObservationIgnored private var previews: [PreviewKey: Preview] = [:]
+    @ObservationIgnored private var previewOrder: [PreviewKey] = []
+    /// The latest answer of any preview of a view, listed while another query of it is read.
+    @ObservationIgnored private var lastPreview: [ItemID: [ItemID]] = [:]
+    /// The query of each view whose read began last, so an older read that answers late is not taken for the newest.
+    @ObservationIgnored private var newestPreviewRead: [ItemID: PreviewKey] = [:]
+    /// Views whose preview was refused, told once until one is read again.
+    @ObservationIgnored private var previewsFailing: Set<ItemID> = []
     /// Text writes the source has not answered, by item. While any wait, the text the person gave is what the
     /// library holds, since a read that raced the write could give older text.
     @ObservationIgnored private var unsettledText: [ItemID: Set<WriteID>] = [:]
@@ -175,6 +186,21 @@ import Observation
         var hits: [ItemID]
         var running: Bool
     }
+
+    private nonisolated struct PreviewKey: Hashable {
+        var view: ItemID
+        var query: LibraryViewQuery
+    }
+
+    private nonisolated struct Preview {
+        var revision: Int
+        var hits: [ItemID]?
+        var running: Bool
+        /// Whether the copy refused the query the last time it was asked.
+        var refused = false
+    }
+
+    private static let previewLimit = 8
 
     private nonisolated struct SearchKey: Hashable {
         var query: String
@@ -558,6 +584,13 @@ import Observation
         if self.views != views { self.views = views }
         viewsGeneration += 1
         viewsFailing.formIntersection(views.map(\.id))
+        // A preview does not depend on the view it was asked for, only on its fallback, so it is kept unless the view is gone.
+        let ids = Set(views.map(\.id))
+        previews = previews.filter { ids.contains($0.key.view) }
+        previewOrder.removeAll { previews[$0] == nil }
+        lastPreview = lastPreview.filter { ids.contains($0.key) }
+        newestPreviewRead = newestPreviewRead.filter { ids.contains($0.key) }
+        previewsFailing.formIntersection(ids)
         viewRevision += 1
     }
 
@@ -1032,9 +1065,61 @@ import Observation
         if views.contains(where: { $0.id == id }), held.map({ $0.revision != revision && !$0.running }) ?? true {
             startViewRead(id, at: revision)
         }
-        return Self.ordered((held?.hits ?? []).compactMap { id in
+        return listed(held?.hits ?? [])
+    }
+
+    private func listed(_ hits: [ItemID]) -> [Item] {
+        Self.ordered(hits.compactMap { id in
             records[id].flatMap { $0.isHeld && $0.item.state != .trashed ? $0.item : nil }
         })
+    }
+
+    /// Answers from the copy's own reading of the query, as `items(inView:)` does of the view's: until it returns,
+    /// the view's last preview stands, or the view's own list where there is none; a change to the items reads it
+    /// again. A query the copy refuses lists the view's own list, and says why once.
+    func previewItems(ofView id: ItemID, query: LibraryViewQuery) -> [Item] {
+        _ = viewRevision
+        let revision = contentRevision
+        let key = PreviewKey(view: id, query: query)
+        if previewOrder.last != key {
+            previewOrder.removeAll { $0 == key }
+            previewOrder.append(key)
+            while previewOrder.count > Self.previewLimit { previews[previewOrder.removeFirst()] = nil }
+        }
+        let held = previews[key]
+        if views.contains(where: { $0.id == id }), held.map({ $0.revision != revision && !$0.running }) ?? true {
+            startPreviewRead(key, at: revision)
+        }
+        guard let hits = held?.hits ?? (held?.refused == true ? nil : lastPreview[id]) else { return items(inView: id) }
+        return listed(hits)
+    }
+
+    private func startPreviewRead(_ key: PreviewKey, at revision: Int) {
+        previews[key, default: Preview(revision: revision, hits: nil, running: true)].running = true
+        newestPreviewRead[key.view] = key
+        Task { [weak self, source] in
+            let found: Result<[ItemID], any Error>
+            do {
+                found = .success(try await source.items(matching: key.query))
+            } catch {
+                found = .failure(error)
+            }
+            // Dropped with the view, or pushed out by newer queries, while it ran.
+            guard let self, let held = previews[key] else { return }
+            switch found {
+            case .success(let hits):
+                previews[key] = Preview(revision: revision, hits: hits, running: false)
+                if newestPreviewRead[key.view] == key { lastPreview[key.view] = hits }
+                previewsFailing.remove(key.view)
+            case .failure(let error):
+                previews[key] = Preview(revision: revision, hits: held.hits, running: false, refused: true)
+                // A view whose own list was refused has said so already.
+                if previewsFailing.insert(key.view).inserted, !viewsFailing.contains(key.view) {
+                    notices.tell(String(localized: "Can’t Show This View"), error.localizedDescription)
+                }
+            }
+            viewRevision += 1
+        }
     }
 
     /// A view the copy cannot answer, such as one asking for a type it does not hold, keeps what it last listed

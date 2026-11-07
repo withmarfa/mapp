@@ -72,8 +72,8 @@ struct GalleryTests {
     @Test func aCardIsRedrawnForItsOwnItemAndNotForTheSelection() {
         let (library, _, newer, other) = BrowserTests().makeFakeLibrary()
         let browser = Browser()
-        func card(_ item: Item, width: CGFloat = 200) -> GalleryCard {
-            GalleryCard(item: item, browser: browser, order: NoteOrder(), day: 1, dateFormat: .automatic, width: width)
+        func card(_ item: Item, width: CGFloat = 200, cards: ViewCards = ViewCards(), chips: [GalleryChip] = []) -> GalleryCard {
+            GalleryCard(item: item, browser: browser, order: NoteOrder(), day: 1, dateFormat: .automatic, width: width, cards: cards, chips: chips)
         }
         let before = card(newer)
         browser.show(.allNotes, in: library, order: NoteOrder())
@@ -85,5 +85,8 @@ struct GalleryTests {
         renamed.title = "Renamed"
         #expect(before != card(renamed), "its own item changing redraws it")
         #expect(before != card(newer, width: 240), "so does its width")
+        #expect(before != card(newer, cards: ViewCards(preview: .text)), "so does the view's choice of preview")
+        #expect(before != card(newer, chips: [GalleryChip(text: "Reading", look: .tag)]), "so does a chip")
+        #expect(before == card(newer, cards: ViewCards(), chips: []), "the same inputs leave it alone")
     }
 }

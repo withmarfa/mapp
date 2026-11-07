@@ -175,6 +175,7 @@ private nonisolated final class FillingReads: MarfaReading {
     }
     func views() async throws -> Rows<LibraryView> { Rows([]) }
     func items(inView id: String) async throws -> [Marfa.Item] { [] }
+    func items(matching filters: ListFilters) async throws -> [Marfa.Item] { [] }
     func links(in id: String) async throws -> BodyLinks { try await copy.items.links(in: id) }
     func links(in ids: [String]) async throws -> [String: BodyLinks] { try await copy.items.links(in: ids) }
 }
@@ -211,6 +212,7 @@ private nonisolated final class HydratingReads: MarfaReading {
     }
     func views() async throws -> Rows<LibraryView> { try await read.views() }
     func items(inView id: String) async throws -> [Marfa.Item] { try await read.items(inView: id) }
+    func items(matching filters: ListFilters) async throws -> [Marfa.Item] { try await read.items(matching: filters) }
     func links(in id: String) async throws -> BodyLinks { try await read.links(in: id) }
     func links(in ids: [String]) async throws -> [String: BodyLinks] { try await read.links(in: ids) }
 }

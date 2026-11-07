@@ -221,10 +221,27 @@ private struct SidebarViewsSection: View, Equatable {
                     $0.move(plan.views, shown: plan.shownViews, by: { SidebarPlace.view($0.id).key }, fromOffsets: source, toOffset: destination)
                 }
             }
+            SidebarPendingViewRow(browser: browser)
         } header: {
             ViewsHeading(browser: browser)
         }
         .accessibilityIdentifier("SidebarViews")
+    }
+}
+
+/// The view a New View panel is making, drawn as the selected row of Views until Save makes it or Cancel drops it. It
+/// is no place yet, so it takes no selection of its own.
+private struct SidebarPendingViewRow: View {
+    let browser: Browser
+
+    var body: some View {
+        if browser.viewPanel?.isNew == true {
+            SidebarLabel(title: String(localized: "New View"), icon: .symbol(SidebarPlace.viewSymbol))
+                .listRowBackground(Color.accentColor.opacity(0.22).clipShape(.rect(cornerRadius: 6)))
+                .selectionDisabled()
+                .accessibilityAddTraits(.isSelected)
+                .accessibilityIdentifier("SidebarNewView")
+        }
     }
 }
 
