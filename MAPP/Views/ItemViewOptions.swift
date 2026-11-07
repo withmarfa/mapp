@@ -45,21 +45,19 @@ struct ViewModeMenu: View {
 
     var body: some View {
         let modes = browser.availableViewModes(in: library)
-        Picker("View As", selection: $browser.viewMode) {
-            if modes.contains(.list) { Text("as List").tag(ItemViewMode.list) }
-            if modes.contains(.gallery) { Text("as Gallery").tag(ItemViewMode.gallery) }
-            if modes.contains(.table) { Text("as Table").tag(ItemViewMode.table) }
-            if modes.contains(.board) { Text("as Board").tag(ItemViewMode.board) }
-            if modes.contains(.timeline) { Text("as Timeline").tag(ItemViewMode.timeline) }
-        } currentValueLabel: {
-            Image(systemName: browser.viewMode.symbol)
+        // A menu rather than a picker for the toolbar's sake: the tray and Icon and Text name an item by its label.
+        Menu("View As", systemImage: browser.viewMode.symbol) {
+            Picker("View As", selection: $browser.viewMode) {
+                if modes.contains(.list) { Text("as List").tag(ItemViewMode.list) }
+                if modes.contains(.gallery) { Text("as Gallery").tag(ItemViewMode.gallery) }
+                if modes.contains(.table) { Text("as Table").tag(ItemViewMode.table) }
+                if modes.contains(.board) { Text("as Board").tag(ItemViewMode.board) }
+                if modes.contains(.timeline) { Text("as Timeline").tag(ItemViewMode.timeline) }
+            }
+            .pickerStyle(.inline)
+            .labelsHidden()
         }
-        .pickerStyle(.menu)
-        .labelsHidden()
-        // The menu's text choices otherwise set the width of the icon-only control.
-        .frame(width: 48)
         .help("View As")
-        .accessibilityLabel("View As")
         .accessibilityIdentifier("ViewModeMenu")
     }
 }

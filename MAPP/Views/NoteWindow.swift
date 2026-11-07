@@ -12,6 +12,8 @@ struct NoteWindow: View {
     @Binding var id: ItemID?
     /// Where the item's file is, once known, for sharing.
     @State private var fileURL: URL?
+    /// Version History waits for Customize Toolbar's tray to close, as replacing a toolbar under its tray crashes.
+    @State private var isToolbarTrayOpen = false
 
     init(id: Binding<ItemID?>) {
         _id = id
@@ -49,23 +51,15 @@ struct NoteWindow: View {
 
     private var item: Item? { id.flatMap { library.item($0) } }
 
-    /// Nothing while the inspector is closed, as the window's own actions are then the only ones.
-    @ToolbarContentBuilder private var inspectorToolbar: some ToolbarContent {
-        if details.isPresented {
-            if let item {
-                InspectorToolbar(browser: nil, items: [item], editor: editor, details: details, fileURL: fileURL)
-            }
-        }
-    }
-
     var body: some View {
         Group {
-            if let history = details.history {
+            if let history = details.history, !isToolbarTrayOpen {
                 VersionHistoryWorkspace(mode: history, details: details)
             } else {
                 page
             }
         }
+        .modifier(ToolbarTrayWatch { isToolbarTrayOpen = $0 })
         .focusedSceneValue(\.detailsPresentation, details)
         .environment(details)
         .sheet(item: Binding { details.typeChange } set: { details.typeChange = $0 }) { TypeChangeSheet(request: $0) }
@@ -107,21 +101,21 @@ struct NoteWindow: View {
                     .focusedSceneValue(\.editor, editor)
                     .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: [item.id], undoManager: undoManager))
                     .toolbar(id: "note") {
-                        NoteToolbar(browser: nil, items: [item], editor: editor, details: details)
+                        WindowToolbar(browser: nil, items: [item], editor: editor, details: details)
                     }
             } else if let item {
                 FileItemPage(item: item, drafts: details, open: { id = $0 }) { fileURL = $0 }
                     .navigationTitle(item.displayTitle)
                     .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: [item.id], undoManager: undoManager))
                     .toolbar(id: "note") {
-                        NoteToolbar(browser: nil, items: [item], editor: nil, details: details, fileURL: fileURL)
+                        WindowToolbar(browser: nil, items: [item], editor: nil, details: details, fileURL: fileURL)
                     }
             }
         }
         .inspector(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
             if let id {
                 ItemInspectorHost(itemID: id, details: details)
-                    .toolbar { inspectorToolbar }
+                    .toolbar(id: "note") { InspectorToolbar(details: details, editor: editor) }
             }
         }
     }

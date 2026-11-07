@@ -58,13 +58,7 @@ struct NoteOrganizeActions: View {
             Button("Recover", systemImage: "arrow.uturn.backward") { library.recover(ids, undoManager: undoManager) }
             VersionHistoryButton(ids: ids, details: details)
         } else {
-            // An item in the bin keeps its tags, so it neither decides the toggle nor takes the change.
-            let active = context.items.filter { $0.state == .active }
-            let allFavorites = !active.isEmpty && active.allSatisfy(\.isFavorite)
-            Button(allFavorites ? "Remove from Favorites" : "Add to Favorites", systemImage: allFavorites ? "star.slash" : "star") {
-                library.setFavorite(ids, !allFavorites, undoManager: undoManager)
-            }
-            .disabled(active.isEmpty)
+            FavoriteButton(ids: ids, undoManager: undoManager)
             AddTagButton(ids: ids, details: details, undoManager: undoManager)
             TypeChangeButton(ids: ids, details: details, undoManager: undoManager)
             // A right click on a card with no page open has nothing to arrange; the menus keep the item in place.
@@ -73,6 +67,23 @@ struct NoteOrganizeActions: View {
             }
             VersionHistoryButton(ids: ids, details: details)
         }
+    }
+}
+
+/// Adds the selection to Favorites, or removes it once every item is there.
+struct FavoriteButton: View {
+    @CurrentLibrary private var library
+    let ids: Set<ItemID>
+    let undoManager: UndoManager?
+
+    var body: some View {
+        // An item in the bin keeps its tags, so it neither decides the toggle nor takes the change.
+        let active = NoteActionContext(library: library, ids: ids, keepsPlace: true).items.filter { $0.state == .active }
+        let allFavorites = !active.isEmpty && active.allSatisfy(\.isFavorite)
+        Button(allFavorites ? "Remove from Favorites" : "Add to Favorites", systemImage: allFavorites ? "star.slash" : "star") {
+            library.setFavorite(ids, !allFavorites, undoManager: undoManager)
+        }
+        .disabled(active.isEmpty)
     }
 }
 

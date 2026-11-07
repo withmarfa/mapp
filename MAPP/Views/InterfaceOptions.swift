@@ -16,9 +16,11 @@ enum InterfaceKey {
     static let inspectorTagsOpen = "inspectorTagsOpen"
     /// Whether the window's toolbar shows a note's or item's title once the page's header has scrolled away.
     static let showsScrolledTitle = "showsScrolledTitle"
+    /// What the toolbar's items show, chosen under Show in Customize Toolbar.
+    static let toolbarLabelStyle = "toolbarLabelStyle"
     /// Whether a note's or item's page backs the toolbar with a blurred band while content scrolls under it.
     static let showsPageToolbarBackground = "showsPageToolbarBackground"
-    static let all = [textSize, inspectorWidth, inspectorDetailsOpen, inspectorPropertiesOpen, inspectorRelationshipsOpen, inspectorLinksInPageOpen, inspectorLinkedFromOpen, inspectorTagsOpen, showsScrolledTitle, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
+    static let all = [textSize, inspectorWidth, inspectorDetailsOpen, inspectorPropertiesOpen, inspectorRelationshipsOpen, inspectorLinksInPageOpen, inspectorLinkedFromOpen, inspectorTagsOpen, showsScrolledTitle, toolbarLabelStyle, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
 }
 
 enum InterfaceStyle {

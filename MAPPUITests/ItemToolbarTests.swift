@@ -45,7 +45,7 @@ final class ItemToolbarTests: XCTestCase {
         capture("List and page toolbars")
     }
 
-    func testShareMoreAndDetailsMoveAboveTheInspectorWhileItIsOpen() {
+    func testOnlyDetailsMovesAboveTheInspectorWhileItIsOpen() {
         let details = control("DetailsToggle")
         let more = control("MoreToolbar")
         let share = control("ShareToolbar")
@@ -58,18 +58,59 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertEqual(count("DetailsToggle"), 1)
         XCTAssertEqual(count("MoreToolbar"), 1)
         XCTAssertEqual(count("ShareToolbar"), 1)
-        XCTAssertGreaterThanOrEqual(share.frame.minX, inspector.frame.minX, "Share, More and Details sit above the inspector column")
+        XCTAssertGreaterThanOrEqual(details.frame.minX, inspector.frame.minX, "Details sits above the inspector column")
         XCTAssertLessThan(share.frame.maxX, more.frame.minX)
-        XCTAssertLessThan(more.frame.maxX, details.frame.minX)
         XCTAssertFalse(control("BackToolbar").exists)
         XCTAssertFalse(control("ForwardToolbar").exists)
-        capture("Share More and Details above the inspector")
+        capture("Details above the inspector")
         details.click()
         XCTAssertTrue(inspector.waitForNonExistence(timeout: 3))
         XCTAssertTrue(control("DetailsToggle").exists, "Details returns to the page toolbar")
         XCTAssertEqual(count("DetailsToggle"), 1)
         XCTAssertEqual(count("MoreToolbar"), 1)
         XCTAssertEqual(count("ShareToolbar"), 1)
+    }
+
+    func testCustomizeToolbarIsAvailableInEveryView() {
+        let customize = app.menuBars.menuItems["Customize Toolbar…"]
+        XCTAssertTrue(customize.isEnabled, "one plain toolbar in the window would dim it")
+        app.typeKey("2", modifierFlags: .command)
+        XCTAssertTrue(window.descendants(matching: .any)["ItemGallery"].waitForExistence(timeout: 3))
+        XCTAssertTrue(customize.isEnabled)
+        control("DetailsToggle").click()
+        XCTAssertTrue(window.descendants(matching: .any)["ItemInspectorDetails"].waitForExistence(timeout: 3))
+        XCTAssertTrue(customize.isEnabled)
+    }
+
+    func testChangingViewUnderTheOpenTrayWaitsForItToClose() {
+        app.menuBars.menuItems["Customize Toolbar…"].click()
+        let done = window.sheets.buttons["Done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 3))
+        app.typeKey("2", modifierFlags: .command)
+        XCTAssertFalse(window.descendants(matching: .any)["ItemGallery"].waitForExistence(timeout: 1), "the window keeps its shape under the tray")
+        done.click()
+        XCTAssertTrue(window.descendants(matching: .any)["ItemGallery"].waitForExistence(timeout: 3))
+    }
+
+    func testVersionHistoryUnderTheOpenTrayWaitsForItToClose() {
+        assertVersionHistoryWaitsForTheTray()
+    }
+
+    func testVersionHistoryUnderTheOpenTrayOfANoteWindowWaitsForItToClose() {
+        app.menuBars.menuItems["Open in New Window"].click()
+        XCTAssertTrue(app.windows.element(boundBy: 1).waitForExistence(timeout: 5))
+        assertVersionHistoryWaitsForTheTray()
+    }
+
+    private func assertVersionHistoryWaitsForTheTray() {
+        app.menuBars.menuItems["Customize Toolbar…"].click()
+        let done = window.sheets.buttons["Done"]
+        XCTAssertTrue(done.waitForExistence(timeout: 3))
+        app.menuBars.menuItems["Version History…"].click()
+        let exit = window.buttons["VersionHistoryExit"]
+        XCTAssertFalse(exit.waitForExistence(timeout: 1), "the window keeps its toolbar under the tray")
+        done.click()
+        XCTAssertTrue(exit.waitForExistence(timeout: 3))
     }
 
     func testViewOptionsOffersSortByAndGroupBy() {

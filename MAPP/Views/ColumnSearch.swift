@@ -6,11 +6,10 @@ import SwiftUI
 /// `searchable` cannot do this on macOS: it always goes to the window's end, never in a column, and has no
 /// minimized form there.
 ///
-/// The view's own controls (`controls`) follow it, in the same glass while it is a glass. In a list column the field
-/// takes most of the column's toolbar in place of its title, ending before those controls
-/// (`ColumnSearchMetrics.share`). Elsewhere it is an item of its own, with the controls as an item after it, and it
-/// grows leftwards from the glass.
-struct ColumnSearch<Controls: View>: ToolbarContent {
+/// One toolbar item whichever it shows, so a person's layout keeps its place. In a list column the field takes most of
+/// the column's toolbar in place of its title, ending before the view's controls (`ColumnSearchMetrics.share`).
+/// Elsewhere it grows leftwards from the glass.
+struct ColumnSearch: CustomizableToolbarContent {
     enum Layout {
         /// Across a list column, whose width a toolbar item cannot tell, so the caller passes it.
         case column(width: CGFloat)
@@ -27,7 +26,6 @@ struct ColumnSearch<Controls: View>: ToolbarContent {
     var onSubmit: () -> Void = {}
     /// Down Arrow in the field, which hands the keyboard to the list.
     var onDown: () -> Void = {}
-    @ViewBuilder let controls: () -> Controls
 
     /// - Parameter trailing: The space after the clear button. In a column the options sit in the same glass
     ///   just past the field, so the field keeps less there.
@@ -46,31 +44,18 @@ struct ColumnSearch<Controls: View>: ToolbarContent {
             .help("Search")
     }
 
-    var body: some ToolbarContent {
-        switch layout {
-        case .column(let width):
+    var body: some CustomizableToolbarContent {
+        ToolbarItem(id: "search") {
             if isExpanded {
-                ToolbarItem(id: "listSearchField") { field(trailing: 2).frame(width: ColumnSearchMetrics.fieldWidth(inColumn: width)) }
-                    .sharedBackgroundVisibility(.visible)
-                ToolbarItem(id: "listOptions") { controls() }
-            } else {
-                ToolbarItemGroup {
-                    button
-                    controls()
+                switch layout {
+                case .column(let width): field(trailing: 2).frame(width: ColumnSearchMetrics.fieldWidth(inColumn: width))
+                case .item: field(trailing: 8).frame(width: ColumnSearchMetrics.itemFieldWidth)
                 }
-            }
-        case .item:
-            if isExpanded {
-                ToolbarItem(id: "collectionSearchField") { field(trailing: 8).frame(width: ColumnSearchMetrics.itemFieldWidth) }
-                    .sharedBackgroundVisibility(.visible)
-                ToolbarItem(id: "collectionOptions") { controls() }
             } else {
-                ToolbarItemGroup {
-                    button
-                    controls()
-                }
+                button
             }
         }
+        .sharedBackgroundVisibility(isExpanded ? .visible : .automatic)
     }
 }
 

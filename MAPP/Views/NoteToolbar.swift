@@ -1,10 +1,13 @@
 import SwiftUI
 
-/// The page's toolbar: View As, Share and More, and, at the far right, Details,
-/// which opens the panel at the window's right edge. Format is out of the
-/// default toolbar but stays in the Format menu, its shortcuts and the palette, and the toolbar can have it back.
-/// While the inspector is open, Share, More and Details sit above it instead (`InspectorToolbar`).
-struct NoteToolbar: CustomizableToolbarContent {
+/// A window's toolbar, which a person can change with Customize Toolbar. Each split view the main window mounts keeps a
+/// layout of its own (`WindowToolbarLayout`), since the system reshuffles a saved layout when one identifier moves between
+/// split views. Nothing else in a window may declare a plain `toolbar`, which turns customization off for the whole window.
+///
+/// The defaults run New Item at the leading side when the sidebar is hidden, then Search, the table's Filter and View
+/// Options, View As, Share and More, and Details at the far right. In the list Search and View Options are the list
+/// column's (`ListToolbar`). Format and `ExtraToolbarItems` start in the tray.
+struct WindowToolbar: CustomizableToolbarContent {
     @CurrentLibrary private var library
     @AppStorage(InterfaceKey.showsScrolledTitle) private var showsScrolledTitle = true
     let browser: Browser?
@@ -14,47 +17,181 @@ struct NoteToolbar: CustomizableToolbarContent {
     let details: DetailsPresentation
     var fileURL: URL?
     var showsCreation = false
+    /// Whether the list column holds Search and View Options, which otherwise come here.
+    var hasListColumn = false
 
     var body: some CustomizableToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details, fileURL: fileURL)
-        ToolbarItem(id: "detailNewItem") {
+        let showsItem = browser?.showsSidebarIndex != true
+        let opensFromCollection = browser.map { $0.usesCollection && !$0.showsCollection } == true && !hasListColumn
+        ToolbarItem(id: "newItem") {
             NewItemButton(browser: browser)
         }
-        .customizationBehavior(.disabled)
         .hidden(!showsCreation)
-        // The item stays in the toolbar while the page's title is in view and only its text goes, rather than the item
-        // being hidden and shown as the page scrolls. A hidden item keeps no place at the detail column's leading edge,
-        // so the first time it was shown it could be laid out from the list column's side, under that column's buttons.
-        // Only the editor's page scrolls its header away; any other page keeps its title in view, so a stale flag from
-        // the note shown before it must not show the title.
-        ToolbarItem(id: "scrolledTitle") {
-            ScrolledItemTitle(title: editor?.isHeaderScrolledAway == true && tools.visibleNote != nil ? tools.notes.first?.title ?? "" : "")
+        // A navigation item that is merely hidden still moves the title in a collection, so these two come and go.
+        if let browser, opensFromCollection {
+            ToolbarItem(id: "backToCollection", placement: .navigation) {
+                Button(String(localized: browser.viewMode.backTitle), systemImage: "chevron.backward") { browser.returnToCollection() }
+                    .accessibilityIdentifier("BackToGallery")
+            }
+            .customizationBehavior(.disabled)
         }
-        .sharedBackgroundVisibility(.hidden)
-        .customizationBehavior(.disabled)
-        .hidden(!showsScrolledTitle || tools.notes.count != 1 || browser?.showsCollection == true)
+        // In the list the item stays in the toolbar while the page's title is in view and only its text goes, rather
+        // than the item being hidden and shown as the page scrolls. A hidden item keeps no place at the detail
+        // column's leading edge, so the first time it was shown it could be laid out from the list column's side,
+        // under that column's buttons. Only the editor's page scrolls its header away; any other page keeps its title
+        // in view, so a stale flag from the note shown before it must not show the title.
+        if hasListColumn || browser == nil {
+            ToolbarItem(id: "scrolledTitle") {
+                ScrolledItemTitle(title: editor?.isHeaderScrolledAway == true && tools.visibleNote != nil ? tools.notes.first?.title ?? "" : "")
+            }
+            .sharedBackgroundVisibility(.hidden)
+            .customizationBehavior(.disabled)
+            .hidden(!showsScrolledTitle || tools.notes.count != 1 || browser?.showsCollection == true)
+        } else if opensFromCollection, showsScrolledTitle, editor?.isHeaderScrolledAway == true, tools.visibleNote != nil {
+            ToolbarItem(id: "scrolledTitle", placement: .navigation) {
+                ScrolledItemTitle(title: tools.notes.first?.title ?? "")
+            }
+            .sharedBackgroundVisibility(.hidden)
+            .customizationBehavior(.disabled)
+        }
         ToolbarSpacer(.flexible)
+        if let browser, !hasListColumn {
+            ViewToolbarItems(browser: browser, layout: .item, isHidden: opensFromCollection)
+            ToolbarSpacer(.fixed)
+                .hidden(opensFromCollection || !showsItem)
+        }
         ToolbarItem(id: "format") {
             if let editor { FormatMenu(editor: editor, note: tools.editableNote) }
         }
             .defaultCustomization(.hidden)
-            .hidden(browser?.showsCollection == true)
-        ToolbarItem(id: "viewMode") {
-            if let browser { ViewModeMenu(browser: browser) }
+            .hidden(browser?.showsCollection == true || !showsItem)
+        if let browser {
+            ToolbarItem(id: "viewMode") { ViewModeMenu(browser: browser) }
+                .hidden(!showsItem)
+            ToolbarSpacer(.fixed)
+                .hidden(!showsItem)
         }
-        .hidden(browser == nil)
-        ToolbarSpacer(.fixed)
-            .hidden(browser == nil || tools.showsInspector)
         ToolbarItem(id: "share") { tools.shareLink }
-            .hidden(tools.showsInspector)
+            .hidden(!showsItem)
         ToolbarItem(id: "more") {
             tools.moreMenu.disabled(items.isEmpty)
         }
-        .hidden(tools.showsInspector)
+        .hidden(!showsItem)
         ToolbarSpacer(.fixed)
-            .hidden(tools.showsInspector)
+            .hidden(tools.showsInspector || !showsItem)
         ToolbarItem(id: "details") { tools.detailsButton }
-            .hidden(tools.showsInspector)
+            .hidden(tools.showsInspector || !showsItem)
+        ExtraToolbarItems(tools: tools)
+    }
+}
+
+/// What a person can add from the tray. Each is a command of the menu bar too. One that cannot act on what is showing
+/// dims, as Mail's do, so a layout keeps its shape from view to view.
+private struct ExtraToolbarItems: CustomizableToolbarContent {
+    let tools: ItemToolbarActions
+
+    var body: some CustomizableToolbarContent {
+        if let browser = tools.browser {
+            ToolbarItem(id: "historyBack") { HistoryButton(direction: .back, browser: browser) }
+                .defaultCustomization(.hidden)
+            ToolbarItem(id: "historyForward") { HistoryButton(direction: .forward, browser: browser) }
+                .defaultCustomization(.hidden)
+        }
+        ToolbarItem(id: "favorite") { tools.withUndo { FavoriteButton(ids: tools.ids, undoManager: $0) } }
+            .defaultCustomization(.hidden)
+        ToolbarItem(id: "addTag") { tools.withUndo { AddTagButton(ids: tools.ids, details: tools.details, undoManager: $0) } }
+            .defaultCustomization(.hidden)
+        ToolbarItem(id: "quickLook") { tools.command(.quickLook) }
+            .defaultCustomization(.hidden)
+        ToolbarItem(id: "openInNewWindow") { tools.command(.openInNewWindow) }
+            .defaultCustomization(.hidden)
+        ToolbarItem(id: "versionHistory") { VersionHistoryButton(ids: tools.ids, details: tools.details) }
+            .defaultCustomization(.hidden)
+        ToolbarItem(id: "customizeLayout") { CustomizeLayoutButton(ids: tools.ids, details: tools.details) }
+            .defaultCustomization(.hidden)
+        ToolbarItem(id: "addAttachment") { tools.command(.addAttachment) }
+            .defaultCustomization(.hidden)
+        ToolbarItem(id: "toggleSource") { tools.command(.toggleSource) }
+            .defaultCustomization(.hidden)
+        ToolbarItem(id: "print") { tools.command(.print) }
+            .defaultCustomization(.hidden)
+        ToolbarItem(id: "exportPDF") { tools.command(.exportPDF) }
+            .defaultCustomization(.hidden)
+        ToolbarItem(id: "delete") { tools.withUndo { NoteRemoveActions(ids: tools.ids, undoManager: $0, keepsPlace: true) } }
+            .defaultCustomization(.hidden)
+        ToolbarItem(id: "bold") { FormatToggle(format: .bold, symbol: "bold", tools: tools) }
+            .defaultCustomization(.hidden)
+        ToolbarItem(id: "italic") { FormatToggle(format: .italic, symbol: "italic", tools: tools) }
+            .defaultCustomization(.hidden)
+        ToolbarItem(id: "bulletList") { FormatToggle(format: .bulletList, symbol: "list.bullet", tools: tools) }
+            .defaultCustomization(.hidden)
+        ToolbarItem(id: "checklist") { FormatToggle(format: .checklist, symbol: "checklist", tools: tools) }
+            .defaultCustomization(.hidden)
+    }
+}
+
+/// Back or Forward through the items a window has shown.
+private struct HistoryButton: View {
+    @CurrentLibrary private var library
+    let direction: SelectionHistory.Direction
+    let browser: Browser
+
+    var body: some View {
+        switch direction {
+        case .back:
+            Button("Back", systemImage: "chevron.backward") { browser.go(.back, in: library) }
+                .disabled(!browser.canGoBack(in: library))
+        case .forward:
+            Button("Forward", systemImage: "chevron.forward") { browser.go(.forward, in: library) }
+                .disabled(!browser.canGoForward(in: library))
+        }
+    }
+}
+
+/// A style of the Format menu as a button of its own, on while the caret is in that style.
+private struct FormatToggle: View {
+    let format: Format
+    let symbol: String
+    let tools: ItemToolbarActions
+
+    var body: some View {
+        let editor = tools.editableNote == nil ? nil : tools.editor
+        Toggle(isOn: Binding { editor.map { format.isActive(in: $0.caret) } ?? false } set: { _ in editor?.apply(format) }) {
+            Label { Text(format.title) } icon: { Image(systemName: symbol) }
+        }
+        .disabled(editor?.canApply(format) != true)
+    }
+}
+
+/// The saved toolbars of the main window, one for each split view it mounts. All of a split view's columns name the same
+/// one.
+enum WindowToolbarLayout {
+    static let list = "main"
+    static let index = "index"
+
+    static func collection(_ mode: ItemViewMode) -> String { "collection.\(mode)" }
+}
+
+/// Says when the Customize Toolbar tray of this window opens and closes. Menu commands still reach a window under its
+/// tray, so a window holds its shape meanwhile. Only the active window's tray counts: it is where the tray opens from.
+struct ToolbarTrayWatch: ViewModifier {
+    @Environment(\.appearsActive) private var appearsActive
+    @State private var trayWindow: NSWindow?
+    let changed: (Bool) -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.willBeginSheetNotification)) { sheet in
+                guard appearsActive, let window = sheet.object as? NSWindow, window.toolbar?.customizationPaletteIsRunning == true else { return }
+                trayWindow = window
+                changed(true)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEndSheetNotification)) { sheet in
+                guard let window = sheet.object as? NSWindow, window === trayWindow else { return }
+                trayWindow = nil
+                changed(false)
+            }
     }
 }
 
@@ -78,30 +215,19 @@ struct ScrolledItemTitle: View {
     }
 }
 
-/// Share, More and Details above the inspector column, where the system sets a toolbar declared inside the inspector's
-/// content. Details is on while the inspector is open and is never dimmed, so the inspector can always be closed.
-/// It contributes nothing while the inspector is closed, because the system keeps a closed inspector's toolbar
-/// and would show the actions a second time beside the page's own.
-struct InspectorToolbar: ToolbarContent {
-    @CurrentLibrary private var library
-    let browser: Browser?
-    let items: [Item]
-    let editor: EditorController?
+/// Details above the inspector column, where the system sets a toolbar declared inside the inspector's content, so the
+/// inspector can always be closed whatever a person's layout holds. It contributes nothing while the inspector is
+/// closed, because the system keeps a closed inspector's toolbar and would show a second Details beside the page's.
+struct InspectorToolbar: CustomizableToolbarContent {
     let details: DetailsPresentation
-    var fileURL: URL?
+    let editor: EditorController?
 
-    var body: some ToolbarContent {
-        let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details, fileURL: fileURL)
-        if tools.showsInspector {
-            ToolbarItemGroup {
-                tools.shareLink
-                tools.moreMenu
-                    .disabled(items.isEmpty)
-            }
-            ToolbarSpacer(.fixed)
-            ToolbarItem {
+    var body: some CustomizableToolbarContent {
+        if details.isPresented {
+            ToolbarItem(id: "inspectorDetails") {
                 DetailsToggle(details: details, editor: editor)
             }
+            .customizationBehavior(.disabled)
         }
     }
 }
@@ -139,74 +265,6 @@ struct LayoutDoneButton: View {
             }
             .help("Finish Customizing")
             .accessibilityIdentifier("LayoutDone")
-    }
-}
-
-/// The toolbar of every view that spans the window (gallery, table, board and timeline), one for the view and the
-/// page it opens, so the order across its single column keeps New Item at the leading side when the sidebar is
-/// hidden. At the trailing side, always in this order: Search, the table's Filter and View Options
-/// (`CurrentViewOptions`), then View As, Share and More, and Details. The list has the same order across its two
-/// columns (`ListToolbar`, `NoteToolbar`). Opened on an item, Search, Filter and View Options give way.
-struct GalleryToolbar: ToolbarContent {
-    @CurrentLibrary private var library
-    @AppStorage(InterfaceKey.showsScrolledTitle) private var showsScrolledTitle = true
-    @Bindable var browser: Browser
-    let items: [Item]
-    let editor: EditorController
-    let details: DetailsPresentation
-    var showsCreation = true
-
-    // Every item but the navigation ones stays in the toolbar and is hidden when it does not apply, as the page's
-    // toolbar does (`NoteToolbar`). The toolbar then keeps its shape as a place or a layout changes, instead of being
-    // rebuilt.
-    var body: some ToolbarContent {
-        let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details)
-        ToolbarItem(id: "collectionNewItem") { NewItemButton(browser: browser) }
-            .hidden(!showsCreation)
-        // A navigation item that is merely hidden still moves the title in a collection, so these two come and go.
-        if !browser.showsCollection {
-            ToolbarItem(placement: .navigation) {
-                Button(String(localized: browser.viewMode.backTitle), systemImage: "chevron.backward") { browser.returnToCollection() }
-                    .accessibilityIdentifier("BackToGallery")
-            }
-            if showsScrolledTitle, editor.isHeaderScrolledAway, tools.visibleNote != nil {
-                ToolbarItem(placement: .navigation) {
-                    ScrolledItemTitle(title: tools.notes.first?.title ?? "")
-                }
-                .sharedBackgroundVisibility(.hidden)
-            }
-        }
-        ToolbarSpacer(.flexible)
-        ColumnSearch(
-            isExpanded: $browser.isSearchExpanded,
-            text: $browser.searchText,
-            prompt: String(localized: "Search"),
-            layout: .item,
-            focusRequests: browser.searchFocusRequests,
-            onDown: { browser.focusRequest = .list }
-        ) {
-            if browser.viewMode == .table { ItemTableFilterMenu(browser: browser) }
-            ViewOptionsMenu(browser: browser)
-        }
-        .hidden(!browser.showsCollection)
-        ToolbarSpacer(.fixed)
-            .hidden(!browser.showsCollection)
-        ToolbarItem(id: "collectionViewMode") { ViewModeMenu(browser: browser) }
-        // Keep the controls in place when selection clears. They move above an open inspector.
-        ToolbarSpacer(.fixed)
-            .hidden(details.isPresented)
-        ToolbarItemGroup {
-            tools.shareLink
-            tools.moreMenu
-                .disabled(browser.selection.isEmpty)
-        }
-        .hidden(details.isPresented)
-        ToolbarSpacer(.fixed)
-            .hidden(details.isPresented)
-        ToolbarItem {
-            tools.detailsButton
-        }
-        .hidden(details.isPresented)
     }
 }
 
@@ -269,13 +327,33 @@ private struct ItemToolbarActions {
         }
     }
 
+    var ids: Set<ItemID> { browser.map(\.selection) ?? Set(items.map(\.id)) }
+
+    func command(_ command: ItemCommand) -> some View {
+        ItemCommandButton(
+            command: command, context: ItemCommandContext(library: library, ids: ids, browser: browser, editor: editor, fileURL: selectedFileURL),
+            editor: editor)
+    }
+
+    func withUndo<Content: View>(@ViewBuilder _ content: @escaping (UndoManager?) -> Content) -> some View {
+        UndoManagerReader(content: content)
+    }
+
     var moreMenu: some View {
         let isShowingSelection = (browser?.selection.count ?? notes.count) == notes.count
         return MoreMenu(
-            ids: browser.map(\.selection) ?? Set(items.map(\.id)),
+            ids: ids,
             notes: isShowingSelection ? notes : [],
             fileURL: selectedFileURL, browser: browser, editor: editor)
     }
+}
+
+/// Hands a toolbar item the window's undo manager, which toolbar content cannot read for itself.
+private struct UndoManagerReader<Content: View>: View {
+    @Environment(\.undoManager) private var undoManager
+    @ViewBuilder let content: (UndoManager?) -> Content
+
+    var body: some View { content(undoManager) }
 }
 
 /// Text styles and emphasis, as Notes offers them under Aa.

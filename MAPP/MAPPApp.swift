@@ -42,6 +42,7 @@ enum TestHost {
 struct MAPPApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
     @State private var settingsRequest = SettingsRequest()
+    @AppStorage(InterfaceKey.toolbarLabelStyle) private var toolbarLabelStyle: ToolbarLabelStyle = .iconOnly
     private var libraries: Libraries { delegate.libraries }
 
     var body: some Scene {
@@ -58,6 +59,7 @@ struct MAPPApp: App {
                 .environment(libraries.host)
         }
         .defaultSize(width: 1100, height: 720)
+        .windowToolbarLabelStyle($toolbarLabelStyle)
         .commands {
             AppCommands(library: libraries.current, host: libraries.host)
             PlaceCommands(library: libraries.current)
@@ -100,6 +102,7 @@ struct MAPPApp: App {
             .modifier(ItemWindowNotices(notices: libraries.host.notices, settingsRequest: settingsRequest))
         }
         .defaultSize(width: 640, height: 720)
+        .windowToolbarLabelStyle($toolbarLabelStyle)
     }
 }
 

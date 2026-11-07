@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Mounts one split view at a time: the workspace identity changes to switch. Settings is a place in the three-column split so macOS releases the outgoing toolbar, and the column count of a mounted split view is never changed. Browser, editor, undo, columns and sidebar scroll live above that boundary so they survive a switch.
@@ -18,6 +19,10 @@ struct MainView: View {
     @State private var snapshotSaver = DelayedAction()
     @State private var measuredWidths = ColumnWidthTracker()
     @Environment(\.appearsActive) private var appearsActive
+    /// The shape kept while Customize Toolbar's tray is open: replacing a toolbar under its tray crashes, and menu
+    /// commands still reach the window. A change made meanwhile shows once the tray closes.
+    @State private var heldPresentation: WorkspacePresentation?
+    @State private var heldViewMode: ItemViewMode?
     private let restoresWindow: Bool
 
     init(browser: Browser = Browser(), details: DetailsPresentation = DetailsPresentation(), restoresWindow: Bool = true) {
@@ -48,11 +53,18 @@ struct MainView: View {
         return usesCollectionLayout ? .collection : .list
     }
 
+    private var shownPresentation: WorkspacePresentation { heldPresentation ?? workspacePresentation }
+    private var shownViewMode: ItemViewMode { heldViewMode ?? browser.viewMode }
+
     private var activeWindow: some View {
         // Settings replaces both column toolbar providers even when the split keeps three columns.
         // Release the outgoing providers before mounting that workspace or changing the column count.
         // Browser, editor, drafts, and column preferences remain above this presentation identity.
-        dialogsWindow.id(workspacePresentation)
+        dialogsWindow.id(shownPresentation)
+        .modifier(ToolbarTrayWatch { isOpen in
+            heldPresentation = isOpen ? workspacePresentation : nil
+            heldViewMode = isOpen ? browser.viewMode : nil
+        })
         .onChange(of: workspacePresentation) {
             editor.flush()
         }
@@ -95,7 +107,7 @@ struct MainView: View {
             sidebarColumn
         } content: {
             Group {
-                if browser.showsSettings {
+                if shownPresentation == .settings {
                     SettingsPageList(browser: browser)
                 } else {
                     NoteList(browser: browser, order: order, pane: $pane).equatable()
@@ -109,23 +121,26 @@ struct MainView: View {
                 min: activeListColumn.range.lowerBound, ideal: measuredWidths.width(of: activeListColumn),
                 max: activeListColumn.range.upperBound)
         } detail: {
-            if browser.showsSettings {
+            if shownPresentation == .settings {
                 SettingsPageView(page: browser.settingsPage, browser: browser)
             } else {
                 itemPage
-                    .modifier(itemInspector)
-                    .toolbar(id: "main") {
-                        NoteToolbar(browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details,
-                            showsCreation: !isSidebarVisible)
-                    }
+                    .modifier(itemInspector(WindowToolbarLayout.list))
+                    .toolbar(id: WindowToolbarLayout.list) { windowToolbar(hasListColumn: true) }
             }
         }
     }
 
-    /// Only the three-column split has a list column to measure.
-    private var hasListColumn: Bool { workspacePresentation == .list || workspacePresentation == .settings }
+    private func windowToolbar(hasListColumn: Bool = false) -> WindowToolbar {
+        WindowToolbar(
+            browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details,
+            showsCreation: !isSidebarVisible, hasListColumn: hasListColumn)
+    }
 
-    private var activeListColumn: ColumnWidth { browser.showsSettings ? .settings : .list }
+    /// Only the three-column split has a list column to measure.
+    private var hasListColumn: Bool { shownPresentation == .list || shownPresentation == .settings }
+
+    private var activeListColumn: ColumnWidth { shownPresentation == .settings ? .settings : .list }
 
     private var sidebarColumn: some View {
         VStack(spacing: 0) {
@@ -151,16 +166,17 @@ struct MainView: View {
 
     private var workspace: some View {
         Group {
-            if let history = details.history, workspacePresentation == .history {
+            if let history = details.history, shownPresentation == .history {
                 VersionHistoryWorkspace(mode: history, details: details)
-            } else if browser.showsSidebarIndex {
+            } else if shownPresentation == .index {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
                     sidebarColumn
                 } detail: {
-                    SidebarIndex(browser: browser, order: order, showsCreation: !isSidebarVisible)
+                    SidebarIndex(browser: browser, order: order)
                         .newItemChips(browser)
+                        .toolbar(id: WindowToolbarLayout.index) { windowToolbar() }
                 }
-            } else if usesCollectionLayout {
+            } else if shownPresentation == .collection {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
                     sidebarColumn
                 } detail: {
@@ -184,25 +200,20 @@ struct MainView: View {
                         }
                     }
                     .newItemChips(browser)
-                    .modifier(itemInspector)
-                    .toolbar {
-                        GalleryToolbar(
-                            browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details,
-                            showsCreation: !isSidebarVisible
-                        )
-                    }
+                    .modifier(itemInspector(WindowToolbarLayout.collection(shownViewMode)))
+                    .toolbar(id: WindowToolbarLayout.collection(shownViewMode)) { windowToolbar() }
                 }
                 // Each view has its own split view: swapped inside one, the next squeezes the right sidebar to its
                 // minimum. Only the split is remade, as the dialogs above it watch the view for a saved view's layout.
-                .id(browser.viewMode)
+                .id(shownViewMode)
             } else {
                 splitView
             }
         }
     }
 
-    private var itemInspector: ItemInspectorColumn {
-        ItemInspectorColumn(browser: browser, details: details, editor: editor)
+    private func itemInspector(_ toolbarLayout: String) -> ItemInspectorColumn {
+        ItemInspectorColumn(browser: browser, details: details, editor: editor, toolbarLayout: toolbarLayout)
     }
 
     private var presentedWindow: some View {
@@ -304,13 +315,17 @@ struct MainView: View {
         .onChange(of: library.isLoaded, initial: true) {
             browser.adopt(library, undoManager: undoManager)
             guard library.isLoaded else { return }
-            if restoresWindow { browser.restore(from: storedBrowser, in: library, order: order) }
-            #if DEBUG
-            if SampleLibrary.isRequested, SampleLibrary.withCollections {
-                browser.sidebarItem = .itemType("core.task")
-                browser.set(layout: .board)
+            // After this update, not in it: chosen while the window's customizable toolbars are first mounted, the page
+            // can miss the selection and stay on No Item Selected.
+            Task {
+                if restoresWindow { browser.restore(from: storedBrowser, in: library, order: order) }
+                #if DEBUG
+                if SampleLibrary.isRequested, SampleLibrary.withCollections {
+                    browser.sidebarItem = .itemType("core.task")
+                    browser.set(layout: .board)
+                }
+                #endif
             }
-            #endif
         }
         // A new item reaches a server's library when its source says so, which the window waits for to open it.
         .onChange(of: newItemIsSettled) {
@@ -378,10 +393,10 @@ private enum WorkspacePresentation: Hashable {
 /// resize of the window lay out every column again, which made live resizing several times slower, and one applied
 /// after the column's toolbar raises an exception during layout when a new window opens.
 private struct ItemInspectorColumn: ViewModifier {
-    @CurrentLibrary private var library
     let browser: Browser
     let details: DetailsPresentation
     let editor: EditorController
+    let toolbarLayout: String
     /// Read once, as the window remakes this column when its layout changes and the column's own width goes with it.
     /// Kept out of the state as it changes, so a drag is not fed back into the column it is resizing.
     @State private var width = UserDefaults.standard.object(forKey: InterfaceKey.inspectorWidth) as? Double ?? 310
@@ -401,9 +416,7 @@ private struct ItemInspectorColumn: ViewModifier {
                     UserDefaults.standard.set(Double(newWidth), forKey: InterfaceKey.inspectorWidth)
                 }
                 .inspectorColumnWidth(min: 260, ideal: width, max: 440)
-                .toolbar {
-                    InspectorToolbar(browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details)
-                }
+                .toolbar(id: toolbarLayout) { InspectorToolbar(details: details, editor: editor) }
         }
     }
 }
