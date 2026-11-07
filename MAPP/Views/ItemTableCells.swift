@@ -43,7 +43,7 @@ struct ItemTableCell: View {
     @ViewBuilder private var content: some View {
         switch column.content {
         case .title: title
-        case .type: Label { Text(row.typeLabel) } icon: { TypeIcon(id: row.typeIcon) }
+        case .type: Label { Text(row.typeLabel) } icon: { TypeGlyph(id: row.typeIcon) }
             .labelStyle(ItemTableLabelStyle())
             .foregroundStyle(.secondary)
         case .parent: link(row.parent)
@@ -64,7 +64,7 @@ struct ItemTableCell: View {
 
     private var title: some View {
         HStack(spacing: 8) {
-            TypeIcon(id: row.typeIcon)
+            TypeGlyph(id: row.typeIcon)
                 .foregroundStyle(.secondary)
                 .frame(width: 16)
                 .accessibilityHidden(true)
@@ -200,7 +200,7 @@ struct ItemTableCell: View {
             Button {
                 if let item = library.item(link.id) { browser.reveal(item, in: library, order: order) }
             } label: {
-                Label { Text(link.title).underline(isHovering) } icon: { TypeIcon(id: link.icon) }
+                Label { Text(link.title).underline(isHovering) } icon: { TypeGlyph(id: link.icon) }
                     .labelStyle(ItemTableLabelStyle())
             }
             .buttonStyle(.plain)

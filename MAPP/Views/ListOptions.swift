@@ -4,13 +4,15 @@ import SwiftUI
 enum ListKey {
     static let previewLines = "listPreviewLines"
     static let defaultPreviewLines = 2
-    static let all = [previewLines]
+    static let showsPictures = "listShowsPictures"
+    static let all = [previewLines, showsPictures]
 }
 
 /// How many lines of each item's text its row shows under the title, as Mail offers for its messages. A row with
 /// less text takes less room.
 struct ListPreviewOptions: View {
     @AppStorage(ListKey.previewLines) private var previewLines = ListKey.defaultPreviewLines
+    @AppStorage(ListKey.showsPictures) private var showsPictures = true
 
     var body: some View {
         Picker("List Preview", systemImage: "text.alignleft", selection: $previewLines) {
@@ -18,5 +20,6 @@ struct ListPreviewOptions: View {
             Text("1 Line").tag(1)
             Text("2 Lines").tag(2)
         }
+        Toggle("Picture Previews", systemImage: "photo", isOn: $showsPictures)
     }
 }

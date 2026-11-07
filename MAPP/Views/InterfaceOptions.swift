@@ -3,6 +3,8 @@ import SwiftUI
 
 enum InterfaceKey {
     static let textSize = "interfaceTextSize"
+    /// The width the person last gave the right sidebar, kept across layouts and launches.
+    static let inspectorWidth = "inspectorWidth"
     /// Whether the inspector's Details section is open, kept across items and launches.
     static let inspectorDetailsOpen = "inspectorDetailsOpen"
     /// Whether the inspector's Properties, Relationships, Links in This Page, Linked From and Tags sections are open, kept across items
@@ -16,7 +18,7 @@ enum InterfaceKey {
     static let showsScrolledTitle = "showsScrolledTitle"
     /// Whether a note's or item's page backs the toolbar with a blurred band while content scrolls under it.
     static let showsPageToolbarBackground = "showsPageToolbarBackground"
-    static let all = [textSize, inspectorDetailsOpen, inspectorPropertiesOpen, inspectorRelationshipsOpen, inspectorLinksInPageOpen, inspectorLinkedFromOpen, inspectorTagsOpen, showsScrolledTitle, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
+    static let all = [textSize, inspectorWidth, inspectorDetailsOpen, inspectorPropertiesOpen, inspectorRelationshipsOpen, inspectorLinksInPageOpen, inspectorLinkedFromOpen, inspectorTagsOpen, showsScrolledTitle, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
 }
 
 enum InterfaceStyle {

@@ -6,7 +6,7 @@ export type HeaderTone = 'neutral' | 'blue' | 'red' | 'green' | 'gray'
 export type HeaderFill = 'none' | 'half' | 'full' | 'slash'
 
 /** Every chip look as CSS custom properties, resolved by the app for light and for dark: the sizes and fills
- *  (`--chip-*`) and each tone's colors (`--tone-<name>`, `--tone-<name>-mark`, `--tone-<name>-chip`). The page applies
+ *  (`--chip-*`) and each tone's colors (`--tone-<name>`, `--tone-<name>-ink`, `--tone-<name>-mark`, `--tone-<name>-chip`). The page applies
  *  the set for the appearance it is in and never picks a color or a size of its own. */
 export interface HeaderChipStyle {
   light: Record<string, string>
@@ -26,8 +26,8 @@ export interface HeaderPin {
   tone?: string | null
 }
 
-/** An item a row links to: drawn as a chip of its type in the item's own tone, or, for a person, as initials and the
- *  name. The app chooses the kind and the tone. */
+/** An item a row links to: drawn as its type's mark in the item's own tone and its title with no fill, or, for a person,
+ *  as initials and the name. The app chooses the kind and the tone. */
 export interface HeaderItem {
   title: string
   item: string
@@ -253,12 +253,13 @@ function element<K extends keyof HTMLElementTagNameMap>(
 /** Gives a chip the tone the app named, from the custom properties the app sent (`--tone-<name>`); the page chooses no
  *  color. A name that is not a word leaves the chip with no tone. */
 function useTone(node: HTMLElement, name: string | null | undefined) {
-  const tones = ['--tone', '--tone-mark', '--tone-chip']
+  const tones = ['--tone', '--tone-ink', '--tone-mark', '--tone-chip']
   if (!name || !/^[a-z]+$/.test(name)) {
     for (const property of tones) node.style.removeProperty(property)
     return
   }
   node.style.setProperty('--tone', `var(--tone-${name})`)
+  node.style.setProperty('--tone-ink', `var(--tone-${name}-ink)`)
   node.style.setProperty('--tone-mark', `var(--tone-${name}-mark)`)
   node.style.setProperty('--tone-chip', `var(--tone-${name}-chip)`)
 }
@@ -360,8 +361,8 @@ class LinkedSection {
  *  menu. The header belongs to MAPP's page, not to Inkkit; do not move it back into a native overlay that follows
  *  WebKit's scrolling.
  *
- *  Under the title the header draws the pins the app sends (`HeaderModel.pins`, at most four, each a key above its
- *  value), then the property block: the rows Swift sends (`HeaderRow`, one model for every item), folded after
+ *  Under the title the header draws the pins the app sends (`HeaderModel.pins`, at most four, each a key with its icon
+ *  above its value, in a slot of a fixed width), then the property block: the rows Swift sends (`HeaderRow`, one model for every item), folded after
  *  `foldAfter` rows with "Show N More" expanding in place, and "Show Less" once expanded. The status, in a pin or a
  *  row, and the parent, in a row, are one button each, moved into place with its menu unchanged. A link value posts
  *  `openItem` or `openLink`; nothing else here is edited. A pin that is a list shows what the app sent, and its
@@ -765,13 +766,13 @@ export class ItemHeader {
   }
 
   /** A symbol the app drew, as a mask in the text's secondary color; nothing for one it did not draw. */
-  private glyph(name: string, parent: HTMLElement): void {
+  private glyph(name: string, parent: HTMLElement, scale = 1): void {
     const icon = this.symbols[name]
     const node = element('span', 'item-glyph', parent)
     node.setAttribute('aria-hidden', 'true')
     if (!icon) return
-    node.style.width = `${icon.width}px`
-    node.style.height = `${icon.height}px`
+    node.style.width = `${icon.width * scale}px`
+    node.style.height = `${icon.height * scale}px`
     node.style.setProperty('-webkit-mask-image', `url("${icon.url}")`)
     node.style.maskImage = `url("${icon.url}")`
   }
@@ -845,7 +846,7 @@ export class ItemHeader {
     return person
   }
 
-  /** An item a row links to: a chip of its type in its own tone, or a person's initials and name. */
+  /** An item a row links to: its type's mark in its own tone and its title, or a person's initials and name. */
   private linkedItem(parent: HTMLElement, target: HeaderItem) {
     const open = () => postToHost({ type: 'openItem', item: target.item })
     if (target.kind === 'person') {
@@ -969,19 +970,25 @@ export class ItemHeader {
     entry.dataset.row = row.id
     const term = element('dt', 'item-prop-label', entry)
     this.glyph(row.symbol, term)
-    element('span', 'item-prop-name', term).textContent = row.label
+    const name = element('span', 'item-prop-name', term)
+    name.textContent = row.label
+    name.title = row.label
     this.value(element('dd', 'item-prop-value', entry), row, model)
     return entry
   }
 
-  /** A pin: its key above its value, the symbol on the value's chip and none on the key. The status pin is the same
-   *  button as the status row's. */
+  /** A pin: its key with the row's icon at 11 points, above its value on one line, cut with an ellipsis where it is
+   *  longer than the slot, with the whole of each in the help. The status pin is the same button as the status row's. */
   private pin(row: HeaderRow, model: HeaderModel): HTMLElement {
     const entry = element('div', 'item-pin-item')
     entry.dataset.pin = row.id
     entry.dataset.kind = row.kind
-    element('dt', 'item-pin-key', entry).textContent = row.label
+    const key = element('dt', 'item-pin-key', entry)
+    key.title = row.label
+    this.glyph(row.symbol, key, 11 / 13)
+    element('span', 'item-pin-name', key).textContent = row.label
     const value = element('dd', 'item-pin-value', entry)
+    value.title = this.wholeValue(row, model)
     this.value(value, row, model, true)
     if (row.more) {
       const more = element('span', 'item-pin-more', value)
@@ -989,6 +996,26 @@ export class ItemHeader {
       more.title = String(row.more)
     }
     return entry
+  }
+
+  /** The words of a pin's value, for its help. */
+  private wholeValue(row: HeaderRow, model: HeaderModel): string {
+    switch (row.kind) {
+      case 'status':
+        return model.status?.label ?? ''
+      case 'parent':
+        return model.parent?.label ?? ''
+      case 'items':
+        return (row.items ?? []).map((item) => item.title).join(', ')
+      case 'people':
+        return (row.people ?? []).map((person) => person.title).join(', ')
+      case 'options':
+        return (row.options ?? []).map((option) => option.label).join(', ')
+      case 'tags':
+        return (row.texts ?? []).join(', ')
+      default:
+        return row.text ?? ''
+    }
   }
 
   private value(value: HTMLElement, row: HeaderRow, model: HeaderModel, pinned = false) {

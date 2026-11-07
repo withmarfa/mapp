@@ -22,7 +22,10 @@ struct SidebarLabel: View {
     }
 
     private var name: some View {
-        Text(title).interfaceFont(.body).lineLimit(1).truncationMode(.tail)
+        // The system bolds a selected row by the table's state, which stops following the selection once the soft
+        // selection has the table and the window's workspace is mounted again, so a place stayed bold after leaving it.
+        // The mark says which row is selected.
+        Text(title).interfaceFont(.body).fontWeight(.regular).lineLimit(1).truncationMode(.tail)
     }
 }
 

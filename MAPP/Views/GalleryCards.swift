@@ -88,7 +88,7 @@ struct GalleryCard: View, Equatable {
                     .lineLimit(2, reservesSpace: true)
                     .multilineTextAlignment(.leading)
                 HStack(spacing: 5) {
-                    TypeIcon(id: facts.icon)
+                    TypeGlyph(id: facts.icon)
                     Text(DateDisplay.text(of: order.sort.date(of: item), place: .list, format: dateFormat, now: library.now())).lineLimit(1)
                     if item.isFavorite { Image(systemName: "star.fill") }
                 }

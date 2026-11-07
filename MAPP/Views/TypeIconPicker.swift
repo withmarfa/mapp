@@ -41,7 +41,7 @@ struct TypeIconPicker: View {
                 LazyVGrid(columns: columns, spacing: 6) {
                     ForEach(results, id: \.self) { icon in
                         Button { choose(icon) } label: {
-                            TypeIcon(id: icon)
+                            TypeGlyph(id: icon)
                                 .font(.title3)
                                 .frame(width: 44, height: 44)
                                 .background(icon == model.current ? Color.accentColor.opacity(0.25) : .clear, in: .rect(cornerRadius: 8))

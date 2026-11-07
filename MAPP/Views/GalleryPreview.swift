@@ -10,8 +10,9 @@ enum GalleryPreview {
         case failed
     }
 
-    /// An image file's picture, or a note's first embedded image, which the embed resolver opens.
-    static func image(for item: Item, in library: any ItemLibrary) async -> Picture {
+    /// An image file's picture, or a note's first embedded image, which the embed resolver opens, at most `maxPixels` on
+    /// its longer side.
+    static func image(for item: Item, maxPixels: Int = 800, in library: any ItemLibrary) async -> Picture {
         switch item.content {
         case .file(let type, _):
             guard type.conforms(to: .image) else { return .none }
@@ -22,7 +23,7 @@ enum GalleryPreview {
             } catch {
                 return .failed
             }
-            return await thumbnail(at: url).map(Picture.image) ?? .none
+            return await thumbnail(at: url, maxPixels: maxPixels).map(Picture.image) ?? .none
         case .markdown:
             var failed = false
             for embed in item.boundEmbeds.prefix(embedLimit) {
@@ -30,7 +31,7 @@ enum GalleryPreview {
                 let resolution = await library.openEmbeddedFile(EmbedReference(text: embed.text), in: item.id, if: isSmallImage)
                 switch resolution {
                 case .file(let file):
-                    if let image = await thumbnail(of: file) { return .image(image) }
+                    if let image = await thumbnail(of: file, maxPixels: maxPixels) { return .image(image) }
                 case .unavailable:
                     failed = true
                 case .missing:
@@ -59,22 +60,22 @@ enum GalleryPreview {
     nonisolated private static let fetchLimit: Int64 = 8 << 20
 
     /// Read from the descriptor the resolver checked, never reopened by path.
-    @concurrent private static func thumbnail(of file: OpenFile) async -> CGImage? {
+    @concurrent private static func thumbnail(of file: OpenFile, maxPixels: Int) async -> CGImage? {
         guard file.length <= fetchLimit, let data = await file.read(at: 0, count: Int(file.length)),
               !Task.isCancelled, let source = CGImageSourceCreateWithData(data as CFData, nil)
         else { return nil }
-        return thumbnail(source)
+        return thumbnail(source, maxPixels: maxPixels)
     }
 
-    @concurrent private static func thumbnail(at url: URL) async -> CGImage? {
+    @concurrent private static func thumbnail(at url: URL, maxPixels: Int) async -> CGImage? {
         guard !Task.isCancelled, let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
-        return thumbnail(source)
+        return thumbnail(source, maxPixels: maxPixels)
     }
 
-    nonisolated private static func thumbnail(_ source: CGImageSource) -> CGImage? {
+    nonisolated private static func thumbnail(_ source: CGImageSource, maxPixels: Int) -> CGImage? {
         CGImageSourceCreateThumbnailAtIndex(source, 0, [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceThumbnailMaxPixelSize: 800,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixels,
             kCGImageSourceCreateThumbnailWithTransform: true,
         ] as CFDictionary)
     }

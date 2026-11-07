@@ -9,7 +9,7 @@ struct RowIconImage: View {
     var body: some View {
         switch icon {
         case .symbol(let name): Image(systemName: name)
-        case .type(let name): TypeIcon(id: name)
+        case .type(let name): TypeGlyph(id: name)
         }
     }
 }
@@ -21,7 +21,7 @@ extension Label where Title == Text, Icon == Image {
         self.init {
             Text(title)
         } icon: {
-            Image(typeIcon: typeIcon)
+            Image(typeGlyph: typeIcon)
         }
     }
 }

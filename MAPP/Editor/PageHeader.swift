@@ -46,7 +46,7 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
 
     /// Every chip look as CSS custom properties for the page, resolved for light and for dark so an appearance
     /// change needs no resend: the sizes and fills (`ChipLooks.cssVariables`) and each tone's colors as
-    /// `--tone-<name>`, `--tone-<name>-mark` and `--tone-<name>-chip`. A chip names its tone and the page forwards the name.
+    /// `--tone-<name>`, `--tone-<name>-ink`, `--tone-<name>-mark` and `--tone-<name>-chip`. A chip names its tone and the page forwards the name.
     struct ChipStyle: Encodable, Equatable, Sendable {
         var light: [String: String]
         var dark: [String: String]
@@ -307,7 +307,7 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
 
     @MainActor
     private static func drawTypeIcon(_ name: String?, size: CGFloat) -> Icon? {
-        let renderer = ImageRenderer(content: TypeIcon(id: name).font(.system(size: size)).foregroundStyle(.black))
+        let renderer = ImageRenderer(content: TypeGlyph(id: name).font(.system(size: size)).foregroundStyle(.black))
         // Three times its size, as the symbols are.
         renderer.scale = 3
         guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,

@@ -18,10 +18,12 @@ struct ChipLooks: Equatable, Sendable {
     var personCircle = 17.0
     var personInitialsSize = 8.0
     var personGap = 6.0
-    /// A type or link chip's fill, as the tone's opacity.
+    /// A type chip's fill, as the tone's opacity.
     var typeTintOpacity = 0.13
     /// The pale square behind a type mark, as the tone's opacity.
     var markOpacity = 0.17
+    /// How far a type's icon and name sit from the tone of their tint, toward black in light and white in dark.
+    var inkDepth = 0.22
     /// The type icon inside a type or link chip, which has no square of its own.
     var chipMarkSize = 13.0
     /// A status chip's edge: its width and its opacity in light and dark.

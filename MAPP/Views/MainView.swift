@@ -180,6 +180,9 @@ struct MainView: View {
                         )
                     }
                 }
+                // Each view has its own split view: swapped inside one, the next squeezes the right sidebar to its
+                // minimum. Only the split is remade, as the dialogs above it watch the view for a saved view's layout.
+                .id(browser.viewMode)
             } else {
                 splitView
             }
@@ -205,6 +208,11 @@ struct MainView: View {
         .onChange(of: details.isPresentedByPerson) { if restoresWindow { storedDetailsPresented = details.isPresentedByPerson } }
         // Closing the sidebar by hand finishes Customize Layout, which has nowhere else to show.
         .onChange(of: details.isPresented) { if !details.isPresented { details.endLayout() } }
+        // Leaving the page finishes it too, as there is nothing left to arrange.
+        .onChange(of: browser.showsPage, initial: true) {
+            details.showsPage = browser.showsPage
+            if !browser.showsPage { details.endLayout() }
+        }
         .overlay(alignment: .top) {
             if let palette = browser.palette {
                 FloatingPanel {
@@ -361,11 +369,25 @@ private struct ItemInspectorColumn: ViewModifier {
     let browser: Browser
     let details: DetailsPresentation
     let editor: EditorController
+    /// Read once, as the window remakes this column when its layout changes and the column's own width goes with it.
+    /// Kept out of the state as it changes, so a drag is not fed back into the column it is resizing.
+    @State private var width = UserDefaults.standard.object(forKey: InterfaceKey.inspectorWidth) as? Double ?? 310
+
+    /// Whether the person is dragging the sidebar's own edge, which is what chooses its width. Dragging another divider
+    /// or the window's edge can squeeze the sidebar too, and that is not a choice to keep.
+    private static func isDraggingEdge(ofSidebarWidth width: CGFloat) -> Bool {
+        guard let event = NSApp.currentEvent, event.type == .leftMouseDragged, let window = event.window else { return false }
+        return abs(window.frame.width - width - event.locationInWindow.x) < 8
+    }
 
     func body(content: Content) -> some View {
         content.inspector(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
             ItemInspectorHost(browser: browser, details: details)
-                .inspectorColumnWidth(min: 260, ideal: 310, max: 440)
+                .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { newWidth in
+                    guard details.isPresented, Self.isDraggingEdge(ofSidebarWidth: newWidth) else { return }
+                    UserDefaults.standard.set(Double(newWidth), forKey: InterfaceKey.inspectorWidth)
+                }
+                .inspectorColumnWidth(min: 260, ideal: width, max: 440)
                 .toolbar {
                     InspectorToolbar(browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details)
                 }

@@ -91,7 +91,8 @@ enum GalleryArtworkCache {
             guard let url, !Task.isCancelled else { return .some(nil) }
             return .some(await quickLook(at: url, width: width, scale: scale).map { GalleryArtwork(image: $0, isDocument: true) })
         }
-        switch await GalleryPreview.image(for: item, in: library) {
+        // Twice the side, as a tall picture fills a square by its width; a list row's is far smaller than a card's.
+        switch await GalleryPreview.image(for: item, maxPixels: min(800, Int(width * scale * 2)), in: library) {
         case .image(let image): return GalleryArtwork(image: image, isDocument: false)
         case .none: return .some(nil)
         case .failed: return nil

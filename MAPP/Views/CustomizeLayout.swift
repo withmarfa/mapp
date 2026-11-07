@@ -3,18 +3,22 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// Customize Layout in the menu bar, the toolbar's More menu and the context menu: starts arranging the page of the one
-/// item selected, in the window whose presentation it is given. The mode is finished from the page's own control or
-/// with Escape, so the item stays dimmed while it is on.
+/// item selected, in the window whose presentation it is given. While the mode is on it finishes it, as the toolbar's
+/// Done does, for a window with its toolbar hidden.
 struct CustomizeLayoutButton: View {
     @CurrentLibrary private var library
     let ids: Set<ItemID>
     let details: DetailsPresentation?
 
     var body: some View {
-        Button("Customize Layout…", systemImage: "slider.horizontal.3") { details?.beginLayout() }
-            .disabled(
-                details == nil || details?.isCustomizingLayout == true || ids.count != 1
-                    || !PageCustomization.isAvailable(for: ids.first.flatMap { library.item($0) }))
+        if details?.isCustomizingLayout == true {
+            Button("Finish Customizing", systemImage: "slider.horizontal.3") { details?.endLayout() }
+        } else {
+            Button("Customize Layout…", systemImage: "slider.horizontal.3") { details?.beginLayout() }
+                .disabled(
+                    details == nil || details?.showsPage == false || ids.count != 1
+                        || !PageCustomization.isAvailable(for: ids.first.flatMap { library.item($0) }))
+        }
     }
 }
 

@@ -6,7 +6,7 @@ nonisolated struct SourceInfo: Identifiable, Hashable, Sendable {
     let code: String
     /// Never empty.
     let name: String
-    /// An icon ID from the sets a type's icon comes from, drawn by the SDK's `TypeIcon`.
+    /// An icon ID from the sets a type's icon comes from, drawn by `TypeGlyph`.
     let mark: String?
     /// Whether the name was set on the source itself, so the person can take it back to the one an app or key gives.
     let hasChosenName: Bool

@@ -134,9 +134,9 @@ private struct ItemTimelineEntry: View {
                 .interfaceFont(.body)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Label { Text(catalogue.label(for: row.item.type)) } icon: { TypeIcon(id: catalogue.icon(for: row.item.type)) }
+                Label { Text(catalogue.label(for: row.item.type)) } icon: { TypeGlyph(id: catalogue.icon(for: row.item.type)) }
                 if let source = row.item.source.map({ sources.info($0) }) {
-                    Label { Text(verbatim: source.name) } icon: { if let mark = source.mark { TypeIcon(id: mark) } }
+                    Label { Text(verbatim: source.name) } icon: { if let mark = source.mark { TypeGlyph(id: mark) } }
                         .labelStyle(.titleAndIcon)
                 }
             }
