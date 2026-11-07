@@ -266,6 +266,63 @@ import WebKit
         }
     }
 
+    // MARK: Documents built to run long
+
+    /// Nothing ends a script once it runs, so what stops these is that they never reach the slow path. A failure here
+    /// leaves a web process spinning until the test host quits.
+    @Test(arguments: LongDocument.allCases) func aDocumentBuiltToRunLongStillFindsItsArticle(_ document: LongDocument) async throws {
+        let html = page(body: prose(12) + document.body, head: document.head, documentTitle: document.title)
+        let article = try #require(try await analyze(html).article)
+        #expect(article.html.contains("Seven miles of chalk"))
+    }
+
+    // MARK: Markup that changes when it is parsed again
+
+    /// The live elements a parser finds in the article, once it is in Reader's document, that the cleaner removes.
+    private func removedMarkup(in article: PageAnalysis.Article) async throws -> String? {
+        let document = SealedPictureRewrite.rewrite(Data(ReaderDocument.html(for: article).utf8), item: ItemID("i"), version: 1)
+        // A page with scripts on reads a noscript as text, so a Web Page's Reader is the parse that finds the most.
+        let sealed = try await SealedWebPage.make(runsScripts: true)
+        try await sealed.show(document.html, encoding: document.encoding)
+        return try await sealed.page.callJavaScript("""
+            const found = document.querySelectorAll('body :is(script, style, link, iframe, object, embed, template, meta, base, video, audio, input, select, textarea, button, form), body [onerror], body [style]');
+            return Array.from(found).map(e => e.outerHTML.slice(0, 80)).join(' ');
+            """, contentWorld: SealedWebPage.world) as? String
+    }
+
+    @Test(arguments: [
+        "<form><math><mtext></form><form><mglyph><xmp></math><style>article{position:fixed}</style><meta http-equiv=refresh content=\"0;url=https://example.com/\"><iframe srcdoc=x></iframe>",
+        "<form><math><mtext></form><form><mglyph><noembed></math><style>article{position:fixed}</style>",
+        "<form><math><mtext></form><form><mglyph><noframes></math><style>article{position:fixed}</style>",
+        "<svg><title><xmp></svg><style>article{position:fixed}</style></xmp></title></svg>",
+        "<math><mtext><table><mglyph><xmp></math><style>article{position:fixed}</style>",
+        "<svg><plaintext></svg><style>article{position:fixed}</style>",
+        "<form><math><mtext></form><form><mglyph><style></math><iframe srcdoc=x></iframe>",
+        "<svg></p><style><a title=\"</style><iframe srcdoc=x></iframe>\">",
+        "<math><mtext><table><mglyph><style><!--</style><iframe srcdoc=x></iframe>-->",
+        "<table><caption><svg><title><table><caption><title><style><a title=\"</style><iframe srcdoc=x></iframe>\">",
+        "<svg><desc><noscript><p title=\"</noscript><iframe srcdoc=x></iframe>\">",
+        "<select><template><style><!--</style><a title=\"--><iframe srcdoc=x></iframe>\">",
+    ]) func markupThatChangesWhenParsedAgainNeverReachesReader(_ markup: String) async throws {
+        // Long paragraphs on both sides, so Readability keeps the block that holds the markup.
+        let html = page(body: longProse(6) + "<div>\(markup)</div><p>\(Self.sentences[0])</p>" + longProse(6))
+        let article = try #require(try await analyze(html).article)
+        #expect(try await removedMarkup(in: article) == "")
+    }
+
+    // MARK: SVG pictures
+
+    @Test func aPictureAnSVGHoldsStaysAndOtherDataAddressesGo() async throws {
+        let png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+        let svg = """
+            <svg width="30" height="30"><image id="a" href="\(png)" width="30" height="30"/><image id="b" xlink:href="\(png)" width="30" height="30"/>\
+            <image id="c" href="data:text/html,x" width="30" height="30"/><a id="d" href="\(png)"><text>x</text></a></svg>
+            """
+        let article = try #require(try await analyze(page(body: prose() + svg + prose())).article)
+        #expect(article.html.components(separatedBy: png).count == 3, "both pictures are kept: \(article.html)")
+        #expect(!article.html.contains("data:text"), "only a picture may be a data address")
+    }
+
     // MARK: Mail
 
     private let mailColumn = """
@@ -288,6 +345,21 @@ import WebKit
         #expect(try await analyze(page()).isMail == false)
         let column = "<html><body><div style=\"max-width:600px;margin:0 auto\">\(prose())</div></body></html>"
         #expect(try await analyze(column).isMail == false, "a column with no layout table is not a mail's")
+    }
+
+    @Test(arguments: [
+        "display:none;max-height:0;overflow:hidden", "DISPLAY: NONE !important", "visibility:hidden", "opacity:0", "max-height:0;overflow:hidden",
+    ]) func aPreheaderNoOneSeesLeavesTheMailAMail(_ style: String) async throws {
+        // The hidden line a sender writes for the inbox's preview, padded so the preview shows nothing else.
+        let filler = String(repeating: "&#847;&zwnj;&nbsp;", count: 90)
+        let html = "<html><body><div style=\"\(style)\">Your order is on its way\(filler)</div>\(mailColumn)\(prose())</td></tr></table></td></tr></table></body></html>"
+        #expect(try await analyze(html).isMail)
+    }
+
+    @Test func anSVGBeforeTheColumnLeavesTheMailAMail() async throws {
+        // An SVG element has no inline style to read, and the walk that reads one must not stop there.
+        let html = "<html><body><svg width=\"0\" height=\"0\"><text>Hidden</text></svg>\(mailColumn)\(prose())</td></tr></table></td></tr></table></body></html>"
+        #expect(try await analyze(html).isMail)
     }
 
     @Test func aTableThatSpansThePageIsNotAMail() async throws {
@@ -324,5 +396,44 @@ import WebKit
         let analysis = try await analyze(html)
         #expect(analysis.isMail == false)
         #expect(analysis.offersReader, "so the essay opens in Reader")
+    }
+}
+
+/// Each feeds one of Readability's slow paths a value of about two megabytes.
+nonisolated enum LongDocument: CaseIterable, CustomTestStringConvertible {
+    case pictureSourceSet, sourceElementSourceSet, lazySourceSet, lazyAddress, lazyPictureInNoscript, metaProperty, titleAgainstHeading, structuredDataName
+
+    private static let length = 2_000_000
+    private static let word = String(repeating: "a", count: length)
+    private static func words(_ prefix: String) -> String { (0..<(length / 8)).map { "\(prefix)\($0)" }.joined(separator: " ") }
+
+    var testDescription: String { "\(self)" }
+
+    var head: String {
+        switch self {
+        case .metaProperty: "<meta property=\"\(String(repeating: " ", count: Self.length))x\" content=\"a\">"
+        case .structuredDataName:
+            "<script type=\"application/ld+json\">{\"@context\":\"https://schema.org\",\"@type\":\"Article\",\"name\":\"\(Self.words("n"))\",\"headline\":\"\(Self.words("h"))\"}</script>"
+        default: ""
+        }
+    }
+
+    var title: String? {
+        switch self {
+        case .titleAgainstHeading, .structuredDataName: Self.words("t")
+        default: nil
+        }
+    }
+
+    var body: String {
+        switch self {
+        case .pictureSourceSet: "<figure><img src=\"https://example.com/a.jpg\" srcset=\"\(Self.word) b\"></figure>"
+        case .sourceElementSourceSet: "<picture><source srcset=\"\(Self.word) b\"><img src=\"https://example.com/a.jpg\"></picture>"
+        case .lazySourceSet: "<figure><img class=\"lazy\" data-x=\"a.jpg 1 \(Self.word) b\"></figure>"
+        case .lazyAddress: "<figure><img class=\"lazy\" data-x=\"\(String(repeating: "a.jpg", count: Self.length / 5)) x\"></figure>"
+        case .lazyPictureInNoscript: "<noscript><img class=\"lazy\" data-x=\"\(String(repeating: "a.jpg", count: Self.length / 5)) x\"></noscript>"
+        case .titleAgainstHeading: "<h1>\(Self.words("b"))</h1>"
+        case .metaProperty, .structuredDataName: ""
+        }
     }
 }

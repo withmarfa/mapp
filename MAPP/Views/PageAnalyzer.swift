@@ -13,8 +13,11 @@ import WebKit
 ///
 /// A document too large to parse, or one that takes longer than the limit, has no article, so the item shows the
 /// original. Nothing waits on the page's thread, since the work is in the web content process; but no API ends a script
-/// that is running there, so the scripts are written to end: they read the document only through `SafeDOM`, which a
-/// document's names cannot turn aside, and walk it once.
+/// that is running there, so the limit stops only the wait. A script that does not end keeps a web content process busy
+/// until the app quits, so the scripts read the document only through `SafeDOM`, which a document's names cannot turn
+/// aside, and the analysis bounds what feeds the paths in Readability that take the square of their input: its
+/// expressions for a `srcset`, a lazy picture's attributes and a `meta` property, and its comparison of a title with a
+/// heading. The rest of Readability's time follows the document's size and `maxElements`; nothing proves a limit on it.
 enum PageAnalyzer {
     /// The longest an analysis may take before the document is taken to have no article.
     static let timeLimit = Duration.seconds(15)
@@ -79,11 +82,17 @@ enum PageAnalyzer {
     /// Of the cleanup of the article, which Reader needs and the original does not:
     /// - What can load, run or draw outside the article is removed: scripts, styles, frames, objects, embeds, templates (whose
     ///   content `querySelectorAll` cannot reach, so the whole element goes), `meta` and `base`, media, form controls
-    ///   and SVG's `foreignObject`, `use`, `animate` and `set`. A form or fieldset is unwrapped and keeps its content.
+    ///   and SVG's `foreignObject`, `use`, `animate` and `set`. So is what parses differently the second time: MathML's
+    ///   `mglyph` and `malignmark`, and the elements whose content is raw text (`xmp`, `noembed`, `noframes`, `plaintext`,
+    ///   `noscript`, which a page with scripts on reads as text). A form or fieldset is unwrapped and keeps its content.
     /// - Event handlers, inline styles and the attributes that make a request or carry a script are dropped. A `href`,
     ///   `xlink:href` or `src` is kept only if its address, parsed as the web view parses it (which ignores the tabs, line
     ///   breaks and control characters a pattern would miss), is `http`, `https`, `mailto` or `tel`, a relative address, or for
-    ///   a picture a `data:image/` one. The document that shows the article allows no script either, so this is the second of two.
+    ///   a picture, an `img` or an SVG `image`, a `data:image/` one. The document that shows the article allows no script
+    ///   either, so this is the second of two.
+    /// - The cleaned article is then parsed as Reader's document will parse it and cleaned again, until a parse finds
+    ///   nothing to clean, since markup can turn into other markup when it is parsed a second time. An article that never
+    ///   settles is no article.
     /// - A `name` is dropped, except on an anchor, where a legacy page links to it.
     /// - An anchor is removed when it is a heading's permalink: a lone `#`, `¶` or `§`, or one marked as such, in or next to
     ///   a heading and linking to a fragment of the page or to the heading's id. Other links stay.
@@ -101,32 +110,66 @@ enum PageAnalyzer {
           for (const e of dom.queryAllInDocument(document, 'img[id], object[id], embed[id], input[id], select[id], textarea[id], button[id], fieldset[id], output[id]')) dom.removeAttribute(e, 'id');
         }
 
-        const removed = 'script, style, link, iframe, object, embed, template, meta, base, video, audio, input, select, textarea, button, datalist, output, dialog, foreignObject, use, animate, set';
+        // Readability's slow paths, which nothing could end once a document had started one. Every srcset is dropped before
+        // a document is shown (SealedPictureRewrite), so its expression has no work to do.
+        function boundSlowPaths() {
+          Readability.prototype.REGEXPS.srcsetUrl = /$^/g;
+          const similarity = Readability.prototype._textSimilarity;
+          Readability.prototype._textSimilarity = function (a, b) { return a.length > 512 || b.length > 512 ? 0 : similarity.call(this, a, b); };
+          for (const e of dom.queryAllInDocument(document, 'meta[property]')) if (dom.getAttribute(e, 'property').length > 256) dom.remove(e);
+          for (const e of dom.queryAllInDocument(document, 'img, picture, figure')) {
+            for (const name of dom.getAttributeNames(e)) if (name !== 'src' && dom.getAttribute(e, name).length > 2048) dom.removeAttribute(e, name);
+          }
+        }
+
+        const removed = 'mglyph, malignmark, xmp, noembed, noframes, plaintext, noscript, script, style, link, iframe, object, embed, template, meta, base, video, audio, input, select, textarea, button, datalist, output, dialog, foreignObject, use, animate, set';
         const dropped = new Set(['style', 'srcdoc', 'ping', 'action', 'formaction', 'poster', 'data', 'background', 'manifest', 'codebase']);
 
-        function isSafeAddress(value, attribute) {
+        function isSafeAddress(value, isPicture) {
           let url;
           try { url = new URL(value, 'https://reader.invalid/'); } catch (e) { return false; }
           if (url.protocol === 'http:' || url.protocol === 'https:') return true;
-          if (attribute === 'src') return url.protocol === 'data:' && /^data:image\//i.test(url.href);
+          if (isPicture) return url.protocol === 'data:' && /^data:image\//i.test(url.href);
           return url.protocol === 'mailto:' || url.protocol === 'tel:';
+        }
+
+        // Answers whether there was anything to take out.
+        function clean(root) {
+          let found = false;
+          const drop = (e, name) => { found = true; dom.removeAttribute(e, name); };
+          for (const e of dom.queryAll(root, removed)) { found = true; dom.remove(e); }
+          for (const e of dom.queryAll(root, 'form, fieldset')) { found = true; dom.replaceWith(e, ...Array.from(dom.childNodes(e))); }
+          for (const e of dom.queryAll(root, '*')) {
+            for (const name of dom.getAttributeNames(e)) {
+              if (/^on/i.test(name) || dropped.has(name.toLowerCase())) drop(e, name);
+            }
+            for (const name of ['href', 'src', 'xlink:href']) {
+              const value = dom.getAttribute(e, name);
+              if (value !== null && !isSafeAddress(value, name === 'src' || dom.matches(e, 'image'))) drop(e, name);
+            }
+            if (dom.getAttribute(e, 'name') !== null && !dom.matches(e, 'a')) drop(e, 'name');
+            if (dom.matches(e, 'img, video, svg, canvas')) {
+              for (const name of ['width', 'height']) if (dom.getAttribute(e, name) !== null) drop(e, name);
+            }
+          }
+          return found;
+        }
+
+        // What Reader's parser will make of the article, cleaned until a parse finds nothing to take out. Null if it never settles.
+        function settled(root) {
+          const parser = new DOMParser();
+          for (let pass = 0; pass < 8; pass++) {
+            const parsed = parser.parseFromString('<!doctype html><body><article>' + dom.innerHTML(root) + '</article></body></html>', 'text/html');
+            const body = dom.body(parsed);
+            if (!clean(body)) return root;
+            root = body;
+          }
+          return null;
         }
 
         function cleanArticle(root, title) {
           const doc = dom.ownerDocument(root);
-          for (const e of dom.queryAll(root, removed)) dom.remove(e);
-          for (const e of dom.queryAll(root, 'form, fieldset')) dom.replaceWith(e, ...Array.from(dom.childNodes(e)));
-          for (const e of dom.queryAll(root, '*')) {
-            for (const name of dom.getAttributeNames(e)) {
-              if (/^on/i.test(name) || dropped.has(name.toLowerCase())) dom.removeAttribute(e, name);
-            }
-            for (const name of ['href', 'src', 'xlink:href']) {
-              const value = dom.getAttribute(e, name);
-              if (value !== null && !isSafeAddress(value, name)) dom.removeAttribute(e, name);
-            }
-            if (dom.getAttribute(e, 'name') !== null && !dom.matches(e, 'a')) dom.removeAttribute(e, 'name');
-            if (dom.matches(e, 'img, video, svg, canvas')) { dom.removeAttribute(e, 'width'); dom.removeAttribute(e, 'height'); }
-          }
+          clean(root);
           // Readability has already told a table of data from one a mail or page lays itself out in.
           for (const t of dom.queryAll(root, 'table')) if (t._readabilityDataTable) dom.classList(t).add('mapp-data');
           const permalink = 'a.anchor, a.heading-anchor, a.header-anchor, a.headerlink, a.permalink, a[aria-label*="ermalink" i]';
@@ -182,18 +225,21 @@ enum PageAnalyzer {
         let article = null;
         try {
           takeNamesOff();
+          boundSlowPaths();
           const copy = dom.cloneNode(document, true);
           if (isProbablyReaderable(copy)) {
             const parsed = new Readability(copy, { maxElemsToParse: limit, serializer: el => el, charThreshold: 500 }).parse();
             if (parsed && parsed.content) {
-              const root = parsed.content;
-              cleanArticle(root, title);
-              article = {
-                html: dom.innerHTML(root),
-                length: dom.textContent(root).replace(/\s+/g, ' ').trim().length,
-                lang: parsed.lang || null,
-                dir: parsed.dir || null,
-              };
+              cleanArticle(parsed.content, title);
+              const root = settled(parsed.content);
+              if (root) {
+                article = {
+                  html: dom.innerHTML(root),
+                  length: dom.textContent(root).replace(/\s+/g, ' ').trim().length,
+                  lang: parsed.lang || null,
+                  dir: parsed.dir || null,
+                };
+              }
             }
           }
         } catch (e) {}

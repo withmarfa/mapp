@@ -14,6 +14,9 @@ import Foundation
 /// A page whose column has a sidebar is not a mail: another cell in a row the column sits in holds text or a picture
 /// of its own. A mail's spacer cells hold neither.
 ///
+/// Text an inline style hides counts for nothing: the preheader a sender writes for the inbox's preview, often padded to
+/// fill it, would otherwise hold more text than the mail beside it.
+///
 /// The walk reads the document only through `SafeDOM`, once, and never asks an element for its children, so a document
 /// that names its elements after properties cannot send it anywhere.
 nonisolated enum MailColumn {
@@ -30,8 +33,15 @@ nonisolated enum MailColumn {
         function mailColumns(body) {
           if (!body) return [];
           const elements = [body], index = new Map([[body, 0]]), parentOf = [-1], own = [0];
+          // Only an HTML element has an inline style; the getter throws on an SVG one.
+          const isHidden = e => {
+            let style = null;
+            try { style = dom.style(e); } catch (x) { return false; }
+            return style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0'
+              || (style.maxHeight === '0px' && style.overflow === 'hidden');
+          };
           const walker = dom.createTreeWalker(document, body, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
-            acceptNode: node => dom.nodeType(node) === Node.ELEMENT_NODE && dom.matches(node, 'script, style, template, noscript')
+            acceptNode: node => dom.nodeType(node) === Node.ELEMENT_NODE && (dom.matches(node, 'script, style, template, noscript') || isHidden(node))
               ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
           });
           let read = 0;
