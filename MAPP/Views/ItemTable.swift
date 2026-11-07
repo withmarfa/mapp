@@ -45,7 +45,7 @@ struct ItemTable: View {
                 }
             }
             .navigationTitle(title)
-            .navigationSubtitle(subtitle(shown: rows.count, of: allRows.count))
+            .navigationSubtitle(subtitle(shown: rows.count, of: allRows.count).editedSubtitle(browser.hasViewChanges))
             .toolbar(removing: browser.isSearchExpanded ? .title : nil)
             .onChange(of: browser.isSearchExpanded) {
                 if !browser.isSearchExpanded { browser.focusRequest = .list }
@@ -72,8 +72,7 @@ struct ItemTable: View {
                 .width(min: column.widths.min, ideal: column.widths.ideal, max: column.widths.max)
                 .customizationID(column.id)
                 // A view's order is the panel's to change, since the header cannot hold an arrangement Save waits for.
-                .disabledCustomizationBehavior(column.content == .title ? .visibility : [])
-                .disabledCustomizationBehavior(isView ? .reorder : [])
+                .disabledCustomizationBehavior(Self.disabledCustomization(of: column, inView: isView))
             }
         } rows: {
             if let grouping {
@@ -157,6 +156,16 @@ struct ItemTable: View {
         var next = collapsed
         if next.contains(group) { next.remove(group) } else { next.insert(group) }
         browser.tableOptions[browser.item, default: .init()].collapsed = next
+    }
+
+    /// What the header may not do with a column: the name always shows, and a view's order is the panel's to change,
+    /// since the header cannot hold an arrangement Save waits for. One call sets the whole set, as a second would
+    /// replace the first.
+    static func disabledCustomization(of column: ItemTableColumn, inView isView: Bool) -> TableColumnCustomizationBehavior {
+        var disabled: TableColumnCustomizationBehavior = []
+        if column.content == .title { disabled.insert(.visibility) }
+        if isView { disabled.insert(.reorder) }
+        return disabled
     }
 
     /// How many items show, and of how many once a filter hides some.

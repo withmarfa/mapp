@@ -14,8 +14,10 @@ struct SavedViewCommand {
                 browser.openViewPanel(in: library)
             })
         }
-        guard library.reachesServer else { return commands }
-        if SavedViews.canSave(browser, in: library) {
+        // Making, copying and deleting a view need the server. Saving and reverting what the window holds do not,
+        // since a change of the layout or columns is the Mac's own.
+        let reachesServer = library.reachesServer
+        if reachesServer, SavedViews.canSave(browser, in: library) {
             commands.append(SavedViewCommand(title: String(localized: "New View"), systemImage: "plus.rectangle.on.rectangle") {
                 browser.openNewViewPanel(in: library)
             })
@@ -35,12 +37,14 @@ struct SavedViewCommand {
                     browser.revertView(in: library)
                 })
             }
-            commands.append(SavedViewCommand(title: String(localized: "Duplicate View"), systemImage: "plus.square.on.square") {
-                Task { await browser.duplicateView(view.id, in: library, order: order) }
-            })
-            commands.append(SavedViewCommand(title: String(localized: "Delete View…"), systemImage: "trash") {
-                browser.deletingView = view.id
-            })
+            if reachesServer {
+                commands.append(SavedViewCommand(title: String(localized: "Duplicate View"), systemImage: "plus.square.on.square") {
+                    Task { await browser.duplicateView(view.id, in: library, order: order) }
+                })
+                commands.append(SavedViewCommand(title: String(localized: "Delete View…"), systemImage: "trash") {
+                    browser.deletingView = view.id
+                })
+            }
         }
         return commands
     }

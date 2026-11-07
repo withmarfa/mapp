@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import MAPP
 
@@ -47,6 +48,19 @@ struct ItemTableLayoutTests {
 
     private static func columns(_ rows: [ItemTableRow]) -> [ItemTableColumn] {
         ItemTableLayout.columns(for: rows, catalogue: catalogue, hidden: [])
+    }
+
+    // MARK: What the header may change
+
+    @MainActor
+    @Test func theNameCanNeverBeHiddenAndAViewsOrderIsNotTheHeadersToChange() {
+        let name = ItemTableColumn.title
+        let other = ItemTableColumn.edited
+        #expect(ItemTable.disabledCustomization(of: name, inView: false) == .visibility)
+        #expect(ItemTable.disabledCustomization(of: other, inView: false) == [])
+        #expect(ItemTable.disabledCustomization(of: other, inView: true) == .reorder)
+        // In a view the name keeps both, since one call sets the whole set.
+        #expect(ItemTable.disabledCustomization(of: name, inView: true) == [.visibility, .reorder])
     }
 
     // MARK: Statuses

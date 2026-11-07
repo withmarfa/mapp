@@ -115,9 +115,9 @@ struct NoteList: View, Equatable {
             }
         }
         .navigationTitle(title)
-        .navigationSubtitle(browser.isSearching
-            ? Text("^[\(ids.count) result](inflect: true)")
-            : Text("^[\(ids.count) item](inflect: true)"))
+        .navigationSubtitle(
+            (browser.isSearching ? Text("^[\(ids.count) result](inflect: true)") : Text("^[\(ids.count) item](inflect: true)"))
+                .editedSubtitle(browser.hasViewChanges))
         // The search field takes the title's place while it is out.
         .toolbar(removing: browser.isSearchExpanded ? .title : nil)
     }

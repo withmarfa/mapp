@@ -30,7 +30,7 @@ struct ItemBoard: View {
         .searchStatus(browser)
         .filteredEmptyState(browser)
         .navigationTitle(title)
-        .navigationSubtitle(Text("^[\(items.count) item](inflect: true)"))
+        .navigationSubtitle(Text("^[\(items.count) item](inflect: true)").editedSubtitle(browser.hasViewChanges))
         .toolbar(removing: browser.isSearchExpanded ? .title : nil)
         .accessibilityIdentifier("ItemBoard")
         .onChange(of: browser.isSearchExpanded) {
