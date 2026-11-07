@@ -22,7 +22,7 @@ nonisolated struct PagePins: Equatable, Sendable {
 
     /// `candidates` are the item's rows before any choice (`PropertyRow.candidates`). A pinned status is the pill the
     /// page draws from its status menu, and stays editable there; a pinned parent is a link that opens it, since
-    /// only the row keeps the parent's menu. Every other pin is read only.
+    /// only the row keeps the parent's menu. Every other pin opens its editor where its row does (`PropertyRow.editable`).
     static func resolve(
         for item: Item, type: ItemTypeInfo?, placement: PagePlacement, lead: PageHeaderLead, relationships: [ItemRelationship],
         candidates: [PropertyRow], parentField: String = PagePlacement.parent, icon: (ItemID) -> String?,
@@ -63,7 +63,7 @@ nonisolated struct PagePins: Equatable, Sendable {
             guard values.count > listLimit else { return row }
             return PropertyRow(
                 id: row.id, label: row.label, value: make(Array(values.prefix(listLimit))), numberToCall: row.numberToCall,
-                more: values.count - listLimit)
+                more: values.count - listLimit, editable: row.editable)
         }
         switch row.value {
         case .items(let values): return cut(values) { .items($0) }

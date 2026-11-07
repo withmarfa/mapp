@@ -75,7 +75,7 @@ final class Tuning {
     /// `tuning[knob] == .flag(true)`, behind `#if DEBUG` with the constant in the `#else`, so Release keeps the
     /// constant. The `Copy` button turns the values into text to paste into a chat. Settle a knob by deleting its
     /// declaration, its use and this entry in one change; none stays as a setting. Panel text is not localized.
-    static let shared = Tuning(knobs: Chips.fields.map(\.knob))
+    static let shared = Tuning(knobs: Chips.fields.map(\.knob) + ValueEditing.knobs)
 
     static let prefix = "tuning."
 
