@@ -35,6 +35,9 @@ export class NoteLinkStatus {
   /** What each link of the note on the page was last answered. */
   private readonly readings = new Map<string, Reading>()
   private readonly asking = new Set<string>()
+  /** The number of the latest request that named each link, so a slower earlier answer cannot replace a newer one. */
+  private readonly requests = new Map<string, number>()
+  private requested = 0
   private queue = new Set<string>()
   private scheduled = false
   /** Changes with the note on the page and when the page ends, so a late answer for either is dropped. */
@@ -89,6 +92,7 @@ export class NoteLinkStatus {
     this.links.clear()
     this.readings.clear()
     this.asking.clear()
+    this.requests.clear()
     this.queue = new Set()
   }
 
@@ -107,18 +111,24 @@ export class NoteLinkStatus {
     this.queue = new Set()
     if (keys.length === 0) return
     const { item, epoch } = this
-    for (const key of keys) this.asking.add(key)
+    const request = ++this.requested
+    for (const key of keys) {
+      this.asking.add(key)
+      this.requests.set(key, request)
+    }
     const links = keys.map((key) => this.links.get(key)!)
     void this.ask(item, links).then(
-      (answers) => this.take(keys, answers, epoch),
-      () => this.take(keys, null, epoch),
+      (answers) => this.take(keys, answers, epoch, request),
+      () => this.take(keys, null, epoch, request),
     )
   }
 
-  private take(keys: string[], answers: LinkAnswers | null, epoch: number): void {
+  private take(keys: string[], answers: LinkAnswers | null, epoch: number, request: number): void {
     if (epoch !== this.epoch) return
     const changed = new Set<string>()
     for (const [index, key] of keys.entries()) {
+      // A link asked again since is still being asked, and its newer answer is the one to take.
+      if (this.requests.get(key) !== request) continue
       this.asking.delete(key)
       const answer = answers?.links[index]
       if (answer === undefined) continue

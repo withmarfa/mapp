@@ -383,6 +383,48 @@ test('an answer that arrives after the note was replaced is dropped', () =>
     expect(marks(root)).toEqual(['true'])
   }))
 
+test('an earlier answer that arrives after a newer one does not overwrite it', () =>
+  withEditor('[[Early]]\n', async (editor, root) => {
+    const releases: ((answer: unknown) => void)[] = []
+    window.webkit!.messageHandlers!.notes!.postMessage = ((request: NoteRequest) => {
+      page.asked.push(request)
+      return new Promise((done) => releases.push(done))
+    }) as never
+    editor.setItem('other')
+    editor.load('[[Early]]\n', 2)
+    await settle()
+    // The library changes while the first request is still out, so the same link is asked about again.
+    editor.linksChanged()
+    await settle()
+    expect(releases).toHaveLength(2)
+    releases[1]!({ links: [{ missing: true }], icons: {} })
+    await settle()
+    expect(marks(root)).toEqual(['true'])
+    // The slower, earlier answer was true when it was asked and is not now.
+    releases[0]!({ links: [{ missing: false }], icons: {} })
+    await settle()
+    expect(marks(root)).toEqual(['true'])
+  }))
+
+test('an earlier answer that arrives before the newer one is replaced by it', () =>
+  withEditor('[[Early]]\n', async (editor, root) => {
+    const releases: ((answer: unknown) => void)[] = []
+    window.webkit!.messageHandlers!.notes!.postMessage = ((request: NoteRequest) => {
+      page.asked.push(request)
+      return new Promise((done) => releases.push(done))
+    }) as never
+    editor.setItem('other')
+    editor.load('[[Early]]\n', 2)
+    await settle()
+    editor.linksChanged()
+    await settle()
+    releases[0]!({ links: [{ missing: false }], icons: {} })
+    await settle()
+    releases[1]!({ links: [{ missing: true }], icons: {} })
+    await settle()
+    expect(marks(root)).toEqual(['true'])
+  }))
+
 test('a suggestion request the person has typed past sends nothing', async () => {
   const aborted = new AbortController()
   aborted.abort()

@@ -100,13 +100,6 @@ private struct AppearanceSettings: View {
             } footer: {
                 Text("Automatic uses words in lists and tables, such as “Yesterday”, and abbreviated dates elsewhere. Times follow your Mac’s 12 or 24 hour setting.")
             }
-            Section {
-                LinkLookOption()
-            } header: {
-                Text("Links")
-            } footer: {
-                Text("How a link to another item looks in a note. A link to an item that doesn’t exist keeps its dashed line in every look.")
-            }
         }
         .labelStyle(.titleOnly)
         .settingsForm()
@@ -123,6 +116,13 @@ private struct EditorSettings: View {
                 TitleLinesOption()
             }
             Section("Text") { TextOptions() }
+            Section {
+                LinkLookOption()
+            } header: {
+                Text("Links")
+            } footer: {
+                Text("How a link to another item looks in a note. A link to an item that doesn’t exist keeps its dashed line in every look.")
+            }
             Section {
                 RemotePictureOptions()
             } header: {

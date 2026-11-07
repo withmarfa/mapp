@@ -93,12 +93,10 @@ nonisolated enum LinkLook: String, CaseIterable, Identifiable, Sendable {
             all[prefix + "padding-inline"] = Measure.pillPaddingInline
             all[prefix + "padding-block"] = Measure.pillPaddingBlock
             all[prefix + "radius"] = Measure.pillRadius
-            if self == .tintedPill {
-                // The tint is already the tone's chip fill, so it is taken whole.
-                all[prefix + "tint-strength"] = "100%"
-            } else {
-                all[prefix + "background"] = Self.appearance(Neutral.fillLight, Neutral.fillDark)
-            }
+            // A link with no known type has no tint, and its fill is then this neutral one, so it never reads as bare text.
+            all[prefix + "background"] = Self.appearance(Neutral.fillLight, Neutral.fillDark)
+            // The tint is already the tone's chip fill, so a tinted pill takes it whole.
+            if self == .tintedPill { all[prefix + "tint-strength"] = "100%" }
         } else {
             all[prefix + "underline"] = "underline"
             all[prefix + "underline-thickness"] = Measure.underlineThickness

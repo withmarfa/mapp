@@ -83,31 +83,23 @@ nonisolated struct LinkReply: Equatable, Sendable {
 }
 
 /// The type icons the page draws before a link, as images it masks in the type's color. Each is drawn once, black on
-/// clear, into a square so the page can scale it without distorting it.
+/// clear, into a square so the page can scale it without distorting it, the way the header draws them
+/// (`PageHeaderIcons.typeIcon`). An icon that cannot be drawn is remembered too, so it is not drawn again for every reply.
 @MainActor
 enum LinkIcons {
     private static var drawn: [String?: String] = [:]
+    private static var failed: Set<String?> = []
     private static let fontSize: CGFloat = 16
 
     /// A data URL of the icon's PNG, nil where it cannot be drawn.
     static func dataURL(for icon: String?) -> String? {
         if let known = drawn[icon] { return known }
-        guard let url = Cost.measure(.iconDraw, { draw(icon) }) else { return nil }
+        if failed.contains(icon) { return nil }
+        guard let url = PageHeaderIcons.typeIcon(icon, size: fontSize, square: true)?.url else {
+            failed.insert(icon)
+            return nil
+        }
         drawn[icon] = url
         return url
-    }
-
-    private static func draw(_ icon: String?) -> String? {
-        func glyph() -> some View { TypeGlyph(id: icon).font(.system(size: fontSize)).foregroundStyle(.black) }
-        let measure = ImageRenderer(content: glyph())
-        guard let natural = measure.nsImage?.size, natural.width > 0, natural.height > 0 else { return nil }
-        let side = max(natural.width, natural.height).rounded(.up)
-        let renderer = ImageRenderer(content: glyph().frame(width: side, height: side))
-        // Three times its size, as the header's icons are, so it stays sharp at any zoom.
-        renderer.scale = 3
-        guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,
-              let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:])
-        else { return nil }
-        return "data:image/png;base64," + png.base64EncodedString()
     }
 }

@@ -39,6 +39,16 @@ import Testing
         }
     }
 
+    @Test func everyPillHasTheNeutralFillForALinkWithNoKnownType() {
+        let neutral = LinkLook.pill.cssVariables()["--inkkit-wiki-link-background"]
+        #expect(neutral != nil)
+        #expect(LinkLook.tintedPill.cssVariables()["--inkkit-wiki-link-background"] == neutral)
+        #expect(LinkLook.tintedPill.cssVariables()["--inkkit-wiki-link-tint-strength"] == "100%")
+        for look in LinkLook.allCases where look != .pill && look != .tintedPill {
+            #expect(look.cssVariables()["--inkkit-wiki-link-background"] == nil, "\(look)")
+        }
+    }
+
     @Test func aStoredLookThatIsNotOneOfTheSixIsTheMark() throws {
         let defaults = try #require(UserDefaults(suiteName: "LinkLookTests-\(UUID().uuidString)"))
         #expect(LinkLook.stored(in: defaults) == .mark)
