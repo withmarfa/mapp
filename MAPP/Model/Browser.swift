@@ -78,6 +78,22 @@ final class Browser {
         return fields
     }
 
+    /// The field a place's board makes its lanes of: the place's group, where it groups by a field. A board's lanes are
+    /// the group, so a saved view's group and the lanes agree, and the table groups by the same field.
+    func boardFieldKey(in place: SidebarItem) -> String? {
+        guard case .column(let id) = tableOptions[place]?.grouping, id.hasPrefix(Self.fieldColumnPrefix) else { return nil }
+        return String(id.dropFirst(Self.fieldColumnPrefix.count))
+    }
+
+    /// Makes `key`'s field the place's board lanes (and its group).
+    func setBoardField(_ key: String, in place: SidebarItem) {
+        tableOptions[place, default: .init()].grouping = .column(Self.fieldColumnPrefix + key)
+        tableOptions[place, default: .init()].collapsed = nil
+    }
+
+    /// How a field's column is named among the table's columns (`ItemTableLayout.columns`).
+    nonisolated static let fieldColumnPrefix = "field."
+
     /// The date fields a timeline of the place's items can place them on, kept as `boardFieldChoices` is.
     func timelineFieldChoices(in library: any ItemLibrary) -> [ItemTypeInfo.Field] {
         let derived = fieldsKey(in: library)
@@ -127,8 +143,9 @@ final class Browser {
     @ObservationIgnored private var stackableMemo: (key: StackableKey, type: String?)?
     /// Held by `paletteIndex(in:)`.
     @ObservationIgnored var paletteMemo: (key: PaletteIndexKey, index: PaletteIndex)?
-    var boardFields: [SidebarItem: String] = [:]
     var compactBoards: [SidebarItem: Bool] = [:]
+    /// The date field each place's timeline shows its items by, where the person chose one. A view's own comes from
+    /// its day grouping (`followView`).
     var timelineFields: [SidebarItem: String] = [:]
     /// Whether the window shows Settings in place of the list and the item page. The place the window was
     /// showing, and its selection are kept, so choosing that place again returns to them.
@@ -359,14 +376,19 @@ final class Browser {
 
     /// The list's sections. Favorites lead wherever they mean something: not in Favorites itself, where every
     /// note is one, nor in search results. A place that keeps its own order, and a search ordered by relevance, are
-    /// one section, in the order given. The window's views ask for them as often as they are drawn, so the last
-    /// answer stands until the items, the order, the day or the place change.
+    /// one section, in the order given. The filters apply, and a sort or group the person set, or a saved view
+    /// has, orders and groups the items in place of the list's own order. The window's views ask for them as often
+    /// as they are drawn, so the last answer stands until the items, the order, the filters, the day or the place
+    /// change.
     func sections(in library: any ItemLibrary, order: NoteOrder, now: Date) -> [NoteSection] {
         let derived = derivedKey(in: library)
-        let key = SectionsKey(derived: derived.key, order: order, day: Calendar.current.startOfDay(for: now))
+        let shape = listShape
+        let key = SectionsKey(derived: derived.key, order: order, day: Calendar.current.startOfDay(for: now), shape: shape)
         if let held = sectionsMemo, held.key == key { return held.sections }
-        let items = derived.items ?? items(in: library)
-        let sections = Cost.measure(.sections) { sectionsUnmeasured(of: items, order: order, now: now) }
+        let sections = Cost.measure(.sections) {
+            if let shape { return shapedSections(shape, in: library, order: order, now: now) }
+            return sectionsUnmeasured(of: derived.items ?? items(in: library), order: order, now: now)
+        }
         sectionsMemo = (key, sections)
         return sections
     }
@@ -383,6 +405,62 @@ final class Browser {
             now: now
         )
     }
+
+    /// What the list's sections depend on besides the items: the filters, and the sort and grouping where they are
+    /// set. Nil where the place is neither filtered nor arranged, so the table's other choices (a folded group, a
+    /// page) never make the sections again.
+    struct ListShape: Equatable {
+        var options: ItemTableOptions
+        /// Whether the table's sort and grouping order the list.
+        var arranged: Bool
+    }
+
+    var listShape: ListShape? {
+        guard let options = tableOptions[item] else { return nil }
+        var grouped = false
+        if case .column = options.grouping { grouped = true }
+        let arranged = options.sort != nil || grouped
+        guard arranged || options.isFiltering else { return nil }
+        var shape = options
+        shape.collapsed = nil
+        shape.pageSize = .standard
+        if !arranged {
+            shape.sort = nil
+            shape.grouping = .automatic
+        }
+        return ListShape(options: shape, arranged: arranged)
+    }
+
+    /// The sections of a place that is filtered or arranged, worked out from the table's content, which the table
+    /// shares and a click on another item never makes again.
+    private func shapedSections(_ shape: ListShape, in library: any ItemLibrary, order: NoteOrder, now: Date) -> [NoteSection] {
+        let content = tableContent(in: library)
+        guard shape.arranged, !ordersByRelevance else {
+            return sectionsUnmeasured(of: content.kept.map(\.item), order: order, now: now)
+        }
+        guard content.grouping != nil else {
+            return content.rows.isEmpty ? [] : [NoteSection(group: nil, items: content.rows.map(\.item))]
+        }
+        return content.groups.map { NoteSection(group: .custom(id: $0.id, title: $0.title), items: $0.rows.map(\.item)) }
+    }
+
+    /// The items the open place shows in the layouts that arrange them themselves (the board, the timeline): the
+    /// place's items, less those the filters hide. `items(in:)` stays whole, for whatever needs every item.
+    func filteredItems(in library: any ItemLibrary) -> [Item] {
+        guard tableOptions[item]?.isFiltering == true else { return items(in: library) }
+        return tableContent(in: library).kept.map(\.item)
+    }
+
+    /// Whether the open place has filters that hide everything it lists.
+    func filtersHideEverything(in library: any ItemLibrary) -> Bool {
+        guard tableOptions[item]?.isFiltering == true else { return false }
+        let content = tableContent(in: library)
+        return content.kept.isEmpty && !content.allRows.isEmpty
+    }
+
+    /// Whether the table has been worked out for the window, which a list or a gallery that is neither filtered nor
+    /// arranged never does.
+    var holdsTableContent: Bool { tableMemo != nil }
 
     /// What the place's table shows, worked out once and shared by everything that draws the table, its controls or
     /// a command about it, until the items, the place's options or the search change. Reading it does not depend on
@@ -413,7 +491,8 @@ final class Browser {
         return (key, listed)
     }
 
-    private var isViewPlace: Bool {
+    /// Whether the open place is a saved view, whose sort and group the list and the gallery take.
+    var isViewPlace: Bool {
         if case .view = item { true } else { false }
     }
 
@@ -438,6 +517,7 @@ final class Browser {
         let derived: DerivedKey
         let order: NoteOrder
         let day: Date
+        let shape: ListShape?
     }
 
     private struct TableKey: Equatable {
@@ -487,7 +567,11 @@ final class Browser {
     func collectionItemIDs(in library: any ItemLibrary, order: NoteOrder) -> [ItemID] {
         guard usesCollection else { return [] }
         guard viewMode == .table else {
-            return sections(in: library, order: order, now: library.now()).flatMap { $0.items.map(\.id) }
+            let shown = sections(in: library, order: order, now: library.now()).flatMap { $0.items.map(\.id) }
+            guard tableOptions[item]?.isFiltering == true else { return shown }
+            // The items the filters hide stay in the selection's reach, as the table's do.
+            let isShown = Set(shown)
+            return shown + items(in: library).map(\.id).filter { !isShown.contains($0) }
         }
         let content = tableContent(in: library)
         // A grouped table shows its rows group by group, not in the sort's order across groups.
@@ -549,7 +633,6 @@ final class Browser {
         viewEditing = nil
         viewTitleForm?.handOff(because: .libraryChanged)
         viewTitleForm = nil
-        boardFields = [:]
         compactBoards = [:]
         timelineFields = [:]
         selection = []

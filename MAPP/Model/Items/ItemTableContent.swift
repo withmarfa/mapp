@@ -13,9 +13,14 @@ final class ItemTableContent {
     let grouping: ItemTableColumn?
     private let options: ItemTableOptions
 
+    /// The rows the filters keep, in the order the items came in: what a layout that sorts and groups the items
+    /// itself (the list, the board, the timeline) works from.
+    lazy var kept: [ItemTableRow] = options.isFiltering
+        ? ItemTableLayout.filter(allRows, by: options.filters, negated: options.negated, columns: columns) : allRows
+
     /// The rows the filters keep, in order.
     lazy var rows: [ItemTableRow] = Cost.measure(.tableRows) {
-        ItemTableLayout.sorted(ItemTableLayout.filter(allRows, by: options.filters, columns: columns), by: sort)
+        ItemTableLayout.sorted(kept, by: sort)
     }
     lazy var groups: [ItemTableGroup] = Cost.measure(.tableGroups) { grouping.map { ItemTableLayout.groups(of: rows, by: $0) } ?? [] }
     lazy var collapsed: Set<String> = grouping.map { ItemTableLayout.collapsed(options, groups: groups, by: $0) } ?? []

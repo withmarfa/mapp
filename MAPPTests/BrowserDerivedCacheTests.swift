@@ -40,6 +40,31 @@ struct BrowserDerivedCacheTests {
         #expect(library.placeReads == reads)
     }
 
+    @Test func theFilteredSectionsAreKeptAndKeyOnTheFilters() {
+        let library = library()
+        let browser = Browser()
+        let before = browser.sections(in: library, order: NoteOrder(), now: date).flatMap { $0.items.map(\.id) }
+        #expect(before.count == 5)
+        browser.tableOptions[.allNotes] = ItemTableOptions(filters: ["title": ["Note 1"]])
+        let filtered = browser.sections(in: library, order: NoteOrder(), now: date).flatMap { $0.items.map(\.id) }
+        #expect(filtered.count < before.count)
+        let reads = library.placeReads
+        _ = browser.sections(in: library, order: NoteOrder(), now: date)
+        #expect(library.placeReads == reads)
+        browser.tableOptions[.allNotes] = nil
+        #expect(browser.sections(in: library, order: NoteOrder(), now: date).flatMap { $0.items.map(\.id) } == before)
+    }
+
+    @Test func anUnfilteredPlaceBuildsNoTableForTheList() {
+        let library = library()
+        let browser = Browser()
+        _ = browser.sections(in: library, order: NoteOrder(), now: date)
+        #expect(!browser.holdsTableContent)
+        browser.tableOptions[.allNotes] = ItemTableOptions(sort: [ItemTableComparator(column: .title)])
+        _ = browser.sections(in: library, order: NoteOrder(), now: date)
+        #expect(browser.holdsTableContent)
+    }
+
     @Test func aSearchKeepsKeyingOnWhatItFinds() {
         let library = library()
         let browser = Browser()

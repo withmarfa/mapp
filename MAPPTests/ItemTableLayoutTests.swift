@@ -206,4 +206,39 @@ struct ItemTableLayoutTests {
         #expect(ItemTableLayout.filter(rows, by: ["field.status": ["pending"]], columns: columns).map(\.item.title) == ["A"])
         #expect(ItemTableLayout.filter(rows, by: ["field.status": ["pending", ""]], columns: columns).map(\.item.title) == ["A", "C"])
     }
+
+    @Test func isNotKeepsTheRowsOutsideTheValuesAndDropsEmptyCellsOfAProperty() {
+        let rows = [Self.row("A", status: "pending"), Self.row("B", status: "completed"), Self.row("C")]
+        let columns = Self.columns(rows)
+        // Marfa's `neq` on a property is false where the property is absent, so the empty cell goes too.
+        #expect(ItemTableLayout.filter(rows, by: ["field.status": ["pending"]], negated: ["field.status"], columns: columns).map(\.item.title)
+            == ["B"])
+        #expect(ItemTableLayout.filter(rows, by: ["field.status": ["pending", "completed"]], negated: ["field.status"], columns: columns).isEmpty)
+        // Excluding the empty cell keeps every row that has a value.
+        #expect(ItemTableLayout.filter(rows, by: ["field.status": [""]], negated: ["field.status"], columns: columns).map(\.item.title)
+            == ["A", "B"])
+        // A column left in `negated` with no filter filters nothing.
+        #expect(ItemTableLayout.filter(rows, by: [:], negated: ["field.status"], columns: columns).count == 3)
+    }
+
+    @Test func isNotOnTheParentKeepsRowsWithoutOne() {
+        let rows = [Self.row("A", parent: "P"), Self.row("B", parent: "Q"), Self.row("C")]
+        let columns = Self.columns(rows)
+        #expect(ItemTableLayout.filter(rows, by: ["parent": ["P"]], negated: ["parent"], columns: columns).map(\.item.title) == ["B", "C"])
+        #expect(ItemTableLayout.filter(rows, by: ["parent": ["P", ""]], negated: ["parent"], columns: columns).map(\.item.title) == ["B"])
+    }
+
+    @Test func optionsKeepIsNotWithTheFilterAndForgetItWithIt() {
+        var options = ItemTableOptions()
+        options.setFilter("field.status", values: ["a"], negated: true)
+        #expect(options.isNegated("field.status"))
+        #expect(options.filterChoices == ["field.status": FilterChoice(values: ["a"], isNegated: true)])
+        options.setFilter("field.status", values: [])
+        #expect(!options.isFiltering)
+        #expect(options.negated.isEmpty)
+        options.setFilter("field.status", values: ["a"], negated: true)
+        options.setFilter("field.done", values: ["true"])
+        options.clearFilters()
+        #expect(!options.isFiltering && options.negated.isEmpty)
+    }
 }
