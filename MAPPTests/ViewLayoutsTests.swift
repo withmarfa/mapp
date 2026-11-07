@@ -114,6 +114,30 @@ struct ViewLayoutsTests {
         #expect(columns == ViewColumns())
     }
 
+    @Test func movingAColumnKeepsTheSavedPlaceOfOneTheTableLacks() {
+        // "gone" was arranged in a table that had it: before "edited" here, and before "type" there.
+        var before = ViewColumns(order: ["gone", "edited", "type"])
+        before.move("created", before: "edited", in: Self.columns)
+        #expect(before.order == ["gone", "created", "edited", "type"])
+
+        var between = ViewColumns(order: ["edited", "gone", "type"])
+        between.move("created", before: "edited", in: Self.columns)
+        #expect(between.order == ["created", "edited", "gone", "type"])
+
+        // When the column comes back it is where it was left.
+        let returned = Self.columns + [ItemTableColumn(id: "gone", label: "Gone", content: .created, style: .date)]
+        #expect(Self.ids(between.arranged(returned)) == ["title", "created", "edited", "gone", "type"])
+    }
+
+    @Test func aColumnTheTableLacksKeepsTheOrderFromBeingForgotten() {
+        var columns = ViewColumns(order: ["gone", "type", "edited", "created"])
+        columns.move("created", before: "edited", in: Self.columns)
+        #expect(columns.order == ["gone", "type", "created", "edited"])
+        // Back in the table's own order, with the absent column still named, the order is kept.
+        columns.move("edited", before: "created", in: Self.columns)
+        #expect(columns.order == ["gone", "type", "edited", "created"])
+    }
+
     @Test func aSavedColumnThatNoLongerExistsIsIgnored() {
         let columns = ViewColumns(order: ["gone", "edited", "type"], shown: ["gone": true, "created": true])
         #expect(Self.ids(columns.arranged(Self.columns)) == ["title", "edited", "type", "created"])
