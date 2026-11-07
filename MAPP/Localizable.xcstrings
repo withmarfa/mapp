@@ -620,6 +620,12 @@
     "Opens a calendar" : {
       "extractionState" : "manual"
     },
+    "Opens a list of words to add to and remove from" : {
+      "extractionState" : "manual"
+    },
+    "Opens a field to type in" : {
+      "extractionState" : "manual"
+    },
     "This value changed while you were editing. Your edit hasn’t been saved." : {
       "extractionState" : "manual"
     },
