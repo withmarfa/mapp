@@ -284,6 +284,9 @@
     "This view changed elsewhere, so it now shows the view as it is. Make your changes again." : {
 
     },
+    "This view changed elsewhere, so it now shows the view as it is. Your name is still here; make your other changes again." : {
+
+    },
     "Unpin" : {
       "extractionState" : "manual"
     },
@@ -962,6 +965,10 @@
 "View Not Renamed" : { "extractionState" : "manual" },
 "The window closed before the view was saved." : { "extractionState" : "manual" },
 "The window closed before the view was renamed." : { "extractionState" : "manual" },
+"The panel closed before the view was saved." : { "extractionState" : "manual" },
+"The panel closed before the view was renamed." : { "extractionState" : "manual" },
+"The view was deleted before it was renamed." : { "extractionState" : "manual" },
+"%@, edited" : { "extractionState" : "manual" },
 "The window changed to another library before the view was saved." : { "extractionState" : "manual" },
 "The window changed to another library before the view was renamed." : { "extractionState" : "manual" },
 "The view won’t keep:" : { "extractionState" : "manual" },

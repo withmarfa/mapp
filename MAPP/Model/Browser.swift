@@ -646,7 +646,7 @@ final class Browser {
         tableOptions = [:]
         viewSeeds = [:]
         deletingView = nil
-        viewPanel?.form?.handOff(because: .libraryChanged)
+        viewPanel?.handOff(because: .libraryChanged)
         viewPanel = nil
         viewWorking = [:]
         compactBoards = [:]
@@ -732,9 +732,12 @@ final class Browser {
     /// The view the window asks the person to confirm deleting.
     var deletingView: ItemID?
 
-    /// The right sidebar's panel for editing a view, while it is open (`Browser+ViewPanel`). It holds the new view's
-    /// name until the server takes it, so a window that closes or changes library can give it back.
+    /// The right sidebar's panel for editing a view, while it is open (`Browser+ViewPanel`). It holds the name typed,
+    /// of a new view or a rename, until the server takes it, so a window that closes or changes library can give it back.
     var viewPanel: ViewPanel?
+
+    /// Views this window is deleting, whose absence from the library is its own doing and not news from elsewhere.
+    @ObservationIgnored var viewsBeingDeleted: Set<ItemID> = []
 
     /// The layout, columns and empty groups the person changed in each view and has not saved (`Browser+SavedViews`).
     var viewWorking: [ItemID: ViewMacSettings] = [:]

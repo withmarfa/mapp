@@ -37,7 +37,7 @@ struct BrowserViewSeedTests {
         mac.layout = layout
         browser.viewSeeds[id] = Browser.ViewSeed(
             version: seed.version, options: seed.options, timelineDate: seed.timelineDate, types: seed.types,
-            preview: seed.preview, mac: mac)
+            preview: seed.preview, mac: mac, windowLayout: seed.windowLayout)
         browser.viewWorking[id] = nil
     }
 

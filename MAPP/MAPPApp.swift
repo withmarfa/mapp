@@ -154,7 +154,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // is told with the rest.
             if kept {
                 QuickAdd.handOffAll(to: libraries.host.notices, in: libraries.current)
-                ViewTitleForm.handOffAll()
+                ViewPanel.handOffAll()
             }
             let told = kept && libraries.host.notices.tellBeforeQuitting(copying: Notices.copyToClipboard) { notice in
                 let alert = NSAlert()

@@ -12,7 +12,7 @@ extension Browser {
     /// Opens a destination the sidebar, the menus and the palette list. Items opens in a layout that spans the window,
     /// so a window on the list moves to the gallery; the person's own choice of another layout stands.
     func choose(_ item: SidebarItem, in library: any ItemLibrary, order: NoteOrder) {
-        if item == .allNotes, viewMode == .list { viewMode = .gallery }
+        if item == .allNotes, viewMode == .list { set(layout: .gallery) }
         show(item, in: library, order: order)
     }
 }

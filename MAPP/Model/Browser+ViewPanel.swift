@@ -44,7 +44,7 @@ extension Browser {
         guard viewPanel == nil else { return }
         if case .view(let id) = item, let view = library.views.first(where: { $0.id == id }) {
             followView(in: library)
-            viewPanel = ViewPanel(editing: view)
+            viewPanel = ViewPanel(editing: view, notices: library.notices)
         } else if offersViewOptions {
             viewPanel = ViewPanel()
         }
@@ -53,12 +53,11 @@ extension Browser {
     /// Edit View on a row of the sidebar's Views, which opens the view first.
     func editView(_ id: ItemID, in library: any ItemLibrary, order: NoteOrder) {
         guard library.views.contains(where: { $0.id == id }), viewPanel?.viewID != id || item != .view(id) else { return }
+        closeViewPanel(in: library)
         if item != .view(id) {
-            closeViewPanel(in: library)
             show(.view(id), in: library, order: order)
             followView(in: library)
         }
-        viewPanel = nil
         openViewPanel(in: library)
     }
 
@@ -68,53 +67,69 @@ extension Browser {
             // A place's panel turns into the new view's; an edit of a view is put aside by keeping its changes held.
             if panel.purpose == .place { panel.becomeNew(from: viewSnapshot(), library: library) }
             if panel.isNew || panel.purpose == .place { return }
+            panel.handOff(because: .left)
             viewPanel = nil
         }
         viewPanel = ViewPanel(newFrom: viewSnapshot(), library: library)
     }
 
-    /// Closes the panel with nothing undone: a view's changes stay held in its place until Revert or Save.
+    /// Closes the panel with nothing undone: a view's changes stay held in its place until Revert or Save. A name the
+    /// person typed and nothing kept is given back, since the panel is where it lived.
     func closeViewPanel(in library: any ItemLibrary) {
         guard let panel = viewPanel else { return }
-        if panel.isNew { return cancelViewPanel(in: library) }
+        panel.handOff(because: .left)
+        if panel.isNew { return dropNewViewPanel(panel) }
         viewPanel = nil
     }
 
-    /// Cancel: a view goes back to the view as saved, and a new view's place goes back as it was.
+    /// Cancel, the person's own: a view goes back to the view as saved, and a new view's place goes back as it was.
+    /// What they typed is theirs to drop. A save under way is not interrupted.
     func cancelViewPanel(in library: any ItemLibrary) {
-        guard let panel = viewPanel else { return }
-        viewPanel = nil
+        guard let panel = viewPanel, !panel.isSaving else { return }
         switch panel.purpose {
-        case .edit(let id): viewRefused(id, in: library)
+        case .edit(let id):
+            viewPanel = nil
+            viewRefused(id, in: library)
         case .new:
             panel.form?.discard()
-            if let snapshot = panel.snapshot { restore(snapshot) }
-        case .place: break
+            dropNewViewPanel(panel)
+        case .place:
+            viewPanel = nil
         }
+    }
+
+    private func dropNewViewPanel(_ panel: ViewPanel) {
+        viewPanel = nil
+        if let snapshot = panel.snapshot { restore(snapshot) }
     }
 
     /// The place changed under the panel: a new view is cancelled, and a view's changes stay held where they were made.
+    /// A name typed is given back, since the change is not the person's Cancel.
     func viewPanelPlaceChanged() {
         guard let panel = viewPanel else { return }
-        viewPanel = nil
-        if panel.isNew {
-            panel.form?.discard()
-            if let snapshot = panel.snapshot { restore(snapshot) }
-        }
+        panel.handOff(because: .left)
+        if panel.isNew { dropNewViewPanel(panel) } else { viewPanel = nil }
     }
 
-    /// Follows the library: a view deleted elsewhere closes its panel and says so, and one renamed elsewhere shows
-    /// its new name unless the person is typing their own.
+    /// Follows the library: a view that a list that was read does not hold closes its panel and says so, and one
+    /// renamed elsewhere shows its new name unless the person is typing their own. An empty list proves nothing,
+    /// since a read that failed publishes one, and Mac settings are never forgotten for an absence.
     func reconcileViewPanel(in library: any ItemLibrary) {
-        guard let panel = viewPanel, let id = panel.viewID else { return }
+        guard let panel = viewPanel, let id = panel.viewID, !viewsBeingDeleted.contains(id) else { return }
         guard let view = library.views.first(where: { $0.id == id }) else {
-            viewPanel = nil
-            forgetView(id)
-            library.notices.tell(String(localized: "View Deleted"), String(localized: "The view was deleted elsewhere, so its panel closed."))
+            if !library.views.isEmpty { closeGoneViewPanel(panel, in: library) }
             return
         }
         if panel.name == panel.knownTitle { panel.name = view.title }
         panel.knownTitle = view.title
+    }
+
+    /// The view the panel edits is gone: the panel closes, and the person is told, or is given back the name they typed.
+    private func closeGoneViewPanel(_ panel: ViewPanel, in library: any ItemLibrary) {
+        if viewPanel === panel { viewPanel = nil }
+        if !panel.handOffBecauseGone() {
+            library.notices.tell(String(localized: "View Deleted"), String(localized: "The view was deleted elsewhere, so its panel closed."))
+        }
     }
 
     // MARK: Putting a place back
@@ -191,8 +206,8 @@ extension Browser {
         case .edit:
             guard !panel.trimmedName.isEmpty else { return }
             guard let plan = viewSavePlan(name: panel.shownName, window: window, in: library) else {
-                // No plan with a name means the view is gone, which the panel reports and closes on.
-                reconcileViewPanel(in: library)
+                // No plan means the library does not hold the view, so there is nothing to save to.
+                closeGoneViewPanel(panel, in: library)
                 return
             }
             if plan.needsConfirmation, !confirmed {
@@ -201,18 +216,30 @@ extension Browser {
             }
             panel.confirmation = nil
             panel.isSaving = true
-            defer { panel.isSaving = false }
-            switch await save(plan, in: library) {
-            case .saved, .gone:
+            let outcome = await save(plan, in: library)
+            panel.isSaving = false
+            switch outcome {
+            case .saved:
                 if viewPanel === panel { viewPanel = nil }
+            case .gone:
+                closeGoneViewPanel(panel, in: library)
             case .changedElsewhere:
-                panel.name = library.views.first { $0.id == plan.view.id }?.title ?? panel.name
-                panel.knownTitle = panel.name
-                panel.failure = String(localized: "This view changed elsewhere, so it now shows the view as it is. Make your changes again.")
+                // The name the person typed stays; one they did not type shows the view's new name.
+                let typed = panel.typedRename != nil
+                if let current = library.views.first(where: { $0.id == plan.view.id })?.title {
+                    if !typed { panel.name = current }
+                    panel.knownTitle = current
+                }
+                panel.failure = typed
+                    ? String(localized: "This view changed elsewhere, so it now shows the view as it is. Your name is still here; make your other changes again.")
+                    : String(localized: "This view changed elsewhere, so it now shows the view as it is. Make your changes again.")
+                panel.settleAfterUnsavedEnd()
             case .offline:
                 panel.failure = Self.needsServer
+                panel.settleAfterUnsavedEnd()
             case .refused(let message):
                 panel.failure = message
+                panel.settleAfterUnsavedEnd()
             }
         case .new:
             guard let form = panel.form, form.canSubmit,
@@ -224,12 +251,15 @@ extension Browser {
             }
             panel.confirmation = nil
             panel.isSaving = true
-            defer { panel.isSaving = false }
-            guard case .done(let view) = await form.submit(draft), viewPanel === panel else {
+            let outcome = await form.submit(draft)
+            panel.isSaving = false
+            guard case .done(let view) = outcome else {
                 if viewPanel === panel { panel.failure = String(localized: "The view wasn’t saved. Your name is still here.") }
                 return
             }
+            // The view exists now, so the Mac keeps its settings whatever became of the panel meanwhile.
             ViewLayouts.update(in: defaults) { $0.set(newView, for: view.id) }
+            guard viewPanel === panel else { return }
             viewPanel = nil
             if let snapshot = panel.snapshot { restore(snapshot, keepingLayout: true) }
             show(.view(view.id), in: library, order: order)

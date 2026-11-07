@@ -13,16 +13,23 @@ final class ViewTitleForm {
         case refused
     }
 
+    /// Why the window stops asking for the title before the server took it.
+    enum Departure {
+        case closed
+        case libraryChanged
+        /// The panel closed or the window moved to another place.
+        case left
+    }
+
     var title: String
     private(set) var isSaving = false
     private let library: any ItemLibrary
     private var isFinished = false
-    private var departure: QuickAdd.Departure?
+    private var departure: Departure?
 
     init(title: String = "", library: any ItemLibrary) {
         self.title = title
         self.library = library
-        Self.open.add(self)
     }
 
     var trimmedTitle: String { title.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -43,14 +50,15 @@ final class ViewTitleForm {
         return .refused
     }
 
-    /// The person cancelled: the title is theirs to drop, so nothing is given back.
+    /// The person's own Cancel: the title is theirs to drop, so nothing is given back. Any other end of the panel
+    /// is a `handOff`.
     func discard() {
         isFinished = true
     }
 
-    /// Gives a title the server has not taken to the clipboard through the library's notices, as the window that
-    /// asked for it closes or changes library. A title on its way to the server is given back only if it is refused.
-    func handOff(because departure: QuickAdd.Departure) {
+    /// Gives a title the server has not taken to the clipboard through the library's notices, as the panel that
+    /// asked for it ends without the person's Cancel. A title on its way to the server is given back only if it is refused.
+    func handOff(because departure: Departure) {
         guard !isFinished, self.departure == nil else { return }
         self.departure = departure
         guard !isSaving else { return }
@@ -65,15 +73,8 @@ final class ViewTitleForm {
         let reason = switch departure {
         case .closed: String(localized: "The window closed before the view was saved.")
         case .libraryChanged: String(localized: "The window changed to another library before the view was saved.")
+        case .left: String(localized: "The panel closed before the view was saved.")
         }
         library.notices.notKept(String(localized: "View Not Saved"), text: title, reason: reason)
-    }
-
-    /// Every form still open, so a quit can give back each title.
-    private static let open = NSHashTable<ViewTitleForm>.weakObjects()
-
-    /// Gives back every title the server has not taken, as the app quits.
-    static func handOffAll() {
-        for form in open.allObjects { form.handOff(because: .closed) }
     }
 }
