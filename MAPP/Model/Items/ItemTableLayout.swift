@@ -517,9 +517,10 @@ nonisolated enum ItemTableLayout {
     /// The rows in groups by each value of `column`: a picked value's in the order its values are given, any other
     /// column's largest first, and the rows with no value last. A filter offers these, so a status column's are its
     /// words, ordered by their groups.
-    static func categories(of rows: [ItemTableRow], by column: ItemTableColumn) -> [ItemTableGroup] {
+    static func categories(of rows: [ItemTableRow], by column: ItemTableColumn, including extra: Set<String> = []) -> [ItemTableGroup] {
         var buckets: [String: [ItemTableRow]] = [:]
         for row in rows { buckets[column.category(of: row) ?? "", default: []].append(row) }
+        for value in extra where buckets[value] == nil { buckets[value] = [] }
         let keys = buckets.keys.filter { !$0.isEmpty }.sorted { a, b in
             switch column.style {
             case .status, .priority, .choice:
@@ -537,6 +538,22 @@ nonisolated enum ItemTableLayout {
             groups.append(ItemTableGroup(id: "", title: String(localized: "No \(column.label)"), rows: empty))
         }
         return groups
+    }
+
+    /// The values a column's filter offers: every value the rows hold, and also those the filter keeps and the
+    /// catalogue's own for a choice, priority, status or yes/no field, each with the rows that hold it, which may be
+    /// none. A view's own filter, or this filter, may already have taken out every row holding a value, and a
+    /// person must still see it to take it off.
+    static func offered(in rows: [ItemTableRow], by column: ItemTableColumn, keeping kept: Set<String>) -> [ItemTableGroup] {
+        var extra = kept
+        if let field = column.field {
+            switch column.style {
+            case .status, .priority, .choice: extra.formUnion(field.options)
+            case .boolean: extra.formUnion(["true", "false"])
+            default: break
+            }
+        }
+        return categories(of: rows, by: column, including: extra)
     }
 
     /// The groups folded when the person has not chosen: finished work, so what is still to do leads.

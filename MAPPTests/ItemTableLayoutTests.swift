@@ -241,4 +241,35 @@ struct ItemTableLayoutTests {
         options.clearFilters()
         #expect(!options.isFiltering && options.negated.isEmpty)
     }
+
+    @Test func aFilterOffersTheValuesItKeepsWhereNoRowHoldsThem() throws {
+        // A view's own filter took out every row holding "blocked", and the window's chip keeps it.
+        let rows = [Self.row("A", status: "pending"), Self.row("B", status: "pending")]
+        let column = try #require(Self.columns(rows).first { $0.id == "field.status" })
+        let offered = ItemTableLayout.offered(in: rows, by: column, keeping: ["blocked"])
+        let blocked = try #require(offered.first { $0.id == "blocked" })
+        #expect(blocked.rows.isEmpty)
+        #expect(blocked.title == column.label(ofCategory: "blocked", in: rows))
+        #expect(!blocked.title.isEmpty)
+    }
+
+    @Test func aChoiceOrStatusColumnOffersEveryOptionItsCatalogueDeclares() throws {
+        let rows = [Self.row("A", status: "pending", priority: "high")]
+        let columns = Self.columns(rows)
+        let status = try #require(columns.first { $0.id == "field.status" })
+        let priority = try #require(columns.first { $0.id == "field.priority" })
+        let statuses = ItemTableLayout.offered(in: rows, by: status, keeping: []).map(\.id)
+        #expect(Set(statuses) == Set(Self.words.map(\.value)))
+        #expect(Set(ItemTableLayout.offered(in: rows, by: priority, keeping: []).map(\.id)) == ["low", "medium", "high", "urgent"])
+        // Those no row holds are counted as none.
+        #expect(ItemTableLayout.offered(in: rows, by: priority, keeping: []).first { $0.id == "low" }?.rows.isEmpty == true)
+        #expect(ItemTableLayout.offered(in: rows, by: priority, keeping: []).first { $0.id == "high" }?.rows.count == 1)
+    }
+
+    @Test func aTextColumnOffersOnlyWhatRowsHoldAndWhatIsKept() throws {
+        let rows = [Self.row("A", notes: "x")]
+        let column = try #require(Self.columns(rows).first { $0.id == "field.notes" })
+        #expect(Set(ItemTableLayout.offered(in: rows, by: column, keeping: []).map(\.id)) == ["x"])
+        #expect(Set(ItemTableLayout.offered(in: rows, by: column, keeping: ["y"]).map(\.id)) == ["x", "y"])
+    }
 }
