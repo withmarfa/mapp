@@ -1011,6 +1011,36 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(await eventually { library.connection == .unavailable(message: "Stopped.") })
     }
 
+    /// A value panel writes through `setItemProperty`, which asks nothing of the connection: the copy queues the edit
+    /// and the server is reached later.
+    @Test func aValueChosenInAPanelWhileTheServerIsUnreachableStaysAndWaitsInTheQueue() async throws {
+        let (library, source) = try await loaded()
+        source.state.set(.offline(reason: "network"))
+        #expect(await eventually { library.connection == .offline(reason: "network") })
+        let field = try #require(library.catalogue.itemTypes[F.task]?.fields.first { $0.key == "status" })
+        let request = ValueEditRequest(
+            kind: .choice(field), library: library, item: F.t1,
+            write: { library.setItemProperty(F.t1, key: "status", value: $0, undoManager: nil) })
+        let model = ValueEditModel(request)
+        var closed = false
+        model.close = { closed = true }
+        model.activate(ValueEditOptions.optionID("done"))
+        #expect(closed, "the panel does not wait for the server")
+        #expect(model.notice == nil)
+        #expect(source.writes == [.editProperties(F.t1, ["status": .string("done")], base: ItemVersion(1), undoing: nil)])
+        #expect(library.notices.waiting.isEmpty, "nothing is told as a fault while offline")
+
+        // The copy applies the write at once and marks the item as waiting for the server.
+        var waiting = try #require(library.item(F.t1))
+        waiting.properties = waiting.properties.filter { $0.key != "status" } + [Property(key: "status", value: .string("done"))]
+        waiting.sync = .waiting(writes: 1)
+        source.send(.upserted([waiting]))
+        #expect(await eventually { library.item(F.t1)?.value(of: "status") == .string("done") })
+        #expect(library.item(F.t1)?.sync == .waiting(writes: 1))
+        let reopened = ValueEditModel(request)
+        #expect(reopened.rows.first { $0.isCurrent }?.id == ValueEditOptions.optionID("done"), "the next panel shows the queued value")
+    }
+
     @Test func syncStateFollowsTheSource() async throws {
         let (library, source) = try await loaded()
         let problem = SyncProblemEntry(
