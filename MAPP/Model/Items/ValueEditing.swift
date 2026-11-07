@@ -74,7 +74,7 @@ nonisolated enum ValueEditOptions {
         rowID.hasPrefix(optionPrefix) ? String(rowID.dropFirst(optionPrefix.count)) : nil
     }
 
-    /// A status field's words, each under its group in the order groups are always listed in. A word the type does not
+    /// A status field's words, each under its group, with the groups in the order the type declares them. A word the type does not
     /// declare, which an item can still hold, is listed under Other so the value it has is always shown. Not Set closes
     /// the list unless the field requires a value.
     static func statusRows(field: ItemTypeInfo.Field, current: String?) -> [ValueListRow] {
@@ -83,9 +83,10 @@ nonisolated enum ValueEditOptions {
         func option(_ word: String, group: StatusGroup?) -> ValueListRow {
             ValueListRow(id: optionID(word), role: .option, title: ItemTypeInfo.Field.label(ofOption: word), mark: .status(group), isCurrent: word == current)
         }
-        for group in StatusGroup.allCases {
+        var groups: [StatusGroup] = []
+        for word in words where !groups.contains(word.group) { groups.append(word.group) }
+        for group in groups {
             let inGroup = words.filter { $0.group == group }
-            guard !inGroup.isEmpty else { continue }
             rows.append(.header(StatusBucket.group(group).title, id: "header:" + group.rawValue))
             rows += inGroup.map { option($0.value, group: group) }
         }
