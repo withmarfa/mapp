@@ -678,6 +678,87 @@ struct ViewPanelTests {
         #expect(Self.store(browser)?.layout == .gallery)
     }
 
+    // MARK: Cards
+
+    @Test func aViewWithNoCardChoicesDrawsTheCardsAsTheyWere() {
+        let (browser, _) = Self.opened()
+        #expect(browser.cards == ViewCards())
+        browser.changeCards { $0.size = .medium }
+        #expect(!browser.hasViewChanges, "a choice that is the default is no change")
+    }
+
+    @Test func aViewsCardsAreHeldCountedAndNotStoredUntilSave() {
+        let (browser, _) = Self.opened()
+        browser.changeCards { $0.preview = .none; $0.setShown("tags", true) }
+        #expect(browser.hasViewChanges)
+        #expect(browser.cards.preview == .none)
+        #expect(browser.cards.properties == ["tags"])
+        #expect(Self.store(browser) == nil)
+    }
+
+    @Test func revertAndCancelPutACardsChoicesBack() {
+        let (browser, library) = Self.opened()
+        browser.changeCards { $0.size = .large }
+        browser.revertView(in: library)
+        #expect(!browser.hasViewChanges)
+        #expect(browser.cards == ViewCards())
+
+        browser.openViewPanel(in: library)
+        browser.changeCards { $0.subtext = .none }
+        browser.cancelViewPanel(in: library)
+        #expect(!browser.hasViewChanges)
+        #expect(browser.cards == ViewCards())
+    }
+
+    @Test func saveWritesTheCardsToThisMac() async {
+        let (browser, library) = Self.opened(reachesServer: false)
+        browser.openViewPanel(in: library)
+        browser.changeCards { $0.fitsPicture = true; $0.size = .small; $0.setShown("field.status", true) }
+        await Self.save(browser, library)
+        let stored = Self.store(browser)?.cards
+        #expect(stored?.fitsPicture == true)
+        #expect(stored?.size == .small)
+        #expect(stored?.properties == ["field.status"])
+        #expect(!browser.hasViewChanges)
+    }
+
+    @Test func aPlacesCardsLastAsLongAsTheWindowAndAreNoChangeToAView() {
+        let (browser, library) = Self.opened()
+        browser.sidebarItem = .allNotes
+        #expect(browser.cards == ViewCards())
+        browser.changeCards { $0.preview = .text }
+        #expect(browser.cards.preview == .text)
+        #expect(!browser.hasViewChanges)
+        browser.sidebarItem = .view(Self.id)
+        #expect(browser.cards == ViewCards(), "the view has its own")
+        browser.sidebarItem = .allNotes
+        #expect(browser.cards.preview == .text)
+        browser.changeCards { $0.preview = .pictureOrText }
+        #expect(browser.placeCards[.allNotes] == nil, "the default is kept as none")
+        browser.changeCards { $0.preview = .picture }
+        browser.adopt(FakeItemLibrary())
+        #expect(browser.cards == ViewCards(), "another library starts again")
+    }
+
+    @Test func cancellingANewViewPutsThePlacesCardsBack() {
+        let (browser, library) = Self.opened()
+        browser.sidebarItem = .allNotes
+        browser.changeCards { $0.size = .large }
+        browser.openNewViewPanel(in: library)
+        browser.changeCards { $0.size = .small }
+        browser.cancelViewPanel(in: library)
+        #expect(browser.cards.size == .large)
+    }
+
+    @Test func aNewViewStartsWithTheCardsOfThePlaceItIsMadeFrom() {
+        let (browser, library) = Self.opened()
+        browser.sidebarItem = .allNotes
+        browser.changeCards { $0.size = .large; $0.setShown("created", true) }
+        let settings = SavedViews.newViewSettings(browser, in: library)
+        #expect(settings.cards.size == .large)
+        #expect(settings.cards.properties == ["created"])
+    }
+
     // MARK: Reordering
 
     @Test func reorderingPutsAnEntryBeforeAnotherOrLast() {

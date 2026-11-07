@@ -139,7 +139,8 @@ extension Browser {
         let id: ItemID? = if case .view(let id) = place { id } else { nil }
         return ViewPanel.Snapshot(
             place: place, options: tableOptions[place], timelineDate: timelineFields[place], viewMode: viewMode,
-            columns: defaults.data(forKey: ItemTableColumnLayouts.key), working: id.flatMap { viewWorking[$0] })
+            columns: defaults.data(forKey: ItemTableColumnLayouts.key), working: id.flatMap { viewWorking[$0] },
+            cards: id == nil ? placeCards[place] : nil)
     }
 
     /// Puts the place back. A new view that was saved keeps the layout the person chose for it.
@@ -152,7 +153,7 @@ extension Browser {
         } else {
             defaults.removeObject(forKey: ItemTableColumnLayouts.key)
         }
-        if case .view(let id) = snapshot.place { viewWorking[id] = snapshot.working }
+        if case .view(let id) = snapshot.place { viewWorking[id] = snapshot.working } else { placeCards[snapshot.place] = snapshot.cards }
     }
 
     // MARK: What the actions offer

@@ -3196,6 +3196,45 @@
     },
     "The sidebar lists the first six types and keeps the rest under Show More. New types appear here automatically." : {
 
+    },
+    "Under the Card" : {
+      "extractionState" : "manual"
+    },
+    "Preview" : {
+      "extractionState" : "manual"
+    },
+    "Picture or Text" : {
+      "extractionState" : "manual"
+    },
+    "Picture" : {
+      "extractionState" : "manual"
+    },
+    "Fit Picture" : {
+      "extractionState" : "manual"
+    },
+    "Small" : {
+      "extractionState" : "manual"
+    },
+    "Large" : {
+      "extractionState" : "manual"
+    },
+    "Subtext" : {
+      "extractionState" : "manual"
+    },
+    "Type and Date" : {
+      "extractionState" : "manual"
+    },
+    "Hide Property" : {
+      "extractionState" : "manual"
+    },
+    "Show Property" : {
+      "extractionState" : "manual"
+    },
+    "The title always shows." : {
+      "extractionState" : "manual"
+    },
+    "Only a card with a picture can fit it." : {
+      "extractionState" : "manual"
     }
   },
   "version" : "1.1"

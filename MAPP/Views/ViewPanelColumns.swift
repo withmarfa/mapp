@@ -115,7 +115,7 @@ private struct ColumnRow: View {
 }
 
 /// Drag to reorder, and the keyboard's way to the same move.
-private struct Arrangeable: ViewModifier {
+struct Arrangeable: ViewModifier {
     let isOn: Bool
     let id: String
     let move: (String) -> Bool

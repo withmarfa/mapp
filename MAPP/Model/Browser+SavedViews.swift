@@ -1,7 +1,7 @@
 import Foundation
 
 /// Following the saved view a window shows: its order, grouping, filters and timeline date from Marfa, and its
-/// layout and columns from this Mac (`ViewLayouts`). Whatever the person changes is held for the window until Save
+/// layout, columns and cards from this Mac (`ViewLayouts`). Whatever the person changes is held for the window until Save
 /// keeps it (`Browser+ViewPanel`) or Revert drops it.
 extension Browser {
     /// The order, grouping and filters a view opened with, the date its timeline showed, the types it showed as a
@@ -72,7 +72,7 @@ extension Browser {
         viewMode = layout
     }
 
-    /// Whether the window's filters, order, grouping, timeline date, layout, columns or empty groups differ from
+    /// Whether the window's filters, order, grouping, timeline date, layout, columns, empty groups or cards differ from
     /// those of the view it shows, in whichever layout it shows them.
     var hasViewChanges: Bool {
         guard case .view(let id) = item, let seed = viewSeeds[id] else { return false }
@@ -90,7 +90,7 @@ extension Browser {
 
     // MARK: This Mac's settings for a view
 
-    /// The layout, columns and empty groups the window shows for a view: what the person has changed and not saved,
+    /// The layout, columns, empty groups and cards the window shows for a view: what the person has changed and not saved,
     /// else what the Mac holds.
     func macSettings(for id: ItemID) -> ViewMacSettings {
         viewWorking[id] ?? viewSeeds[id]?.mac ?? ViewLayouts.stored(in: defaults).settings(for: id) ?? ViewMacSettings()
@@ -100,6 +100,24 @@ extension Browser {
     var hidesEmptyGroups: Bool {
         guard case .view(let id) = item else { return false }
         return macSettings(for: id).hidesEmptyGroups
+    }
+
+    /// What the gallery draws on each card in the open place: a saved view's choice, held until Save, else the
+    /// window's own for the place.
+    var cards: ViewCards {
+        if case .view(let id) = item { macSettings(for: id).cards } else { placeCards[item] ?? ViewCards() }
+    }
+
+    /// Changes what the gallery draws on each card. A saved view's change stays unsaved until Save, and a place's lasts
+    /// as long as the window.
+    func changeCards(_ change: (inout ViewCards) -> Void) {
+        if case .view(let id) = item {
+            changeViewSettings(id) { change(&$0.cards) }
+        } else {
+            var cards = placeCards[item] ?? ViewCards()
+            change(&cards)
+            placeCards[item] = cards == ViewCards() ? nil : cards
+        }
     }
 
     /// Changes the window's settings for a view, which stay unsaved until Save.
