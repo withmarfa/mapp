@@ -175,7 +175,7 @@ struct PagePerson: View {
                 .truncationMode(.tail)
         }
         .font(.system(size: looks.textSize * scale))
-        .foregroundStyle(textStyle(looks: looks))
+        .foregroundStyle(.primary)
         .padding(.trailing, 2 * scale)
         .frame(height: looks.height * scale)
     }
