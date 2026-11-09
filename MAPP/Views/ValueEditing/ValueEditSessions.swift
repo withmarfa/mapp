@@ -26,6 +26,8 @@ final class ValueEditPanelSession: ValueEditSession {
     private weak var parent: NSWindow?
     private var savedResponder: NSResponder?
     private var layoutPending = false
+    /// What the content wants across, worked out once so the panel does not change width as the person types.
+    private var width: CGFloat?
 
     var window: NSWindow? { panel }
 
@@ -49,31 +51,46 @@ final class ValueEditPanelSession: ValueEditSession {
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.appearance = parent.effectiveAppearance
-        let glass = NSGlassEffectView()
-        glass.cornerRadius = ValueEditMetrics.panelRadius
-        glass.contentView = host
-        panel.contentView = glass
+        panel.contentView = Self.surface(holding: host, style: ValuePanelStyle.stored(), appearance: panel.appearance)
         self.panel = panel
         model.layoutChanged = { [weak self] in self?.layoutSoon() }
+        width = model.fittingWidth(scale: InterfaceStyle.scale(for: UserDefaults.standard.object(forKey: InterfaceKey.textSize) as? Int ?? InterfaceStyle.defaultTextSize))
         layout()
         parent.addChildWindow(panel, ordered: .above)
         panel.makeKeyAndOrderFront(nil)
-        if case .date = model.kind { releaseCalendarFocus() }
     }
 
-    /// The calendar takes the first key view when the panel opens, and then keeps the arrows and Return for itself, so the
-    /// quick dates above it were out of reach of the keyboard. The panel holds the keys until a click or Tab gives them to the calendar.
-    private func releaseCalendarFocus() {
-        guard let panel else { return }
-        panel.makeFirstResponder(nil)
-        DispatchQueue.main.async { [weak panel] in
-            guard let panel, panel.isVisible, panel.firstResponder is NSView else { return }
-            var view = panel.firstResponder as? NSView
-            while let current = view {
-                if current is NSDatePicker { panel.makeFirstResponder(nil); return }
-                view = current.superview
+    /// The panel's ground: the system's glass, or, in Solid, the window's own color. Either is cut to the panel's corners
+    /// by its own layer, so nothing square is left behind it.
+    private static func surface(holding host: NSView, style: ValuePanelStyle, appearance: NSAppearance?) -> NSView {
+        switch style {
+        case .glass:
+            let glass = NSGlassEffectView()
+            glass.cornerRadius = ValueEditMetrics.panelRadius
+            glass.contentView = host
+            return glass
+        case .solid:
+            let solid = SolidSurface()
+            solid.wantsLayer = true
+            solid.layer?.cornerRadius = ValueEditMetrics.panelRadius
+            solid.layer?.cornerCurve = .continuous
+            solid.layer?.masksToBounds = true
+            host.frame = solid.bounds
+            host.autoresizingMask = [.width, .height]
+            solid.addSubview(host)
+            return solid
+        }
+    }
+
+    /// Draws the window's color, resolved again whenever the appearance changes.
+    private final class SolidSurface: NSView {
+        override func updateLayer() {
+            effectiveAppearance.performAsCurrentDrawingAppearance {
+                layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
             }
         }
+
+        override var wantsUpdateLayer: Bool { true }
     }
 
     /// The content reports its height from inside a SwiftUI update, where a window resize leaves the glass at the size it
@@ -96,7 +113,7 @@ final class ValueEditPanelSession: ValueEditSession {
         let natural = model.naturalHeight > 0 ? model.naturalHeight : estimatedHeight
         let placement = ValuePanelFrame.placement(
             anchor: target, visible: visible, contentHeight: natural, floor: ValueEditMetrics.widthFloor, ceiling: ValueEditMetrics.widthCeiling,
-            gap: ValueEditMetrics.gap)
+            gap: ValueEditMetrics.gap, fitting: width, centered: request.isCentered)
         model.maxHeight = placement.frame.height
         if panel.frame != placement.frame {
             panel.setFrame(placement.frame, display: true)
@@ -129,5 +146,26 @@ final class ValueEditPanelSession: ValueEditSession {
         guard restoringFocus, let parent else { return }
         parent.makeKey()
         if let saved = savedResponder, parent.firstResponder !== saved { parent.makeFirstResponder(saved) }
+    }
+}
+
+extension ValueEditModel {
+    /// The width the panel needs for its rows and its chip, within the bounds of its kind (`ValueEditMetrics.widthBounds`),
+    /// or nil where the value's own width decides.
+    func fittingWidth(scale: CGFloat) -> CGFloat? {
+        guard let bounds = ValueEditMetrics.widthBounds(for: kind) else { return nil }
+        let font = NSFont.systemFont(ofSize: ValueEditMetrics.textSize * scale)
+        func text(_ string: String) -> CGFloat { (string as NSString).size(withAttributes: [.font: font]).width }
+        let edges = (2 * 8 + 2 * ValueEditMetrics.padding) * scale
+        var widest: CGFloat = 0
+        for row in rows where row.role == .option || row.role == .create {
+            let mark = row.mark == .none ? 0 : 21 * scale
+            let detail = row.detail.map { text($0) + 8 * scale } ?? 0
+            widest = max(widest, mark + text(row.title) + detail + 8 * scale)
+        }
+        if !holdsMany {
+            for chip in chips { widest = max(widest, 21 * scale + text(chip.title) + 28 * scale) }
+        }
+        return min(max(widest + edges, bounds.lowerBound * scale), bounds.upperBound * scale)
     }
 }

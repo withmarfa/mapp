@@ -20,7 +20,23 @@ enum InterfaceKey {
     static let toolbarLabelStyle = "toolbarLabelStyle"
     /// Whether a note's or item's page backs the toolbar with a blurred band while content scrolls under it.
     static let showsPageToolbarBackground = "showsPageToolbarBackground"
-    static let all = [textSize, inspectorWidth, inspectorDetailsOpen, inspectorPropertiesOpen, inspectorRelationshipsOpen, inspectorLinksInPageOpen, inspectorLinkedFromOpen, inspectorTagsOpen, showsScrolledTitle, toolbarLabelStyle, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
+    /// Whether the panels that edit a value are glass or a solid color.
+    static let valuePanelStyle = "valuePanelStyle"
+    static let all = [valuePanelStyle, textSize, inspectorWidth, inspectorDetailsOpen, inspectorPropertiesOpen, inspectorRelationshipsOpen, inspectorLinksInPageOpen, inspectorLinkedFromOpen, inspectorTagsOpen, showsScrolledTitle, toolbarLabelStyle, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
+}
+
+/// What a value panel is made of. Glass lets the page show through; Solid is the window's own color.
+enum ValuePanelStyle: String, CaseIterable, Identifiable {
+    case glass
+    case solid
+
+    static let standard = ValuePanelStyle.glass
+
+    static func stored(in defaults: UserDefaults = .standard) -> ValuePanelStyle {
+        defaults.string(forKey: InterfaceKey.valuePanelStyle).flatMap(Self.init(rawValue:)) ?? standard
+    }
+
+    var id: Self { self }
 }
 
 enum InterfaceStyle {
@@ -93,5 +109,17 @@ struct InterfaceTextOptions: View {
             }
         }
         .accessibilityIdentifier("InterfaceTextSize")
+    }
+}
+
+struct ValuePanelOptions: View {
+    @AppStorage(InterfaceKey.valuePanelStyle) private var style = ValuePanelStyle.standard
+
+    var body: some View {
+        Picker("Value Panels", selection: $style) {
+            Text("Glass").tag(ValuePanelStyle.glass)
+            Text("Solid").tag(ValuePanelStyle.solid)
+        }
+        .accessibilityIdentifier("ValuePanelStyle")
     }
 }

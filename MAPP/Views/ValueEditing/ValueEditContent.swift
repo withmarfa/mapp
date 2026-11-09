@@ -27,39 +27,23 @@ struct ValueEditContent: View {
     // MARK: Search
 
     @ViewBuilder private var searchArea: some View {
-        VStack(alignment: .leading, spacing: 6 * scale) {
-            if !model.heldTokens.isEmpty {
-                TagFlowLayout(spacing: 4 * scale) {
-                    ForEach(model.heldTokens, id: \.self) { token in tokenView(token) }
+        VStack(alignment: .leading, spacing: 0) {
+            ChipFieldLayout(spacing: 4 * scale, lineHeight: ValueEditMetrics.rowHeight * scale) {
+                ForEach(model.chips) { chip in
+                    ValueChipView(chip: chip, scale: scale) { model.remove(chip) }
                 }
-            }
-            HStack(spacing: 6 * scale) {
-                Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
-                TextField(model.searchPrompt, text: Bindable(model).query)
+                TextField(model.chips.isEmpty ? model.searchPrompt : "", text: Bindable(model).query)
                     .textFieldStyle(.plain)
+                    .font(.system(size: ValueEditMetrics.textSize * scale))
                     .focused($fieldFocused)
+                    .accessibilityLabel(model.searchPrompt)
                     .accessibilityIdentifier("ValueEditSearch")
             }
             .padding(.horizontal, 8 * scale)
-            .frame(height: ValueEditMetrics.rowHeight * scale)
-            Divider()
+            .padding(.vertical, 2 * scale)
+            Divider().padding(.top, 2 * scale)
         }
         .padding(.bottom, 4 * scale)
-    }
-
-    private func tokenView(_ token: String) -> some View {
-        HStack(spacing: 3 * scale) {
-            Text(verbatim: token).lineLimit(1)
-            Button { model.removeToken(token) } label: {
-                Image(systemName: "xmark").font(.system(size: 8 * scale, weight: .bold))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Remove \(token)")
-        }
-        .font(.system(size: 11 * scale))
-        .padding(.horizontal, 7 * scale)
-        .padding(.vertical, 3 * scale)
-        .background(.quaternary, in: .capsule)
     }
 
     // MARK: Rows
@@ -138,40 +122,52 @@ struct ValueEditContent: View {
 
     // MARK: Date
 
+    private var dateKey: String { model.kind.field?.key ?? "" }
+
     private var dateList: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(model.rows) { row in ValueEditRow(row: row, model: model, scale: scale) }
+        let calendar = model.request.calendar
+        let now = model.request.library.now()
+        return VStack(alignment: .leading, spacing: 0) {
+            ForEach(model.rows.filter { $0.id != ValueEditOptions.notSetID }) { row in
+                ValueEditRow(row: row, model: model, scale: scale)
+            }
             Divider().padding(.vertical, 5 * scale)
-            DatePicker("Choose Date", selection: Binding {
-                model.storedDate?.date ?? model.request.library.now()
-            } set: { model.setDate($0) }, displayedComponents: model.hasTime ? [.date, .hourAndMinute] : [.date])
-                .datePickerStyle(.graphical)
-                .labelsHidden()
-                .focusEffectDisabled()
-                .frame(maxWidth: .infinity)
-                .accessibilityIdentifier("ItemPropertyDate.\(model.kind.field?.key ?? "")")
-            if model.allowsTime {
-                Toggle("Time", isOn: Binding { model.hasTime } set: { model.setIncludesTime($0) })
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .padding(.horizontal, 8 * scale)
-                .padding(.top, 4 * scale)
-                .accessibilityIdentifier("ItemPropertyTime.\(model.kind.field?.key ?? "")")
+            ValueCalendar(selected: model.storedDate?.date, today: now, calendar: calendar, scale: scale) { model.chooseDay($0) }
+                .accessibilityIdentifier("ItemPropertyDate.\(dateKey)")
+            if model.allowsTime { timeRows }
+            Divider().padding(.vertical, 5 * scale)
+            ForEach(model.rows.filter { $0.id == ValueEditOptions.notSetID }) { row in
+                ValueEditRow(row: row, model: model, scale: scale)
             }
-            HStack {
-                Spacer()
-                Button("Clear") { model.clearDate() }
-                    .disabled(model.value == nil)
-                    .accessibilityIdentifier("ItemPropertyClear.\(model.kind.field?.key ?? "")")
-            }
-            .buttonStyle(.borderless)
-            .padding(.horizontal, 8 * scale)
-            .padding(.top, 6 * scale)
-            .padding(.bottom, 2 * scale)
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
             model.measure(.rows, height)
             model.measure(.list, height)
+        }
+    }
+
+    /// The Time switch, and, once it is on, the time as the system's narrow field with its stepper.
+    @ViewBuilder private var timeRows: some View {
+        Divider().padding(.vertical, 5 * scale)
+        Toggle(isOn: Binding { model.hasTime } set: { model.setIncludesTime($0) }) {
+            Text("Time")
+        }
+        .toggleStyle(.switch)
+        .controlSize(.small)
+        .font(.system(size: ValueEditMetrics.textSize * scale))
+        .padding(.horizontal, 8 * scale)
+        .frame(height: ValueEditMetrics.rowHeight * scale)
+        .accessibilityIdentifier("ItemPropertyTime.\(dateKey)")
+        if model.hasTime {
+            DatePicker("Time", selection: Binding {
+                model.storedDate?.date ?? model.request.library.now()
+            } set: { model.setDate($0) }, displayedComponents: [.hourAndMinute])
+                .datePickerStyle(.stepperField)
+                .labelsHidden()
+                .fixedSize()
+                .padding(.horizontal, 8 * scale)
+                .padding(.vertical, 2 * scale)
+                .accessibilityIdentifier("ItemPropertyTimeField.\(dateKey)")
         }
     }
 
@@ -201,7 +197,7 @@ struct ValueEditContent: View {
     }
 }
 
-/// One option, person, tag or create line.
+/// One option, person, tag or create line. Every row starts at the same edge: the lists keep no room for a tick.
 private struct ValueEditRow: View {
     let row: ValueListRow
     let model: ValueEditModel
@@ -211,12 +207,7 @@ private struct ValueEditRow: View {
 
     var body: some View {
         HStack(spacing: 7 * scale) {
-            Image(systemName: "checkmark")
-                .font(.system(size: 11 * scale, weight: .semibold))
-                .opacity(row.isCurrent ? 1 : 0)
-                .frame(width: 12 * scale)
-                .accessibilityHidden(true)
-            mark
+            ValueMarkView(mark: row.mark, scale: scale, onAccent: isActive)
             Text(verbatim: row.title).lineLimit(1).truncationMode(.tail)
             Spacer(minLength: 8 * scale)
             if let detail = row.detail {
@@ -239,27 +230,8 @@ private struct ValueEditRow: View {
         .onTapGesture { model.activate(row.id) }
         .id(row.id)
         .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(row.isCurrent ? [.isButton, .isSelected] : .isButton)
+        .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
         .accessibilityAction { model.activate(row.id) }
         .accessibilityIdentifier("ValueEditRow.\(row.id)")
-    }
-
-    @ViewBuilder private var mark: some View {
-        switch row.mark {
-        case .none:
-            EmptyView()
-        case .status(let group):
-            StatusMark(mark: .init(group: group), size: 10 * scale)
-        case .person(let initials):
-            Text(verbatim: initials)
-                .font(.system(size: 8 * scale, weight: .semibold))
-                .frame(width: 18 * scale, height: 18 * scale)
-                .background(.quaternary, in: .circle)
-                .foregroundStyle(.primary)
-        case .tag:
-            Image(systemName: "tag").font(.system(size: 11 * scale)).foregroundStyle(isActive ? .white : .secondary)
-        case .symbol(let name):
-            Image(systemName: name).font(.system(size: 11 * scale)).foregroundStyle(isActive ? .white : .secondary)
-        }
     }
 }

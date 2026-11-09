@@ -175,9 +175,11 @@ final class ValueEditPresenter {
             model.submitTyped()
             return true
         }
-        // Once the calendar has the keyboard (Tab reaches it), it takes the arrows and Return itself.
-        if case .date = model.kind, Self.isInCalendar(session.window?.firstResponder) { return false }
+        // The time field takes the arrows and Return itself.
+        if case .date = model.kind, Self.isInDateField(session.window?.firstResponder) { return false }
         switch event.keyCode {
+        case 51 where model.hasSearch && event.modifierFlags.intersection([.command, .control, .option]).isEmpty:
+            return model.removeLastChip()
         case 125:
             model.move(by: 1)
             return true
@@ -199,7 +201,7 @@ final class ValueEditPresenter {
         return false
     }
 
-    private static func isInCalendar(_ responder: NSResponder?) -> Bool {
+    private static func isInDateField(_ responder: NSResponder?) -> Bool {
         var view = responder as? NSView
         while let current = view {
             if current is NSDatePicker { return true }

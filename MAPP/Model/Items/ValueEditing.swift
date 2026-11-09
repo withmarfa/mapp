@@ -18,6 +18,8 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
     case tags
     /// The item's parent, which no field holds: a link to another item.
     case parent
+    /// The item's type, which no field holds. A person chooses one of the types the item can become.
+    case type
 
     /// How the field is edited in a panel, or nil where it is not.
     init?(field: ItemTypeInfo.Field) {
@@ -38,7 +40,7 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
         case .status(let field), .choice(let field), .date(let field), .people(let field, _), .text(let field), .number(let field),
              .words(let field):
             field
-        case .tags, .parent: nil
+        case .tags, .parent, .type: nil
         }
     }
 
@@ -47,6 +49,7 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
         switch self {
         case .tags: PagePlacement.tags
         case .parent: PagePlacement.parent
+        case .type: PagePlacement.type
         default: field?.key ?? ""
         }
     }
@@ -64,13 +67,23 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
         }
     }
 
-    /// Whether choosing a value is the whole of the edit, so the panel closes on it.
+    /// Whether choosing a value is the whole of the edit, so the panel closes on it. The value held then shows as one
+    /// chip in the search field; a value that holds several shows one chip each, and the panel stays open.
     var closesOnChoice: Bool {
         switch self {
-        case .status, .choice, .parent: true
+        case .status, .choice, .parent, .type: true
         case .date, .people, .tags, .text, .number, .words: false
         }
     }
+}
+
+/// A value the panel holds, shown as a chip in its search field with an x to take it away.
+nonisolated struct ValueChip: Identifiable, Hashable, Sendable {
+    let id: String
+    var title: String
+    var mark: ValueListRow.Mark = .none
+    /// Whether the panel can take it away: a type and a required field's value cannot be.
+    var isRemovable = true
 }
 
 /// One line of a list in a value panel or a menu.
@@ -82,6 +95,10 @@ nonisolated struct ValueListRow: Identifiable, Hashable, Sendable {
         case person(initials: String)
         case tag
         case symbol(String)
+        /// A choice's option, with the dot of its own color.
+        case dot(String)
+        /// A type, with its icon.
+        case type(icon: String?)
     }
 
     let id: String
@@ -136,7 +153,7 @@ nonisolated enum ValueEditOptions {
     /// word is listed last where the catalogue does not declare it.
     static func choiceRows(field: ItemTypeInfo.Field, current: String?) -> [ValueListRow] {
         let rows = field.options(including: current).map {
-            ValueListRow(id: optionID($0), role: .option, title: ItemTypeInfo.Field.label(ofOption: $0), isCurrent: $0 == current)
+            ValueListRow(id: optionID($0), role: .option, title: ItemTypeInfo.Field.label(ofOption: $0), mark: .dot($0), isCurrent: $0 == current)
         }
         return rows + notSet(field: field, current: current)
     }

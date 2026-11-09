@@ -11,7 +11,21 @@ nonisolated enum ValueEditMetrics {
     static let panelRadius: CGFloat = 12
     /// The space between the value and its panel.
     static let gap: CGFloat = 4
-    /// The panel is as wide as the value, within these.
+    /// A typed value's panel is as wide as the value, within these.
     static let widthFloor: CGFloat = 220
     static let widthCeiling: CGFloat = 320
+
+    /// The least and most a panel is wide for what it holds, at the default text size: a list is as wide as its longest
+    /// row, a calendar as wide as its seven days. A typed value has none; its panel follows the value.
+    static func widthBounds(for kind: ValueEditKind) -> ClosedRange<CGFloat>? {
+        switch kind {
+        case .date: 240...240
+        case .tags, .words: 176...248
+        case .people: 196...280
+        case .status, .choice: 192...260
+        case .type: 200...264
+        case .parent: 232...352
+        case .text, .number: nil
+        }
+    }
 }

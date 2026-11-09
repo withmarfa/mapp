@@ -76,6 +76,13 @@ private struct AppearanceSettings: View {
                 Text("Changes text in the sidebar, lists, and controls. Note text size is set in Editor.")
             }
             Section {
+                ValuePanelOptions()
+            } header: {
+                Text("Panels")
+            } footer: {
+                Text("The panels that open under a date, status, tags, or other value. Solid uses the window color instead of glass.")
+            }
+            Section {
                 ToolbarOptions()
             } header: {
                 Text("Toolbar")
