@@ -73,38 +73,26 @@ struct ViewPanelSection<Content: View>: View {
     }
 }
 
-/// The layouts the place offers, as tiles. The choice is the window's, held for a view until Save.
+/// The layouts the place offers, as a segmented control. The choice is the window's, held for a view until Save.
 private struct ViewPanelLayoutSection: View {
     @CurrentLibrary private var library
-    @Environment(\.interfaceTextSize) private var textSize
-    let browser: Browser
+    @Bindable var browser: Browser
     let panel: ViewPanel
 
     var body: some View {
-        let scale = InterfaceStyle.scale(for: textSize)
         ViewPanelSection(title: "Layout", note: panel.purpose == .place ? nil : "This Mac") {
-            HStack(spacing: 6) {
+            Picker("Layout", selection: $browser.viewMode) {
                 ForEach(browser.availableViewModes(in: library), id: \.self) { mode in
-                    let isSelected = browser.viewMode == mode
-                    Button {
-                        browser.viewMode = mode
-                    } label: {
-                        VStack(spacing: 4) {
-                            Image(systemName: mode.symbol).font(.system(size: 15 * scale))
-                            Text(mode.title).font(.system(size: 10.5 * scale)).lineLimit(1)
-                        }
-                        .foregroundStyle(isSelected ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
-                        .fontWeight(isSelected ? .medium : .regular)
-                        .frame(maxWidth: .infinity, minHeight: 46 * scale)
-                        .background(isSelected ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear), in: .rect(cornerRadius: 8))
-                        .contentShape(.rect)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(mode.title)
-                    .accessibilityAddTraits(isSelected ? .isSelected : [])
-                    .accessibilityIdentifier("ViewPanelLayout.\(mode.rawValue)")
+                    Image(systemName: mode.symbol)
+                        .accessibilityLabel(mode.title)
+                        .help(mode.title)
+                        .tag(mode)
                 }
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(maxWidth: .infinity)
+            .accessibilityIdentifier("ViewPanelLayout")
         }
     }
 }
@@ -173,7 +161,7 @@ private struct ViewPanelGroup: View {
 }
 
 extension ItemViewMode {
-    /// The layout's name on its tile.
+    /// The layout's name.
     var title: String {
         switch self {
         case .list: String(localized: "List")

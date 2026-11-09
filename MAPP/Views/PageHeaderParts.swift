@@ -17,7 +17,7 @@ struct PageHeaderParts {
     let candidates: [PropertyRow]
     let pins: PagePins
 
-    /// `offersEmpty` is for the page that edits values: a value the item does not have yet is an empty chip there.
+    /// `offersEmpty` is for the page that edits values: a value the item does not have yet reads Empty there.
     init(of item: Item, in library: any ItemLibrary, placements: PagePlacements, dateFormat: DateFormat, offersEmpty: Bool = false) {
         type = library.catalogue.itemTypes[item.type]
         placement = placements.placement(of: item.type, in: library.catalogue)

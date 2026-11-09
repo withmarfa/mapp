@@ -109,6 +109,7 @@ extension EditorController {
             "untitled": String(localized: "Untitled"),
             "title": String(localized: "Title"),
             "status": String(localized: "Status"),
+            "empty": String(localized: "Empty"),
             "discardChanges": String(localized: "Discard Changes"),
             "linkedFrom": String(localized: "Linked From"),
             "customizeLayout": String(localized: "Customize Layout in the Title Row"),

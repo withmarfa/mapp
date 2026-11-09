@@ -4,9 +4,9 @@ import SwiftUI
 /// layout of its own (`WindowToolbarLayout`), since the system reshuffles a saved layout when one identifier moves between
 /// split views. Nothing else in a window may declare a plain `toolbar`, which turns customization off for the whole window.
 ///
-/// The defaults run New Item at the leading side when the sidebar is hidden, then a view's pencil, Revert and Save or
+/// The defaults run New Item at the leading side when the sidebar is hidden, then Revert and Save or
 /// Save as View while there is something to keep, Search, Filter and View Options, the Reader and Original switch on a
-/// page with an article, View As, Share and More, and Details at the far right. In the list the pencil, Search, Filter
+/// page with an article, View As, Share and More, and Details at the far right. In the list Search, Filter
 /// and View Options are the list column's (`ListToolbar`). Format and `ExtraToolbarItems` start in the tray.
 struct WindowToolbar: CustomizableToolbarContent {
     @CurrentLibrary private var library
@@ -25,9 +25,6 @@ struct WindowToolbar: CustomizableToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details, fileURL: fileURL)
         let showsItem = browser?.showsSidebarIndex != true
         let opensFromCollection = browser.map { $0.usesCollection && !$0.showsCollection } == true && !hasListColumn
-        if let browser, !hasListColumn {
-            ViewEditItem(browser: browser)
-        }
         ToolbarItem(id: "newItem") {
             NewItemButton(browser: browser)
         }
@@ -79,18 +76,21 @@ struct WindowToolbar: CustomizableToolbarContent {
         }
             .defaultCustomization(.hidden)
             .hidden(browser?.showsCollection == true || !showsItem)
+        // While a view is edited the toolbar keeps to what edits it: its layout is chosen in the panel, and Share and
+        // More act on items, not on the view.
+        let editsView = browser?.showsViewPanel == true
         if let browser {
             ToolbarItem(id: "viewMode") { ViewModeMenu(browser: browser) }
-                .hidden(!showsItem)
+                .hidden(!showsItem || editsView)
             ToolbarSpacer(.fixed)
-                .hidden(!showsItem)
+                .hidden(!showsItem || editsView)
         }
         ToolbarItem(id: "share") { tools.shareLink }
-            .hidden(!showsItem)
+            .hidden(!showsItem || editsView)
         ToolbarItem(id: "more") {
             tools.moreMenu.disabled(items.isEmpty)
         }
-        .hidden(!showsItem)
+        .hidden(!showsItem || editsView)
         ToolbarSpacer(.fixed)
             .hidden(tools.showsInspector || !showsItem)
         ToolbarItem(id: "details") { tools.detailsButton }

@@ -524,6 +524,7 @@ test("the words the app sends mount Inkkit, with the app's own kept out of its l
     [
       'customizeLayout',
       'discardChanges',
+      'empty',
       'linkedFrom',
       'contents',
       'properties',

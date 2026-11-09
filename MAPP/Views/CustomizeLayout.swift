@@ -15,9 +15,7 @@ struct CustomizeLayoutButton: View {
             Button("Finish Customizing", systemImage: "slider.horizontal.3") { details?.endLayout() }
         } else {
             Button("Customize Layout…", systemImage: "slider.horizontal.3") { details?.beginLayout() }
-                .disabled(
-                    details == nil || details?.showsPage == false || ids.count != 1
-                        || !PageCustomization.isAvailable(for: ids.first.flatMap { library.item($0) }))
+                .disabled(ids.count != 1 || details?.canBeginLayout(for: ids.first.flatMap { library.item($0) }) != true)
         }
     }
 }

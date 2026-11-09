@@ -156,20 +156,20 @@ struct ItemPropertyRow: View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
             StatusMark(mark: statusMark, size: 10 * InterfaceStyle.scale(for: textSize))
                 .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
-            if let text { text } else { InspectorPlaceholder(text: "Choose") }
+            if let text { text } else { InspectorPlaceholder(text: "Empty") }
         }
         .lineLimit(1)
         .truncationMode(.tail)
     }
 
-    /// A value at rest in the row that opens its panel: its text, cut at `lines`, or what stands for none.
-    @ViewBuilder private func choiceLabel(_ text: Text?, placeholder: LocalizedStringKey, lines: Int) -> some View {
+    /// A value at rest in the row that opens its panel: its text, cut at `lines`, or Empty.
+    @ViewBuilder private func choiceLabel(_ text: Text?, lines: Int) -> some View {
         if isStatus {
             statusLabel(text)
         } else if let text {
             text.lineLimit(lines).truncationMode(.tail).fixedSize(horizontal: false, vertical: true)
         } else {
-            InspectorPlaceholder(text: placeholder)
+            InspectorPlaceholder(text: "Empty")
         }
     }
 
@@ -321,16 +321,15 @@ struct ItemPropertyRow: View {
         case .words: "Opens a list of words to add to and remove from"
         default: "Opens a field to type in"
         }
-        let placeholder: LocalizedStringKey = kind.closesOnChoice ? "Choose" : "None"
         return Button { openEditor() } label: {
-            choiceLabel(text.map { Text(verbatim: $0) }, placeholder: placeholder, lines: kind.isTyped || isWords ? 3 : 1)
+            choiceLabel(text.map { Text(verbatim: $0) }, lines: kind.isTyped || isWords ? 3 : 1)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .focusEffectDisabled()
         .accessibilityLabel(LocalizedStringKey(definition.label))
-        .accessibilityValue(text.map { Text(verbatim: $0) } ?? Text("Not Set"))
+        .accessibilityValue(text.map { Text(verbatim: $0) } ?? Text("Empty"))
         .accessibilityHint(hint)
         .accessibilityIdentifier("ItemProperty.\(definition.key)")
     }
@@ -371,7 +370,7 @@ struct ItemPropertyRow: View {
             input.text = typed
             input.isDirty = true
             input.rejected = false
-        }, prompt: Text("None"), axis: isNumber ? .horizontal : .vertical)
+        }, prompt: Text("Empty"), axis: isNumber ? .horizontal : .vertical)
         .labelsHidden()
         .textFieldStyle(.plain)
         .multilineTextAlignment(.leading)

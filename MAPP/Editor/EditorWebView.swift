@@ -183,6 +183,21 @@ final class EditorWebView: WKWebView {
         controller.titleDrafts?.showHistory(of: id, in: library)
     }
 
+    @objc private func toggleLayout(_ sender: NSMenuItem) {
+        controller?.titleDrafts?.toggleLayout()
+    }
+
+    /// Customize Layout, as the Item menu words it, for the page's own rows.
+    private var customizeLayoutItem: NSMenuItem? {
+        guard let controller, let id = controller.noteID, let details = controller.titleDrafts, let library = controller.library,
+              details.isCustomizingLayout || details.canBeginLayout(for: library.item(id))
+        else { return nil }
+        let title = details.isCustomizingLayout ? String(localized: "Finish Customizing") : String(localized: "Customize Layout…")
+        let item = NSMenuItem(title: title, action: #selector(toggleLayout(_:)), keyEquivalent: "")
+        item.target = self
+        return item
+    }
+
     /// Version History, for the note on the page, from the window the editor belongs to.
     private var versionHistoryItem: NSMenuItem? {
         guard let controller, controller.noteID != nil, controller.titleDrafts != nil else { return nil }
@@ -225,8 +240,24 @@ final class EditorWebView: WKWebView {
         #selector(NSTextView.changeLayoutOrientation(_:)),
     ]
 
+    /// True while a menu opened over a property row is up. Continuity Camera's Insert from iPhone or iPad asks the
+    /// responder chain (`validRequestor`) for image return types (`NSImage.imageTypes`), so declining those keeps it out
+    /// of a menu over the property area. AutoFill's request has not been checked, so it may still appear.
+    private var declinesInsertion = false
+
+    override func validRequestor(forSendType sendType: NSPasteboard.PasteboardType?, returnType: NSPasteboard.PasteboardType?) -> Any? {
+        if declinesInsertion, let returnType, NSImage.imageTypes.contains(returnType.rawValue) { return nil }
+        return super.validRequestor(forSendType: sendType, returnType: returnType)
+    }
+
+    override func didCloseMenu(_ menu: NSMenu, with event: NSEvent?) {
+        declinesInsertion = false
+        super.didCloseMenu(menu, with: event)
+    }
+
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         super.willOpenMenu(menu, with: event)
+        declinesInsertion = false
         if let embed = controller?.takeMenuEmbed() {
             let open = NSMenuItem(title: String(localized: "Open"), action: #selector(openEmbed(_:)), keyEquivalent: "")
             let reveal = NSMenuItem(title: String(localized: "Show in Finder"), action: #selector(revealEmbed(_:)), keyEquivalent: "")
@@ -239,11 +270,17 @@ final class EditorWebView: WKWebView {
             menu.insertItem(.separator(), at: items.count)
         }
         if let row = controller?.takeMenuRow() {
+            declinesInsertion = true
             let hide = NSMenuItem(title: String(localized: "Hide from Page"), action: #selector(hideRow(_:)), keyEquivalent: "")
             hide.target = self
             hide.representedObject = MenuRow(item: row.item, row: row.row)
             menu.insertItem(hide, at: 0)
-            menu.insertItem(.separator(), at: 1)
+            var next = 1
+            if let layout = customizeLayoutItem {
+                menu.insertItem(layout, at: next)
+                next += 1
+            }
+            menu.insertItem(.separator(), at: next)
         }
         for item in menu.items {
             let isUnwanted = Self.unwantedItems.contains(item.identifier?.rawValue ?? "")
