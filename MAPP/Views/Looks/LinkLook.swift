@@ -2,9 +2,9 @@ import Foundation
 
 /// How a link to another item reads in a note's text, as the person chose in Settings. Every look, with its sizes and
 /// colors, is here and nowhere else; the page holds none of them. A link to a note that is missing keeps its dashed
-/// line in every look.
+/// line in every look, and in the mark look a lighter dotted one.
 nonisolated enum LinkLook: String, CaseIterable, Identifiable, Sendable {
-    /// The linked item's type icon in the type's color, then the title, underlined under the pointer.
+    /// The linked item's type icon in the type's color, then the title, with a dotted underline and the hand pointer.
     case mark
     /// The title underlined, with no icon.
     case underline
@@ -50,6 +50,10 @@ nonisolated enum LinkLook: String, CaseIterable, Identifiable, Sendable {
         static let quietUnderlineOffset = "3px"
         static let iconSize = "0.95em"
         static let iconGap = "0.3em"
+        /// The mark look's dots, as a share of the text's own color so they read on light and dark; a missing link's
+        /// are lighter.
+        static let markDots = "color-mix(in srgb, currentcolor 55%, transparent)"
+        static let markMissingDots = "color-mix(in srgb, currentcolor 28%, transparent)"
     }
 
     /// The neutral fill of a pill, as black over light and white over dark.
@@ -98,9 +102,16 @@ nonisolated enum LinkLook: String, CaseIterable, Identifiable, Sendable {
             // The tint is already the tone's chip fill, so a tinted pill takes it whole.
             if self == .tintedPill { all[prefix + "tint-strength"] = "100%" }
         } else {
-            all[prefix + "underline"] = self == .mark ? "none" : "underline"
+            all[prefix + "underline"] = "underline"
             all[prefix + "underline-thickness"] = Measure.underlineThickness
             all[prefix + "underline-offset"] = self == .quiet ? Measure.quietUnderlineOffset : Measure.underlineOffset
+            if self == .mark {
+                all[prefix + "underline-style"] = "dotted"
+                all[prefix + "cursor"] = "pointer"
+                all[prefix + "underline-color"] = Measure.markDots
+                all[prefix + "missing-underline-style"] = "dotted"
+                all[prefix + "missing-underline-color"] = Measure.markMissingDots
+            }
             if self == .quiet {
                 all[prefix + "underline-color"] = Self.appearance(Neutral.lineLight, Neutral.lineDark)
             }
