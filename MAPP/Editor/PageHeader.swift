@@ -31,8 +31,8 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     }
 
     /// The status or the parent as the menu the page opens from it, wherever the page draws it. The page draws the
-    /// button; the app builds the menu. An empty status, in the property block, has no value yet: the page shows a
-    /// plus and a quieter edge. A parent exists only with a value.
+    /// button; the app builds the menu. An empty status, in the property block, has no value yet: the page reads it
+    /// as every empty value reads, and `label` is then unused. A parent exists only with a value.
     struct Pin: Encodable, Equatable, Sendable {
         var label: String
         var enabled: Bool
@@ -180,7 +180,7 @@ extension PropertyRow: Encodable {
         try container.encode(value.symbol, forKey: .symbol)
         switch value {
         case .status: try container.encode("status", forKey: .kind)
-        case .empty: try Self.encode("empty", label, into: &container)
+        case .empty: try container.encode("empty", forKey: .kind)
         case .parent: try container.encode("parent", forKey: .kind)
         case .type(let name, let icon):
             try Self.encode("type", name, into: &container)
@@ -255,7 +255,6 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
         var height: Double
     }
 
-    var plus: Icon
     var indicator: Icon
     /// The symbols of the property rows by SF Symbol name, and the icons of the types by `TypeIconKey`.
     var symbols: [String: Icon]
@@ -275,10 +274,7 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
     init?(textSize: Int, typeIcons: Set<String?>) {
         let size = 13 * InterfaceStyle.scale(for: textSize)
         if Self.drawn.textSize != textSize { Self.drawn = Drawn(textSize: textSize) }
-        guard let plus = Self.symbol("plus", size: size, weight: .regular),
-              let indicator = Self.symbol("chevron.down", size: size * 0.7, weight: .bold)
-        else { return nil }
-        self.plus = plus
+        guard let indicator = Self.symbol("chevron.down", size: size * 0.7, weight: .bold) else { return nil }
         self.indicator = indicator
         var symbols: [String: Icon] = [:]
         for name in PropertyRow.Value.symbols + [Self.pictureSymbol, Self.rowGripSymbol] + Self.titleToolSymbols {
