@@ -29,10 +29,11 @@ struct ItemTimeline: View {
             }
         }
         .filteredEmptyState(browser)
+        .navigationTitle(title)
         // The timeline only shows items; it changes none of them.
-        .viewTitle(
-            browser, title: title,
-            subtitle: Text("\(Text("^[\(items.count) item](inflect: true)")), Read Only").editedSubtitle(browser.hasViewChanges))
+        .navigationSubtitle(
+            Text("\(Text("^[\(items.count) item](inflect: true)")), Read Only").editedSubtitle(browser.hasViewChanges))
+        .toolbar(removing: browser.isSearchExpanded ? .title : nil)
         .onChange(of: browser.isSearchExpanded) {
             if !browser.isSearchExpanded { browser.focusRequest = .list }
         }

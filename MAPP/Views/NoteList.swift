@@ -30,8 +30,6 @@ struct NoteList: View, Equatable {
         let excerpts = results?.excerpts ?? [:]
         let isPending = results?.isPending == true
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
-        let subtitle = (browser.isSearching ? Text("^[\(ids.count) result](inflect: true)") : Text("^[\(ids.count) item](inflect: true)"))
-            .editedSubtitle(browser.hasViewChanges)
         // Headings are rows of their own rather than section headers: a list of sections leaves every row at
         // the table's default height, and its first header floats into the toolbar's edge, whose line then runs
         // the list's full width.
@@ -87,9 +85,7 @@ struct NoteList: View, Equatable {
         }
         .searchStatus(browser)
         .bandsToolbar()
-        .toolbar(id: WindowToolbarLayout.list) {
-            ListToolbar(browser: browser, columnWidth: width, title: title, subtitle: subtitle)
-        }
+        .toolbar(id: WindowToolbarLayout.list) { ListToolbar(browser: browser, columnWidth: width) }
         .task {
             for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) {
                 daysSeen += 1
@@ -119,8 +115,11 @@ struct NoteList: View, Equatable {
             }
         }
         .navigationTitle(title)
-        .navigationSubtitle(subtitle)
-        .toolbar(removing: .title)
+        .navigationSubtitle(
+            (browser.isSearching ? Text("^[\(ids.count) result](inflect: true)") : Text("^[\(ids.count) item](inflect: true)"))
+                .editedSubtitle(browser.hasViewChanges))
+        // The search field takes the title's place while it is out.
+        .toolbar(removing: browser.isSearchExpanded ? .title : nil)
     }
 
     /// What was just typed reaches the note before it goes, since a deleted note takes no edit.

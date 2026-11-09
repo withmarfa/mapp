@@ -198,7 +198,6 @@ struct MainView: View {
                             itemPage
                         }
                     }
-                    .environment(\.toolbarLayout, WindowToolbarLayout.collection(shownViewMode))
                     .modifier(itemInspector(WindowToolbarLayout.collection(shownViewMode)))
                     .toolbar(id: WindowToolbarLayout.collection(shownViewMode)) { windowToolbar() }
                 }

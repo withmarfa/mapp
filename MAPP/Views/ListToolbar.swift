@@ -1,16 +1,13 @@
 import SwiftUI
 
-/// What names and acts on the list: the title with Edit View beside it, then Search, Filter and View Options, in the
-/// list column. The rest of the window's items are the page column's (`WindowToolbar`).
+/// What acts on the list: Search, Filter and View Options, in the list column. The rest of
+/// the window's items are the page column's (`WindowToolbar`).
 struct ListToolbar: CustomizableToolbarContent {
     @Bindable var browser: Browser
     /// The width the search field spans when it is out.
     let columnWidth: CGFloat
-    let title: String
-    let subtitle: Text
 
     var body: some CustomizableToolbarContent {
-        ViewTitleItem(browser: browser, title: title, subtitle: subtitle)
         ViewToolbarItems(browser: browser, layout: .column(width: columnWidth))
     }
 }

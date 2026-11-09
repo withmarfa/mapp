@@ -48,7 +48,9 @@ struct ItemTable: View {
                     }
                 }
             }
-            .viewTitle(browser, title: title, subtitle: subtitle(shown: rows.count, of: allRows.count).editedSubtitle(browser.hasViewChanges))
+            .navigationTitle(title)
+            .navigationSubtitle(subtitle(shown: rows.count, of: allRows.count).editedSubtitle(browser.hasViewChanges))
+            .toolbar(removing: browser.isSearchExpanded ? .title : nil)
             .onChange(of: browser.isSearchExpanded) {
                 if !browser.isSearchExpanded { browser.focusRequest = .list }
             }

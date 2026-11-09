@@ -113,20 +113,6 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(exit.waitForExistence(timeout: 3))
     }
 
-    func testHoveringTheViewTitleRevealsEditViewBesideIt() {
-        let title = window.toolbars.staticTexts["Items"].firstMatch
-        XCTAssertTrue(title.waitForExistence(timeout: 3), "the view's title is drawn in the toolbar")
-        let edit = control("EditViewToolbar")
-        XCTAssertTrue(edit.exists)
-        window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6)).hover()
-        XCTAssertGreaterThanOrEqual(edit.frame.minX, title.frame.maxX - 1, "the pencil sits after the title and moves nothing")
-        let before = control("ViewOptionsToolbar").frame
-        title.hover()
-        XCTAssertEqual(control("ViewOptionsToolbar").frame, before, "hovering the title leaves the rest of the toolbar where it was")
-        edit.click()
-        XCTAssertTrue(control("ViewPanelDone").waitForExistence(timeout: 3), "the pencil opens the Edit View panel")
-    }
-
     func testViewOptionsOffersSortByAndGroupBy() {
         control("ViewOptionsToolbar").click()
         let sortBy = window.menuItems["Sort by"].firstMatch

@@ -29,7 +29,9 @@ struct ItemBoard: View {
         }
         .searchStatus(browser)
         .filteredEmptyState(browser)
-        .viewTitle(browser, title: title, subtitle: Text("^[\(items.count) item](inflect: true)").editedSubtitle(browser.hasViewChanges))
+        .navigationTitle(title)
+        .navigationSubtitle(Text("^[\(items.count) item](inflect: true)").editedSubtitle(browser.hasViewChanges))
+        .toolbar(removing: browser.isSearchExpanded ? .title : nil)
         .accessibilityIdentifier("ItemBoard")
         .onChange(of: browser.isSearchExpanded) {
             if !browser.isSearchExpanded { browser.focusRequest = .list }

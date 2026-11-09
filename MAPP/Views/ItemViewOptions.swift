@@ -44,88 +44,21 @@ struct ViewModeMenu: View {
     @Bindable var browser: Browser
 
     var body: some View {
-        // The tray names an item by the title of its label, which a bare representable has none of, so the pop-up button
-        // is the body of a label's style and keeps the label's title for the tray.
-        Label("View As", systemImage: browser.viewMode.symbol)
-            .labelStyle(ViewModePopUpStyle(modes: browser.availableViewModes(in: library), selection: $browser.viewMode))
-            .help("View As")
-            .accessibilityIdentifier("ViewModeMenu")
-    }
-}
-
-private struct ViewModePopUpStyle: LabelStyle {
-    let modes: [ItemViewMode]
-    @Binding var selection: ItemViewMode
-
-    func makeBody(configuration: Configuration) -> some View {
-        ViewModePopUp(modes: modes, selection: $selection).frame(width: 58)
-    }
-}
-
-/// A pop-up button whose face is the current layout's icon and whose menu is a tick and words, as Finder's View button.
-/// SwiftUI's menu picker takes the button's face from the selected row, so the two cannot differ there; the pop-up
-/// button's cell can show a menu item of its own (`usesItemFromMenu`) while the menu keeps the rows.
-private struct ViewModePopUp: NSViewRepresentable {
-    let modes: [ItemViewMode]
-    @Binding var selection: ItemViewMode
-
-    fileprivate static let titles: [ItemViewMode: String] = [
-        .list: String(localized: "as List"), .gallery: String(localized: "as Gallery"), .table: String(localized: "as Table"),
-        .board: String(localized: "as Board"), .timeline: String(localized: "as Timeline"),
-    ]
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    func makeNSView(context: Context) -> NSPopUpButton {
-        let button = NSPopUpButton(frame: .zero, pullsDown: false)
-        button.target = context.coordinator
-        button.action = #selector(Coordinator.choose(_:))
-        button.setAccessibilityLabel(String(localized: "View As"))
-        (button.cell as? NSPopUpButtonCell)?.usesItemFromMenu = false
-        return button
-    }
-
-    /// The menu is rebuilt only when the choices change and the face only when the layout does, so a menu that is open
-    /// is never replaced while it tracks.
-    func updateNSView(_ button: NSPopUpButton, context: Context) {
-        let coordinator = context.coordinator
-        coordinator.selection = $selection
-        if coordinator.modes != modes {
-            coordinator.modes = modes
-            coordinator.shown = nil
-            button.removeAllItems()
-            for mode in modes {
-                let item = NSMenuItem(title: Self.titles[mode] ?? "", action: nil, keyEquivalent: "")
-                item.representedObject = mode
-                button.menu?.addItem(item)
+        let modes = browser.availableViewModes(in: library)
+        // A menu rather than a picker for the toolbar's sake: the tray and Icon and Text name an item by its label.
+        Menu("View As", systemImage: browser.viewMode.symbol) {
+            Picker("View As", selection: $browser.viewMode) {
+                if modes.contains(.list) { Text("as List").tag(ItemViewMode.list) }
+                if modes.contains(.gallery) { Text("as Gallery").tag(ItemViewMode.gallery) }
+                if modes.contains(.table) { Text("as Table").tag(ItemViewMode.table) }
+                if modes.contains(.board) { Text("as Board").tag(ItemViewMode.board) }
+                if modes.contains(.timeline) { Text("as Timeline").tag(ItemViewMode.timeline) }
             }
+            .pickerStyle(.inline)
+            .labelsHidden()
         }
-        guard coordinator.shown != selection else { return }
-        coordinator.showFace(of: selection, on: button)
-    }
-
-    final class Coordinator: NSObject {
-        var selection: Binding<ItemViewMode>?
-        var modes: [ItemViewMode] = []
-        var shown: ItemViewMode?
-
-        /// The cell drops its own face when a row is chosen, also when the row is the one already selected or the change
-        /// is refused, so the face is put back after every choice, from the layout that holds then.
-        @objc func choose(_ sender: NSPopUpButton) {
-            if let mode = sender.selectedItem?.representedObject as? ItemViewMode { selection?.wrappedValue = mode }
-            if let current = selection?.wrappedValue { showFace(of: current, on: sender) }
-        }
-
-        func showFace(of mode: ItemViewMode, on button: NSPopUpButton) {
-            shown = mode
-            if let index = modes.firstIndex(of: mode) { button.selectItem(at: index) }
-            let title = ViewModePopUp.titles[mode] ?? ""
-            let face = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-            face.image = NSImage(systemSymbolName: mode.symbol, accessibilityDescription: nil)
-            (button.cell as? NSPopUpButtonCell)?.menuItem = face
-            (button.cell as? NSPopUpButtonCell)?.imagePosition = .imageOnly
-            button.setAccessibilityValue(title)
-        }
+        .help("View As")
+        .accessibilityIdentifier("ViewModeMenu")
     }
 }
 
@@ -133,11 +66,17 @@ private struct ViewModePopUp: NSViewRepresentable {
 /// (and the table's Filter), before View As. The View menu holds the same options (`CurrentViewOptions`), since a
 /// toolbar can be hidden or customized.
 struct ViewOptionsMenu: View {
+    @CurrentLibrary private var library
     let browser: Browser
 
     var body: some View {
         Menu("View Options", systemImage: "slider.horizontal.3") {
             CurrentViewOptions(browser: browser)
+            if SavedViews.canEdit(browser, in: library), browser.offersViewOptions {
+                Divider()
+                Button("Edit View") { browser.openViewPanel(in: library) }
+                    .accessibilityIdentifier("EditViewMenuItem")
+            }
         }
         .menuIndicator(.hidden)
         .help("View Options")
