@@ -53,6 +53,8 @@ import WebKit
     /// Answers the document's pictures, where it has any to answer.
     @ObservationIgnored private let pictures: SealedPictures?
     @ObservationIgnored private let runsScripts: Bool
+    /// The space left above the document's first line, which every document is given before it appears.
+    @ObservationIgnored private var topSpace: CGFloat = 0
 
     private init(page: WebPage, gate: NavigationGate, pictures: SealedPictures?, runsScripts: Bool) {
         self.page = page
@@ -112,6 +114,9 @@ import WebKit
         guard call == shows else { throw CancellationError() }
         // Before the page is swapped in, so the person never sees the document unstyled. A look that fails to apply
         // leaves the document as it loaded.
+        _ = try? await next.callJavaScript(Self.makeRoom, arguments: ["points": Double(topSpace)], contentWorld: Self.world)
+        try Task.checkCancellation()
+        guard call == shows else { throw CancellationError() }
         if let look {
             _ = try? await next.callJavaScript(SourceLook.script, arguments: look.arguments, contentWorld: Self.world)
             // The await above is a suspension: a newer call may have started, or this one been cancelled.
@@ -128,6 +133,22 @@ import WebKit
     }
 
     static let base = URL(string: "about:blank")!
+
+    /// Leaves `points` above the document's first line, inside the page's own scroll, for what the caller draws over the
+    /// top of the page, so the page scrolls it away with the document and its layout viewport starts where the page
+    /// does. Applies to the document shown now and to every later one.
+    func leaveRoom(above points: CGFloat) async {
+        topSpace = points
+        _ = try? await page.callJavaScript(Self.makeRoom, arguments: ["points": Double(points)], contentWorld: Self.world)
+    }
+
+    /// Pads the root element through its inline style, which a content security policy does not govern and a style sheet
+    /// of the document cannot outrank.
+    nonisolated static let makeRoom = SafeDOM.script + """
+
+        const root = dom.documentElement(document);
+        if (root) Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'style').get.call(root).setProperty('padding-top', points + 'px', 'important');
+        """
 
     /// Has the document ask for its pictures again, from the URLs of `version`, without loading it again, so the place
     /// the person has read to is kept. The script runs in a world of its own, which works whether or not the
