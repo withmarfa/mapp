@@ -270,8 +270,8 @@ final class ValueEditModel {
         }
     }
 
-    /// The rows whose title holds what is typed, under the headings that still have one, and no separator or Not Set
-    /// while something is typed.
+    /// The rows whose title holds what is typed, under the headings that still have one, and no separator while
+    /// something is typed.
     private func narrowed(_ rows: [ValueListRow]) -> [ValueListRow] {
         let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !typed.isEmpty else { return rows }
@@ -284,7 +284,7 @@ final class ValueEditModel {
             case .separator:
                 continue
             case .option, .create:
-                guard row.id != ValueEditOptions.notSetID, row.title.localizedStandardContains(typed) else { continue }
+                guard row.title.localizedStandardContains(typed) else { continue }
                 if let heading { result.append(heading) }
                 heading = nil
                 result.append(row)
@@ -406,7 +406,7 @@ final class ValueEditModel {
         switch kind {
         case .tags, .words: return rows.first { $0.role == .create }?.id ?? rows.first?.id
         case .people: return rows.first { $0.id.hasPrefix("person:") }?.id ?? rows.first?.id
-        default: return rows.first { $0.id != ValueEditOptions.notSetID && $0.id != Self.openID }?.id ?? rows.first?.id
+        default: return rows.first { $0.id != Self.openID }?.id ?? rows.first?.id
         }
     }
 
@@ -428,8 +428,15 @@ final class ValueEditModel {
         if abs(before.0 - totalHeight) > 0.5 || abs(before.1 - rowsHeight) > 0.5 || abs(before.2 - listHeight) > 0.5 { layoutChanged() }
     }
 
-    /// The height the content wants with nothing scrolled.
-    var naturalHeight: CGFloat { totalHeight + max(0, rowsHeight - listHeight) }
+    /// The most a list is tall: ten rows, past which it scrolls. A status list, which is grouped under headings, is as tall
+    /// as its groups.
+    func listLimit(scale: CGFloat) -> CGFloat {
+        if case .status = kind { return .infinity }
+        return CGFloat(ValueEditMetrics.visibleRows) * ValueEditMetrics.rowHeight * scale
+    }
+
+    /// The height the content wants with nothing scrolled past `listLimit`.
+    func naturalHeight(scale: CGFloat) -> CGFloat { totalHeight + max(0, min(rowsHeight, listLimit(scale: scale)) - listHeight) }
 
     func move(by step: Int) {
         let rows = navigable
@@ -463,8 +470,8 @@ final class ValueEditModel {
         guard isEditable else { close(); return }
         switch kind {
         case .status, .choice:
-            let new: PropertyValue? = ValueEditOptions.word(of: id).map { .string($0) }
-            if id == ValueEditOptions.notSetID || new != nil, commit(new), kind.closesOnChoice { close() }
+            guard let word = ValueEditOptions.word(of: id), commit(.string(word)), kind.closesOnChoice else { return }
+            close()
         case .date:
             if id == ValueEditOptions.notSetID {
                 if value != nil { clearDate() }
@@ -759,6 +766,7 @@ final class ValueEditModel {
     func finish(cancelled: Bool) {
         isFinished = true
         guard !cancelled else { return }
+        commitTime()
         guard kind.isTyped, let field = kind.field else { return }
         draft.handOff(
             label: field.label, as: field.kind, rule: field.numberRule, current: currentText, isEditable: isEditable,
@@ -776,18 +784,38 @@ final class ValueEditModel {
 
     var hasTime: Bool { allowsTime && (storedDate?.hasTime ?? false) }
 
-    /// The person chose a date and, where the value has a time, a time in the picker: what it shows is what is written.
-    func setDate(_ selected: Date) { write(selected, withTime: hasTime) }
-
     /// The person chose a day from the quick dates, which keeps the time the value already has.
     func chooseDay(_ day: Date) {
         write(hasTime ? QuickDates.moment(on: day, keepingTimeOf: storedDate?.date, calendar: request.calendar) : day, withTime: hasTime)
     }
 
-    /// The person turned the time on or off. Turning it on keeps the day, and gives a value with none today.
-    func setIncludesTime(_ included: Bool) {
-        guard allowsTime else { return }
-        write(storedDate?.date ?? library.now(), withTime: included)
+    /// What the time field is showing while the person types in it, nil while it shows the value's own time.
+    var timeDraft: String?
+
+    /// The value's time as the person's locale writes it, or empty where the value holds none.
+    var timeText: String {
+        guard hasTime, let date = storedDate?.date else { return "" }
+        let calendar = request.calendar
+        return date.formatted(Date.FormatStyle(date: .omitted, time: .shortened, locale: .current, calendar: calendar, timeZone: calendar.timeZone))
+    }
+
+    /// Writes what was typed in the time field: a time sets it on the day the value holds (today where it holds none),
+    /// and nothing takes it away, leaving the day.
+    func commitTime() {
+        guard let draft = timeDraft else { return }
+        timeDraft = nil
+        guard allowsTime, isEditable else { return }
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.isEmpty {
+            if hasTime, let date = storedDate?.date { write(date, withTime: false) }
+            return
+        }
+        guard let time = TimeOfDay.parse(text) else {
+            notice = String(localized: "Enter a time such as 9:30.")
+            return
+        }
+        let day = storedDate?.date ?? library.now()
+        write(request.calendar.date(bySettingHour: time.hour, minute: time.minute, second: 0, of: day) ?? day, withTime: true)
     }
 
     private func write(_ date: Date, withTime: Bool) {

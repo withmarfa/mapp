@@ -176,7 +176,7 @@ final class ValueEditPresenter {
             return true
         }
         // The time field takes the arrows and Return itself.
-        if case .date = model.kind, Self.isInDateField(session.window?.firstResponder) { return false }
+        if case .date = model.kind, session.window?.firstResponder is NSTextView { return false }
         switch event.keyCode {
         case 51 where model.hasSearch && event.modifierFlags.intersection([.command, .control, .option]).isEmpty:
             return model.removeLastChip()
@@ -197,15 +197,6 @@ final class ValueEditPresenter {
         if plain, !model.hasSearch, let characters = event.charactersIgnoringModifiers, characters.unicodeScalars.allSatisfy({ !$0.properties.isWhitespace && $0.value >= 0x21 && $0.value < 0xF700 }) {
             model.typeAhead(characters)
             return true
-        }
-        return false
-    }
-
-    private static func isInDateField(_ responder: NSResponder?) -> Bool {
-        var view = responder as? NSView
-        while let current = view {
-            if current is NSDatePicker { return true }
-            view = current.superview
         }
         return false
     }

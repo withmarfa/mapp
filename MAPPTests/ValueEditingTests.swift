@@ -42,15 +42,15 @@ struct ValueEditingTests {
         let rows = ValueEditOptions.statusRows(field: Self.status, current: "stale")
         let outline = rows.map { $0.role == .header ? "# " + $0.title : $0.role == .separator ? "-" : $0.title }
         let titles = ["# " + StatusBucket.group(.completed).title, "Done", "# " + StatusBucket.group(.inProgress).title, "Doing",
-                      "# " + StatusBucket.group(.notStarted).title, "Todo", "# " + StatusBucket.other.title, "Stale", "-", "Not Set"]
+                      "# " + StatusBucket.group(.notStarted).title, "Todo", "# " + StatusBucket.other.title, "Stale"]
         #expect(outline == titles)
         #expect(rows.first { $0.title == "Stale" }?.isCurrent == true)
     }
 
-    @Test func nothingSetMarksNotSetAsCurrent() {
+    @Test func nothingSetMarksNoOptionAndListsNoNotSetRow() {
         let rows = ValueEditOptions.statusRows(field: Self.status, current: nil)
-        #expect(rows.last?.isCurrent == true)
-        #expect(rows.dropLast().allSatisfy { !$0.isCurrent })
+        #expect(rows.allSatisfy { !$0.isCurrent })
+        #expect(!rows.contains { $0.id == ValueEditOptions.notSetID })
     }
 
     // MARK: Quick dates
@@ -70,15 +70,24 @@ struct ValueEditingTests {
 
     private static let screen = CGRect(x: 0, y: 0, width: 1000, height: 800)
 
-    @Test func panelOpensBelowTheValueAndEndsWithANarrowValueWithinTheWidthLimits() {
+    @Test func panelOpensBelowTheValueAndStartsWhereItDoesWithinTheWidthLimits() {
         let narrow = ValuePanelFrame.placement(
             anchor: CGRect(x: 300, y: 500, width: 100, height: 20), visible: Self.screen, contentHeight: 200, floor: 220, ceiling: 320, gap: 4)
-        #expect(narrow.frame == CGRect(x: 180, y: 296, width: 220, height: 200))
+        #expect(narrow.frame == CGRect(x: 300, y: 296, width: 220, height: 200))
         #expect(!narrow.isAbove)
         let wide = ValuePanelFrame.placement(
             anchor: CGRect(x: 100, y: 500, width: 600, height: 20), visible: Self.screen, contentHeight: 200, floor: 220, ceiling: 320, gap: 4)
         #expect(wide.frame.width == 320)
         #expect(wide.frame.minX == 100)
+    }
+
+    @Test func aPanelWiderThanItsValueStartsAtTheValueAndShiftsLeftOnlyWhereTheWindowEnds() {
+        let inside = ValuePanelFrame.placement(
+            anchor: CGRect(x: 300, y: 500, width: 40, height: 20), visible: Self.screen, contentHeight: 200, floor: 220, ceiling: 320, gap: 4)
+        #expect(inside.frame.minX == 300)
+        let atTheEdge = ValuePanelFrame.placement(
+            anchor: CGRect(x: 900, y: 500, width: 40, height: 20), visible: Self.screen, contentHeight: 200, floor: 220, ceiling: 320, gap: 4)
+        #expect(atTheEdge.frame.maxX == Self.screen.maxX)
     }
 
     @Test func panelFlipsAboveWhenThereIsNoRoomBelowAndStaysOnScreen() {
@@ -433,25 +442,49 @@ struct ValueEditingTests {
         return ValueEditModel(request)
     }
 
-    @Test func theTimeThePickerShowsIsTheTimeWritten() {
+    @Test func aTimeTypedInTheFieldIsWrittenOnTheDayTheValueHolds() {
         let written = Written()
         let model = datePanel(Self.due, holding: "2026-11-07T09:30:00Z", written: written)
         #expect(model.hasTime)
-        model.setDate(Self.moment(7, 14, 45))
+        model.timeDraft = "2:45 pm"
+        model.commitTime()
         #expect(written.all == [PropertyValue.string(ItemDate.instant(Self.moment(7, 14, 45)))])
     }
 
-    @Test func aDayOnlyValueGainsATimeAndLosesItAgain() throws {
+    @Test func aDayOnlyValueGainsATimeFromTheFieldAndLosesItWhenTheFieldIsEmptied() throws {
         let written = Written()
         let model = datePanel(Self.due, holding: "2026-11-07", written: written)
-        #expect(model.allowsTime && !model.hasTime)
-        model.setIncludesTime(true)
+        #expect(model.allowsTime && !model.hasTime && model.timeText.isEmpty)
+        model.timeDraft = "9:30"
+        model.commitTime()
         let timed = try #require(written.all.last??.string)
         #expect(ItemDate.parse(timed)?.hasTime == true)
         let back = datePanel(Self.due, holding: timed, written: written)
-        back.setIncludesTime(false)
+        back.timeDraft = "  "
+        back.commitTime()
         let day = try #require(written.all.last??.string)
         #expect(ItemDate.parse(day)?.hasTime == false)
+    }
+
+    @Test func aTimeThatIsNotOneIsRefusedWithAReasonAndWritesNothing() {
+        let written = Written()
+        let model = datePanel(Self.due, holding: "2026-11-07", written: written)
+        model.timeDraft = "later"
+        model.commitTime()
+        #expect(written.all.isEmpty)
+        #expect(model.notice != nil)
+    }
+
+    @Test func timesAreReadAsPeopleTypeThem() {
+        #expect(TimeOfDay.parse("9")?.hour == 9)
+        #expect(TimeOfDay.parse("930").map { [$0.hour, $0.minute] } == [9, 30])
+        #expect(TimeOfDay.parse("21.30").map { [$0.hour, $0.minute] } == [21, 30])
+        #expect(TimeOfDay.parse("12 am").map { [$0.hour, $0.minute] } == [0, 0])
+        #expect(TimeOfDay.parse("12:15 PM").map { [$0.hour, $0.minute] } == [12, 15])
+        #expect(TimeOfDay.parse("7p").map { [$0.hour, $0.minute] } == [19, 0])
+        #expect(TimeOfDay.parse("24:00") == nil)
+        #expect(TimeOfDay.parse("13 pm") == nil)
+        #expect(TimeOfDay.parse("9:75") == nil)
     }
 
     @Test func aQuickDateKeepsTheTimeTheValueHasAndAFieldWithoutTimesNeverGainsOne() {
@@ -459,9 +492,9 @@ struct ValueEditingTests {
         datePanel(Self.due, holding: "2026-11-07T09:30:00Z", written: written).chooseDay(Self.moment(9, 0, 0))
         #expect(written.all == [PropertyValue.string(ItemDate.instant(Self.moment(9, 9, 30)))])
         let plain = datePanel(Self.dayOnly, holding: "2026-11-07", written: written)
-        plain.setIncludesTime(true)
-        plain.setDate(Self.moment(9, 14, 45))
-        #expect(written.all.last == PropertyValue.string(ItemDate.day(Self.moment(9, 14, 45), calendar: Self.utc)))
+        plain.timeDraft = "14:45"
+        plain.commitTime()
+        #expect(written.all.count == 1, "a field without times writes none")
     }
 
     // MARK: Rows
@@ -541,14 +574,14 @@ struct ValueEditingTests {
         #expect(upward.activeRow.flatMap { id in upward.rows.first { $0.id == id }?.title } == "Done")
     }
 
-    @Test func theFirstArrowWithNothingSetStartsFromTheEndsNotFromNotSet() {
+    @Test func theFirstArrowWithNothingSetStartsFromTheEnds() {
         let item = Self.item()
         let down = ValueEditModel(Self.request(.status(Self.status), item: item, in: Self.library([item])))
         down.move(by: 1)
-        #expect(down.activeRow.flatMap { id in down.rows.first { $0.id == id }?.title } == "Done", "the first option, though Not Set is marked")
+        #expect(down.activeRow.flatMap { id in down.rows.first { $0.id == id }?.title } == "Done", "the first option")
         let up = ValueEditModel(Self.request(.status(Self.status), item: item, in: Self.library([item])))
         up.move(by: -1)
-        #expect(up.activeRow == ValueEditOptions.notSetID)
+        #expect(up.activeRow.flatMap { id in up.rows.first { $0.id == id }?.title } == "Stale", "the last option")
     }
 
     // MARK: One at a time

@@ -117,19 +117,20 @@ nonisolated struct ValueListRow: Identifiable, Hashable, Sendable {
 /// The rows the lists in a value panel show, from the catalogue and what the item holds; pure, so the panel, the
 /// menu and the tests agree.
 nonisolated enum ValueEditOptions {
+    /// The date panel's row that takes the date away, the one panel with no chip to remove.
     static let notSetID = "not-set"
     static let optionPrefix = "option:"
 
     static func optionID(_ word: String) -> String { optionPrefix + word }
 
-    /// The word a row chooses, or nil for Not Set and for a row that is not an option.
+    /// The word a row chooses, or nil for a row that is not an option.
     static func word(of rowID: String) -> String? {
         rowID.hasPrefix(optionPrefix) ? String(rowID.dropFirst(optionPrefix.count)) : nil
     }
 
     /// A status field's words, each under its group, with the groups in the order the type declares them. A word the type does not
-    /// declare, which an item can still hold, is listed under Other so the value it has is always shown. Not Set closes
-    /// the list unless the field requires a value.
+    /// declare, which an item can still hold, is listed under Other so the value it has is always shown. The value is taken
+    /// away with its chip.
     static func statusRows(field: ItemTypeInfo.Field, current: String?) -> [ValueListRow] {
         guard case .status(let words) = field.kind else { return [] }
         var rows: [ValueListRow] = []
@@ -147,21 +148,32 @@ nonisolated enum ValueEditOptions {
             rows.append(.header(StatusBucket.other.title, id: "header:other"))
             rows.append(option(current, group: nil))
         }
-        return rows + notSet(field: field, current: current)
+        return rows
     }
 
-    /// A choice's options in the catalogue's order, then Not Set unless the field requires a value. The item's own
+    /// A choice's options in the catalogue's order. The item's own
     /// word is listed last where the catalogue does not declare it.
     static func choiceRows(field: ItemTypeInfo.Field, current: String?) -> [ValueListRow] {
         let rows = field.options(including: current).map {
             ValueListRow(id: optionID($0), role: .option, title: ItemTypeInfo.Field.label(ofOption: $0), mark: .dot(ItemTypeInfo.Field.label(ofOption: $0)), isCurrent: $0 == current)
         }
-        return rows + notSet(field: field, current: current)
+        return rows
     }
+}
 
-    private static func notSet(field: ItemTypeInfo.Field, current: String?) -> [ValueListRow] {
-        guard !field.required else { return [] }
-        return [.separator, ValueListRow(id: notSetID, role: .option, title: String(localized: "Not Set"), isCurrent: current == nil || current == "")]
+/// A time of day as a person types it in the date panel: `9`, `930`, `9:30`, `21.30` or `9:30 pm`.
+nonisolated enum TimeOfDay {
+    static func parse(_ text: String) -> (hour: Int, minute: Int)? {
+        let typed = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let match = typed.wholeMatch(of: /(\d{1,2})(?:[:.]?(\d{2}))?\s*(am|pm|a|p)?/),
+              var hour = Int(match.1) else { return nil }
+        let minute = match.2.flatMap { Int($0) } ?? 0
+        guard minute < 60 else { return nil }
+        if let suffix = match.3 {
+            guard (1...12).contains(hour) else { return nil }
+            if suffix.hasPrefix("a") { hour = hour == 12 ? 0 : hour } else { hour = hour == 12 ? 12 : hour + 12 }
+        }
+        return hour < 24 ? (hour, minute) : nil
     }
 }
 

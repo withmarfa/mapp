@@ -6,6 +6,7 @@ struct ValueEditContent: View {
     let model: ValueEditModel
     @Environment(\.interfaceTextSize) private var textSize
     @FocusState private var fieldFocused: Bool
+    @FocusState private var timeFocused: Bool
 
     private var scale: CGFloat { InterfaceStyle.scale(for: textSize) }
 
@@ -28,7 +29,7 @@ struct ValueEditContent: View {
 
     @ViewBuilder private var searchArea: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ChipFieldLayout(spacing: 4 * scale, lineHeight: ValueEditMetrics.rowHeight * scale) {
+            ChipFieldLayout(spacing: 4 * scale, lineHeight: ValueEditMetrics.rowHeight * scale, queryFloor: (model.query.isEmpty ? 16 : 48) * scale) {
                 ForEach(model.chips) { chip in
                     ValueChipView(chip: chip, scale: scale) { model.remove(chip) }
                 }
@@ -70,9 +71,10 @@ struct ValueEditContent: View {
         }
     }
 
-    /// The rows' own height until the room runs out, with a row's worth shown at the very least.
+    /// The rows' own height until ten rows or the room run out, with a row's worth shown at the very least.
     private var scrollHeight: CGFloat {
-        let wanted = model.rowsHeight > 0 ? model.rowsHeight : CGFloat(model.rows.count) * ValueEditMetrics.rowHeight * scale
+        let rowsHeight = model.rowsHeight > 0 ? model.rowsHeight : CGFloat(model.rows.count) * ValueEditMetrics.rowHeight * scale
+        let wanted = min(rowsHeight, model.listLimit(scale: scale))
         let chrome = max(0, model.totalHeight - model.listHeight)
         return min(wanted, max(model.maxHeight - chrome, ValueEditMetrics.rowHeight * scale))
     }
@@ -146,32 +148,34 @@ struct ValueEditContent: View {
         }
     }
 
-    /// The Time switch, and, once it is on, the time as the system's narrow field with its stepper.
+    /// The time as one narrow field, trailing its label. It reads as a placeholder until a time is set; typing a time sets
+    /// one, and emptying the field takes it away again.
     @ViewBuilder private var timeRows: some View {
         Divider().padding(.vertical, 5 * scale)
         HStack(spacing: 8 * scale) {
             Text("Time")
             Spacer(minLength: 8 * scale)
-            Toggle("Time", isOn: Binding { model.hasTime } set: { model.setIncludesTime($0) })
-                .labelsHidden()
-                .toggleStyle(.switch)
-                .controlSize(.small)
-                .accessibilityIdentifier("ItemPropertyTime.\(dateKey)")
+            TextField("", text: Binding { model.timeDraft ?? model.timeText } set: { model.timeDraft = $0 })
+                .textFieldStyle(.plain)
+                .accessibilityLabel("Time")
+                .multilineTextAlignment(.trailing)
+                .focused($timeFocused)
+                .onSubmit { model.commitTime() }
+                .onChange(of: timeFocused) { _, focused in if !focused { model.commitTime() } }
+                .frame(width: 64 * scale)
+                .padding(.horizontal, 6 * scale)
+                .frame(height: 22 * scale)
+                .background(.quaternary, in: .rect(cornerRadius: 5 * scale, style: .continuous))
+                .overlay(alignment: .trailing) {
+                    if (model.timeDraft ?? model.timeText).isEmpty {
+                        Text(verbatim: "--:--").foregroundStyle(.tertiary).padding(.trailing, 6 * scale).allowsHitTesting(false)
+                    }
+                }
+                .accessibilityIdentifier("ItemPropertyTimeField.\(dateKey)")
         }
         .font(.system(size: ValueEditMetrics.textSize * scale))
         .padding(.horizontal, 8 * scale)
         .frame(height: ValueEditMetrics.rowHeight * scale)
-        if model.hasTime {
-            DatePicker("Time", selection: Binding {
-                model.storedDate?.date ?? model.request.library.now()
-            } set: { model.setDate($0) }, displayedComponents: [.hourAndMinute])
-                .datePickerStyle(.stepperField)
-                .labelsHidden()
-                .fixedSize()
-                .padding(.horizontal, 8 * scale)
-                .frame(maxWidth: .infinity, minHeight: ValueEditMetrics.rowHeight * scale + 6 * scale, alignment: .leading)
-                .accessibilityIdentifier("ItemPropertyTimeField.\(dateKey)")
-        }
     }
 
     private func noticeArea(_ notice: String) -> some View {

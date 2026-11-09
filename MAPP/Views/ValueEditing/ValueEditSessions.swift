@@ -121,7 +121,8 @@ final class ValueEditPanelSession: ValueEditSession {
         visible = CGRect(x: max(visible.minX, inside.minX), y: visible.minY, width: min(visible.maxX, inside.maxX) - max(visible.minX, inside.minX), height: visible.height)
         // A long list scrolls in a panel of at most this height, as a menu's does, whatever room the screen has.
         let scale = InterfaceStyle.scale(for: UserDefaults.standard.object(forKey: InterfaceKey.textSize) as? Int ?? InterfaceStyle.defaultTextSize)
-        let natural = min(model.naturalHeight > 0 ? model.naturalHeight : estimatedHeight, ValueEditMetrics.tallest * scale)
+        let wanted = model.naturalHeight(scale: scale)
+        let natural = min(wanted > 0 ? wanted : estimatedHeight, ValueEditMetrics.tallest * scale)
         let placement = ValuePanelFrame.placement(
             anchor: target, visible: visible, contentHeight: natural, floor: ValueEditMetrics.widthFloor, ceiling: ValueEditMetrics.widthCeiling,
             gap: ValueEditMetrics.gap, fitting: width, centered: request.isCentered)

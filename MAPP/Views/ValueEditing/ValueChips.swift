@@ -92,12 +92,14 @@ private struct RemovableChip: ViewModifier {
     }
 }
 
-/// Lays out chips in a row that wraps, with the typed query as the last item taking what is left of the last row.
+/// Lays out chips in a row that wraps, with the typed query as the last item taking what is left of the last row. Every
+/// item is centred on its row, so the cursor and the placeholder sit on the chips' centre line; the query takes a row of
+/// its own only where the chips leave less than `queryFloor`.
 struct ChipFieldLayout: Layout {
     var spacing: CGFloat
     var lineHeight: CGFloat
     /// The least width the query is given before it moves to a row of its own.
-    var queryFloor: CGFloat = 40
+    var queryFloor: CGFloat = 16
 
     private func frames(in width: CGFloat, subviews: Subviews) -> (frames: [CGRect], height: CGFloat) {
         var frames: [CGRect] = []
@@ -106,7 +108,7 @@ struct ChipFieldLayout: Layout {
         for index in subviews.indices {
             let isQuery = index == subviews.count - 1
             var size = subviews[index].sizeThatFits(.unspecified)
-            size.height = isQuery ? lineHeight : max(size.height, 0)
+            size.height = max(size.height, 0)
             if isQuery {
                 if x > 0, width - x < queryFloor {
                     x = 0

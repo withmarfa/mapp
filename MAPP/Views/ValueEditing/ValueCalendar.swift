@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A month drawn across the panel's width in the panel's own look: rows of 28 points, the accent on the chosen day,
+/// A month drawn across the panel's width in the panel's own look: rows of 28 points, the accent in a circle on the chosen day,
 /// today in the accent's color, days of the neighbouring months dimmed. The system's graphical picker keeps its own
 /// size and a grey ground, so it cannot be fitted to the panel.
 struct ValueCalendar: View {
@@ -100,13 +100,10 @@ private struct ValueCalendarDay: View {
                 .font(.system(size: 13 * scale, weight: isToday ? .semibold : .regular))
                 .monospacedDigit()
                 .foregroundStyle(isSelected ? AnyShapeStyle(.white) : isToday ? AnyShapeStyle(Color.accentColor) : inMonth ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+                .frame(width: 28 * scale, height: 28 * scale)
+                .background(isSelected ? AnyShapeStyle(Color.accentColor) : hovered ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear), in: .circle)
+                .contentShape(.circle)
                 .frame(maxWidth: .infinity)
-                .frame(height: 28 * scale)
-                .background {
-                    RoundedRectangle(cornerRadius: ValueEditMetrics.rowRadius * scale, style: .continuous)
-                        .fill(isSelected ? AnyShapeStyle(Color.accentColor) : hovered ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear))
-                }
-                .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .onHover { hovered = $0 }
