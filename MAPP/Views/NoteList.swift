@@ -30,7 +30,6 @@ struct NoteList: View, Equatable {
         let excerpts = results?.excerpts ?? [:]
         let isPending = results?.isPending == true
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
-        let subtitle = String.windowSubtitle(count: ids.count, isSearching: browser.isSearching, isEdited: browser.hasViewChanges)
         // Headings are rows of their own rather than section headers: a list of sections leaves every row at
         // the table's default height, and its first header floats into the toolbar's edge, whose line then runs
         // the list's full width.
@@ -86,7 +85,7 @@ struct NoteList: View, Equatable {
         }
         .searchStatus(browser)
         .bandsToolbar()
-        .viewEditHover(browser, title: title, subtitle: subtitle)
+        .viewEditHover(browser, title: title)
         .toolbar(id: WindowToolbarLayout.list) { ListToolbar(browser: browser, columnWidth: width) }
         .task {
             for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) {

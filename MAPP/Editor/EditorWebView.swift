@@ -190,7 +190,7 @@ final class EditorWebView: WKWebView {
     /// Customize Layout, as the Item menu words it, for the page's own rows.
     private var customizeLayoutItem: NSMenuItem? {
         guard let controller, let id = controller.noteID, let details = controller.titleDrafts, let library = controller.library,
-              details.isCustomizingLayout || PageCustomization.isAvailable(for: library.item(id))
+              details.isCustomizingLayout || details.canBeginLayout(for: library.item(id))
         else { return nil }
         let title = details.isCustomizingLayout ? String(localized: "Finish Customizing") : String(localized: "Customize Layout…")
         let item = NSMenuItem(title: title, action: #selector(toggleLayout(_:)), keyEquivalent: "")
@@ -240,13 +240,14 @@ final class EditorWebView: WKWebView {
         #selector(NSTextView.changeLayoutOrientation(_:)),
     ]
 
-    /// True while a menu opened over a property row is up. AppKit adds AutoFill and Insert from iPhone or iPad to a
-    /// menu after `willOpenMenu`, for whatever the responder says it can receive (`validRequestor`), so declining
-    /// there keeps them out of a menu over the property area while the text, which is a text input, keeps them.
+    /// True while a menu opened over a property row is up. For Insert from iPhone or iPad, AppKit asks the responder chain
+    /// (`validRequestor`) whether it takes image data (`NSImage.imageTypes`), so declining image types there keeps that
+    /// item out of a menu over the property area, while the text, which is a text input, keeps it. What AutoFill asks
+    /// is not documented, so it is not covered here; a Service that returns data of another type is left alone.
     private var declinesInsertion = false
 
     override func validRequestor(forSendType sendType: NSPasteboard.PasteboardType?, returnType: NSPasteboard.PasteboardType?) -> Any? {
-        if declinesInsertion, returnType != nil { return nil }
+        if declinesInsertion, let returnType, NSImage.imageTypes.contains(returnType.rawValue) { return nil }
         return super.validRequestor(forSendType: sendType, returnType: returnType)
     }
 

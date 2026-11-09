@@ -29,7 +29,7 @@ struct ItemBoard: View {
         }
         .searchStatus(browser)
         .filteredEmptyState(browser)
-        .viewEditHover(browser, title: title, subtitle: .windowSubtitle(count: items.count, isSearching: false, isEdited: browser.hasViewChanges))
+        .viewEditHover(browser, title: title)
         .navigationTitle(title)
         .navigationSubtitle(Text("^[\(items.count) item](inflect: true)").editedSubtitle(browser.hasViewChanges))
         .toolbar(removing: browser.isSearchExpanded ? .title : nil)

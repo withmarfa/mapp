@@ -44,11 +44,21 @@ struct ViewModeMenu: View {
     @Bindable var browser: Browser
 
     var body: some View {
-        let modes = browser.availableViewModes(in: library)
-        ViewModePopUp(modes: modes, selection: $browser.viewMode)
-            .frame(width: 58)
+        // The tray names an item by the title of its label, which a bare representable has none of, so the pop-up button
+        // is the body of a label's style and keeps the label's title for the tray.
+        Label("View As", systemImage: browser.viewMode.symbol)
+            .labelStyle(ViewModePopUpStyle(modes: browser.availableViewModes(in: library), selection: $browser.viewMode))
             .help("View As")
             .accessibilityIdentifier("ViewModeMenu")
+    }
+}
+
+private struct ViewModePopUpStyle: LabelStyle {
+    let modes: [ItemViewMode]
+    @Binding var selection: ItemViewMode
+
+    func makeBody(configuration: Configuration) -> some View {
+        ViewModePopUp(modes: modes, selection: $selection).frame(width: 58)
     }
 }
 
@@ -75,22 +85,36 @@ private struct ViewModePopUp: NSViewRepresentable {
         return button
     }
 
+    /// The menu is rebuilt only when the choices change and the face only when the layout does, so a menu that is open
+    /// is never replaced while it tracks.
     func updateNSView(_ button: NSPopUpButton, context: Context) {
-        context.coordinator.selection = $selection
-        button.removeAllItems()
-        for mode in modes {
-            let item = NSMenuItem(title: Self.titles[mode] ?? "", action: nil, keyEquivalent: "")
-            item.representedObject = mode
-            button.menu?.addItem(item)
+        let coordinator = context.coordinator
+        coordinator.selection = $selection
+        if coordinator.modes != modes {
+            coordinator.modes = modes
+            coordinator.shown = nil
+            button.removeAllItems()
+            for mode in modes {
+                let item = NSMenuItem(title: Self.titles[mode] ?? "", action: nil, keyEquivalent: "")
+                item.representedObject = mode
+                button.menu?.addItem(item)
+            }
         }
+        guard coordinator.shown != selection else { return }
+        coordinator.shown = selection
         if let index = modes.firstIndex(of: selection) { button.selectItem(at: index) }
-        let face = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-        face.image = NSImage(systemSymbolName: selection.symbol, accessibilityDescription: String(localized: "View As"))
+        let title = Self.titles[selection] ?? ""
+        let face = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        face.image = NSImage(systemSymbolName: selection.symbol, accessibilityDescription: nil)
         (button.cell as? NSPopUpButtonCell)?.menuItem = face
+        (button.cell as? NSPopUpButtonCell)?.imagePosition = .imageOnly
+        button.setAccessibilityValue(title)
     }
 
     final class Coordinator: NSObject {
         var selection: Binding<ItemViewMode>?
+        var modes: [ItemViewMode] = []
+        var shown: ItemViewMode?
 
         @objc func choose(_ sender: NSPopUpButton) {
             if let mode = sender.selectedItem?.representedObject as? ItemViewMode { selection?.wrappedValue = mode }

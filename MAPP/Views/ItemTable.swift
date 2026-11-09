@@ -48,7 +48,7 @@ struct ItemTable: View {
                     }
                 }
             }
-            .viewEditHover(browser, title: title, subtitle: tableSubtitle(shown: rows.count, of: allRows.count))
+            .viewEditHover(browser, title: title)
             .navigationTitle(title)
             .navigationSubtitle(subtitle(shown: rows.count, of: allRows.count).editedSubtitle(browser.hasViewChanges))
             .toolbar(removing: browser.isSearchExpanded ? .title : nil)
@@ -174,12 +174,6 @@ struct ItemTable: View {
     }
 
     /// How many items show, and of how many once a filter hides some.
-    private func tableSubtitle(shown: Int, of count: Int) -> String {
-        if shown == count || browser.isSearching { return .windowSubtitle(count: count, isSearching: browser.isSearching, isEdited: browser.hasViewChanges) }
-        let text = String(localized: "\(shown) of \(count) items")
-        return browser.hasViewChanges ? String(localized: "\(text), edited") : text
-    }
-
     private func subtitle(shown: Int, of count: Int) -> Text {
         if browser.isSearching { return Text("^[\(count) result](inflect: true)") }
         return shown == count ? Text("^[\(count) item](inflect: true)") : Text("\(shown) of \(count) items")
