@@ -49,6 +49,12 @@ final class DetailsPresentation {
     /// Whether the window shows an item's page, which is what Customize Layout arranges. A gallery, table, board or
     /// timeline with no item opened has none, nor do Settings and an index.
     var showsPage = true
+
+    /// Whether Customize Layout can start for `item`: the window shows a page, and the item has rows to arrange. Finishing
+    /// it needs neither, so the menus offer that whenever `isCustomizingLayout` is on.
+    func canBeginLayout(for item: Item?) -> Bool {
+        showsPage && PageCustomization.isAvailable(for: item)
+    }
     /// Whether ending Customize Layout closes the sidebar, because starting it opened the sidebar.
     @ObservationIgnored private var closesSidebarAtEnd = false
     /// Whether the window's right sidebar is editing a view (`ViewPanel`), in place of the inspector and of Customize

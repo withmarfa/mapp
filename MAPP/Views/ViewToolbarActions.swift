@@ -1,23 +1,5 @@
 import SwiftUI
 
-/// The pencil that opens the panel of a view, or of a place that could become one. macOS has no toolbar placement in the title's own area, so it leads the items
-/// after the view's name.
-struct ViewEditItem: CustomizableToolbarContent {
-    @CurrentLibrary private var library
-    let browser: Browser
-
-    var body: some CustomizableToolbarContent {
-        ToolbarItem(id: "editView") {
-            Button("Edit View", systemImage: "pencil") { browser.openViewPanel(in: library) }
-                .help("Edit View")
-                .accessibilityIdentifier("EditViewToolbar")
-        }
-        .sharedBackgroundVisibility(.hidden)
-        .customizationBehavior(.disabled)
-        .hidden(!SavedViews.canEdit(browser, in: library) || browser.showsViewPanel || !browser.offersViewOptions)
-    }
-}
-
 /// What waits in the toolbar while the window shows something unsaved and the panel is closed: Revert and Save for a
 /// view, and Save as View for a place that is not one. They are locked, as a person's layout must not lose them. The
 /// server's absence is said by the panel, which a Save that cannot reach it opens.
@@ -59,10 +41,10 @@ struct ViewChangeItems: CustomizableToolbarContent {
     }
 }
 
-/// What the panel does with its changes, above it in the right sidebar's toolbar: Cancel and Save while something
-/// changed, one Done when nothing did, and Save as View beside it for a place that is not a view. Return saves, unless
-/// the page has the keyboard, and Escape cancels. Being in a toolbar only while the panel is, they are locked and come
-/// and go.
+/// What the panel does with its changes, above it in the right sidebar's toolbar: Done, or Cancel once something
+/// changed, and Save. Save keeps a view's changes, with Save as New View in its menu, and makes a new view of a place
+/// that is not one. Return saves, unless the page has the keyboard, and Escape leaves. Being in a toolbar only while
+/// the panel is, they are locked and come and go.
 struct ViewPanelToolbar: CustomizableToolbarContent {
     @CurrentLibrary private var library
     @StoredOrder private var order
@@ -73,41 +55,78 @@ struct ViewPanelToolbar: CustomizableToolbarContent {
     var body: some CustomizableToolbarContent {
         let state = browser.viewPanelState(window: SavedViews.panelWindow(browser, in: library, order: order), in: library)
         let returnKey: KeyboardShortcut? = editor?.isFocused == true ? nil : .defaultAction
-        if state == .unchanged {
-            if panel.purpose == .place {
-                let canSave = SavedViews.canSave(browser, in: library)
-                ToolbarItem(id: "viewPanelSaveAs") {
-                    Button("Save as View…") { browser.openNewViewPanel(in: library) }
-                        .disabled(!canSave)
-                        .help(canSave ? "" : String(localized: "This place can’t be saved as a view."))
-                        .accessibilityIdentifier("ViewPanelSaveAs")
+        ToolbarItem(id: "viewPanelLeave") {
+            Group {
+                if state == .unchanged {
+                    Button("Done") { browser.closeViewPanel(in: library) }
+                        .accessibilityIdentifier("ViewPanelDone")
+                } else {
+                    Button("Cancel") { browser.cancelViewPanel(in: library) }
+                        .disabled(panel.isSaving)
+                        .accessibilityIdentifier("ViewPanelCancel")
                 }
-                .customizationBehavior(.disabled)
             }
-            ToolbarItem(id: "viewPanelDone") {
-                Button("Done") { browser.closeViewPanel(in: library) }
-                    .buttonStyle(.borderedProminent)
-                    .keyboardShortcut(returnKey)
-                    .accessibilityIdentifier("ViewPanelDone")
+            .keyboardShortcut(.cancelAction)
+        }
+        .customizationBehavior(.disabled)
+        ToolbarItem(id: "viewPanelSave") {
+            ViewPanelSaveButton(browser: browser, panel: panel, state: state, returnKey: returnKey)
+        }
+        .customizationBehavior(.disabled)
+    }
+}
+
+private struct ViewPanelSaveButton: View {
+    @CurrentLibrary private var library
+    @StoredOrder private var order
+    let browser: Browser
+    let panel: ViewPanel
+    let state: Browser.ViewPanelState
+    let returnKey: KeyboardShortcut?
+
+    var body: some View {
+        switch panel.purpose {
+        case .place:
+            let canSave = SavedViews.canSave(browser, in: library)
+            Button("Save") { browser.openNewViewPanel(in: library) }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(returnKey)
+                .disabled(!canSave)
+                .help(canSave ? String(localized: "Save what this window shows as a view") : String(localized: "This place can’t be saved as a view."))
+                .accessibilityIdentifier("ViewPanelSave")
+        case .new:
+            Button("Save") { save() }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(returnKey)
+                .disabled(state != .ready || panel.isSaving)
+                .accessibilityIdentifier("ViewPanelSave")
+        case .edit:
+            // A menu with a primary action is the system's split button: Save, and Save as New View in its menu.
+            Menu {
+                Button("Save as New View…") { browser.openNewViewPanel(in: library) }
+                    .disabled(!SavedViews.canSave(browser, in: library))
+            } label: {
+                Text("Save")
+            } primaryAction: {
+                save()
             }
-            .customizationBehavior(.disabled)
-        } else {
-            ToolbarItem(id: "viewPanelCancel") {
-                Button("Cancel") { browser.cancelViewPanel(in: library) }
-                    .keyboardShortcut(.cancelAction)
-                    .disabled(panel.isSaving)
-                    .accessibilityIdentifier("ViewPanelCancel")
-            }
-            .customizationBehavior(.disabled)
-            ToolbarItem(id: "viewPanelSave") {
-                Button("Save") { SavedViews.save(browser, in: library, order: order) }
-                    .buttonStyle(.borderedProminent)
+            .menuStyle(.button)
+            .buttonStyle(.borderedProminent)
+            .fixedSize()
+            .disabled(state != .ready || panel.isSaving)
+            .background {
+                Button("Save") { save() }
                     .keyboardShortcut(returnKey)
                     .disabled(state != .ready || panel.isSaving)
-                    .accessibilityIdentifier("ViewPanelSave")
+                    .hidden()
             }
-            .customizationBehavior(.disabled)
+            .accessibilityIdentifier("ViewPanelSave")
         }
+    }
+
+    private func save() {
+        guard state == .ready else { return }
+        SavedViews.save(browser, in: library, order: order)
     }
 }
 

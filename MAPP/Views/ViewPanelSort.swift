@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The panel's Sort: up to `ViewDraft.maxSortKeys` keys, each a column and the direction in that column's own words
+/// The panel's Sort: up to `ViewDraft.maxSortKeys` keys, each a property chosen with Add Sort and the direction in its own words
 /// (Newest First for a date). A key is dragged to a new place, or moved with its menu, and the first sorts first.
 struct ViewPanelSort: View {
     @Environment(\.interfaceTextSize) private var textSize
@@ -47,22 +47,16 @@ private struct SortRow: View {
 
     var body: some View {
         let scale = InterfaceStyle.scale(for: textSize)
-        let others = content.columns.filter { column in column.id == key.column.id || !sort.contains { $0.column.id == column.id } }
         HStack(spacing: InspectorMetrics.gap) {
             Image(systemName: "line.3.horizontal")
                 .font(.system(size: 11 * scale))
                 .foregroundStyle(.tertiary)
                 .accessibilityHidden(true)
-            Picker("Sort by", selection: Binding { key.column.id } set: { id in
-                guard let column = others.first(where: { $0.id == id }) else { return }
-                replace(ItemTableComparator(column: column, order: key.order))
-            }) {
-                ForEach(others) { Text($0.label).tag($0.id) }
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityIdentifier("ViewPanelSortColumn")
+            // The property is fixed once added, as a filter's is: Add Sort chooses it, and the row only turns it round.
+            Text(key.column.label)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityIdentifier("ViewPanelSortColumn")
             Picker("Direction", selection: Binding { key.order } set: { order in
                 replace(ItemTableComparator(column: key.column, order: order))
             }) {

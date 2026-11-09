@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// What acts on the list: the pencil on a view's name, Search, Filter and View Options, in the list column. The rest of
+/// What acts on the list: Search, Filter and View Options, in the list column. The rest of
 /// the window's items are the page column's (`WindowToolbar`).
 struct ListToolbar: CustomizableToolbarContent {
     @Bindable var browser: Browser
@@ -8,7 +8,6 @@ struct ListToolbar: CustomizableToolbarContent {
     let columnWidth: CGFloat
 
     var body: some CustomizableToolbarContent {
-        ViewEditItem(browser: browser)
         ViewToolbarItems(browser: browser, layout: .column(width: columnWidth))
     }
 }
