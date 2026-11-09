@@ -45,29 +45,56 @@ struct ViewModeMenu: View {
 
     var body: some View {
         let modes = browser.availableViewModes(in: library)
-        // A menu holding an inline picker: the rows are a tick and the names, as Finder's are, while the button keeps
-        // the current layout's icon. A menu picker takes its button from the selected row, so it would show that row's
-        // name or its icon in the menu too.
-        Menu {
-            Picker("View As", selection: $browser.viewMode) {
-                if modes.contains(.list) { named("as List", .list) }
-                if modes.contains(.gallery) { named("as Gallery", .gallery) }
-                if modes.contains(.table) { named("as Table", .table) }
-                if modes.contains(.board) { named("as Board", .board) }
-                if modes.contains(.timeline) { named("as Timeline", .timeline) }
-            }
-            .pickerStyle(.inline)
-            .labelsHidden()
-        } label: {
-            Label("View As", systemImage: browser.viewMode.symbol)
-        }
-        .menuIndicator(.visible)
-        .help("View As")
-        .accessibilityIdentifier("ViewModeMenu")
+        ViewModePopUp(modes: modes, selection: $browser.viewMode)
+            .frame(width: 58)
+            .help("View As")
+            .accessibilityIdentifier("ViewModeMenu")
+    }
+}
+
+/// A pop-up button whose face is the current layout's icon and whose menu is a tick and words, as Finder's View button.
+/// SwiftUI's menu picker takes the button's face from the selected row, so the two cannot differ there; the pop-up
+/// button's cell can show a menu item of its own (`usesItemFromMenu`) while the menu keeps the rows.
+private struct ViewModePopUp: NSViewRepresentable {
+    let modes: [ItemViewMode]
+    @Binding var selection: ItemViewMode
+
+    private static let titles: [ItemViewMode: String] = [
+        .list: String(localized: "as List"), .gallery: String(localized: "as Gallery"), .table: String(localized: "as Table"),
+        .board: String(localized: "as Board"), .timeline: String(localized: "as Timeline"),
+    ]
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func makeNSView(context: Context) -> NSPopUpButton {
+        let button = NSPopUpButton(frame: .zero, pullsDown: false)
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.choose(_:))
+        button.setAccessibilityLabel(String(localized: "View As"))
+        (button.cell as? NSPopUpButtonCell)?.usesItemFromMenu = false
+        return button
     }
 
-    private func named(_ title: LocalizedStringKey, _ mode: ItemViewMode) -> some View {
-        Text(title).tag(mode)
+    func updateNSView(_ button: NSPopUpButton, context: Context) {
+        context.coordinator.selection = $selection
+        button.removeAllItems()
+        for mode in modes {
+            let item = NSMenuItem(title: Self.titles[mode] ?? "", action: nil, keyEquivalent: "")
+            item.representedObject = mode
+            button.menu?.addItem(item)
+        }
+        if let index = modes.firstIndex(of: selection) { button.selectItem(at: index) }
+        let face = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        face.image = NSImage(systemSymbolName: selection.symbol, accessibilityDescription: String(localized: "View As"))
+        (button.cell as? NSPopUpButtonCell)?.menuItem = face
+    }
+
+    final class Coordinator: NSObject {
+        var selection: Binding<ItemViewMode>?
+
+        @objc func choose(_ sender: NSPopUpButton) {
+            if let mode = sender.selectedItem?.representedObject as? ItemViewMode { selection?.wrappedValue = mode }
+        }
     }
 }
 

@@ -4,10 +4,10 @@ import SwiftUI
 /// layout of its own (`WindowToolbarLayout`), since the system reshuffles a saved layout when one identifier moves between
 /// split views. Nothing else in a window may declare a plain `toolbar`, which turns customization off for the whole window.
 ///
-/// The defaults run New Item at the leading side when the sidebar is hidden, then a view's pencil, Revert and Save or
+/// The defaults run New Item at the leading side when the sidebar is hidden, then Revert and Save or
 /// Save as View while there is something to keep, Search, Filter and View Options, the Reader and Original switch on a
 /// page with an article, View As, Share and More, and Details at the far right. In the list Search, Filter and View
-/// Options are the list column's (`ListToolbar`), and the pencil is drawn over the list's title (`ViewEditHover`). Format and `ExtraToolbarItems` start in the tray.
+/// Options are the list column's (`ListToolbar`). A view's pencil is no toolbar item: every layout draws it over its title (`ViewEditHover`). Format and `ExtraToolbarItems` start in the tray.
 struct WindowToolbar: CustomizableToolbarContent {
     @CurrentLibrary private var library
     @AppStorage(InterfaceKey.showsScrolledTitle) private var showsScrolledTitle = true
@@ -25,9 +25,6 @@ struct WindowToolbar: CustomizableToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details, fileURL: fileURL)
         let showsItem = browser?.showsSidebarIndex != true
         let opensFromCollection = browser.map { $0.usesCollection && !$0.showsCollection } == true && !hasListColumn
-        if let browser, !hasListColumn {
-            ViewEditItem(browser: browser)
-        }
         ToolbarItem(id: "newItem") {
             NewItemButton(browser: browser)
         }

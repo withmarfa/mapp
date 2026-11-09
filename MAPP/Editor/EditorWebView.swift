@@ -240,8 +240,24 @@ final class EditorWebView: WKWebView {
         #selector(NSTextView.changeLayoutOrientation(_:)),
     ]
 
+    /// True while a menu opened over a property row is up. AppKit adds AutoFill and Insert from iPhone or iPad to a
+    /// menu after `willOpenMenu`, for whatever the responder says it can receive (`validRequestor`), so declining
+    /// there keeps them out of a menu over the property area while the text, which is a text input, keeps them.
+    private var declinesInsertion = false
+
+    override func validRequestor(forSendType sendType: NSPasteboard.PasteboardType?, returnType: NSPasteboard.PasteboardType?) -> Any? {
+        if declinesInsertion, returnType != nil { return nil }
+        return super.validRequestor(forSendType: sendType, returnType: returnType)
+    }
+
+    override func didCloseMenu(_ menu: NSMenu, with event: NSEvent?) {
+        declinesInsertion = false
+        super.didCloseMenu(menu, with: event)
+    }
+
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         super.willOpenMenu(menu, with: event)
+        declinesInsertion = false
         if let embed = controller?.takeMenuEmbed() {
             let open = NSMenuItem(title: String(localized: "Open"), action: #selector(openEmbed(_:)), keyEquivalent: "")
             let reveal = NSMenuItem(title: String(localized: "Show in Finder"), action: #selector(revealEmbed(_:)), keyEquivalent: "")
@@ -254,6 +270,7 @@ final class EditorWebView: WKWebView {
             menu.insertItem(.separator(), at: items.count)
         }
         if let row = controller?.takeMenuRow() {
+            declinesInsertion = true
             let hide = NSMenuItem(title: String(localized: "Hide from Page"), action: #selector(hideRow(_:)), keyEquivalent: "")
             hide.target = self
             hide.representedObject = MenuRow(item: row.item, row: row.row)

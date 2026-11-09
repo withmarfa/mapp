@@ -29,6 +29,7 @@ struct ItemTimeline: View {
             }
         }
         .filteredEmptyState(browser)
+        .viewEditHover(browser, title: title, subtitle: .windowSubtitle(count: items.count, isSearching: false, suffix: String(localized: "Read Only"), isEdited: browser.hasViewChanges))
         .navigationTitle(title)
         // The timeline only shows items; it changes none of them.
         .navigationSubtitle(

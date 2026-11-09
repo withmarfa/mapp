@@ -56,6 +56,7 @@ struct ItemGallery: View {
             }
         }
         .filteredEmptyState(browser)
+        .viewEditHover(browser, title: title, subtitle: .windowSubtitle(count: ids.count, isSearching: browser.isSearching, isEdited: browser.hasViewChanges))
         .navigationTitle(title)
         .navigationSubtitle(
             (browser.isSearching ? Text("^[\(ids.count) result](inflect: true)") : Text("^[\(ids.count) item](inflect: true)"))

@@ -1,6 +1,23 @@
 import SwiftUI
 
-/// Edit View at the list's title: a quiet pencil that shows while the pointer is over the title, drawn over the toolbar
+extension View {
+    /// Edit View at the title this view gives its window, for any layout.
+    func viewEditHover(_ browser: Browser, title: String, subtitle: String) -> some View {
+        overlay(alignment: .topLeading) { ViewEditHover(browser: browser, title: title, subtitle: subtitle).ignoresSafeArea(.container, edges: .top) }
+    }
+}
+
+extension String {
+    /// A window's subtitle as plain text, to measure where its title ends: the count, and what the Text version adds.
+    static func windowSubtitle(count: Int, isSearching: Bool, suffix: String? = nil, isEdited: Bool) -> String {
+        let counted = isSearching ? AttributedString(localized: "^[\(count) result](inflect: true)") : AttributedString(localized: "^[\(count) item](inflect: true)")
+        var text = String(counted.characters)
+        if let suffix { text = String(localized: "\(text), \(suffix)") }
+        return isEdited ? String(localized: "\(text), edited") : text
+    }
+}
+
+/// Edit View at the window's title: a quiet pencil that shows while the pointer is over the title, drawn over the toolbar
 /// so it takes no room from the items beside it and never moves the search field. macOS has no toolbar placement in
 /// the title's own area, and a toolbar item would keep its room while hidden. The pencil is not focusable and is hidden
 /// from VoiceOver; the keyboard and VoiceOver reach Edit View through its menu command and the command palette.
@@ -83,6 +100,7 @@ private struct PointerOver: NSViewRepresentable {
         var target: CGFloat = 0
         private var isInside = false
         private var monitor: Any?
+        private var menuEnd: Any?
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
@@ -104,6 +122,13 @@ private struct PointerOver: NSViewRepresentable {
             super.viewDidMoveToWindow()
             removeMonitor()
             guard window != nil else { return }
+            // A menu that is tracking swallows the exit, so the pointer's place is read again when one closes.
+            menuEnd = NotificationCenter.default.addObserver(forName: NSMenu.didEndTrackingNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self, let window = self.window else { return }
+                    self.set(self.bounds.contains(self.convert(window.mouseLocationOutsideOfEventStream, from: nil)))
+                }
+            }
             monitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
                 let number = event.windowNumber
                 let location = event.locationInWindow
@@ -117,6 +142,8 @@ private struct PointerOver: NSViewRepresentable {
         private func removeMonitor() {
             if let monitor { NSEvent.removeMonitor(monitor) }
             monitor = nil
+            if let menuEnd { NotificationCenter.default.removeObserver(menuEnd) }
+            menuEnd = nil
         }
 
         private func take(windowNumber: Int, at location: CGPoint) -> Bool {
@@ -126,24 +153,6 @@ private struct PointerOver: NSViewRepresentable {
             onClick()
             return true
         }
-    }
-}
-
-/// The pencil that opens the panel of a view, or of a place that could become one. macOS has no toolbar placement in the title's own area, so it leads the items
-/// after the view's name.
-struct ViewEditItem: CustomizableToolbarContent {
-    @CurrentLibrary private var library
-    let browser: Browser
-
-    var body: some CustomizableToolbarContent {
-        ToolbarItem(id: "editView") {
-            Button("Edit View", systemImage: "pencil") { browser.openViewPanel(in: library) }
-                .help("Edit View")
-                .accessibilityIdentifier("EditViewToolbar")
-        }
-        .sharedBackgroundVisibility(.hidden)
-        .customizationBehavior(.disabled)
-        .hidden(!SavedViews.canEdit(browser, in: library) || browser.showsViewPanel || !browser.offersViewOptions)
     }
 }
 
