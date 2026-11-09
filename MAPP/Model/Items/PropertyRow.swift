@@ -114,7 +114,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// item's other relationships, then its tags. A field shows only with a value, except the status, which always
     /// shows where the type has one, since its pill is how a status is set from the page. The keys in `hidden` are what
     /// the page shows elsewhere, such as the title and the text. With `offersEmpty`, an editable value the item does not
-    /// have yet is a row too, as an empty chip that opens its editor: that is the page's way to give a value to the
+    /// have yet is a row too, read as Empty, that opens its editor: that is the page's way to give a value to the
     /// field, the parent and the tags. Empty rows come after the others in each group, so the fold hides them first. The
     /// block and the pins are both chosen from these.
     static func candidates(
