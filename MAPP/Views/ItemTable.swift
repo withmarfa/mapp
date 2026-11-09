@@ -48,10 +48,7 @@ struct ItemTable: View {
                     }
                 }
             }
-            .viewEditHover(browser, title: title)
-            .navigationTitle(title)
-            .navigationSubtitle(subtitle(shown: rows.count, of: allRows.count).editedSubtitle(browser.hasViewChanges))
-            .toolbar(removing: browser.isSearchExpanded ? .title : nil)
+            .viewTitle(browser, title: title, subtitle: subtitle(shown: rows.count, of: allRows.count).editedSubtitle(browser.hasViewChanges))
             .onChange(of: browser.isSearchExpanded) {
                 if !browser.isSearchExpanded { browser.focusRequest = .list }
             }

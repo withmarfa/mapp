@@ -240,10 +240,9 @@ final class EditorWebView: WKWebView {
         #selector(NSTextView.changeLayoutOrientation(_:)),
     ]
 
-    /// True while a menu opened over a property row is up. For Insert from iPhone or iPad, AppKit asks the responder chain
-    /// (`validRequestor`) whether it takes image data (`NSImage.imageTypes`), so declining image types there keeps that
-    /// item out of a menu over the property area, while the text, which is a text input, keeps it. What AutoFill asks
-    /// is not documented, so it is not covered here; a Service that returns data of another type is left alone.
+    /// True while a menu opened over a property row is up. Continuity Camera's Insert from iPhone or iPad asks the
+    /// responder chain (`validRequestor`) for image return types (`NSImage.imageTypes`), so declining those keeps it out
+    /// of a menu over the property area. AutoFill's request has not been checked, so it may still appear.
     private var declinesInsertion = false
 
     override func validRequestor(forSendType sendType: NSPasteboard.PasteboardType?, returnType: NSPasteboard.PasteboardType?) -> Any? {

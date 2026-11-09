@@ -56,12 +56,10 @@ struct ItemGallery: View {
             }
         }
         .filteredEmptyState(browser)
-        .viewEditHover(browser, title: title)
-        .navigationTitle(title)
-        .navigationSubtitle(
-            (browser.isSearching ? Text("^[\(ids.count) result](inflect: true)") : Text("^[\(ids.count) item](inflect: true)"))
+        .viewTitle(
+            browser, title: title,
+            subtitle: (browser.isSearching ? Text("^[\(ids.count) result](inflect: true)") : Text("^[\(ids.count) item](inflect: true)"))
                 .editedSubtitle(browser.hasViewChanges))
-        .toolbar(removing: browser.isSearchExpanded ? .title : nil)
         .task {
             for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
         }

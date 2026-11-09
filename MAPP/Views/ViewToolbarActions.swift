@@ -1,223 +1,94 @@
 import SwiftUI
 
+extension EnvironmentValues {
+    /// The identifier of the toolbar layout the window's columns share, for a view that adds its own items to it.
+    @Entry var toolbarLayout = WindowToolbarLayout.list
+}
+
 extension View {
-    /// Edit View beside the title this view gives its window, for any layout.
-    func viewEditHover(_ browser: Browser, title: String) -> some View {
-        overlay(alignment: .topLeading) { ViewEditHover(browser: browser, title: title).ignoresSafeArea(.container, edges: .top) }
+    /// Names the view in the window and draws its title in the toolbar, with Edit View beside it, for any layout.
+    /// The window keeps the name (`navigationTitle`) for the Window menu and Mission Control; the toolbar's own title is
+    /// removed for `ViewTitleItem`, since SwiftUI offers no way to put a control beside the system's title.
+    func viewTitle(_ browser: Browser, title: String, subtitle: Text) -> some View {
+        modifier(ViewTitleModifier(browser: browser, title: title, subtitle: subtitle))
     }
 }
 
-/// Edit View beside the window's title: a quiet pencil that shows while the pointer is over the title, drawn over the
-/// toolbar so it takes no room from the items beside it and never moves the search field. SwiftUI has no toolbar
-/// placement beside the title (`principal` is centered), and a toolbar item would keep its room while hidden, so the
-/// pencil is placed from the title's own frame, read from the toolbar's text fields each time it is needed. It shows
-/// only where there is room for it before the next toolbar item. It is not focusable and is hidden from VoiceOver; the
-/// keyboard and VoiceOver reach Edit View through its menu command and the command palette.
-struct ViewEditHover: View {
+private struct ViewTitleModifier: ViewModifier {
+    @Environment(\.toolbarLayout) private var layout
+    let browser: Browser
+    let title: String
+    let subtitle: Text
+
+    func body(content: Content) -> some View {
+        content
+            .navigationTitle(title)
+            .navigationSubtitle(subtitle)
+            .toolbar(removing: .title)
+            .toolbar(id: layout) { ViewTitleItem(browser: browser, title: title, subtitle: subtitle) }
+    }
+}
+
+/// The view's title and subtitle, as the toolbar sets its own, at the toolbar's leading side with Edit View after them.
+/// The pencil shows while the pointer is over the item or the button has the keyboard. Its room is kept whether or not
+/// it shows, so hovering moves nothing, and a title too long for the room ends in an ellipsis before it. It comes and
+/// goes with the title it names, so it is locked out of the tray.
+struct ViewTitleItem: CustomizableToolbarContent {
+    let browser: Browser
+    let title: String
+    let subtitle: Text
+
+    var body: some CustomizableToolbarContent {
+        // The search field takes the title's place while it is out, so the title comes and goes with it.
+        if !browser.isSearchExpanded {
+            ToolbarItem(id: "viewTitle", placement: .navigation) {
+                ViewTitle(browser: browser, title: title, subtitle: subtitle)
+            }
+            .sharedBackgroundVisibility(.hidden)
+            .customizationBehavior(.disabled)
+        }
+    }
+}
+
+private struct ViewTitle: View {
     @CurrentLibrary private var library
     @Environment(\.appearsActive) private var appearsActive
+    @FocusState private var hasFocus: Bool
+    @State private var isHovering = false
     let browser: Browser
-    /// What the toolbar writes as the column's title, which finds its text among the toolbar's views.
     let title: String
-    @State private var spot = TitleSpot()
+    let subtitle: Text
+
+    /// The most room the title takes, so a long one never crowds the buttons beside it.
+    private static let widest: CGFloat = 320
 
     var body: some View {
-        let isAvailable = SavedViews.canEdit(browser, in: library) && !browser.showsViewPanel && browser.offersViewOptions
-            && !browser.isSearchExpanded
-        ZStack(alignment: .topLeading) {
-            TitleSpotReader(title: title, isEnabled: isAvailable, spot: $spot) { browser.openViewPanel(in: library) }
-            if isAvailable, spot.isInside, let pencil = spot.pencil {
-                Button { browser.openViewPanel(in: library) } label: {
-                    Image(systemName: "pencil")
-                        .interfaceFont(.caption.weight(.semibold))
-                        .foregroundStyle(appearsActive ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
-                        .frame(width: pencil.width, height: pencil.height)
-                        .contentShape(.rect)
-                }
+        let canEdit = SavedViews.canEdit(browser, in: library) && !browser.showsViewPanel && browser.offersViewOptions
+        HStack(spacing: 2) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title).font(.headline).foregroundStyle(appearsActive ? .primary : .secondary)
+                subtitle.font(.subheadline).foregroundStyle(.secondary)
+            }
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+            Button("Edit View", systemImage: "pencil") { browser.openViewPanel(in: library) }
+                .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
-                .focusable(false)
+                .interfaceFont(.caption.weight(.semibold))
+                .foregroundStyle(appearsActive ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
+                .frame(width: 22, height: 28)
+                .contentShape(.rect)
+                .focused($hasFocus)
+                .opacity(canEdit && (isHovering || hasFocus) ? 1 : 0)
+                .allowsHitTesting(canEdit)
+                .accessibilityHidden(!canEdit)
                 .help("Edit View")
-                .accessibilityHidden(true)
-                .offset(x: pencil.minX, y: pencil.minY)
-            }
+                .accessibilityIdentifier("EditViewToolbar")
         }
-        .frame(height: TitleSpotReader.TrackingView.toolbarHeight)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-}
-
-/// Where the pointer is in relation to the title, in the reader's own coordinates.
-struct TitleSpot: Equatable {
-    /// Whether the pointer is over the title or the pencil.
-    var isInside = false
-    /// Where the pencil goes, or nil while the title is not in the toolbar or leaves no room for it.
-    var pencil: CGRect?
-}
-
-/// Finds the title the toolbar draws and reports the pointer's place against it, without taking any click, so the
-/// title beneath still drags the window. The titlebar sits above the page's content and takes a click before SwiftUI's
-/// button under it, so a click on the pencil's frame is heard here, as the field in `ColumnSearch` hears its clicks.
-/// It stays in place while the pencil is unavailable, so the pointer's place is read again, not remembered, when the
-/// pencil returns.
-private struct TitleSpotReader: NSViewRepresentable {
-    let title: String
-    let isEnabled: Bool
-    @Binding var spot: TitleSpot
-    let onClick: () -> Void
-
-    func makeNSView(context: Context) -> TrackingView {
-        let view = TrackingView()
-        update(view)
-        return view
-    }
-
-    func updateNSView(_ view: TrackingView, context: Context) {
-        update(view)
-    }
-
-    private func update(_ view: TrackingView) {
-        view.onChange = { spot = $0 }
-        view.onClick = onClick
-        view.set(title: title, isEnabled: isEnabled)
-    }
-
-    final class TrackingView: NSView {
-        /// The height of the window's toolbar, which the title sits in.
-        static let toolbarHeight: CGFloat = 52
-        private static let pencilSize = CGSize(width: 22, height: 28)
-        private static let gap: CGFloat = 4
-
-        var onChange: (TitleSpot) -> Void = { _ in }
-        var onClick: () -> Void = {}
-        private var title = ""
-        private var isEnabled = false
-        private var spot = TitleSpot()
-        private var isRefreshScheduled = false
-        private var monitor: Any?
-        private var menuEnd: Any?
-
-        override var isFlipped: Bool { true }
-        override func hitTest(_ point: NSPoint) -> NSView? { nil }
-
-        override func updateTrackingAreas() {
-            super.updateTrackingAreas()
-            trackingAreas.forEach(removeTrackingArea)
-            addTrackingArea(NSTrackingArea(
-                rect: .zero, options: [.mouseEnteredAndExited, .mouseMoved, .activeInActiveApp, .inVisibleRect], owner: self))
-        }
-
-        override func mouseEntered(with event: NSEvent) { refresh() }
-        override func mouseMoved(with event: NSEvent) { refresh() }
-        override func mouseExited(with event: NSEvent) { refresh() }
-
-        /// The toolbar lays its title out after the page does, so a change of frame or of text is read on the next turn.
-        override func layout() {
-            super.layout()
-            scheduleRefresh()
-        }
-
-        func set(title: String, isEnabled: Bool) {
-            guard title != self.title || isEnabled != self.isEnabled else { return }
-            self.title = title
-            self.isEnabled = isEnabled
-            scheduleRefresh()
-        }
-
-        private func scheduleRefresh() {
-            guard !isRefreshScheduled else { return }
-            isRefreshScheduled = true
-            DispatchQueue.main.async { [weak self] in
-                self?.isRefreshScheduled = false
-                self?.refresh()
-            }
-        }
-
-        private func refresh() {
-            var next = TitleSpot()
-            if isEnabled, let pencil = pencilFrame() {
-                next.pencil = pencil
-                next.isInside = hoverFrame(with: pencil).contains(pointer)
-            }
-            guard next != spot else { return }
-            spot = next
-            onChange(next)
-        }
-
-        private var pointer: NSPoint {
-            guard let window else { return NSPoint(x: -1, y: -1) }
-            return convert(window.mouseLocationOutsideOfEventStream, from: nil)
-        }
-
-        /// The title's text, from the toolbar's own views. Nothing here names a private class: it is the text field that
-        /// holds the title, found by its text and its place over this column, and the title's area is the widest
-        /// ancestor narrower than the window, which is the area the toolbar gives the title before its next item.
-        private func titleFrames() -> (text: CGRect, area: CGRect)? {
-            guard let window, let content = window.contentView, let themeFrame = content.superview else { return nil }
-            for root in themeFrame.subviews where root !== content {
-                guard let field = textFields(in: root).first(where: { field in
-                    let frame = convert(field.bounds, from: field)
-                    return !field.isHiddenOrHasHiddenAncestor && field.stringValue == title && bounds.contains(CGPoint(x: frame.midX, y: frame.midY))
-                }) else { continue }
-                var area: NSView = field
-                while let parent = area.superview, convert(parent.bounds, from: parent).width < window.frame.width - 1 { area = parent }
-                let text = textFields(in: area).filter { !$0.isHiddenOrHasHiddenAncestor && !$0.stringValue.isEmpty }
-                    .map { convert($0.bounds, from: $0) }.reduce(CGRect.null) { $0.union($1) }
-                return (text, convert(area.bounds, from: area))
-            }
-            return nil
-        }
-
-        private func textFields(in view: NSView) -> [NSTextField] {
-            if let field = view as? NSTextField { return [field] }
-            return view.subviews.flatMap(textFields(in:))
-        }
-
-        private func pencilFrame() -> CGRect? {
-            guard let (text, area) = titleFrames(), !text.isNull else { return nil }
-            let size = Self.pencilSize
-            let frame = CGRect(x: text.maxX + Self.gap, y: area.midY - size.height / 2, width: size.width, height: size.height)
-            return frame.maxX <= area.maxX ? frame : nil
-        }
-
-        private func hoverFrame(with pencil: CGRect) -> CGRect {
-            guard let (text, area) = titleFrames() else { return pencil }
-            return CGRect(x: text.minX, y: area.minY, width: pencil.maxX - text.minX, height: area.height)
-        }
-
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            removeMonitor()
-            scheduleRefresh()
-            guard window != nil else { return }
-            // A menu that is tracking swallows the exit, so the pointer's place is read again when one closes.
-            menuEnd = NotificationCenter.default.addObserver(forName: NSMenu.didEndTrackingNotification, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.refresh() }
-            }
-            monitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
-                let number = event.windowNumber
-                let location = event.locationInWindow
-                let isTaken = MainActor.assumeIsolated { self?.take(windowNumber: number, at: location) ?? false }
-                return isTaken ? nil : event
-            }
-        }
-
-        isolated deinit { removeMonitor() }
-
-        private func removeMonitor() {
-            if let monitor { NSEvent.removeMonitor(monitor) }
-            monitor = nil
-            if let menuEnd { NotificationCenter.default.removeObserver(menuEnd) }
-            menuEnd = nil
-        }
-
-        /// A click is taken only inside the pencil's own frame, read again now.
-        private func take(windowNumber: Int, at location: CGPoint) -> Bool {
-            guard isEnabled, spot.isInside, windowNumber == window?.windowNumber,
-                  let pencil = pencilFrame(), pencil.contains(convert(location, from: nil))
-            else { return false }
-            onClick()
-            return true
-        }
+        .onHover { isHovering = $0 }
+        .frame(maxWidth: Self.widest, alignment: .leading)
     }
 }
 

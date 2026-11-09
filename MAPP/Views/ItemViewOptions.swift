@@ -69,7 +69,7 @@ private struct ViewModePopUp: NSViewRepresentable {
     let modes: [ItemViewMode]
     @Binding var selection: ItemViewMode
 
-    private static let titles: [ItemViewMode: String] = [
+    fileprivate static let titles: [ItemViewMode: String] = [
         .list: String(localized: "as List"), .gallery: String(localized: "as Gallery"), .table: String(localized: "as Table"),
         .board: String(localized: "as Board"), .timeline: String(localized: "as Timeline"),
     ]
@@ -101,14 +101,7 @@ private struct ViewModePopUp: NSViewRepresentable {
             }
         }
         guard coordinator.shown != selection else { return }
-        coordinator.shown = selection
-        if let index = modes.firstIndex(of: selection) { button.selectItem(at: index) }
-        let title = Self.titles[selection] ?? ""
-        let face = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-        face.image = NSImage(systemSymbolName: selection.symbol, accessibilityDescription: nil)
-        (button.cell as? NSPopUpButtonCell)?.menuItem = face
-        (button.cell as? NSPopUpButtonCell)?.imagePosition = .imageOnly
-        button.setAccessibilityValue(title)
+        coordinator.showFace(of: selection, on: button)
     }
 
     final class Coordinator: NSObject {
@@ -116,8 +109,22 @@ private struct ViewModePopUp: NSViewRepresentable {
         var modes: [ItemViewMode] = []
         var shown: ItemViewMode?
 
+        /// The cell drops its own face when a row is chosen, also when the row is the one already selected or the change
+        /// is refused, so the face is put back after every choice, from the layout that holds then.
         @objc func choose(_ sender: NSPopUpButton) {
             if let mode = sender.selectedItem?.representedObject as? ItemViewMode { selection?.wrappedValue = mode }
+            if let current = selection?.wrappedValue { showFace(of: current, on: sender) }
+        }
+
+        func showFace(of mode: ItemViewMode, on button: NSPopUpButton) {
+            shown = mode
+            if let index = modes.firstIndex(of: mode) { button.selectItem(at: index) }
+            let title = ViewModePopUp.titles[mode] ?? ""
+            let face = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+            face.image = NSImage(systemSymbolName: mode.symbol, accessibilityDescription: nil)
+            (button.cell as? NSPopUpButtonCell)?.menuItem = face
+            (button.cell as? NSPopUpButtonCell)?.imagePosition = .imageOnly
+            button.setAccessibilityValue(title)
         }
     }
 }
