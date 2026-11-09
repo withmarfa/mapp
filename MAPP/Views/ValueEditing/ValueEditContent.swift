@@ -149,15 +149,18 @@ struct ValueEditContent: View {
     /// The Time switch, and, once it is on, the time as the system's narrow field with its stepper.
     @ViewBuilder private var timeRows: some View {
         Divider().padding(.vertical, 5 * scale)
-        Toggle(isOn: Binding { model.hasTime } set: { model.setIncludesTime($0) }) {
+        HStack(spacing: 8 * scale) {
             Text("Time")
+            Spacer(minLength: 8 * scale)
+            Toggle("Time", isOn: Binding { model.hasTime } set: { model.setIncludesTime($0) })
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .accessibilityIdentifier("ItemPropertyTime.\(dateKey)")
         }
-        .toggleStyle(.switch)
-        .controlSize(.small)
         .font(.system(size: ValueEditMetrics.textSize * scale))
         .padding(.horizontal, 8 * scale)
         .frame(height: ValueEditMetrics.rowHeight * scale)
-        .accessibilityIdentifier("ItemPropertyTime.\(dateKey)")
         if model.hasTime {
             DatePicker("Time", selection: Binding {
                 model.storedDate?.date ?? model.request.library.now()
@@ -166,7 +169,7 @@ struct ValueEditContent: View {
                 .labelsHidden()
                 .fixedSize()
                 .padding(.horizontal, 8 * scale)
-                .padding(.vertical, 2 * scale)
+                .frame(maxWidth: .infinity, minHeight: ValueEditMetrics.rowHeight * scale + 6 * scale, alignment: .leading)
                 .accessibilityIdentifier("ItemPropertyTimeField.\(dateKey)")
         }
     }
@@ -212,6 +215,7 @@ private struct ValueEditRow: View {
             Spacer(minLength: 8 * scale)
             if let detail = row.detail {
                 Text(verbatim: detail)
+                    .layoutPriority(1)
                     .foregroundStyle(isActive ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.secondary))
             }
         }

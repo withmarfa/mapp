@@ -95,7 +95,8 @@ nonisolated struct ValueListRow: Identifiable, Hashable, Sendable {
         case person(initials: String)
         case tag
         case symbol(String)
-        /// A choice's option, with the dot of its own color.
+        /// A choice's option, with the dot of its own color, which the option's shown label decides, as it does for the
+        /// value's chip on the page.
         case dot(String)
         /// A type, with its icon.
         case type(icon: String?)
@@ -153,7 +154,7 @@ nonisolated enum ValueEditOptions {
     /// word is listed last where the catalogue does not declare it.
     static func choiceRows(field: ItemTypeInfo.Field, current: String?) -> [ValueListRow] {
         let rows = field.options(including: current).map {
-            ValueListRow(id: optionID($0), role: .option, title: ItemTypeInfo.Field.label(ofOption: $0), mark: .dot($0), isCurrent: $0 == current)
+            ValueListRow(id: optionID($0), role: .option, title: ItemTypeInfo.Field.label(ofOption: $0), mark: .dot(ItemTypeInfo.Field.label(ofOption: $0)), isCurrent: $0 == current)
         }
         return rows + notSet(field: field, current: current)
     }
@@ -186,11 +187,16 @@ nonisolated enum QuickDates {
         return entries
     }
 
-    /// The day beside a quick date, such as "Tue 3 Nov".
-    static func detail(of entry: Entry, calendar: Calendar, locale: Locale) -> String {
-        var style = Date.FormatStyle(date: .abbreviated, time: .omitted, locale: locale, calendar: calendar, timeZone: calendar.timeZone)
-        style = style.weekday(.abbreviated).day().month(.abbreviated)
-        return entry.date.formatted(style)
+    /// The day beside a quick date, such as "Tue 3 Nov", with the year only where it is not the one of `now`, in the
+    /// order and punctuation the locale uses.
+    static func detail(of entry: Entry, now: Date, calendar: Calendar, locale: Locale) -> String {
+        let sameYear = calendar.isDate(entry.date, equalTo: now, toGranularity: .year)
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.setLocalizedDateFormatFromTemplate(sameYear ? "EEEdMMM" : "EEEdMMMy")
+        return formatter.string(from: entry.date)
     }
 
     /// The date to store for choosing `day`: with a time, the day at the time the item already holds, else at the

@@ -63,23 +63,32 @@ final class ValueEditPanelSession: ValueEditSession {
     /// The panel's ground: the system's glass, or, in Solid, the window's own color. Either is cut to the panel's corners
     /// by its own layer, so nothing square is left behind it.
     private static func surface(holding host: NSView, style: ValuePanelStyle, appearance: NSAppearance?) -> NSView {
+        // The window's shadow follows the alpha of what it holds, so the root is cut to the corners itself: the glass view
+        // alone leaves a square shadow edge at the foot of the panel.
+        let root = NSView()
+        root.wantsLayer = true
+        root.layer?.cornerRadius = ValueEditMetrics.panelRadius
+        root.layer?.cornerCurve = .continuous
+        root.layer?.masksToBounds = true
+        let ground: NSView
         switch style {
         case .glass:
             let glass = NSGlassEffectView()
             glass.cornerRadius = ValueEditMetrics.panelRadius
             glass.contentView = host
-            return glass
+            ground = glass
         case .solid:
             let solid = SolidSurface()
             solid.wantsLayer = true
-            solid.layer?.cornerRadius = ValueEditMetrics.panelRadius
-            solid.layer?.cornerCurve = .continuous
-            solid.layer?.masksToBounds = true
             host.frame = solid.bounds
             host.autoresizingMask = [.width, .height]
             solid.addSubview(host)
-            return solid
+            ground = solid
         }
+        ground.frame = root.bounds
+        ground.autoresizingMask = [.width, .height]
+        root.addSubview(ground)
+        return root
     }
 
     /// Draws the window's color, resolved again whenever the appearance changes.
@@ -110,7 +119,9 @@ final class ValueEditPanelSession: ValueEditSession {
         // Sideways a panel stays in its window, which it belongs to; up and down it may leave it, as a menu does.
         let inside = parent.frame.insetBy(dx: 8, dy: 0)
         visible = CGRect(x: max(visible.minX, inside.minX), y: visible.minY, width: min(visible.maxX, inside.maxX) - max(visible.minX, inside.minX), height: visible.height)
-        let natural = model.naturalHeight > 0 ? model.naturalHeight : estimatedHeight
+        // A long list scrolls in a panel of at most this height, as a menu's does, whatever room the screen has.
+        let scale = InterfaceStyle.scale(for: UserDefaults.standard.object(forKey: InterfaceKey.textSize) as? Int ?? InterfaceStyle.defaultTextSize)
+        let natural = min(model.naturalHeight > 0 ? model.naturalHeight : estimatedHeight, ValueEditMetrics.tallest * scale)
         let placement = ValuePanelFrame.placement(
             anchor: target, visible: visible, contentHeight: natural, floor: ValueEditMetrics.widthFloor, ceiling: ValueEditMetrics.widthCeiling,
             gap: ValueEditMetrics.gap, fitting: width, centered: request.isCentered)
@@ -163,9 +174,12 @@ extension ValueEditModel {
             let detail = row.detail.map { text($0) + 8 * scale } ?? 0
             widest = max(widest, mark + text(row.title) + detail + 8 * scale)
         }
-        if !holdsMany {
-            for chip in chips { widest = max(widest, 21 * scale + text(chip.title) + 28 * scale) }
-        }
+        // The search field holds the chips and the room to type after them: one line for what fits, more where it does not.
+        let chipFont = NSFont.systemFont(ofSize: 12 * scale)
+        let typing = 48 * scale
+        let chipWidths = chips.map { ($0.title as NSString).size(withAttributes: [.font: chipFont]).width + 46 * scale }
+        let line = chipWidths.reduce(0, +) + CGFloat(max(chipWidths.count - 1, 0)) * 4 * scale + typing
+        widest = max(widest, line)
         return min(max(widest + edges, bounds.lowerBound * scale), bounds.upperBound * scale)
     }
 }

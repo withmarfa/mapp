@@ -9,6 +9,8 @@ nonisolated enum ValueEditMetrics {
     static let headerHeight: CGFloat = 24
     static let textSize: CGFloat = 13
     static let panelRadius: CGFloat = 12
+    /// The most a panel is tall at the default text size; a longer list scrolls.
+    static let tallest: CGFloat = 520
     /// The space between the value and its panel.
     static let gap: CGFloat = 4
     /// A typed value's panel is as wide as the value, within these.
@@ -24,7 +26,7 @@ nonisolated enum ValueEditMetrics {
         case .people: 196...280
         case .status, .choice: 192...260
         case .type: 200...264
-        case .parent: 232...352
+        case .parent: 200...264
         case .text, .number: nil
         }
     }

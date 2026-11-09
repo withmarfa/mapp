@@ -309,7 +309,7 @@ final class ValueEditModel {
         quickDates.map {
             ValueListRow(
                 id: "quick:" + $0.id, role: .option, title: $0.title,
-                detail: QuickDates.detail(of: $0, calendar: request.calendar, locale: .current), mark: .symbol($0.symbol))
+                detail: QuickDates.detail(of: $0, now: library.now(), calendar: request.calendar, locale: .current), mark: .symbol($0.symbol))
         } + [ValueListRow(id: ValueEditOptions.notSetID, role: .option, title: String(localized: "Not Set"), isCurrent: value == nil)]
     }
 
@@ -637,7 +637,7 @@ final class ValueEditModel {
             return [ValueChip(id: ValueEditOptions.optionID(word), title: ItemTypeInfo.Field.label(ofOption: word), mark: .status(group), isRemovable: !field.required)]
         case .choice(let field):
             guard let word = value?.string, !word.isEmpty else { return [] }
-            return [ValueChip(id: ValueEditOptions.optionID(word), title: ItemTypeInfo.Field.label(ofOption: word), mark: .dot(word), isRemovable: !field.required)]
+            return [ValueChip(id: ValueEditOptions.optionID(word), title: ItemTypeInfo.Field.label(ofOption: word), mark: .dot(ItemTypeInfo.Field.label(ofOption: word)), isRemovable: !field.required)]
         case .parent:
             guard let current = parentTarget else { return [] }
             return [ValueChip(id: "parent:" + current.id, title: current.displayTitle)]

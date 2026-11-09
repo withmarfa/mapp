@@ -97,7 +97,7 @@ struct ChipFieldLayout: Layout {
     var spacing: CGFloat
     var lineHeight: CGFloat
     /// The least width the query is given before it moves to a row of its own.
-    var queryFloor: CGFloat = 70
+    var queryFloor: CGFloat = 40
 
     private func frames(in width: CGFloat, subviews: Subviews) -> (frames: [CGRect], height: CGFloat) {
         var frames: [CGRect] = []
