@@ -183,6 +183,21 @@ final class EditorWebView: WKWebView {
         controller.titleDrafts?.showHistory(of: id, in: library)
     }
 
+    @objc private func toggleLayout(_ sender: NSMenuItem) {
+        controller?.titleDrafts?.toggleLayout()
+    }
+
+    /// Customize Layout, as the Item menu words it, for the page's own rows.
+    private var customizeLayoutItem: NSMenuItem? {
+        guard let controller, let id = controller.noteID, let details = controller.titleDrafts, let library = controller.library,
+              details.isCustomizingLayout || PageCustomization.isAvailable(for: library.item(id))
+        else { return nil }
+        let title = details.isCustomizingLayout ? String(localized: "Finish Customizing") : String(localized: "Customize Layout…")
+        let item = NSMenuItem(title: title, action: #selector(toggleLayout(_:)), keyEquivalent: "")
+        item.target = self
+        return item
+    }
+
     /// Version History, for the note on the page, from the window the editor belongs to.
     private var versionHistoryItem: NSMenuItem? {
         guard let controller, controller.noteID != nil, controller.titleDrafts != nil else { return nil }
@@ -243,7 +258,12 @@ final class EditorWebView: WKWebView {
             hide.target = self
             hide.representedObject = MenuRow(item: row.item, row: row.row)
             menu.insertItem(hide, at: 0)
-            menu.insertItem(.separator(), at: 1)
+            var next = 1
+            if let layout = customizeLayoutItem {
+                menu.insertItem(layout, at: next)
+                next += 1
+            }
+            menu.insertItem(.separator(), at: next)
         }
         for item in menu.items {
             let isUnwanted = Self.unwantedItems.contains(item.identifier?.rawValue ?? "")
