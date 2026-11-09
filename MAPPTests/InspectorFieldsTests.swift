@@ -127,7 +127,7 @@ struct InspectorFieldsTests {
         let library = FakeItemLibrary(items: [Self.item("aic.ticket.task"), Self.item("core.file", id: "10000000-0000-0000-0000-000000000002")])
         library.catalogue = Catalogue(itemTypes: [Self.task, Self.file])
         let empty = ItemPageHeader.header(of: library.items[0].id, in: library, drafts: DetailsPresentation())
-        #expect(empty?.status?.label == "Status")
+        #expect(empty?.status?.label == "")
         #expect(empty?.status?.empty == true)
         #expect(ItemPageHeader.header(of: library.items[1].id, in: library, drafts: DetailsPresentation())?.status == nil)
     }

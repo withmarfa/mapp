@@ -124,7 +124,7 @@ struct PagePinsTests {
 
     // MARK: Empty values
 
-    @Test func whereEmptiesAreOfferedAValueTheItemLacksIsAnEditableEmptyChip() {
+    @Test func whereEmptiesAreOfferedAValueTheItemLacksIsAnEditableEmptyRow() {
         let drawn = Self.resolve(Self.item(), relationships: [Self.parent(nil)], offersEmpty: true)
         let empty = Dictionary(uniqueKeysWithValues: (drawn.pins.pins + drawn.block).filter(\.isEmpty).map { ($0.id, $0) })
         #expect(Set(empty.keys) == ["state", "child-of", "priority", "mobiles", "#tags"])

@@ -137,7 +137,7 @@ import Testing
         #if DEBUG
         #expect(Cost.tallies[.iconDraw] == nil)
         #endif
-        #expect(first.plus.url == again.plus.url)
+        #expect(first.indicator.url == again.indicator.url)
         #expect(first.symbols.mapValues(\.url) == again.symbols.mapValues(\.url))
     }
 
@@ -157,8 +157,8 @@ import Testing
     @Test func aNewTextSizeDrawsEverythingAtTheNewSize() throws {
         let small = try #require(PageHeaderIcons(textSize: 11, typeIcons: ["lucide:folder"]))
         let large = try #require(PageHeaderIcons(textSize: 24, typeIcons: ["lucide:folder"]))
-        #expect(small.plus.width < large.plus.width)
+        #expect(small.indicator.width < large.indicator.width)
         let back = try #require(PageHeaderIcons(textSize: 11, typeIcons: ["lucide:folder"]))
-        #expect(back.plus.url == small.plus.url)
+        #expect(back.indicator.url == small.indicator.url)
     }
 }
