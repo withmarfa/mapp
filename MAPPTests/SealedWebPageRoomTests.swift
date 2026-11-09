@@ -31,6 +31,6 @@ import WebKit
         let page = try await SealedWebPage.make(runsScripts: true)
         await page.leaveRoom(above: 60)
         try await page.show(Data("<html><body>One<script>setTimeout(() => document.documentElement.removeAttribute('style'), 0)</script></body></html>".utf8))
-        try await eventually { try await read("borderTopWidth", of: page) == "60px" }
+        #expect(try await eventuallyAsking { try await read("borderTopWidth", of: page) == "60px" })
     }
 }
