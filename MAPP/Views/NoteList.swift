@@ -12,6 +12,7 @@ struct NoteList: View, Equatable {
     var pane: FocusState<Browser.Pane?>.Binding
     @State private var daysSeen = 0
     @State private var width = ColumnWidth.list.defaultWidth
+    @SceneStorage("sidebarHidden") private var isSidebarHidden = false
     @AppStorage(ListKey.previewLines) private var previewLines = ListKey.defaultPreviewLines
     @AppStorage(ListKey.showsPictures) private var showsPictures = true
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
@@ -85,7 +86,10 @@ struct NoteList: View, Equatable {
         }
         .searchStatus(browser)
         .bandsToolbar()
-        .toolbar(id: WindowToolbarLayout.list) { ListToolbar(browser: browser, columnWidth: width) }
+        .toolbar(id: WindowToolbarLayout.list) {
+            // While the sidebar is hidden its button leads this column's toolbar, so the field has that much less room.
+            ListToolbar(browser: browser, columnWidth: width - (isSidebarHidden ? ColumnSearchMetrics.sidebarButtonRoom : 0))
+        }
         .task {
             for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) {
                 daysSeen += 1

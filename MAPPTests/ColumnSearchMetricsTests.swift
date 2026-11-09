@@ -3,14 +3,13 @@ import Testing
 @testable import MAPP
 
 struct ColumnSearchMetricsTests {
-    @Test func theFieldTakesAShareOfTheRoomBesideTheOptions() {
-        // 330 - 54 = 276 of room, and 85% of that.
-        #expect(ColumnSearchMetrics.fieldWidth(inColumn: ColumnWidth.list.defaultWidth) == 235)
-        #expect(ColumnSearchMetrics.fieldWidth(inColumn: 480) == 362)
+    @Test func theFieldFillsTheColumnButForTheMarginsAndTheOptions() {
+        #expect(ColumnSearchMetrics.fieldWidth(inColumn: ColumnWidth.list.defaultWidth) == 241)
+        #expect(ColumnSearchMetrics.fieldWidth(inColumn: 480) == 391)
     }
 
     @Test func theNarrowestColumnStillHasAUsableField() {
-        #expect(ColumnSearchMetrics.fieldWidth(inColumn: 280) == 192)
+        #expect(ColumnSearchMetrics.fieldWidth(inColumn: 280) == 191)
         #expect(ColumnSearchMetrics.fieldWidth(inColumn: 100) == 120)
     }
 
@@ -20,7 +19,7 @@ struct ColumnSearchMetricsTests {
         }
     }
 
-    @Test func anItemFieldNarrowsByTheSameShare() {
+    @Test func anItemFieldTakesAShareOfItsRoom() {
         #expect(ColumnSearchMetrics.itemFieldWidth == (260 * ColumnSearchMetrics.share).rounded())
     }
 }
