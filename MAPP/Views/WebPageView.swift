@@ -14,25 +14,18 @@ struct WebPageView: View {
     private let runsScripts: Bool
     private let look: SourceLook?
     private let topInset: CGFloat
-    private let givesBack: CGFloat
     private let scrolled: (CGFloat) -> Void
     @State private var sealed: SealedWebPage?
     @State private var failure: String?
-    /// How much of the inset the page has given back, and the scroll that goes with it (`InsetCollapse`).
-    @State private var givenBack: CGFloat = 0
-    @State private var position = ScrollPosition()
-    @State private var collapse = CollapseHolder()
 
     /// An HTML document already in hand, which runs its own scripts only where `runsScripts` says so. It is read in
     /// `encoding`, or where none is given, in the one its bytes declare (`SealedWebPage.show`).
     ///
     /// The page starts `topInset` below the top of the view, a space the caller fills (the toolbar and the item's header)
-    /// and the page scrolls under. `givesBack` of it, the part the caller's header takes, shrinks as the page scrolls, so
-    /// that a header the page draws itself meets what is above the page once the caller's has gone. `scrolled` hears how
-    /// far the person has scrolled the page from its start.
+    /// and the page scrolls under. `scrolled` hears how far the page has moved from its start.
     init(
         html: Data, encoding: String.Encoding? = nil, pictures: SealedPictures? = nil, runsScripts: Bool, look: SourceLook? = nil,
-        topInset: CGFloat = 0, givesBack: CGFloat = 0, scrolled: @escaping (CGFloat) -> Void = { _ in }
+        topInset: CGFloat = 0, scrolled: @escaping (CGFloat) -> Void = { _ in }
     ) {
         self.html = html
         self.encoding = encoding
@@ -40,7 +33,6 @@ struct WebPageView: View {
         self.runsScripts = runsScripts
         self.look = look
         self.topInset = topInset
-        self.givesBack = givesBack
         self.scrolled = scrolled
     }
 
@@ -59,11 +51,10 @@ struct WebPageView: View {
                     .webViewMagnificationGestures(.disabled)
                     .webViewLinkPreviews(.disabled)
                     .webViewContentBackground(look?.leavesBackground == true ? .hidden : .automatic)
-                    .webViewScrollPosition($position)
-                    .background(ContentInset(top: topInset - givenBack))
+                    .background(ContentInset(top: topInset))
                     // The offset is the page's own, `scrollY`: zero at rest, whatever the inset.
                     .webViewOnScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y } action: { _, new in
-                        pageScrolled(to: new)
+                        scrolled(new)
                     }
                     // Each document has a page of its own, so a new one gets a new web view, which lets go of the
                     // page that held the last document and stops its scripts.
@@ -75,24 +66,12 @@ struct WebPageView: View {
         .background(look?.isOnSurface == true ? Color(nsColor: .underPageBackgroundColor) : .clear)
         .accessibilityIdentifier("WebPageView")
         // A new web view starts at the top and reports nothing while it stays there.
-        .onChange(of: sealed.map { ObjectIdentifier($0.page) }) {
-            collapse.value.reset()
-            givenBack = 0
-            scrolled(0)
-        }
+        .onChange(of: sealed.map { ObjectIdentifier($0.page) }) { scrolled(0) }
         .task(id: Reload(html: html, look: look)) { await load() }
         .onChange(of: pictures?.version) { _, version in
             guard let version, let sealed else { return }
             Task { await sealed.redrawPictures(version: version) }
         }
-    }
-
-    private func pageScrolled(to scrollY: CGFloat) {
-        if let adjustment = collapse.value.scrolled(to: scrollY, space: givesBack) {
-            givenBack = adjustment.consumed
-            position.scrollTo(y: adjustment.scrollY)
-        }
-        scrolled(collapse.value.distance)
     }
 
     /// A document is shown again when its bytes or its look change; a look cannot be taken off a loaded document.
@@ -115,11 +94,6 @@ struct WebPageView: View {
     }
 }
 
-/// Holds the collapse where a scroll can change it without redrawing the page.
-private final class CollapseHolder {
-    var value = InsetCollapse()
-}
-
 /// Gives the web view behind it an inset at its top, which the page starts below and scrolls under. SwiftUI's
 /// `contentMargins` does not reach a web view, and a safe-area inset would clip the page where the header is instead of
 /// letting it scroll under. The page's own layout viewport is the space below the inset. The same view hands the wheel
@@ -139,9 +113,6 @@ private struct ContentInset: NSViewRepresentable {
             if webView?.window == nil { webView = findWebView() }
             guard let webView, webView.obscuredContentInsets.top != top else { return }
             webView.obscuredContentInsets = NSEdgeInsets(top: top, left: 0, bottom: 0, right: 0)
-            // A new inset alone leaves the page's fixed and sticky layers where they were, and the web view fills the gap
-            // with their colour; laying it out at once moves them to the new edge.
-            webView.layoutSubtreeIfNeeded()
         }
 
         private func findWebView() -> WKWebView? {
@@ -236,48 +207,5 @@ nonisolated struct WheelGesture {
         let forwards = ownedByPage || overHeader
         if momentumPhase.contains(.ended) || momentumPhase.contains(.cancelled) { ownedByPage = false }
         return forwards
-    }
-}
-
-/// How much of the space a web page leaves for the item's header it has given back. The page scrolls under that space, so
-/// a header the page draws itself (fixed or sticky) sits below it, and once the item's own header has scrolled away
-/// that leaves a gap under the toolbar. As the person scrolls, the space shrinks by the distance scrolled, up to all of
-/// it, and the page's scroll is lowered by the same distance, so what is drawn does not move. The distance the person
-/// has scrolled is then what the page gave back plus the page's own offset.
-nonisolated struct InsetCollapse {
-    /// What the space and the page's scroll are to be set to.
-    struct Adjustment: Equatable {
-        let consumed: CGFloat
-        let scrollY: CGFloat
-    }
-
-    private(set) var consumed: CGFloat = 0
-    /// How far the person has scrolled, as of the last report that counted.
-    private(set) var distance: CGFloat = 0
-    /// The offset a page reported just before it was moved, which a late report of it must not count twice.
-    private var replaced: CGFloat?
-
-    /// How far the person has scrolled, which the item's header follows.
-    func offset(scrollY: CGFloat) -> CGFloat { consumed + scrollY }
-
-    /// The page reports it is at `scrollY`, with `space` of the inset there to give back. Nil where nothing is to change.
-    mutating func scrolled(to scrollY: CGFloat, space: CGFloat) -> Adjustment? {
-        if let stale = replaced {
-            replaced = nil
-            if stale == scrollY { return nil }
-        }
-        let total = offset(scrollY: scrollY)
-        distance = total
-        let next = min(max(total, 0), max(space, 0))
-        guard next != consumed else { return nil }
-        consumed = next
-        if total - next != scrollY { replaced = scrollY }
-        return Adjustment(consumed: next, scrollY: total - next)
-    }
-
-    mutating func reset() {
-        consumed = 0
-        distance = 0
-        replaced = nil
     }
 }

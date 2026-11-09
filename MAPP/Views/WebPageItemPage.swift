@@ -206,7 +206,7 @@ struct WebPageItemPage: View {
             WebPageView(
                 html: document.html, encoding: document.encoding, pictures: pictures, runsScripts: runsScripts,
                 look: SourceLook(mode: shown, isMail: loaded.analysis.isMail, page: style),
-                topInset: toolbarHeight + blockHeight, givesBack: blockHeight, scrolled: scrolled)
+                topInset: toolbarHeight + blockHeight, scrolled: scrolled)
                 .ignoresSafeArea(.container, edges: .top)
                 // Each item's pictures are answered by a page made for it.
                 .id(pictures.map(ObjectIdentifier.init))
