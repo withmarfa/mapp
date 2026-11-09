@@ -18,7 +18,7 @@ export interface HeaderChipStyle {
 }
 
 /** The status or the parent as a button that opens the menu the app builds, wherever the page draws it: in a pin or in
- *  a row of the property block. An empty status, in a row, has no value yet and shows a plus in place of its mark. */
+ *  a row of the property block. An empty status, in a row, has no value yet and reads as any empty value does. */
 export interface HeaderPin {
   label: string
   enabled: boolean
@@ -190,7 +190,6 @@ export interface HeaderIcon {
 }
 
 export interface HeaderIcons {
-  plus: HeaderIcon
   indicator: HeaderIcon
   /** The symbols of the property rows and of the types, by SF Symbol name. */
   symbols: Record<string, HeaderIcon>
@@ -200,6 +199,8 @@ export interface HeaderLabels {
   untitled: string
   title: string
   status: string
+  /** What a value the item does not have yet reads. */
+  empty: string
   discardChanges: string
   linkedFrom: string
   customizeLayout: string
@@ -220,6 +221,7 @@ const englishLabels: HeaderLabels = {
   untitled: 'Untitled',
   title: 'Title',
   status: 'Status',
+  empty: 'Empty',
   discardChanges: 'Discard Changes',
   linkedFrom: 'Linked From',
   customizeLayout: 'Customize Layout',
@@ -616,7 +618,7 @@ export class ItemHeader {
     // The status pin is named for what it sets; what it is set to is read after.
     this.statusPin.setAttribute(
       'aria-description',
-      model.status && !model.status.empty ? model.status.label : '',
+      model.status ? (model.status.empty ? this.labels.empty : model.status.label) : '',
     )
   }
 
@@ -698,7 +700,9 @@ export class ItemHeader {
     pin.hidden = model == null
     pin.disabled = !(model?.enabled ?? false)
     pin.classList.toggle('empty', model?.empty ?? false)
-    pin.querySelector('.item-pin-label')!.textContent = model?.label ?? ''
+    pin.querySelector('.item-pin-label')!.textContent = model?.empty
+      ? this.labels.empty
+      : (model?.label ?? '')
     // The status ring is drawn here, from the tone and fill the app chose, since the catalogue holds no colors.
     const mark = pin.querySelector<HTMLElement>('.item-status-mark')
     if (mark) {
@@ -722,13 +726,11 @@ export class ItemHeader {
     pin.setAttribute('aria-haspopup', 'menu')
     // The status is a status chip; the parent is a linked item and looks like one.
     pin.dataset.kind = menu === 'status' ? 'status' : 'link'
-    // An empty status shows a plus where a filled one shows its mark.
     const symbol =
       menu === 'status'
         ? element('span', 'item-pin-symbol item-status-mark', pin)
         : element('span', 'item-pin-symbol item-chip-mark item-icon-parent', pin)
     symbol.setAttribute('aria-hidden', 'true')
-    element('span', 'item-pin-icon item-icon-plus', pin).setAttribute('aria-hidden', 'true')
     element('span', 'item-pin-label item-chip-text', pin)
     element('span', 'item-pin-icon item-icon-indicator', pin).setAttribute('aria-hidden', 'true')
     // A native pop-up button opens as the mouse goes down, and from the keyboard on Space or Return.
@@ -974,10 +976,7 @@ export class ItemHeader {
     term.setAttribute('aria-label', row.label)
     if (!value.querySelector('a, button')) {
       reach(value)
-      value.setAttribute(
-        'aria-label',
-        row.kind === 'empty' ? row.label : `${row.label}: ${this.wholeValue(row, model)}`,
-      )
+      value.setAttribute('aria-label', `${row.label}: ${this.wholeValue(row, model)}`)
     }
   }
 
@@ -992,7 +991,7 @@ export class ItemHeader {
     this.glyph(row.symbol, key, 11 / 13)
     element('span', 'item-pin-name', key).textContent = row.label
     const value = element('dd', 'item-pin-value', entry)
-    value.title = this.wholeValue(row, model)
+    if (row.kind !== 'empty') value.title = this.wholeValue(row, model)
     this.value(value, row, model, true)
     this.editor(entry, key, value, row, model)
     if (row.more) {
@@ -1011,6 +1010,8 @@ export class ItemHeader {
         return model.status?.label ?? ''
       case 'parent':
         return model.parent?.label ?? ''
+      case 'empty':
+        return this.labels.empty
       case 'items':
         return (row.items ?? []).map((item) => item.title).join(', ')
       case 'people':
@@ -1057,15 +1058,10 @@ export class ItemHeader {
       case 'tags':
         for (const tag of row.texts ?? []) this.chip(value, 'tag', tag)
         break
-      case 'empty': {
-        // A value the item does not have yet: the design's empty chip, a plus and the name, which opens its editor.
-        const chip = this.chip(value, 'empty', row.text ?? row.label)
-        chip.classList.add('empty')
-        const plus = element('span', 'item-pin-icon item-icon-plus')
-        plus.setAttribute('aria-hidden', 'true')
-        chip.prepend(plus)
+      case 'empty':
+        // A value the item does not have yet is quiet text, and its editor opens as any value's does.
+        element('span', 'item-text item-empty', value).textContent = this.labels.empty
         break
-      }
       case 'url': {
         const href = row.text ?? ''
         if (/^https?:\/\//i.test(href)) this.link(value, href, () => openLink(href), href)

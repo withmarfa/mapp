@@ -42,6 +42,7 @@ const headerLabelKeys: readonly (keyof HeaderLabels)[] = [
   'untitled',
   'title',
   'status',
+  'empty',
   'discardChanges',
   'linkedFrom',
   'customizeLayout',

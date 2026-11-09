@@ -15,6 +15,7 @@
   --label-primary: rgb(0 0 0 / 0.85);
   --label-secondary: rgb(0 0 0 / 0.5);
   --label-quinary: rgb(0 0 0 / 0.05);
+  --label-placeholder: rgb(0 0 0 / 0.25);
   --separator: rgb(0 0 0 / 0.1);
   --placeholder: rgb(0 0 0 / 0.498);
   --error: rgb(255 56 60);
@@ -35,6 +36,7 @@
     --label-primary: rgb(255 255 255 / 0.85);
     --label-secondary: rgb(255 255 255 / 0.55);
     --label-quinary: rgb(255 255 255 / 0.05);
+    --label-placeholder: rgb(255 255 255 / 0.25);
     --separator: rgb(255 255 255 / 0.1);
     --placeholder: rgb(255 255 255 / 0.549);
     --error: rgb(255 66 69);
@@ -86,6 +88,8 @@ body {
    interface's text size (the pin measures are the 13 point design scaled). */
 #item-header {
   --interface-text-size: 13px;
+  /* One step of the header's 4 point grid, scaled with the interface's text size. */
+  --step: calc(var(--interface-text-size) * 4 / 13);
   font-size: var(--interface-text-size);
   display: flex;
   flex-direction: column;
@@ -409,11 +413,24 @@ body[data-text='none'] #editor {
   box-shadow: inset 0 0 0 var(--chip-status-edge-width, 0.5px) var(--chip-edge, var(--separator));
 }
 
-/* A value the item does not have yet, in a row or a pin: a plus and a quiet edge, as the design's empty chip. */
-.item-chip.empty {
+/* A status the item does not have yet reads as any empty value does: quiet text with no edge. Its fill, under the
+   pointer, runs past the text as a value's does, and the text stays on the column's edge. */
+.item-menu-pin.empty {
+  margin-inline: calc(var(--step) * -1.5);
+  padding-inline: calc(var(--step) * 1.5);
   background: transparent;
-  box-shadow: inset 0 0 0 var(--chip-status-edge-width, 0.5px) var(--chip-edge, var(--separator));
-  color: var(--label-secondary);
+  box-shadow: none;
+  border-radius: 6px;
+  color: var(--label-placeholder);
+}
+
+.item-menu-pin.empty:not(:disabled):hover {
+  background: var(--label-quinary);
+}
+
+/* The text of a value the item does not have yet. */
+.item-empty {
+  color: var(--label-placeholder);
 }
 
 .item-menu-pin:focus-visible {
@@ -426,7 +443,7 @@ body[data-text='none'] #editor {
 }
 
 .item-menu-pin.empty .item-pin-symbol,
-.item-menu-pin:not(.empty) .item-icon-plus {
+.item-menu-pin.empty .item-icon-indicator {
   display: none;
 }
 
@@ -497,13 +514,6 @@ body[data-text='none'] #editor {
   mask: center / contain no-repeat;
 }
 
-.item-icon-plus {
-  width: var(--icon-plus-width, 1em);
-  height: var(--icon-plus-height, 1em);
-  -webkit-mask-image: var(--icon-plus);
-  mask-image: var(--icon-plus);
-}
-
 /* The chevron of a chip that opens a menu. A chip the person cannot change has none. */
 .item-icon-indicator {
   width: var(--icon-indicator-width, 0.6em);
@@ -557,11 +567,6 @@ body[data-text='none'] #editor {
 
 /* The byline of a page for reading: where the item came from, when it was published and how long it takes, as one quiet
    line. No other page has one. */
-#item-header {
-  /* One step of the header's 4 point grid, scaled with the interface's text size. */
-  --step: calc(var(--interface-text-size) * 4 / 13);
-}
-
 .item-byline {
   display: flex;
   flex-wrap: wrap;

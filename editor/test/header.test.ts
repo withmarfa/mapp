@@ -59,7 +59,6 @@ afterEach(() => {
 
 const icon = { url: 'data:image/png;base64,AAAA', width: 13, height: 13 }
 const icons = {
-  plus: icon,
   indicator: icon,
   symbols: { 'square.stack': icon },
 }
@@ -131,7 +130,10 @@ test('a status in a row with no value is drawn empty, and a status pin carries i
     status: { label: 'Status', enabled: true, empty: true },
   })
   expect(pin('ItemStatusPin').classList.contains('empty')).toBe(true)
-  expect(pin('ItemStatusPin').getAttribute('aria-description')).toBe('')
+  expect(pin('ItemStatusPin').querySelector('.item-pin-label')!.textContent).toBe('Empty')
+  expect(pin('ItemStatusPin').querySelector('.item-icon-plus')).toBeNull()
+  expect(pin('ItemStatusPin').getAttribute('aria-label')).toBe('Status')
+  expect(pin('ItemStatusPin').getAttribute('aria-description')).toBe('Empty')
 })
 
 test('a refused title shows why and offers to discard the draft', () => {
@@ -431,19 +433,19 @@ test('an item a row links to is a chip in its own tone, with the icon of its typ
   expect(posted).toEqual([{ type: 'openItem', item: 'other' }])
 })
 
-test('a value the item does not have yet is an empty chip with a plus that opens its editor', () => {
+test('a value the item does not have yet reads Empty and opens its editor', () => {
   header.set({
     ...ticket,
-    properties: [
-      { id: 'due', label: 'Due', symbol: 'calendar', kind: 'empty', text: 'Due', editable: true },
-    ],
+    properties: [{ id: 'due', label: 'Due', symbol: 'calendar', kind: 'empty', editable: true }],
+    pins: [{ id: 'due', label: 'Due', symbol: 'calendar', kind: 'empty', editable: true }],
   })
-  const chip = root.querySelector<HTMLElement>('.item-props .item-chip.empty')!
-  expect(chip.textContent).toBe('Due')
-  expect(chip.querySelector('.item-icon-plus')).not.toBeNull()
+  const text = root.querySelector<HTMLElement>('.item-props .item-prop-value .item-empty')!
+  expect(text.textContent).toBe('Empty')
+  expect(root.querySelector('.item-chip.empty, .item-icon-plus')).toBeNull()
   const value = root.querySelector<HTMLElement>('.item-prop-value')!
-  expect(value.getAttribute('aria-label')).toBe('Due')
-  chip.click()
+  expect(value.getAttribute('aria-label')).toBe('Due: Empty')
+  expect(root.querySelector('.item-pin-value .item-empty')!.textContent).toBe('Empty')
+  text.click()
   expect(posted.map((message) => message.type)).toEqual(['editValue'])
   expect(posted[0]).toMatchObject({ item: 'ticket', row: 'due' })
 })
@@ -460,7 +462,7 @@ test('the app is told where the value its editor is open under has moved to, onc
   value.getBoundingClientRect = () => frame as DOMRect
   window.dispatchEvent(new Event('resize'))
   expect(posted, 'nothing is open, so nothing is told').toEqual([])
-  root.querySelector<HTMLElement>('.item-chip.empty')!.click()
+  root.querySelector<HTMLElement>('.item-empty')!.click()
   expect(posted.map((message) => message.type)).toEqual(['editValue'])
   window.dispatchEvent(new Event('resize'))
   expect(posted, 'it has not moved').toHaveLength(1)
@@ -885,7 +887,7 @@ test('a page for reading puts the source and reading time in the byline', () => 
 
 test('the type pin draws the icon of the item type, and none for a type with no icon', () => {
   const drawn = { url: 'data:image/png;base64,AAAA', width: 13, height: 13 }
-  const icons = { parent: drawn, plus: drawn, indicator: drawn, symbols: { 'type:globe': drawn } }
+  const icons = { parent: drawn, indicator: drawn, symbols: { 'type:globe': drawn } }
   const node = () => pin('ItemTypePin').querySelector<HTMLElement>('.item-chip-mark')
   header.setIcons(icons)
   header.set({ ...ticket, pins: [typeRow({ icon: 'type:globe' })] })

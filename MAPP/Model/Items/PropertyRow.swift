@@ -44,8 +44,8 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         case boolean(Bool)
         /// Text, a choice's label or a number.
         case text(String)
-        /// A value the item does not have yet, drawn as the design's empty chip: a plus and the name. It only opens
-        /// the editor, so it is always `editable`. The symbol is the one a value of the field's kind has.
+        /// A value the item does not have yet, drawn as the word Empty. It only opens the editor, so it is always
+        /// `editable`. The symbol is the one a value of the field's kind has.
         case empty(symbol: String)
 
         /// The SF Symbol that stands for the kind of value beside its label.
@@ -85,7 +85,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// that can take the edit. The app says so; the page never decides it.
     var editable = false
 
-    /// Whether the row is the empty chip of a value the item does not have yet.
+    /// Whether the row is a value the item does not have yet.
     var isEmpty: Bool {
         if case .empty = value { true } else { false }
     }
