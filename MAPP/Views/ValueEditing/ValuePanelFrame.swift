@@ -1,9 +1,9 @@
 import CoreGraphics
 
 /// Where a value panel goes for the value it edits, in screen coordinates (origin at the bottom left): under the
-/// value and starting at its leading edge, shifted along only as far as the window needs, or at the middle of a point
-/// where there is no value (`centered`). The panel is `fitting` wide
-/// where the content says, else as wide as the value within `floor` and `ceiling`. It flips above where there is no room below, and is as tall as the content unless the room left
+/// value and starting at its leading edge, shifted along only as far as the window needs, or centred on a point where
+/// there is no value (`centered`). The panel is `fitting` wide where the content says, else as wide as the value within
+/// `floor` and `ceiling`. It flips above where there is no room below, and is as tall as the content unless the room left
 /// is shorter, in which case the list scrolls. The frame always lies inside `visible`, the screen's visible frame
 /// narrowed to the window sideways, even where that means covering the value.
 nonisolated enum ValuePanelFrame {

@@ -126,7 +126,7 @@ nonisolated struct TypeChange: Hashable, Sendable {
     }
 }
 
-/// What the type change sheet shows for a set of items and a type.
+/// What the values sheet (`TypeValuesSheet`) shows for a set of items and a type.
 nonisolated struct TypeChangePreview: Hashable, Sendable {
     /// The required fields to ask for, once each, in the new type's order.
     var missing: [ItemTypeInfo.Field]

@@ -41,7 +41,7 @@ private struct NoteActionContext {
 /// collection actions sit beside these (`CollectionActions`).
 struct NoteOrganizeActions: View {
     @CurrentLibrary private var library
-    /// The window's, for the Change Type sheet; the menu bar passes the front window's in.
+    /// The window's, for the Change Type panel; the menu bar passes the front window's in.
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     let ids: Set<ItemID>
     let undoManager: UndoManager?
