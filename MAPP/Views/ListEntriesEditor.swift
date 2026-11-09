@@ -196,7 +196,7 @@ private struct MemberField: View {
             .labelsHidden().toggleStyle(.checkbox)
             .accessibilityIdentifier("ItemListMember.\(key)")
         case .text, .number, .date:
-            TextField(LocalizedStringKey(member.label), text: $text, prompt: Text(member.required ? "Required" : "None"))
+            TextField(LocalizedStringKey(member.label), text: $text, prompt: Text(member.required ? "Required" : "Empty"))
                 .labelsHidden()
                 .textFieldStyle(.plain)
                 .focused($focused)
