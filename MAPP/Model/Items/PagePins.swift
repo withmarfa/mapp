@@ -4,7 +4,7 @@ import Foundation
 /// draws pins, which takes nothing from the editor. The page draws what this returns and decides nothing.
 ///
 /// The person's list (`PagePlacement.pins`) says which properties, in which order. A pin with nothing to show is an
-/// empty chip where the page offers one (`offersEmpty`, for a value the person can set) and is left out where it does
+/// empty value where the page offers one (`offersEmpty`, for a value the person can set) and is left out where it does
 /// not. A pin naming something the type or the item does not have is left out, and stays in the list. A pin never repeats what the header's own
 /// line says (`PageHeaderLead.said`).
 ///
@@ -37,7 +37,7 @@ nonisolated struct PagePins: Equatable, Sendable {
             }
             guard let row = candidates.first(where: { $0.id == id }) else { return nil }
             if row.value == .status {
-                // The pill shows a status the item has; one it has not is an empty chip that opens the status editor.
+                // The pill shows a status the item has; one it has not reads Empty and opens the status editor.
                 guard let status, statusValue(of: item, in: status) == nil else { return row }
                 return offersEmpty && item.isEditable && status.isPicked
                     ? PropertyRow(id: row.id, label: row.label, value: .empty(symbol: PropertyRow.Value.status.symbol), editable: true) : nil
