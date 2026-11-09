@@ -124,7 +124,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     ) -> [PropertyRow] {
         var rows: [PropertyRow] = []
         if let typeLabel {
-            rows.append(PropertyRow(id: PagePlacement.type, label: String(localized: "Type"), value: .type(typeLabel, icon: typeIcon)))
+            rows.append(PropertyRow(id: PagePlacement.type, label: String(localized: "Type"), value: .type(typeLabel, icon: typeIcon), editable: item.isEditable))
         }
         if let source = (sourceName ?? item.source)?.trimmingCharacters(in: .whitespacesAndNewlines), !source.isEmpty {
             rows.append(PropertyRow(id: PagePlacement.source, label: String(localized: "Source"), value: .source(source)))

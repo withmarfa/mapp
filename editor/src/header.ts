@@ -367,6 +367,16 @@ function rectKey(rect: DOMRect): string {
   return [rect.left, rect.top, rect.width, rect.height].map(Math.round).join(',')
 }
 
+/** Where a value's content starts. The value's fill runs past its content (see `.editable > .item-prop-value`), so the
+ *  frame the app opens a panel under starts at the first chip or word, not at the fill. */
+function valueFrame(value: HTMLElement): DOMRect {
+  const box = value.getBoundingClientRect()
+  const first = value.firstElementChild?.getBoundingClientRect()
+  const left =
+    first && first.width > 0 ? Math.min(Math.max(first.left, box.left), box.right) : box.left
+  return new DOMRect(left, box.top, box.right - left, box.height)
+}
+
 export class ItemHeader {
   private model?: HeaderModel
   private readonly labels: HeaderLabels
@@ -1111,7 +1121,7 @@ export class ItemHeader {
   /** Asks the app for the editor of a row's or a pin's value, with the value's frame as a menu's is. */
   private openEditor(value: HTMLElement, row: string) {
     if (!this.model) return
-    const rect = value.getBoundingClientRect()
+    const rect = valueFrame(value)
     this.openValue = { row, rect: rectKey(rect) }
     postToHost({
       type: 'editValue',
@@ -1137,7 +1147,7 @@ export class ItemHeader {
       `[data-row=${row}] .item-prop-value, [data-pin=${row}] .item-pin-value`,
     )
     if (!value) return
-    const rect = value.getBoundingClientRect()
+    const rect = valueFrame(value)
     const key = rectKey(rect)
     if (key === open.rect) return
     open.rect = key

@@ -827,7 +827,8 @@ body[data-text='none'] #editor {
 }
 
 /* A value the app edits in a panel under it: the label and, where it holds no link, the value both open it. The value
-   darkens under the pointer so it reads as something to click, and shows a ring for the keyboard. */
+   darkens under the pointer so it reads as something to click, and the same fill marks it for the keyboard, with no ring
+   round it: the app's panel holds the focus while it is open. */
 .editable > [role='button'] {
   border-radius: 6px;
 }
@@ -845,8 +846,8 @@ body[data-text='none'] #editor {
 }
 
 .editable > [role='button']:focus-visible {
-  outline: 2px solid var(--inkkit-accent-color);
-  outline-offset: 1px;
+  outline: none;
+  background: var(--label-quinary);
 }
 
 /* A symbol the app drew, quiet in the secondary color. */
