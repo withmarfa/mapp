@@ -114,9 +114,11 @@ import WebKit
         guard call == shows else { throw CancellationError() }
         // Before the page is swapped in, so the person never sees the document unstyled. A look that fails to apply
         // leaves the document as it loaded.
-        _ = try? await next.callJavaScript(Self.makeRoom, arguments: ["points": Double(topSpace)], contentWorld: Self.world)
-        try Task.checkCancellation()
-        guard call == shows else { throw CancellationError() }
+        if topSpace > 0 {
+            _ = try? await next.callJavaScript(Self.makeRoom, arguments: ["points": Double(topSpace)], contentWorld: Self.world)
+            try Task.checkCancellation()
+            guard call == shows else { throw CancellationError() }
+        }
         if let look {
             _ = try? await next.callJavaScript(SourceLook.script, arguments: look.arguments, contentWorld: Self.world)
             // The await above is a suspension: a newer call may have started, or this one been cancelled.
@@ -142,12 +144,32 @@ import WebKit
         _ = try? await page.callJavaScript(Self.makeRoom, arguments: ["points": Double(points)], contentWorld: Self.world)
     }
 
-    /// Pads the root element through its inline style, which a content security policy does not govern and a style sheet
-    /// of the document cannot outrank.
+    /// Gives the root element a transparent top border through its inline style, which a content security policy does not
+    /// govern and a style sheet of the document cannot outrank. A border adds to the document's own padding rather than
+    /// replacing it, and the root's background still fills the canvas behind it. An observer in this world puts the
+    /// border back when a page's own script rewrites the root's style attribute.
     nonisolated static let makeRoom = SafeDOM.script + """
 
         const root = dom.documentElement(document);
-        if (root) Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'style').get.call(root).setProperty('padding-top', points + 'px', 'important');
+        if (root) {
+          const apply = () => {
+            const style = dom.style(root);
+            const want = globalThis.mappRoom + 'px solid transparent';
+            if (globalThis.mappRoom > 0) {
+              if (style.getPropertyValue('border-top') !== want || style.getPropertyPriority('border-top') !== 'important') {
+                style.setProperty('border-top', want, 'important');
+              }
+            } else if (style.getPropertyValue('border-top')) {
+              style.removeProperty('border-top');
+            }
+          };
+          globalThis.mappRoom = points;
+          if (!globalThis.mappRoomWatch) {
+            globalThis.mappRoomWatch = new MutationObserver(apply);
+            globalThis.mappRoomWatch.observe(root, { attributes: true, attributeFilter: ['style'] });
+          }
+          apply();
+        }
         """
 
     /// Has the document ask for its pictures again, from the URLs of `version`, without loading it again, so the place
