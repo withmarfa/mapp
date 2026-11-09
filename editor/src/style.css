@@ -80,6 +80,11 @@ body {
     var(--inkkit-padding-inline),
     calc((100% - var(--inkkit-reading-width)) / 2 + var(--inkkit-padding-inline))
   );
+  /* A table, set only through Inkkit's tokens: a little air above it (two steps of the 4 point grid, in rem so the text size scales it), quieter grip dots, and a lighter header. */
+  --inkkit-table-spacing-before: calc(1rem * 8 / 13);
+  --inkkit-table-grip-color: light-dark(rgb(0 0 0 / 0.25), rgb(255 255 255 / 0.3));
+  --inkkit-table-header-background: light-dark(rgb(0 0 0 / 0.035), rgb(255 255 255 / 0.06));
+  --inkkit-table-header-font-weight: 500;
 }
 
 /* The item's header: the system font, a bold title at nearly twice the text's size, and pins sized from the

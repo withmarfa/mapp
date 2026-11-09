@@ -58,9 +58,15 @@ import Testing
         #expect(LinkLook.stored(in: defaults) == .tintedPill)
     }
 
-    @Test func aMarkLinkIsUnderlinedOnlyUnderThePointerAndAnUnderlineLinkAlways() {
-        #expect(LinkLook.mark.cssVariables()["--inkkit-wiki-link-underline"] == "none")
-        #expect(LinkLook.mark.cssVariables()["--inkkit-wiki-link-hover-underline"] == nil, "Inkkit underlines a link under the pointer")
+    @Test func aMarkLinkHasADottedUnderlineAndTheHandAndAMissingOneALighterLine() {
+        let mark = LinkLook.mark.cssVariables()
+        #expect(mark["--inkkit-wiki-link-underline"] == "underline")
+        #expect(mark["--inkkit-wiki-link-underline-style"] == "dotted")
+        #expect(mark["--inkkit-wiki-link-cursor"] == "pointer")
+        #expect(mark["--inkkit-wiki-link-missing-underline-style"] == "dotted")
+        #expect(mark["--inkkit-wiki-link-missing-underline-color"] != mark["--inkkit-wiki-link-underline-color"])
+        #expect(mark["--inkkit-wiki-link-hover-underline"] == nil, "Inkkit keeps the line under the pointer")
         #expect(LinkLook.underline.cssVariables()["--inkkit-wiki-link-underline"] == "underline")
+        #expect(LinkLook.underline.cssVariables()["--inkkit-wiki-link-underline-style"] == nil)
     }
 }
