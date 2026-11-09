@@ -6,8 +6,8 @@ import SwiftUI
 ///
 /// The defaults run New Item at the leading side when the sidebar is hidden, then a view's pencil, Revert and Save or
 /// Save as View while there is something to keep, Search, Filter and View Options, the Reader and Original switch on a
-/// page with an article, View As, Share and More, and Details at the far right. In the list the pencil, Search, Filter
-/// and View Options are the list column's (`ListToolbar`). Format and `ExtraToolbarItems` start in the tray.
+/// page with an article, View As, Share and More, and Details at the far right. In the list Search, Filter and View
+/// Options are the list column's (`ListToolbar`), and the pencil is drawn over the list's title (`ViewEditHover`). Format and `ExtraToolbarItems` start in the tray.
 struct WindowToolbar: CustomizableToolbarContent {
     @CurrentLibrary private var library
     @AppStorage(InterfaceKey.showsScrolledTitle) private var showsScrolledTitle = true

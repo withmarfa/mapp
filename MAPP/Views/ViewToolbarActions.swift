@@ -1,5 +1,134 @@
 import SwiftUI
 
+/// Edit View at the list's title: a quiet pencil that shows while the pointer is over the title, drawn over the toolbar
+/// so it takes no room from the items beside it and never moves the search field. macOS has no toolbar placement in
+/// the title's own area, and a toolbar item would keep its room while hidden. The pencil is not focusable and is hidden
+/// from VoiceOver; the keyboard and VoiceOver reach Edit View through its menu command and the command palette.
+struct ViewEditHover: View {
+    @CurrentLibrary private var library
+    @Environment(\.appearsActive) private var appearsActive
+    let browser: Browser
+    /// What the toolbar writes in the column's title area, so the pencil can follow it.
+    let title: String
+    let subtitle: String
+    @State private var isHovering = false
+
+    /// Where the system starts the title, from the column's leading edge, and the height of its area.
+    private static let leading: CGFloat = 20
+    private static let height: CGFloat = 44
+    private static let pencilWidth: CGFloat = 22
+
+    var body: some View {
+        let isAvailable = SavedViews.canEdit(browser, in: library) && !browser.showsViewPanel && browser.offersViewOptions
+            && !browser.isSearchExpanded
+        if isAvailable {
+            HStack(spacing: 6) {
+                Color.clear.frame(width: Self.leading + Self.textWidth(title, subtitle))
+                Button { browser.openViewPanel(in: library) } label: {
+                    Image(systemName: "pencil")
+                        .interfaceFont(.caption.weight(.semibold))
+                        .foregroundStyle(appearsActive ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
+                        .frame(width: Self.pencilWidth, height: Self.height)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .focusable(false)
+                .opacity(isHovering ? 1 : 0)
+                .allowsHitTesting(isHovering)
+                .help("Edit View")
+                .accessibilityHidden(true)
+            }
+            .frame(height: Self.height)
+            .background { PointerOver(isInside: $isHovering, target: Self.pencilWidth) { browser.openViewPanel(in: library) } }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+    }
+
+    private static func textWidth(_ title: String, _ subtitle: String) -> CGFloat {
+        let bold = NSFont.systemFont(ofSize: 13, weight: .bold)
+        let small = NSFont.systemFont(ofSize: 11)
+        let widest = max((title as NSString).size(withAttributes: [.font: bold]).width,
+                         (subtitle as NSString).size(withAttributes: [.font: small]).width)
+        return widest.rounded(.up)
+    }
+}
+
+/// Reports whether the pointer is over its area without taking any click, so the title beneath still drags the window.
+/// The titlebar sits above the page's content and takes a click before SwiftUI's button under it, so a click on the
+/// area's trailing `target` width is heard here, as the field in `ColumnSearch` hears its clicks.
+private struct PointerOver: NSViewRepresentable {
+    @Binding var isInside: Bool
+    let target: CGFloat
+    let onClick: () -> Void
+
+    func makeNSView(context: Context) -> TrackingView {
+        let view = TrackingView()
+        update(view)
+        return view
+    }
+
+    func updateNSView(_ view: TrackingView, context: Context) {
+        update(view)
+    }
+
+    private func update(_ view: TrackingView) {
+        view.onChange = { isInside = $0 }
+        view.target = target
+        view.onClick = onClick
+    }
+
+    final class TrackingView: NSView {
+        var onChange: (Bool) -> Void = { _ in }
+        var onClick: () -> Void = {}
+        var target: CGFloat = 0
+        private var isInside = false
+        private var monitor: Any?
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func updateTrackingAreas() {
+            super.updateTrackingAreas()
+            trackingAreas.forEach(removeTrackingArea)
+            addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect], owner: self))
+        }
+
+        override func mouseEntered(with event: NSEvent) { set(true) }
+        override func mouseExited(with event: NSEvent) { set(false) }
+
+        private func set(_ value: Bool) {
+            isInside = value
+            onChange(value)
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            removeMonitor()
+            guard window != nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
+                let number = event.windowNumber
+                let location = event.locationInWindow
+                let isTaken = MainActor.assumeIsolated { self?.take(windowNumber: number, at: location) ?? false }
+                return isTaken ? nil : event
+            }
+        }
+
+        isolated deinit { removeMonitor() }
+
+        private func removeMonitor() {
+            if let monitor { NSEvent.removeMonitor(monitor) }
+            monitor = nil
+        }
+
+        private func take(windowNumber: Int, at location: CGPoint) -> Bool {
+            guard isInside, windowNumber == window?.windowNumber else { return false }
+            let point = convert(location, from: nil)
+            guard bounds.contains(point), point.x >= bounds.maxX - target else { return false }
+            onClick()
+            return true
+        }
+    }
+}
+
 /// The pencil that opens the panel of a view, or of a place that could become one. macOS has no toolbar placement in the title's own area, so it leads the items
 /// after the view's name.
 struct ViewEditItem: CustomizableToolbarContent {
