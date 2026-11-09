@@ -765,8 +765,12 @@ final class ValueEditModel {
     /// themselves; ending the panel any other way (a click elsewhere, a resized window, another item) never loses it.
     func finish(cancelled: Bool) {
         isFinished = true
-        guard !cancelled else { return }
-        commitTime()
+        guard !cancelled else {
+            // The time field loses focus as the panel goes, which would otherwise write what was cancelled.
+            timeDraft = nil
+            return
+        }
+        commitTime(isEnding: true)
         guard kind.isTyped, let field = kind.field else { return }
         draft.handOff(
             label: field.label, as: field.kind, rule: field.numberRule, current: currentText, isEditable: isEditable,
@@ -801,7 +805,9 @@ final class ValueEditModel {
 
     /// Writes what was typed in the time field: a time sets it on the day the value holds (today where it holds none),
     /// and nothing takes it away, leaving the day.
-    func commitTime() {
+    /// Ending the panel, a time that can't be read is reported where the person will see it, since the panel's own
+    /// notice goes with it.
+    func commitTime(isEnding: Bool = false) {
         guard let draft = timeDraft else { return }
         timeDraft = nil
         guard allowsTime, isEditable else { return }
@@ -811,9 +817,15 @@ final class ValueEditModel {
             return
         }
         guard let time = TimeOfDay.parse(text) else {
-            notice = String(localized: "Enter a time such as 9:30.")
+            if isEnding {
+                library.notices.tell(String(localized: "Time Not Saved"), String(localized: "“\(text)” isn’t a time, so the time wasn’t changed."))
+            } else {
+                notice = String(localized: "Enter a time such as 9:30.")
+            }
             return
         }
+        // Focus moving through the field leaves the time as it was, seconds included, and adds no undo step.
+        if text == timeText { return }
         let day = storedDate?.date ?? library.now()
         write(request.calendar.date(bySettingHour: time.hour, minute: time.minute, second: 0, of: day) ?? day, withTime: true)
     }
@@ -824,6 +836,8 @@ final class ValueEditModel {
     }
 
     func clearDate() {
+        // A time typed and not yet written would otherwise set the date again as the panel closes.
+        timeDraft = nil
         if commit(nil, failure: String(localized: "The date couldn’t be saved.")) { close() }
     }
 

@@ -178,7 +178,8 @@ final class ValueEditPresenter {
         // The time field takes the arrows and Return itself.
         if case .date = model.kind, session.window?.firstResponder is NSTextView { return false }
         switch event.keyCode {
-        case 51 where model.hasSearch && event.modifierFlags.intersection([.command, .control, .option]).isEmpty:
+        // Not on a repeat: holding Backspace to clear the search must not go on to remove the chips.
+        case 51 where model.hasSearch && !event.isARepeat && event.modifierFlags.intersection([.command, .control, .option]).isEmpty:
             return model.removeLastChip()
         case 125:
             model.move(by: 1)
