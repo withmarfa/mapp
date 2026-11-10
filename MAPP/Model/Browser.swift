@@ -663,6 +663,7 @@ final class Browser {
         writingViews = []
         pendingViewWrites = []
         placeCards = [:]
+        placeRows = [:]
         compactBoards = [:]
         timelineFields = [:]
         selection = []
@@ -785,6 +786,9 @@ final class Browser {
     /// What the gallery draws on each card in a place that is not a saved view, kept for this window only, as the
     /// window keeps that place's other choices (`Browser+SavedViews`).
     var placeCards: [SidebarItem: ViewCards] = [:]
+
+    /// How a list's rows look in a place that is not a saved view, kept for this window only (`Browser+SavedViews`).
+    var placeRows: [SidebarItem: ViewRows] = [:]
 
     /// Where this Mac's settings for views are kept. A test gives its own.
     @ObservationIgnored var defaults: UserDefaults = .standard

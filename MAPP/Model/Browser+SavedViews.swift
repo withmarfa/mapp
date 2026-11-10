@@ -121,6 +121,33 @@ extension Browser {
         if case .view(let id) = item { macSettings(for: id).cards } else { placeCards[item] ?? ViewCards() }
     }
 
+    /// How the list's rows look in the open place: a saved view's choice, else the window's own for the place.
+    var rows: ViewRows {
+        if case .view(let id) = item { macSettings(for: id).rows } else { placeRows[item] ?? ViewRows() }
+    }
+
+    /// Changes the list's rows. A saved view's change is kept on this Mac as it is made, and a place's lasts as long as
+    /// the window, as its cards and layout do. Undo takes either back.
+    func changeRows(_ change: (inout ViewRows) -> Void) {
+        if case .view(let id) = item {
+            changeViewSettings(id) { change(&$0.rows) }
+        } else {
+            let before = placeRows[item] ?? ViewRows()
+            var rows = before
+            change(&rows)
+            guard rows != before else { return }
+            setPlaceRows(rows, before: before, in: item)
+        }
+    }
+
+    private func setPlaceRows(_ rows: ViewRows, before: ViewRows, in place: SidebarItem) {
+        placeRows[place] = rows == ViewRows() ? nil : rows
+        registerUndo(String(localized: "Change Rows")) { browser in
+            guard browser.item == place else { return }
+            browser.setPlaceRows(before, before: rows, in: place)
+        }
+    }
+
     /// Changes what the gallery draws on each card. A saved view's change is kept on this Mac as it is made, and a
     /// place's lasts as long as the window. Undo takes either back.
     func changeCards(_ change: (inout ViewCards) -> Void) {

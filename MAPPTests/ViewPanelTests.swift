@@ -153,6 +153,43 @@ struct ViewPanelTests {
         #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.columns.isShown(.created) != true)
     }
 
+    @Test func rowsAreStoredAsTheyAreChangedAndEachUndoPutsOneBack() {
+        let (browser, _, undo) = Self.opened()
+        for edit: (inout ViewRows) -> Void in [
+            { $0.style = .compact }, { $0.setShowsPreview(false, settings: 2) }, { $0.setShowsPictures(false, settings: true) },
+        ] {
+            undo.beginUndoGrouping()
+            browser.changeRows(edit)
+            Self.close(undo)
+        }
+        let stored = { ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.rows ?? ViewRows() }
+        #expect(stored().style == .compact)
+        #expect(stored().showsPreview == false)
+        #expect(stored().showsPictures == false)
+        #expect(browser.rows == stored())
+        undo.undo()
+        #expect(stored().showsPictures == nil)
+        #expect(stored().showsPreview == false)
+        undo.undo()
+        #expect(stored().showsPreview == nil)
+        #expect(stored().style == .compact)
+        undo.undo()
+        #expect(stored() == ViewRows())
+        #expect(browser.rows == ViewRows())
+    }
+
+    @Test func aPlaceKeepsItsRowsForTheWindowAndUndoPutsThemBack() {
+        let (browser, _, undo) = Self.opened()
+        browser.sidebarItem = .allNotes
+        undo.beginUndoGrouping()
+        browser.changeRows { $0.style = .task }
+        Self.close(undo)
+        #expect(browser.rows.style == .task)
+        #expect(ViewLayouts.stored(in: browser.defaults).views.isEmpty)
+        undo.undo()
+        #expect(browser.rows == ViewRows())
+    }
+
     // MARK: Refused and offline writes
 
     @Test func aRefusedWriteKeepsTheWindowsChoiceAndLeavesTheViewAlone() async {

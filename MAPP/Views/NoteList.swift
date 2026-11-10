@@ -32,9 +32,10 @@ struct NoteList: View, Equatable {
         let ids: [ItemID] = items.map(\.id)
         let context = metaContext(for: items)
         // Each type's style, icon and task fields are settled once for the list, so a row looks its type up and does no
-        // catalogue work of its own. Passing none for the view's choice is where Edit View's rows will hand theirs.
+        // catalogue work of its own. The view's own choice of style, preview and pictures (Edit View's Rows) comes first.
+        let rows = browser.rows
         let styles: [TypeID: ListRowType] = ListRowType.types(
-            of: Set<TypeID>(items.map(\.type)), view: nil, choices: typeStyles, rowStyle: rowStyle, in: library.catalogue)
+            of: Set<TypeID>(items.map(\.type)), view: rows.style, choices: typeStyles, rowStyle: rowStyle, in: library.catalogue)
         let results = browser.searchResults(in: library)
         let excerpts = results?.excerpts ?? [:]
         let isPending = results?.isPending == true
@@ -42,7 +43,8 @@ struct NoteList: View, Equatable {
         // Headings are rows of their own rather than section headers: a list of sections leaves every row at
         // the table's default height, and its first header floats into the toolbar's edge, whose line then runs
         // the list's full width.
-        listContent(sections: sections, ids: ids, now: now, context: context, styles: styles, excerpts: excerpts, title: title)
+        listContent(
+            sections: sections, ids: ids, now: now, context: context, styles: styles, rows: rows, excerpts: excerpts, title: title)
         .onDeleteCommand(perform: deleteSelection)
         .quickLooksOnSpace(browser)
         // Delete alone is the Edit menu's; Command-Delete deletes as it does in Mail.
@@ -98,14 +100,14 @@ struct NoteList: View, Equatable {
     /// The list and its row traits, apart from `body` so that neither is too long for the compiler to check.
     private func listContent(
         sections: [NoteSection], ids: [ItemID], now: Date, context: ItemMeta.Context, styles: [TypeID: ListRowType],
-        excerpts: [ItemID: SearchExcerpt], title: String
+        rows: ViewRows, excerpts: [ItemID: SearchExcerpt], title: String
     ) -> some View {
         SelectableList(browser: browser) {
             // The list reads every line's traits (whether it can be selected, its separators, its drag) each time
             // it updates, as it does on every change of selection, out of sight too. Set here, they come from the
             // line alone; set inside `ListLineRow`, they would have SwiftUI run every row's body to find them.
             ForEach(ListLine.lines(of: sections)) { line in
-                let row = lineRow(line, now: now, context: context, styles: styles, excerpt: excerpts[line.id])
+                let row = lineRow(line, now: now, context: context, styles: styles, rows: rows, excerpt: excerpts[line.id])
                 .selectionDisabled(line.isHeading)
                 .listRowSeparator(line.isHeading ? .hidden : .automatic, edges: .top)
                 .listRowSeparator(line.endsSection ? .hidden : .automatic, edges: .bottom)
@@ -141,11 +143,13 @@ struct NoteList: View, Equatable {
     }
 
     private func lineRow(
-        _ line: ListLine, now: Date, context: ItemMeta.Context, styles: [TypeID: ListRowType], excerpt: SearchExcerpt?
+        _ line: ListLine, now: Date, context: ItemMeta.Context, styles: [TypeID: ListRowType], rows: ViewRows,
+        excerpt: SearchExcerpt?
     ) -> ListLineRow {
         ListLineRow(
-            line: line, order: order, now: now, dateFormat: dateFormat, context: context, previewLines: previewLines,
-            showsPictures: showsPictures, rowType: Self.rowType(of: line, in: styles, fallback: rowStyle), excerpt: excerpt)
+            line: line, order: order, now: now, dateFormat: dateFormat, context: context,
+            previewLines: rows.previewLines(settings: previewLines), showsPictures: rows.showsPictures(settings: showsPictures),
+            rowType: Self.rowType(of: line, in: styles, fallback: rowStyle, view: rows.style), excerpt: excerpt)
     }
 
     /// What the list tells its rows about itself; the type chip also waits on the setting that turns it off.
@@ -160,9 +164,11 @@ struct NoteList: View, Equatable {
         return counted.editedSubtitle(browser.hasViewChanges)
     }
 
-    private static func rowType(of line: ListLine, in types: [TypeID: ListRowType], fallback: ListRowStyle) -> ListRowType {
+    private static func rowType(
+        of line: ListLine, in types: [TypeID: ListRowType], fallback: ListRowStyle, view: ListRowStyle?
+    ) -> ListRowType {
         guard let type = line.type, let rowType = types[type] else {
-            let style = ListRowStyle.resolve(rowStyle: fallback)
+            let style = ListRowStyle.resolve(view: view, rowStyle: fallback)
             return ListRowType(style: style, pictureless: style)
         }
         return rowType
