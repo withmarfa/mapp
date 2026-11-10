@@ -384,7 +384,7 @@ export class NoteEditor {
         },
       },
     )
-    host.engine.setViewport({ scrollContainer: document.documentElement })
+    host.engine.setViewport({ scrollContainer: document.body })
     window.addEventListener('scroll', host.scrolled, { passive: true, capture: true })
     window.addEventListener('resize', host.scrolled)
     root.addEventListener('load', host.scrolled, true)
