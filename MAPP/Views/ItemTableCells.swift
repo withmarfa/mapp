@@ -27,6 +27,8 @@ struct ItemTableCell: View {
             .padding(.vertical, 3)
             .onHover { setHovering($0) }
             .onDisappear { setHovering(false) }
+            // A panel laid over the table gets the pointer and sends no exit to the cell beneath it.
+            .onChange(of: hover.epoch) { isHovering = false }
             // A cell may be reused for another row while the pointer is over it; the old row must not keep its arrow.
             .onChange(of: row.id) { old, _ in
                 if isHovering { hover.exit(old) }
@@ -307,6 +309,8 @@ struct ItemTableLabelStyle: LabelStyle {
 @MainActor @Observable
 final class ItemTableHover {
     private(set) var row: ItemID?
+    /// Counts the times every cell was told to forget the pointer, which each cell reads to drop its own state.
+    private(set) var epoch = 0
     private var cells: [ItemID: Int] = [:]
     private var release: Task<Void, Never>?
     private let grace: Duration
@@ -317,6 +321,14 @@ final class ItemTableHover {
         cells[id, default: 0] += 1
         release?.cancel()
         row = id
+    }
+
+    /// Forgets the pointer, as when a panel opens over the table: the cells beneath it are sent no exit.
+    func clear() {
+        release?.cancel()
+        cells = [:]
+        row = nil
+        epoch += 1
     }
 
     func exit(_ id: ItemID) {

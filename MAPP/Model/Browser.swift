@@ -192,6 +192,10 @@ final class Browser {
     }
     /// Counts the ⌘K pressed while a palette is out, which opens or shuts its Actions.
     var paletteActionsRequests = 0
+
+    /// Whether a floating panel, the palette or quick add, is out over the window, which the views beneath it
+    /// are sent no pointer exit for.
+    var panelIsOut: Bool { palette != nil || (quickAdd.isPresented && quickAdd.draft != nil) }
     /// The window's quick-add panel and what is typed in it.
     let quickAdd = QuickAdd()
     /// Whether the list's search is out as a field, rather than a button beside View Options.
