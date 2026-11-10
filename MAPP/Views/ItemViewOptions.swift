@@ -6,8 +6,8 @@ struct ItemViewOptions: View {
     let browser: Browser?
     /// The layouts the window's place can show; all of them while no window is in front.
     var modes = ItemViewMode.allCases
-    /// Whether each choice claims its Command-number key; the toolbar's copy of the choices leaves them to the menu.
-    var claimsKeys = true
+    /// Whether each choice binds its Command-number key; the toolbar's copy of the choices leaves them to the menu.
+    var bindsKeys = false
 
     var body: some View {
         Group {
@@ -34,7 +34,7 @@ struct ItemViewOptions: View {
     private func choice(_ title: LocalizedStringKey, systemImage: String, _ mode: ItemViewMode, key: KeyEquivalent) -> some View {
         if modes.contains(mode) {
             Toggle(title, systemImage: systemImage, isOn: Binding { browser?.viewMode == mode } set: { _ in browser?.viewMode = mode })
-                .keyboardShortcut(claimsKeys ? KeyboardShortcut(key) : nil)
+                .keyboardShortcut(bindsKeys ? KeyboardShortcut(key) : nil)
                 .accessibilityIdentifier(identifier(mode))
         }
     }
@@ -49,7 +49,7 @@ struct ViewModeMenu: View {
         // A menu rather than a picker for the toolbar's sake: the tray and Icon and Text name an item by its label. Its
         // choices are the View menu's own, so one control makes the change however it is asked for.
         Menu("View As", systemImage: browser.viewMode.symbol) {
-            ItemViewOptions(browser: browser, modes: browser.availableViewModes(in: library), claimsKeys: false)
+            ItemViewOptions(browser: browser, modes: browser.availableViewModes(in: library))
         }
         .help("View As")
         .accessibilityIdentifier("ViewModeMenu")

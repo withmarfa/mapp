@@ -279,4 +279,16 @@ struct ItemBoardTests {
         let lanes = ItemBoardLayout.lanes(items: items, key: "priority", catalogue: Self.mixedCatalogue)
         #expect(lanes.map(\.id) == [.option("low"), .option("high"), .missing, .notApplicable])
     }
+
+    @Test func anInvalidCardOnAMixedBoardShowsItsOwnStatusFieldEvenWithEmptyLanesHidden() {
+        let items = [Self.mixed("a", Self.reading, key: "reading_status", "odd"), Self.mixed("b", Self.ticket, key: "state", "strange")]
+        let catalogue = Self.mixedCatalogue
+        let grouped = ItemBoardLayout.groupsByStatus(items: items, key: "state", catalogue: catalogue)
+        let shown = ItemBoardLayout.lanes(items: items, key: "state", catalogue: catalogue).filter { !$0.items.isEmpty }
+        #expect(shown.map(\.id) == [.invalid], "no group lane is left to show that the board groups by status")
+        #expect(grouped)
+        let keys = items.map { ItemBoardLayout.invalidValueKey(of: $0, key: "state", groupsByStatus: grouped, catalogue: catalogue) }
+        #expect(keys == ["reading_status", "state"])
+        #expect(ItemBoardLayout.invalidValueKey(of: items[0], key: "state", groupsByStatus: false, catalogue: catalogue) == "state")
+    }
 }

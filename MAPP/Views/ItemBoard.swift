@@ -21,7 +21,9 @@ struct ItemBoard: View {
         VStack(spacing: 0) {
             if let field {
                 let lanes = ItemBoardLayout.lanes(items: items, key: field.key, catalogue: library.catalogue)
-                board(browser.hidesEmptyGroups ? lanes.filter { !$0.items.isEmpty } : lanes, key: field.key)
+                // Decided from the items, not the lanes shown: Hide Empty Groups may have removed every group lane.
+                let grouped = ItemBoardLayout.groupsByStatus(items: items, key: field.key, catalogue: library.catalogue)
+                board(browser.hidesEmptyGroups ? lanes.filter { !$0.items.isEmpty } : lanes, key: field.key, grouped: grouped)
             } else if items.isEmpty {
                 if browser.isSearching { SearchEmptyState(browser: browser) }
                 else { EmptyState("No Items") }
@@ -45,13 +47,13 @@ struct ItemBoard: View {
     /// Set from the toolbar's View Options (`ItemBoardOptions`).
     private var compact: Bool { browser.compactBoards[browser.item, default: false] }
 
-    private func board(_ lanes: [ItemBoardLane], key: String) -> some View {
+    private func board(_ lanes: [ItemBoardLane], key: String, grouped: Bool) -> some View {
         let ids = lanes.flatMap { $0.items.map(\.id) }
         return ScrollViewReader { proxy in
             ScrollView(.horizontal) {
                 HStack(alignment: .top, spacing: 16) {
                     ForEach(lanes) { lane in
-                        laneView(lane, lanes: lanes, key: key, ids: ids)
+                        laneView(lane, lanes: lanes, key: key, grouped: grouped, ids: ids)
                     }
                 }
                 .padding(20)
@@ -82,7 +84,7 @@ struct ItemBoard: View {
         .dragContainerSelection(Array(browser.selection))
     }
 
-    private func laneView(_ lane: ItemBoardLane, lanes: [ItemBoardLane], key: String, ids: [ItemID]) -> some View {
+    private func laneView(_ lane: ItemBoardLane, lanes: [ItemBoardLane], key: String, grouped: Bool, ids: [ItemID]) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline) {
                 Text(verbatim: lane.title)
@@ -99,7 +101,7 @@ struct ItemBoard: View {
             ScrollView {
                 LazyVStack(spacing: compact ? 8 : 12) {
                     ForEach(lane.items) { item in
-                        card(item, lane: lane, lanes: lanes, key: key, ids: ids).id(item.id)
+                        card(item, lane: lane, lanes: lanes, key: key, grouped: grouped, ids: ids).id(item.id)
                     }
                     if lane.items.isEmpty {
                         Text("No Items")
@@ -122,17 +124,14 @@ struct ItemBoard: View {
         }
     }
 
-    private func card(_ item: Item, lane: ItemBoardLane, lanes: [ItemBoardLane], key: String, ids: [ItemID]) -> some View {
-        // Where lanes are status groups, each card's own status field holds its value.
-        let grouped = lanes.contains { if case .group = $0.id { true } else { false } }
-        let valueKey = grouped ? ItemBoardLayout.statusField(of: item, catalogue: library.catalogue)?.key ?? key : key
+    private func card(_ item: Item, lane: ItemBoardLane, lanes: [ItemBoardLane], key: String, grouped: Bool, ids: [ItemID]) -> some View {
         return Button {
             let modifiers = NSApp.currentEvent?.modifierFlags ?? []
             select(item.id, ids: ids, extending: modifiers.contains(.shift), toggling: modifiers.contains(.command))
             pane.wrappedValue = .list
         } label: {
             BoardCard(item: item, catalogue: library.catalogue, selected: browser.selection.contains(item.id), compact: compact,
-                      invalidValue: lane.id == .invalid ? item.value(of: valueKey).map(ItemValueText.string) : nil)
+                      invalidValue: lane.id == .invalid ? item.value(of: ItemBoardLayout.invalidValueKey(of: item, key: key, groupsByStatus: grouped, catalogue: library.catalogue)).map(ItemValueText.string) : nil)
         }
         .buttonStyle(.plain)
         .focusable(false)

@@ -78,6 +78,13 @@ nonisolated enum ItemBoardLayout {
         return keys.count > 1 && keys.contains(key)
     }
 
+    /// The key whose value puts an item in the Invalid Value lane: its own status field where the board sorts by
+    /// status groups, `key` otherwise.
+    static func invalidValueKey(of item: Item, key: String, groupsByStatus: Bool, catalogue: Catalogue) -> String {
+        guard groupsByStatus else { return key }
+        return statusField(of: item, catalogue: catalogue)?.key ?? key
+    }
+
     private static func groupedLane(for item: Item, catalogue: Catalogue) -> ItemBoardLane.ID {
         guard let field = statusField(of: item, catalogue: catalogue) else { return .notApplicable }
         guard let value = item.value(of: field.key), value != .null else { return .missing }
@@ -137,22 +144,15 @@ nonisolated enum ItemBoardLayout {
         let types = Set(items.map(\.type))
         let fields = types.compactMap { type in eligibleFields(of: type, catalogue: catalogue).first(where: \.isStatus) }
         var lanes = StatusGroup.allCases.map { group in
-            var lane = ItemBoardLane(id: .group(group), title: StatusBucket.group(group).title, items: [])
-            lane.takesItems = fields.allSatisfy { firstWord($0, in: group) != nil }
-            return lane
+            ItemBoardLane(id: .group(group), title: StatusBucket.group(group).title, items: [],
+                          takesItems: fields.allSatisfy { firstWord($0, in: group) != nil })
         }
-        var missing = ItemBoardLane(id: .missing, title: String(localized: "No Status"), items: [])
-        missing.takesItems = false
-        lanes.append(missing)
+        lanes.append(ItemBoardLane(id: .missing, title: String(localized: "No Status"), items: [], takesItems: false))
         if groups[.invalid] != nil {
-            var lane = ItemBoardLane(id: .invalid, title: String(localized: "Invalid Value"), items: [])
-            lane.takesItems = false
-            lanes.append(lane)
+            lanes.append(ItemBoardLane(id: .invalid, title: String(localized: "Invalid Value"), items: [], takesItems: false))
         }
         if groups[.notApplicable] != nil {
-            var lane = ItemBoardLane(id: .notApplicable, title: String(localized: "Not Applicable"), items: [])
-            lane.takesItems = false
-            lanes.append(lane)
+            lanes.append(ItemBoardLane(id: .notApplicable, title: String(localized: "Not Applicable"), items: [], takesItems: false))
         }
         return lanes.map { lane in
             var lane = lane
