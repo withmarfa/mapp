@@ -35,13 +35,22 @@ struct ColumnSearch: CustomizableToolbarContent {
             onSubmit: onSubmit, onDown: onDown
         ) {
             text = ""
-            isExpanded = false
+            setExpanded(false)
         }
     }
 
     private var button: some View {
-        Button("Search", systemImage: "magnifyingglass") { isExpanded = true }
+        Button("Search", systemImage: "magnifyingglass") { setExpanded(true) }
             .help("Search")
+    }
+
+    /// The view that shows the field takes the title away (`toolbar(removing: .title)`), but SwiftUI hands that to the
+    /// window a pass after it sizes the field, so the toolbar would draw the wide field beside the title, past the
+    /// column's end, and slide it back. Opening, the title is hidden here first; closing, it comes back once the
+    /// field has gone (`ToolbarSearchTextField.viewWillMove(toWindow:)`).
+    private func setExpanded(_ expanded: Bool) {
+        if expanded, case .column = layout { NSApp.keyWindow?.titleVisibility = .hidden }
+        isExpanded = expanded
     }
 
     var body: some CustomizableToolbarContent {
@@ -60,17 +69,20 @@ struct ColumnSearch: CustomizableToolbarContent {
 }
 
 enum ColumnSearchMetrics {
-    /// What a column's toolbar keeps beside an open field: its margins, the options item and the gap before it.
-    static let columnChrome: CGFloat = 54
-    /// What the field takes of the room it could fill. One factor for every layout, so they narrow together.
+    /// What a column's toolbar keeps beside an open field: the toolbar's margin on each side, so the glass sits as
+    /// far from what precedes it as from the column's end, and Filter and View Options in the same glass.
+    static let columnChrome: CGFloat = 89
+    /// The room the sidebar button takes at the start of the list column's toolbar while the sidebar is hidden.
+    static let sidebarButtonRoom: CGFloat = 46
+    /// What a field of its own takes of the room it could fill.
     static let share: CGFloat = 0.85
     /// The room a field could fill as an item of its own, before `share` narrows it.
     private static let itemRoom: CGFloat = 260
     private static let minimum: CGFloat = 120
 
-    /// In a list column, the field ends before the options item, with the rest of the column's room left over.
+    /// In a list column, the field fills the column but for the toolbar's margins and the options beside it.
     static func fieldWidth(inColumn width: CGFloat) -> CGFloat {
-        max(minimum, ((width - columnChrome) * share).rounded())
+        max(minimum, (width - columnChrome).rounded())
     }
 
     static var itemFieldWidth: CGFloat { (itemRoom * share).rounded() }
@@ -216,6 +228,15 @@ private final class ToolbarSearchTextField: NSTextField {
     required init?(coder: NSCoder) { fatalError() }
 
     isolated deinit { removeMonitor() }
+
+    /// The field leaving its window is the search closing, whatever closed it, so the title the search hid
+    /// (`ColumnSearch.setExpanded`) comes back, a pass later so the toolbar has narrowed the item first.
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        if newWindow == nil, let window {
+            DispatchQueue.main.async { [weak window] in window?.titleVisibility = .visible }
+        }
+        super.viewWillMove(toWindow: newWindow)
+    }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
