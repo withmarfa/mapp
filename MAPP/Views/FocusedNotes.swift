@@ -38,8 +38,10 @@ final class DetailsPresentation {
     /// note's page from the editor, a web page from its web view. It names the item, not a flag, so a page that is
     /// still reporting for the item before cannot show that item's title for the next.
     private(set) var itemWithHeaderAway: ItemID?
-    /// The items the window's Change Type sheet is open for.
+    /// The items the window's Change Type panel is asked for.
     var typeChange: TypeChangeRequest?
+    /// The items and type the window asks the values for that the type needs.
+    var typeValues: TypeValuesRequest?
     /// Version History, while the window shows it in place of its page.
     private(set) var history: VersionHistoryMode?
     /// Whether the window's right sidebar is arranging the page's layout (Customize Layout) in place of the inspector.
@@ -211,11 +213,19 @@ final class DetailsPresentation {
     }
 }
 
-/// What the Change Type sheet changes, with the undo manager of the window it was asked for in, since the sheet
+/// What the Change Type panel changes, with the undo manager of the window it was asked for in, since the panel
 /// has its own.
 struct TypeChangeRequest: Identifiable {
     let id = UUID()
     let ids: Set<ItemID>
+    let undoManager: UndoManager?
+}
+
+/// The values a chosen type needs that the items lack (`TypeValuesSheet`), with the undo manager of the window.
+struct TypeValuesRequest: Identifiable {
+    let id = UUID()
+    let ids: Set<ItemID>
+    let type: TypeID
     let undoManager: UndoManager?
 }
 

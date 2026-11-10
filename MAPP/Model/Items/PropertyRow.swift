@@ -120,11 +120,11 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     static func candidates(
         of item: Item, type: ItemTypeInfo?, hidden: Set<String>, relationships: [ItemRelationship], parentField: String, format: DateFormat,
         tags: [String], typeLabel: String?, typeIcon: String?, sourceName: String?, now: Date, calendar: Calendar, locale: Locale,
-        offersEmpty: Bool = false, icon: (ItemID) -> String?, isPerson: (ItemID) -> Bool
+        offersEmpty: Bool = false, changesType: Bool? = nil, icon: (ItemID) -> String?, isPerson: (ItemID) -> Bool
     ) -> [PropertyRow] {
         var rows: [PropertyRow] = []
         if let typeLabel {
-            rows.append(PropertyRow(id: PagePlacement.type, label: String(localized: "Type"), value: .type(typeLabel, icon: typeIcon)))
+            rows.append(PropertyRow(id: PagePlacement.type, label: String(localized: "Type"), value: .type(typeLabel, icon: typeIcon), editable: changesType ?? item.isEditable))
         }
         if let source = (sourceName ?? item.source)?.trimmingCharacters(in: .whitespacesAndNewlines), !source.isEmpty {
             rows.append(PropertyRow(id: PagePlacement.source, label: String(localized: "Source"), value: .source(source)))

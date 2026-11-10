@@ -5,7 +5,7 @@ import SwiftUI
 struct ItemBoard: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
-    /// The window's, for the Change Type sheet.
+    /// The window's, for the Change Type panel.
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     @Bindable var browser: Browser
     var pane: FocusState<Browser.Pane?>.Binding

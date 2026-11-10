@@ -32,7 +32,7 @@ struct PageHeaderParts {
             parentField: PagePlacement.parent, format: dateFormat, tags: library.tags(of: item),
             typeLabel: type.map { ItemPageHeader.localized($0.label) }, typeIcon: library.catalogue.icon(for: item.type),
             sourceName: item.source.map { library.sources.name($0) }, now: now, calendar: .current, locale: .current,
-            offersEmpty: offersEmpty, icon: { Self.typeIcon(of: $0, in: library) }, isPerson: { Self.isPerson($0, in: library) })
+            offersEmpty: offersEmpty, changesType: library.offersTypeChange(for: [item.id]), icon: { Self.typeIcon(of: $0, in: library) }, isPerson: { Self.isPerson($0, in: library) })
         pins = PagePins.resolve(
             for: item, type: type, placement: placement, lead: lead, relationships: relationships, candidates: candidates, offersEmpty: offersEmpty,
             icon: { Self.typeIcon(of: $0, in: library) }, isPerson: { Self.isPerson($0, in: library) })

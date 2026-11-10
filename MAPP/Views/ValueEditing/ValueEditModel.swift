@@ -17,6 +17,15 @@ struct ValueEditRequest {
     var calendar = Calendar.current
     /// Opens the item the parent row names, for the parent's panel.
     var open: (ItemID) -> Void = { _ in }
+    /// The items a type panel changes where the window has several chosen, which `item` cannot name. Empty otherwise.
+    var items: Set<ItemID> = []
+    /// Asks for the values a type needs that the items lack, for the type panel. The panel takes none itself.
+    var needsValues: (TypeID) -> Void = { _ in }
+    /// Opens the panel at the middle of `rect`, where the value has no place of its own to open under.
+    var isCentered = false
+
+    /// The items a type panel changes.
+    var typeTargets: Set<ItemID> { items.isEmpty ? item.map { [$0] } ?? [] : items }
 
     /// One editor at a time is open; this says which value it is for.
     var target: String { (item?.rawValue ?? "new") + "#" + kind.rowID }
@@ -154,6 +163,7 @@ final class ValueEditModel {
 
     /// Whether the item can still take the edit. An editor for an item that cannot closes itself.
     var isEditable: Bool {
+        if kind == .type { return library.offersTypeChange(for: request.typeTargets) }
         guard let id = request.item else { return true }
         guard let item = library.item(id) else { return false }
         return kind == .tags ? item.canEditTags : item.isEditable
@@ -175,7 +185,7 @@ final class ValueEditModel {
 
     private var currentText: String { Self.text(of: value) }
 
-    /// The tags or the words the panel shows as removable tokens above its search field.
+    /// The tags or the words the panel holds, which its search field shows as chips.
     var heldTokens: [String] {
         switch kind {
         case .tags: request.item.flatMap(library.item).map(library.tags(of:)) ?? []
@@ -197,8 +207,16 @@ final class ValueEditModel {
 
     var hasSearch: Bool {
         switch kind {
-        case .people, .tags, .words, .parent: true
-        case .status, .choice, .date, .text, .number: false
+        case .people, .tags, .words, .parent, .status, .choice, .type: true
+        case .date, .text, .number: false
+        }
+    }
+
+    /// Whether the panel adds to what the value holds, which then shows one chip for each thing held.
+    var holdsMany: Bool {
+        switch kind {
+        case .people, .tags, .words: true
+        default: false
         }
     }
 
@@ -208,6 +226,8 @@ final class ValueEditModel {
         case .tags: "Add or Find a Tag"
         case .words: "Add or Find a Word"
         case .parent: "Find an Item"
+        case .type: "Find a Type"
+        case .status, .choice: "Find an Option"
         default: "Find or Add a Person"
         }
     }
@@ -238,8 +258,9 @@ final class ValueEditModel {
 
     private func buildRows() -> [ValueListRow] {
         switch kind {
-        case .status(let field): ValueEditOptions.statusRows(field: field, current: value?.string)
-        case .choice(let field): ValueEditOptions.choiceRows(field: field, current: value?.string)
+        case .status(let field): narrowed(ValueEditOptions.statusRows(field: field, current: value?.string))
+        case .choice(let field): narrowed(ValueEditOptions.choiceRows(field: field, current: value?.string))
+        case .type: typeRows
         case .date: quickRows
         case .people(_, let shape): peopleRows(shape)
         case .tags: tagRows
@@ -249,14 +270,47 @@ final class ValueEditModel {
         }
     }
 
+    /// The rows whose title holds what is typed, under the headings that still have one, and no separator while
+    /// something is typed.
+    private func narrowed(_ rows: [ValueListRow]) -> [ValueListRow] {
+        let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !typed.isEmpty else { return rows }
+        var result: [ValueListRow] = []
+        var heading: ValueListRow?
+        for row in rows {
+            switch row.role {
+            case .header:
+                heading = row
+            case .separator:
+                continue
+            case .option, .create:
+                guard row.title.localizedStandardContains(typed) else { continue }
+                if let heading { result.append(heading) }
+                heading = nil
+                result.append(row)
+            }
+        }
+        return result
+    }
+
+    private var typeRows: [ValueListRow] {
+        let options = library.typeChangeOptions(for: request.typeTargets).map {
+            ValueListRow(id: Self.typePrefix + $0.id.rawValue, role: .option, title: $0.label, mark: .type(icon: $0.icon))
+        }
+        return narrowed(options)
+    }
+
+    static let typePrefix = "type:"
+
     var quickDates: [QuickDates.Entry] { QuickDates.entries(now: library.now(), calendar: request.calendar) }
 
+    /// The quick dates above the calendar, then Not Set, which the panel draws below it.
     private var quickRows: [ValueListRow] {
         quickDates.map {
             ValueListRow(
                 id: "quick:" + $0.id, role: .option, title: $0.title,
-                detail: QuickDates.detail(of: $0, calendar: request.calendar, locale: .current), mark: .symbol($0.symbol))
-        }
+                detail: QuickDates.detail(of: $0, now: library.now(), calendar: request.calendar, locale: .current), mark: .symbol($0.symbol))
+        } + [ValueListRow(id: ValueEditOptions.notSetID, role: .option, title: String(localized: "Not Set"), isCurrent: value == nil)]
     }
 
     private func peopleRows(_ shape: ListShape) -> [ValueListRow] {
@@ -267,14 +321,7 @@ final class ValueEditModel {
         let names = Dictionary(grouping: held.map(\.person) + matching, by: { $0.name.lowercased() }).mapValues(\.count)
         func detail(_ person: PeopleSuggestions.Person) -> String? { names[person.name.lowercased(), default: 0] > 1 ? person.address : nil }
         var rows: [ValueListRow] = []
-        if !held.isEmpty {
-            rows.append(.header(String(localized: "Assigned"), id: "header:held"))
-            rows += held.map {
-                ValueListRow(id: $0.id, role: .option, title: $0.person.name, detail: detail($0.person), mark: mark($0.person), isCurrent: true)
-            }
-        }
         if !matching.isEmpty {
-            rows.append(.header(String(localized: "Matching"), id: "header:matching"))
             rows += matching.prefix(30).map {
                 ValueListRow(id: "person:" + $0.identity, role: .option, title: $0.name, detail: detail($0), mark: mark($0))
             }
@@ -292,7 +339,6 @@ final class ValueEditModel {
         let matching = library.tagSuggestions(matching: query, excluding: held)
         var rows: [ValueListRow] = []
         if !matching.isEmpty {
-            rows.append(.header(String(localized: "Matching"), id: "header:matching"))
             rows += matching.prefix(30).map { ValueListRow(id: "tag:" + $0, role: .option, title: $0, mark: .tag) }
         }
         let typed = ItemTag.normalized(query)
@@ -310,7 +356,6 @@ final class ValueEditModel {
         }
         var rows: [ValueListRow] = []
         if !matching.isEmpty {
-            rows.append(.header(String(localized: "Matching"), id: "header:matching"))
             rows += matching.prefix(30).map { ValueListRow(id: "word:" + $0, role: .option, title: $0, mark: .tag) }
         }
         let known = held.contains(typed.lowercased()) || wordPool.contains { $0.lowercased() == typed.lowercased() }
@@ -323,21 +368,14 @@ final class ValueEditModel {
     /// The most items the parent's list shows before the person narrows it by typing.
     static let parentLimit = 50
     static let openID = "open"
-    static let removeID = "remove"
 
     private var parentRows: [ValueListRow] {
         var rows: [ValueListRow] = []
         let current = parentTarget
-        if let current, let id = current.itemID, current.isOpenable {
-            rows.append(ValueListRow(id: Self.openID, role: .option, title: String(localized: "Open “\(current.displayTitle)”"), mark: .symbol("arrow.up.right")))
-            rows.append(.separator)
-            rows.append(ValueListRow(id: "parent:" + id.rawValue, role: .option, title: current.displayTitle, isCurrent: true))
-        }
         let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let currentID = current?.itemID
         let matching = parentCandidates.filter { $0.id != currentID && (typed.isEmpty || $0.title.localizedStandardContains(typed)) }
         if !matching.isEmpty {
-            rows.append(.header(String(localized: "Items"), id: "header:items"))
             rows += matching.prefix(Self.parentLimit).map {
                 ValueListRow(id: "parent:" + $0.id.rawValue, role: .option, title: $0.displayTitle, detail: library.catalogue.label(for: $0.type))
             }
@@ -345,9 +383,9 @@ final class ValueEditModel {
                 rows.append(.header(String(localized: "Type to narrow the list"), id: "header:more"))
             }
         }
-        if current != nil {
+        if typed.isEmpty, let current, current.itemID != nil, current.isOpenable {
             rows.append(.separator)
-            rows.append(ValueListRow(id: Self.removeID, role: .option, title: String(localized: "Remove Parent"), mark: .symbol("xmark")))
+            rows.append(ValueListRow(id: Self.openID, role: .option, title: String(localized: "Open “\(current.displayTitle)”"), mark: .symbol("arrow.up.right")))
         }
         return rows
     }
@@ -368,7 +406,7 @@ final class ValueEditModel {
         switch kind {
         case .tags, .words: return rows.first { $0.role == .create }?.id ?? rows.first?.id
         case .people: return rows.first { $0.id.hasPrefix("person:") }?.id ?? rows.first?.id
-        default: return rows.first { $0.id.hasPrefix("parent:") }?.id ?? rows.first?.id
+        default: return rows.first { $0.id != Self.openID }?.id ?? rows.first?.id
         }
     }
 
@@ -390,13 +428,21 @@ final class ValueEditModel {
         if abs(before.0 - totalHeight) > 0.5 || abs(before.1 - rowsHeight) > 0.5 || abs(before.2 - listHeight) > 0.5 { layoutChanged() }
     }
 
-    /// The height the content wants with nothing scrolled.
-    var naturalHeight: CGFloat { totalHeight + max(0, rowsHeight - listHeight) }
+    /// The most a list is tall: ten rows, past which it scrolls. A status list, which is grouped under headings, is as tall
+    /// as its groups.
+    func listLimit(scale: CGFloat) -> CGFloat {
+        if case .status = kind { return .infinity }
+        return CGFloat(ValueEditMetrics.visibleRows) * ValueEditMetrics.rowHeight * scale
+    }
+
+    /// The height the content wants with nothing scrolled past `listLimit`.
+    func naturalHeight(scale: CGFloat) -> CGFloat { totalHeight + max(0, min(rowsHeight, listLimit(scale: scale)) - listHeight) }
 
     func move(by step: Int) {
         let rows = navigable
         guard !rows.isEmpty else { return }
         viaKeyboard = true
+        // The first arrow starts from the value the field holds, as a menu opens on its checked item.
         guard let current = activeRow.flatMap({ id in rows.firstIndex { $0.id == id } }) ?? Self.onlyCurrent(in: rows) else {
             highlight = (step > 0 ? rows.first : rows.last)?.id
             return
@@ -404,9 +450,6 @@ final class ValueEditModel {
         highlight = rows[min(max(current + step, 0), rows.count - 1)].id
     }
 
-    /// Where the keyboard starts when nothing is highlighted yet: the row of the one value the item holds, as a menu
-    /// opens on its checked item. With none, or several (tags, people), or with only Not Set marked because nothing is
-    /// set, the first or last row.
     static func onlyCurrent(in rows: [ValueListRow]) -> Int? {
         let held = rows.indices.filter { rows[$0].isCurrent && rows[$0].id != ValueEditOptions.notSetID }
         return held.count == 1 ? held[0] : nil
@@ -433,9 +476,13 @@ final class ValueEditModel {
         guard isEditable else { close(); return }
         switch kind {
         case .status, .choice:
-            let new: PropertyValue? = ValueEditOptions.word(of: id).map { .string($0) }
-            if id == ValueEditOptions.notSetID || new != nil, commit(new), kind.closesOnChoice { close() }
+            guard let word = ValueEditOptions.word(of: id), commit(.string(word)), kind.closesOnChoice else { return }
+            close()
         case .date:
+            if id == ValueEditOptions.notSetID {
+                if value != nil { clearDate() }
+                return
+            }
             guard let entry = quickDates.first(where: { "quick:" + $0.id == id }) else { return }
             chooseDay(entry.date)
             if notice == nil { close() }
@@ -443,7 +490,25 @@ final class ValueEditModel {
         case .tags: activateTag(id)
         case .words: activateWord(id)
         case .parent: activateParent(id)
+        case .type: activateType(id)
         case .text, .number: break
+        }
+    }
+
+    /// Changes the type once every open page has handed over its last edit. A type that needs a value the items lack is
+    /// asked for in the window, since the panel holds no field for it. A change the library refuses is told in a notice,
+    /// and the panel stays.
+    private func activateType(_ id: String) {
+        guard id.hasPrefix(Self.typePrefix) else { return }
+        let type = TypeID(String(id.dropFirst(Self.typePrefix.count)))
+        let targets = request.typeTargets
+        guard library.typeChangePlan(targets, to: type).missing.isEmpty else {
+            request.needsValues(type)
+            close()
+            return
+        }
+        library.changeTypeAfterSaving(targets, to: type, filling: [:], undoManager: request.undoManager) { [weak self] sent in
+            if sent { self?.close() }
         }
     }
 
@@ -526,8 +591,6 @@ final class ValueEditModel {
         case Self.openID:
             if let target = current?.itemID { request.open(target) }
             close()
-        case Self.removeID:
-            changeParent(of: item, adding: nil, removing: current?.itemID)
         default:
             let target = ItemID(String(id.dropFirst("parent:".count)))
             if target == current?.itemID { close() } else { changeParent(of: item, adding: target, removing: current?.itemID) }
@@ -567,6 +630,60 @@ final class ValueEditModel {
                 notice = refusal ?? String(localized: "The parent could not be saved.")
             }
         }
+    }
+
+    /// What the value holds, as the chips in the search field: one for each tag, word or person, and the one value of a
+    /// panel that closes on choosing.
+    var chips: [ValueChip] {
+        switch kind {
+        case .tags:
+            return heldTokens.map { ValueChip(id: "tag:" + $0, title: $0, mark: .tag) }
+        case .words:
+            return heldTokens.map { ValueChip(id: "word:" + $0, title: $0, mark: .tag) }
+        case .people(_, let shape):
+            return PeopleSuggestions.held(in: value, shape: shape).map {
+                ValueChip(id: $0.id, title: $0.person.name, mark: .person(initials: PersonInitials.of($0.person.name) ?? ""))
+            }
+        case .status(let field):
+            guard let word = value?.string, !word.isEmpty, case .status(let words) = field.kind else { return [] }
+            let group = words.first { $0.value == word }?.group
+            return [ValueChip(id: ValueEditOptions.optionID(word), title: ItemTypeInfo.Field.label(ofOption: word), mark: .status(group), isRemovable: !field.required)]
+        case .choice(let field):
+            guard let word = value?.string, !word.isEmpty else { return [] }
+            return [ValueChip(id: ValueEditOptions.optionID(word), title: ItemTypeInfo.Field.label(ofOption: word), mark: .dot(ItemTypeInfo.Field.label(ofOption: word)), isRemovable: !field.required)]
+        case .parent:
+            guard let current = parentTarget else { return [] }
+            return [ValueChip(id: "parent:" + current.id, title: current.displayTitle)]
+        case .type:
+            let types = Set(request.typeTargets.compactMap { library.item($0)?.type })
+            guard types.count == 1, let type = types.first else { return [] }
+            return [ValueChip(id: Self.typePrefix + type.rawValue, title: library.catalogue.label(for: type), mark: .type(icon: library.catalogue.icon(for: type)), isRemovable: false)]
+        case .date, .text, .number:
+            return []
+        }
+    }
+
+    /// Takes one chip's value away: a tag, word or person from the list it is in, or the one value of a status, a choice
+    /// or a parent.
+    func remove(_ chip: ValueChip) {
+        guard isEditable, chip.isRemovable else { return }
+        switch kind {
+        case .tags, .words: removeToken(chip.title)
+        case .people: activate(chip.id)
+        case .status, .choice: commit(nil)
+        case .parent:
+            guard !isSaving, let item = request.item else { return }
+            changeParent(of: item, adding: nil, removing: parentTarget?.itemID)
+        default: break
+        }
+    }
+
+    /// Backspace in an empty search field takes the last chip away, as the field of a tag list always has.
+    @discardableResult
+    func removeLastChip() -> Bool {
+        guard query.isEmpty, let chip = chips.last(where: \.isRemovable) else { return false }
+        remove(chip)
+        return true
     }
 
     /// Removes one tag or word from the tokens above the field.
@@ -654,7 +771,12 @@ final class ValueEditModel {
     /// themselves; ending the panel any other way (a click elsewhere, a resized window, another item) never loses it.
     func finish(cancelled: Bool) {
         isFinished = true
-        guard !cancelled else { return }
+        guard !cancelled else {
+            // The time field loses focus as the panel goes, which would otherwise write what was cancelled.
+            timeDraft = nil
+            return
+        }
+        commitTime(isEnding: true)
         guard kind.isTyped, let field = kind.field else { return }
         draft.handOff(
             label: field.label, as: field.kind, rule: field.numberRule, current: currentText, isEditable: isEditable,
@@ -672,18 +794,46 @@ final class ValueEditModel {
 
     var hasTime: Bool { allowsTime && (storedDate?.hasTime ?? false) }
 
-    /// The person chose a date and, where the value has a time, a time in the picker: what it shows is what is written.
-    func setDate(_ selected: Date) { write(selected, withTime: hasTime) }
-
     /// The person chose a day from the quick dates, which keeps the time the value already has.
     func chooseDay(_ day: Date) {
         write(hasTime ? QuickDates.moment(on: day, keepingTimeOf: storedDate?.date, calendar: request.calendar) : day, withTime: hasTime)
     }
 
-    /// The person turned the time on or off. Turning it on keeps the day, and gives a value with none today.
-    func setIncludesTime(_ included: Bool) {
-        guard allowsTime else { return }
-        write(storedDate?.date ?? library.now(), withTime: included)
+    /// What the time field is showing while the person types in it, nil while it shows the value's own time.
+    var timeDraft: String?
+
+    /// The value's time as the person's locale writes it, or empty where the value holds none.
+    var timeText: String {
+        guard hasTime, let date = storedDate?.date else { return "" }
+        let calendar = request.calendar
+        return date.formatted(Date.FormatStyle(date: .omitted, time: .shortened, locale: .current, calendar: calendar, timeZone: calendar.timeZone))
+    }
+
+    /// Writes what was typed in the time field: a time sets it on the day the value holds (today where it holds none),
+    /// and nothing takes it away, leaving the day.
+    /// Ending the panel, a time that can't be read is reported where the person will see it, since the panel's own
+    /// notice goes with it.
+    func commitTime(isEnding: Bool = false) {
+        guard let draft = timeDraft else { return }
+        timeDraft = nil
+        guard allowsTime, isEditable else { return }
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.isEmpty {
+            if hasTime, let date = storedDate?.date { write(date, withTime: false) }
+            return
+        }
+        guard let time = TimeOfDay.parse(text) else {
+            if isEnding {
+                library.notices.tell(String(localized: "Time Not Saved"), String(localized: "“\(text)” isn’t a time, so the time wasn’t changed."))
+            } else {
+                notice = String(localized: "Enter a time such as 9:30.")
+            }
+            return
+        }
+        // Focus moving through the field leaves the time as it was, seconds included, and adds no undo step.
+        if text == timeText { return }
+        let day = storedDate?.date ?? library.now()
+        write(request.calendar.date(bySettingHour: time.hour, minute: time.minute, second: 0, of: day) ?? day, withTime: true)
     }
 
     private func write(_ date: Date, withTime: Bool) {
@@ -692,6 +842,8 @@ final class ValueEditModel {
     }
 
     func clearDate() {
+        // A time typed and not yet written would otherwise set the date again as the panel closes.
+        timeDraft = nil
         if commit(nil, failure: String(localized: "The date couldn’t be saved.")) { close() }
     }
 

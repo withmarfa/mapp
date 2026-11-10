@@ -156,6 +156,8 @@ struct ItemPageHeader: ViewModifier {
                     kind = item.canEditTags ? .tags : nil
                 case PagePlacement.parent:
                     kind = item.isEditable ? .parent : nil
+                case PagePlacement.type:
+                    kind = library.offersTypeChange(for: [id]) ? .type : nil
                 default:
                     let field = library.catalogue.itemTypes[item.type]?.fields.first { $0.key == row }
                     // A yes or no is a toggle, not a panel.
@@ -166,7 +168,11 @@ struct ItemPageHeader: ViewModifier {
                     kind = field.flatMap(ValueEditKind.init(field:))
                 }
                 guard let kind else { return }
-                editor.presentEditor(Self.request(kind, of: id, in: library, undoManager: undoManager, editor: editor), under: rect)
+                var request = Self.request(kind, of: id, in: library, undoManager: undoManager, editor: editor)
+                request.needsValues = { [weak drafts] type in
+                    drafts?.typeValues = TypeValuesRequest(ids: [id], type: type, undoManager: undoManager)
+                }
+                editor.presentEditor(request, under: rect)
             case .toggleLayout:
                 drafts.toggleLayout()
             case .showLinked:

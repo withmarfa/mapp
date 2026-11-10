@@ -126,12 +126,10 @@ nonisolated struct TypeChange: Hashable, Sendable {
     }
 }
 
-/// What the type change sheet shows for a set of items and a type.
+/// What the values sheet (`TypeValuesSheet`) shows for a set of items and a type.
 nonisolated struct TypeChangePreview: Hashable, Sendable {
     /// The required fields to ask for, once each, in the new type's order.
     var missing: [ItemTypeInfo.Field]
-    /// The labels of the fields the items keep that the new type does not use, in order.
-    var unused: [String]
 }
 
 extension ItemLibrary {
@@ -215,21 +213,16 @@ extension ItemLibrary {
         return result
     }
 
-    /// What changing `ids` to `type` asks for and leaves unused, across all of them.
+    /// What changing `ids` to `type` asks for, across all of them.
     func typeChangePreview(for ids: Set<ItemID>, to type: TypeID) -> TypeChangePreview {
         var missing: [ItemTypeInfo.Field] = []
-        var unused: [String] = []
         for id in ids.sorted(by: { $0.rawValue < $1.rawValue }) {
-            guard let item = item(id), let plan = typeChange(of: id, to: type) else { continue }
+            guard let plan = typeChange(of: id, to: type) else { continue }
             for field in plan.missing where !missing.contains(where: { $0.key == field.key }) { missing.append(field) }
-            for key in plan.unused {
-                let label = catalogue.label(ofField: key, for: item.type) ?? key
-                if !unused.contains(label) { unused.append(label) }
-            }
         }
         let order = catalogue.itemTypes[type]?.fields.map(\.key) ?? []
         missing.sort { (order.firstIndex(of: $0.key) ?? .max) < (order.firstIndex(of: $1.key) ?? .max) }
-        return TypeChangePreview(missing: missing, unused: unused.sorted { $0.localizedStandardCompare($1) == .orderedAscending })
+        return TypeChangePreview(missing: missing)
     }
 }
 

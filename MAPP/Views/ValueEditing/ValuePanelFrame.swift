@@ -1,8 +1,9 @@
 import CoreGraphics
 
 /// Where a value panel goes for the value it edits, in screen coordinates (origin at the bottom left): under the
-/// value and starting at its leading edge, or ending at its trailing edge where the value is narrower than the panel,
-/// as in the sidebar. It flips above where there is no room below, and is as tall as the content unless the room left
+/// value and starting at its leading edge, shifted along only as far as the window needs, or centred on a point where
+/// there is no value (`centered`). The panel is `fitting` wide where the content says, else as wide as the value within
+/// `floor` and `ceiling`. It flips above where there is no room below, and is as tall as the content unless the room left
 /// is shorter, in which case the list scrolls. The frame always lies inside `visible`, the screen's visible frame
 /// narrowed to the window sideways, even where that means covering the value.
 nonisolated enum ValuePanelFrame {
@@ -15,10 +16,11 @@ nonisolated enum ValuePanelFrame {
     static let leastHeight: CGFloat = 96
 
     static func placement(
-        anchor: CGRect, visible: CGRect, contentHeight: CGFloat, floor: CGFloat, ceiling: CGFloat, gap: CGFloat
+        anchor: CGRect, visible: CGRect, contentHeight: CGFloat, floor: CGFloat, ceiling: CGFloat, gap: CGFloat,
+        fitting: CGFloat? = nil, centered: Bool = false
     ) -> Placement {
-        let width = min(max(anchor.width, floor), max(floor, ceiling), visible.width)
-        let leading = width > anchor.width ? anchor.maxX - width : anchor.minX
+        let width = min(fitting ?? min(max(anchor.width, floor), max(floor, ceiling)), visible.width)
+        let leading = centered ? anchor.midX - width / 2 : anchor.minX
         let x = min(max(leading, visible.minX), visible.maxX - width)
         let below = anchor.minY - gap - visible.minY
         let above = visible.maxY - (anchor.maxY + gap)

@@ -327,6 +327,7 @@ struct ItemPropertyRow: View {
                 .contentShape(.rect)
         }
         .buttonStyle(.plain)
+        .focusEffectDisabled()
         .accessibilityLabel(LocalizedStringKey(definition.label))
         .accessibilityValue(text.map { Text(verbatim: $0) } ?? Text("Empty"))
         .accessibilityHint(hint)
