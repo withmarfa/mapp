@@ -97,7 +97,8 @@ nonisolated enum ItemBoardLayout {
 
     /// The lanes of a board by `key`: the words the items' types declare, a status field's by their group (as the
     /// table lists them) and then in declared order, then No Value, and Invalid Value and Not Applicable where an
-    /// item needs them. A board's fields are closed, so a word no type declares is an invalid value.
+    /// item needs them. A board's fields are closed, so a word no type declares is an invalid value. Where the types
+    /// keep their status in different fields (`groupsByStatus`), the lanes are Marfa's status groups instead.
     static func lanes(items: [Item], key: String, catalogue: Catalogue) -> [ItemBoardLane] {
         if groupsByStatus(items: items, key: key, catalogue: catalogue) { return groupLanes(items: items, catalogue: catalogue) }
         var values: [(word: String, bucket: StatusBucket)] = []
