@@ -83,6 +83,15 @@ struct FilterRow: View {
         if !FilterPanelPresenter.shared.isOpen(for: id) { openColumn = nil }
     }
 
+    /// Opens a column's panel once its chip has a view to open under, which the row makes on a later turn of the run loop.
+    private func openValuesWhenShown(_ id: String, attempts: Int = 20) {
+        if anchors.view(for: id) != nil || attempts == 0 {
+            openValues(of: id)
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(25)) { openValuesWhenShown(id, attempts: attempts - 1) }
+    }
+
     private func openFields() {
         let content = browser.tableContent(in: library)
         let fields = content.categoricalColumns.filter(ViewDraft.canFilter).map {
@@ -93,7 +102,7 @@ struct FilterRow: View {
                 FilterPanelPresenter.shared.dismiss(restoringFocus: false)
                 // The new chip is in the row, and has a view, before its panel opens under it.
                 openColumn = id
-                DispatchQueue.main.async { openValues(of: id) }
+                openValuesWhenShown(id)
             }
         }
     }
