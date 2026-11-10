@@ -146,7 +146,14 @@ private struct FilterValuePanelHost: View {
     private func mark(of group: ItemTableGroup, in column: ItemTableColumn) -> ValueListRow.Mark {
         switch column.style {
         case .status: .status(group.value.flatMap { column.field?.statusGroup(of: $0) })
-        case .priority, .choice: group.value == nil ? .none : .dot(group.title)
+        case .priority, .choice:
+            if let value = group.value, let field = column.field {
+                .dot(OptionTone.tone(of: value, in: field, isPriority: library.catalogue.isPriority(field, of: field.declaredBy)))
+            } else if let value = group.value {
+                .dot(OptionTone.tone(for: ItemTypeInfo.Field.label(ofOption: value)))
+            } else {
+                .none
+            }
         default:
             if column.content == .type, let value = group.value { .type(icon: library.catalogue.icon(for: TypeID(value))) } else { .none }
         }
