@@ -97,6 +97,8 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
     var hidesEmptyGroups = false
     /// What the gallery draws on each card.
     var cards = ViewCards()
+    /// What the list's rows take of the view's own, where Settings otherwise decides.
+    var rows = ViewRows()
     /// The table's column widths as the table keeps them (`TableColumnCustomization`), which the person's drag of a
     /// divider records at once and Save does not wait for. Opaque: SwiftUI exposes no way to read or write a
     /// width alone.
@@ -104,12 +106,13 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
 
     init(
         layout: ItemViewMode? = nil, columns: ViewColumns = ViewColumns(), hidesEmptyGroups: Bool = false,
-        cards: ViewCards = ViewCards(), widths: Data? = nil
+        cards: ViewCards = ViewCards(), rows: ViewRows = ViewRows(), widths: Data? = nil
     ) {
         self.layout = layout
         self.columns = columns
         self.hidesEmptyGroups = hidesEmptyGroups
         self.cards = cards
+        self.rows = rows
         self.widths = widths
     }
 
@@ -120,13 +123,14 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
         columns = (try? container.decodeIfPresent(ViewColumns.self, forKey: .columns)) ?? ViewColumns()
         hidesEmptyGroups = (try? container.decodeIfPresent(Bool.self, forKey: .hidesEmptyGroups)) ?? false
         cards = (try? container.decodeIfPresent(ViewCards.self, forKey: .cards)) ?? ViewCards()
+        rows = (try? container.decodeIfPresent(ViewRows.self, forKey: .rows)) ?? ViewRows()
         widths = try? container.decodeIfPresent(Data.self, forKey: .widths)
     }
 
     /// Whether the choices a Save keeps are the same, leaving the widths out, which are kept as they are dragged.
     func sameChoices(as other: ViewMacSettings) -> Bool {
         layout == other.layout && columns == other.columns && hidesEmptyGroups == other.hidesEmptyGroups
-            && cards == other.cards
+            && cards == other.cards && rows == other.rows
     }
 
     /// Takes the choices of another and keeps its own widths.
@@ -135,6 +139,7 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
         columns = other.columns
         hidesEmptyGroups = other.hidesEmptyGroups
         cards = other.cards
+        rows = other.rows
     }
 }
 

@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 
 /// How a row of a list is drawn. Standard, Compact and With Pictures can be the style of every list; Task, Highlight and
 /// Person read the fields of the items they suit, so they are chosen for a type or a view, or come from a type's fields.
-nonisolated enum ListRowStyle: String, CaseIterable, Identifiable, Hashable, Sendable {
+nonisolated enum ListRowStyle: String, Codable, CaseIterable, Identifiable, Hashable, Sendable {
     case standard, compact, withPictures, task, highlight, person
 
     var id: Self { self }

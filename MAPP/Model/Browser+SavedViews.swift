@@ -1,7 +1,7 @@
 import Foundation
 
 /// Following the saved view a window shows: its order, grouping, filters and timeline date from Marfa, and its
-/// layout, columns and cards from this Mac (`ViewLayouts`). What the person changes is written as they change it:
+/// layout, columns, cards and rows from this Mac (`ViewLayouts`). What the person changes is written as they change it:
 /// to Marfa for what Marfa holds (`Browser+ViewWrites`), and to this Mac for what the Mac holds.
 extension Browser {
     /// The order, grouping and filters a view was last read with, the date its timeline showed, the types it showed as
@@ -105,7 +105,7 @@ extension Browser {
 
     // MARK: This Mac's settings for a view
 
-    /// The layout, columns, empty groups and cards the window shows for a view, which are what the Mac holds.
+    /// The layout, columns, empty groups, cards and rows the window shows for a view, which are what the Mac holds.
     func macSettings(for id: ItemID) -> ViewMacSettings {
         viewSeeds[id]?.mac ?? ViewLayouts.stored(in: defaults).settings(for: id) ?? ViewMacSettings()
     }
@@ -119,6 +119,33 @@ extension Browser {
     /// What the gallery draws on each card in the open place: a saved view's choice, else the window's own for the place.
     var cards: ViewCards {
         if case .view(let id) = item { macSettings(for: id).cards } else { placeCards[item] ?? ViewCards() }
+    }
+
+    /// How the list's rows look in the open place: a saved view's choice, else the window's own for the place.
+    var rows: ViewRows {
+        if case .view(let id) = item { macSettings(for: id).rows } else { placeRows[item] ?? ViewRows() }
+    }
+
+    /// Changes the list's rows. A saved view's change is kept on this Mac as it is made, and a place's lasts as long as
+    /// the window, as its cards and layout do. Undo takes either back.
+    func changeRows(_ change: (inout ViewRows) -> Void) {
+        if case .view(let id) = item {
+            changeViewSettings(id) { change(&$0.rows) }
+        } else {
+            let before = placeRows[item] ?? ViewRows()
+            var rows = before
+            change(&rows)
+            guard rows != before else { return }
+            setPlaceRows(rows, before: before, in: item)
+        }
+    }
+
+    private func setPlaceRows(_ rows: ViewRows, before: ViewRows, in place: SidebarItem) {
+        placeRows[place] = rows == ViewRows() ? nil : rows
+        registerUndo(String(localized: "Change Rows")) { browser in
+            guard browser.item == place else { return }
+            browser.setPlaceRows(before, before: rows, in: place)
+        }
     }
 
     /// Changes what the gallery draws on each card. A saved view's change is kept on this Mac as it is made, and a

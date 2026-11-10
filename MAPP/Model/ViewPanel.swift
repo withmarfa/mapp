@@ -27,6 +27,8 @@ final class ViewPanel {
         let mac: ViewMacSettings?
         /// What the window drew on each card for the place, where it is not a view.
         let cards: ViewCards?
+        /// What the window drew for the place's rows, where it is not a view.
+        let rows: ViewRows?
     }
 
     private(set) var purpose: Purpose

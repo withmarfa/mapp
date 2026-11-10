@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Where the list's settings are kept, shared by every view that reads or sets them.
-enum ListKey {
+nonisolated enum ListKey {
     static let previewLines = "listPreviewLines"
     static let defaultPreviewLines = 2
     static let showsPictures = "listShowsPictures"
