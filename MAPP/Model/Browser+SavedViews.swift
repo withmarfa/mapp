@@ -1,7 +1,7 @@
 import Foundation
 
 /// Following the saved view a window shows: its order, grouping, filters and timeline date from Marfa, and its
-/// layout, columns and cards from this Mac (`ViewLayouts`). What the person changes is written as they change it:
+/// layout, columns, cards and rows from this Mac (`ViewLayouts`). What the person changes is written as they change it:
 /// to Marfa for what Marfa holds (`Browser+ViewWrites`), and to this Mac for what the Mac holds.
 extension Browser {
     /// The order, grouping and filters a view was last read with, the date its timeline showed, the types it showed as
@@ -105,7 +105,7 @@ extension Browser {
 
     // MARK: This Mac's settings for a view
 
-    /// The layout, columns, empty groups and cards the window shows for a view, which are what the Mac holds.
+    /// The layout, columns, empty groups, cards and rows the window shows for a view, which are what the Mac holds.
     func macSettings(for id: ItemID) -> ViewMacSettings {
         viewSeeds[id]?.mac ?? ViewLayouts.stored(in: defaults).settings(for: id) ?? ViewMacSettings()
     }

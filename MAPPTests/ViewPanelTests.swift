@@ -185,7 +185,8 @@ struct ViewPanelTests {
         browser.changeRows { $0.style = .task }
         Self.close(undo)
         #expect(browser.rows.style == .task)
-        #expect(ViewLayouts.stored(in: browser.defaults).views.isEmpty)
+        // Opening the view stored its layout; a place's rows add nothing to it.
+        #expect((ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.rows ?? ViewRows()) == ViewRows())
         undo.undo()
         #expect(browser.rows == ViewRows())
     }
