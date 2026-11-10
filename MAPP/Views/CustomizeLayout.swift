@@ -46,6 +46,8 @@ struct ItemLayoutPanel: View {
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
     @State private var arranging = Arranging.page
     let item: Item
+    /// The headings the page reported for the item, for the Outline's count in Sidebar.
+    var outline: [OutlineHeading] = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -64,7 +66,7 @@ struct ItemLayoutPanel: View {
             ScrollView {
                 switch arranging {
                 case .page: pageGroups
-                case .sidebar: SidebarArrangement(item: item)
+                case .sidebar: SidebarArrangement(item: item, outline: outline)
                 }
             }
             .scrollBounceBehavior(.basedOnSize)

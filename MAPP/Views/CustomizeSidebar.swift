@@ -10,15 +10,17 @@ struct SidebarArrangement: View {
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     let item: Item
+    /// The headings the page reported for the item.
+    var outline: [OutlineHeading] = []
 
     /// What this reads is read once for a change to the library or the arrangement: the drag and the open panel keep their
     /// state in the views below, so hovering a drag or opening Add Section reads nothing again.
     var body: some View {
         let relationships = library.relationships(for: item.id)
         let shown = placements.sidebarSections(of: item.type, in: library.catalogue).compactMap(SidebarSection.init(id:))
-        // The Outline's note is read only while the Outline is shown.
-        let extras = SidebarExtras.of(item, in: library, relationships: relationships, sections: shown)
-        let apps = SidebarExtras.appSections(of: item, in: library, relationships: relationships)
+        // The app sections are read once: they give both the counts and what Add Section offers.
+        let extras = SidebarExtras.of(item, in: library, relationships: relationships, outline: outline)
+        let apps = extras.apps
         VStack(alignment: .leading, spacing: InspectorMetrics.groupGap) {
             SectionsBox(
                 shown: shown, names: Dictionary(shown.map { ($0.id, title(of: $0)) }, uniquingKeysWith: { first, _ in first }),

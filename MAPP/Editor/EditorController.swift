@@ -31,6 +31,9 @@ final class EditorController: NSObject {
     private(set) var isContentUnderToolbar = false
     /// Whether the item's title in the page has the keyboard rather than the note's text.
     private(set) var isEditingTitle = false
+    /// The headings the page reported for the note on it, which the sidebar's Outline lists and reveals. Nil until the
+    /// page has reported for the load now on it.
+    private(set) var outline: PageOutline?
     @ObservationIgnored private(set) var header: PageHeader?
     @ObservationIgnored private var headerIconSize: Int?
     /// The types' icons the page already has, so it is sent more only when a header needs one it lacks.
@@ -450,6 +453,7 @@ final class EditorController: NSObject {
         guard isReady else { return }
         releaseHeldEdit()
         embeds.version += 1
+        outline = nil
         call("setItem", json(""))
         generation += 1
         shown = shown.filter { $0.key >= generation - 8 }
@@ -595,6 +599,7 @@ final class EditorController: NSObject {
         switch message {
         case .ready:
             releaseHeldEdit()
+            outline = nil
             isReady = true
             sendHostActivation()
             applyAccent()
@@ -617,6 +622,9 @@ final class EditorController: NSObject {
             }
             if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle, caret: requested.caret) }
             appendPendingEmbeds()
+        case .headings(let headings, let generation):
+            let accepted = PageOutline.accepting(headings, generation: generation, current: self.generation, item: shown[generation]?.id)
+            if accepted != outline { outline = accepted }
         case .painted(let generation):
             guard let open = opening, open.generation == generation else { return }
             open.interval.end()

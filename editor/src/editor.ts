@@ -174,6 +174,14 @@ export interface EditorEvents {
   picturesWaiting?(count: number, sentence: string, button: string): void
   /** A loaded document has had its first frame: said once for each `load`, after the browser has drawn it. */
   painted?(generation: number): void
+  /** The note's headings in Inkkit's own order (the ordinal is the index), said after each `load` and `reload`, and after
+   *  an edit that changes the list. Never said twice for one list under one generation. */
+  headings?(headings: PageHeading[], generation: number): void
+}
+/** A heading as Inkkit lists it: its level and its words without marks. A heading with no words is in the list too. */
+export interface PageHeading {
+  level: number
+  text: string
 }
 const tables: Partial<Record<FormatCommand, TableCommand>> = {
   table: 'insert',
@@ -246,6 +254,7 @@ export class NoteEditor {
         changed({ text, generation }) {
           host.pendingChanged = { text, generation }
           queueMicrotask(() => host.flushChanges())
+          queueMicrotask(() => host.reportHeadings(generation))
           host.invalidateFindGeometry()
         },
         commandStateChanged(state) {
@@ -483,6 +492,23 @@ export class NoteEditor {
     return heading ? this.engine.navigateHeading(heading) : false
   }
   private pendingChanged?: { text: string; generation: number }
+  private headingsSent?: { generation: number; key: string }
+  /** Says the headings of the loaded document when they, or the generation, differ from what was last said. A
+   *  `load` resets what was said, so the app always hears the list for a new generation. */
+  private reportHeadings(generation: number) {
+    if (!this.events.headings || generation !== this.generation) return
+    let list: PageHeading[]
+    try {
+      list = this.engine.headings(generation).map(({ level, text }) => ({ level, text }))
+    } catch (error) {
+      if (!(error instanceof InkKitError)) throw error
+      return
+    }
+    const key = JSON.stringify(list)
+    if (this.headingsSent?.generation === generation && this.headingsSent.key === key) return
+    this.headingsSent = { generation, key }
+    this.events.headings(list, generation)
+  }
   private flushChanges() {
     const pending = this.pendingChanged
     this.pendingChanged = undefined
@@ -526,6 +552,7 @@ export class NoteEditor {
         if (!reload) window.scrollTo(0, 0)
         this.invalidateFindGeometry()
         if (!reload) this.reportPainted(generation)
+        this.reportHeadings(generation)
       } catch (error) {
         if (
           error instanceof InkKitError &&

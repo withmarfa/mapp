@@ -98,7 +98,7 @@ struct SidebarSectionsTests {
 
     @Test func addingLinkedFromToTheSidebarTakesItOffThePage() {
         var placements = PagePlacements()
-        placements.setLinkedFrom(.page, of: Self.ticket)
+        placements.setLinkedFrom(.page, of: Self.ticket, in: Self.catalogue)
         #expect(!placements.sidebarSections(of: Self.ticket, in: Self.catalogue).contains("#linked"))
         placements.addSidebarSection("#linked", of: Self.ticket, in: Self.catalogue)
         #expect(placements.placement(of: Self.ticket, in: Self.catalogue).linkedFromPlace == .inspector)
@@ -108,15 +108,15 @@ struct SidebarSectionsTests {
     @Test func showingLinkedFromOnThePageRemovesItFromTheSidebar() {
         var placements = PagePlacements()
         placements.removeSidebarSection("tags", of: Self.ticket, in: Self.catalogue)
-        placements.set(true, row: PagePlacement.linkedFrom, of: Self.ticket)
+        placements.set(true, row: PagePlacement.linkedFrom, of: Self.ticket, in: Self.catalogue)
         #expect(placements.sidebarSections(of: Self.ticket, in: Self.catalogue) == ["details", "properties", "relationships", "links-in-page"])
     }
 
     @Test func hidingLinkedFromFromThePageBringsItBackToTheSidebarWhereItWas() {
         var placements = PagePlacements()
         placements.moveSidebarSection("#linked", to: 0, of: Self.ticket, in: Self.catalogue)
-        placements.set(true, row: PagePlacement.linkedFrom, of: Self.ticket)
-        placements.set(false, row: PagePlacement.linkedFrom, of: Self.ticket)
+        placements.set(true, row: PagePlacement.linkedFrom, of: Self.ticket, in: Self.catalogue)
+        placements.set(false, row: PagePlacement.linkedFrom, of: Self.ticket, in: Self.catalogue)
         #expect(placements.sidebarSections(of: Self.ticket, in: Self.catalogue).first == "#linked")
     }
 
@@ -153,62 +153,56 @@ struct SidebarSectionsTests {
 
     // MARK: Outline
 
-    @Test func theOutlineListsHeadingsByLevelAndSkipsCodeAndFrontMatter() {
-        let text = """
-            ---
-            # not a heading
-            ---
-            # Title
-            Words.
-            ## Context ##
-            ```
-            # in code
-            ```
-            #hashtag
-            ####### too deep
-            ### Third level
-            """
-        let headings = OutlineHeading.headings(in: text)
-        #expect(headings.map(\.text) == ["Title", "Context", "Third level"])
-        #expect(headings.map(\.level) == [1, 2, 3])
+    private func headingsMessage(_ entries: [(Int, String)], generation: Int = 3) -> [String: Any] {
+        ["type": "headings", "headings": entries.map { ["level": $0.0, "text": $0.1] }, "generation": generation]
     }
 
-    @Test func aNoteWithoutHeadingsHasNoOutline() {
-        #expect(OutlineHeading.headings(in: "just words\n\nand more").isEmpty)
-        #expect(OutlineHeading.headings(in: "").isEmpty)
-    }
-
-    @Test func twoHeadingsThatReadTheSameKeepTheirOwnPlaces() {
-        let headings = OutlineHeading.headings(in: "# Soil\n\ntext\n\n## Soil\n\n### Water\n")
+    @Test func thePagesHeadingsDecodeWithTheirPlaceInItsList() throws {
+        let message = try #require(EditorMessage(body: headingsMessage([(1, "Soil"), (2, "Soil"), (3, "Water")])))
+        guard case .headings(let headings, let generation) = message else { Issue.record("Not headings"); return }
+        #expect(generation == 3)
         #expect(headings.map(\.text) == ["Soil", "Soil", "Water"])
+        #expect(headings.map(\.level) == [1, 2, 3])
         #expect(headings.map(\.index) == [0, 1, 2])
         #expect(Set(headings.map(\.id)).count == 3)
     }
 
-    @Test func setextHeadingsAreListedAndCountedInOrder() {
-        let text = "Title\n=====\n\n# Middle\n\nTwo lines\nof words\n---\n\n---\n\n- not a heading\n"
-        let headings = OutlineHeading.headings(in: text)
-        #expect(headings.map(\.text) == ["Title", "Middle", "Two lines of words"])
-        #expect(headings.map(\.level) == [1, 1, 2])
-    }
-
-    @Test func aHeadingWithNoWordsIsCountedButNotListed() {
-        let headings = OutlineHeading.headings(in: "# \n\n# Next\n")
+    @Test func aHeadingWithNoWordsIsCountedButNotListed() throws {
+        let message = try #require(EditorMessage(body: headingsMessage([(1, ""), (1, "  "), (1, "Next")])))
+        guard case .headings(let headings, _) = message else { Issue.record("Not headings"); return }
         #expect(headings.map(\.text) == ["Next"])
-        #expect(headings.map(\.index) == [1])
+        #expect(headings.map(\.index) == [2])
     }
 
-    @Test func headingsInAQuoteOrAListItemAreListed() {
-        let headings = OutlineHeading.headings(in: "> ## Quoted\n\n- ### In a list\n")
-        #expect(headings.map(\.text) == ["Quoted", "In a list"])
+    @Test func aPageWithNoHeadingsReportsAnEmptyList() throws {
+        guard case .headings(let headings, _) = try #require(EditorMessage(body: headingsMessage([]))) else { Issue.record("Not headings"); return }
+        #expect(headings.isEmpty)
     }
 
-    @Test func aHeadingsLabelCarriesNoInlineMarks() {
-        let text = "# **Bold** and *soft* with [a link](https://example.com) and `code`\n\n## See [[Plan|the plan]] and [[Soil]]\n"
-        #expect(OutlineHeading.headings(in: text).map(\.text) == ["Bold and soft with a link and code", "See the plan and Soil"])
+    @Test func aMalformedHeadingsMessageIsRefused() {
+        #expect(EditorMessage(body: ["type": "headings", "generation": 1]) == nil)
+        #expect(EditorMessage(body: ["type": "headings", "headings": [["level": 1]], "generation": 1]) == nil)
+        #expect(EditorMessage(body: ["type": "headings", "headings": [["level": 1, "text": "A"]]]) == nil)
+    }
+
+    @Test func aListForAnEarlierLoadIsKeptForNothing() {
+        let heading = OutlineHeading(level: 1, text: "Soil", index: 0)
+        let note = ItemID("note")
+        #expect(PageOutline.accepting([heading], generation: 2, current: 3, item: note) == nil)
+        #expect(PageOutline.accepting([heading], generation: 3, current: 3, item: nil) == nil)
+        #expect(PageOutline.accepting([heading], generation: 3, current: 3, item: note) == PageOutline(item: note, generation: 3, headings: [heading]))
+    }
+
+    @Test func theOutlineListsHeadingsOnlyForTheItemOnThePage() {
+        let heading = OutlineHeading(level: 1, text: "Soil", index: 0)
+        let outline = PageOutline(item: ItemID("note"), generation: 3, headings: [heading])
+        #expect(outline.headings(for: ItemID("note")) == [heading])
+        #expect(outline.headings(for: ItemID("other")).isEmpty)
     }
 
     // MARK: What the sections read from the library
+
+    private static let pageHeadings = [OutlineHeading(level: 1, text: "Soil", index: 0), OutlineHeading(level: 1, text: "Soil", index: 1)]
 
     @MainActor private static func fixture() -> (library: FakeItemLibrary, note: MAPP.Item, relationships: [ItemRelationship]) {
         let pr = TypeID("test.pr")
@@ -245,7 +239,7 @@ struct SidebarSectionsTests {
 
     @MainActor @Test func theExtrasGroupAnAppsItemsByTypeAndSourceFromRealLinksOnly() {
         let (library, note, relationships) = Self.fixture()
-        let extras = SidebarExtras.of(note, in: library, relationships: relationships)
+        let extras = SidebarExtras.of(note, in: library, relationships: relationships, outline: Self.pageHeadings)
         #expect(extras.apps.map(\.title) == ["Pull Requests (GitHub)"])
         // Each item once, and neither one with no source nor a note with no link field.
         #expect(extras.apps.first?.targets.map(\.title) == ["Fix soil", "Fix water"])
@@ -256,11 +250,19 @@ struct SidebarSectionsTests {
 
     @MainActor @Test func theExtrasReadOnlyTheSectionsAskedFor() {
         let (library, note, relationships) = Self.fixture()
-        let outlineOnly = SidebarExtras.of(note, in: library, relationships: relationships, sections: [.outline])
+        let outlineOnly = SidebarExtras.of(note, in: library, relationships: relationships, sections: [.outline], outline: Self.pageHeadings)
         #expect(outlineOnly.outline.count == 2)
+        #expect(outlineOnly.count(of: .outline) == 2)
         #expect(outlineOnly.collections.isEmpty)
         #expect(outlineOnly.apps.isEmpty)
-        let none = SidebarExtras.of(note, in: library, relationships: relationships, sections: [.details])
+        let none = SidebarExtras.of(note, in: library, relationships: relationships, sections: [.details], outline: Self.pageHeadings)
         #expect(none.outline.isEmpty)
+    }
+
+    @MainActor @Test func theOutlineHasNoRowsUntilThePageHasReportedForTheItem() {
+        let (library, note, relationships) = Self.fixture()
+        let extras = SidebarExtras.of(note, in: library, relationships: relationships)
+        #expect(extras.outline.isEmpty)
+        #expect(extras.count(of: .outline) == 0)
     }
 }

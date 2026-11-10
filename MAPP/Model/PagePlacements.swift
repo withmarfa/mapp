@@ -95,16 +95,19 @@ nonisolated struct PagePlacements: Equatable, Sendable {
 
     /// Chooses whether the page shows a row. Linked From is either on the page or in the inspector, so showing it
     /// moves it.
-    mutating func set(_ shown: Bool, row: String, of type: TypeID) {
+    mutating func set(_ shown: Bool, row: String, of type: TypeID, in catalogue: Catalogue) {
         if row == PagePlacement.linkedFrom {
-            setLinkedFrom(shown ? .page : .inspector, of: type)
+            setLinkedFrom(shown ? .page : .inspector, of: type, in: catalogue)
         } else {
             setShown(shown, row: row, of: type)
         }
     }
 
-    mutating func setLinkedFrom(_ place: LinkedFromPlace, of type: TypeID) {
-        update(type) { $0.linkedFrom = place }
+    /// Chooses where Linked From goes. A place equal to the type's default is not kept, so the type follows its default
+    /// again.
+    mutating func setLinkedFrom(_ place: LinkedFromPlace, of type: TypeID, in catalogue: Catalogue) {
+        let isDefault = place == placement(of: type, in: catalogue).defaultLinkedFromPlace
+        update(type) { $0.linkedFrom = isDefault ? nil : place }
     }
 
     /// The sidebar's sections for `type`, in order (see `PagePlacement.sidebarSections`).
@@ -118,11 +121,8 @@ nonisolated struct PagePlacements: Equatable, Sendable {
     mutating func setSidebarSections(_ sections: [String], of type: TypeID, in catalogue: Catalogue) {
         let ids = PagePlacement.unique(sections)
         let inSidebar = ids.contains(PagePlacement.linkedFrom)
-        let current = placement(of: type, in: catalogue)
-        if inSidebar != (current.linkedFromPlace == .inspector) {
-            // A place equal to the type's default is not kept, as with an order.
-            let place: LinkedFromPlace = inSidebar ? .inspector : .page
-            update(type) { $0.linkedFrom = place == current.defaultLinkedFromPlace ? nil : place }
+        if inSidebar != (placement(of: type, in: catalogue).linkedFromPlace == .inspector) {
+            setLinkedFrom(inSidebar ? .inspector : .page, of: type, in: catalogue)
         }
         let defaults = SidebarSection.defaultIDs.filter { $0 != PagePlacement.linkedFrom || inSidebar }
         update(type) { $0.sidebar = ids == defaults ? nil : ids }

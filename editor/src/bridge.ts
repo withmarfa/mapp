@@ -34,6 +34,9 @@ export type EditorMessage =
   /** Said once for each `load`, after the browser has drawn the document. The app ends its `item.open` signpost
    *  there, and drops it with no sample when the page takes another generation first. */
   | { type: 'painted'; generation: number }
+  /** The note's headings in Inkkit's own order, so a heading's ordinal is its index here. Said after each load and after
+   *  an edit changes the list; the app reveals a heading by ordinal under this generation. */
+  | { type: 'headings'; headings: { level: number; text: string }[]; generation: number }
   | { type: 'headerScrolledAway'; away: boolean; generation: number }
   | { type: 'contentUnderToolbar'; under: boolean; generation: number }
   | { type: 'titleFocus'; focused: boolean }

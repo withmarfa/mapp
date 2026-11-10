@@ -91,10 +91,18 @@ extension EditorController {
         call("revealHeading", json(text), String(generation))
     }
 
-    /// Scrolls the page to the note's n-th heading (from 0), in the page's own list, as the Outline's rows ask.
+    /// The headings the Outline lists for `id`: those the page reported for the note now on it, and none while the page
+    /// holds another item or has not loaded this one.
+    func headings(of id: ItemID) -> [OutlineHeading] {
+        guard isShowing(id) else { return [] }
+        return outline?.headings(for: id) ?? []
+    }
+
+    /// Scrolls the page to the n-th heading (from 0) of its own list, under the load that list was reported for, so a
+    /// row made from an earlier load reveals nothing: the page refuses a generation that is not on it.
     func revealHeading(at ordinal: Int) {
-        guard isReady else { return }
-        call("revealHeadingAt", String(ordinal), String(generation))
+        guard isReady, let outline else { return }
+        call("revealHeadingAt", String(ordinal), String(outline.generation))
     }
 
     func revealPendingHeading(in note: ItemID) {

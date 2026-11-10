@@ -97,8 +97,8 @@ struct PagePlacementsTests {
         var placements = PagePlacements()
         placements.setShown(true, row: "github_id", of: Self.comment)
         placements.setShown(false, row: "repo", of: Self.ticket)
-        placements.setLinkedFrom(.page, of: Self.ticket)
-        placements.setLinkedFrom(.inspector, of: Self.person)
+        placements.setLinkedFrom(.page, of: Self.ticket, in: Self.catalogue)
+        placements.setLinkedFrom(.inspector, of: Self.person, in: Self.catalogue)
         #expect(placements.placement(of: Self.comment, in: Self.catalogue).showsOnPage("github_id"))
         let ticket = placements.placement(of: Self.ticket, in: Self.catalogue)
         #expect(!ticket.showsOnPage("repo"))
@@ -108,20 +108,36 @@ struct PagePlacementsTests {
 
     @Test func showingLinkedFromOnThePageMovesItThereAndHidingItMovesItBack() {
         var placements = PagePlacements()
-        placements.set(true, row: PagePlacement.linkedFrom, of: Self.ticket)
+        placements.set(true, row: PagePlacement.linkedFrom, of: Self.ticket, in: Self.catalogue)
         #expect(placements.placement(of: Self.ticket, in: Self.catalogue).linkedFromPlace == .page)
-        placements.set(false, row: PagePlacement.linkedFrom, of: Self.ticket)
+        placements.set(false, row: PagePlacement.linkedFrom, of: Self.ticket, in: Self.catalogue)
         #expect(placements.placement(of: Self.ticket, in: Self.catalogue).linkedFromPlace == .inspector)
         // A property row is a row of its own and never changes where Linked From is.
-        placements.set(false, row: "repo", of: Self.ticket)
+        placements.set(false, row: "repo", of: Self.ticket, in: Self.catalogue)
         #expect(!placements.placement(of: Self.ticket, in: Self.catalogue).showsOnPage("repo"))
         #expect(placements.placement(of: Self.ticket, in: Self.catalogue).linkedFromPlace == .inspector)
+    }
+
+    @Test func aLinkedFromPlaceEqualToTheTypesDefaultIsNotKept() {
+        var placements = PagePlacements()
+        placements.setLinkedFrom(.page, of: Self.ticket, in: Self.catalogue)
+        #expect(placements.hasChoice(for: Self.ticket))
+        // Back to the default, by either path, leaves no choice behind.
+        placements.setLinkedFrom(.inspector, of: Self.ticket, in: Self.catalogue)
+        #expect(!placements.hasChoice(for: Self.ticket))
+        placements.set(true, row: PagePlacement.linkedFrom, of: Self.person, in: Self.catalogue)
+        #expect(!placements.hasChoice(for: Self.person))
+        placements.set(false, row: PagePlacement.linkedFrom, of: Self.person, in: Self.catalogue)
+        #expect(placements.hasChoice(for: Self.person))
+        placements.set(true, row: PagePlacement.linkedFrom, of: Self.person, in: Self.catalogue)
+        #expect(!placements.hasChoice(for: Self.person))
+        #expect(placements.rawValue == "{}")
     }
 
     @Test func aChoiceForOneTypeLeavesEveryOtherTypeAlone() {
         var placements = PagePlacements()
         placements.setShown(false, row: "repo", of: Self.ticket)
-        placements.setLinkedFrom(.page, of: Self.ticket)
+        placements.setLinkedFrom(.page, of: Self.ticket, in: Self.catalogue)
         let comment = placements.placement(of: Self.comment, in: Self.catalogue)
         #expect(comment.showsOnPage("repo"))
         #expect(comment.linkedFromPlace == .inspector)
@@ -145,7 +161,7 @@ struct PagePlacementsTests {
         var placements = PagePlacements()
         placements.setShown(false, row: "repo", of: Self.ticket)
         placements.setShown(true, row: "github_id", of: Self.comment)
-        placements.setLinkedFrom(.page, of: Self.comment)
+        placements.setLinkedFrom(.page, of: Self.comment, in: Self.catalogue)
         #expect(PagePlacements(rawValue: placements.rawValue) == placements)
         #expect(PagePlacements().rawValue == "{}")
     }

@@ -102,140 +102,31 @@ nonisolated enum SidebarSection: Hashable, Sendable {
 /// A heading of a note's text, for the Outline section.
 nonisolated struct OutlineHeading: Identifiable, Hashable, Sendable {
     let level: Int
-    /// The words as a person reads them: bold, links and code marks are gone.
+    /// The words as the page renders them: bold, links and code marks are gone.
     let text: String
-    /// The heading's place in the note's headings, from 0, counting each one the note has (a heading with no words
-    /// too, though the Outline lists none). The page reveals the heading at this place in its own list, so two headings
-    /// that read the same each go to their own.
+    /// The heading's place in the page's own list of headings, from 0, counting each one the note has (a heading with
+    /// no words too, though the Outline lists none). The page reveals the heading at this place, so two headings that
+    /// read the same each go to their own.
     let index: Int
     var id: Int { index }
 }
 
-nonisolated extension OutlineHeading {
-    /// The headings of `text`, in order: ATX headings (`#` to `######`, a space, the words) and setext headings (words
-    /// underlined with `=` or `-`), also inside a quote or a list item, skipping a front matter block and fenced code,
-    /// which hold lines that only look like headings. Read for the one note on the page, never for the library.
-    static func headings(in text: String) -> [OutlineHeading] {
-        var result: [OutlineHeading] = []
-        var ordinal = 0
-        var fence: Substring?
-        var lineNumber = 0
-        var paragraph: [String] = []
+/// The headings the page last reported for the note on it, and the load they belong to. The page is the only source:
+/// it lists the headings as its editor counts them, so the Outline never disagrees with what a row reveals.
+nonisolated struct PageOutline: Equatable, Sendable {
+    let item: ItemID
+    let generation: Int
+    /// The headings with words, each with its place in the page's list.
+    let headings: [OutlineHeading]
 
-        func add(level: Int, words: String) {
-            defer { ordinal += 1 }
-            let label = plainLabel(words)
-            if !label.isEmpty { result.append(OutlineHeading(level: level, text: label, index: ordinal)) }
-        }
+    /// The headings the Outline lists for `id`: none for any other item than the one the page holds.
+    func headings(for id: ItemID) -> [OutlineHeading] { item == id ? headings : [] }
 
-        for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            defer { lineNumber += 1 }
-            let line = rawLine.hasSuffix("\r") ? rawLine.dropLast() : rawLine
-            if lineNumber == 0, line == "---" {
-                fence = "---"
-                continue
-            }
-            if let open = fence {
-                if open == "---" ? (line == "---" || line == "...") : line.trimmingCharacters(in: .whitespaces).hasPrefix(open) {
-                    fence = nil
-                }
-                continue
-            }
-            let content = withoutContainers(line)
-            let trimmed = content.drop { $0 == " " }
-            let indent = content.count - trimmed.count
-            if trimmed.allSatisfy({ $0 == " " || $0 == "\t" }) {
-                paragraph = []
-                continue
-            }
-            if indent <= 3, trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
-                fence = trimmed.prefix(3)
-                paragraph = []
-                continue
-            }
-            if indent > 3 {
-                // Indented code, or the lazy continuation of a paragraph.
-                if !paragraph.isEmpty { paragraph.append(trimmed.trimmingCharacters(in: .whitespaces)) }
-                continue
-            }
-            if let (level, words) = atx(trimmed) {
-                add(level: level, words: words)
-                paragraph = []
-                continue
-            }
-            let bare = trimmed.trimmingCharacters(in: .whitespaces)
-            if !paragraph.isEmpty, let level = setextLevel(bare) {
-                add(level: level, words: paragraph.joined(separator: " "))
-                paragraph = []
-                continue
-            }
-            if isThematicBreak(bare) {
-                paragraph = []
-                continue
-            }
-            paragraph.append(bare)
-        }
-        return result
-    }
-
-    /// The line without the quote marks and the list marker it sits behind, which do not change what the line is.
-    private static func withoutContainers(_ line: Substring) -> Substring {
-        var rest = line
-        while true {
-            let trimmed = rest.drop { $0 == " " }
-            if rest.count - trimmed.count <= 3, trimmed.first == ">" {
-                rest = trimmed.dropFirst()
-                if rest.first == " " { rest = rest.dropFirst() }
-                continue
-            }
-            break
-        }
-        let trimmed = rest.drop { $0 == " " }
-        guard rest.count - trimmed.count <= 3, !isThematicBreak(trimmed.trimmingCharacters(in: .whitespaces)) else { return rest }
-        if let marker = trimmed.first, "-*+".contains(marker), trimmed.dropFirst().first == " " {
-            return trimmed.dropFirst(2)
-        }
-        let digits = trimmed.prefix { $0.isASCII && $0.isNumber }
-        if (1...9).contains(digits.count) {
-            let after = trimmed.dropFirst(digits.count)
-            if let mark = after.first, mark == "." || mark == ")", after.dropFirst().first == " " { return after.dropFirst(2) }
-        }
-        return rest
-    }
-
-    private static func atx(_ line: Substring) -> (Int, String)? {
-        let hashes = line.prefix { $0 == "#" }
-        guard (1...6).contains(hashes.count) else { return nil }
-        let rest = line.dropFirst(hashes.count)
-        guard rest.isEmpty || rest.first == " " || rest.first == "\t" else { return nil }
-        var words = rest.trimmingCharacters(in: .whitespaces)
-        // A closing run of hashes is part of the syntax, not of the heading.
-        if let closing = words.range(of: #"\s+#+$"#, options: .regularExpression) { words.removeSubrange(closing) }
-        if words.allSatisfy({ $0 == "#" }) { words = "" }
-        return (hashes.count, words)
-    }
-
-    private static func setextLevel(_ line: String) -> Int? {
-        guard let first = line.first, first == "=" || first == "-", line.allSatisfy({ $0 == first }) else { return nil }
-        return first == "=" ? 1 : 2
-    }
-
-    private static func isThematicBreak(_ line: String) -> Bool {
-        let marks = line.filter { $0 != " " && $0 != "\t" }
-        guard marks.count >= 3, let first = marks.first, "-*_".contains(first) else { return false }
-        return marks.allSatisfy { $0 == first }
-    }
-
-    /// The words with their inline marks taken off: emphasis, code, a link's address, an image's mark and a wiki
-    /// link's brackets, and the spacing between lines collapsed.
-    static func plainLabel(_ words: String) -> String {
-        var source = words
-        // `[[Note|shown]]` reads as `shown`, `[[Note#Heading]]` as the words it names.
-        source = source.replacingOccurrences(of: #"\[\[([^\]|]*)\|([^\]]*)\]\]"#, with: "$2", options: .regularExpression)
-        source = source.replacingOccurrences(of: #"\[\[([^\]]*)\]\]"#, with: "$1", options: .regularExpression)
-        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnly, failurePolicy: .returnPartiallyParsedIfPossible)
-        let plain = (try? AttributedString(markdown: source, options: options)).map { String($0.characters) } ?? source
-        return plain.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    /// What to keep of a list the page reported under `generation`, given the load now on the page and the item it
+    /// holds: a list for any other load is stale and kept for nothing.
+    static func accepting(_ headings: [OutlineHeading], generation: Int, current: Int, item: ItemID?) -> PageOutline? {
+        guard generation == current, let item else { return nil }
+        return PageOutline(item: item, generation: generation, headings: headings)
     }
 }
 
@@ -274,15 +165,19 @@ nonisolated struct SidebarExtras: Sendable {
         }
     }
 
-    /// The headings, files, collections and app items of `item`. An app's section is made of the items its
-    /// relationships reach whose type a connector declares (a type with a link field) and whose source is named: real
-    /// edges and real sources, so an item with none has none. Only what `sections` names is read (all, where nil), so a
-    /// note's text is scanned only while its Outline is in the sidebar.
+    /// The headings, files, collections and app items of `item`. The headings are `outline`, which the page reported
+    /// for `item` (`PageOutline.headings(for:)`): the Outline has none until the page holds this item. An app's section
+    /// is made of the items its relationships reach whose type a connector declares (a type with a link field) and
+    /// whose source is named: real edges and real sources, so an item with none has none. Only what `sections` names is
+    /// read (all, where nil).
     @MainActor
-    static func of(_ item: Item, in library: any ItemLibrary, relationships: [ItemRelationship], sections: [SidebarSection]? = nil) -> SidebarExtras {
+    static func of(
+        _ item: Item, in library: any ItemLibrary, relationships: [ItemRelationship], sections: [SidebarSection]? = nil,
+        outline: [OutlineHeading] = []
+    ) -> SidebarExtras {
         var extras = SidebarExtras()
         func wants(_ section: SidebarSection) -> Bool { sections?.contains(section) ?? true }
-        if wants(.outline), !item.isFile, let body = library.body(of: item.id) { extras.outline = OutlineHeading.headings(in: body.text) }
+        if wants(.outline), !item.isFile { extras.outline = outline }
         if wants(.attachments) { extras.attachments = library.attachments(of: item.id).compactMap { library.item($0) }.map(target) }
         if wants(.collections) { extras.collections = library.collections(holding: [item.id]).map(target) }
         if sections?.contains(where: \.isFromApp) ?? true { extras.apps = appSections(of: item, in: library, relationships: relationships) }

@@ -10,17 +10,18 @@ struct ItemInspectorHost: View {
     let browser: Browser?
     let itemID: ItemID?
     let details: DetailsPresentation
-    /// Goes to a heading of the note on the page, for the Outline section. Nil where no page is beside the sidebar.
-    var onHeading: ((Int) -> Void)?
+    /// The page beside the sidebar, which lists the headings of the note on it and goes to one, for the Outline section.
+    /// Nil where no page is beside the sidebar, and the Outline then has no rows.
+    var editor: EditorController?
     @State private var editing: ItemRelationship?
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
 
-    init(browser: Browser, details: DetailsPresentation, onHeading: ((Int) -> Void)? = nil) {
-        self.browser = browser; itemID = nil; self.details = details; self.onHeading = onHeading
+    init(browser: Browser, details: DetailsPresentation, editor: EditorController? = nil) {
+        self.browser = browser; itemID = nil; self.details = details; self.editor = editor
     }
-    init(itemID: ItemID, details: DetailsPresentation = DetailsPresentation(), onHeading: ((Int) -> Void)? = nil) {
-        self.itemID = itemID; browser = nil; self.details = details; self.onHeading = onHeading
+    init(itemID: ItemID, details: DetailsPresentation = DetailsPresentation(), editor: EditorController? = nil) {
+        self.itemID = itemID; browser = nil; self.details = details; self.editor = editor
     }
 
     private var selectedID: ItemID? { itemID ?? (browser?.selection.count == 1 ? browser?.selection.first : nil) }
@@ -31,12 +32,13 @@ struct ItemInspectorHost: View {
                 ViewEditPanel(browser: browser, panel: panel)
                     .onExitCommand { browser.escapeViewPanel(in: library) }
             } else if let id = selectedID, let item = library.item(id), details.isCustomizingLayout, PageCustomization.isAvailable(for: item) {
-                ItemLayoutPanel(item: item)
+                ItemLayoutPanel(item: item, outline: editor?.headings(of: id) ?? [])
                     .onExitCommand { details.endLayout() }
             } else if let id = selectedID, let item = library.item(id) {
                 let placement = placements.placement(of: item.type, in: library.catalogue)
                 let relationships = library.relationships(for: id)
                 let sections = placement.sidebarSections.compactMap(SidebarSection.init(id:))
+                let outline = editor?.headings(of: id) ?? []
                 ItemInspector(
                     item: item,
                     type: library.catalogue.itemTypes[item.type],
@@ -57,13 +59,13 @@ struct ItemInspectorHost: View {
                     onRemoveTag: { library.removeTag($0, from: [id], undoManager: undoManager) },
                     drafts: details,
                     placement: placement,
-                    onPlace: PageCustomization.isAvailable(for: item) ? { row, shown in placements.set(shown, row: row, of: item.type) } : nil,
+                    onPlace: PageCustomization.isAvailable(for: item) ? { row, shown in placements.set(shown, row: row, of: item.type, in: library.catalogue) } : nil,
                     drawnByPage: PageCustomization.drawnKeys(of: item, in: library.catalogue),
                     linked: placement.linkedFromPlace == .inspector ? linked(to: item, in: relationships) : [],
                     typeIcon: { target in library.item(target).flatMap { library.catalogue.icon(for: $0.type) } },
                     sections: sections,
-                    extras: SidebarExtras.of(item, in: library, relationships: relationships, sections: sections),
-                    onHeading: { onHeading?($0) }
+                    extras: SidebarExtras.of(item, in: library, relationships: relationships, sections: sections, outline: outline),
+                    onHeading: { editor?.revealHeading(at: $0) }
                 )
                 .id(id)
             } else {
