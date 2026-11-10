@@ -97,13 +97,43 @@ extension Browser {
 
     /// Writes the window's choices against the version of the view last read.
     func writeChoices(of id: ItemID) async {
-        guard let library, !writingViews.contains(id) else { return }
+        guard let library else { return }
+        guard !writingViews.contains(id) else {
+            rewritingViews.insert(id)
+            return
+        }
         writingViews.insert(id)
-        defer { writingViews.remove(id) }
-        repeat {
-            rewritingViews.remove(id)
+        rewritingViews.insert(id)
+        await writeUntilSettled(id, in: library)
+        unlockView(id)
+    }
+
+    /// Writes again for as long as the window's choices changed during a write.
+    private func writeUntilSettled(_ id: ItemID, in library: any ItemLibrary) async {
+        while rewritingViews.remove(id) != nil {
             await writeOnce(id, in: library)
-        } while rewritingViews.contains(id)
+        }
+    }
+
+    /// Waits for the write under way on a view to end, then holds the view: one write at a time, in the order asked.
+    /// The holder ends with `unlockView`.
+    private func lockView(_ id: ItemID) async {
+        guard writingViews.contains(id) else {
+            writingViews.insert(id)
+            return
+        }
+        await withCheckedContinuation { viewWaiters[id, default: []].append($0) }
+    }
+
+    /// Hands the view to the next that waits, or frees it.
+    private func unlockView(_ id: ItemID) {
+        guard var waiting = viewWaiters[id], !waiting.isEmpty else {
+            writingViews.remove(id)
+            return
+        }
+        let next = waiting.removeFirst()
+        viewWaiters[id] = waiting.isEmpty ? nil : waiting
+        next.resume()
     }
 
     /// Writes again what the window holds and Marfa has not taken, as Save View asks.
@@ -113,8 +143,19 @@ extension Browser {
     }
 
     private func writeOnce(_ id: ItemID, in library: any ItemLibrary) async {
-        guard item == .view(id), viewPanel?.isNew != true else { return }
-        guard let update = viewUpdate(SavedViews.window(self, in: library), in: library), !update.change.isEmpty else { return }
+        guard viewPanel?.isNew != true else { return }
+        // The window's choices are the open place's: a view that is not open writes them when it is shown again.
+        guard item == .view(id) else {
+            pendingViewWrites.insert(id)
+            return
+        }
+        guard let update = viewUpdate(SavedViews.window(self, in: library), in: library) else { return }
+        if update.change.isEmpty {
+            // A change the view cannot hold is the person's to hear of, though there is nothing to write.
+            tellUnkept(update.unkept, of: id, in: library)
+            return
+        }
+        if library.reachesServer { toldOffline.removeAll() }
         guard library.reachesServer else {
             if toldOffline.insert(id).inserted {
                 library.notices.tell(
@@ -126,7 +167,6 @@ extension Browser {
         let sent = liveChoices
         switch await library.changeView(id, update.change, baseVersion: update.baseVersion) {
         case .success(let view):
-            toldOffline.remove(id)
             // The window keeps what it shows: the view is the window's only where the view can hold it all.
             seed(view, catalogue: library.catalogue, keepingWindow: true)
             if liveChoices != sent { rewritingViews.insert(id) }
@@ -166,10 +206,11 @@ extension Browser {
             panel.name = view.title
             return
         }
-        guard name != view.title else { return }
-        if await writeName(name, of: id, expecting: view.title, in: library) {
-            registerNameUndo(of: id, restoring: view.title, from: name)
-        }
+        guard name != view.title, panel.renaming != name else { return }
+        panel.renaming = name
+        let kept = await writeName(name, of: id, expecting: view.title, in: library)
+        panel.finishRename(kept: kept)
+        if kept { registerNameUndo(of: id, restoring: view.title, from: name) }
     }
 
     private func registerNameUndo(of id: ItemID, restoring old: String, from new: String) {
@@ -184,9 +225,15 @@ extension Browser {
     /// Writes a title, where the view still has the one this change was made from.
     @discardableResult
     private func writeName(_ name: String, of id: ItemID, expecting title: String, in library: any ItemLibrary) async -> Bool {
-        while writingViews.contains(id) { try? await Task.sleep(for: .milliseconds(20)) }
-        writingViews.insert(id)
-        defer { writingViews.remove(id) }
+        await lockView(id)
+        let kept = await writeNameLocked(name, of: id, expecting: title, in: library)
+        // A choice changed while the name was written is written now, so it is never left behind.
+        await writeUntilSettled(id, in: library)
+        unlockView(id)
+        return kept
+    }
+
+    private func writeNameLocked(_ name: String, of id: ItemID, expecting title: String, in library: any ItemLibrary) async -> Bool {
         guard let view = library.views.first(where: { $0.id == id }), let seed = viewSeeds[id] else { return false }
         guard view.title == title else {
             library.notices.tell(String(localized: "Can’t Rename"), String(localized: "This view was renamed elsewhere, so its name was left as it is."))

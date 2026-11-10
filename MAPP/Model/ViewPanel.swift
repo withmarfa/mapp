@@ -31,6 +31,10 @@ final class ViewPanel {
 
     private(set) var purpose: Purpose
     @ObservationIgnored private var notices: Notices?
+    /// The name being written to the server, which is neither kept nor lost until the write answers.
+    @ObservationIgnored var renaming: String?
+    /// Whether the panel ended while a name was being written, so a name the server then refuses is given back.
+    @ObservationIgnored private var leftWhileRenaming: String?
     /// The name already given back, so a quit after a close does not give it twice.
     @ObservationIgnored private var handedOffName: String?
     /// The name of a view being edited. A new view's name is the form's, which keeps it until the server takes it.
@@ -103,15 +107,32 @@ final class ViewPanel {
             form?.handOff(because: departure)
         case .edit:
             guard typedRename != nil else { return }
-            let reason = switch departure {
-            case .closed: String(localized: "The window closed before the view was renamed.")
-            case .libraryChanged: String(localized: "The window changed to another library before the view was renamed.")
-            case .left: String(localized: "The panel closed before the view was renamed.")
+            if renaming != nil {
+                leftWhileRenaming = leaveReason(departure)
+                return
             }
-            giveBackRename(reason: reason)
+            giveBackRename(reason: leaveReason(departure))
         case .place:
             break
         }
+    }
+
+    private func leaveReason(_ departure: ViewTitleForm.Departure) -> String {
+        switch departure {
+        case .closed: String(localized: "The window closed before the view was renamed.")
+        case .libraryChanged: String(localized: "The window changed to another library before the view was renamed.")
+        case .left: String(localized: "The panel closed before the view was renamed.")
+        }
+    }
+
+    /// The write of the name answered. A name the server did not take, from a panel that ended meanwhile, is given back.
+    func finishRename(kept: Bool) {
+        let name = renaming
+        renaming = nil
+        if kept, let name { knownTitle = name }
+        guard let reason = leftWhileRenaming else { return }
+        leftWhileRenaming = nil
+        if !kept, let name { giveBackRename(name: name, reason: reason) }
     }
 
     /// The view is gone, so the name typed for it has nowhere to go. Whether there was one to give back.
@@ -123,7 +144,12 @@ final class ViewPanel {
     }
 
     private func giveBackRename(reason: String) {
-        guard let name = typedRename, name != handedOffName else { return }
+        guard let name = typedRename else { return }
+        giveBackRename(name: name, reason: reason)
+    }
+
+    private func giveBackRename(name: String, reason: String) {
+        guard name != handedOffName else { return }
         handedOffName = name
         notices?.notKept(String(localized: "View Not Renamed"), text: name, reason: reason)
     }

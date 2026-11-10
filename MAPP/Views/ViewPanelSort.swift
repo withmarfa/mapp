@@ -69,7 +69,7 @@ private struct SortRow: View {
             .pickerStyle(.menu)
             .fixedSize()
             .accessibilityIdentifier("ViewPanelSortDirection")
-            Button("Remove Sort", systemImage: "minus.circle.fill") { write(sort.filter { $0.column.id != key.column.id }) }
+            Button("Remove Sort", systemImage: "xmark.circle") { write(sort.filter { $0.column.id != key.column.id }) }
                 .labelStyle(.iconOnly)
                 .buttonStyle(.plain)
                 .foregroundStyle(.tertiary)

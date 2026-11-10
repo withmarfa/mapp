@@ -29,16 +29,17 @@ enum SavedViews {
         let content = browser.tableContent(in: library)
         let options = browser.tableOptions[browser.item] ?? ItemTableOptions()
         let search = browser.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        // The table's own grouping by status is not one the list or the gallery shows.
-        var grouping = content.grouping
-        if !isArranged(browser), case .automatic = options.grouping { grouping = nil }
+        // The order and grouping come from what the layout shows (`arrangement`), which is what the panel shows too.
+        let layoutShows = arrangement(browser, content: content, order: browser.storedOrder)
+        var grouping: ItemTableColumn?
+        if case .column(let id) = layoutShows.grouping, content.grouping?.id == id { grouping = content.grouping }
         var seededTypes: [String]?
         if case .view(let id) = browser.item { seededTypes = browser.viewSeeds[id]?.types }
         return ViewDraft.Window(
-            place: browser.item, columns: content.columns, sort: content.sort, grouping: grouping,
+            place: browser.item, columns: content.columns, sort: layoutShows.sort, grouping: grouping,
             filters: options.filters, negated: options.negated, search: search.isEmpty ? nil : search,
             layout: layout(of: browser, in: library, order: nil), timelineDate: browser.timelineFields[browser.item],
-            seededTypes: seededTypes)
+            seededTypes: seededTypes, dated: layoutShows.isDated ? ViewDraft.Dated(sort: layoutShows.sort, hasSections: layoutShows.grouping == .date) : nil)
     }
 
     /// What the window shows in the layout it shows it in, with that layout's own order and grouping, so a new
@@ -129,6 +130,11 @@ enum SavedViews {
             }
             return Arrangement(sort: content.sort, grouping: grouping, isDated: false)
         }
+        return datedArrangement(order)
+    }
+
+    /// What the list shows while nothing arranges it: its own order, in sections by date where it has them.
+    static func datedArrangement(_ order: NoteOrder) -> Arrangement {
         let column: ItemTableColumn = switch order.sort {
         case .dateEdited: .edited
         case .dateCreated: .created

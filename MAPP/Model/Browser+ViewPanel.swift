@@ -76,6 +76,8 @@ extension Browser {
 
     private func dropNewViewPanel(_ panel: ViewPanel) {
         viewPanel = nil
+        // The steps made while the panel was open describe choices the place no longer has.
+        placeChanged()
         if let snapshot = panel.snapshot { restore(snapshot) }
     }
 
@@ -142,14 +144,15 @@ extension Browser {
     /// Makes the view of what the window shows, under the name typed or the default one, and shows it. What the view
     /// cannot keep of the window is said once it exists. A refusal leaves the panel and the name as they are.
     func makeNewView(from panel: ViewPanel, in library: any ItemLibrary, order: NoteOrder) async {
-        guard let form = panel.form else { return }
+        guard let form = panel.form, !form.isBusy else { return }
         if form.trimmedTitle.isEmpty { form.title = String(localized: "New View") }
         let window = SavedViews.window(self, in: library, order: order)
         let settings = SavedViews.newViewSettings(self, in: library)
-        guard form.canSubmit else {
+        guard library.reachesServer else {
             library.notices.tell(String(localized: "View Not Made"), String(localized: "Making a view needs your Marfa server, which can’t be reached now. Your changes are still in the window."))
             return
         }
+        guard form.canSubmit else { return }
         guard let draft = ViewDraft.draft(window, catalogue: library.catalogue, views: library.views) else { return }
         guard case .done(let view) = await form.submit(draft) else { return }
         // The view exists now, so the Mac keeps its settings whatever became of the panel meanwhile.

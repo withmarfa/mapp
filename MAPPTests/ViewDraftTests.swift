@@ -401,7 +401,7 @@ struct ViewDraftTests {
     @Test func aViewOfSeveralTypesIsSavedAsItWasUntilTheTypeFilterChanges() throws {
         let view = LibraryView(id: ItemID("v"), title: "V", version: 2, query: LibraryViewQuery(types: [Self.task, TypeID("core.note")]))
         let seed = ViewDraft.options(for: view, catalogue: Self.catalogue)
-        func update(_ filters: [String: Set<String>]) -> (change: LibraryViewChange, unkept: [ViewDraft.Unkept], unchanged: [String]) {
+        func update(_ filters: [String: Set<String>]) -> (change: LibraryViewChange, unkept: [ViewDraft.Unkept]) {
             var options = seed
             options.filters = filters
             return ViewDraft.change(
@@ -480,7 +480,7 @@ struct ViewDraftTests {
             query: LibraryViewQuery(types: [Self.task], filter: #"tags contains "x" AND properties.status eq "todo""#))
         let seed = ViewDraft.options(for: view, catalogue: Self.catalogue)
         #expect(seed.filters == ["field.status": ["todo"]])
-        func update(_ filters: [String: Set<String>]) -> (change: LibraryViewChange, unkept: [ViewDraft.Unkept], unchanged: [String]) {
+        func update(_ filters: [String: Set<String>]) -> (change: LibraryViewChange, unkept: [ViewDraft.Unkept]) {
             var options = seed
             options.filters = filters
             return ViewDraft.change(Self.window(.view(view.id), filters: filters), options: options, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
@@ -489,7 +489,6 @@ struct ViewDraftTests {
         // Removing the filter in the window removes it from the view; what the window cannot show stays.
         let removed = update([:])
         #expect(removed.change.query?.filter == #"tags contains "x""#)
-        #expect(removed.unchanged == [#"tags contains "x""#])
 
         let changed = update(["field.status": ["done"]])
         #expect(changed.change.query?.filter == #"tags contains "x" AND properties.status eq "done""#)
@@ -513,7 +512,6 @@ struct ViewDraftTests {
         let window = ViewDraft.Window(place: .view(view.id), columns: Self.columns, sort: [], grouping: nil, filters: [:])
         let update = ViewDraft.change(window, options: options, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
         #expect(update.change.query?.filter == #"properties.owner eq "ann""#)
-        #expect(update.unchanged == [#"properties.owner eq "ann""#])
     }
 
     // MARK: A window's changed filters, read at once

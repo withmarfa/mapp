@@ -24,6 +24,15 @@ nonisolated enum ViewDraft {
         /// worked out again, since a catalogue that changes while the window is open must not change what the
         /// filter stood for. Nil where the place is not a view, or its types were not shown as a filter.
         var seededTypes: [String]?
+        /// Set where the window shows the list's own order, which a list or gallery that is neither sorted nor grouped by a
+        /// column does: the order it shows, and whether it shows sections by date.
+        var dated: Dated?
+    }
+
+    /// The list's own order, which stands for a view with no sort or grouping of its own.
+    struct Dated {
+        var sort: [ItemTableComparator]
+        var hasSections: Bool
     }
 
     /// The layout the window shows, which decides the order and grouping the person sees.
@@ -391,11 +400,24 @@ nonisolated enum ViewDraft {
     /// Whether the window's choices differ from those the view opened with: its order, grouping, filters or the
     /// date its timeline shows.
     static func differs(
-        _ options: ItemTableOptions?, timelineDate: String?, from seed: ItemTableOptions, seedTimelineDate: String?
+        _ options: ItemTableOptions?, timelineDate: String?, from seed: ItemTableOptions, seedTimelineDate: String?,
+        dated: [ItemTableComparator]? = nil
     ) -> Bool {
-        let options = options ?? ItemTableOptions()
+        let options = shown(options ?? ItemTableOptions(), dated: dated)
+        let seed = shown(seed, dated: dated)
         return options.filterChoices != seed.filterChoices || options.grouping != seed.grouping
             || sortKeys(options.sort) != sortKeys(seed.sort) || timelineDate != seedTimelineDate
+    }
+
+    /// The options as a list that shows its own order shows them: with no sort and no column to group by it is ordered
+    /// by that order and has no grouping of a view's kind, however the options spell it.
+    static func shown(_ options: ItemTableOptions, dated: [ItemTableComparator]?) -> ItemTableOptions {
+        guard let dated, options.sort == nil else { return options }
+        if case .column = options.grouping { return options }
+        var shown = options
+        shown.sort = dated
+        shown.grouping = .none
+        return shown
     }
 
     private static func sortKeys(_ sort: [ItemTableComparator]?) -> [String]? {
@@ -405,17 +427,17 @@ nonisolated enum ViewDraft {
     /// The change that saves the window's choices to the view it shows, naming only the settings that differ from
     /// those it opened with, so a setting the window left alone is never sent. The window's filters take the place
     /// of the conditions they showed, so a filter removed in the window is removed from the view; the conditions the
-    /// window cannot show stay as they are and are named (`unchanged`) when the filter is written. A view groups
+    /// window cannot show stay as they are. A view groups
     /// by one thing, so where the timeline's date and the table's grouping both changed, the layout shown decides
     /// which is kept.
     static func change(
         _ window: Window, options: ItemTableOptions?, seed: ItemTableOptions, seedTimelineDate: String?,
         seededTypes: [String]?, view: LibraryView, catalogue: Catalogue
-    ) -> (change: LibraryViewChange, unkept: [Unkept], unchanged: [String]) {
-        let options = options ?? ItemTableOptions()
+    ) -> (change: LibraryViewChange, unkept: [Unkept]) {
+        let options = shown(options ?? ItemTableOptions(), dated: window.dated?.sort)
+        let seed = shown(seed, dated: window.dated?.sort)
         var change = LibraryViewChange()
         var unkept: [Unkept] = []
-        var unchanged: [String] = []
         if let search = window.search { unkept.append(.search(search)) }
         if sortKeys(options.sort) != sortKeys(seed.sort) {
             let sort = sort(window.sort)
@@ -447,6 +469,7 @@ nonisolated enum ViewDraft {
             let group = group(window.grouping)
             change.group = group.group.map { .set($0) } ?? .clear
             unkept += group.unkept
+            if window.dated?.hasSections == true { unkept.append(.dateSections) }
             if redated { unkept.append(.group(column: String(localized: "Timeline date"))) }
         }
         if options.filterChoices != seed.filterChoices {
@@ -454,11 +477,10 @@ nonisolated enum ViewDraft {
                 view.query, with: choices(of: window), columns: window.columns, seededTypes: seededTypes, catalogue: catalogue)
             if filter.query != view.query {
                 change.query = filter.query
-                unchanged = filter.unchanged
             }
             unkept += filter.unkept
         }
-        return (change, unkept, unchanged)
+        return (change, unkept)
     }
 
     // MARK: A view's filter as the window's
@@ -600,14 +622,14 @@ nonisolated enum ViewDraft {
     }
 
     /// The view's query with the window's filters in place of the conditions the window showed: the conditions
-    /// it could not show stay as they are, in order, and are given back as `unchanged`. A window filter the view
+    /// it could not show stay as they are, in order. A window filter the view
     /// cannot hold leaves the query whole, so a filter is never dropped for one the window could not save.
     static func replacing(
         _ query: LibraryViewQuery, with choices: [String: FilterChoice], columns: [ItemTableColumn], seededTypes: [String]?,
         catalogue: Catalogue
-    ) -> (query: LibraryViewQuery, unkept: [Unkept], unchanged: [String]) {
+    ) -> (query: LibraryViewQuery, unkept: [Unkept]) {
         let parsed: Parsed
-        do { parsed = try terms(of: query.filter) } catch { return (query, [.refused(message(of: error))], []) }
+        do { parsed = try terms(of: query.filter) } catch { return (query, [.refused(message(of: error))]) }
         let filterable = Dictionary(uniqueKeysWithValues: columns.filter(\.isCategorical).map { ($0.id, $0) })
         // Where the view's types stand for the Type filter, its conditions on the type are not the filter's.
         let shown = shownTerms(parsed).filter { seededTypes == nil || $0.column != typeColumnID }
@@ -622,7 +644,7 @@ nonisolated enum ViewDraft {
             seeded[typeColumnID] = FilterChoice(values: Set(seededTypes), isNegated: false)
         }
         var window = choices.filter { filterable[$0.key] != nil && !$0.value.values.isEmpty }
-        guard window != seeded else { return (query, [], []) }
+        guard window != seeded else { return (query, []) }
 
         var result = query
         if let column = filterable[typeColumnID] {
@@ -631,7 +653,7 @@ nonisolated enum ViewDraft {
                 let chosen = choice.values.subtracting([""])
                 if !chosen.isEmpty, chosen != Set(query.types.map(\.rawValue)) {
                     guard let types = types(keeping: chosen, beside: [], catalogue: catalogue) else {
-                        return (query, [.filter(column: label(of: column))], [])
+                        return (query, [.filter(column: label(of: column))])
                     }
                     result.types = types
                 }
@@ -642,8 +664,8 @@ nonisolated enum ViewDraft {
         let ownedConditions = Set(owned.map(\.condition))
         let kept = parsed.terms.filter { !ownedConditions.contains($0.condition) }
         let combination = combined(Parsed(terms: kept, join: parsed.join), adding: window, columns: columns, keeping: nil)
-        if combination.unkept.contains(where: refusesFilter) { return (query, combination.unkept, []) }
+        if combination.unkept.contains(where: refusesFilter) { return (query, combination.unkept) }
         result.filter = combination.filter ?? (kept.isEmpty ? nil : try? FilterExpression(join: parsed.join, conditions: kept.map(\.condition)).encoded())
-        return (result, combination.unkept, kept.map(\.text))
+        return (result, combination.unkept)
     }
 }

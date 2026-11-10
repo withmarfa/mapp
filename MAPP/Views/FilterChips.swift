@@ -149,7 +149,6 @@ private struct FilterChipView: View {
 struct FilterValueOption: Identifiable, Hashable {
     let id: String
     var title: String
-    var detail: String?
     var mark: ValueListRow.Mark = .none
 }
 
@@ -275,7 +274,7 @@ struct FilterFieldPanel: View {
     }
 }
 
-/// One line of either panel, as a value panel draws its rows: the mark, the title, the count, and the accent under the
+/// One line of either panel, as a value panel draws its rows: the mark, the title, and the accent under the
 /// pointer.
 private struct FilterOptionRow: View {
     let option: FilterValueOption
@@ -288,10 +287,6 @@ private struct FilterOptionRow: View {
             ValueMarkView(mark: option.mark, scale: scale, onAccent: isHovered)
             Text(verbatim: option.title).lineLimit(1).truncationMode(.tail)
             Spacer(minLength: 8 * scale)
-            if let detail = option.detail {
-                Text(verbatim: detail)
-                    .foregroundStyle(isHovered ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.secondary))
-            }
         }
         .font(.system(size: ValueEditMetrics.textSize * scale))
         .foregroundStyle(isHovered ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
@@ -333,6 +328,8 @@ final class FilterPanelPresenter {
     private var closedByClick: (key: String, at: Date)?
     private var monitors: [Any] = []
     private var observers: [NSObjectProtocol] = []
+    /// Follows the window's appearance, so a panel left open does not keep the one it opened in.
+    private var appearanceWatch: NSKeyValueObservation?
 
     var isOpen: Bool { panel != nil }
 
@@ -424,6 +421,9 @@ final class FilterPanelPresenter {
     }
 
     private func watch() {
+        appearanceWatch = parent?.observe(\.effectiveAppearance) { [weak self] window, _ in
+            MainActor.assumeIsolated { self?.panel?.appearance = window.effectiveAppearance }
+        }
         let center = NotificationCenter.default
         if let parent {
             observers.append(center.addObserver(forName: NSWindow.didMoveNotification, object: parent, queue: .main) { [weak self] _ in
@@ -448,6 +448,7 @@ final class FilterPanelPresenter {
     }
 
     private func unwatch() {
+        appearanceWatch = nil
         monitors.forEach(NSEvent.removeMonitor)
         monitors = []
         observers.forEach(NotificationCenter.default.removeObserver)

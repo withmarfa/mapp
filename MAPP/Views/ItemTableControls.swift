@@ -1,33 +1,11 @@
 import SwiftUI
 
-/// The Filter, on the toolbar just after Search: it shows or hides the row of filters above the list, tinted and counting
-/// the filters where the place has any. What the row keeps is the place's, for the window, in every layout.
-struct ItemTableFilterMenu: View {
-    @Bindable var browser: Browser
-
-    var body: some View {
-        let count = browser.filterCount
-        Button {
-            browser.toggleFilterRow()
-        } label: {
-            HStack(spacing: 3) {
-                Image(systemName: "line.3.horizontal.decrease")
-                if count > 0 { Text("\(count)").font(.caption.monospacedDigit()) }
-            }
-            .foregroundStyle(count > 0 ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary))
-        }
-        .help(browser.showsFilterRow ? "Hide the filters" : "Show the filters")
-        .accessibilityLabel(count > 0 ? Text("Filter, \(count) applied") : Text("Filter"))
-        .accessibilityIdentifier("ItemTableFilter")
-    }
-}
-
 /// The View menu's filter commands: Show or Hide Filters, Add Filter… and Clear Filters.
 struct FilterCommands: View {
     @Bindable var browser: Browser
 
     var body: some View {
-        Button(browser.showsFilterRow ? "Hide Filters" : "Show Filters") { browser.toggleFilterRow() }
+        Button(browser.toggleFiltersTitle) { browser.toggleFilterRow() }
         Button("Add Filter…") { browser.requestAddFilter() }
         if browser.filterCount > 0 {
             Button("Clear Filters") { browser.clearFilters() }

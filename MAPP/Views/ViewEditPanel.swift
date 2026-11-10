@@ -133,11 +133,18 @@ private struct ViewPanelGroup: View {
                     picker
                 }
                 if case .view(let id) = browser.item {
-                    Toggle("Hide Empty Groups", isOn: Binding {
-                        browser.macSettings(for: id).hidesEmptyGroups
-                    } set: { hides in
-                        browser.changeViewSettings(id) { $0.hidesEmptyGroups = hides }
-                    })
+                    HStack {
+                        Text("Hide Empty Groups")
+                        Spacer(minLength: 0)
+                        Toggle("Hide Empty Groups", isOn: Binding {
+                            browser.macSettings(for: id).hidesEmptyGroups
+                        } set: { hides in
+                            browser.changeViewSettings(id) { $0.hidesEmptyGroups = hides }
+                        })
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                    }
                     .disabled(browser.viewMode != .board)
                     .help(browser.viewMode == .board ? "" : String(localized: "Only a board has empty groups."))
                     .accessibilityIdentifier("ViewPanelHideEmptyGroups")

@@ -134,7 +134,7 @@ private struct FilterValuePanelHost: View {
                 isNegated: options.isNegated(columnID),
                 chosen: offered.filter { kept.contains($0.id) }.map { ValueChip(id: $0.id, title: $0.title, mark: mark(of: $0, in: column)) },
                 options: offered.filter { !kept.contains($0.id) }.map {
-                    FilterValueOption(id: $0.id, title: $0.title, detail: String($0.rows.count), mark: mark(of: $0, in: column))
+                    FilterValueOption(id: $0.id, title: $0.title, mark: mark(of: $0, in: column))
                 },
                 setNegated: { browser.setFilter(columnID, values: kept, negated: $0) },
                 add: { browser.setFilter(columnID, values: kept.union([$0]), negated: options.negated.contains(columnID)) },

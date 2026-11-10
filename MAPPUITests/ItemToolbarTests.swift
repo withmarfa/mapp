@@ -223,15 +223,12 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(window.descendants(matching: .any)["ItemGallery"].waitForNonExistence(timeout: 3))
     }
 
-    func testViewAsShowsTheTableWithItsOwnFilterAndViewOptions() {
+    func testViewAsShowsTheTableWithItsViewOptions() {
         show("as Table")
         let table = control("ItemTable")
         XCTAssertTrue(table.waitForExistence(timeout: 3))
         XCTAssertFalse(window.outlines["NoteList"].exists, "the table spans the window")
         XCTAssertFalse(window.webViews.firstMatch.exists)
-        let filter = control("ItemTableFilter")
-        XCTAssertTrue(filter.exists, "Filter is on the toolbar")
-        XCTAssertLessThan(filter.frame.maxX, control("ViewOptionsToolbar").frame.minX, "Filter sits with Search, before View Options")
         XCTAssertLessThan(control("ViewOptionsToolbar").frame.maxX, control("ViewModeMenu").frame.minX)
         control("ViewOptionsToolbar").click()
         for title in ["Sort by", "Group by", "Columns"] {
@@ -249,12 +246,12 @@ final class ItemToolbarTests: XCTestCase {
         XCTAssertTrue(table.waitForNonExistence(timeout: 3))
     }
 
-    func testFilterIsOnTheToolbarInEveryLayout() {
-        let filter = control("ItemTableFilter")
-        XCTAssertTrue(filter.waitForExistence(timeout: 3), "the list has Filter")
-        for title in ["as Gallery", "as Table", "as Board"] {
+    func testViewOptionsHoldShowFiltersInEveryLayout() {
+        for title in ["as List", "as Gallery", "as Table", "as Board"] {
             show(title)
-            XCTAssertTrue(filter.waitForExistence(timeout: 3), title)
+            control("ViewOptionsToolbar").click()
+            XCTAssertTrue(window.menuItems["Show Filters"].firstMatch.waitForExistence(timeout: 3), title)
+            app.typeKey(.escape, modifierFlags: [])
         }
     }
 

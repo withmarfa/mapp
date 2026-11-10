@@ -661,6 +661,7 @@ final class Browser {
         filterRowChoice = [:]
         toldUnkept = [:]
         writingViews = []
+        pendingViewWrites = []
         placeCards = [:]
         compactBoards = [:]
         timelineFields = [:]
@@ -767,6 +768,10 @@ final class Browser {
     /// The views this window is writing, and those that changed again meanwhile (`Browser+ViewWrites`).
     @ObservationIgnored var writingViews: Set<ItemID> = []
     @ObservationIgnored var rewritingViews: Set<ItemID> = []
+    /// Name writes and other work waiting for the write under way on a view to end (`lockView`).
+    @ObservationIgnored var viewWaiters: [ItemID: [CheckedContinuation<Void, Never>]] = [:]
+    /// Views whose choices changed while the window showed another place, written when it shows them again.
+    @ObservationIgnored var pendingViewWrites: Set<ItemID> = []
     @ObservationIgnored var toldOffline: Set<ItemID> = []
     @ObservationIgnored var toldUnkept: [ItemID: Set<ViewDraft.Unkept>] = [:]
 

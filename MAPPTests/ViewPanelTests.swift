@@ -243,6 +243,124 @@ struct ViewPanelTests {
         #expect(shown.grouping != .date)
     }
 
+    // MARK: Faults the review found
+
+    @Test func groupByDateOnAListWritesNoSortThePersonDidNotChooseAndLeavesTheViewUnedited() async {
+        let (browser, library, _) = Self.opened()
+        browser.set(layout: .list)
+        await Self.change(browser) {
+            browser.tableOptions[browser.item, default: .init()].grouping = .automatic
+            browser.tableOptions[browser.item, default: .init()].sort = nil
+        }
+        #expect(Self.held(library)?.group == nil)
+        #expect(Self.held(library)?.sort == Self.view().sort)
+        #expect(Self.held(library)?.version == 2)
+        #expect(!browser.hasViewChanges)
+    }
+
+    @Test func aChoiceChangedWhileANameIsBeingWrittenIsWrittenAfterIt() async {
+        let (browser, library, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        browser.openViewPanel(in: library)
+        browser.viewPanel?.name = "Renamed"
+        var release: CheckedContinuation<Void, Never>?
+        var held = false
+        library.inViewChange = {
+            guard !held else { return }
+            held = true
+            await withCheckedContinuation { release = $0 }
+        }
+        let rename = Task { await browser.commitViewName(in: library) }
+        #expect(await eventually(within: .seconds(20)) { release != nil })
+        browser.setFilter(Self.status, values: ["todo"])
+        browser.choicesChanged()
+        release?.resume()
+        await rename.value
+        #expect(await eventually(within: .seconds(20)) { Self.held(library)?.query.filter?.contains("todo") == true })
+        #expect(Self.held(library)?.title == "Renamed")
+    }
+
+    @Test func aChangeTheViewCannotHoldIsToldEvenThoughThereIsNothingToWrite() async {
+        let ors = #"tags contains "a" OR tags contains "b""#
+        let (browser, library, _) = Self.opened(filter: ors)
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        #expect(Self.held(library)?.version == 1)
+        #expect(library.notices.waiting.contains { $0.title == "View Not Fully Saved" })
+    }
+
+    @Test func aRenameStillBeingWrittenIsNotGivenToTheClipboardWhenThePanelCloses() async {
+        let (browser, library, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        browser.openViewPanel(in: library)
+        browser.viewPanel?.name = "Renamed"
+        var release: CheckedContinuation<Void, Never>?
+        library.inViewChange = { await withCheckedContinuation { release = $0 } }
+        let rename = Task { await browser.commitViewName(in: library) }
+        #expect(await eventually(within: .seconds(20)) { release != nil })
+        browser.closeViewPanel(in: library)
+        release?.resume()
+        await rename.value
+        #expect(Self.held(library)?.title == "Renamed")
+        #expect(!library.notices.waiting.contains { $0.isNotKept })
+    }
+
+    @Test func escapeOnANewViewLeavesNoUndoStepsBehind() {
+        let (browser, library, undo) = Self.opened()
+        browser.openNewViewPanel(in: library)
+        undo.beginUndoGrouping()
+        browser.setFilter(Self.status, values: ["todo"])
+        browser.choicesChanged()
+        Self.close(undo)
+        browser.escapeViewPanel(in: library)
+        #expect(!undo.canUndo)
+    }
+
+    @Test func aSecondDoneOnANewViewIsSilent() async {
+        let (browser, library, _) = Self.opened()
+        browser.openNewViewPanel(in: library)
+        var release: CheckedContinuation<Void, Never>?
+        library.inViewWrite = { await withCheckedContinuation { release = $0 } }
+        let first = Task { await browser.finishViewPanel(in: library, order: Self.order) }
+        #expect(await eventually(within: .seconds(20)) { release != nil })
+        let before = library.notices.told
+        await browser.finishViewPanel(in: library, order: Self.order)
+        #expect(library.notices.told == before)
+        release?.resume()
+        await first.value
+        #expect(library.views.count == 2)
+    }
+
+    @Test func aChangeMadeJustBeforeLeavingTheViewIsWrittenWhenItIsShownAgain() async {
+        let (browser, library, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        browser.setFilter(Self.status, values: ["todo"])
+        let task = browser.choicesChanged()
+        browser.sidebarItem = .allNotes
+        await task?.value
+        #expect(Self.held(library)?.version == 1)
+        browser.sidebarItem = .view(Self.id)
+        browser.followView(in: library)
+        #expect(await eventually(within: .seconds(20)) { Self.held(library)?.query.filter?.contains("todo") == true })
+    }
+
+    @Test func undoOfALayoutOnATypesListPutsTheLayoutBack() {
+        let library = FakeItemLibrary()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        undo.beginUndoGrouping()
+        let browser = Browser()
+        browser.defaults = Self.defaults()
+        browser.adopt(library, undoManager: undo)
+        browser.sidebarItem = .itemType("core.task")
+        browser.viewMode = .list
+        undo.removeAllActions()
+        undo.beginUndoGrouping()
+        browser.viewMode = .table
+        Self.close(undo)
+        undo.undo()
+        #expect(browser.viewMode == .list)
+    }
+
     // MARK: Done and Escape
 
     @Test func doneOnAViewOnlyClosesThePanelAndWritesNothingMore() async {

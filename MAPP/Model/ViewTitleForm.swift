@@ -34,6 +34,9 @@ final class ViewTitleForm {
 
     var trimmedTitle: String { title.trimmingCharacters(in: .whitespacesAndNewlines) }
 
+    /// Whether a view is being made or was made from this form, so another Done has nothing to do.
+    var isBusy: Bool { isSaving || isFinished }
+
     var canSubmit: Bool { !isSaving && !isFinished && !trimmedTitle.isEmpty && library.reachesServer }
 
     /// Makes the view of `draft` under the title, and keeps the title for another try if the server refuses it.

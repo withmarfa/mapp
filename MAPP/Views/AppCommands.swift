@@ -100,7 +100,7 @@ struct AppCommands: Commands {
             .keyboardShortcut("i", modifiers: [.command, .option])
             .disabled(details == nil || notes?.ids.count != 1)
             Divider()
-            // The toolbar's Filter and View Options, for the view in front.
+            // The toolbar's View Options and its filters, for the view in front.
             Group {
                 if library != nil, let browser {
                     // A table, board or timeline with an item page open has no view options to offer.

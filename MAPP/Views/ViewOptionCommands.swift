@@ -75,7 +75,7 @@ struct ViewOptionCommand {
             })
         }
         commands.append(.init(
-            title: browser.showsFilterRow ? String(localized: "Hide Filters") : String(localized: "Show Filters"),
+            title: String(localized: browser.toggleFiltersTitle),
             systemImage: "line.3.horizontal.decrease"
         ) {
             browser.toggleFilterRow()

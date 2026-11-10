@@ -24,6 +24,7 @@ extension Browser {
     /// write carries them. Every layout shows them, and the view opens in the layout this Mac keeps for it.
     func followView(in library: any ItemLibrary) {
         guard case .view(let id) = item, let view = library.views.first(where: { $0.id == id }) else { return }
+        if pendingViewWrites.remove(id) != nil { scheduleWrite(of: id) }
         guard let seed = viewSeeds[id] else {
             apply(layout: ViewLayouts.stored(in: defaults).settings(for: id)?.layout, in: library)
             return self.seed(view, catalogue: library.catalogue)
@@ -54,7 +55,9 @@ extension Browser {
 
     private func differs(_ id: ItemID, from seed: ViewSeed) -> Bool {
         let place = SidebarItem.view(id)
-        return ViewDraft.differs(tableOptions[place], timelineDate: timelineFields[place], from: seed.options, seedTimelineDate: seed.timelineDate)
+        return ViewDraft.differs(
+            tableOptions[place], timelineDate: timelineFields[place], from: seed.options, seedTimelineDate: seed.timelineDate,
+            dated: datedList?.sort)
     }
 
     /// Shows the layout without taking it for a change of the person's, which only the person's own choice is.
@@ -83,6 +86,21 @@ extension Browser {
         guard case .view(let id) = item, let seed = viewSeeds[id], let query = seed.preview,
               (tableOptions[item] ?? ItemTableOptions()).filterChoices != seed.options.filterChoices else { return nil }
         return (id, query)
+    }
+
+    /// The list's own order, from where the app keeps it.
+    var storedOrder: NoteOrder {
+        let sort = defaults.string(forKey: OrderKey.sort).flatMap(NoteSort.init(rawValue:)) ?? NoteOrder().sort
+        let groups = defaults.object(forKey: OrderKey.groupsByDate) as? Bool ?? NoteOrder().groupsByDate
+        return NoteOrder(sort: sort, groupsByDate: groups)
+    }
+
+    /// What the list or gallery shows while neither the person nor the view arranged it: the list's own order. Nil in
+    /// every other layout, and once a sort or a column to group by orders it.
+    var datedList: ViewDraft.Dated? {
+        guard !SavedViews.isArranged(self) else { return nil }
+        let arrangement = SavedViews.datedArrangement(storedOrder)
+        return ViewDraft.Dated(sort: arrangement.sort, hasSections: arrangement.grouping == .date)
     }
 
     // MARK: This Mac's settings for a view
@@ -148,16 +166,29 @@ extension Browser {
         viewSeeds[id]?.mac = kept
     }
 
-    /// Takes the person's own change of layout, in a view, which this Mac keeps at once. Undo goes back to the layout
+    /// Takes the person's own change of layout, which a view keeps on this Mac at once. Undo goes back to the layout
     /// the window showed.
     func recordLayout(from old: ItemViewMode) {
-        guard !isApplyingLayout, case .view(let id) = item else { return }
+        guard !isApplyingLayout else { return }
+        guard case .view(let id) = item else {
+            registerPlaceLayoutUndo(in: item, from: old, to: viewMode)
+            return
+        }
         let before = macSettings(for: id)
         var settings = before
         settings.layout = viewMode
         guard settings != before else { return }
         keep(settings, for: id)
         registerLayoutUndo(of: id, from: old, to: viewMode, mac: before)
+    }
+
+    /// A place that is not a view holds its layout only in the window, and Undo puts the earlier one back.
+    private func registerPlaceLayoutUndo(in place: SidebarItem, from old: ItemViewMode, to new: ItemViewMode) {
+        registerUndo(String(localized: "Change Layout")) { browser in
+            guard browser.item == place else { return }
+            browser.set(layout: old)
+            browser.registerPlaceLayoutUndo(in: place, from: new, to: old)
+        }
     }
 
     private func registerLayoutUndo(of id: ItemID, from old: ItemViewMode, to new: ItemViewMode, mac before: ViewMacSettings) {
@@ -197,7 +228,7 @@ extension Browser {
         let update = ViewDraft.change(
             window, options: tableOptions[item], seed: seed.options, seedTimelineDate: seed.timelineDate, seededTypes: seed.types,
             view: view, catalogue: library.catalogue)
-        return ViewUpdate(view: view, change: update.change, baseVersion: seed.version, unkept: update.unkept, unchanged: update.unchanged)
+        return ViewUpdate(view: view, change: update.change, baseVersion: seed.version, unkept: update.unkept)
     }
 
     struct ViewUpdate {
@@ -206,8 +237,6 @@ extension Browser {
         let baseVersion: Int64
         /// What of the window the view will not keep.
         let unkept: [ViewDraft.Unkept]
-        /// The conditions of the view's filter the window cannot show, which the update leaves as they are.
-        let unchanged: [String]
     }
 
     /// A write refused because the view changed elsewhere, or a revert, puts the window back to the view as the

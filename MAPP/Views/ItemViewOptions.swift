@@ -56,21 +56,35 @@ struct ViewModeMenu: View {
     }
 }
 
-/// The options of the view a window shows, in one menu at the same place on every view's toolbar: after Search
-/// (and the table's Filter), before View As. The View menu holds the same options (`CurrentViewOptions`), since a
-/// toolbar can be hidden or customized.
+/// The options of the view a window shows, in one menu at the same place on every view's toolbar: after Search,
+/// before View As. It opens with Show Filters or Hide Filters, and is tinted and counts the filters where the place has
+/// any, so a saved view that opens with its row hidden still says filters apply. The View menu holds the same options
+/// (`CurrentViewOptions`), since a toolbar can be hidden or customized.
 struct ViewOptionsMenu: View {
     @CurrentLibrary private var library
     let browser: Browser
 
     var body: some View {
-        Menu("View Options", systemImage: "slider.horizontal.3") {
+        let count = browser.filterCount
+        Menu {
+            if browser.offersViewOptions {
+                Button(browser.toggleFiltersTitle) { browser.toggleFilterRow() }
+                    .accessibilityIdentifier("ToggleFiltersMenuItem")
+                Divider()
+            }
             CurrentViewOptions(browser: browser)
             if SavedViews.canEdit(browser, in: library), browser.offersViewOptions {
                 Divider()
                 Button("Edit View") { browser.openViewPanel(in: library) }
                     .accessibilityIdentifier("EditViewMenuItem")
             }
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "slider.horizontal.3")
+                if count > 0 { Text("\(count)").font(.caption.monospacedDigit()) }
+            }
+            .foregroundStyle(count > 0 ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary))
+            .accessibilityLabel(count > 0 ? Text("View Options, \(count) filters applied") : Text("View Options"))
         }
         .menuIndicator(.hidden)
         .help("View Options")
