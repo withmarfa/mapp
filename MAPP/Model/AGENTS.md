@@ -4,7 +4,7 @@ The data model, free of SwiftUI: the `ItemLibrary` protocol, `MarfaLibrary` over
 
 ## Items and types
 
-- MAPP names no item type of its own. A type's label, fields, parent, status words, groups and icon come from the server's catalogue (`Catalogue`). Code never tests a type by its identifier, with two exceptions: a child of `core.task` carries `due_at` and `priority` (`Catalogue.isTask`), and `PageHeaderKind` walks up the parents for an item page's header. A collection is a type that plays the `container` role (`Catalogue.isCollection`), never a type's name.
+- MAPP names no item type of its own. A type's label, fields, parent, status words, groups and icon come from the server's catalogue (`Catalogue`). Code never tests a type by its identifier, with three exceptions: a child of `core.task` carries `due_at` and `priority` (`Catalogue.isTask`), `PageHeaderKind` walks up the parents for an item page's header, and `ListRowStyle.fromFields` does the same for a list row's starting style (`core.highlight`; a file type by `Catalogue.isFileType`, a person by `PageHeaderKind`). A task row's other fields (`completed_at`, `recurrence`, `assignees`) and a highlight's (`color`, `start_location`, `locator_type`, `excerpt-of`) are named in `MarfaMapping`, never in a row's code. A task's priority takes its color by rank (`OptionTone.tone(of:in:isPriority:)`), never by the option's word. A collection is a type that plays the `container` role (`Catalogue.isCollection`), never a type's name.
 - A field is a status only when it is of the `status` kind, and a list of entries only when it is an `array` of `object` with `items_fields` (`Field.Kind.list`), whatever it is called. Name no field in code. `ListEntries` is the only place that changes a list; every edit returns the whole list with the other entries as they were. The person's work on a list lives in `ListEditing`, never in the rows.
 - Folders are facts on items, never places: MAPP syncs no folders and has no Folders section, Move To or New Folder.
 - What the item page shows of a type (`PagePlacements`), the sidebar layout (`SidebarLayouts`), column widths and, for a saved view, its layout, columns, cards and Hide Empty Groups (`ViewLayouts`) are MAPP's own settings on this Mac, never written to Marfa. An unreadable stored sidebar layout or page placement is set aside under its own key (`SidebarLayouts.setAsideKey`, `PagePlacements.setAsideKey`), never removed.
@@ -55,7 +55,7 @@ The data model, free of SwiftUI: the `ItemLibrary` protocol, `MarfaLibrary` over
 
 ## Code Review Rules
 
-- **Named type.** Flag code that tests for an item type by its identifier, or gives one a label, field or behavior of its own, outside `PageHeaderKind`'s header choice. Flag an SF Symbol named for a type.
+- **Named type.** Flag code that tests for an item type by its identifier, or gives one a label, field or behavior of its own, outside `PageHeaderKind`'s header choice, `Catalogue.isTask` and `ListRowStyle.fromFields`. Flag an SF Symbol named for a type.
 - **Folder as a place.** Flag a change that brings back a folder as a sidebar place, a move between folders, or a folder MAPP keeps or syncs itself.
 - **Fallback library.** Flag a change that shows anything but the connect, waiting or failure page while no server's copy is open.
 - **Unflushed switch.** Flag a change of library or a quit that does not first flush the open pages (`Libraries.flushEditors`), or that goes ahead when the flush fails. A window close waits for its editor's flush the same way (`EditorCloseDelegate`).

@@ -94,7 +94,7 @@ final class FakeItemLibrary: ItemLibrary {
         let project = TypeID("test.project")
         let taskFields = [
             ItemTypeInfo.Field(key: "status", label: "Status", kind: .choice(["todo", "in_progress", "done"]), declaredBy: task),
-            ItemTypeInfo.Field(key: "priority", label: "Priority", kind: .choice(["high", "medium", "low"]), declaredBy: task),
+            ItemTypeInfo.Field(key: "priority", label: "Priority", kind: .choice(["low", "medium", "high", "urgent"]), declaredBy: task),
             ItemTypeInfo.Field(key: "assignee", label: "Assignee", kind: .text, declaredBy: task),
         ]
         let types = [

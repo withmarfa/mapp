@@ -132,10 +132,22 @@ struct ViewCardsTests {
         #expect(chips.allSatisfy { $0.look == .tag })
     }
 
-    @Test func aChoiceIsAnOptionChipWithItsOwnWords() {
-        let item = Self.item("A", properties: [Property(key: "priority", value: .string("high"))])
+    @Test func aTasksPriorityChipTakesItsColorFromItsRankAsEveryOtherPriorityDoes() {
+        let item = Self.item("A", properties: [Property(key: "priority", value: .string("low"))])
         let chips = Self.chips("field.priority", of: item)
-        #expect(chips == [GalleryChip(text: ItemTypeInfo.Field.label(ofOption: "high"), look: .option)])
+        #expect(chips == [GalleryChip(text: ItemTypeInfo.Field.label(ofOption: "low"), look: .option(.purple))])
+        #expect(OptionTone.tone(for: "Low") == .purple)
+    }
+
+    @Test func aChoiceOfAnythingButAPriorityTakesTheColorOfItsWords() {
+        let field = ItemTypeInfo.Field(key: "kind", label: "Kind", kind: .choice(["high", "low"]), declaredBy: TypeID("test.project"))
+        let item = Item(
+            id: ItemID("P"), type: TypeID("test.project"), title: "P", titleRule: .property("title"),
+            properties: [Property(key: "kind", value: .string("high"))], version: ItemVersion(1), created: .now, modified: .now)
+        let library = FakeItemLibrary()
+        library.catalogue = Catalogue(itemTypes: [
+            ItemTypeInfo(id: TypeID("test.project"), label: "Project", fields: [field], titleField: "title", bodyField: nil, parent: nil)])
+        #expect(Self.chips("field.kind", of: item, in: library) == [GalleryChip(text: "High", look: .option(OptionTone.tone(for: "High")))])
     }
 
     @Test func aTextValueIsAPlainChip() {

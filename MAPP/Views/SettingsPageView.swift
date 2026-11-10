@@ -45,6 +45,7 @@ struct SettingsPageView: View {
     @ViewBuilder private var content: some View {
         switch page {
         case .appearance: AppearanceSettings()
+        case .lists: ListsSettings()
         case .editor: EditorSettings()
         case .sidebar: SidebarSettings()
         case .library: LibrarySettings()
@@ -95,10 +96,6 @@ private struct AppearanceSettings: View {
                 Text("Default Column Widths")
             } footer: {
                 Text("Where each column starts in a new window. Dragging a column to a new width changes only that window.")
-            }
-            Section("Notes List") {
-                OrderOptions()
-                ListPreviewOptions()
             }
             Section {
                 DateFormatOptions()

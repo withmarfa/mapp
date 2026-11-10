@@ -67,7 +67,7 @@ struct PagePinsView: View {
                 }
             case .options(let words):
                 ForEach(Array(words.enumerated()), id: \.offset) { index, word in
-                    PageChip(text: word, kind: .option(OptionTone.tone(for: word)))
+                    PageChip(text: word, kind: .option(pin.optionTones.indices.contains(index) ? pin.optionTones[index] : OptionTone.tone(for: word)))
                         .layoutPriority(index == words.count - 1 ? 0 : 1)
                 }
             case .tags(let tags):

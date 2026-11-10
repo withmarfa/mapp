@@ -135,6 +135,25 @@ import Testing
         #expect(await GalleryArtworkCache.artwork(for: item, width: 200, scale: 2, in: library)?.image.width == 5)
     }
 
+    @Test func aFailedPictureIsToldApartFromAnItemWithNone() async throws {
+        let bare = try #require(library.item(note))
+        func name(_ outcome: GalleryArtworkCache.Outcome) -> String {
+            switch outcome {
+            case .picture: "picture"
+            case .none: "none"
+            case .failed: "failed"
+            }
+        }
+        #expect(name(await GalleryArtworkCache.outcome(for: bare, width: 200, scale: 2, in: library)) == "none")
+
+        library.bindEmbed("![[Photo.png]]", in: note, file: try file("Photo.png", EmbedFixtures.png(width: 5, height: 2)))
+        let item = try #require(library.item(note))
+        library.fetchFails = true
+        #expect(name(await GalleryArtworkCache.outcome(for: item, width: 200, scale: 2, in: library)) == "failed")
+        library.fetchFails = false
+        #expect(name(await GalleryArtworkCache.outcome(for: item, width: 200, scale: 2, in: library)) == "picture")
+    }
+
     /// Binning, renaming or restoring the file changes nothing of the note, so the card follows the file itself.
     @Test func aNotesCardFollowsItsFileWhenItIsBinnedRenamedAndRestored() async throws {
         let id = try #require(library.bindEmbed("![[Photo.png]]", in: note, file: try file("Photo.png", EmbedFixtures.png(width: 5, height: 2))))

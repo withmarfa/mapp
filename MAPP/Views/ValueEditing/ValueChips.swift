@@ -26,9 +26,9 @@ struct ValueMarkView: View {
             glyph("tag")
         case .symbol(let name):
             glyph(name)
-        case .dot(let word):
+        case .dot(let tone):
             Circle()
-                .fill(OptionTone.tone(for: word).color(for: scheme))
+                .fill(tone.color(for: scheme))
                 .frame(width: 8 * scale, height: 8 * scale)
                 .frame(width: 14 * scale)
                 .accessibilityHidden(true)

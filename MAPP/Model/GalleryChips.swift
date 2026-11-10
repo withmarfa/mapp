@@ -26,8 +26,8 @@ nonisolated struct GalleryChip: Hashable, Sendable {
     enum Look: Hashable, Sendable {
         /// A word with no mark of its own, such as a date or a number.
         case plain
-        /// A choice or one word of a list, with a dot in its own color.
-        case option
+        /// A choice or one word of a list, with a dot in its own color: the one the field gives it, else its words'.
+        case option(TypeTone)
         case tag
         /// A status with the ring of its group.
         case status(PageHeader.Mark)
@@ -92,7 +92,12 @@ nonisolated struct GalleryChip: Hashable, Sendable {
         }
         guard let value = PropertyRow.value(of: field, in: item, format: format) else { return [] }
         switch value {
-        case .options(let words): return words.map { GalleryChip(text: $0, look: .option) }
+        case .options(let words):
+            let tones = PropertyRow.optionTones(
+                of: field, in: item, isPriority: library.catalogue.isPriority(field, of: field.declaredBy))
+            return words.enumerated().map { index, word in
+                GalleryChip(text: word, look: .option(tones.indices.contains(index) ? tones[index] : OptionTone.tone(for: word)))
+            }
         case .people(let names): return names.map { GalleryChip(text: $0, look: .plain) }
         case .items(let targets): return targets.map { GalleryChip(text: $0.title, look: .link(icon: $0.icon)) }
         case .date(let text), .text(let text), .url(let text), .email(let text), .phone(let text):

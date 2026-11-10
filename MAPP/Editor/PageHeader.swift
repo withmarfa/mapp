@@ -195,7 +195,9 @@ extension PropertyRow: Encodable {
             try container.encode(names.map { Listed(title: $0, initials: PersonInitials.of($0)) }, forKey: .people)
         case .options(let options):
             try container.encode("options", forKey: .kind)
-            try container.encode(options.map { Option(label: $0, tone: OptionTone.tone(for: $0).rawValue) }, forKey: .options)
+            try container.encode(
+                options.enumerated().map { Option(label: $1, tone: (optionTones.indices.contains($0) ? optionTones[$0] : OptionTone.tone(for: $1)).rawValue) },
+                forKey: .options)
         case .tags(let tags):
             try container.encode("tags", forKey: .kind)
             try container.encode(tags, forKey: .texts)

@@ -71,16 +71,28 @@ enum GalleryArtworkCache {
         storage.object(forKey: Key(basis, Int(bucket(width))))?.artwork
     }
 
-    /// Nil when there is no picture. A picture that couldn't be made now, as when a file can't be fetched offline,
-    /// is not kept, so the card asks again when it next shows.
-    static func artwork(for item: Item, width: CGFloat, scale: CGFloat, in library: any ItemLibrary) async -> GalleryArtwork? {
+    /// What making an item's picture came to.
+    enum Outcome: Sendable {
+        case picture(GalleryArtwork)
+        /// The item has no picture to show.
+        case none
+        /// It couldn't be made now, as when a file can't be fetched offline: not kept, so a view asks again when it
+        /// next shows.
+        case failed
+    }
+
+    static func outcome(for item: Item, width: CGFloat, scale: CGFloat, in library: any ItemLibrary) async -> Outcome {
         let bucket = bucket(width)
         let key = Key(basis(of: item, in: library), Int(bucket))
-        if let entry = storage.object(forKey: key) { return entry.artwork }
-        let made = await make(for: item, width: bucket, scale: scale, in: library)
-        guard let made else { return nil }
+        if let entry = storage.object(forKey: key) { return entry.artwork.map(Outcome.picture) ?? .none }
+        guard let made = await make(for: item, width: bucket, scale: scale, in: library) else { return .failed }
         if !Task.isCancelled { storage.setObject(Entry(made), forKey: key) }
-        return made
+        return made.map(Outcome.picture) ?? .none
+    }
+
+    /// Nil when there is no picture or it couldn't be made now (`outcome` tells the two apart).
+    static func artwork(for item: Item, width: CGFloat, scale: CGFloat, in library: any ItemLibrary) async -> GalleryArtwork? {
+        if case .picture(let artwork) = await outcome(for: item, width: width, scale: scale, in: library) { artwork } else { nil }
     }
 
     /// Nil for a picture that couldn't be made now; `.some(nil)` for an item with none.
