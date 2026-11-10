@@ -89,7 +89,7 @@ struct AppCommands: Commands {
             if let place = browser?.indexPlace {
                 IndexViewOptions(place: place, bindsKeys: true)
             } else {
-                ItemViewOptions(browser: browser, modes: browser.flatMap { browser in library.map { browser.availableViewModes(in: $0) } } ?? ItemViewMode.allCases)
+                ItemViewOptions(browser: browser, modes: browser.flatMap { browser in library.map { browser.availableViewModes(in: $0) } } ?? ItemViewMode.allCases, bindsKeys: true)
             }
             Divider()
             SavedViewMenu(browser: browser, library: library)

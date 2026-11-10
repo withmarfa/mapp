@@ -201,4 +201,94 @@ struct ItemBoardTests {
         #expect(ItemBoardLayout.move(page, key: "title", to: .option("short"), catalogue: catalogue) == .refused)
         #expect(ItemBoardLayout.move(page, key: "title", to: .missing, catalogue: catalogue) == .refused)
     }
+
+    // MARK: Mixed status fields
+
+    private static let reading = TypeID("example.reading")
+    private static let ticket = TypeID("example.ticket")
+
+    private static func status(_ key: String, _ words: [(String, StatusGroup)], by type: TypeID) -> ItemTypeInfo.Field {
+        .init(key: key, label: key, kind: .status(words.map { StatusWord(value: $0.0, group: $0.1) }), declaredBy: type)
+    }
+
+    private static var mixedCatalogue: Catalogue {
+        Catalogue(itemTypes: [
+            type(reading, fields: [status("reading_status", [("queued", .notStarted), ("reading", .inProgress), ("read", .completed)], by: reading)]),
+            type(ticket, fields: [status("state", [("todo", .notStarted), ("doing", .inProgress), ("done", .completed), ("dropped", .canceled)], by: ticket),
+                                  choice(["low", "high"], key: "priority")]),
+            type(text, fields: []),
+        ])
+    }
+
+    private static func mixed(_ id: String, _ type: TypeID, key: String? = nil, _ word: String? = nil) -> Item {
+        var item = Self.item(id, type: type)
+        if let key, let word { item.properties = [Property(key: key, value: .string(word))] }
+        return item
+    }
+
+    @Test func differentStatusFieldsMakeTheBoardLanesTheStatusGroups() {
+        let items = [
+            Self.mixed("a", Self.reading, key: "reading_status", "reading"), Self.mixed("b", Self.ticket, key: "state", "dropped"),
+            Self.mixed("c", Self.ticket, key: "state", "todo"), Self.mixed("d", Self.reading), Self.mixed("e", Self.text),
+            Self.mixed("f", Self.ticket, key: "state", "odd"),
+        ]
+        let fields = ItemBoardLayout.availableFields(items: items, catalogue: Self.mixedCatalogue)
+        let key = ItemBoardLayout.selectedField(nil, available: fields)?.key ?? ""
+        let lanes = ItemBoardLayout.lanes(items: items, key: key, catalogue: Self.mixedCatalogue)
+        #expect(lanes.map(\.id) == [.group(.inProgress), .group(.notStarted), .group(.completed), .group(.canceled), .missing, .invalid, .notApplicable])
+        #expect(lanes.map { $0.items.map(\.id.rawValue) } == [["a"], ["c"], [], ["b"], ["d"], ["f"], ["e"]])
+        #expect(lanes.first { $0.id == .missing }?.title == "No Status")
+    }
+
+    @Test func aGroupLaneTakesCardsOnlyWhereEveryTypeHasAWord() {
+        let items = [Self.mixed("a", Self.reading, key: "reading_status", "reading"), Self.mixed("b", Self.ticket, key: "state", "todo")]
+        let lanes = ItemBoardLayout.lanes(items: items, key: "state", catalogue: Self.mixedCatalogue)
+        let takes = Dictionary(uniqueKeysWithValues: lanes.map { ($0.id, $0.takesItems) })
+        #expect(takes[.group(.inProgress)] == true)
+        #expect(takes[.group(.canceled)] == false, "reading has no canceled word")
+        #expect(takes[.missing] == false)
+    }
+
+    @Test func movingIntoAGroupWritesTheTypesOwnFirstWordForIt() {
+        let ticket = Self.mixed("b", Self.ticket, key: "state", "todo")
+        let reading = Self.mixed("a", Self.reading, key: "reading_status", "queued")
+        let catalogue = Self.mixedCatalogue
+        #expect(ItemBoardLayout.move(ticket, key: "state", to: .group(.completed), catalogue: catalogue) == .set(.string("done")))
+        #expect(ItemBoardLayout.move(reading, key: "state", to: .group(.completed), catalogue: catalogue) == .set(.string("read")))
+        #expect(ItemBoardLayout.move(ticket, key: "state", to: .group(.notStarted), catalogue: catalogue) == .unchanged)
+        #expect(ItemBoardLayout.move(reading, key: "state", to: .group(.canceled), catalogue: catalogue) == .refused)
+        #expect(ItemBoardLayout.move(Self.mixed("t", Self.text), key: "state", to: .group(.completed), catalogue: catalogue) == .refused)
+        let library = FakeItemLibrary(items: [ticket, reading])
+        library.catalogue = catalogue
+        let plan = ItemBoardLayout.movePlan([ticket.id, reading.id], key: "state", to: .group(.completed), shown: [ticket.id, reading.id], in: library)
+        #expect(plan.changes.map(\.key).sorted() == ["reading_status", "state"], "each item is written through its own status field")
+    }
+
+    @Test func oneSharedStatusFieldKeepsItsOwnWords() {
+        let catalogue = Catalogue(itemTypes: [
+            Self.type(Self.reading, fields: [Self.status("state", [("queued", .notStarted), ("read", .completed)], by: Self.reading)]),
+            Self.type(Self.ticket, fields: [Self.status("state", [("todo", .notStarted), ("done", .completed)], by: Self.ticket)]),
+        ])
+        let items = [Self.mixed("a", Self.reading), Self.mixed("b", Self.ticket)]
+        let lanes = ItemBoardLayout.lanes(items: items, key: "state", catalogue: catalogue)
+        #expect(lanes.map(\.id) == [.option("queued"), .option("todo"), .option("read"), .option("done"), .missing])
+    }
+
+    @Test func aChoiceFieldStillGroupsByItsOwnWordsOnAMixedBoard() {
+        let items = [Self.mixed("a", Self.reading), Self.mixed("b", Self.ticket)]
+        let lanes = ItemBoardLayout.lanes(items: items, key: "priority", catalogue: Self.mixedCatalogue)
+        #expect(lanes.map(\.id) == [.option("low"), .option("high"), .missing, .notApplicable])
+    }
+
+    @Test func anInvalidCardOnAMixedBoardShowsItsOwnStatusFieldEvenWithEmptyLanesHidden() {
+        let items = [Self.mixed("a", Self.reading, key: "reading_status", "odd"), Self.mixed("b", Self.ticket, key: "state", "strange")]
+        let catalogue = Self.mixedCatalogue
+        let grouped = ItemBoardLayout.groupsByStatus(items: items, key: "state", catalogue: catalogue)
+        let shown = ItemBoardLayout.lanes(items: items, key: "state", catalogue: catalogue).filter { !$0.items.isEmpty }
+        #expect(shown.map(\.id) == [.invalid], "no group lane is left to show that the board groups by status")
+        #expect(grouped)
+        let keys = items.map { ItemBoardLayout.invalidValueKey(of: $0, key: "state", groupsByStatus: grouped, catalogue: catalogue) }
+        #expect(keys == ["reading_status", "state"])
+        #expect(ItemBoardLayout.invalidValueKey(of: items[0], key: "state", groupsByStatus: false, catalogue: catalogue) == "state")
+    }
 }
