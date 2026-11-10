@@ -29,6 +29,8 @@ struct CommandPalette: View {
     /// The row Actions is open for, by its identifier, or nil while it is shut.
     @State private var actionsFor: String?
     @State private var showsFilters = false
+    /// The filters and the panel open for one, which last until the palette is put away.
+    @State private var filterState = PaletteFilterState()
     /// Where the keyboard was before the palette took it, and goes back to once the palette is put away.
     @State private var returnFocus: Browser.Pane = .list
     /// Every note's title folded once while the palette is open, so a keystroke folds only what was typed.
@@ -43,6 +45,8 @@ struct CommandPalette: View {
     /// What Search Notes found for the query, asked once per query and again only when its answer changes (`watchSearch`),
     /// never by the body, which the arrow keys and the pointer run again and again.
     @State private var searched = SearchResults.none
+    /// What `searched` lists once the filters have narrowed it: filtered when the answer or the filters change, never by the body.
+    @State private var searchedItems: [Item] = []
     /// The height of the buttons that float over the results, with their margin: what the last row must clear.
     @State private var floatingHeight: CGFloat = 56
 
@@ -57,13 +61,14 @@ struct CommandPalette: View {
         let mode: Browser.Palette
         let returnFocus: Browser.Pane
         let selection: Set<ItemID>
+        let filters: PaletteFilters
     }
 
     /// What is held across runs of the body: the items' titles for a basis, and how the titles ranked for a query.
     /// The commands are never held, since they read the editor, the browser and the host, which change while the
     /// palette is open and are not part of the basis.
     private final class Listing {
-        var itemTitles: (basis: Basis, titles: [String])?
+        var items: (basis: Basis, items: [Item], titles: [String])?
         var ranking: (key: Ranking, picks: [PaletteMatch.Pick], scores: [Int])?
     }
 
@@ -75,7 +80,7 @@ struct CommandPalette: View {
 
     private var basis: Basis {
         Basis(library: ObjectIdentifier(library), content: library.contentRevision, membership: library.membershipRevision,
-              mode: mode, returnFocus: returnFocus, selection: browser.selection)
+              mode: mode, returnFocus: returnFocus, selection: browser.selection, filters: filterState.filters)
     }
 
     private var isTyped: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -121,7 +126,8 @@ struct CommandPalette: View {
             }
             .padding(12)
             if showsFilters {
-                PaletteFilterRow()
+                Divider()
+                PaletteFilterRow(state: filterState)
             }
             Divider()
             results(sections, rows: rows, chosen: chosen, target: target)
@@ -169,6 +175,12 @@ struct CommandPalette: View {
                 }
             }
         }
+        // Filtering narrows what was found, so a change of filters is not a new search.
+        .onChange(of: filterState.filters) {
+            highlighted = 0
+            scrollTarget = nil
+            applyFilters(to: searched)
+        }
         .onChange(of: query) {
             highlighted = 0
             scrollTarget = nil
@@ -215,7 +227,7 @@ struct CommandPalette: View {
                     .onTapGesture { closeActions() }
             }
             HStack(alignment: .bottom) {
-                PaletteFilterButton(count: filterCount, isOn: showsFilters) { showsFilters.toggle() }
+                PaletteFilterButton(count: filterState.filters.count, isOn: showsFilters) { showsFilters.toggle() }
                 Spacer(minLength: 0)
                 if let row = rows.indices.contains(chosen) ? rows[chosen] : nil {
                     PaletteFooter(
@@ -274,8 +286,15 @@ struct CommandPalette: View {
         }
     }
 
-    /// Filters are not offered yet; the filter row (`PaletteFilterRow`) shows only its add button.
-    private var filterCount: Int { 0 }
+    /// The active items the filters let through, most recently edited first, and their titles. Worked out once for a
+    /// basis, which holds the filters, and not for each keystroke or hover.
+    private func filteredItems(_ basis: Basis) -> (items: [Item], titles: [String]) {
+        if let held = listing.items, held.basis == basis { return (held.items, held.titles) }
+        let items = basis.filters.apply(to: browser.paletteIndex(in: library).recent, now: library.now())
+        let titles = items.map(\.title)
+        listing.items = (basis, items, titles)
+        return (items, titles)
+    }
 
     private func openTitle(for row: Entry) -> String {
         if row.item == nil { return String(localized: "Run") }
@@ -394,14 +413,7 @@ struct CommandPalette: View {
         let commands = commands
         let fixed = commands + places
         let fixedTitles = fixed.map(\.title)
-        let recent = browser.paletteIndex(in: library).recent
-        let itemTitles: [String]
-        if let held = listing.itemTitles, held.basis == basis {
-            itemTitles = held.titles
-        } else {
-            itemTitles = recent.map(\.title)
-            listing.itemTitles = (basis, itemTitles)
-        }
+        let (recent, itemTitles) = filteredItems(basis)
         let typed = isTyped
         let key = Ranking(basis: basis, query: query, fixedTitles: fixedTitles)
         let picks: [PaletteMatch.Pick]
@@ -427,7 +439,16 @@ struct CommandPalette: View {
     }
 
     private func refreshSearch() {
-        searched = mode == .search && isTyped ? library.search(query, in: .everywhere) : .none
+        setSearched(mode == .search && isTyped ? library.search(query, in: .everywhere) : .none)
+    }
+
+    private func setSearched(_ results: SearchResults) {
+        searched = results
+        applyFilters(to: results)
+    }
+
+    private func applyFilters(to results: SearchResults) {
+        searchedItems = filterState.filters.apply(to: results.items, now: library.now())
     }
 
     /// Keeps `searched` current for the query: the library's answer arrives later through its observed state, so each
@@ -437,12 +458,12 @@ struct CommandPalette: View {
         let words = query
         while !Task.isCancelled {
             let (changes, signal) = AsyncStream.makeStream(of: Void.self)
-            searched = withObservationTracking {
+            setSearched(withObservationTracking {
                 library.search(words, in: .everywhere)
             } onChange: {
                 signal.yield()
                 signal.finish()
-            }
+            })
             for await _ in changes { break }
         }
     }
@@ -452,15 +473,15 @@ struct CommandPalette: View {
 
     /// What a search lists: the best matches, in the order the library ranked them. Sorting them by date would
     /// push a strong old match out past the limit.
-    static func listed(_ results: SearchResults) -> [Item] {
-        Array(results.items.prefix(searchLimit))
+    static func listed(_ items: [Item]) -> [Item] {
+        Array(items.prefix(searchLimit))
     }
 
     /// Items whose text or title has what was typed, best match first, with the notes named by the words typed
     /// apart from those that hold them in the text; or the most recently edited before anything is typed.
     private var found: [Section] {
         let results = isTyped ? searched : nil
-        let items = results.map(Self.listed) ?? Array(browser.paletteIndex(in: library).recent.prefix(12))
+        let items = results == nil ? Array(filteredItems(basis).items.prefix(12)) : Self.listed(searchedItems)
         let now = library.now()
         let entries = items.map { item in
             // An excerpt that is the title says nothing the title does not, so the preview stands.
