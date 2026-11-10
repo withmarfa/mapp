@@ -55,6 +55,7 @@ struct ItemLayoutPanel: View {
             }
             .pickerStyle(.segmented)
             .labelsHidden()
+            .frame(maxWidth: .infinity)
             .padding(.horizontal, 16)
             .padding(.top, 12)
             .accessibilityIdentifier("LayoutArranging")

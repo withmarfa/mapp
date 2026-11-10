@@ -85,7 +85,8 @@ private struct SharedNameColumn: ViewModifier {
 /// The inspector's sections, each of which folds and keeps whether it is open for every item and launch.
 enum InspectorSectionKind: CaseIterable {
     case details, properties, relationships, linksInPage, linkedFrom, tags, outline, attachments, collections
-    /// Every section from an app shares one fold, since which ones an item has depends on its links.
+    /// Each section from an app folds on its own (`InspectorSectionView`'s `foldKey`), since which ones an item has
+    /// depends on its links.
     case app
 
     var key: String {
@@ -162,12 +163,16 @@ struct InspectorSectionView<Content: View, Add: View>: View {
     var count: Int?
     var placeholder: LocalizedStringKey?
     var boxed = true
+    let identifier: String
     let add: (Bool) -> Add
     @ViewBuilder let content: Content
 
+    /// `foldKey` and `identifier` name this section alone where several share one kind, as each app's does.
     init(_ kind: InspectorSectionKind, title: LocalizedStringKey, count: Int? = nil, placeholder: LocalizedStringKey? = nil,
-         boxed: Bool = true, @ViewBuilder add: @escaping (Bool) -> Add, @ViewBuilder content: () -> Content) {
-        _isOpen = AppStorage(wrappedValue: true, kind.key)
+         boxed: Bool = true, foldKey: String? = nil, identifier: String? = nil, @ViewBuilder add: @escaping (Bool) -> Add,
+         @ViewBuilder content: () -> Content) {
+        _isOpen = AppStorage(wrappedValue: true, foldKey ?? kind.key)
+        self.identifier = identifier ?? kind.identifier
         self.kind = kind
         self.title = title
         self.count = count
@@ -178,16 +183,16 @@ struct InspectorSectionView<Content: View, Add: View>: View {
     }
 
     var body: some View {
-        InspectorSection(title: title, count: count, isOpen: $isOpen, identifier: kind.identifier, placeholder: placeholder,
+        InspectorSection(title: title, count: count, isOpen: $isOpen, identifier: identifier, placeholder: placeholder,
                          boxed: boxed, add: add) { content }
     }
 }
 
 extension InspectorSectionView where Add == EmptyView {
     init(_ kind: InspectorSectionKind, title: LocalizedStringKey, count: Int? = nil, placeholder: LocalizedStringKey? = nil,
-         boxed: Bool = true, @ViewBuilder content: () -> Content) {
-        self.init(kind, title: title, count: count, placeholder: placeholder, boxed: boxed, add: { _ in EmptyView() },
-                  content: content)
+         boxed: Bool = true, foldKey: String? = nil, identifier: String? = nil, @ViewBuilder content: () -> Content) {
+        self.init(kind, title: title, count: count, placeholder: placeholder, boxed: boxed, foldKey: foldKey, identifier: identifier,
+                  add: { _ in EmptyView() }, content: content)
     }
 }
 

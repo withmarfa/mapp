@@ -102,23 +102,35 @@ nonisolated enum SidebarSection: Hashable, Sendable {
 /// A heading of a note's text, for the Outline section.
 nonisolated struct OutlineHeading: Identifiable, Hashable, Sendable {
     let level: Int
+    /// The words as a person reads them: bold, links and code marks are gone.
     let text: String
-    /// The position among the headings, since two headings can read the same.
+    /// The heading's place in the note's headings, from 0, counting each one the note has (a heading with no words
+    /// too, though the Outline lists none). The page reveals the heading at this place in its own list, so two headings
+    /// that read the same each go to their own.
     let index: Int
     var id: Int { index }
 }
 
 nonisolated extension OutlineHeading {
-    /// The headings of `text`, in order: ATX headings (`#` to `######`, a space, the words), skipping a front matter
-    /// block and fenced code, which hold lines that only look like headings. Read for the one note on the page, never
-    /// for the library.
+    /// The headings of `text`, in order: ATX headings (`#` to `######`, a space, the words) and setext headings (words
+    /// underlined with `=` or `-`), also inside a quote or a list item, skipping a front matter block and fenced code,
+    /// which hold lines that only look like headings. Read for the one note on the page, never for the library.
     static func headings(in text: String) -> [OutlineHeading] {
         var result: [OutlineHeading] = []
+        var ordinal = 0
         var fence: Substring?
         var lineNumber = 0
-        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+        var paragraph: [String] = []
+
+        func add(level: Int, words: String) {
+            defer { ordinal += 1 }
+            let label = plainLabel(words)
+            if !label.isEmpty { result.append(OutlineHeading(level: level, text: label, index: ordinal)) }
+        }
+
+        for rawLine in text.split(separator: "\n", omittingEmptySubsequences: false) {
             defer { lineNumber += 1 }
-            let line = line.hasSuffix("\r") ? line.dropLast() : line
+            let line = rawLine.hasSuffix("\r") ? rawLine.dropLast() : rawLine
             if lineNumber == 0, line == "---" {
                 fence = "---"
                 continue
@@ -129,24 +141,101 @@ nonisolated extension OutlineHeading {
                 }
                 continue
             }
-            let trimmed = line.drop { $0 == " " }
-            if line.count - trimmed.count <= 3, trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
-                fence = trimmed.prefix(3)
+            let content = withoutContainers(line)
+            let trimmed = content.drop { $0 == " " }
+            let indent = content.count - trimmed.count
+            if trimmed.allSatisfy({ $0 == " " || $0 == "\t" }) {
+                paragraph = []
                 continue
             }
-            if line.count - trimmed.count > 3 { continue }
-            let hashes = trimmed.prefix { $0 == "#" }
-            guard (1...6).contains(hashes.count) else { continue }
-            let rest = trimmed.dropFirst(hashes.count)
-            guard rest.first == " " || rest.first == "\t" else { continue }
-            var words = rest.trimmingCharacters(in: .whitespaces)
-            // A closing run of hashes is part of the syntax, not of the heading.
-            if let closing = words.range(of: #"\s+#+$"#, options: .regularExpression) { words.removeSubrange(closing) }
-            if words.allSatisfy({ $0 == "#" }) { words = "" }
-            guard !words.isEmpty else { continue }
-            result.append(OutlineHeading(level: hashes.count, text: words, index: result.count))
+            if indent <= 3, trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
+                fence = trimmed.prefix(3)
+                paragraph = []
+                continue
+            }
+            if indent > 3 {
+                // Indented code, or the lazy continuation of a paragraph.
+                if !paragraph.isEmpty { paragraph.append(trimmed.trimmingCharacters(in: .whitespaces)) }
+                continue
+            }
+            if let (level, words) = atx(trimmed) {
+                add(level: level, words: words)
+                paragraph = []
+                continue
+            }
+            let bare = trimmed.trimmingCharacters(in: .whitespaces)
+            if !paragraph.isEmpty, let level = setextLevel(bare) {
+                add(level: level, words: paragraph.joined(separator: " "))
+                paragraph = []
+                continue
+            }
+            if isThematicBreak(bare) {
+                paragraph = []
+                continue
+            }
+            paragraph.append(bare)
         }
         return result
+    }
+
+    /// The line without the quote marks and the list marker it sits behind, which do not change what the line is.
+    private static func withoutContainers(_ line: Substring) -> Substring {
+        var rest = line
+        while true {
+            let trimmed = rest.drop { $0 == " " }
+            if rest.count - trimmed.count <= 3, trimmed.first == ">" {
+                rest = trimmed.dropFirst()
+                if rest.first == " " { rest = rest.dropFirst() }
+                continue
+            }
+            break
+        }
+        let trimmed = rest.drop { $0 == " " }
+        guard rest.count - trimmed.count <= 3, !isThematicBreak(trimmed.trimmingCharacters(in: .whitespaces)) else { return rest }
+        if let marker = trimmed.first, "-*+".contains(marker), trimmed.dropFirst().first == " " {
+            return trimmed.dropFirst(2)
+        }
+        let digits = trimmed.prefix { $0.isASCII && $0.isNumber }
+        if (1...9).contains(digits.count) {
+            let after = trimmed.dropFirst(digits.count)
+            if let mark = after.first, mark == "." || mark == ")", after.dropFirst().first == " " { return after.dropFirst(2) }
+        }
+        return rest
+    }
+
+    private static func atx(_ line: Substring) -> (Int, String)? {
+        let hashes = line.prefix { $0 == "#" }
+        guard (1...6).contains(hashes.count) else { return nil }
+        let rest = line.dropFirst(hashes.count)
+        guard rest.isEmpty || rest.first == " " || rest.first == "\t" else { return nil }
+        var words = rest.trimmingCharacters(in: .whitespaces)
+        // A closing run of hashes is part of the syntax, not of the heading.
+        if let closing = words.range(of: #"\s+#+$"#, options: .regularExpression) { words.removeSubrange(closing) }
+        if words.allSatisfy({ $0 == "#" }) { words = "" }
+        return (hashes.count, words)
+    }
+
+    private static func setextLevel(_ line: String) -> Int? {
+        guard let first = line.first, first == "=" || first == "-", line.allSatisfy({ $0 == first }) else { return nil }
+        return first == "=" ? 1 : 2
+    }
+
+    private static func isThematicBreak(_ line: String) -> Bool {
+        let marks = line.filter { $0 != " " && $0 != "\t" }
+        guard marks.count >= 3, let first = marks.first, "-*_".contains(first) else { return false }
+        return marks.allSatisfy { $0 == first }
+    }
+
+    /// The words with their inline marks taken off: emphasis, code, a link's address, an image's mark and a wiki
+    /// link's brackets, and the spacing between lines collapsed.
+    static func plainLabel(_ words: String) -> String {
+        var source = words
+        // `[[Note|shown]]` reads as `shown`, `[[Note#Heading]]` as the words it names.
+        source = source.replacingOccurrences(of: #"\[\[([^\]|]*)\|([^\]]*)\]\]"#, with: "$2", options: .regularExpression)
+        source = source.replacingOccurrences(of: #"\[\[([^\]]*)\]\]"#, with: "$1", options: .regularExpression)
+        let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnly, failurePolicy: .returnPartiallyParsedIfPossible)
+        let plain = (try? AttributedString(markdown: source, options: options)).map { String($0.characters) } ?? source
+        return plain.split(whereSeparator: \.isWhitespace).joined(separator: " ")
     }
 }
 
@@ -196,8 +285,15 @@ nonisolated struct SidebarExtras: Sendable {
         if wants(.outline), !item.isFile, let body = library.body(of: item.id) { extras.outline = OutlineHeading.headings(in: body.text) }
         if wants(.attachments) { extras.attachments = library.attachments(of: item.id).compactMap { library.item($0) }.map(target) }
         if wants(.collections) { extras.collections = library.collections(holding: [item.id]).map(target) }
-        guard sections?.contains(where: \.isFromApp) ?? true else { return extras }
+        if sections?.contains(where: \.isFromApp) ?? true { extras.apps = appSections(of: item, in: library, relationships: relationships) }
+        return extras
+    }
 
+    /// The groups an app's data gives `item`, by title: the items its relationships reach whose type a connector
+    /// declares (a type with a link field) and whose source is named. Read apart from the rest, since Add Section
+    /// offers the groups not yet shown and that takes only this scan of the item's links.
+    @MainActor
+    static func appSections(of item: Item, in library: any ItemLibrary, relationships: [ItemRelationship]) -> [AppSection] {
         var seen: Set<ItemID> = []
         var groups: [SidebarSection: [ItemRelationshipTarget]] = [:]
         for relationship in relationships {
@@ -209,13 +305,12 @@ nonisolated struct SidebarExtras: Sendable {
                 groups[.app(type: other.type, source: source), default: []].append(found)
             }
         }
-        extras.apps = groups.map { section, targets in
+        return groups.map { section, targets in
             guard case .app(let type, let source) = section else { preconditionFailure("an app section") }
             return AppSection(
                 section: section, title: section.title(in: library.catalogue, sources: library.sources),
                 icon: library.catalogue.icon(for: type), sourceName: library.sources.name(source), targets: targets)
         }.sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
-        return extras
     }
 
     private static func target(_ item: Item) -> ItemRelationshipTarget {

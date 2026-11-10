@@ -476,6 +476,12 @@ export class NoteEditor {
       .find((entry) => headingKey(entry.text) === wanted)
     return heading ? this.engine.navigateHeading(heading) : false
   }
+  /** Moves to the n-th heading of the note on the page (from 0), in Inkkit's own list, so two headings that read the
+   *  same each have their own place. Whether there was one. */
+  revealHeadingAt(ordinal: number, expected = this.generation): boolean {
+    const heading = this.engine.headings(expected)[ordinal]
+    return heading ? this.engine.navigateHeading(heading) : false
+  }
   private pendingChanged?: { text: string; generation: number }
   private flushChanges() {
     const pending = this.pendingChanged

@@ -11,15 +11,15 @@ struct ItemInspectorHost: View {
     let itemID: ItemID?
     let details: DetailsPresentation
     /// Goes to a heading of the note on the page, for the Outline section. Nil where no page is beside the sidebar.
-    var onHeading: ((String) -> Void)?
+    var onHeading: ((Int) -> Void)?
     @State private var editing: ItemRelationship?
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
 
-    init(browser: Browser, details: DetailsPresentation, onHeading: ((String) -> Void)? = nil) {
+    init(browser: Browser, details: DetailsPresentation, onHeading: ((Int) -> Void)? = nil) {
         self.browser = browser; itemID = nil; self.details = details; self.onHeading = onHeading
     }
-    init(itemID: ItemID, details: DetailsPresentation = DetailsPresentation(), onHeading: ((String) -> Void)? = nil) {
+    init(itemID: ItemID, details: DetailsPresentation = DetailsPresentation(), onHeading: ((Int) -> Void)? = nil) {
         self.itemID = itemID; browser = nil; self.details = details; self.onHeading = onHeading
     }
 
@@ -155,7 +155,7 @@ struct ItemInspector: View {
     /// What the outline, attachments, collections and app sections hold for this item.
     var extras = SidebarExtras()
     /// Goes to a heading of the item's text.
-    var onHeading: (String) -> Void = { _ in }
+    var onHeading: (Int) -> Void = { _ in }
     /// Holds what the window keeps for the inspector when no window gives it, as in a preview.
     @State private var ownPresentation = DetailsPresentation()
     /// The empty properties the person has added, and the ones they have edited, which stay listed if cleared.
@@ -327,7 +327,7 @@ struct ItemInspector: View {
     private var outlineSection: some View {
         InspectorSectionView(.outline, title: "Outline", count: extras.outline.count) {
             ForEach(extras.outline) { heading in
-                Button { onHeading(heading.text) } label: {
+                Button { onHeading(heading.index) } label: {
                     Text(verbatim: heading.text)
                         .lineLimit(1)
                         .truncationMode(.tail)
@@ -359,12 +359,14 @@ struct ItemInspector: View {
     private func appSection(_ app: AppSection) -> some View {
         let group = LinkGroup(item: item.id, field: "#" + app.id)
         let links = LinkLimit.split(app.targets, expanded: presentation.expandedLinks.contains(group))
-        return InspectorSectionView(.app, title: LocalizedStringKey(app.title), count: app.targets.count) {
+        return InspectorSectionView(
+            .app, title: LocalizedStringKey(app.title), count: app.targets.count, foldKey: "\(InspectorSectionKind.app.key).\(app.id)",
+            identifier: "\(InspectorSectionKind.app.identifier)-\(app.id)") {
             ForEach(links.shown) { target in
                 InspectorItemRow(target: target, typeIcon: typeIcon, onOpen: onOpen)
             }
             if links.hidden > 0 {
-                ItemShowMoreButton(count: links.hidden, identifier: "AppSectionShowMore") { presentation.expandLinks(group) }
+                ItemShowMoreButton(count: links.hidden, identifier: "AppSectionShowMore-\(app.id)") { presentation.expandLinks(group) }
             }
         }
     }

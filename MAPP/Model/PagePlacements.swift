@@ -118,8 +118,11 @@ nonisolated struct PagePlacements: Equatable, Sendable {
     mutating func setSidebarSections(_ sections: [String], of type: TypeID, in catalogue: Catalogue) {
         let ids = PagePlacement.unique(sections)
         let inSidebar = ids.contains(PagePlacement.linkedFrom)
-        if inSidebar != (placement(of: type, in: catalogue).linkedFromPlace == .inspector) {
-            setLinkedFrom(inSidebar ? .inspector : .page, of: type)
+        let current = placement(of: type, in: catalogue)
+        if inSidebar != (current.linkedFromPlace == .inspector) {
+            // A place equal to the type's default is not kept, as with an order.
+            let place: LinkedFromPlace = inSidebar ? .inspector : .page
+            update(type) { $0.linkedFrom = place == current.defaultLinkedFromPlace ? nil : place }
         }
         let defaults = SidebarSection.defaultIDs.filter { $0 != PagePlacement.linkedFrom || inSidebar }
         update(type) { $0.sidebar = ids == defaults ? nil : ids }
@@ -275,11 +278,15 @@ nonisolated struct PagePlacement: Equatable, Sendable {
 
     var linkedFromPlace: LinkedFromPlace { choice.linkedFrom ?? defaultLinkedFrom }
 
-    /// The sidebar's sections in order: the person's list, or the default sections. Linked From is there only while
-    /// its place is the sidebar, at its place in the list or, where the list does not name it, last.
+    /// Where Linked From goes for this type when the person has chosen nothing.
+    var defaultLinkedFromPlace: LinkedFromPlace { defaultLinkedFrom }
+
+    /// The sidebar's sections in order: the person's list, or the default sections. A stored id that names no section
+    /// is dropped here, so the panel and every move work from one list. Linked From is there only while its place is
+    /// the sidebar, at its place in the list or, where the list does not name it, last.
     var sidebarSections: [String] {
         let linked = PagePlacement.linkedFrom
-        var sections = Self.unique(choice.sidebar ?? SidebarSection.defaultIDs)
+        var sections = Self.unique(choice.sidebar ?? SidebarSection.defaultIDs).filter { SidebarSection(id: $0) != nil }
         if linkedFromPlace == .page {
             sections.removeAll { $0 == linked }
         } else if !sections.contains(linked) {

@@ -91,6 +91,12 @@ extension EditorController {
         call("revealHeading", json(text), String(generation))
     }
 
+    /// Scrolls the page to the note's n-th heading (from 0), in the page's own list, as the Outline's rows ask.
+    func revealHeading(at ordinal: Int) {
+        guard isReady else { return }
+        call("revealHeadingAt", String(ordinal), String(generation))
+    }
+
     func revealPendingHeading(in note: ItemID) {
         guard let pending = pendingHeading, pending.note == note, isReady else { return }
         pendingHeading = nil

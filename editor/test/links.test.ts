@@ -202,6 +202,14 @@ test('revealing a heading finds it by its text, ignoring case, and answers wheth
     expect(editor.revealHeading('Missing heading')).toBe(false)
   }))
 
+test('revealing the n-th heading reaches each of two headings that read the same, and setext headings count', () =>
+  withEditor('# Soil\n\nText\n\n## Soil\n\nMore\n\nLast\n----\n', async (editor) => {
+    expect(editor.revealHeadingAt(0)).toBe(true)
+    expect(editor.revealHeadingAt(1)).toBe(true)
+    expect(editor.revealHeadingAt(2)).toBe(true)
+    expect(editor.revealHeadingAt(3)).toBe(false)
+  }))
+
 test('links that name no note are marked missing, asking the app once for every name', () =>
   withEditor('[[Here]] and [[Gone]] and [[Here]] again\n', async (_editor, root) => {
     page.missing.add('Gone')

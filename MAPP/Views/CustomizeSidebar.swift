@@ -9,50 +9,28 @@ struct SidebarArrangement: View {
     @CurrentLibrary private var library
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
-    @State private var isAdding = false
-    @State private var isTargeted = false
     let item: Item
 
+    /// What this reads is read once for a change to the library or the arrangement: the drag and the open panel keep their
+    /// state in the views below, so hovering a drag or opening Add Section reads nothing again.
     var body: some View {
         let relationships = library.relationships(for: item.id)
-        let extras = SidebarExtras.of(item, in: library, relationships: relationships)
         let shown = placements.sidebarSections(of: item.type, in: library.catalogue).compactMap(SidebarSection.init(id:))
-        let addable = self.addable(shown: shown, extras: extras)
+        // The Outline's note is read only while the Outline is shown.
+        let extras = SidebarExtras.of(item, in: library, relationships: relationships, sections: shown)
+        let apps = SidebarExtras.appSections(of: item, in: library, relationships: relationships)
         VStack(alignment: .leading, spacing: InspectorMetrics.groupGap) {
-            InspectorBox {
-                if shown.isEmpty {
-                    Text("No Sections").foregroundStyle(.secondary)
-                } else {
-                    ForEach(shown, id: \.id) { section in
-                        SidebarSectionRow(
-                            section: section, shown: shown, name: title(of: section), count: count(of: section, relationships: relationships, extras: extras),
-                            move: { move($0, to: $1) }, remove: { remove(section) }, reset: reset, hasChoice: placements.hasChoice(for: item.type))
-                    }
-                }
-            }
-            .overlay {
-                if isTargeted {
-                    RoundedRectangle(cornerRadius: InspectorMetrics.boxRadius, style: .continuous)
-                        .strokeBorder(Color.accentColor, lineWidth: 2)
-                }
-            }
-            // A drop beside the rows puts the section last.
-            .dropDestination(for: LayoutRowDrag.self) { drops, _ in
-                guard let drop = drops.first, shown.contains(where: { $0.id == drop.id }) else { return false }
-                move(drop.id, to: shown.count)
-                return true
-            } isTargeted: { isTargeted = $0 }
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier("SidebarSections")
-            AddSectionButton(isOpen: $isAdding, isEnabled: !addable.builtIn.isEmpty || !addable.apps.isEmpty)
-                .popover(isPresented: $isAdding, arrowEdge: .top) {
-                    AddSectionPanel(
-                        typeName: library.catalogue.label(for: item.type), builtIn: addable.builtIn, apps: addable.apps,
-                        choose: { section in
-                            placements.addSidebarSection(section.id, of: item.type, in: library.catalogue)
-                            isAdding = false
-                        })
-                }
+            SectionsBox(
+                shown: shown, names: Dictionary(shown.map { ($0.id, title(of: $0)) }, uniquingKeysWith: { first, _ in first }),
+                counts: Dictionary(
+                    shown.compactMap { section in count(of: section, relationships: relationships, extras: extras, apps: apps).map { (section.id, $0) } },
+                    uniquingKeysWith: { first, _ in first }),
+                move: move, remove: remove, reset: reset, hasChoice: placements.hasChoice(for: item.type))
+            AddSectionControl(
+                typeName: library.catalogue.label(for: item.type),
+                builtIn: SidebarSection.builtIn.filter { !shown.contains($0) },
+                apps: apps.filter { !shown.contains($0.section) },
+                choose: { placements.addSidebarSection($0.id, of: item.type, in: library.catalogue) })
         }
         .padding(.horizontal, 16)
         .padding(.top, 16)
@@ -64,15 +42,9 @@ struct SidebarArrangement: View {
         section.title(in: library.catalogue, sources: library.sources)
     }
 
-    /// The sections left to add: those of the built-in kinds not shown, and the groups this item has from an app that
-    /// are not shown.
-    private func addable(shown: [SidebarSection], extras: SidebarExtras) -> (builtIn: [SidebarSection], apps: [AppSection]) {
-        (SidebarSection.builtIn.filter { !shown.contains($0) }, extras.apps.filter { !shown.contains($0.section) })
-    }
-
     /// How many rows a section holds for this item, which the row names beside the section. Nil for Details, and for
     /// a section the item has none of, which says nothing.
-    private func count(of section: SidebarSection, relationships: [ItemRelationship], extras: SidebarExtras) -> Int? {
+    private func count(of section: SidebarSection, relationships: [ItemRelationship], extras: SidebarExtras, apps: [AppSection]) -> Int? {
         let count: Int? = switch section {
         case .details: nil
         case .properties:
@@ -83,12 +55,13 @@ struct SidebarArrangement: View {
         case .linkedFrom:
             ItemInspectorHost.linked(to: item, in: relationships, library: library, format: dateFormat).count
         case .tags: library.tags(of: item).count
-        case .outline, .attachments, .collections, .app: extras.count(of: section)
+        case .outline, .attachments, .collections: extras.count(of: section)
+        case .app: apps.first { $0.section == section }?.targets.count
         }
         return count.flatMap { $0 > 0 ? $0 : nil }
     }
 
-    private func move(_ id: String, to index: Int) {
+    private func move(_ id: String, _ index: Int) {
         placements.moveSidebarSection(id, to: index, of: item.type, in: library.catalogue)
     }
 
@@ -97,6 +70,65 @@ struct SidebarArrangement: View {
     }
 
     private func reset() { placements.reset(item.type) }
+}
+
+/// The sections shown, as rows in a box that takes a drop beside them.
+private struct SectionsBox: View {
+    @State private var isTargeted = false
+    let shown: [SidebarSection]
+    let names: [String: String]
+    let counts: [String: Int]
+    let move: (String, Int) -> Void
+    let remove: (SidebarSection) -> Void
+    let reset: () -> Void
+    let hasChoice: Bool
+
+    var body: some View {
+        InspectorBox {
+            if shown.isEmpty {
+                Text("No Sections").foregroundStyle(.secondary)
+            } else {
+                ForEach(shown, id: \.id) { section in
+                    SidebarSectionRow(
+                        section: section, shown: shown, name: names[section.id] ?? section.title, count: counts[section.id],
+                        move: move, remove: { remove(section) }, reset: reset, hasChoice: hasChoice)
+                }
+            }
+        }
+        .overlay {
+            if isTargeted {
+                RoundedRectangle(cornerRadius: InspectorMetrics.boxRadius, style: .continuous)
+                    .strokeBorder(Color.accentColor, lineWidth: 2)
+            }
+        }
+        // A drop beside the rows puts the section last.
+        .dropDestination(for: LayoutRowDrag.self) { drops, _ in
+            guard let drop = drops.first, shown.contains(where: { $0.id == drop.id }) else { return false }
+            move(drop.id, shown.count)
+            return true
+        } isTargeted: { isTargeted = $0 }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("SidebarSections")
+    }
+}
+
+/// The Add Section button and the panel it opens under it, which keeps its own open state.
+private struct AddSectionControl: View {
+    @State private var isAdding = false
+    let typeName: String
+    let builtIn: [SidebarSection]
+    let apps: [AppSection]
+    let choose: (SidebarSection) -> Void
+
+    var body: some View {
+        AddSectionButton(isOpen: $isAdding, isEnabled: !builtIn.isEmpty || !apps.isEmpty)
+            .popover(isPresented: $isAdding, arrowEdge: .bottom) {
+                AddSectionPanel(typeName: typeName, builtIn: builtIn, apps: apps) { section in
+                    choose(section)
+                    isAdding = false
+                }
+            }
+    }
 }
 
 /// A section of the arrangement: a handle, its name and count, and the remove button. Dragging it, Move Up and Move Down

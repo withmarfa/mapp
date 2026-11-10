@@ -409,7 +409,7 @@ private struct ItemInspectorColumn: ViewModifier {
 
     func body(content: Content) -> some View {
         content.inspector(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
-            ItemInspectorHost(browser: browser, details: details, onHeading: { editor.revealHeading($0) })
+            ItemInspectorHost(browser: browser, details: details, onHeading: { editor.revealHeading(at: $0) })
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { newWidth in
                     guard details.isPresented, Self.isDraggingEdge(ofSidebarWidth: newWidth) else { return }
                     UserDefaults.standard.set(Double(newWidth), forKey: InterfaceKey.inspectorWidth)
