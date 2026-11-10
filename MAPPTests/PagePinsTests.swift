@@ -157,6 +157,26 @@ struct PagePinsTests {
         #expect(bare.map(\.id) == ["#updated"])
     }
 
+    @Test func aPriorityRowCarriesItsRankColorsToThePageAndPins() throws {
+        let priority = try #require(Self.catalogue.itemTypes[TypeID("aic.ticket")]?.fields.first { $0.key == "priority" })
+        let candidates = PropertyRow.candidates(
+            of: Self.item(["priority": .string("high")]), type: Self.catalogue.itemTypes[TypeID("aic.ticket")], hidden: ["title", "body"],
+            relationships: [], parentField: "child-of", format: .automatic, tags: [], typeLabel: nil, typeIcon: nil, sourceName: nil,
+            now: Self.now, calendar: .current, locale: Locale(identifier: "en_GB"), isPriority: { $0.key == "priority" },
+            icon: { _ in nil }, isPerson: { _ in false })
+        let row = try #require(candidates.first { $0.id == "priority" })
+        #expect(row.optionTones == [OptionTone.tone(of: "high", in: priority, isPriority: true)])
+        #expect(row.optionTones != [OptionTone.tone(for: "High")])
+        let sent = try JSONSerialization.jsonObject(with: JSONEncoder().encode(row)) as? [String: Any]
+        let options = try #require(sent?["options"] as? [[String: Any]])
+        #expect(options.map { $0["tone"] as? String } == [row.optionTones[0].rawValue])
+        let others = PropertyRow.candidates(
+            of: Self.item(["priority": .string("high")]), type: Self.catalogue.itemTypes[TypeID("aic.ticket")], hidden: ["title", "body"],
+            relationships: [], parentField: "child-of", format: .automatic, tags: [], typeLabel: nil, typeIcon: nil, sourceName: nil,
+            now: Self.now, calendar: .current, locale: Locale(identifier: "en_GB"), icon: { _ in nil }, isPerson: { _ in false })
+        #expect(others.first { $0.id == "priority" }?.optionTones == [])
+    }
+
     @Test func aListOfFiveShowsTwoAndPlusThree() {
         var placements = PagePlacements()
         placements.setPins(["#tags", "#updated"], of: TypeID("aic.ticket"))

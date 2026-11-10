@@ -162,7 +162,8 @@ struct NoteList: View, Equatable {
 
     private static func rowType(of line: ListLine, in types: [TypeID: ListRowType], fallback: ListRowStyle) -> ListRowType {
         guard let type = line.type, let rowType = types[type] else {
-            return ListRowType(style: ListRowStyle.resolve(rowStyle: fallback))
+            let style = ListRowStyle.resolve(rowStyle: fallback)
+            return ListRowType(style: style, pictureless: style)
         }
         return rowType
     }
@@ -200,10 +201,6 @@ struct ItemRow: View {
         return excerpt
     }
 
-    private var isPicture: Bool {
-        if case .file(let type, _) = item.content { type.conforms(to: .image) } else { false }
-    }
-
     var body: some View {
         Group {
             if excerpt != nil {
@@ -225,7 +222,7 @@ struct ItemRow: View {
     private var standard: some View {
         HStack(alignment: .top, spacing: 0) {
             text
-            if style.showsPictures, showsPictures, isPicture { RowPicture(item: item) }
+            if style.showsPictures, showsPictures, item.isImageFile { RowPicture(item: item) }
         }
     }
 
@@ -303,7 +300,7 @@ private struct RowPicture: View {
                 case .none:
                     if !Task.isCancelled { (artwork, hasNone) = (nil, true) }
                 case .failed:
-                    break
+                    if !Task.isCancelled { hasNone = false }
                 }
             }
     }
@@ -368,7 +365,7 @@ private struct ListLineRow: View {
                 .padding(.top, isFirst ? 0 : 10)
                 .accessibilityAddTraits(.isHeader)
         case .item(let item, _):
-            let style = rowType.style
+            let style = rowType.drawnStyle(hasPicture: showsPictures && item.isImageFile)
             let shown = excerpt == nil ? style : (style == .withPictures ? .withPictures : .standard)
             ItemRow(
                 item: item,

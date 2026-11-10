@@ -66,7 +66,7 @@ nonisolated struct PagePins: Equatable, Sendable {
             guard values.count > listLimit else { return row }
             return PropertyRow(
                 id: row.id, label: row.label, value: make(Array(values.prefix(listLimit))), numberToCall: row.numberToCall,
-                more: values.count - listLimit, editable: row.editable)
+                more: values.count - listLimit, editable: row.editable, optionTones: Array(row.optionTones.prefix(listLimit)))
         }
         switch row.value {
         case .items(let values): return cut(values) { .items($0) }

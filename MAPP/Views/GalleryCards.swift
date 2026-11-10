@@ -150,7 +150,7 @@ private struct GalleryChipView: View {
     var body: some View {
         switch chip.look {
         case .plain: PageChip(text: chip.text, kind: .plain)
-        case .option: PageChip(text: chip.text, kind: .option(OptionTone.tone(for: chip.text)))
+        case .option(let tone): PageChip(text: chip.text, kind: .option(tone))
         case .tag: PageChip(text: chip.text, kind: .tag)
         case .status(let mark): PageChip(text: chip.text, kind: .status(mark, chevron: false))
         case .link(let icon): PageChip(text: chip.text, kind: .link(icon: icon))

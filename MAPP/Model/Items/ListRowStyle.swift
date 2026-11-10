@@ -1,4 +1,5 @@
 import Foundation
+import UniformTypeIdentifiers
 
 /// How a row of a list is drawn. Standard, Compact and With Pictures can be the style of every list; Task, Highlight and
 /// Person read the fields of the items they suit, so they are chosen for a type or a view, or come from a type's fields.
@@ -102,21 +103,33 @@ nonisolated struct ListTypeStyles: RawRepresentable, Hashable, Sendable {
 /// its icon, and, for a task, the fields its facts read.
 nonisolated struct ListRowType: Hashable, Sendable {
     var style: ListRowStyle
+    /// What a row of this type draws when its style is With Pictures and its item has no picture to show: the list's Row
+    /// Style from Settings, since With Pictures is only where the type starts.
+    var pictureless: ListRowStyle = .standard
     var icon: String?
     var isTask = false
     var statusField: ItemTypeInfo.Field?
     var priorityField: ItemTypeInfo.Field?
 
     /// A type the catalogue does not know: only its style.
-    init(style: ListRowStyle) { self.style = style }
-
-    init(_ type: TypeID, style: ListRowStyle, in catalogue: Catalogue) {
+    init(style: ListRowStyle, pictureless: ListRowStyle = .standard) {
         self.style = style
+        self.pictureless = pictureless
+    }
+
+    init(_ type: TypeID, style: ListRowStyle, pictureless: ListRowStyle = .standard, in catalogue: Catalogue) {
+        self.style = style
+        self.pictureless = pictureless
         let info = catalogue.itemTypes[type]
         icon = info?.icon
         statusField = info?.statusField
         isTask = catalogue.isTask(type)
         if isTask { priorityField = info?.fields.first { $0.key == MarfaMapping.priorityField } }
+    }
+
+    /// The style a row draws for an item that does or does not have a picture to show.
+    func drawnStyle(hasPicture: Bool) -> ListRowStyle {
+        style == .withPictures && !hasPicture ? pictureless : style
     }
 
     /// The group of the word `item` holds in the type's status field.
@@ -131,6 +144,14 @@ nonisolated struct ListRowType: Hashable, Sendable {
         in catalogue: Catalogue
     ) -> [TypeID: ListRowType] {
         let styles = ListRowStyle.styles(of: types, view: view, choices: choices, rowStyle: rowStyle, in: catalogue)
-        return styles.reduce(into: [:]) { $0[$1.key] = ListRowType($1.key, style: $1.value, in: catalogue) }
+        let pictureless = ListRowStyle.resolve(rowStyle: rowStyle)
+        return styles.reduce(into: [:]) { $0[$1.key] = ListRowType($1.key, style: $1.value, pictureless: pictureless, in: catalogue) }
+    }
+}
+
+extension Item {
+    /// Whether the item is an image file, the only item a list row shows a picture for.
+    nonisolated var isImageFile: Bool {
+        if case .file(let type, _) = content { type.conforms(to: .image) } else { false }
     }
 }

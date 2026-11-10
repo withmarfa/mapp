@@ -108,6 +108,21 @@ struct ListRowStyleTests {
         #expect(plain.map(\.mark) == ["Low", "Medium", "High", "Urgent"].map { .dot(OptionTone.tone(for: $0)) })
     }
 
+    @Test func aRowWithNoPictureDrawsTheListsRowStyleNotAlwaysStandard() {
+        for fallback in [ListRowStyle.standard, .compact] {
+            let types = ListRowType.types(
+                of: [TypeID("acme.scan"), TypeID("core.note")], choices: ListTypeStyles(), rowStyle: fallback,
+                in: Catalogue(itemTypes: [info("core.file"), info("acme.scan", parent: "core.file"), info("core.note")]))
+            let scan = types[TypeID("acme.scan")]!
+            #expect(scan.style == .withPictures)
+            #expect(scan.drawnStyle(hasPicture: true) == .withPictures)
+            #expect(scan.drawnStyle(hasPicture: false) == fallback)
+            #expect(types[TypeID("core.note")]!.drawnStyle(hasPicture: false) == fallback)
+        }
+        let tasks = ListRowType(style: .task, pictureless: .compact)
+        #expect(tasks.drawnStyle(hasPicture: false) == .task)
+    }
+
     @Test func aFileTypeStartsWithPicturesWithoutNamingAnImageType() {
         let catalogue = Catalogue(itemTypes: [
             info("core.file"), info("core.file.image", parent: "core.file"), info("acme.scan", parent: "core.file"), info("core.note"),

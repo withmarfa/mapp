@@ -84,6 +84,10 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// Whether the value opens an editor under it, or for a yes or no flips: any value that can be edited, on an item
     /// that can take the edit. The app says so; the page never decides it.
     var editable = false
+    /// The color of each value of an `options` row that takes its color from the field and not from its words: a task's
+    /// priority, by rank (`OptionTone.tone(of:in:isPriority:)`). Empty for any other row, whose values take the color
+    /// of their words (`OptionTone.tone(for:)`).
+    var optionTones: [TypeTone] = []
 
     /// Whether the row is a value the item does not have yet.
     var isEmpty: Bool {
@@ -120,7 +124,8 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     static func candidates(
         of item: Item, type: ItemTypeInfo?, hidden: Set<String>, relationships: [ItemRelationship], parentField: String, format: DateFormat,
         tags: [String], typeLabel: String?, typeIcon: String?, sourceName: String?, now: Date, calendar: Calendar, locale: Locale,
-        offersEmpty: Bool = false, changesType: Bool? = nil, icon: (ItemID) -> String?, isPerson: (ItemID) -> Bool
+        offersEmpty: Bool = false, changesType: Bool? = nil, isPriority: (ItemTypeInfo.Field) -> Bool = { _ in false },
+        icon: (ItemID) -> String?, isPerson: (ItemID) -> Bool
     ) -> [PropertyRow] {
         var rows: [PropertyRow] = []
         if let typeLabel {
@@ -143,7 +148,8 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
             } else if let value = value(of: field, in: item, format: format) {
                 fields.append(PropertyRow(
                     id: field.key, label: field.label, value: value, numberToCall: numberToCall(of: field, in: item),
-                    editable: item.isEditable && isEdited(field)))
+                    editable: item.isEditable && isEdited(field),
+                    optionTones: optionTones(of: field, in: item, isPriority: isPriority(field))))
             } else if offersEmpty, item.isEditable, isEdited(field), !InspectorFields.hasValue(item.value(of: field.key)) {
                 empty.append(PropertyRow(id: field.key, label: field.label, value: .empty(symbol: symbol(of: field)), editable: true))
             }
@@ -201,6 +207,15 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     static func numberToCall(of field: ItemTypeInfo.Field, in item: Item) -> String? {
         guard case .list(let shape) = field.kind, let main = ListEntries.main(of: item.value(of: field.key)) else { return nil }
         return shape.numberToCall(in: main)
+    }
+
+    /// The color of each option `field` holds in `item`, for a field that colors its options by rank; empty for any other.
+    static func optionTones(of field: ItemTypeInfo.Field, in item: Item, isPriority: Bool) -> [TypeTone] {
+        guard isPriority, let stored = item.value(of: field.key) else { return [] }
+        switch (field.kind, stored) {
+        case (.choice, .string(let text)): return [OptionTone.tone(of: text, in: field, isPriority: true)]
+        default: return []
+        }
     }
 
     /// The value a field's row draws, or nil where the field has none or holds something a row does not show.
