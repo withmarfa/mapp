@@ -16,4 +16,10 @@ nonisolated enum OptionTone {
         }
         return palette[Int(hash % UInt32(palette.count))]
     }
+
+    /// The tone of an option's dot as a value panel draws it: by the option written for reading
+    /// (`Field.label(ofOption:)`), so a priority's dot is the same in a panel and in a list row.
+    static func tone(ofOption value: String) -> TypeTone {
+        tone(for: ItemTypeInfo.Field.label(ofOption: value))
+    }
 }

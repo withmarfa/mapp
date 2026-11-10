@@ -5,21 +5,28 @@ enum ListKey {
     static let previewLines = "listPreviewLines"
     static let defaultPreviewLines = 2
     static let showsPictures = "listShowsPictures"
-    static let all = [previewLines, showsPictures]
+    /// The row style of every list (`ListRowStyle.forEveryList`).
+    static let rowStyle = "listRowStyle"
+    /// The style each type was given, as `ListTypeStyles` keeps them.
+    static let typeStyles = "listTypeStyles"
+    static let showsTypeWhenMixed = "listShowsTypeWhenMixed"
+    static let all = [previewLines, showsPictures, rowStyle, typeStyles, showsTypeWhenMixed]
 }
 
-/// How many lines of each item's text its row shows under the title, as Mail offers for its messages. A row with
-/// less text takes less room.
+/// What every list's rows show, as Mail offers it for its messages: how many lines of each item's text sit under the
+/// title (a row with less text takes less room), whether pictures show, and whether a list that mixes types names them.
 struct ListPreviewOptions: View {
     @AppStorage(ListKey.previewLines) private var previewLines = ListKey.defaultPreviewLines
     @AppStorage(ListKey.showsPictures) private var showsPictures = true
+    @AppStorage(ListKey.showsTypeWhenMixed) private var showsType = true
 
     var body: some View {
-        Picker("List Preview", systemImage: "text.alignleft", selection: $previewLines) {
+        Picker("Preview", selection: $previewLines) {
             Text("None").tag(0)
             Text("1 Line").tag(1)
             Text("2 Lines").tag(2)
         }
-        Toggle("Picture Previews", systemImage: "photo", isOn: $showsPictures)
+        Toggle("Show Pictures", isOn: $showsPictures)
+        Toggle("Show the Type When a List Mixes Types", isOn: $showsType)
     }
 }
