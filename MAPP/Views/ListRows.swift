@@ -40,7 +40,7 @@ struct TaskRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.displayTitle)
                     .interfaceFont(.body.weight(.semibold))
-                    .lineLimit(2)
+                    .lineLimit(1)
                 if task.hasLine || !meta.isEmpty {
                     HStack(spacing: 10) {
                         if let due = task.due { dueChip(due) }

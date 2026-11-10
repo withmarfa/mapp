@@ -55,7 +55,7 @@ The data model, free of SwiftUI: the `ItemLibrary` protocol, `MarfaLibrary` over
 
 ## Code Review Rules
 
-- **Named type.** Flag code that tests for an item type by its identifier, or gives one a label, field or behavior of its own, outside `PageHeaderKind`'s header choice. Flag an SF Symbol named for a type.
+- **Named type.** Flag code that tests for an item type by its identifier, or gives one a label, field or behavior of its own, outside `PageHeaderKind`'s header choice, `Catalogue.isTask` and `ListRowStyle.fromFields`. Flag an SF Symbol named for a type.
 - **Folder as a place.** Flag a change that brings back a folder as a sidebar place, a move between folders, or a folder MAPP keeps or syncs itself.
 - **Fallback library.** Flag a change that shows anything but the connect, waiting or failure page while no server's copy is open.
 - **Unflushed switch.** Flag a change of library or a quit that does not first flush the open pages (`Libraries.flushEditors`), or that goes ahead when the flush fails. A window close waits for its editor's flush the same way (`EditorCloseDelegate`).
