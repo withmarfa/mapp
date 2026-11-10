@@ -75,6 +75,7 @@ struct ListRowStyleTests {
     @Test func aPriorityIsColoredAsTheValuePanelColorsIt() {
         #expect(OptionTone.tone(ofOption: "low") == .purple)
         #expect(OptionTone.tone(ofOption: "medium") == .yellow)
+        #expect(OptionTone.tone(ofOption: "high") == .red)
         #expect(OptionTone.tone(ofOption: "urgent") == .blue)
     }
 }
