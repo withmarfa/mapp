@@ -25,15 +25,32 @@ struct ViewChoices: Equatable {
 ///   the meantime is never overwritten without the person being told.
 extension Browser {
     /// What the open place's choices are now.
-    var liveChoices: ViewChoices {
-        ViewChoices(options: tableOptions[item] ?? ItemTableOptions(), timelineDate: timelineFields[item])
+    var liveChoices: ViewChoices { choices(in: item) }
+
+    /// What a place's choices are now, whether or not the window shows it.
+    func choices(in place: SidebarItem) -> ViewChoices {
+        ViewChoices(options: tableOptions[place] ?? ItemTableOptions(), timelineDate: timelineFields[place])
     }
 
-    /// Registers a step of the window's Undo.
+    /// Registers a step of the window's Undo. While a new view's panel is open the step belongs to the panel, so that
+    /// dropping the panel removes these steps and no earlier one (`dropUndoSteps`).
     func registerUndo(_ name: String, _ undo: @escaping @MainActor (Browser) -> Void) {
         guard let undoManager else { return }
-        undoManager.registerUndo(withTarget: self) { browser in MainActor.assumeIsolated { undo(browser) } }
+        let target: AnyObject = viewPanel.flatMap { $0.isNew ? $0 : nil } ?? self
+        undoManager.registerUndo(withTarget: target) { [weak self] _ in
+            MainActor.assumeIsolated { if let self { undo(self) } }
+        }
         undoManager.setActionName(name)
+    }
+
+    /// Removes the steps made while a new view's panel was open, which describe choices the place no longer has.
+    func dropUndoSteps(of panel: ViewPanel) {
+        undoManager?.removeAllActions(withTarget: panel)
+    }
+
+    /// The server can be reached again, so a later stretch without it is told again.
+    func reachabilityChanged(in library: any ItemLibrary) {
+        if library.reachesServer { toldOffline.removeAll() }
     }
 
     /// The window moved to another place, whose choices an Undo must not touch.
@@ -155,7 +172,6 @@ extension Browser {
             tellUnkept(update.unkept, of: id, in: library)
             return
         }
-        if library.reachesServer { toldOffline.removeAll() }
         guard library.reachesServer else {
             if toldOffline.insert(id).inserted {
                 library.notices.tell(
@@ -164,12 +180,13 @@ extension Browser {
             }
             return
         }
-        let sent = liveChoices
+        let place = SidebarItem.view(id)
+        let sent = choices(in: place)
         switch await library.changeView(id, update.change, baseVersion: update.baseVersion) {
         case .success(let view):
             // The window keeps what it shows: the view is the window's only where the view can hold it all.
             seed(view, catalogue: library.catalogue, keepingWindow: true)
-            if liveChoices != sent { rewritingViews.insert(id) }
+            if choices(in: place) != sent { rewritingViews.insert(id) }
             tellUnkept(update.unkept, of: id, in: library)
         case .failure(let failure):
             // The library has told the person why. A view changed elsewhere shows as it is now; any other refusal
@@ -207,9 +224,11 @@ extension Browser {
             return
         }
         guard name != view.title, panel.renaming != name else { return }
+        // A rename queued ahead of this one either lands first or fails, so the view then has either title.
+        let expected = Set([view.title] + [panel.renaming].compactMap { $0 })
         panel.renaming = name
-        let kept = await writeName(name, of: id, expecting: view.title, in: library)
-        panel.finishRename(kept: kept)
+        let kept = await writeName(name, of: id, expecting: expected, in: library)
+        panel.finishRename(name: name, kept: kept)
         if kept { registerNameUndo(of: id, restoring: view.title, from: name) }
     }
 
@@ -218,24 +237,24 @@ extension Browser {
             browser.viewPanel?.name = old
             browser.registerNameUndo(of: id, restoring: new, from: old)
             guard let library = browser.library else { return }
-            Task { await browser.writeName(old, of: id, expecting: new, in: library) }
+            Task { await browser.writeName(old, of: id, expecting: [new], in: library) }
         }
     }
 
     /// Writes a title, where the view still has the one this change was made from.
     @discardableResult
-    private func writeName(_ name: String, of id: ItemID, expecting title: String, in library: any ItemLibrary) async -> Bool {
+    private func writeName(_ name: String, of id: ItemID, expecting titles: Set<String>, in library: any ItemLibrary) async -> Bool {
         await lockView(id)
-        let kept = await writeNameLocked(name, of: id, expecting: title, in: library)
+        let kept = await writeNameLocked(name, of: id, expecting: titles, in: library)
         // A choice changed while the name was written is written now, so it is never left behind.
         await writeUntilSettled(id, in: library)
         unlockView(id)
         return kept
     }
 
-    private func writeNameLocked(_ name: String, of id: ItemID, expecting title: String, in library: any ItemLibrary) async -> Bool {
+    private func writeNameLocked(_ name: String, of id: ItemID, expecting titles: Set<String>, in library: any ItemLibrary) async -> Bool {
         guard let view = library.views.first(where: { $0.id == id }), let seed = viewSeeds[id] else { return false }
-        guard view.title == title else {
+        guard titles.contains(view.title) else {
             library.notices.tell(String(localized: "Can’t Rename"), String(localized: "This view was renamed elsewhere, so its name was left as it is."))
             return false
         }

@@ -76,8 +76,7 @@ extension Browser {
 
     private func dropNewViewPanel(_ panel: ViewPanel) {
         viewPanel = nil
-        // The steps made while the panel was open describe choices the place no longer has.
-        placeChanged()
+        dropUndoSteps(of: panel)
         if let snapshot = panel.snapshot { restore(snapshot) }
     }
 
@@ -160,6 +159,7 @@ extension Browser {
         tellUnkept(draft.unkept, of: view.id, in: library)
         guard viewPanel === panel else { return }
         viewPanel = nil
+        dropUndoSteps(of: panel)
         if let snapshot = panel.snapshot { restore(snapshot, keepingLayout: true) }
         show(.view(view.id), in: library, order: order)
         followView(in: library)

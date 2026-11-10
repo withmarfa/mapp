@@ -125,14 +125,14 @@ final class ViewPanel {
         }
     }
 
-    /// The write of the name answered. A name the server did not take, from a panel that ended meanwhile, is given back.
-    func finishRename(kept: Bool) {
-        let name = renaming
-        renaming = nil
-        if kept, let name { knownTitle = name }
-        guard let reason = leftWhileRenaming else { return }
+    /// The write of `name` answered. From a panel that ended meanwhile, whatever the person typed last and the view does
+    /// not hold is given back, once no later write of a name is still under way.
+    func finishRename(name: String, kept: Bool) {
+        if renaming == name { renaming = nil }
+        if kept { knownTitle = name }
+        guard let reason = leftWhileRenaming, renaming == nil else { return }
         leftWhileRenaming = nil
-        if !kept, let name { giveBackRename(name: name, reason: reason) }
+        giveBackRename(reason: reason)
     }
 
     /// The view is gone, so the name typed for it has nowhere to go. Whether there was one to give back.

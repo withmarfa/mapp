@@ -160,6 +160,7 @@ private struct SavedViewDialogs: ViewModifier {
             }
             // Each change of the place's order, grouping or filters is one step of Undo and, in a saved view, a write.
             .onChange(of: browser.liveChoices, initial: true) { browser.choicesChanged() }
+            .onChange(of: library.reachesServer, initial: true) { browser.reachabilityChanged(in: library) }
             .onChange(of: library.views) {
                 browser.followView(in: library)
                 browser.reconcileViewPanel(in: library)

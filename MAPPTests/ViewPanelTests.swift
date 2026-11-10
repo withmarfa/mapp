@@ -193,6 +193,98 @@ struct ViewPanelTests {
         #expect(Self.held(library)?.version == 1)
     }
 
+    @Test func aSecondOfflineStretchIsToldAgainOnceTheServerWasBack() async {
+        let (browser, library, _) = Self.opened(reachesServer: false)
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        #expect(library.notices.told == 1)
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo", "done"]) }
+        #expect(library.notices.told == 1)
+        library.reachesServer = true
+        browser.reachabilityChanged(in: library)
+        library.reachesServer = false
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["done"]) }
+        #expect(library.notices.told == 2)
+    }
+
+    @Test func aNameTypedDuringARenameIsWrittenWithoutClaimingTheViewWasRenamedElsewhere() async {
+        let (browser, library, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        browser.openViewPanel(in: library)
+        browser.viewPanel?.name = "First"
+        var release: CheckedContinuation<Void, Never>?
+        var held = false
+        library.inViewChange = {
+            guard !held else { return }
+            held = true
+            await withCheckedContinuation { release = $0 }
+        }
+        let first = Task { await browser.commitViewName(in: library) }
+        #expect(await eventually(within: .seconds(20)) { release != nil })
+        browser.viewPanel?.name = "Second"
+        let second = Task { await browser.commitViewName(in: library) }
+        release?.resume()
+        await first.value
+        await second.value
+        #expect(Self.held(library)?.title == "Second")
+        #expect(!library.notices.waiting.contains { $0.title == "Can’t Rename" })
+    }
+
+    @Test func aNameTypedAfterTheRenameWasSentIsGivenBackWhenThePanelCloses() async {
+        let (browser, library, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        browser.openViewPanel(in: library)
+        browser.viewPanel?.name = "First"
+        var release: CheckedContinuation<Void, Never>?
+        library.inViewChange = { await withCheckedContinuation { release = $0 } }
+        let rename = Task { await browser.commitViewName(in: library) }
+        #expect(await eventually(within: .seconds(20)) { release != nil })
+        browser.viewPanel?.name = "Second"
+        browser.closeViewPanel(in: library)
+        release?.resume()
+        await rename.value
+        #expect(Self.held(library)?.title == "First")
+        #expect(library.notices.waiting.contains { $0.isNotKept && $0.text == "Second" })
+    }
+
+    @Test func aRefusedRenameGivesBackTheLatestNameTyped() async {
+        let (browser, library, undo) = Self.opened(reachesServer: false)
+        undo.beginUndoGrouping()
+        browser.openViewPanel(in: library)
+        browser.viewPanel?.name = "First"
+        let panel = browser.viewPanel
+        panel?.renaming = "First"
+        panel?.name = "Second"
+        browser.closeViewPanel(in: library)
+        panel?.finishRename(name: "First", kept: false)
+        #expect(library.notices.waiting.contains { $0.isNotKept && $0.text == "Second" })
+        #expect(!library.notices.waiting.contains { $0.isNotKept && $0.text == "First" })
+    }
+
+    @Test func leavingAViewMidWriteCausesNoRewriteOfIt() async {
+        let (browser, library, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        var release: CheckedContinuation<Void, Never>?
+        library.inViewChange = { await withCheckedContinuation { release = $0 } }
+        browser.setFilter(Self.status, values: ["todo"])
+        let task = browser.choicesChanged()
+        #expect(await eventually(within: .seconds(20)) { release != nil })
+        browser.sidebarItem = .allNotes
+        release?.resume()
+        await task?.value
+        #expect(Self.held(library)?.query.filter?.contains("todo") == true)
+        #expect(!browser.pendingViewWrites.contains(Self.id))
+    }
+
+    @Test func escapeOnANewViewKeepsTheStepsMadeBeforeItOpened() async {
+        let (browser, library, undo) = Self.opened()
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        browser.openNewViewPanel(in: library)
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo", "done"]) }
+        browser.escapeViewPanel(in: library)
+        #expect(undo.canUndo)
+        await Self.undo(undo, library) { $0?.query.filter?.contains("todo") != true }
+    }
+
     @Test func undoNeverOverwritesAChangeMadeElsewhere() async {
         let (browser, library, undo) = Self.opened()
         await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
