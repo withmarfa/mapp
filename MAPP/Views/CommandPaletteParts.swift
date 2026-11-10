@@ -2,7 +2,7 @@ import SwiftUI
 
 /// One row of the command palette: a command, a place or an item.
 struct PaletteEntry: Identifiable {
-    let id: String
+    var id: String
     let title: String
     /// The type's name for an item, at the row's right.
     var detail: String?
@@ -269,7 +269,6 @@ struct PaletteActionsPanel: View {
         .frame(width: 300)
         .glassEffect(.regular, in: .rect(cornerRadius: 16))
         .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
-        .onChange(of: query) { highlighted = 0 }
         .task {
             try? await Task.sleep(for: .milliseconds(50))
             focus.wrappedValue = .actions
@@ -300,9 +299,13 @@ struct PaletteActionsPanel: View {
         .accessibilityAddTraits(isHighlighted ? .isSelected : [])
     }
 
+    /// The actions that have a shortcut of their own. While Actions is open the palette owns every one of these keys,
+    /// for a row that does not offer the action too, so none reaches the window's menu.
+    static let shortcutKinds: [PaletteAction.Kind] = [.openInNewWindow, .copyLink, .versionHistory, .delete]
+
     /// The action's own shortcut, which the key caps beside it show.
-    static func shortcut(of action: PaletteAction) -> KeyboardShortcut? {
-        switch action.kind {
+    static func shortcut(of kind: PaletteAction.Kind) -> KeyboardShortcut? {
+        switch kind {
         case .openInNewWindow: KeyboardShortcut(.return, modifiers: .command)
         case .copyLink: KeyboardShortcut("c", modifiers: [.command, .shift])
         case .versionHistory: KeyboardShortcut("y", modifiers: [.command, .option])

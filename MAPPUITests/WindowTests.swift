@@ -233,8 +233,8 @@ final class WindowTests: XCTestCase {
 
         app.typeKey("k", modifierFlags: .command)
         XCTAssertTrue(field.waitForExistence(timeout: 2))
-        // New Item leads what "new" finds.
-        app.typeText("new")
+        // Items lead what is typed, so the words are the command's own, which no note's title shares.
+        app.typeText("new item")
         app.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(field.waitForNonExistence(timeout: 2))
         window.completeQuickAdd(type: "Note", title: "Palette note")

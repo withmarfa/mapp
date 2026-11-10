@@ -55,9 +55,16 @@ struct CommandPaletteTests {
             host.layoutSubtreeIfNeeded()
             return labels(of: host).contains { $0.hasPrefix("Bold") }
         }, "the formatting commands arrive once the page holds the note")
-        // The list builds only the rows in view, and Highlight and Link… lie below them since Recent sits above the commands.
-        for title in ["Heading 4", "Heading 5", "Heading 6"] {
-            #expect(labels(of: host).contains { $0.hasPrefix(title) }, "\(title) is offered with the other formats")
+        // The list builds only the rows in view, so each editor-only command is asked for by its own query, which
+        // narrows the list to it.
+        for title in ["Heading 4", "Heading 5", "Heading 6", "Highlight", "Link"] {
+            browser.paletteSeed = title
+            let seeded = NSHostingView(rootView: CommandPalette(browser: browser, editor: page.editor, mode: .commands).environment(\.library, page.library))
+            window.contentView = seeded
+            #expect(try await eventuallyAsking {
+                seeded.layoutSubtreeIfNeeded()
+                return labels(of: seeded).contains { $0.hasPrefix(title) }
+            }, "\(title) is offered with the other formats: \(labels(of: seeded))")
         }
     }
 
@@ -101,6 +108,21 @@ struct CommandPaletteTests {
         let picks: [Pick] = (0..<PaletteSections.itemLimit).map(Pick.item)
         let sections = PaletteSections.forCommands(picks: picks, typed: true, commandCount: 0, recentCount: 20)
         #expect(sections[0].rows == picks)
+    }
+
+    @Test func theCountLeavesOutTheRowThatSearchesTheNotes() {
+        let picks: [Pick] = (0..<52).map(Pick.item) + [.fixed(0)]
+        let sections = PaletteSections.forCommands(picks: picks, typed: true, commandCount: 1, recentCount: 60)
+        #expect(PaletteSections.resultCount(sections) == PaletteSections.itemLimit + 2)
+        #expect(PaletteSections.resultCount(sections) { $0 != .searchNotes } == PaletteSections.itemLimit + 1)
+    }
+
+    @Test func repeatedIdsAreMadeDistinctAndKeepTheirOrder() {
+        let ids = ["command:Remove from “Trips”", "command:Delete", "command:Remove from “Trips”", "command:Remove from “Trips”"]
+        let distinct = PaletteSections.distinct(ids)
+        #expect(Set(distinct).count == ids.count)
+        #expect(distinct[0] == ids[0] && distinct[1] == ids[1])
+        #expect(PaletteSections.distinct(ids) == distinct, "the same list gives the same ids")
     }
 
     @Test func aSectionWithNoRowsIsDropped() {
@@ -154,6 +176,21 @@ struct CommandPaletteTests {
             let titles = PaletteAction.forItem(isFile: false, isFavorite: false, isActive: isActive).map(\.title)
             #expect(!titles.contains { $0.contains("Immediately") })
         }
+    }
+
+    @Test func aShortcutRunsOnlyAnActionTheRowOffersAndTheFieldShows() {
+        let note = PaletteAction.forItem(isFile: false, isFavorite: false, isActive: true)
+        #expect(PaletteAction.reachable(.delete, among: note, filteredBy: "")?.kind == .delete)
+        #expect(PaletteAction.reachable(.delete, among: note, filteredBy: "fav") == nil, "the field hides Delete")
+        #expect(PaletteAction.reachable(.delete, among: PaletteAction.forCommand, filteredBy: "") == nil, "a command offers only Run")
+        let file = PaletteAction.forItem(isFile: true, isFavorite: false, isActive: true)
+        #expect(PaletteAction.reachable(.copyLink, among: file, filteredBy: "") == nil, "a file has no Copy Link")
+        #expect(PaletteActionsPanel.shortcutKinds.allSatisfy { PaletteActionsPanel.shortcut(of: $0) != nil })
+    }
+
+    @Test func inSearchTheFirstActionReadsOpenAtMatch() {
+        let actions = PaletteAction.forItem(isFile: false, isFavorite: false, isActive: true, openTitle: "Open at Match")
+        #expect(actions.first?.title == "Open at Match")
     }
 
     @Test func aCommandOffersOnlyRun() {

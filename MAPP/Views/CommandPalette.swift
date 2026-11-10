@@ -40,6 +40,9 @@ struct CommandPalette: View {
     /// What the Actions field holds and which action is chosen, kept here since the arrow keys reach the palette.
     @State private var actionsQuery = ""
     @State private var actionsHighlighted = 0
+    /// What Search Notes found for the query, asked once per query and again only when its answer changes (`watchSearch`),
+    /// never by the body, which the arrow keys and the pointer run again and again.
+    @State private var searched = SearchResults.none
     /// The height of the buttons that float over the results, with their margin: what the last row must clear.
     @State private var floatingHeight: CGFloat = 56
 
@@ -110,7 +113,8 @@ struct CommandPalette: View {
                     .onExitCommand { escape() }
                     .accessibilityIdentifier("CommandPaletteField")
                 if isTyped {
-                    Text(rows.count == 1 ? String(localized: "1 result") : String(localized: "\(rows.count) results"))
+                    let count = PaletteSections.resultCount(sections) { $0.id != Self.searchNotesID }
+                    Text(count == 1 ? String(localized: "1 result") : String(localized: "\(count) results"))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .accessibilityIdentifier("CommandPaletteCount")
@@ -146,16 +150,22 @@ struct CommandPalette: View {
             escape()
             return .handled
         }
-        // Shortcut buttons, since a field takes most Command keys before a key press handler sees them. Out of sight, but in the window's key equivalents.
+        // Shortcut buttons, since a field takes most Command keys before a key press handler sees them. Out of sight, but
+        // in the window's key equivalents. While Actions is open the palette owns every Actions shortcut: one the row
+        // does not offer, or the field has filtered out, does nothing, and never reaches the window's menu.
         .background {
             if let target {
-                ForEach(actionsShown(for: target), id: \.id) { action in
-                    if let shortcut = PaletteActionsPanel.shortcut(of: action) {
-                        Button(action.title) { perform(action, on: target) }
-                            .keyboardShortcut(shortcut)
-                            .opacity(0)
-                            .frame(width: 0, height: 0)
-                            .accessibilityHidden(true)
+                ForEach(PaletteActionsPanel.shortcutKinds, id: \.self) { kind in
+                    if let shortcut = PaletteActionsPanel.shortcut(of: kind) {
+                        Button(String(describing: kind)) {
+                            if let action = PaletteAction.reachable(kind, among: actions(for: target), filteredBy: actionsQuery) {
+                                perform(action, on: target)
+                            }
+                        }
+                        .keyboardShortcut(shortcut)
+                        .opacity(0)
+                        .frame(width: 0, height: 0)
+                        .accessibilityHidden(true)
                     }
                 }
             }
@@ -163,7 +173,10 @@ struct CommandPalette: View {
         .onChange(of: query) {
             highlighted = 0
             scrollTarget = nil
+            // At once, so Return before the next draw reads the answer for what was typed.
+            refreshSearch()
         }
+        .task(id: query) { await watchSearch() }
         // The row Actions is open for may go while it is open, as another device deletes it.
         .onChange(of: actionsFor != nil && (target == nil || target?.item.map { library.item($0) == nil } == true)) { _, isGone in
             if isGone { closeActions() }
@@ -217,7 +230,7 @@ struct CommandPalette: View {
                 PaletteActionsPanel(
                     title: target.title, actions: actions(for: target),
                     perform: { perform($0, on: target) }, submit: { performHighlighted(on: target) }, close: { closeActions() },
-                    query: $actionsQuery, highlighted: $actionsHighlighted, focus: $focus
+                    query: actionsField, highlighted: $actionsHighlighted, focus: $focus
                 )
                 .padding(.trailing, 10)
                 .padding(.bottom, floatingHeight)
@@ -315,7 +328,9 @@ struct CommandPalette: View {
 
     private func actions(for row: Entry) -> [PaletteAction] {
         guard let id = row.item, let item = library.item(id) else { return PaletteAction.forCommand }
-        return PaletteAction.forItem(isFile: item.isFile, isFavorite: item.isFavorite, isActive: item.state == .active)
+        return PaletteAction.forItem(
+            isFile: item.isFile, isFavorite: item.isFavorite, isActive: item.state == .active,
+            openTitle: mode == .search ? String(localized: "Open at Match") : String(localized: "Open"))
     }
 
     /// Does what the action says through the same path as the menus, once the palette is put away.
@@ -323,9 +338,18 @@ struct CommandPalette: View {
         PaletteAction.filtered(actions(for: row), by: actionsQuery)
     }
 
+    /// The Actions field, which puts the highlight back on the first action whenever its words change.
+    private var actionsField: Binding<String> {
+        Binding { actionsQuery } set: {
+            actionsQuery = $0
+            actionsHighlighted = 0
+        }
+    }
+
     private func performHighlighted(on row: Entry) {
         let shown = actionsShown(for: row)
-        if shown.indices.contains(actionsHighlighted) { perform(shown[actionsHighlighted], on: row) }
+        guard !shown.isEmpty else { return }
+        perform(shown[min(actionsHighlighted, shown.count - 1)], on: row)
     }
 
     private func perform(_ action: PaletteAction, on row: Entry) {
@@ -346,7 +370,7 @@ struct CommandPalette: View {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(link, forType: .string)
                 } else {
-                    library.notices.tell(String(localized: "Can’t Copy Link"), String(localized: "No link names this item on its own yet."))
+                    library.notices.tell(String(localized: "Can’t Copy Link"), String(localized: "This item isn’t ready to link yet. Its copy may not have loaded, or you may be offline."))
                 }
             }
         case .addToFavorites, .removeFromFavorites:
@@ -400,6 +424,27 @@ struct CommandPalette: View {
         }
     }
 
+    private func refreshSearch() {
+        searched = mode == .search && isTyped ? library.search(query, in: .everywhere) : .none
+    }
+
+    /// Keeps `searched` current for the query: the library's answer arrives later through its observed state, so each
+    /// run reads it under observation and waits for the next change.
+    private func watchSearch() async {
+        guard mode == .search, isTyped else { return }
+        let words = query
+        while !Task.isCancelled {
+            let (changes, signal) = AsyncStream.makeStream(of: Void.self)
+            searched = withObservationTracking {
+                library.search(words, in: .everywhere)
+            } onChange: {
+                signal.yield()
+                signal.finish()
+            }
+            for await _ in changes { break }
+        }
+    }
+
     /// The most a search lists.
     static let searchLimit = 50
 
@@ -412,7 +457,7 @@ struct CommandPalette: View {
     /// Items whose text or title has what was typed, best match first, with the notes named by the words typed
     /// apart from those that hold them in the text; or the most recently edited before anything is typed.
     private var found: [Section] {
-        let results = isTyped ? library.search(query, in: .everywhere) : nil
+        let results = isTyped ? searched : nil
         let items = results.map(Self.listed) ?? Array(browser.paletteIndex(in: library).recent.prefix(12))
         let now = library.now()
         let entries = items.map { item in
@@ -439,8 +484,8 @@ struct CommandPalette: View {
         let one = browser.selection.count == 1 && selected.count == 1 ? selected.first : nil
         let hasVisibleEditor = browser.showsPage && one?.id == editor.noteID && editor.hasNote
         var entries: [Entry] = []
-        func add(_ title: String, _ systemImage: String, _ shortcut: String? = nil, action: @escaping () -> Void) {
-            entries.append(Entry(id: "command:" + title, title: title, icon: .symbol(systemImage), shortcut: shortcut, action: action))
+        func add(_ title: String, _ systemImage: String, _ shortcut: String? = nil, id: String? = nil, action: @escaping () -> Void) {
+            entries.append(Entry(id: id ?? "command:" + title, title: title, icon: .symbol(systemImage), shortcut: shortcut, action: action))
         }
 
         // The page keeps ⌘[ and ⌘] while it has the keyboard (see AppCommands), so the palette does not suggest them.
@@ -608,7 +653,7 @@ struct CommandPalette: View {
                 }
             }
             for collection in library.collections(holding: members) {
-                add(String(localized: "Remove from “\(collection.displayTitle)”"), "rectangle.stack.badge.minus") {
+                add(String(localized: "Remove from “\(collection.displayTitle)”"), "rectangle.stack.badge.minus", id: "command:removeFrom:\(collection.id)") {
                     library.removeFromCollection(browser.selection, collection.id, undoManager: undoManager)
                 }
             }
@@ -637,6 +682,9 @@ struct CommandPalette: View {
                 browser.showSettings(page)
             })
         }
+        // Whatever else shares a title, such as two table columns of one label, is told apart by its place.
+        let distinctIDs = PaletteSections.distinct(entries.map(\.id))
+        for index in entries.indices { entries[index].id = distinctIDs[index] }
         return entries
     }
 
@@ -649,10 +697,12 @@ struct CommandPalette: View {
         }
     }
 
+    static let searchNotesID = "command:searchNotesFor"
+
     /// The last row under Items: the same words, searched in the text of every note.
     private var searchNotesEntry: Entry {
         let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        return Entry(id: "command:searchNotesFor", title: String(localized: "Search Notes for “\(typed)”"), icon: .symbol("magnifyingglass"),
+        return Entry(id: Self.searchNotesID, title: String(localized: "Search Notes for “\(typed)”"), icon: .symbol("magnifyingglass"),
                      shortcut: "⇧⌘P", takesFocus: true) {
             browser.paletteSeed = typed
             browser.palette = .search

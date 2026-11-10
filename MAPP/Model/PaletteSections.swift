@@ -69,9 +69,21 @@ nonisolated enum PaletteSections {
         sections.filter { !$0.rows.isEmpty }
     }
 
-    /// The count the field shows: every row listed, once something is typed.
-    static func resultCount<Row>(_ sections: [Section<Row>]) -> Int {
-        sections.reduce(0) { $0 + $1.rows.count }
+    /// The count the field shows: the rows that are results, once something is typed. A row that only sends the
+    /// person elsewhere, such as the one that searches the notes, is not a result.
+    static func resultCount<Row>(_ sections: [Section<Row>], counting isResult: (Row) -> Bool = { _ in true }) -> Int {
+        sections.reduce(0) { $0 + $1.rows.filter(isResult).count }
+    }
+
+    /// The ids with any repeat made distinct by its place among the repeats, so a list keyed by them never holds one
+    /// twice and each row keeps its id while the list is built in the same order.
+    static func distinct(_ ids: [String]) -> [String] {
+        var seen: [String: Int] = [:]
+        return ids.map { id in
+            let count = seen[id, default: 0]
+            seen[id] = count + 1
+            return count == 0 ? id : "\(id)#\(count)"
+        }
     }
 }
 
@@ -128,6 +140,12 @@ nonisolated struct PaletteAction: Identifiable, Equatable, Sendable {
 
     /// A command row offers its one action.
     static var forCommand: [PaletteAction] { [PaletteAction(.run, String(localized: "Run"), "return", keys: ["↩"])] }
+
+    /// The action of `kind` a shortcut may run: one the row offers and the Actions field still shows.
+    /// Nil for a row that does not offer it or a field that hides it, so the shortcut does nothing.
+    static func reachable(_ kind: Kind, among offered: [PaletteAction], filteredBy query: String) -> PaletteAction? {
+        filtered(offered, by: query).first { $0.kind == kind }
+    }
 
     /// The actions whose titles answer what was typed in the panel's field.
     static func filtered(_ actions: [PaletteAction], by query: String) -> [PaletteAction] {
