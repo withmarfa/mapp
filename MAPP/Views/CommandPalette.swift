@@ -515,7 +515,7 @@ struct CommandPalette: View {
                     browser.openQuickAdd(typeID: type.id.rawValue, in: library)
                 })
             }
-            // After New Item and the typed ones, so what "new" finds leads with New Item.
+            // After New Item and the typed ones, so the commands "new" finds lead with New Item.
             add(String(localized: "New Window"), "macwindow.badge.plus", "⌥⌘N") { openWindow(id: "main") }
             if browser.selection.count == 1, let details {
                 add(details.isPresented ? String(localized: "Hide Details") : String(localized: "Show Details"), "sidebar.right", "⌥⌘I") { details.isPresented.toggle() }
