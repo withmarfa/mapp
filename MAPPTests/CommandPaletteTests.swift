@@ -38,33 +38,37 @@ struct CommandPaletteTests {
         NSApplication.shared.accessibilitySetValue(true, forAttribute: NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface"))
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 700, height: 600), styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
-        let host = NSHostingView(rootView: CommandPalette(browser: browser, editor: page.editor, mode: .commands).environment(\.library, page.library))
-        window.contentView = host
         window.orderFrontRegardless()
         defer { window.orderOut(nil); window.contentView = nil; window.close() }
 
-        #expect(try await eventuallyAsking {
-            host.layoutSubtreeIfNeeded()
-            return labels(of: host).contains { $0.contains("Settings") }
-        }, "the palette lists its commands: \(labels(of: host))")
+        // The list builds only the rows in view, so each command is asked for by a query that narrows the list to it.
+        func offers(_ title: String, prefix: Bool = true) async throws -> Bool {
+            browser.paletteSeed = title
+            let view = NSHostingView(rootView: CommandPalette(browser: browser, editor: page.editor, mode: .commands).environment(\.library, page.library))
+            window.contentView = view
+            return try await eventuallyAsking {
+                view.layoutSubtreeIfNeeded()
+                return labels(of: view).contains { prefix ? $0.hasPrefix(title) : $0.contains(title) }
+            }
+        }
+        #expect(try await offers("Settings", prefix: false), "the palette lists its commands")
+        #expect(try await offers("New Window"), "New Window is a command of the palette")
+
+        // One palette, one query, held open while the page takes the note.
+        browser.paletteSeed = "Bold"
+        let host = NSHostingView(rootView: CommandPalette(browser: browser, editor: page.editor, mode: .commands).environment(\.library, page.library))
+        window.contentView = host
+        try await Task.sleep(for: .milliseconds(500))
+        host.layoutSubtreeIfNeeded()
         #expect(!labels(of: host).contains { $0.hasPrefix("Bold") }, "no note is on the page yet")
-        #expect(labels(of: host).contains { $0.hasPrefix("New Window") }, "New Window is a command of the palette")
 
         try await page.show(note.id)
         #expect(try await eventuallyAsking {
             host.layoutSubtreeIfNeeded()
             return labels(of: host).contains { $0.hasPrefix("Bold") }
-        }, "the formatting commands arrive once the page holds the note")
-        // The list builds only the rows in view, so each editor-only command is asked for by its own query, which
-        // narrows the list to it.
+        }, "the formatting commands arrive once the page holds the note, for the same query: \(labels(of: host))")
         for title in ["Heading 4", "Heading 5", "Heading 6", "Highlight", "Link"] {
-            browser.paletteSeed = title
-            let seeded = NSHostingView(rootView: CommandPalette(browser: browser, editor: page.editor, mode: .commands).environment(\.library, page.library))
-            window.contentView = seeded
-            #expect(try await eventuallyAsking {
-                seeded.layoutSubtreeIfNeeded()
-                return labels(of: seeded).contains { $0.hasPrefix(title) }
-            }, "\(title) is offered with the other formats: \(labels(of: seeded))")
+            #expect(try await offers(title), "\(title) is offered with the other formats")
         }
     }
 
