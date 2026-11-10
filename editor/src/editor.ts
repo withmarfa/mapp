@@ -483,13 +483,27 @@ export class NoteEditor {
     const heading = this.engine
       .headings(expected)
       .find((entry) => headingKey(entry.text) === wanted)
-    return heading ? this.engine.navigateHeading(heading) : false
+    return heading ? this.goToHeading(heading, expected) : false
+  }
+  /** Inkkit's `navigateHeading` puts the caret in the heading and leaves the scrolling to ProseMirror's scroll to
+   *  selection, which is skipped while the page holds no DOM selection: the first reveal after a load, before
+   *  anything has been focused, moved the caret and nothing else. So the page reveals the caret itself, which does
+   *  nothing where the heading is already in view. */
+  private goToHeading(
+    heading: Parameters<InkKitEditor['navigateHeading']>[0],
+    expected: number,
+  ): boolean {
+    this.engine.navigateHeading(heading)
+    const snapshot = this.engine.textSnapshot(expected)
+    const at = snapshot.selection.from
+    this.engine.revealTextRange({ snapshotId: snapshot.snapshotId, from: at, to: at })
+    return true
   }
   /** Moves to the n-th heading of the note on the page (from 0), in Inkkit's own list, so two headings that read the
    *  same each have their own place. Whether there was one. */
   revealHeadingAt(ordinal: number, expected = this.generation): boolean {
     const heading = this.engine.headings(expected)[ordinal]
-    return heading ? this.engine.navigateHeading(heading) : false
+    return heading ? this.goToHeading(heading, expected) : false
   }
   private pendingChanged?: { text: string; generation: number }
   private headingsSent?: { generation: number; key: string }

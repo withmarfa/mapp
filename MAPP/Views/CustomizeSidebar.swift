@@ -18,9 +18,10 @@ struct SidebarArrangement: View {
     var body: some View {
         let relationships = library.relationships(for: item.id)
         let shown = placements.sidebarSections(of: item.type, in: library.catalogue).compactMap(SidebarSection.init(id:))
-        // The app sections are read once: they give both the counts and what Add Section offers.
-        let extras = SidebarExtras.of(item, in: library, relationships: relationships, outline: outline)
-        let apps = extras.apps
+        // The app sections are read once, apart from the rest: they give both the counts and what Add Section offers,
+        // including groups not shown. Attachments and collections are read only where a shown section needs them.
+        let extras = SidebarExtras.of(item, in: library, relationships: relationships, sections: shown, outline: outline)
+        let apps = SidebarExtras.appSections(of: item, in: library, relationships: relationships)
         VStack(alignment: .leading, spacing: InspectorMetrics.groupGap) {
             SectionsBox(
                 shown: shown, names: Dictionary(shown.map { ($0.id, title(of: $0)) }, uniquingKeysWith: { first, _ in first }),
