@@ -23,7 +23,7 @@ struct ItemInspectorHost: View {
         Group {
             if let browser, details.isEditingView, let panel = browser.viewPanel {
                 ViewEditPanel(browser: browser, panel: panel)
-                    .onExitCommand { browser.cancelViewPanel(in: library) }
+                    .onExitCommand { browser.escapeViewPanel(in: library) }
             } else if let id = selectedID, let item = library.item(id), details.isCustomizingLayout, PageCustomization.isAvailable(for: item) {
                 ItemLayoutPanel(item: item)
                     .onExitCommand { details.endLayout() }

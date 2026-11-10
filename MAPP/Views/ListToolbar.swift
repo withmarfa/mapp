@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// What acts on the list: Search, Filter and View Options, in the list column. The rest of
+/// What acts on the list: Search and View Options, in the list column. The rest of
 /// the window's items are the page column's (`WindowToolbar`).
 struct ListToolbar: CustomizableToolbarContent {
     @Bindable var browser: Browser
@@ -28,14 +28,6 @@ struct ViewToolbarItems: CustomizableToolbarContent {
             onDown: { if !browser.showsSidebarIndex { browser.focusRequest = .list } }
         )
         .hidden(isHidden)
-        ToolbarItem(id: "viewFilter") {
-            if showsFilter {
-                ItemTableFilterMenu(browser: browser)
-            } else {
-                Menu("Filter", systemImage: "line.3.horizontal.decrease") {}.disabled(true)
-            }
-        }
-        .hidden(isHidden || !showsFilter)
         ToolbarItem(id: "viewOptions") {
             if let place = browser.indexPlace {
                 IndexViewOptionsMenu(place: place)
@@ -45,8 +37,6 @@ struct ViewToolbarItems: CustomizableToolbarContent {
         }
         .hidden(isHidden)
     }
-
-    private var showsFilter: Bool { browser.offersViewOptions && !browser.showsSidebarIndex }
 }
 
 /// Opens quick add, to make an item in the place being shown.

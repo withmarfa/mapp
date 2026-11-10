@@ -74,9 +74,18 @@ struct ViewOptionCommand {
                 browser.tableOptions[place, default: .init()].pageSize = size
             })
         }
+        commands.append(.init(
+            title: String(localized: browser.toggleFiltersTitle),
+            systemImage: "line.3.horizontal.decrease"
+        ) {
+            browser.toggleFilterRow()
+        })
+        commands.append(.init(title: String(localized: "Add Filter…"), systemImage: "line.3.horizontal.decrease") {
+            browser.requestAddFilter()
+        })
         if browser.tableOptions[place]?.isFiltering == true {
             commands.append(.init(title: String(localized: "Clear Filters"), systemImage: "line.3.horizontal.decrease") {
-                browser.tableOptions[place, default: .init()].clearFilters()
+                browser.clearFilters()
             })
         }
         return commands

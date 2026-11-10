@@ -1,26 +1,21 @@
 import SwiftUI
 
-/// The Filter, on the toolbar just after Search and in the View menu. It reads the place as the table reads it
-/// (`ItemTableContent`), and what it keeps is the place's, for the window, in every layout.
-struct ItemTableFilterMenu: View {
+/// The View menu's filter commands: Show or Hide Filters, Add Filter… and Clear Filters.
+struct FilterCommands: View {
     @Bindable var browser: Browser
 
     var body: some View {
-        let isFiltering = browser.tableOptions[browser.item]?.isFiltering == true
-        Menu {
-            FilterMenuItems(browser: browser)
-        } label: {
-            Label("Filter", systemImage: isFiltering ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease")
+        Button(browser.toggleFiltersTitle) { browser.toggleFilterRow() }
+        Button("Add Filter…") { browser.requestAddFilter() }
+        if browser.filterCount > 0 {
+            Button("Clear Filters") { browser.clearFilters() }
         }
-        .menuIndicator(.hidden)
-        .help("Show only some items")
-        .accessibilityIdentifier("ItemTableFilter")
     }
 }
 
 /// The table's part of View Options (`CurrentViewOptions`): Sort, Group and the columns shown. Sort and Group are the
-/// place's, for the window; the columns shown are kept for the place (`ItemTableColumnLayouts`), or held for a saved
-/// view until Save (`Browser.setColumn`). A saved view's list
+/// place's, for the window; the columns shown are kept for the place (`ItemTableColumnLayouts`), or stored for a saved
+/// view (`Browser.setColumn`). A saved view's list
 /// and gallery take its Sort and Group too, without the table's rows at a time and columns (`columns` false).
 struct ItemTableViewOptions: View {
     @CurrentLibrary private var library

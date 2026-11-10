@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The table's columns for the window's place. A saved view's are held for the window until Save (`ViewColumns`); any
-/// other place keeps its own at once (`ItemTableColumnLayouts`), so every control that shows or hides a column asks here.
+/// The table's columns for the window's place. A saved view's are stored for this Mac as they are changed (`ViewColumns`); any
+/// other place keeps its own too (`ItemTableColumnLayouts`), so every control that shows or hides a column asks here.
 extension Browser {
     private var columnsViewID: ItemID? {
         if case .view(let id) = item { id } else { nil }

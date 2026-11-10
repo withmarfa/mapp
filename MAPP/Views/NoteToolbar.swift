@@ -4,8 +4,8 @@ import SwiftUI
 /// layout of its own (`WindowToolbarLayout`), since the system reshuffles a saved layout when one identifier moves between
 /// split views. Nothing else in a window may declare a plain `toolbar`, which turns customization off for the whole window.
 ///
-/// The defaults run New Item at the leading side when the sidebar is hidden, then Revert and Save or
-/// Save as View while there is something to keep, Search, Filter and View Options, the Reader and Original switch on a
+/// The defaults run New Item at the leading side when the sidebar is hidden, then
+/// Save as View while a place that is not a view has something to keep, Search, Filter and View Options, the Reader and Original switch on a
 /// page with an article, View As, Share and More, and Details at the far right. In the list Search, Filter
 /// and View Options are the list column's (`ListToolbar`). Format and `ExtraToolbarItems` start in the tray.
 struct WindowToolbar: CustomizableToolbarContent {

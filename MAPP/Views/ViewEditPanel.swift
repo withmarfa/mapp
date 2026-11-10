@@ -1,8 +1,10 @@
 import SwiftUI
 
-/// The right sidebar while a view is edited (`ViewPanel`): its name, layout, filters, sort, group, and the table's columns or the gallery's cards. Each
-/// change shows at once in the window beside it, and none is kept until Save (`ViewPanelToolbar`). A type's list and
-/// the other places that can become a view get the same panel without a name, and offer Save as View.
+/// The right sidebar while a view is edited (`ViewPanel`): its name, how it is shown, sort, group, and the table's
+/// columns or the gallery's cards. Each change shows at once in the window beside it and, in a saved view, is written
+/// as it is made; Done closes the panel (`ViewPanelToolbar`). Filters are not here: they live in the row above the list
+/// (`FilterChips`). A type's list and the other places that can become a view get the same panel without a name, and
+/// offer Save as View. A Rows section for the list comes after the list's rows do.
 struct ViewEditPanel: View {
     @CurrentLibrary private var library
     @StoredOrder private var order
@@ -12,24 +14,23 @@ struct ViewEditPanel: View {
 
     var body: some View {
         let content = browser.tableContent(in: library)
+        let arrangement = SavedViews.arrangement(browser, content: content, order: order)
         ScrollView {
             VStack(alignment: .leading, spacing: InspectorMetrics.sectionGap) {
-                ViewPanelNotes(browser: browser, panel: panel)
                 if panel.purpose != .place {
                     ViewPanelSection(title: "Name") {
                         InspectorBox {
                             TextField("View Name", text: $panel.shownName)
                                 .textFieldStyle(.plain)
                                 .focused($nameFocused)
-                                .onSubmit { SavedViews.save(browser, in: library, order: order) }
+                                .onSubmit { submitName() }
                                 .accessibilityIdentifier("ViewPanelName")
                         }
                     }
                 }
                 ViewPanelLayoutSection(browser: browser, panel: panel)
-                ViewPanelFilters(browser: browser, panel: panel, content: content)
-                ViewPanelSort(browser: browser, content: content)
-                ViewPanelGroup(browser: browser, content: content)
+                ViewPanelSort(browser: browser, content: content, sort: arrangement.sort)
+                ViewPanelGroup(browser: browser, content: content, arrangement: arrangement)
                 if browser.viewMode == .table {
                     ViewPanelColumns(browser: browser, panel: panel, content: content)
                 } else if browser.viewMode == .gallery {
@@ -42,12 +43,25 @@ struct ViewEditPanel: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .scrollBounceBehavior(.basedOnSize)
-        .modifier(ViewSaveConfirmation(browser: browser, panel: panel))
         .task(id: ObjectIdentifier(panel)) {
             if panel.isNew { nameFocused = true }
         }
+        // A name is written when the person commits it: Return, or leaving the field.
+        .onChange(of: nameFocused) { if !nameFocused, panel.viewID != nil { commitName() } }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ViewEditPanel")
+    }
+
+    private func submitName() {
+        if panel.isNew {
+            Task { await browser.finishViewPanel(in: library, order: order) }
+        } else {
+            commitName()
+        }
+    }
+
+    private func commitName() {
+        Task { await browser.commitViewName(of: panel, in: library) }
     }
 }
 
@@ -73,7 +87,8 @@ struct ViewPanelSection<Content: View>: View {
     }
 }
 
-/// The layouts the place offers, as a segmented control. The choice is the window's, held for a view until Save.
+/// The layout the window shows the place in, as a pop-up named Show As with the layout's symbol and name. The choice is
+/// the window's, and this Mac keeps a saved view's as it is made.
 private struct ViewPanelLayoutSection: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
@@ -81,18 +96,21 @@ private struct ViewPanelLayoutSection: View {
 
     var body: some View {
         ViewPanelSection(title: "Layout", note: panel.purpose == .place ? nil : "This Mac") {
-            Picker("Layout", selection: $browser.viewMode) {
-                ForEach(browser.availableViewModes(in: library), id: \.self) { mode in
-                    Image(systemName: mode.symbol)
-                        .accessibilityLabel(mode.title)
-                        .help(mode.title)
-                        .tag(mode)
+            InspectorBox {
+                HStack {
+                    Text("Show As")
+                    Spacer(minLength: 0)
+                    Picker("Show As", selection: $browser.viewMode) {
+                        ForEach(browser.availableViewModes(in: library), id: \.self) { mode in
+                            Label(mode.title, systemImage: mode.symbol).tag(mode)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .fixedSize()
+                    .accessibilityIdentifier("ViewPanelLayout")
                 }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(maxWidth: .infinity)
-            .accessibilityIdentifier("ViewPanelLayout")
         }
     }
 }
@@ -101,8 +119,10 @@ private struct ViewPanelLayoutSection: View {
 /// its board.
 private struct ViewPanelGroup: View {
     @CurrentLibrary private var library
+    @StoredOrder private var order
     let browser: Browser
     let content: ItemTableContent
+    let arrangement: SavedViews.Arrangement
 
     var body: some View {
         ViewPanelSection(title: "Group") {
@@ -113,11 +133,18 @@ private struct ViewPanelGroup: View {
                     picker
                 }
                 if case .view(let id) = browser.item {
-                    Toggle("Hide Empty Groups", isOn: Binding {
-                        browser.macSettings(for: id).hidesEmptyGroups
-                    } set: { hides in
-                        browser.changeViewSettings(id) { $0.hidesEmptyGroups = hides }
-                    })
+                    HStack {
+                        Text("Hide Empty Groups")
+                        Spacer(minLength: 0)
+                        Toggle("Hide Empty Groups", isOn: Binding {
+                            browser.macSettings(for: id).hidesEmptyGroups
+                        } set: { hides in
+                            browser.changeViewSettings(id) { $0.hidesEmptyGroups = hides }
+                        })
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                    }
                     .disabled(browser.viewMode != .board)
                     .help(browser.viewMode == .board ? "" : String(localized: "Only a board has empty groups."))
                     .accessibilityIdentifier("ViewPanelHideEmptyGroups")
@@ -146,17 +173,45 @@ private struct ViewPanelGroup: View {
             .labelsHidden()
             .accessibilityIdentifier("ViewPanelGroupBy")
         default:
-            Picker("Group by", selection: Binding { content.grouping?.id ?? "" } set: { id in
-                browser.tableOptions[place, default: .init()].grouping = id.isEmpty ? .none : .column(id)
-                browser.tableOptions[place, default: .init()].collapsed = nil
-            }) {
+            Picker("Group by", selection: Binding { Self.tag(of: arrangement.grouping) } set: { setGrouping($0) }) {
                 Text("None").tag("")
+                if arrangement.isDated, order.groupsByDate {
+                    Text("Date").tag(Self.dateTag)
+                }
                 Divider()
                 ForEach(content.categoricalColumns) { Text($0.label).tag($0.id) }
             }
             .labelsHidden()
             .accessibilityIdentifier("ViewPanelGroupBy")
         }
+    }
+
+    private static let dateTag = "\u{0}date"
+
+    private static func tag(of grouping: SavedViews.ShownGrouping) -> String {
+        switch grouping {
+        case .none: ""
+        case .date: dateTag
+        case .column(let id): id
+        }
+    }
+
+    /// Groups the layout. A list that sorts by date and groups by it is put back to that by clearing its sort and
+    /// grouping; asking it for no groups sorts it by what it showed, which is what stops the date sections.
+    private func setGrouping(_ tag: String) {
+        let place = browser.item
+        var options = browser.tableOptions[place] ?? ItemTableOptions()
+        if tag == Self.dateTag {
+            options.grouping = .automatic
+            options.sort = nil
+        } else if tag.isEmpty {
+            options.grouping = .none
+            if arrangement.isDated { options.sort = arrangement.sort }
+        } else {
+            options.grouping = .column(tag)
+        }
+        options.collapsed = nil
+        browser.tableOptions[place] = options
     }
 }
 

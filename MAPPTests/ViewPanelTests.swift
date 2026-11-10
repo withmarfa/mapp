@@ -2,10 +2,11 @@ import Foundation
 import Testing
 @testable import MAPP
 
-/// What the panel that edits a view holds, keeps and gives back: nothing changes on Marfa or on this Mac until Save,
-/// and a Save writes Marfa's part before this Mac's.
+/// What the panel that edits a view does: each change shows in the window as it is made, is written to a saved view as it
+/// is made, and is taken back by one Undo. Done only closes the panel, except for a new view, which it makes.
 @MainActor
-@Suite(.hangLimit)
+// Serialised: each test drives its own undo manager's groups by hand, and tests that interleave on the main actor hung the host.
+@Suite(.serialized, .hangLimit)
 struct ViewPanelTests {
     static func defaults() -> UserDefaults {
         let suite = "MAPP.ViewPanelTests.\(UUID().uuidString)"
@@ -16,822 +17,485 @@ struct ViewPanelTests {
 
     private static let id = ItemID("view-open-tasks")
     private static let order = NoteOrder()
+    private static let status = ViewDraft.columnID(of: "properties.status") ?? "field.status"
 
-    private static func view(version: Int64 = 1) -> LibraryView {
+    private static func view(filter: String? = nil) -> LibraryView {
         LibraryView(
-            id: id, title: "Open Tasks", version: version,
-            query: LibraryViewQuery(types: [TypeID("core.task")], states: [.active]),
+            id: id, title: "Open Tasks", version: 1,
+            query: LibraryViewQuery(types: [TypeID("core.task")], states: [.active], filter: filter),
             sort: [LibraryViewSort(field: "updated_at", ascending: false)], group: LibraryViewGroup(field: "properties.status"))
     }
 
-    /// A second view, so that a list of views without the first is a list that was read.
-    private static let other = LibraryView(id: ItemID("view-everything"), title: "Everything Else", version: 1, query: LibraryViewQuery(states: [.active]))
-
-    private static func opened(reachesServer: Bool = true) -> (Browser, FakeItemLibrary) {
-        let library = FakeItemLibrary()
-        library.views = [view(), other]
+    private static func opened(filter: String? = nil, reachesServer: Bool = true) -> (Browser, FakeItemLibrary, UndoManager) {
+        let date = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        let tasks = ["todo", "done", "in_progress"].enumerated().map { index, status in
+            Item(
+                id: ItemID("t\(index)"), type: TypeID("core.task"), title: "t\(index)", name: "t\(index)", titleRule: .firstLine,
+                properties: [Property(key: "status", value: .string(status))], version: ItemVersion(1), created: date, modified: date)
+        }
+        let library = FakeItemLibrary(items: tasks, now: date)
+        library.views = [view(filter: filter)]
+        library.viewMembers[id] = tasks.map(\.id)
         library.reachesServer = reachesServer
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        undo.beginUndoGrouping()
         let browser = Browser()
         browser.defaults = defaults()
-        browser.adopt(library)
+        browser.adopt(library, undoManager: undo)
         browser.sidebarItem = .view(id)
         browser.viewMode = .table
         browser.followView(in: library)
-        return (browser, library)
+        browser.choicesChanged()
+        // The opening is not the person's: nothing of it can be undone.
+        Self.close(undo)
+        undo.removeAllActions()
+        return (browser, library, undo)
     }
 
-    private static func window(_ browser: Browser, _ library: FakeItemLibrary) -> ViewDraft.Window {
-        SavedViews.window(browser, in: library)
+    /// Ends the group a change was registered in, so that each change is a step of its own, as a turn of the run loop makes
+    /// it in the app. The groups are the test's, since the manager's own end a group on a later turn of
+    /// the loop, which the test host answers with an exception that leaves a test hanging.
+    private static func close(_ undo: UndoManager) {
+        while undo.groupingLevel > 0 { undo.endUndoGrouping() }
     }
 
-    private static func save(_ browser: Browser, _ library: FakeItemLibrary, confirmed: Bool = true) async {
-        await browser.saveViewPanel(
-            window: window(browser, library), newView: SavedViews.newViewSettings(browser, in: library), confirmed: confirmed,
-            in: library, order: order)
+    private static func held(_ library: FakeItemLibrary) -> LibraryView? { library.views.first { $0.id == id } }
+
+    /// Makes one change as the window does, then lets the write it caused finish.
+    private static func change(_ browser: Browser, _ edit: () -> Void) async {
+        browser.undoManager?.beginUndoGrouping()
+        edit()
+        let task = browser.choicesChanged()
+        if let undo = browser.undoManager { close(undo) }
+        await task?.value
     }
 
-    private static func held(_ library: FakeItemLibrary) -> LibraryView? {
-        library.views.first { $0.id == id }
+    /// Takes back one change, then waits for the view to hold what the Undo must leave there.
+    private static func undo(_ undo: UndoManager, _ library: FakeItemLibrary, until held: (LibraryView?) -> Bool) async {
+        Self.close(undo)
+        undo.undo()
+        let reached = await eventually(within: .seconds(20)) { held(Self.held(library)) }
+        #expect(reached)
     }
 
-    private static func store(_ browser: Browser) -> ViewMacSettings? {
-        ViewLayouts.stored(in: browser.defaults).settings(for: id)
+    // MARK: Written as made, and Undo
+
+    @Test func aFilterIsWrittenToTheViewAsItIsMade() async {
+        let (browser, library, _) = Self.opened()
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        #expect(Self.held(library)?.version == 2)
+        #expect(Self.held(library)?.query.filter?.contains("todo") == true)
     }
 
-    // MARK: Held until Save
-
-    @Test func aLayoutIsHeldAndCountsAsAChange() {
-        let (browser, _) = Self.opened()
-        #expect(!browser.hasViewChanges)
-        browser.viewMode = .gallery
-        #expect(browser.hasViewChanges)
-        #expect(Self.store(browser) == nil)
-        #expect(browser.macSettings(for: Self.id).layout == .gallery)
+    @Test func undoOfAFilterWritesTheEarlierValueBack() async {
+        let (browser, library, undo) = Self.opened()
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        await Self.undo(undo, library) { $0?.version == 3 }
+        #expect(Self.held(library)?.query.filter == nil)
+        #expect(browser.filterCount == 0)
     }
 
-    @Test func columnsAreHeldAndRevertPutsThemBack() {
-        let (browser, library) = Self.opened()
-        browser.changeViewSettings(Self.id) { $0.columns.setShown(.created, true) }
-        #expect(browser.hasViewChanges)
-        #expect(Self.store(browser) == nil)
-        browser.viewMode = .gallery
-        browser.revertView(in: library)
-        #expect(!browser.hasViewChanges)
-        #expect(browser.viewMode == .table)
-        #expect(browser.macSettings(for: Self.id).columns == ViewColumns())
-    }
-
-    @Test func aLayoutTheAppPutsBackIsNoChangeOfThePersons() {
-        let (browser, _) = Self.opened()
-        browser.set(layout: .gallery)
-        #expect(!browser.hasViewChanges)
-    }
-
-    @Test func columnsAreShownInTheOrderHeld() {
-        let (browser, _) = Self.opened()
-        let columns: [ItemTableColumn] = [.title, .type, .edited, .created]
-        browser.changeViewSettings(Self.id) {
-            $0.columns.setShown(.created, true)
-            $0.columns.move("created", before: "type", in: columns)
-        }
-        let shown = browser.macSettings(for: Self.id).columns.shownColumns(columns).map(\.id)
-        #expect(shown == ["title", "created", "type", "edited"])
-    }
-
-
-    // MARK: What the app does is not the person's change
-
-    @Test func choosingItemsFromAViewIsNoChangeOfTheViews() {
-        let (browser, library) = Self.opened()
-        browser.set(layout: .list)
-        browser.choose(.allNotes, in: library, order: Self.order)
-        #expect(browser.viewMode == .gallery)
-        #expect(browser.viewWorking[Self.id] == nil)
-        browser.sidebarItem = .view(Self.id)
-        browser.followView(in: library)
-        #expect(!browser.hasViewChanges)
-    }
-
-    @Test func aLayoutTheViewHoldsNoneOfIsKeptNilNotPinned() {
-        let (browser, library) = Self.opened()
-        #expect(browser.viewSeeds[Self.id]?.mac.layout == nil)
-        browser.openViewPanel(in: library)
-        browser.changeViewSettings(Self.id) { $0.hidesEmptyGroups = true }
-        #expect(browser.hasViewChanges)
-        #expect(browser.macSettings(for: Self.id).layout == nil)
-    }
-
-    @Test func savingAColumnChangeKeepsNoLayoutTheViewNeverHad() async {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        browser.changeViewSettings(Self.id) { $0.columns.setShown(.created, true) }
-        await Self.save(browser, library)
-        #expect(Self.store(browser)?.layout == nil)
-        #expect(Self.store(browser)?.columns.isShown(.created) == true)
-    }
-
-    @Test func backInTheLayoutAViewOpenedInIsNoChange() {
-        let (browser, library) = Self.opened()
-        browser.viewMode = .gallery
-        #expect(browser.hasViewChanges)
-        browser.viewMode = .table
-        #expect(!browser.hasViewChanges)
-        browser.viewMode = .board
-        browser.revertView(in: library)
-        #expect(browser.viewMode == .table)
-        #expect(!browser.hasViewChanges)
-    }
-
-    // MARK: The toolbar's Save
-
-    @Test func theToolbarsSaveLeavesTheSidebarAloneWhenNothingGoesWrong() async {
-        let (browser, library) = Self.opened()
-        browser.tableOptions[browser.item]?.grouping = .none
-        SavedViews.save(browser, in: library, order: Self.order)
-        #expect(!browser.showsViewPanel)
-        await eventually { browser.viewPanel == nil }
-        #expect(!browser.hasViewChanges)
+    @Test func undoOfAGroupingWritesTheEarlierGroupBack() async {
+        let (browser, library, undo) = Self.opened()
+        await Self.change(browser) { browser.tableOptions[browser.item, default: .init()].grouping = .none }
         #expect(Self.held(library)?.group == nil)
+        await Self.undo(undo, library) { $0?.group != nil }
+        #expect(Self.held(library)?.group == LibraryViewGroup(field: "properties.status"))
     }
 
-    @Test func theToolbarsSaveShowsThePanelToSayWhyItFailed() async {
-        let (browser, library) = Self.opened()
-        browser.tableOptions[browser.item]?.grouping = .none
+    @Test func undoOfASortWritesTheEarlierOrderBack() async {
+        let (browser, library, undo) = Self.opened()
+        await Self.change(browser) {
+            browser.tableOptions[browser.item, default: .init()].sort = [ItemTableComparator(column: .title, order: .forward)]
+        }
+        #expect(Self.held(library)?.sort != Self.view().sort)
+        await Self.undo(undo, library) { $0?.sort == Self.view().sort }
+        #expect(Self.held(library)?.sort == Self.view().sort)
+    }
+
+    @Test func undoTakesBackOneChangeAtATime() async {
+        let (browser, library, undo) = Self.opened()
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        await Self.change(browser) { browser.tableOptions[browser.item, default: .init()].grouping = .none }
+        await Self.undo(undo, library) { $0?.group != nil }
+        #expect(Self.held(library)?.query.filter?.contains("todo") == true)
+        await Self.undo(undo, library) { $0?.query.filter == nil }
+        #expect(Self.held(library)?.query.filter == nil)
+    }
+
+    @Test func redoWritesTheChangeAgain() async {
+        let (browser, library, undo) = Self.opened()
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        await Self.undo(undo, library) { $0?.query.filter == nil }
+        Self.close(undo)
+        undo.redo()
+        #expect(await eventually(within: .seconds(20)) { Self.held(library)?.query.filter?.contains("todo") == true })
+    }
+
+    @Test func undoOfALayoutPutsTheLayoutBackOnThisMac() {
+        let (browser, _, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        browser.viewMode = .gallery
+        Self.close(undo)
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.layout == .gallery)
+        undo.undo()
+        #expect(browser.viewMode == .table)
+    }
+
+    @Test func columnsAreStoredAsTheyAreChangedAndUndoPutsThemBack() {
+        let (browser, _, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        browser.changeViewSettings(Self.id) { $0.columns.setShown(.created, true) }
+        Self.close(undo)
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.columns.isShown(.created) == true)
+        undo.undo()
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.columns.isShown(.created) != true)
+    }
+
+    // MARK: Refused and offline writes
+
+    @Test func aRefusedWriteKeepsTheWindowsChoiceAndLeavesTheViewAlone() async {
+        let (browser, library, _) = Self.opened()
         library.viewFailure = ViewWriteFailure(kind: .refused, message: "No")
-        SavedViews.save(browser, in: library, order: Self.order)
-        await eventually { browser.showsViewPanel }
-        #expect(browser.viewPanel?.failure == "No")
-        #expect(browser.hasViewChanges)
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        #expect(browser.filterCount == 1)
+        #expect(Self.held(library)?.version == 1)
+        #expect(Self.held(library)?.query.filter == nil)
     }
 
-    @Test func theToolbarsSaveShowsThePanelToAskFirst() async {
-        let (browser, library) = Self.opened()
-        browser.tableOptions[browser.item]?.grouping = .none
-        browser.searchText = "plans"
-        SavedViews.save(browser, in: library, order: Self.order)
-        await eventually { browser.showsViewPanel }
-        #expect(browser.viewPanel?.confirmation != nil)
+    @Test func undoAfterARefusedWriteWritesNothingThePersonNeverHad() async {
+        let (browser, library, undo) = Self.opened()
+        library.viewFailure = ViewWriteFailure(kind: .refused, message: "No")
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        library.viewFailure = nil
+        Self.close(undo)
+        undo.undo()
+        #expect(browser.filterCount == 0)
+        // Nothing was written, so there is nothing to wait for: give a wrong write the chance to show.
+        await browser.choicesChanged()?.value
+        #expect(Self.held(library)?.version == 1)
     }
 
-    @Test func editViewBringsOutAPanelSavingQuietly() {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        browser.viewPanel?.isQuiet = true
-        browser.openViewPanel(in: library)
-        #expect(browser.showsViewPanel)
-        browser.viewPanel?.isQuiet = true
-        browser.editView(Self.id, in: library, order: Self.order)
-        #expect(browser.showsViewPanel, "the sidebar's Edit View does too")
+    @Test func theNextWriteAfterARefusalCarriesTheChange() async {
+        let (browser, library, _) = Self.opened()
+        library.viewFailure = ViewWriteFailure(kind: .refused, message: "No")
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        library.viewFailure = nil
+        browser.writeViewAgain()
+        #expect(await eventually(within: .seconds(20)) { Self.held(library)?.query.filter?.contains("todo") == true })
     }
 
-    @Test func aSecondSaveLeavesTheSaveUnderWayAlone() async {
-        let (browser, library) = Self.opened()
-        browser.tableOptions[browser.item]?.grouping = .none
+    @Test func anOfflineWriteDoesNotBlockAndKeepsTheChoice() async {
+        let (browser, library, _) = Self.opened(reachesServer: false)
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        #expect(browser.filterCount == 1)
+        #expect(Self.held(library)?.version == 1)
+    }
+
+    @Test func aSecondOfflineStretchIsToldAgainOnceTheServerWasBack() async {
+        let (browser, library, _) = Self.opened(reachesServer: false)
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        #expect(library.notices.told == 1)
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo", "done"]) }
+        #expect(library.notices.told == 1)
+        library.reachesServer = true
+        browser.reachabilityChanged(in: library)
+        library.reachesServer = false
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["done"]) }
+        #expect(library.notices.told == 2)
+    }
+
+    @Test func aNameTypedDuringARenameIsWrittenWithoutClaimingTheViewWasRenamedElsewhere() async {
+        let (browser, library, undo) = Self.opened()
+        undo.beginUndoGrouping()
         browser.openViewPanel(in: library)
+        browser.viewPanel?.name = "First"
+        var release: CheckedContinuation<Void, Never>?
+        var held = false
+        library.inViewChange = {
+            guard !held else { return }
+            held = true
+            await withCheckedContinuation { release = $0 }
+        }
+        let first = Task { await browser.commitViewName(in: library) }
+        #expect(await eventually(within: .seconds(20)) { release != nil })
+        browser.viewPanel?.name = "Second"
+        let second = Task { await browser.commitViewName(in: library) }
+        release?.resume()
+        await first.value
+        await second.value
+        #expect(Self.held(library)?.title == "Second")
+        #expect(!library.notices.waiting.contains { $0.title == "Can’t Rename" })
+    }
+
+    @Test func aNameTypedAfterTheRenameWasSentIsGivenBackWhenThePanelCloses() async {
+        let (browser, library, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        browser.openViewPanel(in: library)
+        browser.viewPanel?.name = "First"
+        var release: CheckedContinuation<Void, Never>?
+        library.inViewChange = { await withCheckedContinuation { release = $0 } }
+        let rename = Task { await browser.commitViewName(in: library) }
+        #expect(await eventually(within: .seconds(20)) { release != nil })
+        browser.viewPanel?.name = "Second"
+        browser.closeViewPanel(in: library)
+        release?.resume()
+        await rename.value
+        #expect(Self.held(library)?.title == "First")
+        #expect(library.notices.waiting.contains { $0.isNotKept && $0.text == "Second" })
+    }
+
+    @Test func aRefusedRenameGivesBackTheLatestNameTyped() async {
+        let (browser, library, undo) = Self.opened(reachesServer: false)
+        undo.beginUndoGrouping()
+        browser.openViewPanel(in: library)
+        browser.viewPanel?.name = "First"
         let panel = browser.viewPanel
-        panel?.isQuiet = true
-        panel?.isSaving = true
-        SavedViews.save(browser, in: library, order: Self.order)
-        await Task.yield()
-        #expect(browser.viewPanel === panel)
-        #expect(Self.held(library)?.group != nil, "nothing was written twice")
+        panel?.renaming = "First"
+        panel?.name = "Second"
+        browser.closeViewPanel(in: library)
+        panel?.finishRename(name: "First", kept: false)
+        #expect(library.notices.waiting.contains { $0.isNotKept && $0.text == "Second" })
+        #expect(!library.notices.waiting.contains { $0.isNotKept && $0.text == "First" })
     }
 
-    @Test func saveAsViewIsOfferedOnlyWhereAPlaceHoldsChoicesAViewCouldKeep() {
-        let (browser, library) = Self.opened()
-        browser.tableOptions[browser.item]?.setFilter("type", values: ["core.task"])
-        #expect(!SavedViews.hasChoicesToKeep(browser, in: library), "a saved view has Revert and Save")
-        browser.sidebarItem = .itemType("core.task")
-        #expect(!SavedViews.hasChoicesToKeep(browser, in: library))
-        browser.tableOptions[browser.item, default: .init()].setFilter("type", values: ["core.task"])
-        #expect(SavedViews.hasChoicesToKeep(browser, in: library))
+    @Test func leavingAViewMidWriteCausesNoRewriteOfIt() async {
+        let (browser, library, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        var release: CheckedContinuation<Void, Never>?
+        library.inViewChange = { await withCheckedContinuation { release = $0 } }
+        browser.setFilter(Self.status, values: ["todo"])
+        let task = browser.choicesChanged()
+        #expect(await eventually(within: .seconds(20)) { release != nil })
+        browser.sidebarItem = .allNotes
+        release?.resume()
+        await task?.value
+        #expect(Self.held(library)?.query.filter?.contains("todo") == true)
+        #expect(!browser.pendingViewWrites.contains(Self.id))
     }
 
-    // MARK: A name the person typed is not lost
-
-    private static func texts(_ library: FakeItemLibrary) -> [String] {
-        library.notices.waiting.compactMap(\.text)
+    @Test func escapeOnANewViewKeepsTheStepsMadeBeforeItOpened() async {
+        let (browser, library, undo) = Self.opened()
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        browser.openNewViewPanel(in: library)
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo", "done"]) }
+        browser.escapeViewPanel(in: library)
+        #expect(undo.canUndo)
+        await Self.undo(undo, library) { $0?.query.filter?.contains("todo") != true }
     }
 
-    @Test func aViewChangedElsewhereKeepsTheNameTypedInThePanel() async {
-        let (browser, library) = Self.opened()
+    @Test func undoNeverOverwritesAChangeMadeElsewhere() async {
+        let (browser, library, undo) = Self.opened()
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        // Another window changed the view: this window follows it.
+        var elsewhere = Self.held(library) ?? Self.view()
+        elsewhere.version += 1
+        elsewhere.query.filter = #"properties.status eq "done""#
+        library.views = [elsewhere]
+        browser.seed(elsewhere, catalogue: library.catalogue)
+        Self.close(undo)
+        undo.undo()
+        await browser.choicesChanged()?.value
+        #expect(Self.held(library)?.query.filter == #"properties.status eq "done""#)
+        #expect(Self.held(library)?.version == elsewhere.version)
+    }
+
+    // MARK: A condition the row cannot show
+
+    @Test func aConditionTheRowCannotShowIsKeptThroughAWrite() async {
+        let (browser, library, _) = Self.opened(filter: #"source eq "mail""#)
+        #expect(!ViewDraft.unshownConditions(of: Self.view(filter: #"source eq "mail""#).query, catalogue: library.catalogue).isEmpty)
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        let filter = Self.held(library)?.query.filter ?? ""
+        #expect(filter.contains(#"source eq "mail""#))
+        #expect(filter.contains("todo"))
+    }
+
+    // MARK: Group by, from one place
+
+    @Test func aListShowsItsDateSectionsAsItsGrouping() {
+        let (browser, library, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        browser.viewMode = .list
+        Self.close(undo)
+        browser.tableOptions[browser.item]?.grouping = .automatic
+        browser.tableOptions[browser.item]?.sort = nil
+        let content = browser.tableContent(in: library)
+        let shown = SavedViews.arrangement(browser, content: content, order: NoteOrder())
+        #expect(shown.grouping == .date)
+        #expect(shown.isDated)
+    }
+
+    @Test func aTableShowsItsOwnGroupingNotTheListsDates() {
+        let (browser, library, _) = Self.opened()
+        browser.viewMode = .table
+        let content = browser.tableContent(in: library)
+        let shown = SavedViews.arrangement(browser, content: content, order: NoteOrder())
+        #expect(shown.grouping != .date)
+    }
+
+    // MARK: Faults the review found
+
+    @Test func groupByDateOnAListWritesNoSortThePersonDidNotChooseAndLeavesTheViewUnedited() async {
+        let (browser, library, _) = Self.opened()
+        browser.set(layout: .list)
+        await Self.change(browser) {
+            browser.tableOptions[browser.item, default: .init()].grouping = .automatic
+            browser.tableOptions[browser.item, default: .init()].sort = nil
+        }
+        #expect(Self.held(library)?.group == nil)
+        #expect(Self.held(library)?.sort == Self.view().sort)
+        #expect(Self.held(library)?.version == 2)
+        #expect(!browser.hasViewChanges)
+    }
+
+    @Test func aChoiceChangedWhileANameIsBeingWrittenIsWrittenAfterIt() async {
+        let (browser, library, undo) = Self.opened()
+        undo.beginUndoGrouping()
         browser.openViewPanel(in: library)
-        browser.viewPanel?.shownName = "Mine"
-        browser.tableOptions[browser.item]?.grouping = .none
-        var renamed = Self.view(version: 2)
-        renamed.title = "Theirs"
-        library.views = [renamed, Self.other]
-        await Self.save(browser, library)
-        #expect(browser.viewPanel?.shownName == "Mine")
-        #expect(browser.viewPanel?.failure != nil)
-        // Saved again, the name is still the person's.
-        await Self.save(browser, library)
-        #expect(library.views.first { $0.id == Self.id }?.title == "Mine")
+        browser.viewPanel?.name = "Renamed"
+        var release: CheckedContinuation<Void, Never>?
+        var held = false
+        library.inViewChange = {
+            guard !held else { return }
+            held = true
+            await withCheckedContinuation { release = $0 }
+        }
+        let rename = Task { await browser.commitViewName(in: library) }
+        #expect(await eventually(within: .seconds(20)) { release != nil })
+        browser.setFilter(Self.status, values: ["todo"])
+        browser.choicesChanged()
+        release?.resume()
+        await rename.value
+        #expect(await eventually(within: .seconds(20)) { Self.held(library)?.query.filter?.contains("todo") == true })
+        #expect(Self.held(library)?.title == "Renamed")
     }
 
-    @Test func aViewChangedElsewhereShowsItsNameWhereTheNameWasNotTyped() async {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        browser.tableOptions[browser.item]?.grouping = .none
-        var renamed = Self.view(version: 2)
-        renamed.title = "Theirs"
-        library.views = [renamed, Self.other]
-        await Self.save(browser, library)
-        #expect(browser.viewPanel?.shownName == "Theirs")
+    @Test func aChangeTheViewCannotHoldIsToldEvenThoughThereIsNothingToWrite() async {
+        let ors = #"tags contains "a" OR tags contains "b""#
+        let (browser, library, _) = Self.opened(filter: ors)
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
+        #expect(Self.held(library)?.version == 1)
+        #expect(library.notices.waiting.contains { $0.title == "View Not Fully Saved" })
     }
 
-    @Test func aViewTheServerSaysIsGoneHandsOverTheNameTypedAndClosesThePanel() async {
-        let (browser, library) = Self.opened()
-        ViewLayouts.update(in: browser.defaults) { $0.set(ViewMacSettings(layout: .gallery), for: Self.id) }
+    @Test func aRenameStillBeingWrittenIsNotGivenToTheClipboardWhenThePanelCloses() async {
+        let (browser, library, undo) = Self.opened()
+        undo.beginUndoGrouping()
         browser.openViewPanel(in: library)
-        browser.viewPanel?.shownName = "Mine"
-        library.viewFailure = ViewWriteFailure(kind: .gone, message: "Gone")
-        await Self.save(browser, library)
-        #expect(browser.viewPanel == nil)
-        #expect(Self.texts(library) == ["Mine"])
-        #expect(Self.store(browser)?.layout == .gallery)
-    }
-
-    @Test func aViewGoneWithNoNameTypedIsToldAndClosesThePanel() async {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        browser.tableOptions[browser.item]?.grouping = .none
-        library.viewFailure = ViewWriteFailure(kind: .gone, message: "Gone")
-        await Self.save(browser, library)
-        #expect(browser.viewPanel == nil)
-        // The panel's own notice comes with the library's about the refused write; neither is a name given back.
-        #expect(library.notices.waiting.map(\.title).contains("View Deleted"))
+        browser.viewPanel?.name = "Renamed"
+        var release: CheckedContinuation<Void, Never>?
+        library.inViewChange = { await withCheckedContinuation { release = $0 } }
+        let rename = Task { await browser.commitViewName(in: library) }
+        #expect(await eventually(within: .seconds(20)) { release != nil })
+        browser.closeViewPanel(in: library)
+        release?.resume()
+        await rename.value
+        #expect(Self.held(library)?.title == "Renamed")
         #expect(!library.notices.waiting.contains { $0.isNotKept })
     }
 
-    @Test func aViewMissingWhenSaveIsPressedHandsOverTheNameTyped() async {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        browser.viewPanel?.shownName = "Mine"
-        library.views = []
-        await Self.save(browser, library)
-        #expect(browser.viewPanel == nil)
-        #expect(Self.texts(library) == ["Mine"])
+    @Test func escapeOnANewViewLeavesNoUndoStepsBehind() {
+        let (browser, library, undo) = Self.opened()
+        browser.openNewViewPanel(in: library)
+        undo.beginUndoGrouping()
+        browser.setFilter(Self.status, values: ["todo"])
+        browser.choicesChanged()
+        Self.close(undo)
+        browser.escapeViewPanel(in: library)
+        #expect(!undo.canUndo)
     }
 
-    @Test func aChangeOfPlaceHandsOverANewViewsTitle() {
-        let (browser, library) = Self.opened()
-        browser.sidebarItem = .allNotes
+    @Test func aSecondDoneOnANewViewIsSilent() async {
+        let (browser, library, _) = Self.opened()
         browser.openNewViewPanel(in: library)
-        browser.viewPanel?.shownName = "Everything"
+        var release: CheckedContinuation<Void, Never>?
+        library.inViewWrite = { await withCheckedContinuation { release = $0 } }
+        let first = Task { await browser.finishViewPanel(in: library, order: Self.order) }
+        #expect(await eventually(within: .seconds(20)) { release != nil })
+        let before = library.notices.told
+        await browser.finishViewPanel(in: library, order: Self.order)
+        #expect(library.notices.told == before)
+        release?.resume()
+        await first.value
+        #expect(library.views.count == 2)
+    }
+
+    @Test func aChangeMadeJustBeforeLeavingTheViewIsWrittenWhenItIsShownAgain() async {
+        let (browser, library, undo) = Self.opened()
+        undo.beginUndoGrouping()
+        browser.setFilter(Self.status, values: ["todo"])
+        let task = browser.choicesChanged()
+        browser.sidebarItem = .allNotes
+        await task?.value
+        #expect(Self.held(library)?.version == 1)
         browser.sidebarItem = .view(Self.id)
-        #expect(browser.viewPanel == nil)
-        #expect(Self.texts(library) == ["Everything"])
-    }
-
-    @Test func closingTheSidebarHandsOverANewViewsTitle() {
-        let (browser, library) = Self.opened()
-        browser.sidebarItem = .allNotes
-        browser.openNewViewPanel(in: library)
-        browser.viewPanel?.shownName = "Everything"
-        browser.closeViewPanel(in: library)
-        #expect(browser.viewPanel == nil)
-        #expect(Self.texts(library) == ["Everything"])
-    }
-
-    @Test func cancellingANewViewDropsItsTitleBecauseThePersonAskedTo() {
-        let (browser, library) = Self.opened()
-        browser.sidebarItem = .allNotes
-        browser.openNewViewPanel(in: library)
-        browser.viewPanel?.shownName = "Everything"
-        browser.cancelViewPanel(in: library)
-        #expect(library.notices.waiting.isEmpty)
-    }
-
-    @Test func aChangeOfPlaceHandsOverARenameTyped() {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        browser.viewPanel?.shownName = "Mine"
-        browser.sidebarItem = .allNotes
-        #expect(Self.texts(library) == ["Mine"])
-    }
-
-    @Test func closingTheSidebarHandsOverARenameTyped() {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        browser.viewPanel?.shownName = "Mine"
-        browser.closeViewPanel(in: library)
-        #expect(Self.texts(library) == ["Mine"])
-    }
-
-    @Test func openingNewViewHandsOverARenameTyped() {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        browser.viewPanel?.shownName = "Mine"
-        browser.openNewViewPanel(in: library)
-        #expect(browser.viewPanel?.isNew == true)
-        #expect(Self.texts(library) == ["Mine"])
-    }
-
-    @Test func aNameLeftAsItWasHandsOverNothing() {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        browser.closeViewPanel(in: library)
-        browser.openViewPanel(in: library)
-        browser.sidebarItem = .allNotes
-        #expect(library.notices.waiting.isEmpty)
-    }
-
-    @Test func quittingHandsOverARenameTyped() {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        browser.viewPanel?.shownName = "Mine"
-        ViewPanel.handOffAll()
-        #expect(Self.texts(library) == ["Mine"])
-        ViewPanel.handOffAll()
-        #expect(Self.texts(library) == ["Mine"])
-    }
-
-    // MARK: A view that is not in the list
-
-    @Test func aViewAbsentFromAListThatWasReadClosesThePanelAndKeepsWhatTheMacHeld() {
-        let (browser, library) = Self.opened()
-        ViewLayouts.update(in: browser.defaults) { $0.set(ViewMacSettings(layout: .gallery), for: Self.id) }
-        browser.openViewPanel(in: library)
-        library.views = [Self.other]
-        browser.reconcileViewPanel(in: library)
-        #expect(browser.viewPanel == nil)
-        #expect(library.notices.waiting.count == 1)
-        #expect(Self.store(browser)?.layout == .gallery)
-    }
-
-    @Test func anEmptyListProvesNothingAboutAView() {
-        let (browser, library) = Self.opened()
-        ViewLayouts.update(in: browser.defaults) { $0.set(ViewMacSettings(layout: .gallery), for: Self.id) }
-        browser.openViewPanel(in: library)
-        library.views = []
-        browser.reconcileViewPanel(in: library)
-        #expect(browser.viewPanel != nil)
-        #expect(library.notices.waiting.isEmpty)
-        #expect(Self.store(browser)?.layout == .gallery)
-    }
-
-    @Test func aViewDeletedHereWithItsPanelOpenIsNotDeletedElsewhere() async {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        browser.viewPanel?.shownName = "Mine"
-        library.inViewWrite = { browser.reconcileViewPanel(in: library) }
-        await browser.deleteView(Self.id, in: library)
-        #expect(browser.viewPanel == nil)
-        #expect(library.notices.waiting.isEmpty)
-        #expect(Self.store(browser) == nil)
-    }
-
-    // MARK: Saving a new view
-
-    @Test func aNewViewMadeAsThePlaceChangedStillKeepsItsMacSettings() async {
-        let (browser, library) = Self.opened()
-        browser.sidebarItem = .allNotes
-        browser.viewMode = .table
-        browser.openNewViewPanel(in: library)
-        browser.viewPanel?.shownName = "Everything"
-        browser.viewMode = .gallery
-        library.inViewWrite = { browser.sidebarItem = .favorites }
-        await browser.saveViewPanel(
-            window: SavedViews.window(browser, in: library, order: Self.order), newView: SavedViews.newViewSettings(browser, in: library),
-            confirmed: true, in: library, order: Self.order)
-        let made = library.views.first { $0.title == "Everything" }
-        #expect(made != nil)
-        #expect(made.flatMap { ViewLayouts.stored(in: browser.defaults).settings(for: $0.id) }?.layout == .gallery)
-        // The title the server took is nobody's to be given back.
-        #expect(library.notices.waiting.isEmpty)
-    }
-
-    @Test func cancelWaitsForASaveUnderWay() async {
-        let (browser, library) = Self.opened()
-        browser.sidebarItem = .allNotes
-        browser.viewMode = .table
-        browser.openNewViewPanel(in: library)
-        browser.viewPanel?.shownName = "Everything"
-        browser.viewMode = .gallery
-        library.inViewWrite = { browser.cancelViewPanel(in: library) }
-        await browser.saveViewPanel(
-            window: SavedViews.window(browser, in: library, order: Self.order), newView: SavedViews.newViewSettings(browser, in: library),
-            confirmed: true, in: library, order: Self.order)
-        let made = library.views.first { $0.title == "Everything" }
-        #expect(browser.item == made.map { SidebarItem.view($0.id) })
-        #expect(made.flatMap { ViewLayouts.stored(in: browser.defaults).settings(for: $0.id) }?.layout == .gallery)
-        #expect(browser.viewPanel == nil)
-    }
-
-    // MARK: Offline
-
-    @Test func saveAndRevertStayInThePaletteWithNoServer() {
-        let (browser, library) = Self.opened(reachesServer: false)
-        browser.viewMode = .gallery
-        let titles = SavedViewCommand.commands(for: browser, in: library, order: Self.order).map(\.title)
-        #expect(titles.contains(String(localized: "Edit View")))
-        #expect(titles.contains(String(localized: "Save View")))
-        #expect(titles.contains(String(localized: "Revert View")))
-        #expect(!titles.contains(String(localized: "New View")))
-        #expect(!titles.contains(String(localized: "Duplicate View")))
-        #expect(!titles.contains(String(localized: "Delete View…")))
-    }
-
-    @Test func everySavedViewCommandIsOfferedWithAServer() {
-        let (browser, library) = Self.opened()
-        browser.viewMode = .gallery
-        let titles = SavedViewCommand.commands(for: browser, in: library, order: Self.order).map(\.title)
-        for title in ["Edit View", "New View", "Save View", "Revert View", "Duplicate View", "Delete View…"] {
-            #expect(titles.contains(String(localized: String.LocalizationValue(title))))
-        }
-    }
-
-    // MARK: Save
-
-    @Test func nothingChangedIsOneDone() {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        #expect(browser.viewPanelState(window: Self.window(browser, library), in: library) == .unchanged)
-    }
-
-    @Test func aMacOnlyChangeNeedsNoServer() async {
-        let (browser, library) = Self.opened(reachesServer: false)
-        browser.openViewPanel(in: library)
-        browser.viewMode = .gallery
-        browser.changeViewSettings(Self.id) { $0.hidesEmptyGroups = true }
-        #expect(browser.viewPanelState(window: Self.window(browser, library), in: library) == .ready)
-        await Self.save(browser, library)
-        #expect(Self.store(browser)?.layout == .gallery)
-        #expect(Self.store(browser)?.hidesEmptyGroups == true)
-        #expect(library.views.first?.version == 1)
-        #expect(browser.viewPanel == nil)
-        #expect(!browser.hasViewChanges)
-    }
-
-    @Test func aMarfaOnlyChangeIsSentAndTheMacKeepsNothing() async {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        browser.tableOptions[browser.item]?.grouping = .none
-        await Self.save(browser, library)
-        #expect(Self.held(library)?.group == nil)
-        #expect(Self.held(library)?.version == 2)
-        #expect(Self.store(browser) == nil)
-        #expect(browser.viewPanel == nil)
-        #expect(!browser.hasViewChanges)
-    }
-
-    @Test func aNameAndAMacChangeAreKeptTogether() async {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        browser.viewPanel?.name = "  Tasks Still Open  "
-        browser.viewMode = .gallery
-        await Self.save(browser, library)
-        #expect(Self.held(library)?.title == "Tasks Still Open")
-        #expect(Self.store(browser)?.layout == .gallery)
-    }
-
-    @Test func anEmptyNameDimsSave() {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        browser.viewPanel?.name = "   "
-        #expect(browser.viewPanelState(window: Self.window(browser, library), in: library) == .blocked(nil))
-    }
-
-    @Test func offlineMarfaChangesDimSaveWithAReasonAndWriteNothing() async {
-        let (browser, library) = Self.opened(reachesServer: false)
-        browser.openViewPanel(in: library)
-        browser.tableOptions[browser.item]?.grouping = .none
-        browser.viewMode = .gallery
-        guard case .blocked(let reason?) = browser.viewPanelState(window: Self.window(browser, library), in: library) else {
-            Issue.record("Save was not dimmed with a reason")
-            return
-        }
-        #expect(!reason.isEmpty)
-        await Self.save(browser, library)
-        #expect(Self.store(browser) == nil)
-        #expect(library.views.first?.version == 1)
-        #expect(browser.viewPanel?.failure != nil)
-    }
-
-    @Test func aRefusedSaveKeepsThePanelAndTheMacUntouched() async {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        browser.tableOptions[browser.item]?.grouping = .none
-        browser.viewMode = .gallery
-        library.viewFailure = ViewWriteFailure(kind: .refused, message: "Marfa refused it")
-        await Self.save(browser, library)
-        #expect(browser.viewPanel?.failure == "Marfa refused it")
-        #expect(Self.store(browser) == nil)
-        #expect(browser.hasViewChanges)
-        #expect(library.views.first?.version == 1)
-    }
-
-    @Test func aViewChangedElsewhereGoesBackToTheViewAsItIs() async {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        browser.tableOptions[browser.item]?.grouping = .none
-        browser.viewMode = .gallery
-        // Another app saves first.
-        library.views = [Self.view(version: 2)]
-        await Self.save(browser, library)
-        #expect(browser.viewPanel?.failure != nil)
-        #expect(Self.store(browser) == nil)
-        #expect(!browser.hasViewChanges)
-        #expect(browser.viewMode == .table)
-    }
-
-    @Test func aViewDeletedWhileSavingClosesThePanel() async {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        browser.tableOptions[browser.item]?.grouping = .none
-        library.views = []
-        await Self.save(browser, library)
-        #expect(browser.viewPanel == nil)
-    }
-
-    @Test func aSaveThatLeavesSomethingOutAsksFirst() async {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        browser.tableOptions[browser.item]?.grouping = .none
-        browser.searchText = "plans"
-        await Self.save(browser, library, confirmed: false)
-        #expect(browser.viewPanel?.confirmation?.unkept.isEmpty == false)
-        #expect(library.views.first?.version == 1)
-    }
-
-    // MARK: Cancel and the place
-
-    @Test func cancelPutsTheViewBackAsSaved() {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        browser.tableOptions[browser.item]?.grouping = .none
-        browser.viewMode = .gallery
-        browser.changeViewSettings(Self.id) { $0.columns.setShown(.created, true) }
-        browser.cancelViewPanel(in: library)
-        #expect(browser.viewPanel == nil)
-        #expect(!browser.hasViewChanges)
-        #expect(browser.viewMode == .table)
-        #expect(browser.tableOptions[browser.item]?.grouping != ItemTableOptions.Grouping.none)
-    }
-
-    @Test func aChangeOfPlaceClosesThePanelAndLeavesTheChangesHeld() {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        browser.changeViewSettings(Self.id) { $0.hidesEmptyGroups = true }
-        browser.sidebarItem = .allNotes
-        #expect(browser.viewPanel == nil)
-        browser.sidebarItem = .view(Self.id)
-        #expect(browser.macSettings(for: Self.id).hidesEmptyGroups)
         browser.followView(in: library)
-        #expect(browser.hasViewChanges)
-        browser.revertView(in: library)
-        #expect(!browser.hasViewChanges)
+        #expect(await eventually(within: .seconds(20)) { Self.held(library)?.query.filter?.contains("todo") == true })
     }
 
-    @Test func aViewDeletedElsewhereClosesThePanelAndSaysSo() {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        library.views = [Self.other]
-        browser.reconcileViewPanel(in: library)
-        #expect(browser.viewPanel == nil)
-        #expect(library.notices.waiting.isEmpty == false)
-    }
-
-    @Test func aViewRenamedElsewhereShowsItsNewNameUnlessTheNameIsBeingTyped() {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        var renamed = Self.view(version: 2)
-        renamed.title = "Open"
-        library.views = [renamed]
-        browser.reconcileViewPanel(in: library)
-        #expect(browser.viewPanel?.name == "Open")
-
-        browser.viewPanel?.name = "Mine"
-        renamed.title = "Other"
-        library.views = [renamed]
-        browser.reconcileViewPanel(in: library)
-        #expect(browser.viewPanel?.name == "Mine")
-    }
-
-    // MARK: New View
-
-    @Test func newViewStartsEmptyAndCancelGoesBackToThePlace() {
-        let (browser, library) = Self.opened()
-        browser.sidebarItem = .allNotes
-        browser.tableOptions[.allNotes, default: .init()].filters = ["type": ["core.task"]]
-        browser.viewMode = .table
-        browser.openNewViewPanel(in: library)
-        #expect(browser.viewPanel?.isNew == true)
-        #expect(browser.viewPanel?.shownName == "")
-        browser.tableOptions[.allNotes, default: .init()].filters = [:]
-        browser.viewMode = .gallery
-        browser.cancelViewPanel(in: library)
-        #expect(browser.viewPanel == nil)
-        #expect(browser.tableOptions[.allNotes]?.filters == ["type": ["core.task"]])
-        #expect(browser.viewMode == .table)
-        #expect(library.views.count == 2)
-    }
-
-    @Test func savingANewViewMakesAndShowsIt() async {
-        let (browser, library) = Self.opened()
-        browser.sidebarItem = .allNotes
-        browser.viewMode = .table
-        browser.openNewViewPanel(in: library)
-        browser.viewPanel?.shownName = "Everything"
-        browser.viewMode = .gallery
-        await browser.saveViewPanel(
-            window: SavedViews.window(browser, in: library, order: Self.order), newView: SavedViews.newViewSettings(browser, in: library),
-            confirmed: true, in: library, order: Self.order)
-        let made = library.views.first { $0.title == "Everything" }
-        #expect(made != nil)
-        #expect(browser.viewPanel == nil)
-        #expect(browser.item == made.map { SidebarItem.view($0.id) })
-        #expect(made.flatMap { ViewLayouts.stored(in: browser.defaults).settings(for: $0.id) }?.layout == .gallery)
-        #expect(browser.viewMode == .gallery)
-    }
-
-    @Test func aNewViewTheServerRefusesKeepsItsNameAndThePanel() async {
-        let (browser, library) = Self.opened()
-        browser.sidebarItem = .allNotes
-        browser.openNewViewPanel(in: library)
-        browser.viewPanel?.shownName = "Everything"
-        library.viewFailure = ViewWriteFailure(kind: .offline, message: "Offline")
-        await browser.saveViewPanel(
-            window: SavedViews.window(browser, in: library, order: Self.order), newView: SavedViews.newViewSettings(browser, in: library),
-            confirmed: true, in: library, order: Self.order)
-        #expect(browser.viewPanel?.shownName == "Everything")
-        #expect(library.views.count == 2)
-    }
-
-    @Test func newViewAndEditViewShareOnePanelAtATime() {
-        let (browser, library) = Self.opened()
-        browser.openViewPanel(in: library)
-        browser.openNewViewPanel(in: library)
-        #expect(browser.viewPanel?.isNew == true)
-    }
-
-    // MARK: Duplicate
-
-    @Test func duplicateMakesACopyWithTheSameSettingsAndShowsIt() async {
-        let (browser, library) = Self.opened()
-        ViewLayouts.update(in: browser.defaults) { $0.set(ViewMacSettings(layout: .gallery, hidesEmptyGroups: true), for: Self.id) }
-        let copy = await browser.duplicateView(Self.id, in: library, order: Self.order)
-        #expect(copy?.title == "Open Tasks Copy")
-        #expect(copy?.query == Self.view().query)
-        #expect(copy?.sort == Self.view().sort)
-        #expect(copy?.group == Self.view().group)
-        #expect(browser.item == copy.map { SidebarItem.view($0.id) })
-        let kept = copy.flatMap { ViewLayouts.stored(in: browser.defaults).settings(for: $0.id) }
-        #expect(kept?.layout == .gallery)
-        #expect(kept?.hidesEmptyGroups == true)
-    }
-
-    @Test func duplicateNeedsTheServer() async {
-        let (browser, library) = Self.opened(reachesServer: false)
-        #expect(await browser.duplicateView(Self.id, in: library, order: Self.order) == nil)
-        #expect(library.views.count == 2)
-    }
-
-    // MARK: Deleting
-
-    @Test func deletingAViewForgetsWhatTheMacKept() async {
-        let (browser, library) = Self.opened()
-        ViewLayouts.update(in: browser.defaults) { $0.set(ViewMacSettings(layout: .gallery), for: Self.id) }
-        await browser.deleteView(Self.id, in: library)
-        #expect(Self.store(browser) == nil)
-        #expect(browser.viewSeeds[Self.id] == nil)
-    }
-
-    @Test func aFailedDeleteKeepsWhatTheMacKept() async {
-        let (browser, library) = Self.opened()
-        ViewLayouts.update(in: browser.defaults) { $0.set(ViewMacSettings(layout: .gallery), for: Self.id) }
-        library.viewFailure = ViewWriteFailure(kind: .offline, message: "Offline")
-        await browser.deleteView(Self.id, in: library)
-        #expect(Self.store(browser)?.layout == .gallery)
-    }
-
-    // MARK: What the Mac stored
-
-    @Test func storedSettingsThatCannotBeReadOpenTheViewAsItIs() {
-        let defaults = Self.defaults()
-        defaults.set("not json", forKey: ViewLayouts.key)
+    @Test func undoOfALayoutOnATypesListPutsTheLayoutBack() {
         let library = FakeItemLibrary()
-        library.views = [Self.view()]
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        undo.beginUndoGrouping()
         let browser = Browser()
-        browser.defaults = defaults
-        browser.adopt(library)
-        browser.sidebarItem = .view(Self.id)
-        browser.followView(in: library)
-        #expect(!browser.hasViewChanges)
-        #expect(browser.macSettings(for: Self.id).columns == ViewColumns())
+        browser.defaults = Self.defaults()
+        browser.adopt(library, undoManager: undo)
+        browser.sidebarItem = .itemType("core.task")
+        browser.viewMode = .list
+        undo.removeAllActions()
+        undo.beginUndoGrouping()
+        browser.viewMode = .table
+        Self.close(undo)
+        undo.undo()
+        #expect(browser.viewMode == .list)
     }
 
-    @Test func aSavedColumnThatNoLongerExistsIsLeftOut() {
-        let (browser, _) = Self.opened()
-        let columns: [ItemTableColumn] = [.title, .type, .edited]
-        browser.changeViewSettings(Self.id) {
-            $0.columns.setShown(.created, true)
-            $0.columns.move("created", before: nil, in: [.title, .type, .edited, .created])
-        }
-        #expect(browser.macSettings(for: Self.id).columns.shownColumns(columns).map(\.id) == ["title", "type", "edited"])
-    }
+    // MARK: Done and Escape
 
-    @Test func widthsAreKeptAtOnceAndSurviveASave() async {
-        let (browser, library) = Self.opened()
+    @Test func doneOnAViewOnlyClosesThePanelAndWritesNothingMore() async {
+        let (browser, library, _) = Self.opened()
         browser.openViewPanel(in: library)
-        browser.keepWidths(Data([9]), of: Self.id)
-        #expect(!browser.hasViewChanges)
-        browser.viewMode = .gallery
-        await Self.save(browser, library)
-        #expect(Self.store(browser)?.widths == Data([9]))
-        #expect(Self.store(browser)?.layout == .gallery)
+        await browser.finishViewPanel(in: library, order: Self.order)
+        #expect(browser.viewPanel == nil)
+        #expect(Self.held(library)?.version == 1)
     }
 
-    // MARK: Cards
-
-    @Test func aViewWithNoCardChoicesDrawsTheCardsAsTheyWere() {
-        let (browser, _) = Self.opened()
-        #expect(browser.cards == ViewCards())
-        browser.changeCards { $0.size = .medium }
-        #expect(!browser.hasViewChanges, "a choice that is the default is no change")
-    }
-
-    @Test func aViewsCardsAreHeldCountedAndNotStoredUntilSave() {
-        let (browser, _) = Self.opened()
-        browser.changeCards { $0.preview = .none; $0.setShown("tags", true) }
-        #expect(browser.hasViewChanges)
-        #expect(browser.cards.preview == .none)
-        #expect(browser.cards.properties == ["tags"])
-        #expect(Self.store(browser) == nil)
-    }
-
-    @Test func revertAndCancelPutACardsChoicesBack() {
-        let (browser, library) = Self.opened()
-        browser.changeCards { $0.size = .large }
-        browser.revertView(in: library)
-        #expect(!browser.hasViewChanges)
-        #expect(browser.cards == ViewCards())
-
+    @Test func aTypedNameIsWrittenOnDoneAndUndoWritesTheOldNameBack() async {
+        let (browser, library, undo) = Self.opened()
         browser.openViewPanel(in: library)
-        browser.changeCards { $0.subtext = .none }
-        browser.cancelViewPanel(in: library)
-        #expect(!browser.hasViewChanges)
-        #expect(browser.cards == ViewCards())
+        browser.viewPanel?.name = "Renamed"
+        undo.beginUndoGrouping()
+        await browser.finishViewPanel(in: library, order: Self.order)
+        Self.close(undo)
+        #expect(Self.held(library)?.title == "Renamed")
+        await Self.undo(undo, library) { $0?.title == "Open Tasks" }
+        #expect(Self.held(library)?.title == "Open Tasks")
     }
 
-    @Test func saveWritesTheCardsToThisMac() async {
-        let (browser, library) = Self.opened(reachesServer: false)
-        browser.openViewPanel(in: library)
-        browser.changeCards { $0.fitsPicture = true; $0.size = .small; $0.setShown("field.status", true) }
-        await Self.save(browser, library)
-        let stored = Self.store(browser)?.cards
-        #expect(stored?.fitsPicture == true)
-        #expect(stored?.size == .small)
-        #expect(stored?.properties == ["field.status"])
-        #expect(!browser.hasViewChanges)
-    }
-
-    @Test func aPlacesCardsLastAsLongAsTheWindowAndAreNoChangeToAView() {
-        let (browser, library) = Self.opened()
-        browser.sidebarItem = .allNotes
-        #expect(browser.cards == ViewCards())
-        browser.changeCards { $0.preview = .text }
-        #expect(browser.cards.preview == .text)
-        #expect(!browser.hasViewChanges)
-        browser.sidebarItem = .view(Self.id)
-        #expect(browser.cards == ViewCards(), "the view has its own")
-        browser.sidebarItem = .allNotes
-        #expect(browser.cards.preview == .text)
-        browser.changeCards { $0.preview = .pictureOrText }
-        #expect(browser.placeCards[.allNotes] == nil, "the default is kept as none")
-        browser.changeCards { $0.preview = .picture }
-        browser.adopt(FakeItemLibrary())
-        #expect(browser.cards == ViewCards(), "another library starts again")
-    }
-
-    @Test func cancellingANewViewPutsThePlacesCardsBack() {
-        let (browser, library) = Self.opened()
-        browser.sidebarItem = .allNotes
-        browser.changeCards { $0.size = .large }
+    @Test func doneOnANewViewMakesItWithTheDefaultNameAndEscapeMakesNothing() async {
+        let (browser, library, _) = Self.opened()
         browser.openNewViewPanel(in: library)
-        browser.changeCards { $0.size = .small }
-        browser.cancelViewPanel(in: library)
-        #expect(browser.cards.size == .large)
+        browser.escapeViewPanel(in: library)
+        #expect(browser.viewPanel == nil)
+        #expect(library.views.count == 1)
+        browser.openNewViewPanel(in: library)
+        await browser.finishViewPanel(in: library, order: Self.order)
+        #expect(library.views.count == 2)
+        #expect(library.views.contains { $0.title == "New View" })
     }
 
-    @Test func aNewViewStartsWithTheCardsOfThePlaceItIsMadeFrom() {
-        let (browser, library) = Self.opened()
-        browser.sidebarItem = .allNotes
-        browser.changeCards { $0.size = .large; $0.setShown("created", true) }
-        let settings = SavedViews.newViewSettings(browser, in: library)
-        #expect(settings.cards.size == .large)
-        #expect(settings.cards.properties == ["created"])
-    }
-
-    // MARK: Reordering
-
-    @Test func reorderingPutsAnEntryBeforeAnotherOrLast() {
-        #expect(Reordering.moving("c", before: "a", in: ["a", "b", "c"]) == ["c", "a", "b"])
-        #expect(Reordering.moving("a", before: nil, in: ["a", "b", "c"]) == ["b", "c", "a"])
-        #expect(Reordering.moving("a", before: "a", in: ["a", "b"]) == ["a", "b"])
-        #expect(Reordering.moving("z", before: "a", in: ["a", "b"]) == ["a", "b"])
-        #expect(Reordering.moving("b", by: -1, in: ["a", "b", "c"]) == ["b", "a", "c"])
-        #expect(Reordering.moving("a", by: -1, in: ["a", "b"]) == ["a", "b"])
+    @Test func aTypesListOffersToSaveWhatItShowsAsAView() async {
+        let library = FakeItemLibrary()
+        let browser = Browser()
+        browser.defaults = Self.defaults()
+        browser.adopt(library, undoManager: UndoManager())
+        browser.sidebarItem = .itemType("core.task")
+        browser.viewMode = .table
+        browser.openViewPanel(in: library)
+        #expect(browser.viewPanel?.purpose == .place)
+        #expect(library.views.isEmpty)
     }
 }

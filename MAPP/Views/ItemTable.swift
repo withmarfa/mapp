@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// A place's items as a table, in the manner of a database view: a row for each item, a column for each field its
-/// type has, and the place's own grouping, sort and filters from its toolbar (`ItemTableFilterMenu`, `ItemTableViewOptions`). Selecting a row shows it in Details, and
+/// type has, and the place's own grouping, sort and filters from its toolbar (`ItemTableViewOptions`). Selecting a row shows it in Details, and
 /// opening one shows its page in the table's place, as the gallery does.
 struct ItemTable: View {
     @CurrentLibrary private var library

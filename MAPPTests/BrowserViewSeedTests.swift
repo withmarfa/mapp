@@ -37,8 +37,7 @@ struct BrowserViewSeedTests {
         mac.layout = layout
         browser.viewSeeds[id] = Browser.ViewSeed(
             version: seed.version, options: seed.options, timelineDate: seed.timelineDate, types: seed.types,
-            preview: seed.preview, mac: mac, windowLayout: seed.windowLayout)
-        browser.viewWorking[id] = nil
+            preview: seed.preview, mac: mac)
     }
 
     @Test func aViewOpensWithItsOwnOrderAndGrouping() {
@@ -207,7 +206,7 @@ struct BrowserViewSeedTests {
         #expect(browser.viewSeeds.isEmpty)
         #expect(browser.deletingView == nil)
         #expect(browser.viewPanel == nil)
-        #expect(browser.viewWorking.isEmpty)
+        #expect(browser.writingViews.isEmpty)
     }
 
     @Test func aChangedOrderOrGroupingIsOfferedInEveryLayout() {

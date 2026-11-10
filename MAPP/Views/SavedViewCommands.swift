@@ -14,8 +14,8 @@ struct SavedViewCommand {
                 browser.openViewPanel(in: library)
             })
         }
-        // Making, copying and deleting a view need the server. Saving and reverting what the window holds do not,
-        // since a change of the layout or columns is the Mac's own.
+        // Making, copying and deleting a view need the server. Save View and Revert View are for a change the server did
+        // not take, which the window keeps.
         let reachesServer = library.reachesServer
         if reachesServer, SavedViews.canSave(browser, in: library) {
             commands.append(SavedViewCommand(title: String(localized: "New View"), systemImage: "plus.rectangle.on.rectangle") {
@@ -31,7 +31,7 @@ struct SavedViewCommand {
         if let view = shown {
             if browser.hasViewChanges {
                 commands.append(SavedViewCommand(title: String(localized: "Save View"), systemImage: "arrow.trianglehead.2.clockwise") {
-                    SavedViews.save(browser, in: library, order: order)
+                    browser.writeViewAgain()
                 })
                 commands.append(SavedViewCommand(title: String(localized: "Revert View"), systemImage: "arrow.uturn.backward") {
                     browser.revertView(in: library)
@@ -77,7 +77,7 @@ struct SavedViewMenu: View {
         }
         .disabled(!canEdit || shown == nil)
         Button("Save View", systemImage: "arrow.trianglehead.2.clockwise") {
-            if let browser, let library { SavedViews.save(browser, in: library, order: order) }
+            browser?.writeViewAgain()
         }
         .disabled(shown == nil || browser?.hasViewChanges != true)
         Button("Revert View", systemImage: "arrow.uturn.backward") {
@@ -153,7 +153,14 @@ private struct SavedViewDialogs: ViewModifier {
             } message: {
                 Text("The view is deleted for every app connected to your Marfa server. You can’t undo this action.")
             }
-            .onChange(of: browser.item, initial: true) { browser.followView(in: library) }
+            .onChange(of: browser.item, initial: true) {
+                browser.placeChanged()
+                browser.followView(in: library)
+                browser.choicesChanged()
+            }
+            // Each change of the place's order, grouping or filters is one step of Undo and, in a saved view, a write.
+            .onChange(of: browser.liveChoices, initial: true) { browser.choicesChanged() }
+            .onChange(of: library.reachesServer, initial: true) { browser.reachabilityChanged(in: library) }
             .onChange(of: library.views) {
                 browser.followView(in: library)
                 browser.reconcileViewPanel(in: library)

@@ -58,6 +58,8 @@ final class FakeItemLibrary: ItemLibrary {
     /// Awaited while a view is being made, before it exists, and while one is being deleted, once it is gone, so a
     /// test can act in the window a write leaves open.
     var inViewWrite: (() async -> Void)?
+    /// Awaited when a view's change arrives, before it is applied, so a test can act while a write is under way.
+    var inViewChange: (() async -> Void)?
 
     init(items: [Item] = [], bodies: [ItemID: String] = [:], now: Date = .now) {
         self.items = items
@@ -533,6 +535,7 @@ final class FakeItemLibrary: ItemLibrary {
     }
 
     func changeView(_ id: ItemID, _ change: LibraryViewChange, baseVersion: Int64) async -> Result<LibraryView, ViewWriteFailure> {
+        await inViewChange?()
         guard var view = views.first(where: { $0.id == id }) else { return .failure(ViewWriteFailure(kind: .gone, message: "Gone")) }
         let failure = viewFailure ?? (view.version == baseVersion ? nil : ViewWriteFailure(kind: .conflict, message: "Changed elsewhere"))
         if let failure {
