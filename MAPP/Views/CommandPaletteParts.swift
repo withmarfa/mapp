@@ -181,29 +181,191 @@ struct PaletteFilterButton: View {
         .buttonStyle(.glass)
         .buttonBorderShape(count > 0 ? .capsule : .circle)
         .controlSize(.large)
-        .tint(count > 0 || isOn ? .accentColor : nil)
+        // As the list's View Options button shows filters: the glass stays, and the symbol and count take the accent.
+        .foregroundStyle(count > 0 ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary))
         .help(isOn ? "Hide Filters" : "Show Filters")
         .accessibilityLabel(isOn ? "Hide Filters" : "Show Filters")
         .accessibilityIdentifier("CommandPaletteFilters")
     }
 }
 
-/// The row under the field that holds the filters' chips. It holds only the add button until the chips are built
-/// for it: they go inside this row, ahead of the button.
+/// What the palette's filters hold and the panel open for one of them. A class, so the panels, which open in windows of
+/// their own, read and change the same state the palette draws.
+@MainActor @Observable
+final class PaletteFilterState {
+    var filters = PaletteFilters()
+    /// The field whose panel is open, which keeps its chip in the row while it has no value yet.
+    var openField: PaletteFilters.Field?
+}
+
+/// The row under the field that holds the filters' chips and the +, which are a view's filter row (`FilterChipsBar`)
+/// with the palette's three fields.
 struct PaletteFilterRow: View {
+    @CurrentLibrary private var library
+    let state: PaletteFilterState
+    @State private var anchors = FilterChipAnchors()
+
     var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "plus")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.tertiary)
-                .frame(width: 22, height: 22)
-                .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(.separator))
-                .accessibilityHidden(true)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 12)
-        .padding(.bottom, 10)
+        FilterChipsBar(
+            chips: chips, anchors: anchors,
+            open: { id in PaletteFilters.Field(rawValue: id).map(openValues) },
+            remove: { id in if let field = PaletteFilters.Field(rawValue: id) { remove(field) } },
+            add: openFields
+        )
+        .onDisappear { FilterPanelPresenter.shared.dismiss(restoringFocus: false) }
         .accessibilityIdentifier("CommandPaletteFilterRow")
+    }
+
+    private var chips: [FilterChipItem] {
+        PaletteFilters.Field.allCases.compactMap { field in
+            guard state.filters.isSet(field) || state.openField == field else { return nil }
+            return FilterChipItem(
+                id: field.rawValue, field: field.title,
+                relation: state.filters.negated.contains(field) ? String(localized: "is not") : String(localized: "is"),
+                values: PaletteFilterOptions(library: library).chosen(in: state.filters, for: field).map(\.title).joined(separator: ", "))
+        }
+    }
+
+    private func remove(_ field: PaletteFilters.Field) {
+        if state.openField == field { FilterPanelPresenter.shared.dismiss(restoringFocus: false) }
+        state.filters.clear(field)
+    }
+
+    private func openValues(_ field: PaletteFilters.Field) {
+        state.openField = field
+        FilterPanelPresenter.shared.present(
+            key: field.rawValue, anchor: anchors.view(for: field.rawValue), width: 280, onClose: { state.openField = nil }
+        ) {
+            PaletteFilterValueHost(state: state, field: field).environment(\.library, library)
+        }
+        // The click that closed this panel asked to open it again: it stays closed.
+        if !FilterPanelPresenter.shared.isOpen(for: field.rawValue) { state.openField = nil }
+    }
+
+    /// Opens a field's panel once its chip has a view in the window to open under, which the row makes on a later turn of the run loop.
+    private func openValuesWhenShown(_ field: PaletteFilters.Field, attempts: Int = 20) {
+        if anchors.view(for: field.rawValue)?.window != nil || attempts == 0 {
+            openValues(field)
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(25)) { openValuesWhenShown(field, attempts: attempts - 1) }
+    }
+
+    private func openFields() {
+        let fields = PaletteFilters.Field.allCases.filter { !state.filters.isSet($0) && state.openField != $0 }.map {
+            FilterFieldOption(id: $0.rawValue, title: $0.title, symbol: $0.symbol)
+        }
+        FilterPanelPresenter.shared.present(key: FilterChipAnchors.addKey, anchor: anchors.view(for: FilterChipAnchors.addKey), width: 240, onClose: {}) {
+            FilterFieldPanel(fields: fields) { id in
+                FilterPanelPresenter.shared.dismiss(restoringFocus: false)
+                guard let field = PaletteFilters.Field(rawValue: id) else { return }
+                state.openField = field
+                openValuesWhenShown(field)
+            }
+        }
+    }
+}
+
+extension PaletteFilters.Field {
+    var title: String {
+        switch self {
+        case .type: String(localized: "Type")
+        case .collection: String(localized: "Collection")
+        case .updated: String(localized: "Updated")
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .type: "square.grid.2x2"
+        case .collection: "rectangle.stack"
+        case .updated: "calendar"
+        }
+    }
+}
+
+extension PaletteFilters.Period {
+    var title: String {
+        switch self {
+        case .today: String(localized: "Today")
+        case .thisWeek: String(localized: "This Week")
+        case .thisMonth: String(localized: "This Month")
+        case .thisYear: String(localized: "This Year")
+        }
+    }
+}
+
+/// The values each field offers in the library as it is now.
+private struct PaletteFilterOptions {
+    let library: any ItemLibrary
+
+    func all(for field: PaletteFilters.Field) -> [FilterValueOption] {
+        switch field {
+        case .type:
+            // The type's own name, as a table's Type column says it; the sidebar's longer label only where two types share one.
+            let counts = library.itemTypeCounts
+            let names = counts.map { library.catalogue.label(for: $0.id) }
+            return zip(counts, names).map { count, name in
+                FilterValueOption(id: count.id.rawValue, title: names.filter { $0 == name }.count > 1 ? count.label : name, mark: .type(icon: count.icon))
+            }
+        case .collection:
+            return library.collections.map {
+                FilterValueOption(id: $0.id.rawValue, title: $0.displayTitle, mark: .type(icon: library.catalogue.icon(for: $0.type)))
+            }
+        case .updated:
+            return PaletteFilters.Period.allCases.map { FilterValueOption(id: $0.rawValue, title: $0.title, mark: .symbol("calendar")) }
+        }
+    }
+
+    /// The values the filter holds that the library still has.
+    func chosen(in filters: PaletteFilters, for field: PaletteFilters.Field) -> [FilterValueOption] {
+        let held: Set<String> = switch field {
+        case .type: Set(filters.types.map(\.rawValue))
+        case .collection: Set(filters.collections.map(\.rawValue))
+        case .updated: filters.period.map { [$0.rawValue] } ?? []
+        }
+        return all(for: field).filter { held.contains($0.id) }
+    }
+}
+
+/// A field's value panel, read from the palette's filters as they are now, so a pick shows in it at once.
+private struct PaletteFilterValueHost: View {
+    @CurrentLibrary private var library
+    let state: PaletteFilterState
+    let field: PaletteFilters.Field
+
+    var body: some View {
+        let options = PaletteFilterOptions(library: library)
+        let chosen = options.chosen(in: state.filters, for: field)
+        let held = Set(chosen.map(\.id))
+        FilterValuePanel(
+            field: field.title,
+            isNegated: state.filters.negated.contains(field),
+            chosen: chosen.map { ValueChip(id: $0.id, title: $0.title, mark: $0.mark) },
+            options: options.all(for: field).filter { !held.contains($0.id) },
+            setNegated: { isNegated in
+                if isNegated { state.filters.negated.insert(field) } else { state.filters.negated.remove(field) }
+            },
+            add: add,
+            remove: remove
+        )
+    }
+
+    private func add(_ id: String) {
+        switch field {
+        case .type: state.filters.types.insert(TypeID(id))
+        case .collection: state.filters.collections.insert(ItemID(rawValue: id))
+        case .updated: state.filters.period = PaletteFilters.Period(rawValue: id)
+        }
+    }
+
+    private func remove(_ id: String) {
+        switch field {
+        case .type: state.filters.types.remove(TypeID(id))
+        case .collection: state.filters.collections.remove(ItemID(rawValue: id))
+        case .updated: state.filters.period = nil
+        }
+        if !state.filters.isSet(field) { state.filters.negated.remove(field) }
     }
 }
 

@@ -83,9 +83,10 @@ struct FilterRow: View {
         if !FilterPanelPresenter.shared.isOpen(for: id) { openColumn = nil }
     }
 
-    /// Opens a column's panel once its chip has a view to open under, which the row makes on a later turn of the run loop.
+    /// Opens a column's panel once its chip has a view in the window to open under, which the row makes on a later turn of
+    /// the run loop: the view exists before it has a window, and a panel asked for then does not open.
     private func openValuesWhenShown(_ id: String, attempts: Int = 20) {
-        if anchors.view(for: id) != nil || attempts == 0 {
+        if anchors.view(for: id)?.window != nil || attempts == 0 {
             openValues(of: id)
             return
         }

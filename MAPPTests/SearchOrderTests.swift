@@ -90,7 +90,7 @@ import Testing
         let weaker = (0..<60).map { FakeItemLibrary.note("Search \($0)", modified: start - Double($0)) }
         library.items.append(contentsOf: weaker)
         let results = library.search("search", in: .everywhere)
-        let listed = CommandPalette.listed(results)
+        let listed = CommandPalette.listed(results.items)
         #expect(listed.count == CommandPalette.searchLimit)
         #expect(listed.first?.id == strongOld.id)
         #expect(listed.map(\.id) == results.items.prefix(CommandPalette.searchLimit).map(\.id))
