@@ -117,19 +117,22 @@ struct ItemBoard: View {
         .background(Color.primary.opacity(0.04), in: .rect(cornerRadius: 12))
         .accessibilityElement(children: .contain)
         .accessibilityLabel(lane.title)
-        .dropDestination(for: ItemReference.self, isEnabled: isDestination(lane.id)) { references, _ in
+        .dropDestination(for: ItemReference.self, isEnabled: isDestination(lane)) { references, _ in
             move(references.map(\.id), to: lane.id, key: key)
         }
     }
 
     private func card(_ item: Item, lane: ItemBoardLane, lanes: [ItemBoardLane], key: String, ids: [ItemID]) -> some View {
-        Button {
+        // Where lanes are status groups, each card's own status field holds its value.
+        let grouped = lanes.contains { if case .group = $0.id { true } else { false } }
+        let valueKey = grouped ? ItemBoardLayout.statusField(of: item, catalogue: library.catalogue)?.key ?? key : key
+        return Button {
             let modifiers = NSApp.currentEvent?.modifierFlags ?? []
             select(item.id, ids: ids, extending: modifiers.contains(.shift), toggling: modifiers.contains(.command))
             pane.wrappedValue = .list
         } label: {
             BoardCard(item: item, catalogue: library.catalogue, selected: browser.selection.contains(item.id), compact: compact,
-                      invalidValue: lane.id == .invalid ? item.value(of: key).map(ItemValueText.string) : nil)
+                      invalidValue: lane.id == .invalid ? item.value(of: valueKey).map(ItemValueText.string) : nil)
         }
         .buttonStyle(.plain)
         .focusable(false)
@@ -142,7 +145,7 @@ struct ItemBoard: View {
             // A card inside the selection acts for all of it, as in the other layouts.
             let acting = browser.selection.contains(item.id) ? browser.selection : [item.id]
             Menu("Move To") {
-                ForEach(lanes.filter { isDestination($0.id) }) { target in
+                ForEach(lanes.filter(isDestination)) { target in
                     Button {
                         move(Array(acting), to: target.id, key: key)
                     } label: {
@@ -163,8 +166,9 @@ struct ItemBoard: View {
         .draggable(containerItemID: item.id)
     }
 
-    private func isDestination(_ id: ItemBoardLane.ID) -> Bool {
-        switch id { case .option, .missing: true; case .invalid, .notApplicable: false }
+    private func isDestination(_ lane: ItemBoardLane) -> Bool {
+        guard lane.takesItems else { return false }
+        return switch lane.id { case .option, .group, .missing: true; case .invalid, .notApplicable: false }
     }
 
     private func move(_ ids: [ItemID], to lane: ItemBoardLane.ID, key: String) {
@@ -178,7 +182,7 @@ struct ItemBoard: View {
         var moved = 0
         for change in plan.changes {
             let told = library.notices.told
-            if library.setItemProperty(change.id, key: key, value: change.value, undoManager: undoManager) {
+            if library.setItemProperty(change.id, key: change.key, value: change.value, undoManager: undoManager) {
                 moved += 1
             } else if library.notices.told == told {
                 skips.skip(.cantChange)

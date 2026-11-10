@@ -10,12 +10,15 @@ nonisolated struct ItemBoardField: Identifiable, Hashable, Sendable {
 
 nonisolated struct ItemBoardLane: Identifiable, Hashable, Sendable {
     enum ID: Hashable, Sendable {
-        case option(String), missing, invalid, notApplicable
+        case option(String), group(StatusGroup), missing, invalid, notApplicable
     }
 
     let id: ID
     let title: String
     var items: [Item]
+    /// Whether a card can be dropped here. A lane of a board that mixes status fields takes a card only where every
+    /// type has a word in the group, and never the lane of items with no status.
+    var takesItems = true
 }
 
 /// A board is a projection of the current library, never a second store of its items.
@@ -60,6 +63,29 @@ nonisolated enum ItemBoardLayout {
         eligibleFields(of: item.type, catalogue: catalogue).first { $0.key == key }
     }
 
+    /// The first status field of an item's type: the one a board of mixed status fields sorts the item by.
+    static func statusField(of item: Item, catalogue: Catalogue) -> ItemTypeInfo.Field? {
+        eligibleFields(of: item.type, catalogue: catalogue).first(where: \.isStatus)
+    }
+
+    /// Whether the board of `items` sorts by `key`'s status groups: the items' types have status fields of more than
+    /// one key, so no one field's words can be every card's lane. One shared field keeps its own words.
+    static func groupsByStatus(items: [Item], key: String, catalogue: Catalogue) -> Bool {
+        var keys: Set<String> = []
+        for type in Set(items.map(\.type)) {
+            if let field = eligibleFields(of: type, catalogue: catalogue).first(where: \.isStatus) { keys.insert(field.key) }
+        }
+        return keys.count > 1 && keys.contains(key)
+    }
+
+    private static func groupedLane(for item: Item, catalogue: Catalogue) -> ItemBoardLane.ID {
+        guard let field = statusField(of: item, catalogue: catalogue) else { return .notApplicable }
+        guard let value = item.value(of: field.key), value != .null else { return .missing }
+        guard case .string(let text) = value else { return .invalid }
+        guard !text.isEmpty else { return .missing }
+        return field.statusGroup(of: text).map(ItemBoardLane.ID.group) ?? .invalid
+    }
+
     static func lane(for item: Item, key: String, catalogue: Catalogue) -> ItemBoardLane.ID {
         guard let field = field(key, of: item, catalogue: catalogue) else { return .notApplicable }
         guard let value = item.value(of: key), value != .null else { return .missing }
@@ -73,6 +99,7 @@ nonisolated enum ItemBoardLayout {
     /// table lists them) and then in declared order, then No Value, and Invalid Value and Not Applicable where an
     /// item needs them. A board's fields are closed, so a word no type declares is an invalid value.
     static func lanes(items: [Item], key: String, catalogue: Catalogue) -> [ItemBoardLane] {
+        if groupsByStatus(items: items, key: key, catalogue: catalogue) { return groupLanes(items: items, catalogue: catalogue) }
         var values: [(word: String, bucket: StatusBucket)] = []
         var seen: Set<String> = []
         for type in Set(items.map(\.type)).sorted(by: { $0.rawValue < $1.rawValue }) {
@@ -97,11 +124,51 @@ nonisolated enum ItemBoardLayout {
         }
         return lanes.map { lane in
             var lane = lane
-            lane.items = (groups[lane.id] ?? []).sorted {
-                let order = $0.displayTitle.localizedStandardCompare($1.displayTitle)
-                return order == .orderedSame ? $0.id.rawValue < $1.id.rawValue : order == .orderedAscending
-            }
+            lane.items = sorted(groups[lane.id] ?? [])
             return lane
+        }
+    }
+
+    /// The lanes of a board whose types keep their status in different fields: Marfa's four status groups, which
+    /// every type shares, then No Status, and Invalid Value and Not Applicable where an item needs them.
+    private static func groupLanes(items: [Item], catalogue: Catalogue) -> [ItemBoardLane] {
+        let groups = Dictionary(grouping: items) { groupedLane(for: $0, catalogue: catalogue) }
+        let types = Set(items.map(\.type))
+        let fields = types.compactMap { type in eligibleFields(of: type, catalogue: catalogue).first(where: \.isStatus) }
+        var lanes = StatusGroup.allCases.map { group in
+            var lane = ItemBoardLane(id: .group(group), title: StatusBucket.group(group).title, items: [])
+            lane.takesItems = fields.allSatisfy { firstWord($0, in: group) != nil }
+            return lane
+        }
+        var missing = ItemBoardLane(id: .missing, title: String(localized: "No Status"), items: [])
+        missing.takesItems = false
+        lanes.append(missing)
+        if groups[.invalid] != nil {
+            var lane = ItemBoardLane(id: .invalid, title: String(localized: "Invalid Value"), items: [])
+            lane.takesItems = false
+            lanes.append(lane)
+        }
+        if groups[.notApplicable] != nil {
+            var lane = ItemBoardLane(id: .notApplicable, title: String(localized: "Not Applicable"), items: [])
+            lane.takesItems = false
+            lanes.append(lane)
+        }
+        return lanes.map { lane in
+            var lane = lane
+            lane.items = sorted(groups[lane.id] ?? [])
+            return lane
+        }
+    }
+
+    /// The word a card takes on moving into `group`: the first its type declares there.
+    private static func firstWord(_ field: ItemTypeInfo.Field, in group: StatusGroup) -> String? {
+        field.options.first { !$0.isEmpty && field.statusGroup(of: $0) == group }
+    }
+
+    private static func sorted(_ items: [Item]) -> [Item] {
+        items.sorted {
+            let order = $0.displayTitle.localizedStandardCompare($1.displayTitle)
+            return order == .orderedSame ? $0.id.rawValue < $1.id.rawValue : order == .orderedAscending
         }
     }
 
@@ -111,6 +178,7 @@ nonisolated enum ItemBoardLayout {
 
     /// The destination belongs to the board, but permission and allowed choices belong to this item's type.
     static func move(_ item: Item, key: String, to destination: ItemBoardLane.ID, catalogue: Catalogue) -> Move {
+        if case .group(let group) = destination { return move(item, toGroup: group, catalogue: catalogue).move }
         guard item.isEditable, let field = field(key, of: item, catalogue: catalogue) else { return .refused }
         let value: PropertyValue?
         switch destination {
@@ -121,17 +189,25 @@ nonisolated enum ItemBoardLayout {
         case .missing:
             guard !field.required else { return .refused }
             value = nil
-        case .invalid, .notApplicable: return .refused
+        case .group, .invalid, .notApplicable: return .refused
         }
         if item.value(of: key) == value { return .unchanged }
         return .set(value)
+    }
+
+    /// A move into a status group writes the item's own status field, the first word its type declares in the group.
+    static func move(_ item: Item, toGroup group: StatusGroup, catalogue: Catalogue) -> (key: String, move: Move) {
+        guard item.isEditable, let field = statusField(of: item, catalogue: catalogue) else { return ("", .refused) }
+        guard let word = firstWord(field, in: group) else { return (field.key, .refused) }
+        if case .string(let current)? = item.value(of: field.key), field.statusGroup(of: current) == group { return (field.key, .unchanged) }
+        return (field.key, .set(.string(word)))
     }
 
     /// What moving a selection to a lane changes, and why each item left out stays: gone from the library, not on
     /// the board now, in the bin or unable to be changed, a file, or a type that doesn't take the lane. An item
     /// already in the lane is no skip.
     struct MovePlan {
-        var changes: [(id: ItemID, value: PropertyValue?)] = []
+        var changes: [(id: ItemID, key: String, value: PropertyValue?)] = []
         var skips = BatchSkips()
     }
 
@@ -148,8 +224,17 @@ nonisolated enum ItemBoardLayout {
                 plan.skips.skip(.notShown)
                 continue
             }
-            switch move(item, key: key, to: lane, catalogue: library.catalogue) {
-            case .set(let value): plan.changes.append((id, value))
+            var writeKey = key
+            let outcome: Move
+            if case .group(let group) = lane {
+                let grouped = move(item, toGroup: group, catalogue: library.catalogue)
+                writeKey = grouped.key
+                outcome = grouped.move
+            } else {
+                outcome = move(item, key: key, to: lane, catalogue: library.catalogue)
+            }
+            switch outcome {
+            case .set(let value): plan.changes.append((id, writeKey, value))
             case .unchanged: break
             case .refused: plan.skips.skip(item.writeObstacle ?? (item.isFile ? .fileHasNoLane : .cantMoveToLane))
             }
