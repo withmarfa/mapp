@@ -49,7 +49,14 @@ struct ItemLayoutPanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            FullWidthSegments(titles: [String(localized: "Page"), String(localized: "Sidebar")], selection: sidebarSelected)
+            Picker("Arrange", selection: $arranging) {
+                Text("Page").tag(Arranging.page)
+                Text("Sidebar").tag(Arranging.sidebar)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .buttonSizing(.flexible)
+            .controlSize(.large)
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 16)
             .padding(.top, 12)
@@ -64,10 +71,6 @@ struct ItemLayoutPanel: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ItemLayoutPanel")
-    }
-
-    private var sidebarSelected: Binding<Int> {
-        Binding(get: { arranging == .sidebar ? 1 : 0 }, set: { arranging = $0 == 1 ? .sidebar : .page })
     }
 
     private var pageGroups: some View {
@@ -297,38 +300,5 @@ private struct LayoutRowView: View {
         } else {
             Button("Hide from Page") { if let moved = layout.moving(row.id, to: .hidden) { change(moved) } }
         }
-    }
-}
-
-/// The system's segmented control, as wide as the space it is given: SwiftUI's segmented picker keeps the width of its
-/// words on macOS, and this panel's control must match the boxes under it.
-private struct FullWidthSegments: NSViewRepresentable {
-    let titles: [String]
-    @Binding var selection: Int
-
-    func makeCoordinator() -> Coordinator { Coordinator(self) }
-
-    func makeNSView(context: Context) -> NSSegmentedControl {
-        let control = NSSegmentedControl(labels: titles, trackingMode: .selectOne, target: context.coordinator,
-                                         action: #selector(Coordinator.changed(_:)))
-        control.segmentDistribution = .fillEqually
-        control.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        control.setAccessibilityIdentifier("LayoutArranging")
-        return control
-    }
-
-    func updateNSView(_ control: NSSegmentedControl, context: Context) {
-        context.coordinator.parent = self
-        control.selectedSegment = selection
-    }
-
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView control: NSSegmentedControl, context: Context) -> CGSize? {
-        CGSize(width: proposal.width ?? control.intrinsicContentSize.width, height: control.intrinsicContentSize.height)
-    }
-
-    final class Coordinator: NSObject {
-        var parent: FullWidthSegments
-        init(_ parent: FullWidthSegments) { self.parent = parent }
-        @objc func changed(_ sender: NSSegmentedControl) { parent.selection = sender.selectedSegment }
     }
 }
