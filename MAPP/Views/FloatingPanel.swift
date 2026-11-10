@@ -14,6 +14,8 @@ struct FloatingPanel<Content: View>: View {
                 Color.clear
                     .contentShape(.rect)
                     .onTapGesture(perform: onDismiss)
+                    // Claims the pointer, so a view beneath the panel is told when it leaves it.
+                    .onContinuousHover { _ in }
                 content
                     .padding(.top, window.size.height * FloatingPanelMetrics.topFraction)
                     .padding(.horizontal, 16)

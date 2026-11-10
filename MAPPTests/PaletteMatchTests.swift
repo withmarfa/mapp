@@ -21,6 +21,14 @@ struct PaletteMatchTests {
         #expect(PaletteMatch.ranked(["New Note", "Nnn"], "nn") == [1, 0])
     }
 
+    @Test func theWordsTypedInOnePieceBeatTheSameLettersSpreadOut() {
+        let typed = "new item"
+        #expect(PaletteMatch.score("New Item", typed) == 0)
+        #expect(PaletteMatch.score("Test the new item flow", typed) == 1)
+        #expect(PaletteMatch.score("Nothing ever works in the team", typed) == 3)
+        #expect(PaletteMatch.score("Test the new item flow", typed)! < PaletteMatch.score("Nothing ever works in the team", typed)!)
+    }
+
     @Test func anEmptyQueryKeepsEveryTitleInOrder() {
         #expect(PaletteMatch.ranked(["b", "a"], "  ") == [0, 1])
     }
@@ -79,5 +87,14 @@ struct PalettePicksTests {
     @Test func aRankingIsAsWideAsTheLimit() {
         let picks = PaletteMatch.Titles().picks(fixed: [], items: ["a1", "a2", "a3"], "a", limit: 2)
         #expect(picks == [.item(0), .item(1)])
+    }
+
+    @Test func theMatchedRunIsFoundIgnoringCaseAndAccents() {
+        let title = "Café Kitchen quotes"
+        let range = PaletteMatch.matchRange(in: title, "kitch")
+        #expect(range.map { String(title[$0]) } == "Kitch")
+        #expect(PaletteMatch.matchRange(in: title, "cafe").map { String(title[$0]) } == "Café")
+        #expect(PaletteMatch.matchRange(in: title, "kq") == nil)
+        #expect(PaletteMatch.matchRange(in: title, "  ") == nil)
     }
 }

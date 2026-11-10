@@ -233,8 +233,9 @@ final class WindowTests: XCTestCase {
 
         app.typeKey("k", modifierFlags: .command)
         XCTAssertTrue(field.waitForExistence(timeout: 2))
-        // New Item leads what "new" finds.
-        app.typeText("new")
+        // The section holding the best match leads, so New Item, an exact title match, is the first row even though
+        // the sample library has an item whose title holds the same words.
+        app.typeText("new item")
         app.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(field.waitForNonExistence(timeout: 2))
         window.completeQuickAdd(type: "Note", title: "Palette note")

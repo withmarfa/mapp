@@ -70,7 +70,7 @@ struct AppCommands: Commands {
         CommandGroup(after: .textEditing) {
             palette("Search Notes…", systemImage: "magnifyingglass", .search)
                 .keyboardShortcut("p", modifiers: [.command, .shift])
-            palette("Command Palette", systemImage: "command", .commands)
+            palette("Command Palette", systemImage: "command", .commands, asksActionsWhenOut: true)
                 .keyboardShortcut("k")
         }
 
@@ -163,10 +163,16 @@ extension AppCommands {
         return library.map { browser.canGoForward(in: $0) } ?? false
     }
 
-    /// Opens a palette over the window in front, or puts it away if that palette is already out.
-    private func palette(_ title: LocalizedStringKey, systemImage: String, _ palette: Browser.Palette) -> some View {
+    /// Opens a palette over the window in front, or puts it away if that palette is already out. ⌘K, with either palette
+    /// out, opens Actions for the chosen row instead.
+    private func palette(_ title: LocalizedStringKey, systemImage: String, _ palette: Browser.Palette, asksActionsWhenOut: Bool = false) -> some View {
         Button(title, systemImage: systemImage) {
-            browser?.palette = browser?.palette == palette ? nil : palette
+            guard let browser else { return }
+            if asksActionsWhenOut, browser.palette != nil {
+                browser.paletteActionsRequests += 1
+            } else {
+                browser.palette = browser.palette == palette ? nil : palette
+            }
         }
         .disabled(browser == nil)
     }

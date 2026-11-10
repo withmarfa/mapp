@@ -24,7 +24,12 @@ nonisolated enum PaletteMatch {
 
         /// The indices of the titles that answer the query, best first and otherwise in the order given.
         func ranked(_ titles: [String], _ query: String) -> [Int] {
-            PaletteMatch.ranked(titles, Query(query)) { title in
+            scored(titles, query).map(\.index)
+        }
+
+        /// `ranked`, with each title's score.
+        func scored(_ titles: [String], _ query: String) -> [(index: Int, score: Int)] {
+            PaletteMatch.scored(titles, Query(query)) { title in
                 if let kept = folded[title] { return kept }
                 let characters = Array(PaletteMatch.fold(title))
                 folded[title] = characters
@@ -35,13 +40,18 @@ nonisolated enum PaletteMatch {
         /// What the palette lists for a query, by title alone: with nothing typed, every fixed title and no item;
         /// otherwise every fixed title that answers it and the best `limit` items, in rank order, equal matches with the fixed ones first.
         func picks(fixed: [String], items: [String], _ query: String, limit: Int = PaletteMatch.listLimit) -> [Pick] {
-            guard !PaletteMatch.Query(query).isEmpty else { return fixed.indices.map(Pick.fixed) }
+            scoredPicks(fixed: fixed, items: items, query, limit: limit).map(\.pick)
+        }
+
+        /// `picks`, with each pick's score (0 for everything when nothing is typed).
+        func scoredPicks(fixed: [String], items: [String], _ query: String, limit: Int = PaletteMatch.listLimit) -> [(pick: Pick, score: Int)] {
+            guard !PaletteMatch.Query(query).isEmpty else { return fixed.indices.map { (Pick.fixed($0), 0) } }
             var itemsLeft = limit
-            return ranked(fixed + items, query).compactMap { index in
-                if index < fixed.count { return .fixed(index) }
+            return scored(fixed + items, query).compactMap { index, score in
+                if index < fixed.count { return (.fixed(index), score) }
                 guard itemsLeft > 0 else { return nil }
                 itemsLeft -= 1
-                return .item(index - fixed.count)
+                return (.item(index - fixed.count), score)
             }
         }
     }
@@ -50,6 +60,8 @@ nonisolated enum PaletteMatch {
     enum Pick: Equatable, Sendable {
         case fixed(Int)
         case item(Int)
+        /// The last row of a cut-short Items section: the rest of the answer, in Search Notes.
+        case searchNotes
     }
 
     /// The most items a typed query lists. Entries are built for these only, never for every item in the library.
@@ -59,6 +71,18 @@ nonisolated enum PaletteMatch {
     /// equally.
     static func score(_ title: String, _ query: String) -> Int? {
         score(folded: Array(fold(title)), Query(query))
+    }
+
+    static func score(_ title: String, query: Query) -> Int? {
+        score(folded: Array(fold(title)), query)
+    }
+
+    /// Where the title holds what was typed in one piece, for showing it in bold, ignoring case and accents; nil
+    /// when it holds the typed letters only spread out, or not at all.
+    static func matchRange(in title: String, _ query: String) -> Range<String.Index>? {
+        let typed = query.trimmingCharacters(in: .whitespaces)
+        guard !typed.isEmpty else { return nil }
+        return title.range(of: typed, options: [.caseInsensitive, .diacriticInsensitive])
     }
 
     /// The same score, for a title already folded and read as characters.
@@ -87,18 +111,18 @@ nonisolated enum PaletteMatch {
 
     /// The indices of the titles that answer the query, best first and otherwise in the order given.
     static func ranked(_ titles: [String], _ query: String) -> [Int] {
-        ranked(titles, Query(query)) { Array(fold($0)) }
+        scored(titles, Query(query)) { Array(fold($0)) }.map(\.index)
     }
 
     static func fold(_ text: String) -> String {
         text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
     }
 
-    private static func ranked(_ titles: [String], _ query: Query, folding: (String) -> [Character]) -> [Int] {
+    private static func scored(_ titles: [String], _ query: Query, folding: (String) -> [Character]) -> [(index: Int, score: Int)] {
         var scored: [(index: Int, score: Int)] = []
         for (index, title) in titles.enumerated() {
             if let score = score(folded: folding(title), query) { scored.append((index, score)) }
         }
-        return scored.sorted { ($0.score, $0.index) < ($1.score, $1.index) }.map(\.index)
+        return scored.sorted { ($0.score, $0.index) < ($1.score, $1.index) }
     }
 }

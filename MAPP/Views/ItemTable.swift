@@ -89,6 +89,7 @@ struct ItemTable: View {
             }
         }
         .tableStyle(.inset)
+        .onChange(of: browser.panelIsOut) { _, isOut in if isOut { hover.clear() } }
         .softSelection(rows: pages.shownIDs + collapsed.sorted(), selection: { browser.selection })
         .remembersScroll(in: browser.listMemory)
         .alternatingRowBackgrounds(.disabled)
