@@ -135,7 +135,7 @@ struct ViewCardsTests {
     @Test func aTasksPriorityChipTakesItsColorFromItsRankAsEveryOtherPriorityDoes() {
         let item = Self.item("A", properties: [Property(key: "priority", value: .string("low"))])
         let chips = Self.chips("field.priority", of: item)
-        #expect(chips == [GalleryChip(text: ItemTypeInfo.Field.label(ofOption: "low"), look: .option(.blue))])
+        #expect(chips == [GalleryChip(text: ItemTypeInfo.Field.label(ofOption: "low"), look: .option(.purple))])
         #expect(OptionTone.tone(for: "Low") == .purple)
     }
 
