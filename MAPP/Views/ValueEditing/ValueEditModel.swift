@@ -442,11 +442,17 @@ final class ValueEditModel {
         let rows = navigable
         guard !rows.isEmpty else { return }
         viaKeyboard = true
-        guard let current = activeRow.flatMap({ id in rows.firstIndex { $0.id == id } }) else {
+        // The first arrow starts from the value the field holds, as a menu opens on its checked item.
+        guard let current = activeRow.flatMap({ id in rows.firstIndex { $0.id == id } }) ?? Self.onlyCurrent(in: rows) else {
             highlight = (step > 0 ? rows.first : rows.last)?.id
             return
         }
         highlight = rows[min(max(current + step, 0), rows.count - 1)].id
+    }
+
+    static func onlyCurrent(in rows: [ValueListRow]) -> Int? {
+        let held = rows.indices.filter { rows[$0].isCurrent && rows[$0].id != ValueEditOptions.notSetID }
+        return held.count == 1 ? held[0] : nil
     }
 
     func activateHighlighted() {

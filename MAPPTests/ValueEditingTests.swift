@@ -387,19 +387,18 @@ struct ValueEditingTests {
         return ValueEditModel(Self.request(.people(Self.assignees, Self.people), item: item, in: library, write: { written.all.append($0); return true }))
     }
 
-    @Test func twoPeopleWithOneNameAreTwoRowsAndRemovingOneKeepsTheOther() throws {
+    @Test func twoPeopleWithOneNameAreTwoChipsAndRemovingOneKeepsTheOther() throws {
         let (sam, other, written) = (Self.person("Sam", "one@example.com"), Self.person("Sam", "two@example.com"), Written())
         let model = peoplePanel([sam, other], written: written)
-        let held = model.rows.filter(\.isCurrent)
+        let held = model.chips
         #expect(held.count == 2 && Set(held.map(\.id)).count == 2)
-        #expect(held.map(\.detail) == ["one@example.com", "two@example.com"])
-        model.activate(try #require(held.last).id)
+        model.remove(try #require(held.last))
         #expect(written.all == [PropertyValue.array([sam])])
     }
 
-    @Test func peopleWithNoAddressAreToldByNameAndTheSameNameTwiceStillHasTwoRows() {
+    @Test func theSameNameTwiceWithNoAddressStillHasTwoChips() {
         let model = peoplePanel([Self.person("Ana"), Self.person("Ana")], written: Written())
-        let held = model.rows.filter(\.isCurrent)
+        let held = model.chips
         #expect(held.count == 2 && Set(held.map(\.id)).count == 2)
     }
 
@@ -581,7 +580,7 @@ struct ValueEditingTests {
         #expect(down.activeRow.flatMap { id in down.rows.first { $0.id == id }?.title } == "Done", "the first option")
         let up = ValueEditModel(Self.request(.status(Self.status), item: item, in: Self.library([item])))
         up.move(by: -1)
-        #expect(up.activeRow.flatMap { id in up.rows.first { $0.id == id }?.title } == "Stale", "the last option")
+        #expect(up.activeRow.flatMap { id in up.rows.first { $0.id == id }?.title } == "Todo", "the last option")
     }
 
     // MARK: One at a time

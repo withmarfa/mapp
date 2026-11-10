@@ -458,7 +458,7 @@ test('the app is told where the value its editor is open under has moved to, onc
     ],
   })
   const value = root.querySelector<HTMLElement>('.item-prop-value')!
-  let frame = { left: 10, top: 20, width: 100, height: 24 }
+  let frame = { left: 10, top: 20, width: 100, height: 24, right: 110, bottom: 44 }
   value.getBoundingClientRect = () => frame as DOMRect
   window.dispatchEvent(new Event('resize'))
   expect(posted, 'nothing is open, so nothing is told').toEqual([])
@@ -466,7 +466,7 @@ test('the app is told where the value its editor is open under has moved to, onc
   expect(posted.map((message) => message.type)).toEqual(['editValue'])
   window.dispatchEvent(new Event('resize'))
   expect(posted, 'it has not moved').toHaveLength(1)
-  frame = { left: 10, top: 60, width: 100, height: 24 }
+  frame = { left: 10, top: 60, width: 100, height: 24, right: 110, bottom: 84 }
   window.dispatchEvent(new Event('resize'))
   window.dispatchEvent(new Event('resize'))
   expect(posted.map((message) => message.type)).toEqual(['editValue', 'valueMoved'])
