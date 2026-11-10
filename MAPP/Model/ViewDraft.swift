@@ -302,6 +302,13 @@ nonisolated enum ViewDraft {
         }
     }
 
+    /// Whether a saved view's query can hold a filter on the column, as the window's filter does, so the row offers only
+    /// filters that can be saved. Today's filterable columns are the categorical ones, which the query holds as a type,
+    /// a parent or a property.
+    static func canFilter(_ column: ItemTableColumn) -> Bool {
+        column.isCategorical && filterField(of: column) != nil
+    }
+
     /// One table category as a Marfa condition; nil where a filter cannot express it. Is Not is `neq`, and the
     /// empty cell, which Is Not excludes, is `exists`.
     private static func condition(of column: ItemTableColumn, value: String, negated: Bool = false) -> FilterCondition? {

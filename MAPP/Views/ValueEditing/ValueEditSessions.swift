@@ -62,7 +62,7 @@ final class ValueEditPanelSession: ValueEditSession {
 
     /// The panel's ground: the system's glass, or, in Solid, the window's own color. Either is cut to the panel's corners
     /// by its own layer, so nothing square is left behind it.
-    private static func surface(holding host: NSView, style: ValuePanelStyle, appearance: NSAppearance?) -> NSView {
+    static func surface(holding host: NSView, style: ValuePanelStyle, appearance: NSAppearance?) -> NSView {
         // The window's shadow follows the alpha of what it holds, so the root is cut to the corners itself: the glass view
         // alone leaves a square shadow edge at the foot of the panel.
         let root = NSView()

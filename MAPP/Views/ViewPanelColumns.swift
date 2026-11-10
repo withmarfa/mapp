@@ -41,6 +41,7 @@ struct ViewPanelColumns: View {
                         Label(showsHidden ? "Hide \(hidden.count) Hidden" : "Show \(hidden.count) More", systemImage: showsHidden ? "chevron.up" : "plus")
                     }
                     .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
                     .accessibilityIdentifier("ViewPanelShowMoreColumns")
                     if showsHidden {
                         ForEach(hidden) { column in

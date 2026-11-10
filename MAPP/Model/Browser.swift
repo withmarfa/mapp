@@ -38,7 +38,7 @@ final class Browser {
         didSet {
             if viewMode != oldValue {
                 listMemory.scrollOffset = nil
-                recordLayout()
+                recordLayout(from: oldValue)
             }
             isCollectionItemPresented = false
             if viewMode.spansWindow { focusRequest = .list }
@@ -637,7 +637,9 @@ final class Browser {
     /// the clipboard, as the window's view of the library left went (`QuickAdd.Departure.libraryChanged`).
     func adopt(_ library: any ItemLibrary, undoManager: UndoManager? = nil) {
         let id = ObjectIdentifier(library)
+        if let undoManager { self.undoManager = undoManager }
         guard libraryID != id else { return }
+        self.library = library
         let isFirst = libraryID == nil
         libraryID = id
         pagingState = nil
@@ -655,7 +657,10 @@ final class Browser {
         deletingView = nil
         viewPanel?.handOff(because: .libraryChanged)
         viewPanel = nil
-        viewWorking = [:]
+        observedChoices = [:]
+        filterRowChoice = [:]
+        toldUnkept = [:]
+        writingViews = []
         placeCards = [:]
         compactBoards = [:]
         timelineFields = [:]
@@ -750,8 +755,27 @@ final class Browser {
     /// Views this window is deleting, whose absence from the library is its own doing and not news from elsewhere.
     @ObservationIgnored var viewsBeingDeleted: Set<ItemID> = []
 
-    /// The layout, columns, empty groups and cards the person changed in each view and has not saved (`Browser+SavedViews`).
-    var viewWorking: [ItemID: ViewMacSettings] = [:]
+    /// The window's undo manager, which takes back a change of a view's or a place's choices (`Browser+ViewWrites`).
+    @ObservationIgnored var undoManager: UndoManager?
+
+    /// The library the window shows, which a change undone is written to.
+    @ObservationIgnored var library: (any ItemLibrary)?
+
+    /// What each place's choices were when last looked at, so a change of them is the person's (`Browser+ViewWrites`).
+    @ObservationIgnored var observedChoices: [SidebarItem: ViewChoices] = [:]
+
+    /// The views this window is writing, and those that changed again meanwhile (`Browser+ViewWrites`).
+    @ObservationIgnored var writingViews: Set<ItemID> = []
+    @ObservationIgnored var rewritingViews: Set<ItemID> = []
+    @ObservationIgnored var toldOffline: Set<ItemID> = []
+    @ObservationIgnored var toldUnkept: [ItemID: Set<ViewDraft.Unkept>] = [:]
+
+    /// Whether the row of filters above the list shows in a place the person chose, which is window state and never
+    /// saved (`Browser+FilterRow`). A place the person did not choose for shows it by what it holds.
+    var filterRowChoice: [SidebarItem: Bool] = [:]
+
+    /// Whether Add Filter… asked for its panel, which the row opens and then clears (`Browser+FilterRow`).
+    var isAddFilterRequested = false
 
     /// What the gallery draws on each card in a place that is not a saved view, kept for this window only, as the
     /// window keeps that place's other choices (`Browser+SavedViews`).

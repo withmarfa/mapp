@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The panel's two sections for a gallery, in place of Columns: what fills each card (Cards), and what the card says
-/// under its picture (Under the Card). A saved view's choices are held until Save, and a place's last as long as the
+/// under its picture (Under the Card). A saved view's choices are kept on this Mac as they are made, and a place's last as long as the
 /// window (`Browser.changeCards`).
 struct ViewPanelCards: View {
     let browser: Browser
@@ -22,10 +22,6 @@ struct ViewPanelCards: View {
                     .fixedSize()
                     .accessibilityIdentifier("ViewPanelCardPreview")
                 }
-                Toggle("Fit Picture", isOn: Binding { cards.fitsPicture } set: { value in browser.changeCards { $0.fitsPicture = value } })
-                    .disabled(!cards.preview.showsPicture)
-                    .help(cards.preview.showsPicture ? "" : String(localized: "Only a card with a picture can fit it."))
-                    .accessibilityIdentifier("ViewPanelCardFitPicture")
                 HStack {
                     Text("Size")
                     Spacer(minLength: 0)
@@ -33,10 +29,14 @@ struct ViewPanelCards: View {
                         ForEach(ViewCards.Size.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
                     .labelsHidden()
-                    .pickerStyle(.segmented)
+                    .pickerStyle(.menu)
                     .fixedSize()
                     .accessibilityIdentifier("ViewPanelCardSize")
                 }
+                Toggle("Fit Picture", isOn: Binding { cards.fitsPicture } set: { value in browser.changeCards { $0.fitsPicture = value } })
+                    .disabled(!cards.preview.showsPicture)
+                    .help(cards.preview.showsPicture ? "" : String(localized: "Only a card with a picture can fit it."))
+                    .accessibilityIdentifier("ViewPanelCardFitPicture")
             }
         }
         UnderTheCard(browser: browser, panel: panel, content: content)
@@ -99,6 +99,7 @@ private struct UnderTheCard: View {
                             systemImage: showsHidden ? "chevron.up" : "plus")
                     }
                     .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
                     .accessibilityIdentifier("ViewPanelShowMoreProperties")
                     if showsHidden {
                         ForEach(hidden) { property in

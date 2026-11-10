@@ -1,14 +1,15 @@
 import SwiftUI
 
 /// The panel's Sort: up to `ViewDraft.maxSortKeys` keys, each a property chosen with Add Sort and the direction in its own words
-/// (Newest First for a date). A key is dragged to a new place, or moved with its menu, and the first sorts first.
+/// (Newest First for a date). A key is dragged to a new place, or moved with its menu, and the first sorts first. The
+/// keys are those the layout beside the panel uses (`SavedViews.arrangement`).
 struct ViewPanelSort: View {
     @Environment(\.interfaceTextSize) private var textSize
     let browser: Browser
     let content: ItemTableContent
+    let sort: [ItemTableComparator]
 
     var body: some View {
-        let sort = content.sort
         let unused = content.columns.filter { column in !sort.contains { $0.column.id == column.id } }
         ViewPanelSection(title: "Sort") {
             InspectorBox {
@@ -26,6 +27,7 @@ struct ViewPanelSort: View {
                     .menuStyle(.button)
                     .buttonStyle(.plain)
                     .menuIndicator(.hidden)
+                    .foregroundStyle(.secondary)
                     .accessibilityIdentifier("ViewPanelAddSort")
                 }
             }

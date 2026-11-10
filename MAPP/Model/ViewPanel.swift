@@ -2,25 +2,17 @@ import Foundation
 import Observation
 
 /// The right sidebar's panel that edits a view, or a place that can become one. It holds what only the panel knows:
-/// the name being typed, whether a save is under way, why one failed, and how to put a place back if the person
-/// cancels. What the person changes lives in the window (`Browser.tableOptions`, `viewWorking`), where it shows at once.
+/// the name being typed, and how to put a place back if the person escapes a new view. What the person changes lives in
+/// the window (`Browser.tableOptions`, `viewSeeds`), where it shows at once and, in a saved view, is written as made.
 @Observable
 final class ViewPanel {
     enum Purpose: Equatable {
-        /// A saved view: Cancel puts it back as saved, and Save keeps the changes.
+        /// A saved view: each change is written as it is made, and Done closes the panel.
         case edit(ItemID)
-        /// A view that does not exist yet, made of what the window shows: Cancel puts the place back as it was.
+        /// A view that does not exist yet, made of what the window shows: Done makes it, and Escape makes nothing.
         case new
         /// A place that is not a view, such as a type's list: it has no name and keeps nothing, and offers Save as View.
         case place
-    }
-
-    /// What Save asks the person to confirm first.
-    struct Confirmation: Equatable {
-        /// What of the window the view will not keep.
-        var unkept: [ViewDraft.Unkept]
-        /// The conditions of the view's filter the window cannot show, which a save leaves as they are.
-        var unchanged: [String]
     }
 
     /// A place as it was when a new view began, so cancelling or saving leaves it as it was.
@@ -31,8 +23,8 @@ final class ViewPanel {
         let viewMode: ItemViewMode
         /// The columns the place keeps for itself (`ItemTableColumnLayouts`), as stored.
         let columns: Data?
-        /// The settings held for the view, where the place is one.
-        let working: ViewMacSettings?
+        /// What this Mac held for the view, where the place is one.
+        let mac: ViewMacSettings?
         /// What the window drew on each card for the place, where it is not a view.
         let cards: ViewCards?
     }
@@ -41,25 +33,12 @@ final class ViewPanel {
     @ObservationIgnored private var notices: Notices?
     /// The name already given back, so a quit after a close does not give it twice.
     @ObservationIgnored private var handedOffName: String?
-    /// Why the panel was left while a save was under way, to be settled when the save ends.
-    @ObservationIgnored private var departure: ViewTitleForm.Departure?
     /// The name of a view being edited. A new view's name is the form's, which keeps it until the server takes it.
     var name: String
     /// The view's name as the panel last read it, so a rename elsewhere shows unless the person is typing their own.
     var knownTitle: String
     private(set) var form: ViewTitleForm?
     private(set) var snapshot: Snapshot?
-    var isSaving = false
-    /// Why the last save did not happen, in words for the person.
-    var failure: String? {
-        didSet { if failure != nil { isQuiet = false } }
-    }
-    var confirmation: Confirmation? {
-        didSet { if confirmation != nil { isQuiet = false } }
-    }
-    /// Whether the panel stays out of sight, as it does for the toolbar's Save, which needs the sidebar only to ask
-    /// something or to say why a save failed.
-    var isQuiet = false
 
     init(editing view: LibraryView, notices: Notices) {
         purpose = .edit(view.id)
@@ -109,25 +88,21 @@ final class ViewPanel {
 
     var trimmedName: String { shownName.trimmingCharacters(in: .whitespacesAndNewlines) }
 
-    /// The name the person typed over a view's own, which nothing else holds until a save keeps it.
+    /// The name the person typed over a view's own, which nothing else holds until it is committed.
     var typedRename: String? {
         guard case .edit = purpose, trimmedName != knownTitle.trimmingCharacters(in: .whitespacesAndNewlines),
               !trimmedName.isEmpty else { return nil }
         return trimmedName
     }
 
-    /// Gives what the person typed and no save has kept to the clipboard, through the library's notices, as the panel
-    /// ends in any way but their own Cancel. A name on its way to the server is given back only if the save fails.
+    /// Gives what the person typed and nothing has kept to the clipboard, through the library's notices, as the panel
+    /// ends in any way but their own Escape.
     func handOff(because departure: ViewTitleForm.Departure) {
         switch purpose {
         case .new:
             form?.handOff(because: departure)
         case .edit:
             guard typedRename != nil else { return }
-            guard !isSaving else {
-                self.departure = self.departure ?? departure
-                return
-            }
             let reason = switch departure {
             case .closed: String(localized: "The window closed before the view was renamed.")
             case .libraryChanged: String(localized: "The window changed to another library before the view was renamed.")
@@ -145,13 +120,6 @@ final class ViewPanel {
         guard typedRename != nil else { return false }
         giveBackRename(reason: String(localized: "The view was deleted before it was renamed."))
         return true
-    }
-
-    /// A save has ended without keeping the name: a panel left while it ran gives the name back now.
-    func settleAfterUnsavedEnd() {
-        guard let departure else { return }
-        self.departure = nil
-        handOff(because: departure)
     }
 
     private func giveBackRename(reason: String) {
