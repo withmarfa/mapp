@@ -266,9 +266,9 @@ struct CommandPalette: View {
                 }
                 .padding(.horizontal, 6)
                 .padding(.top, 2)
-                // Room under the last row for the buttons that float over the list.
-                .padding(.bottom, floatingHeight)
             }
+            // Room under the last row for the buttons that float over the list; a scroll to a row keeps it clear of them.
+            .contentMargins(.bottom, floatingHeight, for: .scrollContent)
             .frame(maxHeight: 460)
             .onChange(of: scrollTarget) { if let scrollTarget { proxy.scrollTo(scrollTarget) } }
         }
