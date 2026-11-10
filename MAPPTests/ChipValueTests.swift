@@ -8,7 +8,7 @@ struct ChipValueTests {
 
     /// The values are FNV-1a over the UTF-8 bytes, taken modulo the palette's nine tones, worked out apart from the code.
     @Test func anOptionKeepsItsColorAcrossLaunchesAndMachines() {
-        #expect(OptionTone.tone(for: "High") == .red)
+        #expect(OptionTone.tone(for: "High") == .pink)
         #expect(OptionTone.tone(for: "Low") == .purple)
         #expect(OptionTone.tone(for: "performance") == .green)
         #expect(OptionTone.tone(for: "editor") == .purple)

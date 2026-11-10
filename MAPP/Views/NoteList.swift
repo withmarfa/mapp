@@ -31,9 +31,9 @@ struct NoteList: View, Equatable {
         let items: [Item] = sections.flatMap(\.items)
         let ids: [ItemID] = items.map(\.id)
         let context = metaContext(for: items)
-        // Each type's style is settled once for the list, so a row looks its type up and does no resolving of its own.
-        // Passing none for the view's choice is where Edit View's rows will hand theirs.
-        let styles: [TypeID: ListRowStyle] = ListRowStyle.styles(
+        // Each type's style, icon and task fields are settled once for the list, so a row looks its type up and does no
+        // catalogue work of its own. Passing none for the view's choice is where Edit View's rows will hand theirs.
+        let styles: [TypeID: ListRowType] = ListRowType.types(
             of: Set<TypeID>(items.map(\.type)), view: nil, choices: typeStyles, rowStyle: rowStyle, in: library.catalogue)
         let results = browser.searchResults(in: library)
         let excerpts = results?.excerpts ?? [:]
@@ -97,7 +97,7 @@ struct NoteList: View, Equatable {
 
     /// The list and its row traits, apart from `body` so that neither is too long for the compiler to check.
     private func listContent(
-        sections: [NoteSection], ids: [ItemID], now: Date, context: ItemMeta.Context, styles: [TypeID: ListRowStyle],
+        sections: [NoteSection], ids: [ItemID], now: Date, context: ItemMeta.Context, styles: [TypeID: ListRowType],
         excerpts: [ItemID: SearchExcerpt], title: String
     ) -> some View {
         SelectableList(browser: browser) {
@@ -141,11 +141,11 @@ struct NoteList: View, Equatable {
     }
 
     private func lineRow(
-        _ line: ListLine, now: Date, context: ItemMeta.Context, styles: [TypeID: ListRowStyle], excerpt: SearchExcerpt?
+        _ line: ListLine, now: Date, context: ItemMeta.Context, styles: [TypeID: ListRowType], excerpt: SearchExcerpt?
     ) -> ListLineRow {
         ListLineRow(
             line: line, order: order, now: now, dateFormat: dateFormat, context: context, previewLines: previewLines,
-            showsPictures: showsPictures, style: Self.style(of: line, in: styles, fallback: rowStyle), excerpt: excerpt)
+            showsPictures: showsPictures, rowType: Self.rowType(of: line, in: styles, fallback: rowStyle), excerpt: excerpt)
     }
 
     /// What the list tells its rows about itself; the type chip also waits on the setting that turns it off.
@@ -160,9 +160,11 @@ struct NoteList: View, Equatable {
         return counted.editedSubtitle(browser.hasViewChanges)
     }
 
-    private static func style(of line: ListLine, in styles: [TypeID: ListRowStyle], fallback: ListRowStyle) -> ListRowStyle {
-        guard let type = line.type, let style = styles[type] else { return fallback }
-        return style
+    private static func rowType(of line: ListLine, in types: [TypeID: ListRowType], fallback: ListRowStyle) -> ListRowType {
+        guard let type = line.type, let rowType = types[type] else {
+            return ListRowType(style: ListRowStyle.resolve(rowStyle: fallback))
+        }
+        return rowType
     }
 
     /// What was just typed reaches the note before it goes, since a deleted note takes no edit.
@@ -266,41 +268,42 @@ struct ItemRow: View {
     }
 }
 
-/// A small preview of a picture item at the trailing edge of its row. It holds its place until the picture is made, so
-/// a row does not change height as the list scrolls. Made as a gallery card's is, so the two share a picture's cost.
+/// A small preview of an image file at the trailing edge of its row, which the row decides from the item before this is
+/// made, so a row with no picture is a standard row from its first frame. It holds its place until the picture is made,
+/// so a row does not change height as the list scrolls. Made as a gallery card's is, so the two share a picture's cost.
+/// The square stays in the row (at no size once the item is known to have no picture) so the task that makes the picture
+/// is never removed with it: a picture that couldn't be made now is asked for again when the row next shows.
 private struct RowPicture: View {
     @CurrentLibrary private var library
     @Environment(\.displayScale) private var displayScale
     let item: Item
     @State private var artwork: GalleryArtwork?
-    /// Set once the picture came back with none, so the row is a standard row with no empty square.
     @State private var hasNone = false
 
     private static let side: CGFloat = 44
 
     var body: some View {
-        if !hasNone { square }
-    }
-
-    @ViewBuilder private var square: some View {
         let basis = GalleryArtworkCache.basis(of: item, in: library)
         let shown = artwork ?? GalleryArtworkCache.peek(basis, width: Self.side)
         let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
         shape.fill(.quinary)
-            .frame(width: Self.side, height: Self.side)
+            .frame(width: hasNone ? 0 : Self.side, height: hasNone ? 0 : Self.side)
             .overlay {
                 if let shown {
                     Image(decorative: shown.image, scale: 1).resizable().scaledToFill()
                 }
             }
             .clipShape(shape)
-            .padding(.leading, 10)
+            .padding(.leading, hasNone ? 0 : 10)
             .accessibilityHidden(true)
             .task(id: basis) {
-                let made = await GalleryArtworkCache.artwork(for: item, width: Self.side, scale: displayScale, in: library)
-                if !Task.isCancelled {
-                    artwork = made
-                    hasNone = made == nil
+                switch await GalleryArtworkCache.outcome(for: item, width: Self.side, scale: displayScale, in: library) {
+                case .picture(let made):
+                    if !Task.isCancelled { (artwork, hasNone) = (made, false) }
+                case .none:
+                    if !Task.isCancelled { (artwork, hasNone) = (nil, true) }
+                case .failed:
+                    break
                 }
             }
     }
@@ -353,7 +356,7 @@ private struct ListLineRow: View {
     let context: ItemMeta.Context
     let previewLines: Int
     let showsPictures: Bool
-    let style: ListRowStyle
+    let rowType: ListRowType
     let excerpt: SearchExcerpt?
 
     var body: some View {
@@ -365,6 +368,7 @@ private struct ListLineRow: View {
                 .padding(.top, isFirst ? 0 : 10)
                 .accessibilityAddTraits(.isHeader)
         case .item(let item, _):
+            let style = rowType.style
             let shown = excerpt == nil ? style : (style == .withPictures ? .withPictures : .standard)
             ItemRow(
                 item: item,
@@ -373,9 +377,8 @@ private struct ListLineRow: View {
                 previewLines: previewLines,
                 style: shown,
                 showsPictures: showsPictures,
-                typeIcon: shown == .compact ? library.catalogue.icon(for: item.type) : nil,
-                task: shown == .task
-                    ? TaskRowFacts.make(for: item, catalogue: library.catalogue, now: now, format: dateFormat) : nil,
+                typeIcon: shown == .compact ? rowType.icon : nil,
+                task: shown == .task ? TaskRowFacts.make(for: item, type: rowType, now: now, format: dateFormat) : nil,
                 highlight: shown == .highlight ? HighlightRowFacts.make(for: item, in: library) : nil,
                 person: shown == .person ? PersonRowFacts.make(for: item) : nil,
                 excerpt: excerpt

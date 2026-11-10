@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// The row styles other than Standard. Each draws only the facts its item has, so a missing one leaves no gap, and each
-/// is cheap: facts are made once in `ListLineRow`, and nothing here looks anything up.
+/// The row styles other than Standard. Each draws only the facts its item has, so a missing one leaves no gap. A row's
+/// facts are made in `ListLineRow` from its item and what the list resolved once for its type (`ListRowType`); the
+/// views here look nothing up.
 
 /// One line: the type's mark, the title and the date.
 struct CompactRow: View {
@@ -45,7 +46,7 @@ struct TaskRow: View {
                     HStack(spacing: 10) {
                         if let due = task.due { dueChip(due) }
                         if let finish = task.finish { Text(finish).foregroundStyle(.secondary) }
-                        if let priority = task.priority { priorityDot(priority) }
+                        if let priority = task.priority { priorityDot(priority, tone: task.priorityTone) }
                         if let people = task.people { peopleView(people) }
                         if let repeats = task.repeats {
                             Label(repeats, systemImage: "repeat").foregroundStyle(.secondary)
@@ -69,9 +70,9 @@ struct TaskRow: View {
                 in: Capsule())
     }
 
-    private func priorityDot(_ value: String) -> some View {
+    private func priorityDot(_ value: String, tone: TypeTone?) -> some View {
         HStack(spacing: 4) {
-            Circle().fill(OptionTone.tone(ofOption: value).color(for: scheme)).frame(width: 7, height: 7)
+            Circle().fill((tone ?? .neutral).color(for: scheme)).frame(width: 7, height: 7)
             Text(ItemTypeInfo.Field.label(ofOption: value)).foregroundStyle(.secondary)
         }
     }

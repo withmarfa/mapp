@@ -256,10 +256,15 @@ final class ValueEditModel {
         return built
     }
 
+    /// Whether `field` is a task's priority, whose options are colored by rank.
+    private func isPriority(_ field: ItemTypeInfo.Field) -> Bool {
+        library.catalogue.isPriority(field, of: field.declaredBy)
+    }
+
     private func buildRows() -> [ValueListRow] {
         switch kind {
         case .status(let field): narrowed(ValueEditOptions.statusRows(field: field, current: value?.string))
-        case .choice(let field): narrowed(ValueEditOptions.choiceRows(field: field, current: value?.string))
+        case .choice(let field): narrowed(ValueEditOptions.choiceRows(field: field, current: value?.string, isPriority: isPriority(field)))
         case .type: typeRows
         case .date: quickRows
         case .people(_, let shape): peopleRows(shape)
@@ -650,7 +655,7 @@ final class ValueEditModel {
             return [ValueChip(id: ValueEditOptions.optionID(word), title: ItemTypeInfo.Field.label(ofOption: word), mark: .status(group), isRemovable: !field.required)]
         case .choice(let field):
             guard let word = value?.string, !word.isEmpty else { return [] }
-            return [ValueChip(id: ValueEditOptions.optionID(word), title: ItemTypeInfo.Field.label(ofOption: word), mark: .dot(ItemTypeInfo.Field.label(ofOption: word)), isRemovable: !field.required)]
+            return [ValueChip(id: ValueEditOptions.optionID(word), title: ItemTypeInfo.Field.label(ofOption: word), mark: .dot(OptionTone.tone(of: word, in: field, isPriority: isPriority(field))), isRemovable: !field.required)]
         case .parent:
             guard let current = parentTarget else { return [] }
             return [ValueChip(id: "parent:" + current.id, title: current.displayTitle)]

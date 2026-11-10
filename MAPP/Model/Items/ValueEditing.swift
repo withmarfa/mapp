@@ -95,9 +95,8 @@ nonisolated struct ValueListRow: Identifiable, Hashable, Sendable {
         case person(initials: String)
         case tag
         case symbol(String)
-        /// A choice's option, with the dot of its own color, which the option's shown label decides, as it does for the
-        /// value's chip on the page.
-        case dot(String)
+        /// A choice's option, with the dot of the color the field gives it (`OptionTone.tone(of:in:isPriority:)`).
+        case dot(TypeTone)
         /// A type, with its icon.
         case type(icon: String?)
     }
@@ -153,11 +152,12 @@ nonisolated enum ValueEditOptions {
 
     /// A choice's options in the catalogue's order. The item's own
     /// word is listed last where the catalogue does not declare it.
-    static func choiceRows(field: ItemTypeInfo.Field, current: String?) -> [ValueListRow] {
-        let rows = field.options(including: current).map {
-            ValueListRow(id: optionID($0), role: .option, title: ItemTypeInfo.Field.label(ofOption: $0), mark: .dot(ItemTypeInfo.Field.label(ofOption: $0)), isCurrent: $0 == current)
+    static func choiceRows(field: ItemTypeInfo.Field, current: String?, isPriority: Bool) -> [ValueListRow] {
+        field.options(including: current).map {
+            ValueListRow(
+                id: optionID($0), role: .option, title: ItemTypeInfo.Field.label(ofOption: $0),
+                mark: .dot(OptionTone.tone(of: $0, in: field, isPriority: isPriority)), isCurrent: $0 == current)
         }
-        return rows
     }
 }
 

@@ -42,24 +42,23 @@ nonisolated enum ListRowStyle: String, CaseIterable, Identifiable, Hashable, Sen
             }, uniquingKeysWith: { first, _ in first })
     }
 
-    /// What a type's fields suggest: a person (`PageHeaderKind`), a Marfa highlight or a picture file, by the built-in
-    /// type the type is or builds on, else Task for a type with a status. The app names no type that a person or an app
-    /// made.
+    /// What a type's fields suggest: a person (`PageHeaderKind`), a Marfa highlight (`core.highlight`, which no field
+    /// alone tells), pictures for a file type (a row shows a picture only for an item that is an image file, so a type of
+    /// other files draws standard rows), else Task for a type with a status. The app names no type that a person or an
+    /// app made.
     static func fromFields(of type: TypeID, in catalogue: Catalogue) -> ListRowStyle? {
         if PageHeaderKind.of(type, in: catalogue) == .person { return .person }
         var visited: Set<TypeID> = []
         var current: TypeID? = type
         while let id = current, visited.insert(id).inserted {
-            if let style = builtIn[id] { return style }
+            if id == highlightType { return .highlight }
             current = catalogue.itemTypes[id]?.parent
         }
+        if catalogue.isFileType(type) { return .withPictures }
         return catalogue.itemTypes[type]?.statusField == nil ? nil : .task
     }
 
-    private static let builtIn: [TypeID: ListRowStyle] = [
-        TypeID("core.highlight"): .highlight,
-        TypeID("core.file.image"): .withPictures,
-    ]
+    private static let highlightType = TypeID("core.highlight")
 
     /// Whether rows of this style may show a picture.
     var showsPictures: Bool { self == .withPictures }
@@ -87,12 +86,51 @@ nonisolated struct ListTypeStyles: RawRepresentable, Hashable, Sendable {
 
     var rawValue: String {
         let stored = Dictionary(styles.map { ($0.key.rawValue, $0.value.rawValue) }, uniquingKeysWith: { first, _ in first })
-        guard let data = try? JSONEncoder().encode(stored), let text = String(data: data, encoding: .utf8) else { return "{}" }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        guard let data = try? encoder.encode(stored), let text = String(data: data, encoding: .utf8) else { return "{}" }
         return text
     }
 
     subscript(type: TypeID) -> ListRowStyle? {
         get { styles[type] }
         set { styles[type] = newValue }
+    }
+}
+
+/// What a list's rows need to know of one type, looked up once for the list so a row does no catalogue work: its style,
+/// its icon, and, for a task, the fields its facts read.
+nonisolated struct ListRowType: Hashable, Sendable {
+    var style: ListRowStyle
+    var icon: String?
+    var isTask = false
+    var statusField: ItemTypeInfo.Field?
+    var priorityField: ItemTypeInfo.Field?
+
+    /// A type the catalogue does not know: only its style.
+    init(style: ListRowStyle) { self.style = style }
+
+    init(_ type: TypeID, style: ListRowStyle, in catalogue: Catalogue) {
+        self.style = style
+        let info = catalogue.itemTypes[type]
+        icon = info?.icon
+        statusField = info?.statusField
+        isTask = catalogue.isTask(type)
+        if isTask { priorityField = info?.fields.first { $0.key == MarfaMapping.priorityField } }
+    }
+
+    /// The group of the word `item` holds in the type's status field.
+    func statusGroup(of item: Item) -> StatusGroup? {
+        guard let field = statusField, let word = item.value(of: field.key)?.string else { return nil }
+        return field.statusGroup(of: word)
+    }
+
+    /// Each of `types` as a list shows it (`ListRowStyle.styles`).
+    static func types(
+        of types: some Collection<TypeID>, view: ListRowStyle? = nil, choices: ListTypeStyles, rowStyle: ListRowStyle,
+        in catalogue: Catalogue
+    ) -> [TypeID: ListRowType] {
+        let styles = ListRowStyle.styles(of: types, view: view, choices: choices, rowStyle: rowStyle, in: catalogue)
+        return styles.reduce(into: [:]) { $0[$1.key] = ListRowType($1.key, style: $1.value, in: catalogue) }
     }
 }

@@ -3,7 +3,8 @@ import Marfa
 
 /// What a Task row says about a task, each fact only where the item has it, so a row with none leaves no gap. The
 /// due date, priority, assignees and repeat are read from a task (`Catalogue.isTask`) as the table reads them; the
-/// status is any type's status field, whatever its words.
+/// status is any type's status field, whatever its words. What the catalogue says of the type comes in as the list
+/// resolved it once (`ListRowType`).
 nonisolated struct TaskRowFacts: Hashable, Sendable {
     struct Due: Hashable, Sendable {
         let label: String
@@ -21,40 +22,47 @@ nonisolated struct TaskRowFacts: Hashable, Sendable {
     var due: Due?
     /// The priority's value as the type declares it, which the row writes as a word and colors as the value panel does.
     var priority: String?
+    /// The color of the priority's dot, by its rank among the type's options.
+    var priorityTone: TypeTone?
     var people: People?
     var repeats: String?
-    /// When a finished task finished, in words: "Yesterday", "Canceled 15 Jun".
+    /// When a finished task finished, in words: "Yesterday", "Canceled 15 Jun". A finished item with no finish time
+    /// says only that it was canceled, or nothing.
     var finish: String?
 
     var hasLine: Bool { due != nil || priority != nil || people != nil || repeats != nil || finish != nil }
 
     static func make(
-        for item: Item, catalogue: Catalogue, now: Date, format: DateFormat, calendar: Calendar = .current,
+        for item: Item, type: ListRowType, now: Date, format: DateFormat, calendar: Calendar = .current,
         locale: Locale = .current
     ) -> TaskRowFacts {
         var facts = TaskRowFacts()
-        facts.statusGroup = catalogue.statusGroup(of: item)
+        facts.statusGroup = type.statusGroup(of: item)
         func text(_ key: String) -> String? {
             item.value(of: key)?.string.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.flatMap { $0.isEmpty ? nil : $0 }
         }
-        if let group = facts.statusGroup, group.isFinished {
-            let day = text(completedField).flatMap { ItemDate.parse($0, calendar: calendar)?.date } ?? item.modified
-            let when = DateDisplay.text(of: day, hasTime: false, place: .table, format: format, now: now, calendar: calendar, locale: locale)
-            facts.finish = group == .canceled ? String(localized: "Canceled \(when)") : when
+        let isFinished = facts.statusGroup?.isFinished == true
+        if let group = facts.statusGroup, isFinished {
+            if let day = text(MarfaMapping.completedField).flatMap({ ItemDate.parse($0, calendar: calendar)?.date }) {
+                let when = DateDisplay.text(of: day, hasTime: false, place: .table, format: format, now: now, calendar: calendar, locale: locale)
+                facts.finish = group == .canceled ? String(localized: "Canceled \(when)") : when
+            } else if group == .canceled {
+                facts.finish = String(localized: "Canceled")
+            }
         }
-        guard catalogue.isTask(item.type) else { return facts }
-        if facts.finish == nil, let due = text(MarfaMapping.dueField).flatMap({ ItemDate.parse($0, calendar: calendar)?.date }) {
+        guard type.isTask else { return facts }
+        if !isFinished, let due = text(MarfaMapping.dueField).flatMap({ ItemDate.parse($0, calendar: calendar)?.date }) {
             facts.due = dueFact(due, now: now, format: format, calendar: calendar, locale: locale)
         }
-        facts.priority = text(MarfaMapping.priorityField)
+        if let priority = text(MarfaMapping.priorityField) {
+            facts.priority = priority
+            facts.priorityTone = type.priorityField.map { OptionTone.tone(of: priority, in: $0, isPriority: true) }
+                ?? OptionTone.tone(for: ItemTypeInfo.Field.label(ofOption: priority))
+        }
         facts.people = people(of: item)
-        facts.repeats = item.value(of: recurrenceField).flatMap(repeatWords)
+        facts.repeats = item.value(of: MarfaMapping.recurrenceField).flatMap(repeatWords)
         return facts
     }
-
-    private static let completedField = "completed_at"
-    private static let recurrenceField = "recurrence"
-    private static let assigneesField = "assignees"
 
     private static func dueFact(_ due: Date, now: Date, format: DateFormat, calendar: Calendar, locale: Locale) -> Due {
         let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: due)).day ?? 0
@@ -74,11 +82,11 @@ nonisolated struct TaskRowFacts: Hashable, Sendable {
 
     /// One person by name, with their initials; several as a count. An entry names a person by name, email or both.
     private static func people(of item: Item) -> People? {
-        guard case .array(let entries)? = item.value(of: assigneesField) else { return nil }
+        guard case .array(let entries)? = item.value(of: MarfaMapping.assigneesField) else { return nil }
         let names = entries.compactMap { entry -> String? in
             guard case .object(let members) = entry else { return nil }
-            let name = members["name"]?.string?.trimmingCharacters(in: .whitespaces) ?? ""
-            let email = members["email"]?.string?.trimmingCharacters(in: .whitespaces) ?? ""
+            let name = members[MarfaMapping.personNameMember]?.string?.trimmingCharacters(in: .whitespaces) ?? ""
+            let email = members[MarfaMapping.personEmailMember]?.string?.trimmingCharacters(in: .whitespaces) ?? ""
             return !name.isEmpty ? name : (email.isEmpty ? nil : email)
         }
         guard let first = names.first else { return nil }
@@ -134,15 +142,15 @@ nonisolated struct HighlightRowFacts: Hashable, Sendable {
             item.value(of: key)?.string.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.flatMap { $0.isEmpty ? nil : $0 }
         }
         var facts = HighlightRowFacts()
-        facts.color = text("color")
-        for edge in item.edgesOut where edge.type == excerptEdge {
+        facts.color = text(MarfaMapping.highlightColorField)
+        for edge in item.edgesOut where edge.type == MarfaMapping.excerptEdge {
             if case .item(let id) = edge.target, let source = library.item(id) {
                 facts.source = source.displayTitle
                 break
             }
         }
-        if let start = text("start_location") {
-            switch text("locator_type") {
+        if let start = text(MarfaMapping.startLocationField) {
+            switch text(MarfaMapping.locatorTypeField) {
             case "page": facts.place = String(localized: "page \(start)")
             case "offset", "order": facts.place = String(localized: "location \(start)")
             case "time": facts.place = start
@@ -151,8 +159,6 @@ nonisolated struct HighlightRowFacts: Hashable, Sendable {
         }
         return facts
     }
-
-    private static let excerptEdge = "excerpt-of"
 }
 
 /// What a Person row says under the name: the same line the person's page keeps under theirs, or the entity's own
@@ -163,7 +169,7 @@ nonisolated struct PersonRowFacts: Hashable, Sendable {
 
     static func make(for item: Item) -> PersonRowFacts {
         let described = PersonHeader(item: item).subtitle
-            ?? item.value(of: "description")?.string?.trimmingCharacters(in: .whitespacesAndNewlines).split(whereSeparator: \.isNewline).first.map(String.init)
+            ?? item.value(of: MarfaMapping.descriptionField)?.string?.trimmingCharacters(in: .whitespacesAndNewlines).split(whereSeparator: \.isNewline).first.map(String.init)
         return PersonRowFacts(initials: PersonInitials.of(item.displayTitle), line: described?.isEmpty == true ? nil : described)
     }
 }

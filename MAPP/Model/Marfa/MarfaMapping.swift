@@ -28,6 +28,21 @@ nonisolated enum MarfaMapping {
     static let taskType = TypeID("core.task")
     static let priorityField = "priority"
     static let dueField = "due_at"
+    /// The other built-in fields a list row reads: a task's finish time, repeat and people.
+    static let completedField = "completed_at"
+    static let recurrenceField = "recurrence"
+    static let assigneesField = "assignees"
+    /// The members of an entry of a people field that name the person.
+    static let personNameMember = "name"
+    static let personEmailMember = "email"
+    /// A `core.highlight`'s color, where its passage starts and how that is read, and the edge to the item it is an
+    /// excerpt of.
+    static let highlightColorField = "color"
+    static let startLocationField = "start_location"
+    static let locatorTypeField = "locator_type"
+    static let excerptEdge = "excerpt-of"
+    /// A `core.entity`'s own description.
+    static let descriptionField = "description"
     /// The type an event is, or descends from; with a task, the types whose `starts_at` is read as a start date.
     static let eventType = TypeID("core.event")
     static let startField = "starts_at"

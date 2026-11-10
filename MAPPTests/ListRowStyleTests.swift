@@ -72,11 +72,55 @@ struct ListRowStyleTests {
         ])
     }
 
-    @Test func aPriorityIsColoredAsTheValuePanelColorsIt() {
-        #expect(OptionTone.tone(ofOption: "low") == .purple)
-        #expect(OptionTone.tone(ofOption: "medium") == .yellow)
-        #expect(OptionTone.tone(ofOption: "high") == .red)
-        #expect(OptionTone.tone(ofOption: "urgent") == .blue)
+    private func priority(_ options: [String], declaredBy owner: String = "core.task") -> ItemTypeInfo.Field {
+        ItemTypeInfo.Field(key: "priority", label: "Priority", kind: .choice(options), declaredBy: TypeID(owner))
+    }
+
+    @Test func aPriorityTakesItsColorFromItsRankNotItsWord() {
+        let four = priority(["low", "medium", "high", "urgent"])
+        #expect(["low", "medium", "high", "urgent"].map { OptionTone.tone(of: $0, in: four, isPriority: true) } == [.purple, .yellow, .red, .blue])
+        let words = priority(["minor", "normal", "major", "blocker"])
+        #expect(["minor", "normal", "major", "blocker"].map { OptionTone.tone(of: $0, in: words, isPriority: true) } == [.purple, .yellow, .red, .blue])
+        #expect(OptionTone.tone(of: "high", in: four, isPriority: false) == OptionTone.tone(for: "High"))
+    }
+
+    @Test func otherCountsSpreadOverThePriorityColorsFromLowestToHighest() {
+        func tones(_ options: [String]) -> [TypeTone] {
+            let field = priority(options)
+            return options.map { OptionTone.tone(of: $0, in: field, isPriority: true) }
+        }
+        #expect(tones(["only"]) == [.purple])
+        #expect(tones(["a", "b"]) == [.purple, .blue])
+        #expect(tones(["a", "b", "c"]) == [.purple, .red, .blue])
+        #expect(tones(["a", "b", "c", "d", "e"]) == [.purple, .yellow, .red, .red, .blue])
+    }
+
+    @Test func aPriorityOptionTheFieldDoesNotDeclareTakesTheLabelsColor() {
+        let field = priority(["low", "high"])
+        #expect(OptionTone.tone(of: "urgent", in: field, isPriority: true) == OptionTone.tone(for: "Urgent"))
+    }
+
+    @Test func aPanelsChoiceRowsAndAListRowsPriorityAgree() {
+        let field = priority(["low", "medium", "high", "urgent"])
+        let rows = ValueEditOptions.choiceRows(field: field, current: "high", isPriority: true)
+        #expect(rows.map(\.mark) == [.dot(.purple), .dot(.yellow), .dot(.red), .dot(.blue)])
+        let plain = ValueEditOptions.choiceRows(field: field, current: nil, isPriority: false)
+        #expect(plain.map(\.mark) == ["Low", "Medium", "High", "Urgent"].map { .dot(OptionTone.tone(for: $0)) })
+    }
+
+    @Test func aFileTypeStartsWithPicturesWithoutNamingAnImageType() {
+        let catalogue = Catalogue(itemTypes: [
+            info("core.file"), info("core.file.image", parent: "core.file"), info("acme.scan", parent: "core.file"), info("core.note"),
+        ])
+        #expect(ListRowStyle.fromFields(of: TypeID("acme.scan"), in: catalogue) == .withPictures)
+        #expect(ListRowStyle.fromFields(of: TypeID("core.file.image"), in: catalogue) == .withPictures)
+        #expect(ListRowStyle.fromFields(of: TypeID("core.note"), in: catalogue) == nil)
+    }
+
+    @Test func storedTypeChoicesAreWrittenInOneOrder() {
+        var choices = ListTypeStyles()
+        for type in ["core.task", "core.note", "acme.a", "core.file.image"] { choices[TypeID(type)] = .compact }
+        #expect(choices.rawValue == #"{"acme.a":"compact","core.file.image":"compact","core.note":"compact","core.task":"compact"}"#)
     }
 }
 
@@ -112,7 +156,7 @@ struct TaskRowFactsTests {
     }
 
     private func facts(_ item: Item) -> TaskRowFacts {
-        TaskRowFacts.make(for: item, catalogue: catalogue, now: now, format: .automatic, calendar: calendar, locale: Locale(identifier: "en_GB"))
+        TaskRowFacts.make(for: item, type: ListRowType(item.type, style: .task, in: catalogue), now: now, format: .automatic, calendar: calendar, locale: Locale(identifier: "en_GB"))
     }
 
     @Test func dueDatesReadAsWords() {
@@ -124,11 +168,18 @@ struct TaskRowFactsTests {
     }
 
     @Test func aFinishedTaskShowsWhenItFinishedAndNoDueDate() {
-        let done = facts(task(["status": .string("done"), "due_at": .string("2026-11-01")]))
+        let done = facts(task(["status": .string("done"), "due_at": .string("2026-11-01"), "completed_at": .string("2026-11-09")]))
         #expect(done.due == nil)
         #expect(done.finish == "Yesterday")
         let dropped = facts(task(["status": .string("dropped"), "completed_at": .string("2026-06-15")]))
         #expect(dropped.finish == "Canceled 15 Jun")
+    }
+
+    @Test func aFinishedTaskWithNoFinishTimeNeverShowsItsEditDayAsOne() {
+        let done = facts(task(["status": .string("done")]))
+        #expect(done.finish == nil)
+        #expect(done.due == nil)
+        #expect(facts(task(["status": .string("dropped")])).finish == "Canceled")
     }
 
     @Test func aRowHasOnlyWhatTheItemHolds() {
@@ -142,6 +193,7 @@ struct TaskRowFactsTests {
         ]))
         #expect(full.statusGroup == .notStarted)
         #expect(full.priority == "high")
+        #expect(full.priorityTone == .blue)
         #expect(full.people == .init(initials: "RK", label: "2 people"))
         #expect(full.repeats == "Yearly")
     }
