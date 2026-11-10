@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The panel's Columns, for the table: the name stays and is first, the others are shown or hidden with the eye and
-/// dragged into order. A saved view's choices are held until Save, and a place's own apply at once and keep their
+/// dragged into order. A saved view's choices are stored for this Mac as made, and a place's own apply at once and keep their
 /// order, which only a view arranges.
 struct ViewPanelColumns: View {
     @Environment(\.interfaceTextSize) private var textSize

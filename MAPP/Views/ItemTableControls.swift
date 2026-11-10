@@ -36,8 +36,8 @@ struct FilterCommands: View {
 }
 
 /// The table's part of View Options (`CurrentViewOptions`): Sort, Group and the columns shown. Sort and Group are the
-/// place's, for the window; the columns shown are kept for the place (`ItemTableColumnLayouts`), or held for a saved
-/// view until Save (`Browser.setColumn`). A saved view's list
+/// place's, for the window; the columns shown are kept for the place (`ItemTableColumnLayouts`), or stored for a saved
+/// view (`Browser.setColumn`). A saved view's list
 /// and gallery take its Sort and Group too, without the table's rows at a time and columns (`columns` false).
 struct ItemTableViewOptions: View {
     @CurrentLibrary private var library

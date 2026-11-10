@@ -229,7 +229,7 @@ private struct SidebarViewsSection: View, Equatable {
     }
 }
 
-/// The view a New View panel is making, drawn as the selected row of Views until Save makes it or Cancel drops it. It
+/// The view a New View panel is making, drawn as the selected row of Views until Done makes it or Escape drops it. It
 /// is no place yet, so it takes no selection of its own.
 private struct SidebarPendingViewRow: View {
     let browser: Browser

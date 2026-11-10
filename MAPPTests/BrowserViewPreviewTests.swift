@@ -94,7 +94,7 @@ struct BrowserViewPreviewTests {
         browser.tableOptions[browser.item]?.negated = []
         #expect(browser.viewPreview != nil)
         let saved = Self.view(version: 2, filter: #"properties.status eq "todo""#)
-        browser.viewUpdated(saved, in: library)
+        browser.seed(saved, catalogue: library.catalogue)
         #expect(!browser.hasViewChanges)
         #expect(browser.viewPreview == nil)
     }
