@@ -80,4 +80,13 @@ struct PalettePicksTests {
         let picks = PaletteMatch.Titles().picks(fixed: [], items: ["a1", "a2", "a3"], "a", limit: 2)
         #expect(picks == [.item(0), .item(1)])
     }
+
+    @Test func theMatchedRunIsFoundIgnoringCaseAndAccents() {
+        let title = "Café Kitchen quotes"
+        let range = PaletteMatch.matchRange(in: title, "kitch")
+        #expect(range.map { String(title[$0]) } == "Kitch")
+        #expect(PaletteMatch.matchRange(in: title, "cafe").map { String(title[$0]) } == "Café")
+        #expect(PaletteMatch.matchRange(in: title, "kq") == nil)
+        #expect(PaletteMatch.matchRange(in: title, "  ") == nil)
+    }
 }

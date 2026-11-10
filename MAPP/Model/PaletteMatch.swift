@@ -61,6 +61,18 @@ nonisolated enum PaletteMatch {
         score(folded: Array(fold(title)), Query(query))
     }
 
+    static func score(_ title: String, query: Query) -> Int? {
+        score(folded: Array(fold(title)), query)
+    }
+
+    /// Where the title holds what was typed in one piece, for showing it in bold, ignoring case and accents; nil
+    /// when it holds the typed letters only spread out, or not at all.
+    static func matchRange(in title: String, _ query: String) -> Range<String.Index>? {
+        let typed = query.trimmingCharacters(in: .whitespaces)
+        guard !typed.isEmpty else { return nil }
+        return title.range(of: typed, options: [.caseInsensitive, .diacriticInsensitive])
+    }
+
     /// The same score, for a title already folded and read as characters.
     static func score(folded title: [Character], _ query: Query) -> Int? {
         guard !query.isEmpty else { return 0 }

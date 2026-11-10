@@ -190,6 +190,8 @@ final class Browser {
             quickAdd.isPresented = false
         }
     }
+    /// Counts the ⌘K pressed while a palette is out, which opens or shuts its Actions.
+    var paletteActionsRequests = 0
     /// The window's quick-add panel and what is typed in it.
     let quickAdd = QuickAdd()
     /// Whether the list's search is out as a field, rather than a button beside View Options.

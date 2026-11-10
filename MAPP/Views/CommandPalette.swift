@@ -2,9 +2,10 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// ⌘K: one field that reaches the window's commands, the places in the sidebar and the notes by title. ⇧⌘P: the
-/// same field searching the text of every note, each found note shown with the words around what was found.
-/// Arrow keys choose, Return runs, and Escape or a click outside puts it away. The commands are only what could
-/// be done now, so what it lists is what the menus have enabled.
+/// same field searching the text of every note, each found note shown with the words around what was found. Both
+/// list in sections, and what a row can do is in Actions (⌘K again). Arrow keys choose, Return runs, and Escape or
+/// a click outside puts it away. The commands are only what could be done now, so what it lists is what the menus
+/// have enabled.
 struct CommandPalette: View {
     @CurrentLibrary private var library
     @FocusedValue(\.detailsPresentation) private var details
@@ -17,11 +18,17 @@ struct CommandPalette: View {
     @AppStorage(OrderKey.sort) private var sort = NoteOrder().sort
     @AppStorage(OrderKey.groupsByDate) private var groupsByDate = NoteOrder().groupsByDate
     @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
+    @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     let browser: Browser
     let editor: EditorController
     let mode: Browser.Palette
     @State private var query = ""
     @State private var highlighted = 0
+    /// Moves the list to a row the keyboard chose, never one the pointer is over, which would slide rows under it.
+    @State private var scrollTarget: String?
+    /// The row Actions is open for, by its identifier, or nil while it is shut.
+    @State private var actionsFor: String?
+    @State private var showsFilters = false
     /// Where the keyboard was before the palette took it, and goes back to once the palette is put away.
     @State private var returnFocus: Browser.Pane = .list
     /// Every note's title folded once while the palette is open, so a keystroke folds only what was typed.
@@ -31,19 +38,8 @@ struct CommandPalette: View {
     @State private var listing = Listing()
     @FocusState private var isFieldFocused: Bool
 
-    private struct Entry: Identifiable {
-        let id: String
-        let title: String
-        var detail: String?
-        /// The words around what a search found, or an item's preview where nothing was searched for.
-        var snippet: String?
-        var excerpt: SearchExcerpt?
-        let icon: RowIcon
-        var shortcut: String?
-        /// Another interface takes the keyboard itself, so the note should not regain focus first.
-        var takesFocus = false
-        let action: () -> Void
-    }
+    private typealias Entry = PaletteEntry
+    private typealias Section = PaletteSections.Section<PaletteEntry>
 
     /// Everything that can change what the palette lists, other than the query.
     private struct Basis: Equatable {
@@ -74,14 +70,19 @@ struct CommandPalette: View {
               mode: mode, returnFocus: returnFocus, selection: browser.selection)
     }
 
+    private var isTyped: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
     /// A search is never held: its answer arrives later, through the library's own observed state, which the body
     /// must read each time to run again.
-    private func shown() -> [Entry] {
+    private func shown() -> [Section] {
         mode == .search ? found : matching(basis)
     }
 
     var body: some View {
-        let entries = shown()
+        let sections = shown()
+        let rows = sections.flatMap(\.rows)
+        let chosen = rows.indices.contains(highlighted) ? highlighted : max(rows.count - 1, 0)
+        let target = actionsFor.flatMap { id in rows.first { $0.id == id } }
         VStack(spacing: 0) {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
@@ -90,48 +91,47 @@ struct CommandPalette: View {
                     .textFieldStyle(.plain)
                     .interfaceFont(.title3)
                     .focused($isFieldFocused)
-                    .onSubmit { run(entries) }
+                    .onSubmit { run(rows, at: chosen) }
                     .onExitCommand { close() }
                     .accessibilityIdentifier("CommandPaletteField")
-            }
-            .padding(12)
-            Divider()
-            if entries.isEmpty {
-                Text("No Results")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(20)
-            } else {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            ForEach(entries.indices, id: \.self) { index in
-                                row(entries[index], isHighlighted: index == highlighted)
-                                    .id(index)
-                                    .onTapGesture { run(entries, at: index) }
-                            }
-                        }
-                        .padding(6)
-                    }
-                    .frame(maxHeight: 460)
-                    .onChange(of: highlighted) { proxy.scrollTo(highlighted) }
+                if isTyped {
+                    Text(rows.count == 1 ? String(localized: "1 result") : String(localized: "\(rows.count) results"))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .accessibilityIdentifier("CommandPaletteCount")
                 }
             }
+            .padding(12)
+            if showsFilters {
+                PaletteFilterRow()
+            }
+            Divider()
+            results(sections, rows: rows, chosen: chosen, target: target)
         }
-        .floatingPanelSurface(width: 520)
+        .floatingPanelSurface(width: 680)
         .onKeyPress(.downArrow) {
-            highlighted = min(highlighted + 1, max(entries.count - 1, 0))
+            highlighted = min(chosen + 1, max(rows.count - 1, 0))
+            scrollTarget = rows.indices.contains(highlighted) ? rows[highlighted].id : nil
             return .handled
         }
         .onKeyPress(.upArrow) {
-            highlighted = max(highlighted - 1, 0)
+            highlighted = max(chosen - 1, 0)
+            scrollTarget = rows.indices.contains(highlighted) ? rows[highlighted].id : nil
             return .handled
         }
         .onKeyPress(.escape) {
             close()
             return .handled
         }
-        .onChange(of: query) { highlighted = 0 }
+        .onChange(of: query) {
+            highlighted = 0
+            scrollTarget = nil
+        }
+        // The row Actions is open for may go while it is open, as another device deletes it.
+        .onChange(of: actionsFor != nil && (target == nil || target?.item.map { library.item($0) == nil } == true)) { _, isGone in
+            if isGone { closeActions() }
+        }
+        .onChange(of: browser.paletteActionsRequests) { toggleActions(rows, chosen: chosen) }
         .onAppear { returnFocus = editor.isFocused ? .page : .list }
         // The field takes the keyboard once the palette is in the window; asked any sooner, the list keeps it.
         .defaultFocus($isFieldFocused, true)
@@ -143,42 +143,87 @@ struct CommandPalette: View {
         .accessibilityLabel("Command Palette")
     }
 
-    private func row(_ entry: Entry, isHighlighted: Bool) -> some View {
-        HStack(spacing: 10) {
-            RowIconImage(icon: entry.icon)
-                .frame(width: 20)
-                .foregroundStyle(isHighlighted ? .white : .secondary)
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 10) {
-                    Text(entry.title)
-                        .lineLimit(1)
-                    if let detail = entry.detail {
-                        Text(detail)
-                            .foregroundStyle(isHighlighted ? .white.opacity(0.8) : .secondary)
-                            .lineLimit(1)
-                    }
-                }
-                if let text = entry.excerpt?.attributed(matchColor: isHighlighted ? .white : .primary) ?? entry.snippet.map({ AttributedString($0) }) {
-                    Text(text)
-                        .interfaceFont(.callout)
-                        .foregroundStyle(isHighlighted ? .white.opacity(0.8) : .secondary)
-                        .lineLimit(1)
+    /// The rows, or "No Results", with the filter button, the footer and Actions floating over them.
+    private func results(_ sections: [Section], rows: [Entry], chosen: Int, target: Entry?) -> some View {
+        ZStack(alignment: .bottom) {
+            if rows.isEmpty {
+                Text("No Results")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 110)
+            } else {
+                list(sections, chosen: chosen)
+            }
+            if actionsFor != nil {
+                // A click beside the panel puts it away and keeps the palette.
+                Color.clear
+                    .contentShape(.rect)
+                    .onTapGesture { closeActions() }
+            }
+            HStack(alignment: .bottom) {
+                PaletteFilterButton(count: filterCount, isOn: showsFilters) { showsFilters.toggle() }
+                Spacer(minLength: 0)
+                if let row = rows.indices.contains(chosen) ? rows[chosen] : nil {
+                    PaletteFooter(
+                        openTitle: openTitle(for: row), onOpen: { run(rows, at: chosen) },
+                        onActions: { toggleActions(rows, chosen: chosen) })
                 }
             }
-            Spacer(minLength: 8)
-            if let shortcut = entry.shortcut {
-                Text(shortcut)
-                    .foregroundStyle(isHighlighted ? .white.opacity(0.8) : .secondary)
+            .padding(10)
+            if let target {
+                PaletteActionsPanel(title: target.title, actions: actions(for: target)) { action in
+                    perform(action, on: target)
+                } close: {
+                    closeActions()
+                }
+                .padding(.trailing, 10)
+                .padding(.bottom, 54)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             }
         }
-        .foregroundStyle(isHighlighted ? .white : .primary)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(isHighlighted ? Color.accentColor : .clear, in: .rect(cornerRadius: 6))
-        .contentShape(.rect)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
-        .accessibilityAddTraits(isHighlighted ? .isSelected : [])
+        .frame(minHeight: actionsFor == nil ? 0 : 340)
+    }
+
+    private func list(_ sections: [Section], chosen: Int) -> some View {
+        var offset = 0
+        let numbered = sections.map { section in
+            defer { offset += section.rows.count }
+            return (section: section, start: offset)
+        }
+        return ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(numbered, id: \.section.kind) { group in
+                        PaletteSectionHeader(title: group.section.kind.title)
+                        ForEach(Array(group.section.rows.enumerated()), id: \.element.id) { position, entry in
+                            let index = group.start + position
+                            PaletteRow(
+                                entry: entry, query: query, isHighlighted: index == chosen,
+                                isSearch: mode == .search
+                            ) {
+                                if highlighted != index { highlighted = index }
+                            } onRun: {
+                                run(sections.flatMap(\.rows), at: index)
+                            }
+                            .id(entry.id)
+                        }
+                    }
+                }
+                .padding(.horizontal, 6)
+                .padding(.top, 2)
+                // Room under the last row for the buttons that float over the list.
+                .padding(.bottom, 56)
+            }
+            .frame(maxHeight: 460)
+            .onChange(of: scrollTarget) { if let scrollTarget { proxy.scrollTo(scrollTarget) } }
+        }
+    }
+
+    /// Filters are not offered yet; the filter row (`PaletteFilterRow`) shows only its add button.
+    private var filterCount: Int { 0 }
+
+    private func openTitle(for row: Entry) -> String {
+        if row.item == nil { return String(localized: "Run") }
+        return mode == .search ? String(localized: "Open at Match") : String(localized: "Open")
     }
 
     // MARK: Running
@@ -195,12 +240,68 @@ struct CommandPalette: View {
         if returningFocus, browser.focusRequest == nil { browser.focusRequest = returnFocus }
     }
 
+    // MARK: Actions
+
+    private func toggleActions(_ rows: [Entry], chosen: Int) {
+        if actionsFor != nil {
+            closeActions()
+        } else if rows.indices.contains(chosen) {
+            actionsFor = rows[chosen].id
+        }
+    }
+
+    private func closeActions() {
+        actionsFor = nil
+        isFieldFocused = true
+    }
+
+    private func actions(for row: Entry) -> [PaletteAction] {
+        guard let id = row.item, let item = library.item(id) else { return PaletteAction.forCommand }
+        return PaletteAction.forItem(isFile: item.isFile, isFavorite: item.isFavorite, isActive: item.state == .active)
+    }
+
+    /// Does what the action says through the same path as the menus, once the palette is put away.
+    private func perform(_ action: PaletteAction, on row: Entry) {
+        guard let id = row.item, let item = library.item(id) else {
+            if action.kind == .run { run([row], at: 0) }
+            return
+        }
+        switch action.kind {
+        case .open, .run:
+            run([row], at: 0)
+        case .openInNewWindow:
+            close()
+            ItemWindows.open(library.idsForWindows([id])) { openWindow(value: $0) }
+        case .copyLink:
+            close()
+            Task {
+                if let link = await library.bodyLink(to: id, in: nil) {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(link, forType: .string)
+                } else {
+                    library.notices.tell(String(localized: "Can’t Copy Link"), String(localized: "No link names this item on its own yet."))
+                }
+            }
+        case .addToFavorites, .removeFromFavorites:
+            close()
+            library.setFavorite([id], action.kind == .addToFavorites, undoManager: undoManager)
+        case .versionHistory:
+            close(returningFocus: false)
+            reveal(item)
+            details?.showHistory(of: id, in: library)
+        case .delete:
+            close()
+            library.deleteAfterSaving([id], undoManager: undoManager, asking: details)
+        }
+    }
+
     // MARK: What it offers
 
-    /// The commands and places that answer the query, then the notes, in the order in which equally good matches are
-    /// listed. The commands are built each time, since what they offer changes under an open palette. The titles are ranked first and an entry is built only for each of the best `PaletteMatch.listLimit`
-    /// notes, never for every item in the library.
-    private func matching(_ basis: Basis) -> [Entry] {
+    /// The commands, places and notes that answer the query, in sections. The commands are built each time, since
+    /// what they offer changes under an open palette. The titles are ranked first and an entry is built only for each
+    /// of the best `PaletteMatch.listLimit` notes, never for every item in the library.
+    private func matching(_ basis: Basis) -> [Section] {
+        let commands = commands
         let fixed = commands + places
         let fixedTitles = fixed.map(\.title)
         let recent = browser.paletteIndex(in: library).recent
@@ -211,7 +312,7 @@ struct CommandPalette: View {
             itemTitles = recent.map(\.title)
             listing.itemTitles = (basis, itemTitles)
         }
-        let typed = !query.trimmingCharacters(in: .whitespaces).isEmpty
+        let typed = isTyped
         let key = Ranking(basis: basis, query: query, fixedTitles: fixedTitles)
         let picks: [PaletteMatch.Pick]
         if let held = listing.ranking, held.key == key {
@@ -220,11 +321,14 @@ struct CommandPalette: View {
             picks = titles.picks(fixed: fixedTitles, items: typed ? itemTitles : [], query)
             listing.ranking = (key, picks)
         }
-        return picks.map { pick in
-            switch pick {
-            case .fixed(let index): fixed[index]
-            case .item(let index): note(recent[index])
-            }
+        let sections = PaletteSections.forCommands(picks: picks, typed: typed, commandCount: commands.count, recentCount: recent.count)
+        return sections.map { section in
+            Section(kind: section.kind, rows: section.rows.map { pick in
+                switch pick {
+                case .fixed(let index): fixed[index]
+                case .item(let index): note(recent[index])
+                }
+            })
         }
     }
 
@@ -237,21 +341,26 @@ struct CommandPalette: View {
         Array(results.items.prefix(searchLimit))
     }
 
-    /// Items whose text or title has what was typed, best match first, or the most recently edited before anything is.
-    private var found: [Entry] {
-        let isEmpty = query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        let results = isEmpty ? nil : library.search(query, in: .everywhere)
+    /// Items whose text or title has what was typed, best match first, with the notes named by the words typed
+    /// apart from those that hold them in the text; or the most recently edited before anything is typed.
+    private var found: [Section] {
+        let results = isTyped ? library.search(query, in: .everywhere) : nil
         let items = results.map(Self.listed) ?? Array(browser.paletteIndex(in: library).recent.prefix(12))
-        return items.map { item in
+        let now = library.now()
+        let entries = items.map { item in
             // An excerpt that is the title says nothing the title does not, so the preview stands.
             let excerpt = results?.excerpts[item.id].flatMap { $0.plainText == item.name ? nil : $0 }
             return Entry(
                 id: "note:\(item.id)", title: item.displayTitle, detail: library.placeLabel(of: item),
                 snippet: item.preview.isEmpty ? nil : item.preview, excerpt: excerpt,
-                icon: .type(library.catalogue.icon(for: item.type)), takesFocus: true
+                date: DateDisplay.text(of: item.modified, place: .list, format: dateFormat, now: now),
+                icon: .type(library.catalogue.icon(for: item.type)), item: item.id, takesFocus: true
             ) {
                 reveal(item)
             }
+        }
+        return PaletteSections.forSearch(rows: entries, typed: isTyped) { entry in
+            PaletteMatch.matchRange(in: entry.title, query) != nil
         }
     }
 
@@ -472,9 +581,10 @@ struct CommandPalette: View {
         }
     }
 
-    /// An item by title, with its type, or the Inbox for one waiting there.
+    /// An item by title, with its type.
     private func note(_ item: Item) -> Entry {
-        Entry(id: "note:\(item.id)", title: item.displayTitle, detail: library.placeLabel(of: item), icon: .type(library.catalogue.icon(for: item.type)), takesFocus: true) {
+        Entry(id: "note:\(item.id)", title: item.displayTitle, detail: library.placeLabel(of: item),
+              icon: .type(library.catalogue.icon(for: item.type)), item: item.id, takesFocus: true) {
             reveal(item)
         }
     }
