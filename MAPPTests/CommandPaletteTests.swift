@@ -95,6 +95,36 @@ struct CommandPaletteTests {
         #expect(PaletteSections.resultCount(sections) == 6)
     }
 
+    /// The sections ⌘K lists for a typed title, ranked as the palette ranks them. Commands are the first fixed titles.
+    private func sections(fixed: [String], commandCount: Int, items: [String], typing query: String) -> [PaletteSections.Section<Pick>] {
+        let scored = PaletteMatch.Titles().scoredPicks(fixed: fixed, items: items, query)
+        return PaletteSections.forCommands(picks: scored.map(\.pick), scores: scored.map(\.score), typed: true, commandCount: commandCount, recentCount: items.count)
+    }
+
+    @Test func theSectionHoldingTheBestMatchComesFirstSoReturnRunsTheCommandTyped() {
+        let sections = sections(fixed: ["New Item", "New Note", "Inbox"], commandCount: 2, items: ["Test the new item flow", "Garden ideas"], typing: "new item")
+        #expect(sections.map(\.kind) == [.commands, .items])
+        #expect(sections[0].rows.first == .fixed(0), "New Item is the first row")
+        #expect(sections[1].rows == [.item(0)])
+    }
+
+    @Test func anItemTypedByItsExactTitleLeadsTheCommandsThatHoldTheWords() {
+        let sections = sections(fixed: ["New Item", "Show New Items"], commandCount: 2, items: ["new item"], typing: "new item")
+        #expect(sections.map(\.kind) == [.items, .commands])
+    }
+
+    @Test func sectionsWhoseBestMatchesTieKeepItemsFirst() {
+        let sections = sections(fixed: ["Rename Item", "Inbox"], commandCount: 1, items: ["Rename the shed", "Rename Garden"], typing: "ren")
+        #expect(sections.first?.kind == .items)
+        let tied = PaletteSections.forCommands(picks: [.fixed(0), .item(0)], scores: [1, 1], typed: true, commandCount: 1, recentCount: 1)
+        #expect(tied.map(\.kind) == [.items, .commands])
+    }
+
+    @Test func aPlaceLeadsWhenItHoldsTheBestMatch() {
+        let sections = sections(fixed: ["New Note", "Inbox"], commandCount: 1, items: ["Move to the inbox"], typing: "inbox")
+        #expect(sections.map(\.kind) == [.places, .items])
+    }
+
     @Test func itemsAreCutToEightWithALastRowThatSearchesTheNotes() {
         let picks: [Pick] = (0..<52).map(Pick.item) + [.fixed(1), .fixed(0)]
         let sections = PaletteSections.forCommands(picks: picks, typed: true, commandCount: 1, recentCount: 60)

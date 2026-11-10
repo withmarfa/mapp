@@ -64,7 +64,7 @@ struct CommandPalette: View {
     /// palette is open and are not part of the basis.
     private final class Listing {
         var itemTitles: (basis: Basis, titles: [String])?
-        var ranking: (key: Ranking, picks: [PaletteMatch.Pick])?
+        var ranking: (key: Ranking, picks: [PaletteMatch.Pick], scores: [Int])?
     }
 
     private struct Ranking: Equatable {
@@ -405,13 +405,16 @@ struct CommandPalette: View {
         let typed = isTyped
         let key = Ranking(basis: basis, query: query, fixedTitles: fixedTitles)
         let picks: [PaletteMatch.Pick]
+        let scores: [Int]
         if let held = listing.ranking, held.key == key {
-            picks = held.picks
+            (picks, scores) = (held.picks, held.scores)
         } else {
-            picks = titles.picks(fixed: fixedTitles, items: typed ? itemTitles : [], query)
-            listing.ranking = (key, picks)
+            let scored = titles.scoredPicks(fixed: fixedTitles, items: typed ? itemTitles : [], query)
+            picks = scored.map(\.pick)
+            scores = scored.map(\.score)
+            listing.ranking = (key, picks, scores)
         }
-        let sections = PaletteSections.forCommands(picks: picks, typed: typed, commandCount: commands.count, recentCount: recent.count)
+        let sections = PaletteSections.forCommands(picks: picks, scores: scores, typed: typed, commandCount: commands.count, recentCount: recent.count)
         return sections.map { section in
             Section(kind: section.kind, rows: section.rows.map { pick in
                 switch pick {

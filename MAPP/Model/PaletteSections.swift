@@ -34,8 +34,11 @@ nonisolated enum PaletteSections {
 
     /// ⌘K's sections. Before anything is typed, the most recent items and then every command. Once something is
     /// typed, the items, the places and the commands that answer it, each in the order it was ranked and each only
-    /// if it has rows. Items are cut to `itemLimit`, and a last row sends the rest to Search Notes. `commandCount` is how many of the fixed picks (commands first, then places) are commands.
-    static func forCommands(picks: [PaletteMatch.Pick], typed: Bool, commandCount: Int, recentCount: Int) -> [Section<PaletteMatch.Pick>] {
+    /// if it has rows. The section holding the best match (`scores`, one per pick, lower is better) comes first, so
+    /// Return runs it; sections whose best matches tie keep the order Items, Places, Commands. Items are cut to
+    /// `itemLimit`, and a last row sends the rest to Search Notes. `commandCount` is how many of the fixed picks
+    /// (commands first, then places) are commands.
+    static func forCommands(picks: [PaletteMatch.Pick], scores: [Int] = [], typed: Bool, commandCount: Int, recentCount: Int) -> [Section<PaletteMatch.Pick>] {
         guard typed else {
             let recent = (0..<min(recentCount, recentLimit)).map(PaletteMatch.Pick.item)
             let commands = (0..<commandCount).map(PaletteMatch.Pick.fixed)
@@ -44,15 +47,24 @@ nonisolated enum PaletteSections {
         var items: [PaletteMatch.Pick] = []
         var places: [PaletteMatch.Pick] = []
         var commands: [PaletteMatch.Pick] = []
-        for pick in picks {
+        var best: [Kind: Int] = [:]
+        for (position, pick) in picks.enumerated() {
+            let kind: Kind
             switch pick {
-            case .item: items.append(pick)
-            case .searchNotes: break
-            case .fixed(let index): if index < commandCount { commands.append(pick) } else { places.append(pick) }
+            case .item: kind = .items; items.append(pick)
+            case .searchNotes: continue
+            case .fixed(let index):
+                if index < commandCount { kind = .commands; commands.append(pick) } else { kind = .places; places.append(pick) }
             }
+            let score = position < scores.count ? scores[position] : 0
+            best[kind] = min(best[kind] ?? score, score)
         }
         if items.count > itemLimit { items = Array(items.prefix(itemLimit)) + [.searchNotes] }
-        return dropEmpty([.init(kind: .items, rows: items), .init(kind: .places, rows: places), .init(kind: .commands, rows: commands)])
+        let sections = dropEmpty([.init(kind: .items, rows: items), .init(kind: .places, rows: places), .init(kind: .commands, rows: commands)])
+        // A stable sort keeps the order above for sections whose best matches tie.
+        return sections.enumerated().sorted { a, b in
+            (best[a.element.kind] ?? 0, a.offset) < (best[b.element.kind] ?? 0, b.offset)
+        }.map(\.element)
     }
 
     /// Search Notes' sections: what was found by title, then what was found by its text, each in the order the

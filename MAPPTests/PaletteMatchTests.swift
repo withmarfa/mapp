@@ -21,6 +21,14 @@ struct PaletteMatchTests {
         #expect(PaletteMatch.ranked(["New Note", "Nnn"], "nn") == [1, 0])
     }
 
+    @Test func theWordsTypedInOnePieceBeatTheSameLettersSpreadOut() {
+        let typed = "new item"
+        #expect(PaletteMatch.score("New Item", typed) == 0)
+        #expect(PaletteMatch.score("Test the new item flow", typed) == 1)
+        #expect(PaletteMatch.score("Nothing ever works in the team", typed) == 3)
+        #expect(PaletteMatch.score("Test the new item flow", typed)! < PaletteMatch.score("Nothing ever works in the team", typed)!)
+    }
+
     @Test func anEmptyQueryKeepsEveryTitleInOrder() {
         #expect(PaletteMatch.ranked(["b", "a"], "  ") == [0, 1])
     }

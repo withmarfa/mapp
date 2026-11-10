@@ -233,7 +233,8 @@ final class WindowTests: XCTestCase {
 
         app.typeKey("k", modifierFlags: .command)
         XCTAssertTrue(field.waitForExistence(timeout: 2))
-        // Items lead what is typed, so the words are the command's own, which no note's title shares.
+        // The section holding the best match leads, so New Item, an exact title match, is the first row even though
+        // the sample library has an item whose title holds the same words.
         app.typeText("new item")
         app.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(field.waitForNonExistence(timeout: 2))
