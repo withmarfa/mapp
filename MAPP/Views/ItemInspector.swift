@@ -10,12 +10,19 @@ struct ItemInspectorHost: View {
     let browser: Browser?
     let itemID: ItemID?
     let details: DetailsPresentation
+    /// The page beside the sidebar, which lists the headings of the note on it and goes to one, for the Outline section.
+    /// Nil where no page is beside the sidebar, and the Outline then has no rows.
+    var editor: EditorController?
     @State private var editing: ItemRelationship?
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
 
-    init(browser: Browser, details: DetailsPresentation) { self.browser = browser; itemID = nil; self.details = details }
-    init(itemID: ItemID, details: DetailsPresentation = DetailsPresentation()) { self.itemID = itemID; browser = nil; self.details = details }
+    init(browser: Browser, details: DetailsPresentation, editor: EditorController? = nil) {
+        self.browser = browser; itemID = nil; self.details = details; self.editor = editor
+    }
+    init(itemID: ItemID, details: DetailsPresentation = DetailsPresentation(), editor: EditorController? = nil) {
+        self.itemID = itemID; browser = nil; self.details = details; self.editor = editor
+    }
 
     private var selectedID: ItemID? { itemID ?? (browser?.selection.count == 1 ? browser?.selection.first : nil) }
 
@@ -25,11 +32,13 @@ struct ItemInspectorHost: View {
                 ViewEditPanel(browser: browser, panel: panel)
                     .onExitCommand { browser.escapeViewPanel(in: library) }
             } else if let id = selectedID, let item = library.item(id), details.isCustomizingLayout, PageCustomization.isAvailable(for: item) {
-                ItemLayoutPanel(item: item)
+                ItemLayoutPanel(item: item, outline: editor?.headings(of: id) ?? [])
                     .onExitCommand { details.endLayout() }
             } else if let id = selectedID, let item = library.item(id) {
                 let placement = placements.placement(of: item.type, in: library.catalogue)
                 let relationships = library.relationships(for: id)
+                let sections = placement.sidebarSections.compactMap(SidebarSection.init(id:))
+                let outline = editor?.headings(of: id) ?? []
                 ItemInspector(
                     item: item,
                     type: library.catalogue.itemTypes[item.type],
@@ -50,10 +59,13 @@ struct ItemInspectorHost: View {
                     onRemoveTag: { library.removeTag($0, from: [id], undoManager: undoManager) },
                     drafts: details,
                     placement: placement,
-                    onPlace: PageCustomization.isAvailable(for: item) ? { row, shown in placements.set(shown, row: row, of: item.type) } : nil,
+                    onPlace: PageCustomization.isAvailable(for: item) ? { row, shown in placements.set(shown, row: row, of: item.type, in: library.catalogue) } : nil,
                     drawnByPage: PageCustomization.drawnKeys(of: item, in: library.catalogue),
                     linked: placement.linkedFromPlace == .inspector ? linked(to: item, in: relationships) : [],
-                    typeIcon: { target in library.item(target).flatMap { library.catalogue.icon(for: $0.type) } }
+                    typeIcon: { target in library.item(target).flatMap { library.catalogue.icon(for: $0.type) } },
+                    sections: sections,
+                    extras: SidebarExtras.of(item, in: library, relationships: relationships, sections: sections, outline: outline),
+                    onHeading: { editor?.revealHeading(at: $0) }
                 )
                 .id(id)
             } else {
@@ -75,8 +87,12 @@ struct ItemInspectorHost: View {
     /// The items that link to the one shown, newest first. A collection's members are its contents, which stay on
     /// its page.
     private func linked(to item: Item, in relationships: [ItemRelationship]) -> [LinkedItem] {
+        Self.linked(to: item, in: relationships, library: library, format: dateFormat)
+    }
+
+    static func linked(to item: Item, in relationships: [ItemRelationship], library: any ItemLibrary, format: DateFormat) -> [LinkedItem] {
         LinkedItem.list(
-            pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: library.now(), format: dateFormat,
+            pointingTo: item.id, in: relationships, catalogue: library.catalogue, now: library.now(), format: format,
             members: library.catalogue.isCollection(item.type) ? .excluding : .all, item: { library.item($0) })
     }
 
@@ -135,6 +151,13 @@ struct ItemInspector: View {
     var linked: [LinkedItem] = []
     /// The icon of the type of the item with this identifier, for the rows that name an item.
     var typeIcon: (ItemID) -> String? = { _ in nil }
+    /// The sections to list, in order: the person's arrangement for the item's type. A section with nothing to show for
+    /// this item is left out of what is drawn but keeps its place in the arrangement.
+    var sections: [SidebarSection] = SidebarSection.defaults
+    /// What the outline, attachments, collections and app sections hold for this item.
+    var extras = SidebarExtras()
+    /// Goes to a heading of the item's text.
+    var onHeading: (Int) -> Void = { _ in }
     /// Holds what the window keeps for the inspector when no window gives it, as in a preview.
     @State private var ownPresentation = DetailsPresentation()
     /// The empty properties the person has added, and the ones they have edited, which stay listed if cleared.
@@ -158,12 +181,21 @@ struct ItemInspector: View {
                     Label("Read only. A connector manages this item, so changes made here would be overwritten.", systemImage: "lock")
                         .interfaceFont(.callout).foregroundStyle(.secondary)
                 }
-                detailsSection
-                if hasProperties { properties }
-                if hasRelationships { relationshipSection }
-                if !mentions.isEmpty { linksInPageSection }
-                if !linked.isEmpty { linkedFromSection }
-                if hasTags { tagSection }
+                ForEach(sections, id: \.id) { section in
+                    switch section {
+                    case .details: detailsSection
+                    case .properties: if hasProperties { properties }
+                    case .relationships: if hasRelationships { relationshipSection }
+                    case .linksInPage: if !mentions.isEmpty { linksInPageSection }
+                    case .linkedFrom: if !linked.isEmpty { linkedFromSection }
+                    case .tags: if hasTags { tagSection }
+                    case .outline: if !extras.outline.isEmpty { outlineSection }
+                    case .attachments: if !extras.attachments.isEmpty { itemsSection(.attachments, title: "Attachments", targets: extras.attachments) }
+                    case .collections: if !extras.collections.isEmpty { itemsSection(.collections, title: "Collections", targets: extras.collections) }
+                    case .app:
+                        if let app = extras.apps.first(where: { $0.section == section }) { appSection(app) }
+                    }
+                }
             }
             .sharesInspectorNameColumn()
             .padding(.horizontal, 16)
@@ -291,6 +323,54 @@ struct ItemInspector: View {
             }
         }
         .showOnPageMenu(isShown: false, onChange: showOnPage(PagePlacement.linkedFrom))
+    }
+
+    /// The note's headings; one goes to its place in the text.
+    private var outlineSection: some View {
+        InspectorSectionView(.outline, title: "Outline", count: extras.outline.count) {
+            ForEach(extras.outline) { heading in
+                Button { onHeading(heading.index) } label: {
+                    Text(verbatim: heading.text)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .padding(.leading, CGFloat(heading.level - 1) * 10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(InspectorRowButtonStyle())
+                .foregroundStyle(.primary)
+                .accessibilityIdentifier("OutlineHeading.\(heading.index)")
+            }
+        }
+    }
+
+    /// Items the item holds or is in, such as its files and its collections.
+    private func itemsSection(_ kind: InspectorSectionKind, title: LocalizedStringKey, targets: [ItemRelationshipTarget]) -> some View {
+        let group = LinkGroup(item: item.id, field: "#" + kind.identifier)
+        let links = LinkLimit.split(targets, expanded: presentation.expandedLinks.contains(group))
+        return InspectorSectionView(kind, title: title, count: targets.count) {
+            ForEach(links.shown) { target in
+                InspectorItemRow(target: target, typeIcon: typeIcon, onOpen: onOpen)
+            }
+            if links.hidden > 0 {
+                ItemShowMoreButton(count: links.hidden, identifier: kind.identifier + "ShowMore") { presentation.expandLinks(group) }
+            }
+        }
+    }
+
+    /// The items an app's data gives the item, of one type, named for the type and the app.
+    private func appSection(_ app: AppSection) -> some View {
+        let group = LinkGroup(item: item.id, field: "#" + app.id)
+        let links = LinkLimit.split(app.targets, expanded: presentation.expandedLinks.contains(group))
+        return InspectorSectionView(
+            .app, title: LocalizedStringKey(app.title), count: app.targets.count, foldKey: "\(InspectorSectionKind.app.key).\(app.id)",
+            identifier: "\(InspectorSectionKind.app.identifier)-\(app.id)") {
+            ForEach(links.shown) { target in
+                InspectorItemRow(target: target, typeIcon: typeIcon, onOpen: onOpen)
+            }
+            if links.hidden > 0 {
+                ItemShowMoreButton(count: links.hidden, identifier: "AppSectionShowMore-\(app.id)") { presentation.expandLinks(group) }
+            }
+        }
     }
 
     /// Details is a grid of small cells, so its section draws no box around them.

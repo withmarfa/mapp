@@ -132,7 +132,7 @@ nonisolated extension PagePlacements {
         for row in layout.page + layout.pinned + layout.hidden {
             let shown = layout.group(of: row.id) != .hidden
             let wasShown = row.id == PagePlacement.linkedFrom ? before.linkedFromPlace == .page : before.showsOnPage(row.id)
-            if shown != wasShown { set(shown, row: row.id, of: type) }
+            if shown != wasShown { set(shown, row: row.id, of: type, in: catalogue) }
         }
         setRowOrder(layout.isInDefaultOrder ? nil : layout.arrangedOrder, of: type)
     }

@@ -39,6 +39,9 @@ nonisolated enum EditorMessage: Sendable {
     case state(CaretState)
     /// A loaded note has had its first frame, said once for each load.
     case painted(generation: Int)
+    /// The headings of the loaded note in the editor's own order, each with its place in that list, under the load they
+    /// belong to. Said after each load and when an edit changes the list. A heading with no words is counted, not listed.
+    case headings([OutlineHeading], generation: Int)
     /// The item's header has gone under the toolbar, or come back; said only when it changes.
     case headerScrolledAway(Bool, generation: Int)
     /// The page has scrolled, so some of it is under the toolbar; said only when it changes.
@@ -114,6 +117,15 @@ nonisolated enum EditorMessage: Sendable {
         case "painted":
             guard let generation = dict["generation"] as? Int else { return nil }
             self = .painted(generation: generation)
+        case "headings":
+            guard let list = dict["headings"] as? [[String: Any]], let generation = dict["generation"] as? Int else { return nil }
+            var headings: [OutlineHeading] = []
+            for (index, entry) in list.enumerated() {
+                guard let level = entry["level"] as? Int, let text = entry["text"] as? String else { return nil }
+                let words = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !words.isEmpty { headings.append(OutlineHeading(level: level, text: words, index: index)) }
+            }
+            self = .headings(headings, generation: generation)
         case "headerScrolledAway":
             guard let away = dict["away"] as? Bool, let generation = dict["generation"] as? Int else { return nil }
             self = .headerScrolledAway(away, generation: generation)

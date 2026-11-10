@@ -120,6 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let defaults = UserDefaults.standard
             let kept = defaults.dictionaryRepresentation().keys.filter {
                 $0.hasPrefix("NSSplitView Subview Frames") || $0.hasPrefix("NSToolbar Configuration")
+                    || $0.hasPrefix("\(InterfaceKey.inspectorAppOpen).")
             }
             for key in OrderKey.all + PageKey.all + ListKey.all + InterfaceKey.all + kept { defaults.removeObject(forKey: key) }
         }

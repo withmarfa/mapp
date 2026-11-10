@@ -115,7 +115,7 @@ struct NoteWindow: View {
         }
         .inspector(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
             if let id {
-                ItemInspectorHost(itemID: id, details: details)
+                ItemInspectorHost(itemID: id, details: details, editor: editor)
                     .toolbar(id: "note") { InspectorToolbar(details: details, editor: editor) }
             }
         }

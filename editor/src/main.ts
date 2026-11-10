@@ -36,6 +36,7 @@ declare global {
       picturesChanged(): void
       savedPicturesChanged(addresses: string[]): void
       revealHeading(text: string, expected?: number): boolean
+      revealHeadingAt(ordinal: number, expected?: number): boolean
       setFinding(finding: boolean): void
       findSelect(from: number, to: number, generation?: number, snapshotId?: string): void
       findScroll(from: number, generation?: number, snapshotId?: string): void
@@ -106,6 +107,9 @@ const editor = await NoteEditor.mount(
     },
     painted(generation) {
       postToHost({ type: 'painted', generation })
+    },
+    headings(headings, generation) {
+      postToHost({ type: 'headings', headings, generation })
     },
     // Above the text, so a note with pictures that wait can load them all at once.
     picturesWaiting(count, sentence, button) {
@@ -269,6 +273,10 @@ window.editor = {
   savedPicturesChanged: (addresses) => editor.savedPicturesChanged(addresses),
   revealHeading: (text, expected) => {
     const result = guardedCommand(() => editor.revealHeading(text, expected))
+    return result === true
+  },
+  revealHeadingAt: (ordinal, expected) => {
+    const result = guardedCommand(() => editor.revealHeadingAt(ordinal, expected))
     return result === true
   },
   setFinding: (finding) => editor.setFinding(finding),

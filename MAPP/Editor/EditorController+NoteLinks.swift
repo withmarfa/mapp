@@ -85,6 +85,26 @@ extension EditorController {
         withExtendedLifetime(chosen) { _ = menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil) }
     }
 
+    /// Scrolls the page to the heading of the note on it that has this text, as a link to the note's own heading does.
+    func revealHeading(_ text: String) {
+        guard isReady else { return }
+        call("revealHeading", json(text), String(generation))
+    }
+
+    /// The headings the Outline lists for `id`: those the page reported for the note now on it, and none while the page
+    /// holds another item or has not loaded this one.
+    func headings(of id: ItemID) -> [OutlineHeading] {
+        guard isShowing(id) else { return [] }
+        return outline?.headings(for: id) ?? []
+    }
+
+    /// Scrolls the page to the n-th heading (from 0) of its own list, under the load that list was reported for, so a
+    /// row made from an earlier load reveals nothing: the page refuses a generation that is not on it.
+    func revealHeading(at ordinal: Int) {
+        guard isReady, let outline else { return }
+        call("revealHeadingAt", String(ordinal), String(outline.generation))
+    }
+
     func revealPendingHeading(in note: ItemID) {
         guard let pending = pendingHeading, pending.note == note, isReady else { return }
         pendingHeading = nil

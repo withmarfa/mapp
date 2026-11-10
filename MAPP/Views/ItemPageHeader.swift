@@ -181,7 +181,7 @@ struct ItemPageHeader: ViewModifier {
                 drafts.isPresented = true
             case .hideFromPage(let row, let id):
                 guard editor.isShowing(id), let type = library.item(id)?.type else { return }
-                PagePlacements.update { $0.set(false, row: row, of: type) }
+                PagePlacements.update { $0.set(false, row: row, of: type, in: library.catalogue) }
             case .moveRow(let row, let order, let id):
                 guard editor.isShowing(id), let item = library.item(id) else { return }
                 let rows = PageLayout.rows(
