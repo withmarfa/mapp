@@ -20,8 +20,9 @@ nonisolated struct PaletteFilters: Equatable, Sendable {
             }
         }
 
-        func contains(_ date: Date, now: Date, calendar: Calendar) -> Bool {
-            calendar.dateInterval(of: component, for: now)?.contains(date) ?? false
+        /// The span of the day, week, month or year `now` falls in, in the calendar's time zone and first weekday.
+        func interval(now: Date, calendar: Calendar) -> DateInterval? {
+            calendar.dateInterval(of: component, for: now)
         }
     }
 
@@ -56,17 +57,27 @@ nonisolated struct PaletteFilters: Equatable, Sendable {
         negated.remove(field)
     }
 
-    func admits(_ item: Item, now: Date, calendar: Calendar = .current) -> Bool {
+    /// `span` is the period's span, worked out once for all the items. It ends where the next period starts, so that
+    /// instant is not in it.
+    private func admits(_ item: Item, span: DateInterval?) -> Bool {
         func holds(_ field: Field, _ matches: () -> Bool) -> Bool {
             !isSet(field) || matches() != negated.contains(field)
         }
         return holds(.type) { types.contains(item.type) }
-            && holds(.collection) { item.collectionIDs.contains { collections.contains($0) } }
-            && holds(.updated) { period?.contains(item.modified, now: now, calendar: calendar) ?? true }
+            && holds(.collection) {
+                // Reads the edges in place: no list of the item's collections is built for each item.
+                item.edgesOut.contains { edge in
+                    guard edge.type == MarfaMapping.collectionEdge, case .item(let id) = edge.target else { return false }
+                    return collections.contains(id)
+                }
+            }
+            && holds(.updated) { span.map { $0.start <= item.modified && item.modified < $0.end } ?? false }
     }
 
     /// The items that pass, in their order. Unfiltered, the same array.
     func apply(to items: [Item], now: Date, calendar: Calendar = .current) -> [Item] {
-        isEmpty ? items : items.filter { admits($0, now: now, calendar: calendar) }
+        guard !isEmpty else { return items }
+        let span = period?.interval(now: now, calendar: calendar)
+        return items.filter { admits($0, span: span) }
     }
 }

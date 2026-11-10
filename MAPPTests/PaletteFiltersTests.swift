@@ -79,6 +79,29 @@ struct PaletteFiltersTests {
         #expect(titles(filters, items) == ["Kitchen quotes", "Kitchen quotation", "Garden beds"])
     }
 
+    @Test func aPeriodIncludesItsFirstInstantAndNotWhereTheNextBegins() {
+        func start(_ component: Calendar.Component) -> Date { Self.calendar.dateInterval(of: component, for: Self.now)!.start }
+        func end(_ component: Calendar.Component) -> Date { Self.calendar.dateInterval(of: component, for: Self.now)!.end }
+        let cases: [(PaletteFilters.Period, Calendar.Component)] = [(.today, .day), (.thisWeek, .weekOfYear), (.thisMonth, .month), (.thisYear, .year)]
+        for (period, component) in cases {
+            var filters = PaletteFilters()
+            filters.period = period
+            let held = [item("first", modified: start(component)), item("next", modified: end(component)), item("before", modified: start(component) - 1)]
+            #expect(titles(filters, held) == ["first"], "\(period)")
+        }
+    }
+
+    @Test func aPeriodFollowsThePersonsTimeZone() {
+        var calendar = Self.calendar
+        calendar.timeZone = TimeZone(secondsFromGMT: 13 * 3600)!
+        var filters = PaletteFilters()
+        filters.period = .today
+        // 12:00 UTC is 01:00 on the next date at +13, whose day began at 11:00 UTC.
+        let sameLocalDay = item("same", modified: Self.now - 3600)
+        let previousLocalDay = item("previous", modified: Self.now - 2 * 3600)
+        #expect(filters.apply(to: [sameLocalDay, previousLocalDay], now: Self.now, calendar: calendar).map(\.title) == ["same"])
+    }
+
     @Test func fieldsNarrowTogetherAndTheCountFollowsThem() {
         var filters = PaletteFilters()
         filters.types = [TypeID("core.note")]

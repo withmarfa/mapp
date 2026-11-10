@@ -181,7 +181,8 @@ struct PaletteFilterButton: View {
         .buttonStyle(.glass)
         .buttonBorderShape(count > 0 ? .capsule : .circle)
         .controlSize(.large)
-        .tint(count > 0 || isOn ? .accentColor : nil)
+        // As the list's View Options button shows filters: the glass stays, and the symbol and count take the accent.
+        .foregroundStyle(count > 0 ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary))
         .help(isOn ? "Hide Filters" : "Show Filters")
         .accessibilityLabel(isOn ? "Hide Filters" : "Show Filters")
         .accessibilityIdentifier("CommandPaletteFilters")
