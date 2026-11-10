@@ -236,7 +236,8 @@ body[data-text='none'] #editor {
 
 /* The row above the title: Linked From and Customize Layout. Out of the flow, so showing it moves nothing, and only faded
    (never hidden) while it rests, so the keyboard and VoiceOver reach it always. It shows with the pointer over it or the
-   title, with the keyboard in it, and for as long as Customize Layout is on. */
+   title, with keyboard focus in it (`:focus-visible`, so a click that leaves focus on a tool does not keep it lit), and
+   for as long as Customize Layout is on. */
 .item-tools {
   position: absolute;
   top: calc(var(--step) * 1);
@@ -256,7 +257,7 @@ body[data-text='none'] #editor {
 #item-header:has(.item-lead:hover) .item-tools,
 #item-header[data-layout='on'] .item-tools,
 .item-tools:hover,
-.item-tools:focus-within {
+.item-tools:has(:focus-visible) {
   opacity: 1;
 }
 

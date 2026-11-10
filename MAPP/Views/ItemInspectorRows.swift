@@ -84,7 +84,9 @@ private struct SharedNameColumn: ViewModifier {
 
 /// The inspector's sections, each of which folds and keeps whether it is open for every item and launch.
 enum InspectorSectionKind: CaseIterable {
-    case details, properties, relationships, linksInPage, linkedFrom, tags
+    case details, properties, relationships, linksInPage, linkedFrom, tags, outline, attachments, collections
+    /// Every section from an app shares one fold, since which ones an item has depends on its links.
+    case app
 
     var key: String {
         switch self {
@@ -94,6 +96,10 @@ enum InspectorSectionKind: CaseIterable {
         case .linksInPage: InterfaceKey.inspectorLinksInPageOpen
         case .linkedFrom: InterfaceKey.inspectorLinkedFromOpen
         case .tags: InterfaceKey.inspectorTagsOpen
+        case .outline: InterfaceKey.inspectorOutlineOpen
+        case .attachments: InterfaceKey.inspectorAttachmentsOpen
+        case .collections: InterfaceKey.inspectorCollectionsOpen
+        case .app: InterfaceKey.inspectorAppOpen
         }
     }
 
@@ -105,6 +111,10 @@ enum InspectorSectionKind: CaseIterable {
         case .linksInPage: "ItemInspectorLinksInPage"
         case .linkedFrom: "ItemInspectorLinkedFrom"
         case .tags: "ItemInspectorTags"
+        case .outline: "ItemInspectorOutline"
+        case .attachments: "ItemInspectorAttachments"
+        case .collections: "ItemInspectorCollections"
+        case .app: "ItemInspectorApp"
         }
     }
 }

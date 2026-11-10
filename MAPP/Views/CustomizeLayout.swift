@@ -34,31 +34,53 @@ extension UTType {
     nonisolated static let mappLayoutRow = UTType(exportedAs: "\(Bundle.main.bundleIdentifier ?? "com.withmarfa.mapp").layout-row")
 }
 
-/// The right sidebar while Customize Layout is on: the item's rows in three groups, Pinned (up to four), On the Page and
-/// Hidden, which a person arranges by dragging, by the pin on a row, or with Move Up and Move Down. The page stays in
-/// view and follows each change at once. The choice is for the item's type (`PagePlacements`), so it holds for every item
-/// of the type, and it is MAPP's own: the item is not changed, so a read-only item can be laid out too.
+/// The right sidebar while Customize Layout is on. Page arranges the item's rows in three groups, Pinned (up to four), On
+/// the Page and Hidden, by dragging, by the pin on a row, or with Move Up and Move Down; Sidebar orders, removes and adds
+/// the sidebar's own sections (`SidebarArrangement`). The page and the sidebar stay in view and follow each change at
+/// once. Both choices are for the item's type (`PagePlacements`), so they hold for every item of the type, and they are
+/// MAPP's own: the item is not changed, so a read-only item can be laid out too.
 struct ItemLayoutPanel: View {
+    private enum Arranging: Hashable { case page, sidebar }
+
     @CurrentLibrary private var library
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
+    @State private var arranging = Arranging.page
     let item: Item
 
     var body: some View {
-        let layout = self.layout
-        ScrollView {
-            VStack(alignment: .leading, spacing: InspectorMetrics.sectionGap) {
-                LayoutGroupView(group: .pinned, layout: layout, options: { options }, change: apply)
-                LayoutGroupView(group: .page, layout: layout, options: { EmptyView() }, change: apply)
-                LayoutGroupView(group: .hidden, layout: layout, options: { EmptyView() }, change: apply)
+        VStack(spacing: 0) {
+            Picker("Arrange", selection: $arranging) {
+                Text("Page").tag(Arranging.page)
+                Text("Sidebar").tag(Arranging.sidebar)
             }
+            .pickerStyle(.segmented)
+            .labelsHidden()
             .padding(.horizontal, 16)
             .padding(.top, 12)
-            .padding(.bottom, 20)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityIdentifier("LayoutArranging")
+            ScrollView {
+                switch arranging {
+                case .page: pageGroups
+                case .sidebar: SidebarArrangement(item: item)
+                }
+            }
+            .scrollBounceBehavior(.basedOnSize)
         }
-        .scrollBounceBehavior(.basedOnSize)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ItemLayoutPanel")
+    }
+
+    private var pageGroups: some View {
+        let layout = self.layout
+        return VStack(alignment: .leading, spacing: InspectorMetrics.sectionGap) {
+            LayoutGroupView(group: .pinned, layout: layout, options: { options }, change: apply)
+            LayoutGroupView(group: .page, layout: layout, options: { EmptyView() }, change: apply)
+            LayoutGroupView(group: .hidden, layout: layout, options: { EmptyView() }, change: apply)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+        .padding(.bottom, 20)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var layout: PageLayout {
@@ -72,7 +94,7 @@ struct ItemLayoutPanel: View {
         placements.apply(layout, of: item.type, in: library.catalogue)
     }
 
-    /// Takes the type's choices back, quietly, beside the first heading.
+    /// Takes the type's choices back, for the page and the sidebar, quietly, beside the first heading.
     private var options: some View {
         Menu {
             Button("Use Defaults") { placements.reset(item.type) }

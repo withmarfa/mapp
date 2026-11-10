@@ -14,6 +14,10 @@ enum InterfaceKey {
     static let inspectorLinksInPageOpen = "inspectorLinksInPageOpen"
     static let inspectorLinkedFromOpen = "inspectorLinkedFromOpen"
     static let inspectorTagsOpen = "inspectorTagsOpen"
+    static let inspectorOutlineOpen = "inspectorOutlineOpen"
+    static let inspectorAttachmentsOpen = "inspectorAttachmentsOpen"
+    static let inspectorCollectionsOpen = "inspectorCollectionsOpen"
+    static let inspectorAppOpen = "inspectorAppOpen"
     /// Whether the window's toolbar shows a note's or item's title once the page's header has scrolled away.
     static let showsScrolledTitle = "showsScrolledTitle"
     /// What the toolbar's items show, chosen under Show in Customize Toolbar.
@@ -22,7 +26,7 @@ enum InterfaceKey {
     static let showsPageToolbarBackground = "showsPageToolbarBackground"
     /// Whether the panels that edit a value are glass or a solid color.
     static let valuePanelStyle = "valuePanelStyle"
-    static let all = [valuePanelStyle, textSize, inspectorWidth, inspectorDetailsOpen, inspectorPropertiesOpen, inspectorRelationshipsOpen, inspectorLinksInPageOpen, inspectorLinkedFromOpen, inspectorTagsOpen, showsScrolledTitle, toolbarLabelStyle, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
+    static let all = [valuePanelStyle, textSize, inspectorWidth, inspectorDetailsOpen, inspectorPropertiesOpen, inspectorRelationshipsOpen, inspectorLinksInPageOpen, inspectorLinkedFromOpen, inspectorTagsOpen, inspectorOutlineOpen, inspectorAttachmentsOpen, inspectorCollectionsOpen, inspectorAppOpen, showsScrolledTitle, toolbarLabelStyle, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
 }
 
 /// What a value panel is made of. Glass lets the page show through; Solid is the window's own color.

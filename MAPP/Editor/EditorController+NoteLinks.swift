@@ -85,6 +85,12 @@ extension EditorController {
         withExtendedLifetime(chosen) { _ = menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil) }
     }
 
+    /// Scrolls the page to the heading of the note on it that has this text, as a link to the note's own heading does.
+    func revealHeading(_ text: String) {
+        guard isReady else { return }
+        call("revealHeading", json(text), String(generation))
+    }
+
     func revealPendingHeading(in note: ItemID) {
         guard let pending = pendingHeading, pending.note == note, isReady else { return }
         pendingHeading = nil
