@@ -241,9 +241,9 @@ struct PaletteFilterRow: View {
         if !FilterPanelPresenter.shared.isOpen(for: field.rawValue) { state.openField = nil }
     }
 
-    /// Opens a field's panel once its chip has a view to open under, which the row makes on a later turn of the run loop.
+    /// Opens a field's panel once its chip has a view in the window to open under, which the row makes on a later turn of the run loop.
     private func openValuesWhenShown(_ field: PaletteFilters.Field, attempts: Int = 20) {
-        if anchors.view(for: field.rawValue) != nil || attempts == 0 {
+        if anchors.view(for: field.rawValue)?.window != nil || attempts == 0 {
             openValues(field)
             return
         }
@@ -301,13 +301,18 @@ private struct PaletteFilterOptions {
     func all(for field: PaletteFilters.Field) -> [FilterValueOption] {
         switch field {
         case .type:
-            library.itemTypeCounts.map { FilterValueOption(id: $0.id.rawValue, title: $0.label, mark: .type(icon: $0.icon)) }
+            // The type's own name, as a table's Type column says it; the sidebar's longer label only where two types share one.
+            let counts = library.itemTypeCounts
+            let names = counts.map { library.catalogue.label(for: $0.id) }
+            return zip(counts, names).map { count, name in
+                FilterValueOption(id: count.id.rawValue, title: names.filter { $0 == name }.count > 1 ? count.label : name, mark: .type(icon: count.icon))
+            }
         case .collection:
-            library.collections.map {
+            return library.collections.map {
                 FilterValueOption(id: $0.id.rawValue, title: $0.displayTitle, mark: .type(icon: library.catalogue.icon(for: $0.type)))
             }
         case .updated:
-            PaletteFilters.Period.allCases.map { FilterValueOption(id: $0.rawValue, title: $0.title, mark: .symbol("calendar")) }
+            return PaletteFilters.Period.allCases.map { FilterValueOption(id: $0.rawValue, title: $0.title, mark: .symbol("calendar")) }
         }
     }
 
