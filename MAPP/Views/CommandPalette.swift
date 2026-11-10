@@ -36,7 +36,10 @@ struct CommandPalette: View {
     /// What the palette lists for the query as it stands, kept across the arrow keys and anything else that runs the
     /// body again. Nothing here is observed.
     @State private var listing = Listing()
-    @FocusState private var isFieldFocused: Bool
+    @FocusState private var focus: PaletteFocus?
+    /// What the Actions field holds and which action is chosen, kept here since the arrow keys reach the palette.
+    @State private var actionsQuery = ""
+    @State private var actionsHighlighted = 0
 
     private typealias Entry = PaletteEntry
     private typealias Section = PaletteSections.Section<PaletteEntry>
@@ -90,9 +93,11 @@ struct CommandPalette: View {
                 TextField(mode == .search ? "Search Notes" : "Search Commands and Notes", text: $query)
                     .textFieldStyle(.plain)
                     .interfaceFont(.title3)
-                    .focused($isFieldFocused)
+                    .focused($focus, equals: .field)
+                    // Actions holds the keyboard while it is open.
+                    .disabled(actionsFor != nil)
                     .onSubmit { run(rows, at: chosen) }
-                    .onExitCommand { close() }
+                    .onExitCommand { escape() }
                     .accessibilityIdentifier("CommandPaletteField")
                 if isTyped {
                     Text(rows.count == 1 ? String(localized: "1 result") : String(localized: "\(rows.count) results"))
@@ -110,17 +115,25 @@ struct CommandPalette: View {
         }
         .floatingPanelSurface(width: 680)
         .onKeyPress(.downArrow) {
+            if let target {
+                actionsHighlighted = min(actionsHighlighted + 1, max(PaletteAction.filtered(actions(for: target), by: actionsQuery).count - 1, 0))
+                return .handled
+            }
             highlighted = min(chosen + 1, max(rows.count - 1, 0))
             scrollTarget = rows.indices.contains(highlighted) ? rows[highlighted].id : nil
             return .handled
         }
         .onKeyPress(.upArrow) {
+            if target != nil {
+                actionsHighlighted = max(actionsHighlighted - 1, 0)
+                return .handled
+            }
             highlighted = max(chosen - 1, 0)
             scrollTarget = rows.indices.contains(highlighted) ? rows[highlighted].id : nil
             return .handled
         }
         .onKeyPress(.escape) {
-            close()
+            escape()
             return .handled
         }
         .onChange(of: query) {
@@ -134,10 +147,10 @@ struct CommandPalette: View {
         .onChange(of: browser.paletteActionsRequests) { toggleActions(rows, chosen: chosen) }
         .onAppear { returnFocus = editor.isFocused ? .page : .list }
         // The field takes the keyboard once the palette is in the window; asked any sooner, the list keeps it.
-        .defaultFocus($isFieldFocused, true)
+        .defaultFocus($focus, .field)
         .task {
             try? await Task.sleep(for: .milliseconds(50))
-            isFieldFocused = true
+            focus = .field
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Command Palette")
@@ -170,11 +183,11 @@ struct CommandPalette: View {
             }
             .padding(10)
             if let target {
-                PaletteActionsPanel(title: target.title, actions: actions(for: target)) { action in
-                    perform(action, on: target)
-                } close: {
-                    closeActions()
-                }
+                PaletteActionsPanel(
+                    title: target.title, actions: actions(for: target),
+                    perform: { perform($0, on: target) }, close: { closeActions() },
+                    query: $actionsQuery, highlighted: $actionsHighlighted, focus: $focus
+                )
                 .padding(.trailing, 10)
                 .padding(.bottom, 54)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
@@ -247,12 +260,21 @@ struct CommandPalette: View {
             closeActions()
         } else if rows.indices.contains(chosen) {
             actionsFor = rows[chosen].id
+            actionsQuery = ""
+            actionsHighlighted = 0
+            focus = .actions
         }
+    }
+
+    /// Escape puts away Actions if it is out, and otherwise the palette.
+    private func escape() {
+        if actionsFor != nil { closeActions() } else { close() }
     }
 
     private func closeActions() {
         actionsFor = nil
-        isFieldFocused = true
+        // Not at once: the Escape that closed Actions is still being handled, and would reach the field and close the palette.
+        Task { focus = .field }
     }
 
     private func actions(for row: Entry) -> [PaletteAction] {

@@ -207,6 +207,11 @@ struct PaletteFilterRow: View {
     }
 }
 
+/// Where the palette's keyboard is: its own field, or the Actions panel's.
+enum PaletteFocus: Hashable {
+    case field, actions
+}
+
 /// What can be done to the chosen row: a panel over the buttons with the row's title, its actions, and a field that
 /// narrows them. Escape puts the panel away and leaves the palette.
 struct PaletteActionsPanel: View {
@@ -214,9 +219,9 @@ struct PaletteActionsPanel: View {
     let actions: [PaletteAction]
     let perform: (PaletteAction) -> Void
     let close: () -> Void
-    @State private var query = ""
-    @State private var highlighted = 0
-    @FocusState private var isFocused: Bool
+    @Binding var query: String
+    @Binding var highlighted: Int
+    var focus: FocusState<PaletteFocus?>.Binding
 
     var body: some View {
         let shown = PaletteAction.filtered(actions, by: query)
@@ -252,7 +257,7 @@ struct PaletteActionsPanel: View {
             Divider().padding(.top, 6)
             TextField("Search for Actions…", text: $query)
                 .textFieldStyle(.plain)
-                .focused($isFocused)
+                .focused(focus, equals: .actions)
                 .onSubmit { if shown.indices.contains(chosen) { perform(shown[chosen]) } }
                 .onExitCommand(perform: close)
                 .padding(.horizontal, 12)
@@ -284,7 +289,10 @@ struct PaletteActionsPanel: View {
             if let action = shown.first(where: { $0.kind == .delete }), query.isEmpty { perform(action) } else { query = "" }
         }
         .onChange(of: query) { highlighted = 0 }
-        .onAppear { isFocused = true }
+        .task {
+            try? await Task.sleep(for: .milliseconds(50))
+            focus.wrappedValue = .actions
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Actions")
     }
