@@ -80,8 +80,7 @@ struct CommandPalette: View {
 
     private var isTyped: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
-    /// A search is never held: its answer arrives later, through the library's own observed state, which the body
-    /// must read each time to run again.
+    /// A search is not held by `listing`: its answer arrives later, and `searched` follows it (`watchSearch`).
     private func shown() -> [Section] {
         mode == .search ? found : matching(basis)
     }
@@ -370,7 +369,7 @@ struct CommandPalette: View {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(link, forType: .string)
                 } else {
-                    library.notices.tell(String(localized: "Can’t Copy Link"), String(localized: "This item isn’t ready to link yet. Its copy may not have loaded, or you may be offline."))
+                    library.notices.tell(String(localized: "Can’t Copy Link"), String(localized: "This item isn’t ready to link yet. Try again once its copy has loaded."))
                 }
             }
         case .addToFavorites, .removeFromFavorites:
