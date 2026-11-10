@@ -88,6 +88,21 @@ struct CommandPaletteTests {
         #expect(PaletteSections.resultCount(sections) == 6)
     }
 
+    @Test func itemsAreCutToEightWithALastRowThatSearchesTheNotes() {
+        let picks: [Pick] = (0..<52).map(Pick.item) + [.fixed(1), .fixed(0)]
+        let sections = PaletteSections.forCommands(picks: picks, typed: true, commandCount: 1, recentCount: 60)
+        #expect(sections.map(\.kind) == [.items, .places, .commands])
+        #expect(sections[0].rows == (0..<PaletteSections.itemLimit).map(Pick.item) + [.searchNotes])
+        #expect(sections[1].rows == [.fixed(1)])
+        #expect(sections[2].rows == [.fixed(0)])
+    }
+
+    @Test func eightItemsOrFewerNeedNoRowToSearchTheNotes() {
+        let picks: [Pick] = (0..<PaletteSections.itemLimit).map(Pick.item)
+        let sections = PaletteSections.forCommands(picks: picks, typed: true, commandCount: 0, recentCount: 20)
+        #expect(sections[0].rows == picks)
+    }
+
     @Test func aSectionWithNoRowsIsDropped() {
         let sections = PaletteSections.forCommands(picks: [.fixed(0), .item(1)], typed: true, commandCount: 1, recentCount: 2)
         #expect(sections.map(\.kind) == [.items, .commands])

@@ -29,9 +29,12 @@ nonisolated enum PaletteSections {
     /// The most recent items ⌘K lists before anything is typed.
     static let recentLimit = 5
 
+    /// The most items ⌘K lists under Items, so Places and Commands stay in view. Search Notes has the rest.
+    static let itemLimit = 8
+
     /// ⌘K's sections. Before anything is typed, the most recent items and then every command. Once something is
     /// typed, the items, the places and the commands that answer it, each in the order it was ranked and each only
-    /// if it has rows. `commandCount` is how many of the fixed picks (commands first, then places) are commands.
+    /// if it has rows. Items are cut to `itemLimit`, and a last row sends the rest to Search Notes. `commandCount` is how many of the fixed picks (commands first, then places) are commands.
     static func forCommands(picks: [PaletteMatch.Pick], typed: Bool, commandCount: Int, recentCount: Int) -> [Section<PaletteMatch.Pick>] {
         guard typed else {
             let recent = (0..<min(recentCount, recentLimit)).map(PaletteMatch.Pick.item)
@@ -44,9 +47,11 @@ nonisolated enum PaletteSections {
         for pick in picks {
             switch pick {
             case .item: items.append(pick)
+            case .searchNotes: break
             case .fixed(let index): if index < commandCount { commands.append(pick) } else { places.append(pick) }
             }
         }
+        if items.count > itemLimit { items = Array(items.prefix(itemLimit)) + [.searchNotes] }
         return dropEmpty([.init(kind: .items, rows: items), .init(kind: .places, rows: places), .init(kind: .commands, rows: commands)])
     }
 

@@ -190,6 +190,8 @@ final class Browser {
             quickAdd.isPresented = false
         }
     }
+    /// What the next palette starts with typed, as ⌘K's "Search Notes for" hands its words on.
+    var paletteSeed = ""
     /// Counts the ⌘K pressed while a palette is out, which opens or shuts its Actions.
     var paletteActionsRequests = 0
 

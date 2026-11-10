@@ -40,6 +40,8 @@ struct CommandPalette: View {
     /// What the Actions field holds and which action is chosen, kept here since the arrow keys reach the palette.
     @State private var actionsQuery = ""
     @State private var actionsHighlighted = 0
+    /// The height of the buttons that float over the results, with their margin: what the last row must clear.
+    @State private var floatingHeight: CGFloat = 56
 
     private typealias Entry = PaletteEntry
     private typealias Section = PaletteSections.Section<PaletteEntry>
@@ -96,7 +98,15 @@ struct CommandPalette: View {
                     .focused($focus, equals: .field)
                     // Actions holds the keyboard while it is open.
                     .disabled(actionsFor != nil)
-                    .onSubmit { run(rows, at: chosen) }
+                    // Read afresh: Return can come before the view is drawn again after the last key.
+                    .onSubmit {
+                        let current = shown().flatMap(\.rows)
+                        if let id = actionsFor, let live = current.first(where: { $0.id == id }) {
+                            performHighlighted(on: live)
+                        } else {
+                            run(current, at: current.indices.contains(highlighted) ? highlighted : max(current.count - 1, 0))
+                        }
+                    }
                     .onExitCommand { escape() }
                     .accessibilityIdentifier("CommandPaletteField")
                 if isTyped {
@@ -136,6 +146,20 @@ struct CommandPalette: View {
             escape()
             return .handled
         }
+        // Shortcut buttons, since a field takes most Command keys before a key press handler sees them. Out of sight, but in the window's key equivalents.
+        .background {
+            if let target {
+                ForEach(actionsShown(for: target), id: \.id) { action in
+                    if let shortcut = PaletteActionsPanel.shortcut(of: action) {
+                        Button(action.title) { perform(action, on: target) }
+                            .keyboardShortcut(shortcut)
+                            .opacity(0)
+                            .frame(width: 0, height: 0)
+                            .accessibilityHidden(true)
+                    }
+                }
+            }
+        }
         .onChange(of: query) {
             highlighted = 0
             scrollTarget = nil
@@ -145,7 +169,13 @@ struct CommandPalette: View {
             if isGone { closeActions() }
         }
         .onChange(of: browser.paletteActionsRequests) { toggleActions(rows, chosen: chosen) }
-        .onAppear { returnFocus = editor.isFocused ? .page : .list }
+        .onAppear {
+            returnFocus = editor.isFocused ? .page : .list
+            if !browser.paletteSeed.isEmpty {
+                query = browser.paletteSeed
+                browser.paletteSeed = ""
+            }
+        }
         // The field takes the keyboard once the palette is in the window; asked any sooner, the list keeps it.
         .defaultFocus($focus, .field)
         .task {
@@ -182,14 +212,15 @@ struct CommandPalette: View {
                 }
             }
             .padding(10)
+            .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { floatingHeight = $0 }
             if let target {
                 PaletteActionsPanel(
                     title: target.title, actions: actions(for: target),
-                    perform: { perform($0, on: target) }, close: { closeActions() },
+                    perform: { perform($0, on: target) }, submit: { performHighlighted(on: target) }, close: { closeActions() },
                     query: $actionsQuery, highlighted: $actionsHighlighted, focus: $focus
                 )
                 .padding(.trailing, 10)
-                .padding(.bottom, 54)
+                .padding(.bottom, floatingHeight)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             }
         }
@@ -224,7 +255,7 @@ struct CommandPalette: View {
                 .padding(.horizontal, 6)
                 .padding(.top, 2)
                 // Room under the last row for the buttons that float over the list.
-                .padding(.bottom, 56)
+                .padding(.bottom, floatingHeight)
             }
             .frame(maxHeight: 460)
             .onChange(of: scrollTarget) { if let scrollTarget { proxy.scrollTo(scrollTarget) } }
@@ -246,6 +277,11 @@ struct CommandPalette: View {
         guard entries.indices.contains(index) else { return }
         close(returningFocus: !entries[index].takesFocus)
         entries[index].action()
+        if mode == .search, isTyped, let id = entries[index].item {
+            let words = query.trimmingCharacters(in: .whitespacesAndNewlines)
+            let editor = editor
+            Task { @MainActor in await editor.find(words, in: id) }
+        }
     }
 
     private func close(returningFocus: Bool = true) {
@@ -283,6 +319,15 @@ struct CommandPalette: View {
     }
 
     /// Does what the action says through the same path as the menus, once the palette is put away.
+    private func actionsShown(for row: Entry) -> [PaletteAction] {
+        PaletteAction.filtered(actions(for: row), by: actionsQuery)
+    }
+
+    private func performHighlighted(on row: Entry) {
+        let shown = actionsShown(for: row)
+        if shown.indices.contains(actionsHighlighted) { perform(shown[actionsHighlighted], on: row) }
+    }
+
     private func perform(_ action: PaletteAction, on row: Entry) {
         guard let id = row.item, let item = library.item(id) else {
             if action.kind == .run { run([row], at: 0) }
@@ -349,6 +394,7 @@ struct CommandPalette: View {
                 switch pick {
                 case .fixed(let index): fixed[index]
                 case .item(let index): note(recent[index])
+                case .searchNotes: searchNotesEntry
                 }
             })
         }
@@ -600,6 +646,16 @@ struct CommandPalette: View {
                 browser.choose(place.item, in: library, order: order)
                 browser.focusRequest = .list
             }
+        }
+    }
+
+    /// The last row under Items: the same words, searched in the text of every note.
+    private var searchNotesEntry: Entry {
+        let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return Entry(id: "command:searchNotesFor", title: String(localized: "Search Notes for “\(typed)”"), icon: .symbol("magnifyingglass"),
+                     shortcut: "⇧⌘P", takesFocus: true) {
+            browser.paletteSeed = typed
+            browser.palette = .search
         }
     }
 

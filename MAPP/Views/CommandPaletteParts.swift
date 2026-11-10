@@ -218,6 +218,8 @@ struct PaletteActionsPanel: View {
     let title: String
     let actions: [PaletteAction]
     let perform: (PaletteAction) -> Void
+    /// Return in the field: reads the highlight when it is pressed, not when the view was last drawn.
+    let submit: () -> Void
     let close: () -> Void
     @Binding var query: String
     @Binding var highlighted: Int
@@ -258,7 +260,7 @@ struct PaletteActionsPanel: View {
             TextField("Search for Actions…", text: $query)
                 .textFieldStyle(.plain)
                 .focused(focus, equals: .actions)
-                .onSubmit { if shown.indices.contains(chosen) { perform(shown[chosen]) } }
+                .onSubmit(submit)
                 .onExitCommand(perform: close)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
@@ -267,27 +269,6 @@ struct PaletteActionsPanel: View {
         .frame(width: 300)
         .glassEffect(.regular, in: .rect(cornerRadius: 16))
         .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
-        .onKeyPress(.downArrow) {
-            highlighted = min(chosen + 1, max(shown.count - 1, 0))
-            return .handled
-        }
-        .onKeyPress(.upArrow) {
-            highlighted = max(chosen - 1, 0)
-            return .handled
-        }
-        .onKeyPress(.escape) {
-            close()
-            return .handled
-        }
-        .onKeyPress(phases: .down) { press in
-            guard let action = shown.first(where: { Self.matches($0, press) }) else { return .ignored }
-            perform(action)
-            return .handled
-        }
-        // AppKit maps Command-Delete to this text-system command before the key reaches SwiftUI.
-        .onCommand(#selector(NSResponder.deleteToBeginningOfLine(_:))) {
-            if let action = shown.first(where: { $0.kind == .delete }), query.isEmpty { perform(action) } else { query = "" }
-        }
         .onChange(of: query) { highlighted = 0 }
         .task {
             try? await Task.sleep(for: .milliseconds(50))
@@ -319,14 +300,14 @@ struct PaletteActionsPanel: View {
         .accessibilityAddTraits(isHighlighted ? .isSelected : [])
     }
 
-    /// Whether the keys pressed are the action's own shortcut.
-    private static func matches(_ action: PaletteAction, _ press: KeyPress) -> Bool {
+    /// The action's own shortcut, which the key caps beside it show.
+    static func shortcut(of action: PaletteAction) -> KeyboardShortcut? {
         switch action.kind {
-        case .openInNewWindow: press.key == .return && press.modifiers == .command
-        case .copyLink: press.characters.lowercased() == "c" && press.modifiers == [.command, .shift]
-        case .versionHistory: press.key == .init("y") && press.modifiers == [.command, .option]
-        case .delete: press.key == .delete && press.modifiers == .command
-        default: false
+        case .openInNewWindow: KeyboardShortcut(.return, modifiers: .command)
+        case .copyLink: KeyboardShortcut("c", modifiers: [.command, .shift])
+        case .versionHistory: KeyboardShortcut("y", modifiers: [.command, .option])
+        case .delete: KeyboardShortcut(.delete, modifiers: .command)
+        default: nil
         }
     }
 }
