@@ -7,8 +7,9 @@ import {
   type FormatCommand,
   type Keymap,
 } from './editor'
-import { ItemHeader, type HeaderIcon, type HeaderIcons, type HeaderModel } from './header'
+import { ItemHeader, type HeaderIcons, type HeaderModel } from './header'
 import { LinkStyle } from './link-style'
+import { showSymbol, showSymbolButton } from './symbol'
 import { InkKitError, normalizeLinkAddress } from '@aicayzer/inkkit'
 import '@aicayzer/inkkit/style.css'
 import './style.css'
@@ -336,21 +337,10 @@ window.editor = {
   },
   setHeaderIcons: (icons) => {
     header.setIcons(icons)
-    const photo = icons.symbols?.photo
-    pictureIcon.hidden = !photo
-    if (photo) maskWith(pictureIcon, photo)
-    const close = icons.symbols?.xmark
-    pictureCloseIcon.hidden = !close
-    if (close) maskWith(pictureCloseIcon, close)
+    showSymbol(pictureIcon, icons.symbols?.photo)
+    // The close button is only that symbol, so it waits for it rather than show as an empty circle.
+    showSymbolButton(pictureClose, pictureCloseIcon, icons.symbols?.xmark)
   },
-}
-
-/** Draws a symbol the app made as a mask on an element, so it takes the element's color. */
-function maskWith(element: HTMLElement, icon: HeaderIcon): void {
-  element.style.width = `${icon.width}px`
-  element.style.height = `${icon.height}px`
-  element.style.setProperty('-webkit-mask-image', `url("${icon.url}")`)
-  element.style.maskImage = `url("${icon.url}")`
 }
 
 postToHost({ type: 'ready' })

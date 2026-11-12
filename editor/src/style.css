@@ -187,6 +187,10 @@ body {
   cursor: default;
 }
 
+#picture-bar button[hidden] {
+  display: none;
+}
+
 #picture-bar button:hover {
   background: color-mix(in srgb, var(--inkkit-accent-color) 26%, transparent);
 }
