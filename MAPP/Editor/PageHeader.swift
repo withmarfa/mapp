@@ -262,6 +262,9 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
     /// The symbol on the callout that says pictures at web addresses are not loaded, kept with the row symbols.
     static let pictureSymbol = "photo"
 
+    /// The symbol in the callout's close button, drawn small and bold as it is in the app's other small buttons.
+    static let closeSymbol = "xmark"
+
     /// The symbols of the row above the title: Linked From and Customize Layout.
     static let titleToolSymbols = ["arrow.down.left", "rectangle.split.2x1"]
 
@@ -280,6 +283,7 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
         for name in PropertyRow.Value.symbols + [Self.pictureSymbol, Self.rowGripSymbol] + Self.titleToolSymbols {
             symbols[name] = Self.symbol(name, size: size, weight: .regular)
         }
+        symbols[Self.closeSymbol] = Self.symbol(Self.closeSymbol, size: size * 9 / 13, weight: .bold)
         for name in typeIcons {
             if Self.drawn.types[name] == nil { Self.drawn.types[name] = Self.typeIcon(name, size: size) }
             symbols[TypeIconKey.value(for: name)] = Self.drawn.types[name]

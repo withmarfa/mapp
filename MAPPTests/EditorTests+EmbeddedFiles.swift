@@ -33,12 +33,12 @@ extension EditorTests {
             defaults: defaults))
         try await page.load("![RSS picture](\(address))\r\n")
         let label = try await settle(page.editor,
-            "document.querySelector('.inkkit-file[data-inkkit-file-kind=file] .inkkit-file-label')?.textContent",
-            as: String.self) { $0 == "Load Picture: RSS picture" }
-        #expect(label == "Load Picture: RSS picture")
+            "document.querySelector('.inkkit-file[data-inkkit-file-appearance=placeholder] .inkkit-file-label')?.textContent",
+            as: String.self) { $0 == "RSS picture" }
+        #expect(label == "RSS picture")
         #expect(try await page.editor.webView.evaluateJavaScript(
-            "document.querySelector('.inkkit-file[data-inkkit-file-layout=fill][role=button]')?.getAttribute('aria-label')"
-        ) as? String == "Open Load Picture: RSS picture")
+            "document.querySelector('.inkkit-file[data-inkkit-file-appearance=placeholder] button.inkkit-file-action')?.getAttribute('aria-label')"
+        ) as? String == "Load RSS picture")
         #expect(try await page.editor.webView.evaluateJavaScript(
             "document.querySelectorAll('.ProseMirror img, .ProseMirror iframe').length"
         ) as? Int == 0)
@@ -46,7 +46,7 @@ extension EditorTests {
             "performance.getEntriesByType('resource').some(entry => /^https?:/.test(entry.name))"
         ) as? Bool == false)
         #expect(PictureStub.requests(to: address).isEmpty)
-        try await page.run("document.querySelector('.inkkit-file[role=button]').click()")
+        try await page.run("document.querySelector('.inkkit-file-action').click()")
         let loaded = try await settle(page.editor,
             "(() => { const image = document.querySelector('.inkkit-image img'); return !!image && image.naturalWidth > 0 && image.src.startsWith('mapp-embed:'); })()",
             as: Bool.self) { $0 == true }

@@ -9,6 +9,7 @@ import {
 } from './editor'
 import { ItemHeader, type HeaderIcons, type HeaderModel } from './header'
 import { LinkStyle } from './link-style'
+import { showSymbol, showSymbolButton } from './symbol'
 import { InkKitError, normalizeLinkAddress } from '@aicayzer/inkkit'
 import '@aicayzer/inkkit/style.css'
 import './style.css'
@@ -74,7 +75,9 @@ const root = document.getElementById('editor')
 const headerRoot = document.getElementById('item-header')
 const footerRoot = document.getElementById('item-footer')
 const pictureBar = document.getElementById('picture-bar')
-const pictureButton = pictureBar?.querySelector('button')
+const pictureButton = pictureBar?.querySelector<HTMLButtonElement>('.picture-load')
+const pictureClose = pictureBar?.querySelector<HTMLButtonElement>('.picture-close')
+const pictureCloseIcon = pictureClose?.querySelector<HTMLElement>('.picture-close-icon')
 const pictureSentence = pictureBar?.querySelector<HTMLElement>('.picture-sentence')
 const pictureIcon = pictureBar?.querySelector<HTMLElement>('.picture-icon')
 if (
@@ -83,6 +86,8 @@ if (
   !footerRoot ||
   !pictureBar ||
   !pictureButton ||
+  !pictureClose ||
+  !pictureCloseIcon ||
   !pictureSentence ||
   !pictureIcon
 )
@@ -112,8 +117,8 @@ const editor = await NoteEditor.mount(
       postToHost({ type: 'headings', headings, generation })
     },
     // Above the text, so a note with pictures that wait can load them all at once.
-    picturesWaiting(count, sentence, button) {
-      pictureBar.hidden = count === 0
+    picturesWaiting(count, sentence, button, shown) {
+      pictureBar.hidden = !shown
       pictureSentence.textContent = sentence
       pictureButton.textContent = button
     },
@@ -123,6 +128,11 @@ const editor = await NoteEditor.mount(
 )
 const header = new ItemHeader(headerRoot, footerRoot, labels.header)
 pictureButton.addEventListener('click', () => editor.loadPictures())
+// Closing hides the callout for this page: it loads nothing and changes no setting.
+pictureClose.addEventListener('click', () => editor.dismissPictures())
+const closeLabel = labels.words.closePictures ?? 'Close'
+pictureClose.setAttribute('aria-label', closeLabel)
+pictureClose.title = closeLabel
 
 // Escape hands the keyboard back to the list. Heard on the window, since a read-only page's editor hears
 // no keys of its own.
@@ -322,18 +332,18 @@ window.editor = {
   },
   setHeader: (model) => {
     header.set(model)
-    if (model) pictureBar.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)
+    if (model)
+      document.documentElement.style.setProperty(
+        '--interface-text-size',
+        `${model.interfaceTextSize}px`,
+      )
     checkHeaderScrolledAway()
   },
   setHeaderIcons: (icons) => {
     header.setIcons(icons)
-    const photo = icons.symbols?.photo
-    pictureIcon.hidden = !photo
-    if (!photo) return
-    pictureIcon.style.width = `${photo.width}px`
-    pictureIcon.style.height = `${photo.height}px`
-    pictureIcon.style.setProperty('-webkit-mask-image', `url("${photo.url}")`)
-    pictureIcon.style.maskImage = `url("${photo.url}")`
+    showSymbol(pictureIcon, icons.symbols?.photo)
+    // The close button is only that symbol, so it waits for it rather than show as an empty circle.
+    showSymbolButton(pictureClose, pictureCloseIcon, icons.symbols?.xmark)
   },
 }
 

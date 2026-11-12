@@ -58,14 +58,14 @@ export function splitLabels(all: AppLabels): {
 } {
   const {
     linkToNote,
-    pictureFrom,
-    loadNamedPicture,
-    loadingPicture,
+    loadAction,
+    loadingNamed,
     picturesOff,
     loadOnePicture,
     loadPictures,
     pictureNotLoaded,
     picturesNotLoaded,
+    closePictures,
     ...rest
   } = all
   const header: Partial<HeaderLabels> = {}
@@ -78,14 +78,14 @@ export function splitLabels(all: AppLabels): {
     header,
     words: {
       linkToNote,
-      pictureFrom,
-      loadNamedPicture,
-      loadingPicture,
+      loadAction,
+      loadingNamed,
       picturesOff,
       loadOnePicture,
       loadPictures,
       pictureNotLoaded,
       picturesNotLoaded,
+      closePictures,
     },
   }
 }
@@ -169,9 +169,10 @@ export interface EditorEvents {
   find(state: FindState): void
   openLink(href: string): void
   copy(text: string): void
-  /** How many pictures at web addresses wait for the person to load them, the sentence that says so and the words
-   *  for the button that loads them together. */
-  picturesWaiting?(count: number, sentence: string, button: string): void
+  /** How many pictures at web addresses wait for the person to load them, the sentence that says so, the words for
+   *  the button that loads them together, and whether the callout shows: not once the person has closed it for the
+   *  page. */
+  picturesWaiting?(count: number, sentence: string, button: string, shown: boolean): void
   /** A loaded document has had its first frame: said once for each `load`, after the browser has drawn it. */
   painted?(generation: number): void
   /** The note's headings in Inkkit's own order (the ordinal is the index), said after each `load` and `reload`, and after
@@ -246,7 +247,7 @@ export class NoteEditor {
     host.pictures = new WebPictures(
       words,
       (addresses) => host.drawLinksAgain(addresses),
-      (count, sentence, button) => events.picturesWaiting?.(count, sentence, button),
+      (count, sentence, button, shown) => events.picturesWaiting?.(count, sentence, button, shown),
     )
     host.engine = await InkKitEditor.mount(
       root,
@@ -332,10 +333,9 @@ export class NoteEditor {
             const address = webAddress(reference.target)
             if (address) {
               if (host.pictures.opensInBrowser(address)) return events.openLink(address)
-              // A picture that waits is loaded with the page's others, as the callout's button does; one
-              // that was refused and can be tried again, alone.
-              if (host.pictures.isWaiting(address)) host.pictures.chooseAll()
-              else void host.pictures.choose(address)
+              // Load on a placeholder box, or Open on a refused picture that can be tried again, loads that picture
+              // alone; the callout's button is the one that loads them all.
+              void host.pictures.choose(address)
               return
             }
             postToHost({ type: 'openEmbed', embed: request(reference, context.documentId) })
@@ -415,6 +415,10 @@ export class NoteEditor {
   /** The person chose to load every picture that waits. */
   loadPictures() {
     this.pictures.chooseAll()
+  }
+  /** The person closed the callout that counts the pictures that wait: it stays hidden until a note is opened. */
+  dismissPictures() {
+    this.pictures.dismiss()
   }
   /** What the app answered for each embed of the note, by its text, so two embeds of one file, and one drawn
    *  again, ask it once. Only a file is kept: an embed the app could not show (`{unavailable: reason}`, or no file)
@@ -581,6 +585,7 @@ export class NoteEditor {
     apply()
   }
   load(text: string, generation: number, editable = true) {
+    this.pictures.opened()
     this.replace(text, generation, editable, false)
   }
   reload(text: string, generation: number, editable = true) {

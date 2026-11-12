@@ -659,9 +659,6 @@
     "%lld Lines" : {
 
     },
-    "%lld min read" : {
-      "extractionState" : "manual"
-    },
     "%lld more" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -805,6 +802,9 @@
     },
     "^[Move %lld item](inflect: true) to Recently Deleted?" : {
       "extractionState" : "manual"
+    },
+    "+%lld more" : {
+
     },
     "1 day late" : {
 
@@ -1432,6 +1432,9 @@
       "extractionState" : "manual"
     },
     "Cleared" : {
+
+    },
+    "Close" : {
 
     },
     "Code" : {
@@ -2318,6 +2321,9 @@
     "Lists" : {
 
     },
+    "Load" : {
+
+    },
     "Load More" : {
       "extractionState" : "manual"
     },
@@ -2330,19 +2336,13 @@
     "Load Picture" : {
 
     },
-    "Load Picture from %@" : {
-      "extractionState" : "manual"
-    },
-    "Load Picture: %@" : {
-      "extractionState" : "manual"
-    },
     "Load Pictures" : {
 
     },
-    "Loading file…" : {
+    "Loading %@…" : {
 
     },
-    "Loading Picture…" : {
+    "Loading file…" : {
 
     },
     "Loading versions…" : {
