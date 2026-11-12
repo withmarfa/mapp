@@ -100,9 +100,6 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     var parent: Pin?
     /// The pinned properties under the title, in the order the person chose, at most four.
     var pins: [PropertyRow]
-    /// A reading item's line above the title: its source, when it was published and how long it takes. No other
-    /// page has one.
-    var byline: PageByline?
     /// The property block's rows, all of them; the page shows the first `foldAfter` until it is expanded.
     var properties: [PropertyRow]
     var foldAfter = PropertyRow.foldAfter
@@ -212,7 +209,7 @@ extension PropertyRow: Encodable {
             try Self.encode("text", flag ? String(localized: "Yes") : String(localized: "No"), into: &container)
         case .text(let text): try Self.encode("text", text, into: &container)
         }
-        if more > 0 { try container.encode(more, forKey: .more) }
+        if more > 0 { try container.encode(PagePins.moreText(more), forKey: .more) }
         if editable { try container.encode(true, forKey: .editable) }
     }
 

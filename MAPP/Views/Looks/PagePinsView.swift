@@ -4,7 +4,7 @@ import SwiftUI
 /// key with its row's icon above its value, in a slot of a fixed width, as the note page's are, with the same chips
 /// (`PageChip`). The pins are read only, except the status, which opens a native menu and writes as the note page's
 /// does, and a linked item, which opens the item. A value keeps to one line, cut with an ellipsis, with the whole of it
-/// in the help, and a list shows what `PagePins` gave it and its "+N".
+/// in the help, and a list shows what `PagePins` gave it (its first value) and "+N more", which never truncates.
 struct PagePinsView: View {
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
     let item: Item
@@ -89,7 +89,7 @@ struct PagePinsView: View {
                 if let url = Self.dialAddress(text) { link(text, url) } else { plain(text) }
             }
             if pin.more > 0 {
-                Text(verbatim: "+\(pin.more)")
+                Text(verbatim: PagePins.moreText(pin.more))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .fixedSize()

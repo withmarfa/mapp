@@ -88,7 +88,7 @@ struct PageHeaderKindTests {
 
     @Test func aPersonsNumberToCallIsALinkWhateverTheFieldIsCalled() {
         let item = Self.item("core.entity.person", title: "Ruth Okonjo", [:])
-        let lead = PageHeaderLead(for: item, kind: .person, body: nil, now: .now, format: .automatic)
+        let lead = PageHeaderLead(for: item, kind: .person, now: .now, format: .automatic)
         let rows = [
             PropertyRow(id: "mobiles", label: "Mobiles", value: .text("+44 20 7946 0000, work"), numberToCall: "+44 20 7946 0000"),
             PropertyRow(id: "mail", label: "Mail", value: .email("a@example.com")),
@@ -96,148 +96,34 @@ struct PageHeaderKindTests {
             PropertyRow(id: "phone", label: "Phone", value: .text("+44 20 7946 0000")),
         ]
         #expect(lead.refine(rows).map(\.value) == [.phone("+44 20 7946 0000"), .email("a@example.com"), .text("+44 20 7946 0000")])
-        let general = PageHeaderLead(for: item, kind: .general, body: nil, now: .now, format: .automatic)
+        let general = PageHeaderLead(for: item, kind: .general, now: .now, format: .automatic)
         #expect(general.refine(rows) == rows)
     }
 
     // MARK: Reading
 
-    @Test func readingTimeIsCountedFromTheWordsOfTheBody() {
-        #expect(ReadingHeader.minutes(words: 1) == 1)
-        #expect(ReadingHeader.minutes(words: 220) == 1)
-        #expect(ReadingHeader.minutes(words: 221) == 2)
-        #expect(ReadingHeader.minutes(words: 1_320) == 6)
-        let body = "# Title\n\nSome **words** and a [link](https://example.com/a/very/long/address) and ![alt](img.png) <b>bold</b> --- 42"
-        // Title, Some, words, and, a, link, and, bold, 42 (the rule and the addresses are not words).
-        #expect(ReadingHeader.words(in: body) == 10 - 1)
-        // Markup is read as it is written: an image's label can run over lines, a link's text stays, and what never
-        // closes is text.
-        #expect(ReadingHeader.words(in: "![a label\nover lines](img.png)") == 0)
-        #expect(ReadingHeader.words(in: "[one](a)two [three](b)") == 3)
-        #expect(ReadingHeader.words(in: "<p class=\"x\">text</p>") == 1)
-        #expect(ReadingHeader.words(in: "unclosed <tag and ](x and ![y](z") == 6)
-        #expect(ReadingHeader.words(in: "Caf\u{E9} \u{1F600} 42") == 2)
-    }
-
-    /// The count before it learned to stop looking for a closer that is not there, which every opener searched for
-    /// to the end of the text.
-    private static func wordsSearchingFromEveryOpener(in markdown: String) -> Int {
-        func replacingMatches(in bytes: [UInt8], _ match: ([UInt8], Int) -> Int?) -> [UInt8] {
-            var result = [UInt8]()
-            var index = 0
-            while index < bytes.count {
-                if let end = match(bytes, index) {
-                    result.append(UInt8(ascii: " "))
-                    index = end
-                } else {
-                    result.append(bytes[index])
-                    index += 1
-                }
-            }
-            return result
-        }
-        var bytes = Array(markdown.utf8)
-        bytes = replacingMatches(in: bytes) { bytes, start in
-            guard bytes[start] == UInt8(ascii: "!"), start + 1 < bytes.count, bytes[start + 1] == UInt8(ascii: "["),
-                  let label = bytes[(start + 2)...].firstIndex(of: UInt8(ascii: "]")),
-                  label + 1 < bytes.count, bytes[label + 1] == UInt8(ascii: "("),
-                  let end = bytes[(label + 2)...].firstIndex(of: UInt8(ascii: ")")) else { return nil }
-            return end + 1
-        }
-        bytes = replacingMatches(in: bytes) { bytes, start in
-            guard bytes[start] == UInt8(ascii: "]"), start + 1 < bytes.count, bytes[start + 1] == UInt8(ascii: "("),
-                  let end = bytes[(start + 2)...].firstIndex(of: UInt8(ascii: ")")) else { return nil }
-            return end + 1
-        }
-        bytes = replacingMatches(in: bytes) { bytes, start in
-            guard bytes[start] == UInt8(ascii: "<"), let end = bytes[(start + 1)...].firstIndex(of: UInt8(ascii: ">")) else { return nil }
-            return end + 1
-        }
-        return String(decoding: bytes, as: UTF8.self).split(whereSeparator: \.isWhitespace)
-            .filter { $0.contains(where: { $0.isLetter || $0.isNumber }) }.count
-    }
-
-    /// A fixed pseudo-random run (SplitMix64), so a failure names text that fails again.
-    private struct Seeded: RandomNumberGenerator {
-        var state: UInt64
-        mutating func next() -> UInt64 {
-            state &+= 0x9E37_79B9_7F4A_7C15
-            var z = state
-            z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
-            z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
-            return z ^ (z >> 31)
-        }
-    }
-
-    @Test func readingTimeCountsAsTheSearchFromEveryOpenerDid() {
-        // Mostly markup, so openers with and without closers, nested and crossing, meet often.
-        let pieces = ["!", "[", "]", "(", ")", "<", ">", "![", "](", "a", "word", " ", "\n", "\u{E9}", "e\u{301}", "\u{1F600}", "42"]
-        var random = Seeded(state: 155)
-        for _ in 0..<5_000 {
-            let text = (0..<Int.random(in: 0...40, using: &random)).map { _ in pieces.randomElement(using: &random)! }.joined()
-            #expect(ReadingHeader.words(in: text) == Self.wordsSearchingFromEveryOpener(in: text), "\(text.debugDescription)")
-        }
-    }
-
-    /// Text full of openers that never close cost the old count a search to the end of the text from every one, so
-    /// 120 KB of `a < b ` took a third of a second for each edit. Compared with plain text of the same length, so a
-    /// slow machine slows both.
-    @Test func readingTimeIsCountedInOneReadWhateverTheMarkup() {
-        let length = 60_000
-        func text(_ unit: String, ending: String = "") -> String {
-            String(repeating: unit, count: length / unit.utf8.count) + ending
-        }
-        func fastest(_ text: String) -> Duration {
-            (0..<3).map { _ in ContinuousClock().measure { _ = ReadingHeader.words(in: text) } }.min()!
-        }
-        let plain = fastest(text("word "))
-        let unclosed = [
-            text("a < b "), text("x ](y "), text("![a "), text("![a ", ending: "]"), text("![a](b "), text("<![a]("),
-        ]
-        for markup in unclosed {
-            let time = fastest(markup)
-            #expect(time < plain * 10, "\(markup.prefix(8).debugDescription): \(time) against \(plain) for plain text")
-        }
-    }
-
-    @Test func aShortClippingHasNoReadingTime() {
-        let item = Self.item("core.bookmark", ["url": .string("https://www.ycombinator.com/blog/x")])
-        #expect(ReadingHeader(item: item, body: "A few words.", format: .automatic).byline.detail == nil)
-        let long = String(repeating: "word ", count: 1_320)
-        #expect(ReadingHeader(item: item, body: long, format: .automatic, locale: Locale(identifier: "en_GB")).byline.detail == "6 min read")
-        #expect(ReadingHeader(item: item, body: nil, format: .automatic).byline.detail == nil)
-    }
-
-    @Test func theSourceIsNamedBeforeThePublisherBeforeTheHost() {
-        let url: [String: PropertyValue] = ["url": .string("https://www.ycombinator.com/blog/x")]
-        #expect(ReadingHeader(item: Self.item("core.bookmark", url), body: nil, format: .automatic).byline.source == "ycombinator.com")
-        #expect(ReadingHeader(item: Self.item("core.bookmark", url.merging(["publisher": .string("YC")]) { $1 }), body: nil, format: .automatic).byline.source == "YC")
-        let both = url.merging(["publisher": .string("YC"), "source_title": .string("Y Combinator Blog")]) { $1 }
-        #expect(ReadingHeader(item: Self.item("core.bookmark", both), body: nil, format: .automatic).byline.source == "Y Combinator Blog")
-    }
-
-    @Test func thePublishedDateAndTheDekComeFromTheItem() {
+    @Test func aReadingItemsDescriptionIsItsDekAndTheSourceAndTheDayAreLeftAsProperties() {
         let item = Self.item("core.bookmark", [
-            "published_at": .string("2025-10-02"), "description": .string("  Why startups fail  "), "url": .string("https://example.com")
+            "published_at": .string("2025-10-02"), "description": .string("  Why startups fail  "), "url": .string("https://example.com"),
+            "publisher": .string("YC"), "source_title": .string("Y Combinator Blog"), "image_url": .string("https://example.com/a.png"),
         ])
-        let reading = ReadingHeader(item: item, body: nil, format: .automatic, locale: Locale(identifier: "en_GB"), calendar: Self.utc)
-        #expect(reading.byline.date == "2 Oct 2025")
-        #expect(reading.dek == "Why startups fail")
-        #expect(PageHeaderLead(for: item, kind: .reading, body: nil, now: .now, format: .automatic).showsType == false)
+        let lead = PageHeaderLead(for: item, kind: .reading, now: .now, format: .automatic)
+        #expect(lead.subtitle == "Why startups fail")
+        // The page draws the description, and loads no picture; every other property is a property.
+        #expect(lead.consumed == ["description", "image_url"])
     }
 
-    @Test func aPinNeverRepeatsWhatTheHeadersOwnLineSays() {
-        func said(_ type: String, _ kind: PageHeaderKind, _ properties: [String: PropertyValue] = [:]) -> Set<String> {
-            PageHeaderLead(for: Self.item(type, properties), kind: kind, body: nil, now: .now, format: .automatic).said
+    @Test func aPinNeverRepeatsWhatTheHeaderDrawsItself() {
+        func consumed(_ type: String, _ kind: PageHeaderKind, _ properties: [String: PropertyValue] = [:]) -> Set<String> {
+            PageHeaderLead(for: Self.item(type, properties), kind: kind, now: .now, format: .automatic).consumed
         }
-        // A general page has no line, so every pin shows.
-        #expect(said("aic.plain", .general).isEmpty)
-        // An event's line is its time, and a person's is their work: each says only what it draws.
-        #expect(said("core.event", .event, ["starts_at": .string("2026-10-29T10:00:00Z")]) == EventHeader.keys)
-        #expect(said("core.entity.person", .person) == PersonHeader.keys)
-        // A page for reading says what it is, where it came from and when, so no pin repeats the type, the source
-        // or the last edit.
-        #expect(said("core.bookmark", .reading) == ReadingHeader.keys.union([PagePlacement.type, PagePlacement.source, PagePlacement.updated]))
+        // A general page draws nothing of its own, so every pin shows.
+        #expect(consumed("aic.plain", .general).isEmpty)
+        // An event draws its time, and a person their work: each says only what it draws.
+        #expect(consumed("core.event", .event, ["starts_at": .string("2026-10-29T10:00:00Z")]) == EventHeader.keys)
+        #expect(consumed("core.entity.person", .person) == PersonHeader.keys)
+        // A page for reading names its type, source and last edit like any other page.
+        #expect(consumed("core.bookmark", .reading) == ReadingHeader.keys)
     }
 
     @Test func onlyAWebAddressCanBeOpened() {
@@ -247,10 +133,4 @@ struct PageHeaderKindTests {
         #expect(ReadingHeader.webAddress("not a url") == nil)
         #expect(ReadingHeader.webAddress(nil) == nil)
     }
-
-    static let utc: Calendar = {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "UTC")!
-        return calendar
-    }()
 }

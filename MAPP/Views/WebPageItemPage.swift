@@ -407,9 +407,9 @@ struct SourceViewPicker: View {
 }
 
 /// The page's header, drawn in SwiftUI as the note page's is drawn on the web: the title, then the pins, and where the
-/// item's kind has a line of its own (a page for reading) its byline above the title and its description under it. The
-/// same in either look: the look sets only the title's type, so changing it never moves the pins or the lines.
-/// `PageHeaderParts` gives both pages their kind, line and pins, and `PageChip` their looks.
+/// item's kind has a description of its own (a page for reading) that under the title. The same in either look: the
+/// look sets only the title's type, so changing it never moves the pins or the description.
+/// `PageHeaderParts` gives both pages their kind, lead and pins, and `PageChip` their looks.
 private struct WebPageHeader: View {
     @CurrentLibrary private var library
     @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
@@ -430,8 +430,6 @@ private struct WebPageHeader: View {
         let textSize = CGFloat(style.textSize)
         let statusField = parts.type?.statusField
         VStack(alignment: .leading, spacing: 10) {
-            let byline = [parts.lead.byline?.source, parts.lead.byline?.date, parts.lead.byline?.detail].compactMap { $0 }.filter { !$0.isEmpty }
-            if !byline.isEmpty { line(byline, step: step) }
             VStack(alignment: .leading, spacing: step) {
                 Text(verbatim: item.displayTitle)
                     .font(reading
@@ -474,23 +472,5 @@ private struct WebPageHeader: View {
                 drafts.draft(for: old, key: key).rejected = false
             }
         }
-    }
-
-    /// Where a page for reading came from, when it was published and how long it takes, as one quiet line, with the
-    /// switch at its trailing edge where the page has an article to read. The line is drawn where it has either, and while
-    /// the page loads. The switch is always there, hidden where it is not offered, so the line keeps its height.
-    private func line(_ parts: [String], step: CGFloat) -> some View {
-        HStack(spacing: step * 2.5) {
-            ForEach(Array(parts.enumerated()), id: \.offset) { index, part in
-                if index > 0 { Circle().fill(.secondary).opacity(0.7).frame(width: 2, height: 2).accessibilityHidden(true) }
-                Text(verbatim: part).lineLimit(1)
-            }
-            .font(.system(size: CGFloat(interfaceTextSize) * 12 / 13, weight: .medium))
-            .tracking(CGFloat(interfaceTextSize) * 12 / 13 * 0.02)
-            .textCase(.uppercase)
-            .foregroundStyle(.secondary)
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("WebPageLine")
     }
 }

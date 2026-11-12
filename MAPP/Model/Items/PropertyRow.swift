@@ -79,7 +79,8 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     let value: Value
     /// The number to call the main entry of a list holds, where its list can hold one (`ListShape.numberToCall`).
     var numberToCall: String?
-    /// How many values of a list a pin left out, for the "+N" after the first two. Always 0 in the property block.
+    /// How many values of a list a pin left out, for the "+N more" after the first value (`PagePins.moreText`). Always
+    /// 0 in the property block.
     var more = 0
     /// Whether the value opens an editor under it, or for a yes or no flips: any value that can be edited, on an item
     /// that can take the edit. The app says so; the page never decides it.
@@ -245,28 +246,6 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
             return words.count == values.count && !words.isEmpty ? .options(words) : nil
         default: return nil
         }
-    }
-}
-
-/// Who made the item and when, under its title: the source the library names, and the day in the list's own
-/// words.
-nonisolated struct PageByline: Hashable, Sendable, Encodable {
-    var source: String?
-    var date: String
-    /// A last part some pages add, such as how long a page takes to read.
-    var detail: String?
-
-    init(source: String?, date: String, detail: String? = nil) {
-        self.source = source
-        self.date = date
-        self.detail = detail
-    }
-
-    /// `sourceName` is what the server names the item's source (`SourceDirectory.name`), given for an item that has one.
-    init(item: Item, sourceName: String? = nil, now: Date, format: DateFormat, calendar: Calendar = .current, locale: Locale = .current) {
-        let source = (sourceName ?? item.source)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        self.source = source?.isEmpty == false ? source : nil
-        date = DateDisplay.text(of: item.created, place: .list, format: format, now: now, calendar: calendar, locale: locale)
     }
 }
 

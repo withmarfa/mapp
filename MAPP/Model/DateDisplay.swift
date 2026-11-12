@@ -26,7 +26,7 @@ nonisolated enum DateFormat: String, CaseIterable, Identifiable, Sendable {
 nonisolated enum DateDisplay {
     /// Where the date is shown, since a row has little room and a value is read by itself.
     enum Place: Sendable {
-        /// A property, the inspector, a byline or a version: the day, and the time where there is one.
+        /// A property, the inspector or a version: the day, and the time where there is one.
         case value
         /// A line of the list, where the time shows only today.
         case list

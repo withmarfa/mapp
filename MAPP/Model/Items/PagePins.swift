@@ -5,14 +5,17 @@ import Foundation
 ///
 /// The person's list (`PagePlacement.pins`) says which properties, in which order. A pin with nothing to show is an
 /// empty value where the page offers one (`offersEmpty`, for a value the person can set) and is left out where it does
-/// not. A pin naming something the type or the item does not have is left out, and stays in the list. A pin never repeats what the header's own
-/// line says (`PageHeaderLead.said`).
+/// not. A pin naming something the type or the item does not have is left out, and stays in the list. A pin never repeats what the header
+/// draws itself (`PageHeaderLead.consumed`).
 ///
 /// An event's time is its first pin, whatever the person chose. It takes one of the `pinLimit` slots, and a pin it
 /// pushes out goes back to the property block, so nothing the item shows disappears.
 nonisolated struct PagePins: Equatable, Sendable {
-    /// Most values of a list a pin shows before "+N".
-    static let listLimit = 2
+    /// Most values of a list a pin shows before "+N more": the first, so it can be shown whole.
+    static let listLimit = 1
+
+    /// What a pin says of the values of a list it left out: "+4 more". The page draws these words and never makes them.
+    static func moreText(_ count: Int) -> String { String(localized: "+\(count) more") }
 
     /// The pins to draw, in order.
     let pins: [PropertyRow]
@@ -28,7 +31,7 @@ nonisolated struct PagePins: Equatable, Sendable {
         candidates: [PropertyRow], parentField: String = PagePlacement.parent, offersEmpty: Bool = false, icon: (ItemID) -> String?,
         isPerson: (ItemID) -> Bool
     ) -> PagePins {
-        let said = lead.said
+        let said = lead.consumed
         let status = type?.statusField
         func row(for id: String) -> PropertyRow? {
             if id == parentField {
@@ -60,8 +63,8 @@ nonisolated struct PagePins: Equatable, Sendable {
         item.value(of: field.key)?.string.flatMap { $0.isEmpty ? nil : $0 }
     }
 
-    /// A list shows its first `listLimit` values, and how many it left out.
-    private static func capped(_ row: PropertyRow) -> PropertyRow {
+    /// A list shows its first `listLimit` values, and how many it left out; any other row is as it was.
+    static func capped(_ row: PropertyRow) -> PropertyRow {
         func cut<Value>(_ values: [Value], _ make: ([Value]) -> PropertyRow.Value) -> PropertyRow {
             guard values.count > listLimit else { return row }
             return PropertyRow(

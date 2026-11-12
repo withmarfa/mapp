@@ -15,7 +15,6 @@ extension EditorTests {
                    kind: .general, person: nil, subtitle: nil, status: .init(label: "In Progress", enabled: true),
                    parent: .init(label: "Field Research", enabled: true),
                    pins: [PropertyRow(id: PagePlacement.type, label: "Type", value: .type("Task", icon: "lucide:list-checks"))],
-                   byline: nil,
                    properties: [PropertyRow(id: "status", label: "Status", value: .status), PropertyRow(id: "child-of", label: "Parent", value: .parent)],
                    contents: [], linked: [], showsText: true, showMore: "Show 0 More", showMoreContents: "Show 0 More", showMoreLinked: "Show 0 More", interfaceTextSize: 13, titleLines: 2, chips: .init(looks: .defaults))
     }
