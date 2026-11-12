@@ -406,9 +406,9 @@ struct SourceViewPicker: View {
     }
 }
 
-/// The page's header, drawn in SwiftUI as the note page's is drawn on the web: the title, then the pins, and where the
-/// item's kind has a description of its own (a page for reading) that under the title. The same in either look: the
-/// look sets only the title's type, so changing it never moves the pins or the description.
+/// The page's header, drawn in SwiftUI as the note page's is drawn on the web: the title, with the description of a kind
+/// that has one under it, then the pins. The same in either look: the look sets only the title's type, so changing it
+/// never moves the pins or the description.
 /// `PageHeaderParts` gives both pages their kind, lead and pins, and `PageChip` their looks.
 private struct WebPageHeader: View {
     @CurrentLibrary private var library

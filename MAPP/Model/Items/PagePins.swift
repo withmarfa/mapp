@@ -5,8 +5,8 @@ import Foundation
 ///
 /// The person's list (`PagePlacement.pins`) says which properties, in which order. A pin with nothing to show is an
 /// empty value where the page offers one (`offersEmpty`, for a value the person can set) and is left out where it does
-/// not. A pin naming something the type or the item does not have is left out, and stays in the list. A pin never repeats what the header
-/// draws itself (`PageHeaderLead.consumed`).
+/// not. A pin naming something the type or the item does not have is left out, and stays in the list. A pin never
+/// repeats what the header draws itself (`PageHeaderLead.consumed`).
 ///
 /// An event's time is its first pin, whatever the person chose. It takes one of the `pinLimit` slots, and a pin it
 /// pushes out goes back to the property block, so nothing the item shows disappears.
@@ -20,7 +20,7 @@ nonisolated struct PagePins: Equatable, Sendable {
     /// The pins to draw, in order.
     let pins: [PropertyRow]
     /// The rows the property block leaves out: every property pinned, drawn or not, so a pin is never also a row,
-    /// and whatever the header's own line says. A pin the event's time pushed out stays in the block.
+    /// and whatever the header draws itself. A pin the event's time pushed out stays in the block.
     let leftOutOfBlock: Set<String>
 
     /// `candidates` are the item's rows before any choice (`PropertyRow.candidates`). A pinned status is the pill the

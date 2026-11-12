@@ -150,7 +150,7 @@ export interface HeaderModel {
   status: HeaderPin | null
   parent: HeaderPin | null
   /** The properties the person pinned under the title, in their order, at most four. The app has left out a pin with
-   *  nothing to show and any that the kind's own line already says. */
+   *  nothing to show and any that the header draws itself. */
   pins: HeaderRow[]
   properties: HeaderRow[]
   /** How many rows show before the rest wait behind a button. */
