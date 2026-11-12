@@ -91,6 +91,27 @@ body {
   --inkkit-table-grip-color: light-dark(rgb(0 0 0 / 0.25), rgb(255 255 255 / 0.3));
   --inkkit-table-header-background: light-dark(rgb(0 0 0 / 0.035), rgb(255 255 255 / 0.06));
   --inkkit-table-header-font-weight: 500;
+  /* A picture waiting for the person, Inkkit's file placeholder: a quiet box with the picture symbol, the caption in
+     the text's own color and size, and a Load button at its end that is the pictures banner's button (the
+     --picture-* values below feed both, so the two cannot drift). The box is 30 high and its button 22, centered
+     with 4 above and below; both are off the 4 point grid by design. */
+  --inkkit-file-placeholder-background: var(--label-quinary);
+  --inkkit-file-placeholder-radius: calc(var(--interface-text-size) * 8 / 13);
+  --inkkit-file-placeholder-min-height: calc(var(--interface-text-size) * 30 / 13);
+  --inkkit-file-placeholder-padding: 0 calc(var(--step) * 1) 0 calc(var(--step) * 2);
+  --inkkit-file-placeholder-gap: calc(var(--step) * 2);
+  --inkkit-file-placeholder-color: var(--inkkit-text-color);
+  --inkkit-file-placeholder-font-size: 1em;
+  --inkkit-file-placeholder-symbol-color: var(--label-secondary);
+  --inkkit-file-placeholder-button-background: var(--picture-button-fill);
+  --inkkit-file-placeholder-button-hover-background: var(--picture-button-fill-hover);
+  --inkkit-file-placeholder-button-border-color: transparent;
+  --inkkit-file-placeholder-button-hover-border-color: transparent;
+  --inkkit-file-placeholder-button-color: var(--inkkit-accent-color);
+  --inkkit-file-placeholder-button-font-size: var(--picture-button-text-size);
+  --inkkit-file-placeholder-button-font-weight: var(--picture-button-font-weight);
+  --inkkit-file-placeholder-button-height: var(--picture-button-height);
+  --inkkit-file-placeholder-button-padding-inline: var(--picture-button-padding);
 }
 
 /* The item's header: the system font, a bold title at nearly twice the text's size, and pins sized from the
@@ -140,6 +161,7 @@ body {
   --picture-button-height: calc(var(--interface-text-size) * 22 / 13);
   --picture-button-text-size: calc(var(--interface-text-size) * 12 / 13);
   --picture-button-padding: calc(var(--step) * 3);
+  --picture-button-font-weight: 500;
   --picture-button-fill: color-mix(in srgb, var(--inkkit-accent-color) 16%, transparent);
   --picture-button-fill-hover: color-mix(in srgb, var(--inkkit-accent-color) 26%, transparent);
 }
@@ -200,7 +222,7 @@ body {
   color: var(--inkkit-accent-color);
   font: inherit;
   font-size: var(--picture-button-text-size);
-  font-weight: 500;
+  font-weight: var(--picture-button-font-weight);
   cursor: default;
 }
 

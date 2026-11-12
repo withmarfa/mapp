@@ -85,7 +85,7 @@ async function withNote(
 }
 
 const cards = () => [...document.querySelectorAll('.inkkit-file')]
-// A picture that waits or loads is a quiet line whose label is in `.inkkit-file-label` and, while it waits, ends
+// A picture that waits or loads is a quiet box whose label is in `.inkkit-file-label` and, while it waits, ends
 // with a Load button; any other card keeps its Open arrow.
 const labels = () => cards().map((card) => card.querySelector('.inkkit-file-label')?.textContent)
 const controls = () => [...document.querySelectorAll('.inkkit-file-open, .inkkit-file-action')]
@@ -94,7 +94,7 @@ const settled = () => new Promise((resolve) => setTimeout(resolve, 20))
 const loaded: PictureAnswer = { state: 'loaded', url: 'mapp-embed://picture/?address=x&v=1' }
 const picture = '![A picture](https://example.com/a.png)\n'
 
-test('with Ask, a picture at a web address is a quiet line named by its alt text, and nothing is fetched', async () => {
+test('with Ask, a picture at a web address is a quiet box named by its alt text, and nothing is fetched', async () => {
   const { asked, embeds } = app(() => ({ state: 'waiting' }))
   await withNote(picture, async () => {
     await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
@@ -129,7 +129,7 @@ test('choosing a waiting picture asks the app to load it, and the card becomes t
   })
 })
 
-test('a waiting picture is one quiet line with a Load button, not a card that fills the column', async () => {
+test('a waiting picture is one quiet box with a Load button, not a card that fills the column', async () => {
   app(() => ({ state: 'waiting' }))
   await withNote(`${picture}\n![](https://example.org/b.png)\n`, async () => {
     await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(2))

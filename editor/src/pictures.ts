@@ -4,7 +4,7 @@ import { askPicture, type PictureAnswer, type PictureAsk } from './bridge'
 /** The words a picture's line or card and the callout above the text use. The app supplies them in the person's
  *  language. */
 export interface PictureWords {
-  /** The button at the end of the quiet line for a picture that waits, which loads that picture alone. */
+  /** The button at the end of the box for a picture that waits, which loads that picture alone. */
   loadAction?: string
   /** The line of a picture being fetched, with `%@` where the picture's description, or its website, goes. */
   loadingNamed?: string
@@ -44,12 +44,11 @@ export type Ask = typeof askPicture
  * has of a picture. An `http` address is asked for too, and the app refuses it with a reason the card shows.
  *
  * Each picture is in one state: not loaded (`waiting`, or `off` where Settings says Never), loading, loaded or
- * refused. A picture that is `waiting` or `loading` is Inkkit's quiet placeholder, one line in the text with no
- * border: a picture symbol and the picture's description (or its website when it has none) in secondary text. A
- * waiting one ends with a small Load button, which fires the adapter's `open` for that picture alone and loads
- * only it; the banner's Load Pictures button loads them all. A loading one names the same picture ("Loading
- * <description>…", so several loading together read apart), with no button, so the line does not change shape while
- * it loads. A picture that is `off` or `refused` keeps Inkkit's default card, readable, with its Open arrow. A
+ * refused. A picture that is `waiting` or `loading` is Inkkit's placeholder, a quiet box in the text: a picture
+ * symbol, the picture's description (or its website when it has none) and, while it waits, a Load button at the end,
+ * which fires the adapter's `open` for that picture alone and loads only it; the banner's Load Pictures button
+ * loads them all. A loading one names the same picture ("Loading <description>…", so several loading together read
+ * apart), with no button, in the same box. The box's look is `--inkkit-file-placeholder-*` tokens in `style.css`. A picture that is `off` or `refused` keeps Inkkit's default card, readable, with its Open arrow. A
  * `refused` picture whose `retry` is set is tried again alone by its Open arrow. Any other card's Open
  * arrow opens the address in the browser (`opensInBrowser`). The page styles none of Inkkit's own classes.
  *
@@ -151,7 +150,7 @@ export class WebPictures {
       case 'refused':
         return { kind: 'file', label: `${host}: ${state.reason}` }
       default:
-        // One quiet line naming the picture, its description or else its website, with a button that loads it.
+        // A box naming the picture, its description or else its website, with a button that loads it.
         return quiet(alt || host, this.words.loadAction ?? 'Load')
     }
   }
@@ -320,7 +319,7 @@ export class WebPictures {
   }
 }
 
-/** Inkkit's quiet line for a picture the page shows no picture for yet: a symbol and the label, and with `action` a
+/** Inkkit's quiet box for a picture the page shows no picture for yet: a symbol and the label, and with `action` a
  *  button that fires the adapter's `open` for this picture alone. */
 function quiet(label: string, action?: string): FilePresentation {
   return {

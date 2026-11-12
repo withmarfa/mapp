@@ -333,7 +333,7 @@ export class NoteEditor {
             const address = webAddress(reference.target)
             if (address) {
               if (host.pictures.opensInBrowser(address)) return events.openLink(address)
-              // Load on a quiet line, or Open on a refused picture that can be tried again, loads that picture
+              // Load on a placeholder box, or Open on a refused picture that can be tried again, loads that picture
               // alone; the callout's button is the one that loads them all.
               void host.pictures.choose(address)
               return
