@@ -10,7 +10,8 @@ import SwiftUI
 /// not edited on the page, except a pinned status, which keeps its menu; the inspector shows them all.
 ///
 /// Its pictures are the app's to give (`SealedPictures`), for this item: while some wait for the person, a callout at the
-/// top of the page says how many and loads them, as on a note's page.
+/// top of the page says how many and loads them, as the pictures banner on a note's page does (`PicturesWaitingCallout`).
+/// Its close button hides it for the page until the page is opened again.
 struct WebPageItemPage: View {
     private enum Content: Equatable {
         case loading
@@ -83,6 +84,8 @@ struct WebPageItemPage: View {
     @State private var content = Content.loading
     @State private var shownID: ItemID?
     @State private var pictures: SealedPictures?
+    /// Whether the person closed the pictures callout on this page.
+    @State private var calloutDismissal = PicturesCalloutDismissal()
     /// The look the person chose for this mail, which does not follow the choice made for articles.
     @State private var mailChoice: SourceViewMode?
     @State private var attempt = 0
@@ -135,8 +138,10 @@ struct WebPageItemPage: View {
                         WebPageHeader(item: item, inset: inset, drafts: drafts, open: open, reading: headerMode == .reader)
                             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
                         // At the top of the page, clearly further from the header than from the text it belongs to.
-                        if let pictures, pictures.waitingCount > 0 {
-                            PicturesWaitingCallout(count: pictures.waitingCount) { pictures.loadWaiting() }
+                        if let pictures, pictures.waitingCount > 0, !calloutDismissal.isClosed(for: item.id) {
+                            PicturesWaitingCallout(
+                                count: pictures.waitingCount, load: { pictures.loadWaiting() },
+                                close: { calloutDismissal.close(for: item.id) })
                                 .padding(.horizontal, inset)
                                 .padding(.top, calloutGap * 2)
                                 .padding(.bottom, calloutGap * 0.75)
@@ -151,7 +156,11 @@ struct WebPageItemPage: View {
             }
         }
         .accessibilityIdentifier("WebPageItemPage")
-        .onAppear { offerLook() }
+        .onAppear {
+            // Opening the page again, the same item included, shows a callout the person closed.
+            calloutDismissal.reopen()
+            offerLook()
+        }
         .onDisappear {
             drafts.offerPageLook(nil, for: item.id)
             drafts.headerScrolled(away: false, for: item.id)
@@ -329,13 +338,29 @@ private struct ScrollingToolbarBand: View {
     }
 }
 
-/// At the top of the page while some of its pictures wait for the person, in the words and the look of the callout on a
-/// note's page, which follows Mail's mailing-list banner: how many are not loaded, and a pill button that loads them.
-/// Its measures are the note page's, in steps of 4/13 of the interface text size (4 points at 13).
+/// Whether the person closed the pictures callout, and for which item. Closing hides it for that item until the page
+/// is opened again; a different item never inherits it, and neither the count of waiting pictures nor loading them
+/// brings it back.
+struct PicturesCalloutDismissal: Equatable {
+    private var closed: ItemID?
+
+    func isClosed(for item: ItemID) -> Bool { closed == item }
+
+    mutating func close(for item: ItemID) { closed = item }
+
+    /// The page is opened, again or anew.
+    mutating func reopen() { closed = nil }
+}
+
+/// At the top of the page while some of its pictures wait for the person, in the words and the look of the pictures
+/// banner at the top of a note's page (`#picture-bar` in the editor), which follows Mail's mailing-list banner: how
+/// many are not loaded, a pill button that loads them, and a small round close button that hides the banner for the
+/// page. Its measures are the note page's, in steps of 4/13 of the interface text size (4 points at 13).
 struct PicturesWaitingCallout: View {
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
     let count: Int
     let load: () -> Void
+    let close: () -> Void
 
     var body: some View {
         let size = CGFloat(textSize)
@@ -358,6 +383,18 @@ struct PicturesWaitingCallout: View {
                 if count == 1 { Text("Load Picture") } else { Text("Load Pictures") }
             }
             .buttonStyle(PicturePillStyle(step: step))
+            Button(action: close) {
+                Image(systemName: "xmark")
+                    .font(.system(size: size * 0.75, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.circle)
+            .controlSize(.small)
+            .tint(.secondary)
+            .help("Close")
+            .accessibilityLabel("Close")
+            .accessibilityIdentifier("PicturesWaitingCalloutClose")
         }
         .font(.system(size: size))
         .padding(.horizontal, step * 3)
