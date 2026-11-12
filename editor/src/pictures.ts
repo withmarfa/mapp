@@ -1,11 +1,11 @@
 import { InkKitError, type FilePresentation } from '@aicayzer/inkkit'
 import { askPicture, type PictureAnswer, type PictureAsk } from './bridge'
 
-/** The words a picture's card and the callout above the text use. The app supplies them in the person's language. */
+/** The words a picture's line or card and the callout above the text use. The app supplies them in the person's
+ *  language. */
 export interface PictureWords {
-  /** Has `%@` where the picture's website goes. */
-  pictureFrom?: string
-  loadNamedPicture?: string
+  /** The button at the end of the quiet line for a picture that waits, which loads that picture alone. */
+  loadAction?: string
   loadingPicture?: string
   picturesOff?: string
   /** The callout's button for one waiting picture, and for several. */
@@ -15,6 +15,8 @@ export interface PictureWords {
   pictureNotLoaded?: string
   /** The callout's sentence for several, with `%lld` where the number of pictures goes. */
   picturesNotLoaded?: string
+  /** The accessibility label of the callout's close button. */
+  closePictures?: string
 }
 
 /** A picture at a web address `http` or `https`, which is the only kind of embed whose target is one. */
@@ -41,16 +43,18 @@ export type Ask = typeof askPicture
  * has of a picture. An `http` address is asked for too, and the app refuses it with a reason the card shows.
  *
  * Each picture is in one state: not loaded (`waiting`, or `off` where Settings says Never), loading, loaded or
- * refused. Only a waiting picture's card differs from Inkkit's default card: it is a `file` card, since the facade
- * draws no quieter placeholder and has no per-card button text, whose label says what activating it does. It is
- * presented with `layout: 'fill'`, so every one takes the column's width, and `activation: 'card'`, so the whole card
- * is one button with no Open arrow. The page styles none of Inkkit's own card classes.
+ * refused. A picture that is `waiting` or `loading` is Inkkit's quiet placeholder, one line in the text with no
+ * border: a picture symbol and the picture's description (or its website when it has none) in secondary text. A
+ * waiting one ends with a small Load button, which fires the adapter's `open` for that picture alone and loads
+ * only it; the banner's Load Pictures button loads them all. A loading one has no button, so the line does not
+ * change shape while it loads. A picture that is `off` or `refused` keeps Inkkit's default card, readable, with its
+ * Open arrow. A `refused` picture whose `retry` is set is tried again alone by its Open arrow. Any other card's Open
+ * arrow opens the address in the browser (`opensInBrowser`). The page styles none of Inkkit's own classes.
  *
- * Activating a waiting card (a click, or Return or Space with it focused) fires the adapter's `open`, which loads
- * every picture that waits, as the callout's button does; a refused picture whose `retry` is set is tried alone. Any
- * other card's Open arrow opens the address in the browser (`opensInBrowser`).
+ * The callout above the text (`#picture-bar`) counts the distinct addresses still waiting among the cards drawn, and
+ * so drops as each one is chosen. Its close button (`dismiss`) hides it for the page on show, and nothing the
+ * pictures do brings it back; a different note, or the same one opened anew (`opened`), does.
  *
- * The callout above the text (`#picture-bar`) counts the distinct addresses still waiting among the cards drawn.
  * The asks mean: `chosen` when the person chose, `drawing` when a card is drawn, and `cached` for printing and
  * export, which show only what the app already holds and fetch nothing (`NoteEditor.printable` sets `cacheOnly`).
  *
@@ -64,7 +68,8 @@ export class WebPictures {
   /** How many cards are drawn for each address, from resolving one to Inkkit abandoning it. */
   private live = new Map<string, number>()
   private item = ''
-  private announced = -1
+  private announced = ''
+  private dismissed = false
   private scheduled = false
   /** While true the page only wants what the app already holds, as printing and exporting do. */
   cacheOnly = false
@@ -73,8 +78,14 @@ export class WebPictures {
     private words: PictureWords,
     /** Draws these addresses' cards again. */
     private redraw: (addresses: string[]) => void,
-    /** Hears how many pictures wait for the person to load them, whenever that changes. */
-    private waitingChanged: (count: number, sentence: string, button: string) => void,
+    /** Hears how many pictures wait for the person to load them, and whether the callout is to show, whenever that
+     *  changes. The callout shows while any wait, unless the person closed it for this page. */
+    private waitingChanged: (
+      count: number,
+      sentence: string,
+      button: string,
+      shown: boolean,
+    ) => void,
     private ask: Ask = askPicture,
   ) {}
 
@@ -84,10 +95,23 @@ export class WebPictures {
     this.item = id
     this.states.clear()
     this.asking.clear()
+    this.dismissed = false
     this.schedule()
   }
 
-  /** The card for a picture, drawn from what the app has said of it, asking the app the first time. */
+  /** The note is opened anew, even if it is the one already on the page: a callout the person closed shows again. */
+  opened() {
+    this.dismissed = false
+    this.schedule()
+  }
+
+  /** The person closed the callout: it stays hidden for this page. Nothing is loaded and no setting changes. */
+  dismiss() {
+    this.dismissed = true
+    this.schedule()
+  }
+
+  /** The line or card for a picture, drawn from what the app has said of it, asking the app the first time. */
   async present(
     address: string,
     label: string | undefined,
@@ -115,10 +139,7 @@ export class WebPictures {
     const host = hostOf(address)
     switch (state.kind) {
       case 'loading':
-        return {
-          kind: 'file',
-          label: `${host}: ${this.words.loadingPicture ?? 'Loading Picture…'}`,
-        }
+        return quiet(this.words.loadingPicture ?? 'Loading Picture…')
       case 'off':
         return {
           kind: 'file',
@@ -127,18 +148,8 @@ export class WebPictures {
       case 'refused':
         return { kind: 'file', label: `${host}: ${state.reason}` }
       default:
-        // The card says what activating it does, and which picture it is: its description, or else its website.
-        // A function replaces the placeholder, so a `$` in the text is not read as a replacement pattern.
-        // Only this card fills the column and is one button, so a click on it, or Return or Space, loads the
-        // pictures; the card's other states keep Inkkit's default card.
-        return {
-          kind: 'file',
-          layout: 'fill',
-          activation: 'card',
-          label: alt
-            ? (this.words.loadNamedPicture ?? 'Load Picture: %@').replace('%@', () => alt)
-            : (this.words.pictureFrom ?? 'Load Picture from %@').replace('%@', () => host),
-        }
+        // One quiet line naming the picture, its description or else its website, with a button that loads it.
+        return quiet(alt || host, this.words.loadAction ?? 'Load')
     }
   }
 
@@ -195,14 +206,9 @@ export class WebPictures {
     return true
   }
 
-  /** Every picture of the note that waits for the person, chosen together. */
+  /** Every picture of the note that waits for the person, chosen together, as the callout's button does. */
   chooseAll() {
     for (const address of this.waiting()) void this.choose(address)
-  }
-
-  /** Whether the picture at an address waits for the person to load it. */
-  isWaiting(address: string): boolean {
-    return this.states.get(address)?.kind === 'waiting'
   }
 
   /** Whether a card's Open should open the address in the browser, which it does for a picture that is not waiting
@@ -292,8 +298,10 @@ export class WebPictures {
   private announce() {
     this.scheduled = false
     const count = this.waiting().length
-    if (count === this.announced) return
-    this.announced = count
+    const shown = count > 0 && !this.dismissed
+    const key = `${count}:${shown}`
+    if (key === this.announced) return
+    this.announced = key
     this.waitingChanged(
       count,
       count === 1
@@ -304,7 +312,20 @@ export class WebPictures {
       count === 1
         ? (this.words.loadOnePicture ?? 'Load Picture')
         : (this.words.loadPictures ?? 'Load Pictures'),
+      shown,
     )
+  }
+}
+
+/** Inkkit's quiet line for a picture the page shows no picture for yet: a symbol and the label, and with `action` a
+ *  button that fires the adapter's `open` for this picture alone. */
+function quiet(label: string, action?: string): FilePresentation {
+  return {
+    kind: 'file',
+    appearance: 'placeholder',
+    symbol: 'image',
+    label,
+    ...(action ? { action } : {}),
   }
 }
 

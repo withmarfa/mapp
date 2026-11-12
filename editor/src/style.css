@@ -173,7 +173,11 @@ body {
 
 #picture-bar button {
   flex: none;
-  padding: calc(var(--step) * 1) calc(var(--step) * 3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(var(--step) * 6);
+  padding: 0 calc(var(--step) * 3);
   border: 0;
   border-radius: 999px;
   background: color-mix(in srgb, var(--inkkit-accent-color) 16%, transparent);
@@ -185,6 +189,29 @@ body {
 
 #picture-bar button:hover {
   background: color-mix(in srgb, var(--inkkit-accent-color) 26%, transparent);
+}
+
+/* The close button, as in Mail's banner: a small grey circle with an x, as tall as the Load button. It only hides the
+   banner. */
+#picture-bar .picture-close {
+  width: calc(var(--step) * 6);
+  padding: 0;
+  background: color-mix(in srgb, var(--label-secondary) 18%, transparent);
+  color: var(--label-secondary);
+}
+
+#picture-bar .picture-close:hover {
+  background: color-mix(in srgb, var(--label-secondary) 28%, transparent);
+}
+
+.picture-close-icon {
+  background: currentColor;
+  -webkit-mask: center / contain no-repeat;
+  mask: center / contain no-repeat;
+}
+
+.picture-close-icon[hidden] {
+  display: none;
 }
 
 /* A page with no text to write draws no editor, rather than an empty one that takes typing. An empty one would invite
