@@ -571,22 +571,8 @@ body[data-text='none'] #editor {
   outline: none;
 }
 
-/* The byline of a page for reading: where the item came from, when it was published and how long it takes, as one quiet
-   line. No other page has one. */
-.item-byline {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0 calc(var(--step) * 2);
-  color: var(--label-secondary);
-  font-size: calc(var(--interface-text-size) * 13 / 13);
-}
-
-.item-byline[hidden] {
-  display: none;
-}
-
-.item-byline-dot {
+/* The dot between the type and the date of a linked item. */
+.item-detail-dot {
   flex: none;
   width: 2px;
   height: 2px;
@@ -1050,20 +1036,11 @@ body[data-text='none'] #editor {
   object-fit: cover;
 }
 
-/* A page for reading: the source above the title, a serif column at the page width the person chose, the description under the title. */
+/* A page for reading: a serif column at the page width the person chose, the description under the title. */
 body[data-header='reading'] {
   --inkkit-font-family: 'New York', ui-serif, Georgia, serif;
   --inkkit-font-size: 1.125rem;
   --inkkit-line-height: 1.65;
-}
-
-#item-header[data-kind='reading'] .item-byline {
-  order: -1;
-  margin-top: 0;
-  font-size: calc(var(--interface-text-size) * 12 / 13);
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
 }
 
 #item-header[data-kind='reading'] .item-title {

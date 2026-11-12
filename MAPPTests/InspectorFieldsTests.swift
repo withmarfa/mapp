@@ -102,14 +102,13 @@ struct InspectorFieldsTests {
         #expect(header?.status?.enabled == false)
     }
 
-    @MainActor @Test func anEmptyStatusIsAnEmptyChipPinAndAGeneralPageHasNoLine() {
+    @MainActor @Test func anEmptyStatusIsAnEmptyChipPin() {
         let item = Self.item("aic.ticket.task")
         let library = FakeItemLibrary(items: [item])
         library.catalogue = Catalogue(itemTypes: [Self.task])
         let header = ItemPageHeader.header(of: item.id, in: library, drafts: DetailsPresentation())
         #expect(header?.pins.map(\.id) == ["#type", "status", "#updated"])
         #expect(header?.pins.first { $0.id == "status" }?.isEmpty == true)
-        #expect(header?.byline == nil)
         // A pinned row is not in the property block either.
         #expect(header?.properties.map(\.id).contains("status") == false)
     }

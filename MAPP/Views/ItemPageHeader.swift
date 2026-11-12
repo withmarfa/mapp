@@ -94,7 +94,6 @@ struct ItemPageHeader: ViewModifier {
                 return PageHeader.Pin(label: target.title, enabled: true, icon: .init(name: icon), tone: TypeTone(icon: icon).rawValue)
             },
             pins: pins.pins,
-            byline: lead.byline,
             properties: properties,
             contents: contents,
             linked: linked,

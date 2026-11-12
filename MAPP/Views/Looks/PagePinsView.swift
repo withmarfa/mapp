@@ -4,7 +4,8 @@ import SwiftUI
 /// key with its row's icon above its value, in a slot of a fixed width, as the note page's are, with the same chips
 /// (`PageChip`). The pins are read only, except the status, which opens a native menu and writes as the note page's
 /// does, and a linked item, which opens the item. A value keeps to one line, cut with an ellipsis, with the whole of it
-/// in the help, and a list shows what `PagePins` gave it and its "+N".
+/// in the help, and a list shows what `PagePins` gave it (its first value) and "+N more", which never truncates, with
+/// every value of the list in the help.
 struct PagePinsView: View {
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
     let item: Item
@@ -33,7 +34,7 @@ struct PagePinsView: View {
                     .frame(minHeight: step * 3.75)
                     .help(pin.label)
                     value(of: pin, step: step)
-                        .help(Self.wholeValue(of: pin))
+                        .help(pin.wholeValue)
                 }
                 .padding(.trailing, step * 2)
                 .accessibilityElement(children: .contain)
@@ -89,7 +90,7 @@ struct PagePinsView: View {
                 if let url = Self.dialAddress(text) { link(text, url) } else { plain(text) }
             }
             if pin.more > 0 {
-                Text(verbatim: "+\(pin.more)")
+                Text(verbatim: PagePins.moreText(pin.more))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .fixedSize()
@@ -97,19 +98,6 @@ struct PagePinsView: View {
         }
         .frame(maxWidth: .infinity, minHeight: step * 6, alignment: .leading)
         .clipped()
-    }
-
-    /// The words of a pin's value, for its help.
-    private static func wholeValue(of pin: PropertyRow) -> String {
-        switch pin.value {
-        case .status, .parent, .empty: ""
-        case .type(let name, _): name
-        case .items(let targets): targets.map(\.title).joined(separator: ", ")
-        case .people(let words), .options(let words), .tags(let words): words.joined(separator: ", ")
-        case .when(_, let help): help
-        case .source(let text), .date(let text), .text(let text), .url(let text), .email(let text), .phone(let text): text
-        case .boolean(let flag): flag ? String(localized: "Yes") : String(localized: "No")
-        }
     }
 
     private func plain(_ text: String) -> some View {

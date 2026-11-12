@@ -35,39 +35,22 @@ nonisolated enum PageHeaderKind: String, Encodable, Sendable {
     ]
 }
 
-/// What a kind of header adds to the general page for one item: the block or pin it draws, the line it keeps, and the
-/// properties it already shows, which leave the property block and the pins so nothing is shown twice. A general
-/// page has no line of its own: its type, source and last edit are pins.
+/// What a kind of header adds to the general page for one item: the block or pin it draws, and the properties it
+/// already shows, which leave the property block and the pins so nothing is shown twice. Every page names its type,
+/// source and last edit as pins and rows, whatever its kind.
 nonisolated struct PageHeaderLead: Equatable, Sendable {
     var kind = PageHeaderKind.general
     var event: EventHeader?
     var person: PersonHeader?
     /// A person's job and organization, or a reading item's description (its dek).
     var subtitle: String?
-    /// The line above the title where the kind has one: where a reading item came from, when it was published and
-    /// how long it takes. No other page has a byline.
-    var byline: PageByline?
-    /// False where the kind's own line says what the item is, so the page names the type nowhere.
-    var showsType = true
-    /// The keys of the item's properties the header draws.
+    /// The keys of the item's properties the header draws, which no pin and no row of the property block repeats.
     var consumed: Set<String> = []
 
     static let general = PageHeaderLead()
 
-    /// The rows the header's own line says already, which no pin and no row of the property block repeats: the
-    /// properties it draws, the type where `showsType` is false, and the source and last edit where the byline stands
-    /// for them.
-    var said: Set<String> {
-        var rows = consumed
-        if !showsType { rows.insert(PagePlacement.type) }
-        if byline != nil { rows.formUnion([PagePlacement.source, PagePlacement.updated]) }
-        return rows
-    }
-
-    /// The lead for `item`. `body` is its text, which a reading time is counted from.
-    init(
-        for item: Item, kind: PageHeaderKind, body: String?, now: Date, format: DateFormat, calendar: Calendar = .current, locale: Locale = .current
-    ) {
+    /// The lead for `item`.
+    init(for item: Item, kind: PageHeaderKind, now: Date, calendar: Calendar = .current, locale: Locale = .current) {
         self.kind = kind
         switch kind {
         case .general, .webpage:
@@ -83,10 +66,7 @@ nonisolated struct PageHeaderLead: Equatable, Sendable {
             subtitle = person.subtitle
             consumed = PersonHeader.keys
         case .reading:
-            let reading = ReadingHeader(item: item, body: body, format: format, locale: locale, calendar: calendar)
-            subtitle = reading.dek
-            byline = reading.byline
-            showsType = false
+            subtitle = ReadingHeader(item: item).dek
             consumed = ReadingHeader.keys
         }
     }

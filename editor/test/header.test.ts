@@ -25,7 +25,6 @@ const ticket: HeaderModel = {
   },
   parent: { label: 'Field Research', enabled: true, empty: false },
   pins: [],
-  byline: null,
   properties: [
     { id: 'status', label: 'Status', symbol: 'circle.dotted', kind: 'status' },
     { id: 'child-of', label: 'Epic', symbol: 'square.stack', kind: 'parent' },
@@ -347,10 +346,8 @@ const rows = (count: number): HeaderModel['properties'] =>
     text: `Value ${index}`,
   }))
 
-test('a page with no byline of its own has none between the title and the pins', () => {
+test('the pins follow the title with nothing drawn between them', () => {
   header.set({ ...ticket, pins: [typeRow()] })
-  expect(root.querySelector<HTMLElement>('.item-byline')!.hidden).toBe(true)
-  expect(root.querySelector('.item-byline')!.textContent).toBe('')
   const order = [...root.children].map((child) => child.className)
   expect(order.indexOf('item-pins')).toBeGreaterThan(order.indexOf('item-lead'))
   expect(root.querySelector<HTMLElement>('.item-pins')!.hidden).toBe(false)
@@ -707,16 +704,6 @@ test('a long list of linked items expands, and folds again', () => {
   expect(section.querySelectorAll('.item-linked-row')).toHaveLength(3)
 })
 
-test('the byline keeps one dot between its parts however often it is drawn again', () => {
-  const dots = () => root.querySelectorAll('.item-byline-dot').length
-  header.set({ ...ticket, byline: { source: 'GitHub', date: 'Today' } })
-  const first = dots()
-  expect(first).toBe(1)
-  header.set({ ...ticket, byline: { source: 'GitHub', date: 'Yesterday' } })
-  header.set({ ...ticket, byline: { source: 'GitHub', date: 'Today' } })
-  expect(dots()).toBe(first)
-})
-
 test('the title is told how many lines to show', () => {
   header.set({ ...ticket, titleLines: 4 })
   expect(root.style.getPropertyValue('--title-lines')).toBe('4')
@@ -871,16 +858,10 @@ test('rows first drawn where the page has no width are drawn again once it has o
   }
 })
 
-test('a page for reading puts the source and reading time in the byline', () => {
-  header.set({
-    ...ticket,
-    kind: 'reading',
-    subtitle: 'Why startups fail',
-    byline: { source: 'Y Combinator Blog', date: '2 Oct 2025', detail: '6 min read' },
-  })
-  const parts = [...root.querySelectorAll('.item-byline-part')].map((part) => part.textContent)
-  expect(parts).toEqual(['Y Combinator Blog', '2 Oct 2025', '6 min read'])
-  expect(root.querySelector('.item-byline')!.children[0]!.className).toBe('item-byline-part')
+test('a page for reading draws nothing above its title and its description under it', () => {
+  header.set({ ...ticket, kind: 'reading', subtitle: 'Why startups fail' })
+  const order = [...root.children].map((child) => child.className)
+  expect(order.slice(0, 2)).toEqual(['item-tools', 'item-lead'])
   expect(root.querySelector('.item-subtitle')!.textContent).toBe('Why startups fail')
   expect(document.body.dataset.header).toBe('reading')
 })
@@ -982,7 +963,7 @@ test('a pinned parent is a chip that opens it, and a pinned value is read only',
   expect(pinned('#updated').querySelector('button')).toBeNull()
 })
 
-test('a pinned list shows what the app sent and "+N" for what it left out', () => {
+test("a pinned list shows what the app sent and the app's words for what it left out", () => {
   header.set({
     ...ticket,
     pins: [
@@ -991,17 +972,37 @@ test('a pinned list shows what the app sent and "+N" for what it left out', () =
         label: 'Tags',
         symbol: 'tag',
         kind: 'tags',
-        texts: ['one', 'two'],
-        more: 3,
+        texts: ['one'],
+        more: '+3 more',
       },
     ],
   })
   expect(
     [...pinned('#tags').querySelectorAll('.item-chip')].map((chip) => chip.textContent),
-  ).toEqual(['#one', '#two'])
-  expect(pinned('#tags').querySelector('.item-pin-more')!.textContent).toBe('+3')
+  ).toEqual(['#one'])
+  expect(pinned('#tags').querySelector('.item-pin-more')!.textContent).toBe('+3 more')
   header.set({ ...ticket, pins: [{ ...pinRows[3]!, text: 'Today' }] })
   expect(root.querySelector('.item-pin-more')).toBeNull()
+})
+
+test("a pinned list's hover names every value the app says it holds, not only the one it draws", () => {
+  header.set({
+    ...ticket,
+    pins: [
+      {
+        id: 'labels',
+        label: 'Labels',
+        symbol: 'list.bullet',
+        kind: 'options',
+        options: [{ label: 'amber', tone: 'amber' }],
+        more: '+4 more',
+        help: 'amber, blue, green, red, violet',
+      },
+    ],
+  })
+  expect(pinned('labels').querySelector<HTMLElement>('.item-pin-value')!.title).toBe(
+    'amber, blue, green, red, violet',
+  )
 })
 
 test('a pin is not a row: no pin carries the data-row that Hide from Page reads', () => {

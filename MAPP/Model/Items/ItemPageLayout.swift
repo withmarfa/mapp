@@ -2,7 +2,7 @@ import Foundation
 import UniformTypeIdentifiers
 
 /// How an item's page is laid out: its text in the editor, a file in its preview, or an HTML document in the sealed web
-/// page under the item's title and byline.
+/// page under the item's title.
 nonisolated enum ItemPageLayout: Equatable, Sendable {
     /// The editor, with the item's header and text.
     case text
@@ -24,7 +24,7 @@ extension ItemLibrary {
     /// - Any other file opens in its preview.
     /// - An item to read (`PageHeaderKind.reading`: a bookmark or media) that is not a file, but has a file attached
     ///   that is not in the bin and is HTML by its content type (or, where that is unknown, its extension), opens to
-    ///   that document under the item's own title and byline, as an article saved with its source does. Of several,
+    ///   that document under the item's own title, as an article saved with its source does. Of several,
     ///   the oldest is shown, but only while the item's own text is empty or blank (a body not yet held counts as
     ///   empty, and the layout is read again once it is). An item with text keeps the editor, and so does any other
     ///   item, even with an HTML file attached, so a person's text is never hidden by one.

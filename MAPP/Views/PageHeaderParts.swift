@@ -2,10 +2,10 @@ import Foundation
 
 /// What an item page's header draws of the item, resolved once for every page that draws one: the note page's, which
 /// sends it to the editor's web page (`ItemPageHeader`), and a saved web page's, drawn in SwiftUI (`WebPageItemPage`).
-/// Both take their kind, their line and their pins from here, so they cannot disagree about what a header shows.
+/// Both take their kind, their lead and their pins from here, so they cannot disagree about what a header shows.
 ///
 /// A saved web page draws the same header whichever look it is shown in. The look changes the title's type and what the
-/// page below shows, never the pins or the lines.
+/// page below shows, never the pins or the lead.
 struct PageHeaderParts {
     let type: ItemTypeInfo?
     let kind: PageHeaderKind
@@ -24,8 +24,7 @@ struct PageHeaderParts {
         relationships = library.relationships(for: item.id)
         now = library.now()
         kind = PageHeaderKind.of(item.type, in: library.catalogue)
-        lead = PageHeaderLead(
-            for: item, kind: kind, body: kind == .reading ? library.body(of: item.id)?.text : nil, now: now, format: dateFormat)
+        lead = PageHeaderLead(for: item, kind: kind, now: now)
         let type = type, relationships = relationships
         candidates = PropertyRow.candidates(
             of: item, type: type, hidden: library.hiddenPropertyKeys(of: item).union(lead.consumed), relationships: relationships,

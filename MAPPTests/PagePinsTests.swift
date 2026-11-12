@@ -15,14 +15,22 @@ struct PagePinsTests {
             field("title"), field("body"),
             field("state", "status", definition: ["status_values": [["value": "pending", "group": "not_started"], ["value": "in_progress", "group": "in_progress"]]]),
             field("priority", "enum", definition: ["enum_values": ["low", "high"]]),
-            field("mobiles"),
+            field("mobiles"), field("labels"),
+        ],
+        titleField: "title", bodyField: "body"))
+
+    private static let bookmark = MarfaMapping.itemType(ItemType(
+        id: "core.bookmark", label: "Bookmark",
+        fields: [
+            field("title"), field("body"), field("description"), field("publisher"), field("source_title"),
+            field("published_at", "datetime"), field("image_url"),
         ],
         titleField: "title", bodyField: "body"))
 
     private static let catalogue = Catalogue(itemTypes: [
         ticket,
         ItemTypeInfo(id: TypeID("core.event"), label: "Event", fields: [], titleField: "title", bodyField: "body", parent: nil),
-        ItemTypeInfo(id: TypeID("core.bookmark"), label: "Bookmark", fields: [], titleField: "title", bodyField: "body", parent: nil),
+        bookmark,
     ])
 
     private static let created = Date(timeIntervalSince1970: 1_700_000_000)
@@ -54,8 +62,7 @@ struct PagePinsTests {
     ) -> Drawn {
         let type = catalogue.itemTypes[item.type]
         let placement = placements.placement(of: item.type, in: catalogue)
-        let lead = PageHeaderLead(
-            for: item, kind: kind ?? PageHeaderKind.of(item.type, in: catalogue), body: nil, now: now, format: .automatic)
+        let lead = PageHeaderLead(for: item, kind: kind ?? PageHeaderKind.of(item.type, in: catalogue), now: now)
         let candidates = PropertyRow.candidates(
             of: item, type: type, hidden: Set(["title", "body"]).union(lead.consumed), relationships: relationships, parentField: "child-of",
             format: .automatic, tags: tags, typeLabel: type?.label, typeIcon: type?.icon, sourceName: item.source, now: now,
@@ -127,7 +134,7 @@ struct PagePinsTests {
     @Test func whereEmptiesAreOfferedAValueTheItemLacksIsAnEditableEmptyRow() {
         let drawn = Self.resolve(Self.item(), relationships: [Self.parent(nil)], offersEmpty: true)
         let empty = Dictionary(uniqueKeysWithValues: (drawn.pins.pins + drawn.block).filter(\.isEmpty).map { ($0.id, $0) })
-        #expect(Set(empty.keys) == ["state", "child-of", "priority", "mobiles", "#tags"])
+        #expect(Set(empty.keys) == ["state", "child-of", "priority", "mobiles", "labels", "#tags"])
         #expect(empty.values.allSatisfy { $0.editable })
         #expect(empty["state"]?.value == .empty(symbol: PropertyRow.Value.status.symbol))
         #expect(drawn.pins.pins.map(\.id) == ["#type", "state", "child-of", "#updated"])
@@ -177,21 +184,82 @@ struct PagePinsTests {
         #expect(others.first { $0.id == "priority" }?.optionTones == [])
     }
 
-    @Test func aListOfFiveShowsTwoAndPlusThree() {
+    @Test func aListShowsItsFirstValueAndHowManyItLeftOut() {
         var placements = PagePlacements()
         placements.setPins(["#tags", "#updated"], of: TypeID("aic.ticket"))
-        let drawn = Self.resolve(Self.item(), placements: placements, tags: ["a", "b", "c", "d", "e"])
-        let tags = drawn.pins.pins[0]
-        #expect(tags.value == .tags(["a", "b"]))
-        #expect(tags.more == 3)
-        #expect(drawn.pins.pins[1].more == 0)
-        // Two are not cut.
-        let two = Self.resolve(Self.item(), placements: placements, tags: ["a", "b"])
-        #expect(two.pins.pins[0].more == 0)
-        #expect(two.pins.pins[0].value == .tags(["a", "b"]))
+        func tags(_ values: [String]) -> Drawn { Self.resolve(Self.item(), placements: placements, tags: values) }
+        // None: the pin has nothing to show, and is left out.
+        #expect(tags([]).pins.pins.map(\.id) == ["#updated"])
+        // One: just the value.
+        #expect(tags(["a"]).pins.pins[0].value == .tags(["a"]))
+        #expect(tags(["a"]).pins.pins[0].more == 0)
+        // Two: the first, and one more.
+        #expect(tags(["a", "b"]).pins.pins[0].value == .tags(["a"]))
+        #expect(tags(["a", "b"]).pins.pins[0].more == 1)
+        // Five: the first, and four more.
+        let five = tags(["a", "b", "c", "d", "e"])
+        #expect(five.pins.pins[0].value == .tags(["a"]))
+        #expect(five.pins.pins[0].more == 4)
+        #expect(five.pins.pins[1].more == 0)
         // The block shows every value of a list.
         placements.setPins([], of: TypeID("aic.ticket"))
         #expect(Self.resolve(Self.item(), placements: placements, tags: ["a", "b", "c"]).block.last?.value == .tags(["a", "b", "c"]))
+    }
+
+    @Test func everyKindOfListKeepsItsFirstValueAndCountsTheOthers() {
+        var placements = PagePlacements()
+        placements.setPins(["labels", "child-of"], of: TypeID("aic.ticket"))
+        let labels = (0..<5).map { PropertyValue.string("label \($0)") }
+        let drawn = Self.resolve(Self.item(["labels": .array(labels)]), placements: placements, relationships: [Self.parent()])
+        #expect(drawn.pins.pins[0].value == .options(["label 0"]))
+        #expect(drawn.pins.pins[0].more == 4)
+        // The block keeps all five.
+        placements.setPins([], of: TypeID("aic.ticket"))
+        let block = Self.resolve(Self.item(["labels": .array(labels)]), placements: placements)
+        #expect(block.block.first { $0.id == "labels" }?.value == .options((0..<5).map { "label \($0)" }))
+
+        func capped(_ value: PropertyRow.Value) -> PropertyRow {
+            PagePins.capped(PropertyRow(id: "list", label: "List", value: value))
+        }
+        let people = capped(.people(["Ruth", "Ada", "Cher"]))
+        #expect(people.value == .people(["Ruth"]))
+        #expect(people.more == 2)
+        let targets = (0..<3).map { PropertyRow.Target(title: "Item \($0)", item: ItemID("i\($0)")) }
+        let items = capped(.items(targets))
+        #expect(items.value == .items([targets[0]]))
+        #expect(items.more == 2)
+    }
+
+    @Test func theWordsForTheRestComeFromTheAppAndReachThePageAsText() throws {
+        #expect(PagePins.moreText(1) == "+1 more")
+        #expect(PagePins.moreText(4) == "+4 more")
+        var placements = PagePlacements()
+        placements.setPins(["#tags"], of: TypeID("aic.ticket"))
+        let drawn = Self.resolve(Self.item(), placements: placements, tags: ["a", "b", "c", "d", "e"])
+        let sent = try JSONSerialization.jsonObject(with: JSONEncoder().encode(drawn.pins.pins[0])) as? [String: Any]
+        #expect(sent?["more"] as? String == PagePins.moreText(4))
+        #expect(sent?["texts"] as? [String] == ["a"])
+        let whole = try JSONSerialization.jsonObject(with: JSONEncoder().encode(Self.resolve(Self.item(), placements: placements, tags: ["a"]).pins.pins[0])) as? [String: Any]
+        #expect(whole?["more"] == nil)
+    }
+
+    @Test func aCutListKeepsEveryValueInItsHelpAndSendsItToThePage() throws {
+        var placements = PagePlacements()
+        placements.setPins(["labels"], of: TypeID("aic.ticket"))
+        let labels = ["amber", "blue", "green", "red", "violet"].map { PropertyValue.string($0) }
+        let row = try #require(Self.resolve(Self.item(["labels": .array(labels)]), placements: placements).pins.pins.first)
+        #expect(row.value == .options(["amber"]))
+        #expect(row.wholeValue == "amber, blue, green, red, violet")
+        let sent = try JSONSerialization.jsonObject(with: JSONEncoder().encode(row)) as? [String: Any]
+        #expect(sent?["help"] as? String == "amber, blue, green, red, violet")
+        // A list that is not cut, and a row that is not a list, send no help of their own.
+        let whole = PagePins.capped(PropertyRow(id: "list", label: "List", value: .options(["amber"])))
+        #expect(whole.help == nil)
+        #expect(whole.wholeValue == "amber")
+        let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(whole)) as? [String: Any]
+        #expect(encoded?["help"] == nil)
+        let targets = (0..<3).map { PropertyRow.Target(title: "Item \($0)", item: ItemID("i\($0)")) }
+        #expect(PagePins.capped(PropertyRow(id: "list", label: "List", value: .items(targets))).wholeValue == "Item 0, Item 1, Item 2")
     }
 
     // MARK: Kinds with a line of their own
@@ -223,19 +291,33 @@ struct PagePinsTests {
         #expect(drawn.block.map(\.id) == ["#tags"])
     }
 
-    @Test func aReadingItemRepeatsNeitherItsTypeNorItsSourceNorItsDay() {
+    @Test func aReadingItemPinsItsTypeSourceAndDayLikeAnyOtherPage() {
         var placements = PagePlacements()
-        placements.setPins(["#type", "#source", "#updated", "child-of"], of: TypeID("core.bookmark"))
-        let item = Self.item(["url": .string("https://example.com/a")], type: "core.bookmark", source: "feed")
-        let drawn = Self.resolve(item, placements: placements, relationships: [Self.parent()])
-        #expect(drawn.pins.pins.map(\.id) == ["child-of"])
-        #expect(drawn.pins.leftOutOfBlock.isSuperset(of: ["#type", "#source", "#updated"]))
-        #expect(Self.resolve(item, relationships: [Self.parent()]).pins.pins.map(\.id) == ["child-of"])
+        placements.setPins(["#type", "#source", "publisher", "published_at"], of: TypeID("core.bookmark"))
+        let item = Self.item(Self.reading, type: "core.bookmark", source: "feed")
+        let drawn = Self.resolve(item, placements: placements)
+        #expect(drawn.pins.pins.map(\.id) == ["#type", "#source", "publisher", "published_at"])
+        #expect(drawn.pins.pins[1].value == .source("feed"))
+        // The default pins name the type, and nothing the page draws itself.
+        #expect(Self.resolve(item, relationships: [Self.parent()]).pins.pins.map(\.id) == ["#type", "child-of", "#updated"])
     }
 
+    @Test func aReadingItemsSourceAndPublishedDayAreInThePropertyBlock() {
+        let item = Self.item(Self.reading, type: "core.bookmark", source: "feed")
+        let block = Self.resolve(item).block.map(\.id)
+        for key in ["publisher", "source_title", "published_at", "#source"] { #expect(block.contains(key), "\(key)") }
+        // The description is the page's dek, and the picture's address is never drawn.
+        for key in ["description", "image_url"] { #expect(!block.contains(key), "\(key)") }
+    }
+
+    private static let reading: [String: PropertyValue] = [
+        "url": .string("https://example.com/a"), "publisher": .string("YC"), "source_title": .string("Y Combinator Blog"),
+        "published_at": .string("2025-10-02T00:00:00Z"), "description": .string("Why startups fail"), "image_url": .string("https://example.com/a.png"),
+    ]
+
     @Test func aPersonsNumberToCallStaysALink() {
-        let person = PageHeaderLead(for: Self.item(type: "core.entity.person"), kind: .person, body: nil, now: Self.now, format: .automatic)
-        #expect(person.said == PersonHeader.keys)
+        let person = PageHeaderLead(for: Self.item(type: "core.entity.person"), kind: .person, now: Self.now)
+        #expect(person.consumed == PersonHeader.keys)
     }
 
     // MARK: Status

@@ -74,7 +74,8 @@ export interface HeaderRow {
     | 'text'
     | 'empty'
   text?: string
-  /** What a pin's hover says in place of its value's words: an event's time, its zone and how far off it is. */
+  /** What a pin's hover and accessibility label say in place of its value's words: an event's time, its zone and how
+   *  far off it is, or every value of a list the pin cut to its first. */
   help?: string
   /** A tag's words, each after a number sign. */
   texts?: string[]
@@ -85,8 +86,9 @@ export interface HeaderRow {
   /** The type's chip: the key of its icon in `HeaderIcons.symbols` and the name of its tone. */
   icon?: string | null
   tone?: string | null
-  /** How many values of a list a pin left out, shown as "+N" after the first two. */
-  more?: number
+  /** What a pin says of the values of a list it left out, such as "+4 more", drawn after the first value. The app
+   *  words it; the page never counts. */
+  more?: string
 }
 
 /** An item that links to the one on the page. */
@@ -107,9 +109,9 @@ export interface HeaderLinked {
  *   the pin's help.
  * - `person`: adds an avatar, a subtitle and rows whose email and phone values open `mailto:` and `tel:` links, and
  *   calls Linked From "Timeline", open by default.
- * - `reading` (`core.bookmark`, `core.media`): puts the source, published date and reading time above the title
- *   (`byline`, which no other kind has), the description under it as a dek, and the text in a larger serif face set
- *   through `body[data-header]`, at the page width the person chose like any other page. The pins follow the title.
+ * - `reading` (`core.bookmark`, `core.media`): puts the description under the title as a dek, and sets the text in a
+ *   larger serif face through `body[data-header]`, at the page width the person chose like any other page. The
+ *   source and the published date are properties, and the pins follow the title.
  *
  * A fifth kind, `webpage` (`core.file.webpage`), never reaches this page: a file has no text to edit, so SwiftUI
  * draws a Web Page's title and pins natively (`WebPageItemPage`) above the sealed HTML view.
@@ -138,7 +140,7 @@ export interface HeaderModel {
   titleRefusal: string
   editable: boolean
   /** False where the item is titled by the first line of its text (`Item.titleRule` is `.firstLine`), which the page
-   *  already shows as its text, so the page draws no title and the byline leads. The toolbar and the list still show
+   *  already shows as its text, so the page draws no title and the pins lead. The toolbar and the list still show
    *  the derived title, and `bottom` and the scrolled-away report do not change. Decided from the title rule, never
    *  from a type. */
   showsTitle?: boolean
@@ -149,10 +151,8 @@ export interface HeaderModel {
   status: HeaderPin | null
   parent: HeaderPin | null
   /** The properties the person pinned under the title, in their order, at most four. The app has left out a pin with
-   *  nothing to show and any that the kind's own line already says. */
+   *  nothing to show and any that the header draws itself. */
   pins: HeaderRow[]
-  /** A reading item's line above the title; no other page has one. */
-  byline: { source?: string | null; date: string; detail?: string | null } | null
   properties: HeaderRow[]
   /** How many rows show before the rest wait behind a button. */
   foldAfter: number
@@ -338,7 +338,7 @@ class LinkedSection {
         element('span', 'item-linked-name', button).textContent = linked.title
         const detail = element('span', 'item-linked-detail', button)
         element('span', '', detail).textContent = linked.type
-        element('span', 'item-byline-dot', detail).setAttribute('aria-hidden', 'true')
+        element('span', 'item-detail-dot', detail).setAttribute('aria-hidden', 'true')
         element('span', '', detail).textContent = linked.date
         return entry
       }),
@@ -389,7 +389,6 @@ export class ItemHeader {
   private readonly subtitle: HTMLParagraphElement
   private readonly titleError: HTMLDivElement
   private readonly titleRefusal: HTMLParagraphElement
-  private readonly byline: HTMLDivElement
   private readonly pins: HTMLDListElement
   private readonly pinsBox: HTMLDivElement
   private readonly properties: HTMLDListElement
@@ -450,7 +449,6 @@ export class ItemHeader {
     discard.addEventListener('click', () => {
       if (this.model) postToHost({ type: 'titleDiscard', item: this.model.item })
     })
-    this.byline = element('div', 'item-byline', root)
     this.pinsBox = element('div', 'item-pins', root)
     this.pins = element('dl', 'item-pin-list', this.pinsBox)
     const buttons = document.createElement('div')
@@ -866,14 +864,13 @@ export class ItemHeader {
     link.addEventListener('click', open)
   }
 
-  /** Draws the byline, the pins, the property block and the linked items from the model. */
+  /** Draws the pins, the property block and the linked items from the model. */
   private redraw() {
     const model = this.model
     if (!model) return
     const key = JSON.stringify([
       model.kind,
       model.person,
-      model.byline,
       model.pins,
       model.properties,
       model.contents,
@@ -892,18 +889,6 @@ export class ItemHeader {
     this.drawn = key
 
     this.drawTools(model)
-    // Where a reading item came from, when it was published and how long it takes, as one quiet line.
-    this.byline.replaceChildren()
-    let first = true
-    for (const part of [model.byline?.source, model.byline?.date, model.byline?.detail]) {
-      if (!part) continue
-      if (!first)
-        element('span', 'item-byline-dot', this.byline).setAttribute('aria-hidden', 'true')
-      first = false
-      element('span', 'item-byline-part', this.byline).textContent = part
-    }
-    this.byline.hidden = first
-
     this.pins.replaceChildren(...model.pins.map((pin) => this.pin(pin, model)))
     this.pinsBox.hidden = model.pins.length === 0
 
@@ -1006,8 +991,7 @@ export class ItemHeader {
     this.editor(entry, key, value, row, model)
     if (row.more) {
       const more = element('span', 'item-pin-more', value)
-      more.textContent = `+${row.more}`
-      more.title = String(row.more)
+      more.textContent = row.more
     }
     return entry
   }

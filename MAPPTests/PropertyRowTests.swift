@@ -35,12 +35,10 @@ struct PropertyRowTests {
         ],
         titleField: "title", bodyField: "body"))
 
-    private static func item(_ properties: [String: PropertyValue], source: String? = nil, created: Date = .now) -> MAPP.Item {
-        var item = MAPP.Item(
+    private static func item(_ properties: [String: PropertyValue]) -> MAPP.Item {
+        MAPP.Item(
             id: ItemID("10000000-0000-0000-0000-000000000001"), type: TypeID("aic.ticket"), title: "Title", titleRule: .property("title"),
-            properties: properties.map { Property(key: $0, value: $1) }, version: ItemVersion(1), created: created, modified: created)
-        item.source = source
-        return item
+            properties: properties.map { Property(key: $0, value: $1) }, version: ItemVersion(1), created: .now, modified: .now)
     }
 
     private static func rows(
@@ -191,19 +189,6 @@ struct PropertyRowTests {
         #expect(expanded.shown.count == 9)
         #expect(expanded.hidden == 0)
         #expect(PropertyRow.split(Array(all.prefix(PropertyRow.foldAfter)), expanded: false).hidden == 0)
-    }
-
-    // MARK: Byline
-
-    @Test func theBylineNamesTheSourceAndTheDay() {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "Europe/London")!
-        let now = calendar.date(from: DateComponents(year: 2026, month: 10, day: 27, hour: 12))!
-        let created = calendar.date(from: DateComponents(year: 2026, month: 10, day: 26, hour: 9))!
-        let byline = PageByline(item: Self.item([:], source: "workbench-folder", created: created), now: now, format: .automatic, calendar: calendar, locale: Locale(identifier: "en_GB"))
-        #expect(byline.source == "workbench-folder")
-        #expect(byline.date == "Yesterday")
-        #expect(PageByline(item: Self.item([:], source: "  "), now: now, format: .automatic, calendar: calendar).source == nil)
     }
 
     // MARK: Linked from

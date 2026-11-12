@@ -83,7 +83,7 @@ struct ItemFileView: View {
 }
 
 /// The page of an item that is not shown as text (`ItemLibrary.pageLayout(of:)`): an HTML document in the sealed web
-/// page, under the item's title and byline, or any other file in its preview.
+/// page, under the item's title, or any other file in its preview.
 struct FileItemPage: View {
     @CurrentLibrary private var library
     let item: Item
