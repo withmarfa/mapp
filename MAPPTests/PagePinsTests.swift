@@ -62,8 +62,7 @@ struct PagePinsTests {
     ) -> Drawn {
         let type = catalogue.itemTypes[item.type]
         let placement = placements.placement(of: item.type, in: catalogue)
-        let lead = PageHeaderLead(
-            for: item, kind: kind ?? PageHeaderKind.of(item.type, in: catalogue), now: now, format: .automatic)
+        let lead = PageHeaderLead(for: item, kind: kind ?? PageHeaderKind.of(item.type, in: catalogue), now: now)
         let candidates = PropertyRow.candidates(
             of: item, type: type, hidden: Set(["title", "body"]).union(lead.consumed), relationships: relationships, parentField: "child-of",
             format: .automatic, tags: tags, typeLabel: type?.label, typeIcon: type?.icon, sourceName: item.source, now: now,
@@ -298,7 +297,7 @@ struct PagePinsTests {
     ]
 
     @Test func aPersonsNumberToCallStaysALink() {
-        let person = PageHeaderLead(for: Self.item(type: "core.entity.person"), kind: .person, now: Self.now, format: .automatic)
+        let person = PageHeaderLead(for: Self.item(type: "core.entity.person"), kind: .person, now: Self.now)
         #expect(person.consumed == PersonHeader.keys)
     }
 

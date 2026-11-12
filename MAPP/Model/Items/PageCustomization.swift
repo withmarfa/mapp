@@ -12,7 +12,7 @@ nonisolated enum PageCustomization {
     /// block changes nothing.
     static func drawnKeys(of item: Item, in catalogue: Catalogue) -> Set<String> {
         // Whether an event can be placed on a calendar day is read from the item, so the keys follow it.
-        PageHeaderLead(for: item, kind: PageHeaderKind.of(item.type, in: catalogue), now: Date(), format: .automatic).consumed
+        PageHeaderLead(for: item, kind: PageHeaderKind.of(item.type, in: catalogue), now: Date()).consumed
     }
 
     /// The fields Customize Layout and the inspector's Show on Page offer for `item`: those the library

@@ -50,7 +50,7 @@ nonisolated struct PageHeaderLead: Equatable, Sendable {
     static let general = PageHeaderLead()
 
     /// The lead for `item`.
-    init(for item: Item, kind: PageHeaderKind, now: Date, format: DateFormat, calendar: Calendar = .current, locale: Locale = .current) {
+    init(for item: Item, kind: PageHeaderKind, now: Date, calendar: Calendar = .current, locale: Locale = .current) {
         self.kind = kind
         switch kind {
         case .general, .webpage:

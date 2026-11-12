@@ -24,7 +24,7 @@ struct PageHeaderParts {
         relationships = library.relationships(for: item.id)
         now = library.now()
         kind = PageHeaderKind.of(item.type, in: library.catalogue)
-        lead = PageHeaderLead(for: item, kind: kind, now: now, format: dateFormat)
+        lead = PageHeaderLead(for: item, kind: kind, now: now)
         let type = type, relationships = relationships
         candidates = PropertyRow.candidates(
             of: item, type: type, hidden: library.hiddenPropertyKeys(of: item).union(lead.consumed), relationships: relationships,

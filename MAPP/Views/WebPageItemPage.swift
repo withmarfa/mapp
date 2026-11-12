@@ -406,9 +406,8 @@ struct SourceViewPicker: View {
     }
 }
 
-/// The page's header, drawn in SwiftUI as the note page's is drawn on the web: the title, with the description of a kind
-/// that has one under it, then the pins. The same in either look: the look sets only the title's type, so changing it
-/// never moves the pins or the description.
+/// The page's header, drawn in SwiftUI as the note page's is drawn on the web: the title, then the pins. The same in
+/// either look: the look sets only the title's type, so changing it never moves the pins.
 /// `PageHeaderParts` gives both pages their kind, lead and pins, and `PageChip` their looks.
 private struct WebPageHeader: View {
     @CurrentLibrary private var library
@@ -430,27 +429,17 @@ private struct WebPageHeader: View {
         let textSize = CGFloat(style.textSize)
         let statusField = parts.type?.statusField
         VStack(alignment: .leading, spacing: 10) {
-            VStack(alignment: .leading, spacing: step) {
-                Text(verbatim: item.displayTitle)
-                    .font(reading
-                        ? .system(size: textSize * 2.1, weight: .semibold, design: .serif)
-                        : .system(size: textSize * 1.9, weight: .semibold))
-                    .tracking(reading ? -textSize * 2.1 * 0.01 : 0)
-                    .lineLimit(TitleLines.resolved(titleLines))
-                    .truncationMode(.tail)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
-                    .accessibilityAddTraits(.isHeader)
-                    .accessibilityIdentifier("WebPageTitle")
-                if let dek = parts.lead.subtitle {
-                    Text(verbatim: dek)
-                        .font(.system(size: textSize * 1.2, design: .serif))
-                        .lineSpacing(textSize * 0.2)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .textSelection(.enabled)
-                }
-            }
+            Text(verbatim: item.displayTitle)
+                .font(reading
+                    ? .system(size: textSize * 2.1, weight: .semibold, design: .serif)
+                    : .system(size: textSize * 1.9, weight: .semibold))
+                .tracking(reading ? -textSize * 2.1 * 0.01 : 0)
+                .lineLimit(TitleLines.resolved(titleLines))
+                .truncationMode(.tail)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("WebPageTitle")
             if !parts.pins.pins.isEmpty {
                 PagePinsView(item: item, pins: parts.pins.pins, statusField: statusField, drafts: drafts, open: open)
                     .padding(.top, step * 1.5)

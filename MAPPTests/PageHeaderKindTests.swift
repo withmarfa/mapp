@@ -88,7 +88,7 @@ struct PageHeaderKindTests {
 
     @Test func aPersonsNumberToCallIsALinkWhateverTheFieldIsCalled() {
         let item = Self.item("core.entity.person", title: "Ruth Okonjo", [:])
-        let lead = PageHeaderLead(for: item, kind: .person, now: .now, format: .automatic)
+        let lead = PageHeaderLead(for: item, kind: .person, now: .now)
         let rows = [
             PropertyRow(id: "mobiles", label: "Mobiles", value: .text("+44 20 7946 0000, work"), numberToCall: "+44 20 7946 0000"),
             PropertyRow(id: "mail", label: "Mail", value: .email("a@example.com")),
@@ -96,7 +96,7 @@ struct PageHeaderKindTests {
             PropertyRow(id: "phone", label: "Phone", value: .text("+44 20 7946 0000")),
         ]
         #expect(lead.refine(rows).map(\.value) == [.phone("+44 20 7946 0000"), .email("a@example.com"), .text("+44 20 7946 0000")])
-        let general = PageHeaderLead(for: item, kind: .general, now: .now, format: .automatic)
+        let general = PageHeaderLead(for: item, kind: .general, now: .now)
         #expect(general.refine(rows) == rows)
     }
 
@@ -107,7 +107,7 @@ struct PageHeaderKindTests {
             "published_at": .string("2025-10-02"), "description": .string("  Why startups fail  "), "url": .string("https://example.com"),
             "publisher": .string("YC"), "source_title": .string("Y Combinator Blog"), "image_url": .string("https://example.com/a.png"),
         ])
-        let lead = PageHeaderLead(for: item, kind: .reading, now: .now, format: .automatic)
+        let lead = PageHeaderLead(for: item, kind: .reading, now: .now)
         #expect(lead.subtitle == "Why startups fail")
         // The page draws the description, and loads no picture; every other property is a property.
         #expect(lead.consumed == ["description", "image_url"])
@@ -115,7 +115,7 @@ struct PageHeaderKindTests {
 
     @Test func aPinNeverRepeatsWhatTheHeaderDrawsItself() {
         func consumed(_ type: String, _ kind: PageHeaderKind, _ properties: [String: PropertyValue] = [:]) -> Set<String> {
-            PageHeaderLead(for: Self.item(type, properties), kind: kind, now: .now, format: .automatic).consumed
+            PageHeaderLead(for: Self.item(type, properties), kind: kind, now: .now).consumed
         }
         // A general page draws nothing of its own, so every pin shows.
         #expect(consumed("aic.plain", .general).isEmpty)
