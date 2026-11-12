@@ -332,7 +332,11 @@ window.editor = {
   },
   setHeader: (model) => {
     header.set(model)
-    if (model) pictureBar.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)
+    if (model)
+      document.documentElement.style.setProperty(
+        '--interface-text-size',
+        `${model.interfaceTextSize}px`,
+      )
     checkHeaderScrolledAway()
   },
   setHeaderIcons: (icons) => {

@@ -283,7 +283,7 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
         for name in PropertyRow.Value.symbols + [Self.pictureSymbol, Self.rowGripSymbol] + Self.titleToolSymbols {
             symbols[name] = Self.symbol(name, size: size, weight: .regular)
         }
-        symbols[Self.closeSymbol] = Self.symbol(Self.closeSymbol, size: size * 8 / 13, weight: .bold)
+        symbols[Self.closeSymbol] = Self.symbol(Self.closeSymbol, size: size * 9 / 13, weight: .bold)
         for name in typeIcons {
             if Self.drawn.types[name] == nil { Self.drawn.types[name] = Self.typeIcon(name, size: size) }
             symbols[TypeIconKey.value(for: name)] = Self.drawn.types[name]

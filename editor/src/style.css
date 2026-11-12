@@ -15,6 +15,8 @@
   --label-primary: rgb(0 0 0 / 0.85);
   --label-secondary: rgb(0 0 0 / 0.5);
   --label-quinary: rgb(0 0 0 / 0.05);
+  --fill-secondary: rgb(0 0 0 / 0.078);
+  --fill-tertiary: rgb(0 0 0 / 0.047);
   --label-placeholder: rgb(0 0 0 / 0.25);
   --separator: rgb(0 0 0 / 0.1);
   --placeholder: rgb(0 0 0 / 0.498);
@@ -36,6 +38,8 @@
     --label-primary: rgb(255 255 255 / 0.85);
     --label-secondary: rgb(255 255 255 / 0.55);
     --label-quinary: rgb(255 255 255 / 0.05);
+    --fill-secondary: rgb(255 255 255 / 0.078);
+    --fill-tertiary: rgb(255 255 255 / 0.047);
     --label-placeholder: rgb(255 255 255 / 0.25);
     --separator: rgb(255 255 255 / 0.1);
     --placeholder: rgb(255 255 255 / 0.549);
@@ -126,12 +130,24 @@ body {
   user-select: none;
 }
 
+/* The interface text size the pictures' measures follow, as the header's do: the app sets it on the root, and every
+   measure below is that size's share, so they scale with it. They are points at the default 13: the Load button is 22
+   high with 12 point text, and the box for a waiting picture is 30 high with 8 point corners. 22 and 30 are off the
+   4 point grid by design. */
+:root {
+  --interface-text-size: 13px;
+  --step: calc(var(--interface-text-size) * 4 / 13);
+  --picture-button-height: calc(var(--interface-text-size) * 22 / 13);
+  --picture-button-text-size: calc(var(--interface-text-size) * 12 / 13);
+  --picture-button-padding: calc(var(--step) * 3);
+  --picture-button-fill: color-mix(in srgb, var(--inkkit-accent-color) 16%, transparent);
+  --picture-button-fill-hover: color-mix(in srgb, var(--inkkit-accent-color) 26%, transparent);
+}
+
 /* At the top of the text while pictures at web addresses wait for the person: a quiet banner on the text's
    margins, in the style of Mail's mailing-list banner, whose pill button loads them all. It sits clearly
    further from what is above it than from the text it belongs to. */
 #picture-bar {
-  --interface-text-size: 13px;
-  --step: calc(var(--interface-text-size) * 4 / 13);
   padding: calc(var(--step) * 8) var(--inkkit-column-inset) 0;
   font-family: -apple-system, system-ui, sans-serif;
   font-size: var(--interface-text-size);
@@ -176,13 +192,14 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: calc(var(--step) * 6);
-  padding: 0 calc(var(--step) * 3);
+  height: var(--picture-button-height);
+  padding: 0 var(--picture-button-padding);
   border: 0;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--inkkit-accent-color) 16%, transparent);
+  background: var(--picture-button-fill);
   color: var(--inkkit-accent-color);
   font: inherit;
+  font-size: var(--picture-button-text-size);
   font-weight: 500;
   cursor: default;
 }
@@ -192,20 +209,21 @@ body {
 }
 
 #picture-bar button:hover {
-  background: color-mix(in srgb, var(--inkkit-accent-color) 26%, transparent);
+  background: var(--picture-button-fill-hover);
 }
 
-/* The close button, as in Mail's banner: a small grey circle with an x, as tall as the Load button. It only hides the
-   banner. */
+/* The close button, as in Mail's banner: a grey circle with an x, as tall as the Load button and a little closer to
+   it than the other parts are to each other. It only hides the banner. */
 #picture-bar .picture-close {
-  width: calc(var(--step) * 6);
+  width: var(--picture-button-height);
+  margin-inline-start: calc(var(--interface-text-size) * -2 / 13);
   padding: 0;
-  background: color-mix(in srgb, var(--label-secondary) 18%, transparent);
+  background: var(--fill-tertiary);
   color: var(--label-secondary);
 }
 
 #picture-bar .picture-close:hover {
-  background: color-mix(in srgb, var(--label-secondary) 28%, transparent);
+  background: var(--fill-secondary);
 }
 
 .picture-close-icon {

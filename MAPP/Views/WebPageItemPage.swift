@@ -379,18 +379,21 @@ struct PicturesWaitingCallout: View {
             .fontWeight(.medium)
             .foregroundStyle(.primary)
             .frame(maxWidth: .infinity, alignment: .leading)
-            Button(action: load) {
-                if count == 1 { Text("Load Picture") } else { Text("Load Pictures") }
+            // The close button sits two points (at 13) closer to Load Pictures than the other parts are to each other.
+            HStack(spacing: size * 10 / 13) {
+                Button(action: load) {
+                    if count == 1 { Text("Load Picture") } else { Text("Load Pictures") }
+                }
+                .buttonStyle(PicturePillStyle(size: size))
+                Button(action: close) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: size * 9 / 13, weight: .bold))
+                }
+                .buttonStyle(PictureCloseStyle(size: size))
+                .help("Close")
+                .accessibilityLabel("Close")
+                .accessibilityIdentifier("PicturesWaitingCalloutClose")
             }
-            .buttonStyle(PicturePillStyle(step: step))
-            Button(action: close) {
-                Image(systemName: "xmark")
-                    .font(.system(size: size * 0.75, weight: .semibold))
-            }
-            .buttonStyle(PictureCloseStyle(step: step))
-            .help("Close")
-            .accessibilityLabel("Close")
-            .accessibilityIdentifier("PicturesWaitingCalloutClose")
         }
         .font(.system(size: size))
         .padding(.horizontal, step * 3)
@@ -401,32 +404,42 @@ struct PicturesWaitingCallout: View {
     }
 }
 
-/// A tinted pill with no border, brighter under the pointer.
+/// The pictures banner's buttons, as designed: the measures are points at the default 13 point interface text size,
+/// scaled with it, as the note page's are (`--picture-button-*` in the editor's style sheet). 22 and 30 are off the
+/// 4 point grid by August's choice.
+private enum PictureButtonMetrics {
+    static func height(_ size: CGFloat) -> CGFloat { size * 22 / 13 }
+    static func textSize(_ size: CGFloat) -> CGFloat { size * 12 / 13 }
+}
+
+/// A tinted pill with no border, 22 points high with 12 point medium text, brighter under the pointer.
 private struct PicturePillStyle: ButtonStyle {
-    let step: CGFloat
+    let size: CGFloat
     @State private var hovering = false
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .fontWeight(.medium)
+            .font(.system(size: PictureButtonMetrics.textSize(size), weight: .medium))
             .foregroundStyle(.tint)
-            .padding(.horizontal, step * 3)
-            .padding(.vertical, step)
+            .padding(.horizontal, size * 12 / 13)
+            .frame(height: PictureButtonMetrics.height(size))
             .background(.tint.opacity(hovering || configuration.isPressed ? 0.26 : 0.16), in: Capsule())
             .onHover { hovering = $0 }
     }
 }
 
-/// A small grey circle as tall as the pill beside it, with its symbol in secondary text, brighter under the pointer.
+/// A circle as tall as the pill beside it, in a tertiary fill as Mail's close button has, with its symbol in
+/// secondary text, a shade stronger under the pointer.
 private struct PictureCloseStyle: ButtonStyle {
-    let step: CGFloat
+    let size: CGFloat
     @State private var hovering = false
 
     func makeBody(configuration: Configuration) -> some View {
+        let height = PictureButtonMetrics.height(size)
         configuration.label
             .foregroundStyle(.secondary)
-            .frame(width: step * 6, height: step * 6)
-            .background(.secondary.opacity(hovering || configuration.isPressed ? 0.28 : 0.18), in: Circle())
+            .frame(width: height, height: height)
+            .background(hovering || configuration.isPressed ? AnyShapeStyle(.fill.secondary) : AnyShapeStyle(.fill.tertiary), in: Circle())
             .contentShape(Circle())
             .onHover { hovering = $0 }
     }
