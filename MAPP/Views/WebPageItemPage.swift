@@ -386,12 +386,8 @@ struct PicturesWaitingCallout: View {
             Button(action: close) {
                 Image(systemName: "xmark")
                     .font(.system(size: size * 0.75, weight: .semibold))
-                    .foregroundStyle(.secondary)
             }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.circle)
-            .controlSize(.small)
-            .tint(.secondary)
+            .buttonStyle(PictureCloseStyle(step: step))
             .help("Close")
             .accessibilityLabel("Close")
             .accessibilityIdentifier("PicturesWaitingCalloutClose")
@@ -417,6 +413,21 @@ private struct PicturePillStyle: ButtonStyle {
             .padding(.horizontal, step * 3)
             .padding(.vertical, step)
             .background(.tint.opacity(hovering || configuration.isPressed ? 0.26 : 0.16), in: Capsule())
+            .onHover { hovering = $0 }
+    }
+}
+
+/// A small grey circle as tall as the pill beside it, with its symbol in secondary text, brighter under the pointer.
+private struct PictureCloseStyle: ButtonStyle {
+    let step: CGFloat
+    @State private var hovering = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(.secondary)
+            .frame(width: step * 6, height: step * 6)
+            .background(.secondary.opacity(hovering || configuration.isPressed ? 0.28 : 0.18), in: Circle())
+            .contentShape(Circle())
             .onHover { hovering = $0 }
     }
 }
