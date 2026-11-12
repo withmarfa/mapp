@@ -247,7 +247,7 @@ test('the line says it is loading, with no button, while the app fetches, and a 
   await withNote(picture, async () => {
     await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
     open()
-    await vi.waitFor(() => expect(labels()).toEqual(['Loading Picture…']))
+    await vi.waitFor(() => expect(labels()).toEqual(['Loading A picture…']))
     expect(document.querySelector('.inkkit-file-action')).toBeNull()
     expect(controls()).toHaveLength(0)
     await settled()
@@ -255,6 +255,41 @@ test('the line says it is loading, with no button, while the app fetches, and a 
     finish(loaded)
     await vi.waitFor(() => expect(document.querySelector('.inkkit-file img')).not.toBeNull())
   })
+})
+
+test('pictures loading together are told apart: each line names its own, by description or else website', async () => {
+  app((request) =>
+    request.ask === 'chosen'
+      ? (new Promise<PictureAnswer>(() => {}) as unknown as PictureAnswer)
+      : { state: 'waiting' },
+  )
+  await withNote(
+    '![One $& two](https://a.example.com/a.png)\n\n![](https://b.example.com/b.png)\n',
+    async (editor) => {
+      await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(2))
+      editor.loadPictures()
+      await vi.waitFor(() =>
+        expect(labels()).toEqual(['Loading One $& two…', 'Loading b.example.com…']),
+      )
+    },
+  )
+})
+
+test('a loading line is in the words the app gave, with its picture where the placeholder is', async () => {
+  app((request) =>
+    request.ask === 'chosen'
+      ? (new Promise<PictureAnswer>(() => {}) as unknown as PictureAnswer)
+      : { state: 'waiting' },
+  )
+  await withNote(
+    picture,
+    async () => {
+      await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
+      open()
+      await vi.waitFor(() => expect(labels()).toEqual(['Chargement de A picture…']))
+    },
+    { loadingNamed: 'Chargement de %@…' },
+  )
 })
 
 test('the bar counts the pictures that wait, once for an address however often it appears', async () => {
@@ -427,7 +462,7 @@ test('a picture saved as a file on the item is asked about again, loaded or not,
       await vi.waitFor(() => expect(labels()[0]).toBe('example.com: No'))
       expect(asked.filter((request) => request.address.includes('example.com/a'))).toHaveLength(1)
       open(1)
-      await vi.waitFor(() => expect(labels()[1]).toBe('Loading Picture…'))
+      await vi.waitFor(() => expect(labels()[1]).toBe('Loading b…'))
       saved = true
       editor.savedPicturesChanged(['https://example.com/a.png', 'https://chosen.example.com/b.png'])
       await vi.waitFor(() =>
@@ -454,7 +489,7 @@ test('a picture being chosen when a saved file comes still ends loaded with the 
   await withNote(picture, async (editor) => {
     await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
     open()
-    await vi.waitFor(() => expect(labels()).toEqual(['Loading Picture…']))
+    await vi.waitFor(() => expect(labels()).toEqual(['Loading A picture…']))
     editor.savedPicturesChanged(['https://example.com/a.png'])
     await settled()
     finish(loaded)
@@ -472,7 +507,7 @@ test('a picture being chosen when the setting changes still ends loaded with the
   await withNote(picture, async (editor) => {
     await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
     open()
-    await vi.waitFor(() => expect(labels()).toEqual(['Loading Picture…']))
+    await vi.waitFor(() => expect(labels()).toEqual(['Loading A picture…']))
     editor.picturesChanged()
     await settled()
     finish(loaded)

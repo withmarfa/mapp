@@ -59,7 +59,7 @@ export function splitLabels(all: AppLabels): {
   const {
     linkToNote,
     loadAction,
-    loadingPicture,
+    loadingNamed,
     picturesOff,
     loadOnePicture,
     loadPictures,
@@ -79,7 +79,7 @@ export function splitLabels(all: AppLabels): {
     words: {
       linkToNote,
       loadAction,
-      loadingPicture,
+      loadingNamed,
       picturesOff,
       loadOnePicture,
       loadPictures,

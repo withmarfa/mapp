@@ -48,7 +48,7 @@ extension EditorController {
             "diagramUnavailable": String(localized: "Diagram unavailable:"),
             "footnote": String(localized: "Footnote"),
             "loadAction": String(localized: "Load"),
-            "loadingPicture": String(localized: "Loading Picture…"),
+            "loadingNamed": String(localized: "Loading %@…"),
             "picturesOff": String(localized: "Remote Pictures Are Off"),
             "loadOnePicture": String(localized: "Load Picture"),
             "loadPictures": String(localized: "Load Pictures"),

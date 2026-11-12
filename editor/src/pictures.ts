@@ -6,7 +6,8 @@ import { askPicture, type PictureAnswer, type PictureAsk } from './bridge'
 export interface PictureWords {
   /** The button at the end of the quiet line for a picture that waits, which loads that picture alone. */
   loadAction?: string
-  loadingPicture?: string
+  /** The line of a picture being fetched, with `%@` where the picture's description, or its website, goes. */
+  loadingNamed?: string
   picturesOff?: string
   /** The callout's button for one waiting picture, and for several. */
   loadOnePicture?: string
@@ -46,9 +47,10 @@ export type Ask = typeof askPicture
  * refused. A picture that is `waiting` or `loading` is Inkkit's quiet placeholder, one line in the text with no
  * border: a picture symbol and the picture's description (or its website when it has none) in secondary text. A
  * waiting one ends with a small Load button, which fires the adapter's `open` for that picture alone and loads
- * only it; the banner's Load Pictures button loads them all. A loading one has no button, so the line does not
- * change shape while it loads. A picture that is `off` or `refused` keeps Inkkit's default card, readable, with its
- * Open arrow. A `refused` picture whose `retry` is set is tried again alone by its Open arrow. Any other card's Open
+ * only it; the banner's Load Pictures button loads them all. A loading one names the same picture ("Loading
+ * <description>…", so several loading together read apart), with no button, so the line does not change shape while
+ * it loads. A picture that is `off` or `refused` keeps Inkkit's default card, readable, with its Open arrow. A
+ * `refused` picture whose `retry` is set is tried again alone by its Open arrow. Any other card's Open
  * arrow opens the address in the browser (`opensInBrowser`). The page styles none of Inkkit's own classes.
  *
  * The callout above the text (`#picture-bar`) counts the distinct addresses still waiting among the cards drawn, and
@@ -139,7 +141,8 @@ export class WebPictures {
     const host = hostOf(address)
     switch (state.kind) {
       case 'loading':
-        return quiet(this.words.loadingPicture ?? 'Loading Picture…')
+        // Named like the waiting line, so pictures loading together read apart, and a copy or print says which.
+        return quiet((this.words.loadingNamed ?? 'Loading %@…').replace('%@', () => alt || host))
       case 'off':
         return {
           kind: 'file',
