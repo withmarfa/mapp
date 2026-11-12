@@ -82,6 +82,9 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// How many values of a list a pin left out, for the "+N more" after the first value (`PagePins.moreText`). Always
     /// 0 in the property block.
     var more = 0
+    /// The words of every value of a list a pin cut, joined as `wholeValue` joins them, so the pin's help and its
+    /// accessibility label name them all (`PagePins.capped`). Nil for any row that shows its whole value.
+    var help: String?
     /// Whether the value opens an editor under it, or for a yes or no flips: any value that can be edited, on an item
     /// that can take the edit. The app says so; the page never decides it.
     var editable = false
@@ -89,6 +92,21 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// priority, by rank (`OptionTone.tone(of:in:isPriority:)`). Empty for any other row, whose values take the color
     /// of their words (`OptionTone.tone(for:)`).
     var optionTones: [TypeTone] = []
+
+    /// The words of the row's value, for a pin's help and its accessibility label: every value of a list, even where the
+    /// pin shows only the first.
+    var wholeValue: String {
+        if let help { return help }
+        switch value {
+        case .status, .parent, .empty: return ""
+        case .type(let name, _): return name
+        case .items(let targets): return targets.map(\.title).joined(separator: ", ")
+        case .people(let words), .options(let words), .tags(let words): return words.joined(separator: ", ")
+        case .when(_, let help): return help
+        case .source(let text), .date(let text), .text(let text), .url(let text), .email(let text), .phone(let text): return text
+        case .boolean(let flag): return flag ? String(localized: "Yes") : String(localized: "No")
+        }
+    }
 
     /// Whether the row is a value the item does not have yet.
     var isEmpty: Bool {

@@ -74,7 +74,8 @@ export interface HeaderRow {
     | 'text'
     | 'empty'
   text?: string
-  /** What a pin's hover says in place of its value's words: an event's time, its zone and how far off it is. */
+  /** What a pin's hover and accessibility label say in place of its value's words: an event's time, its zone and how
+   *  far off it is, or every value of a list the pin cut to its first. */
   help?: string
   /** A tag's words, each after a number sign. */
   texts?: string[]

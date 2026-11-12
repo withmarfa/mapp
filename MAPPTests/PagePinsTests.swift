@@ -243,6 +243,25 @@ struct PagePinsTests {
         #expect(whole?["more"] == nil)
     }
 
+    @Test func aCutListKeepsEveryValueInItsHelpAndSendsItToThePage() throws {
+        var placements = PagePlacements()
+        placements.setPins(["labels"], of: TypeID("aic.ticket"))
+        let labels = ["amber", "blue", "green", "red", "violet"].map { PropertyValue.string($0) }
+        let row = try #require(Self.resolve(Self.item(["labels": .array(labels)]), placements: placements).pins.pins.first)
+        #expect(row.value == .options(["amber"]))
+        #expect(row.wholeValue == "amber, blue, green, red, violet")
+        let sent = try JSONSerialization.jsonObject(with: JSONEncoder().encode(row)) as? [String: Any]
+        #expect(sent?["help"] as? String == "amber, blue, green, red, violet")
+        // A list that is not cut, and a row that is not a list, send no help of their own.
+        let whole = PagePins.capped(PropertyRow(id: "list", label: "List", value: .options(["amber"])))
+        #expect(whole.help == nil)
+        #expect(whole.wholeValue == "amber")
+        let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(whole)) as? [String: Any]
+        #expect(encoded?["help"] == nil)
+        let targets = (0..<3).map { PropertyRow.Target(title: "Item \($0)", item: ItemID("i\($0)")) }
+        #expect(PagePins.capped(PropertyRow(id: "list", label: "List", value: .items(targets))).wholeValue == "Item 0, Item 1, Item 2")
+    }
+
     // MARK: Kinds with a line of their own
 
     @Test func anEventsTimeIsItsFirstPinAndTheRestFollow() throws {

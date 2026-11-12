@@ -210,6 +210,7 @@ extension PropertyRow: Encodable {
         case .text(let text): try Self.encode("text", text, into: &container)
         }
         if more > 0 { try container.encode(PagePins.moreText(more), forKey: .more) }
+        if let help { try container.encode(help, forKey: .help) }
         if editable { try container.encode(true, forKey: .editable) }
     }
 

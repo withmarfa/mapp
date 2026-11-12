@@ -63,13 +63,15 @@ nonisolated struct PagePins: Equatable, Sendable {
         item.value(of: field.key)?.string.flatMap { $0.isEmpty ? nil : $0 }
     }
 
-    /// A list shows its first `listLimit` values, and how many it left out; any other row is as it was.
+    /// A list shows its first `listLimit` values, and how many it left out, and keeps the words of all of them as its
+    /// help; any other row is as it was.
     static func capped(_ row: PropertyRow) -> PropertyRow {
         func cut<Value>(_ values: [Value], _ make: ([Value]) -> PropertyRow.Value) -> PropertyRow {
             guard values.count > listLimit else { return row }
             return PropertyRow(
                 id: row.id, label: row.label, value: make(Array(values.prefix(listLimit))), numberToCall: row.numberToCall,
-                more: values.count - listLimit, editable: row.editable, optionTones: Array(row.optionTones.prefix(listLimit)))
+                more: values.count - listLimit, help: row.wholeValue, editable: row.editable,
+                optionTones: Array(row.optionTones.prefix(listLimit)))
         }
         switch row.value {
         case .items(let values): return cut(values) { .items($0) }

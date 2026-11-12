@@ -985,6 +985,26 @@ test("a pinned list shows what the app sent and the app's words for what it left
   expect(root.querySelector('.item-pin-more')).toBeNull()
 })
 
+test("a pinned list's hover names every value the app says it holds, not only the one it draws", () => {
+  header.set({
+    ...ticket,
+    pins: [
+      {
+        id: 'labels',
+        label: 'Labels',
+        symbol: 'list.bullet',
+        kind: 'options',
+        options: [{ label: 'amber', tone: 'amber' }],
+        more: '+4 more',
+        help: 'amber, blue, green, red, violet',
+      },
+    ],
+  })
+  expect(pinned('labels').querySelector<HTMLElement>('.item-pin-value')!.title).toBe(
+    'amber, blue, green, red, violet',
+  )
+})
+
 test('a pin is not a row: no pin carries the data-row that Hide from Page reads', () => {
   header.set({ ...ticket, pins: pinRows, properties: [] })
   expect(root.querySelector('.item-pin-item[data-row]')).toBeNull()
