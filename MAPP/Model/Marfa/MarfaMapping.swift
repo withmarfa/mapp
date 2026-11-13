@@ -28,22 +28,11 @@ nonisolated enum MarfaMapping {
     static let taskType = TypeID("core.task")
     static let priorityField = "priority"
     static let dueField = "due_at"
-    /// The other built-in fields a list row reads: a task's finish time, repeat and people.
-    static let completedField = "completed_at"
-    static let recurrenceField = "recurrence"
+    /// A task's people.
     static let assigneesField = "assignees"
-    /// The members of an entry of a people field that name the person.
-    static let personNameMember = "name"
-    static let personEmailMember = "email"
-    /// A `core.highlight`'s color, where its passage starts and how that is read, and the edge to the item it is an
-    /// excerpt of.
-    static let highlightColorField = "color"
+    /// Where a `core.highlight`'s passage starts.
     static let startLocationField = "start_location"
-    static let locatorTypeField = "locator_type"
-    static let excerptEdge = "excerpt-of"
     static let highlightType = TypeID("core.highlight")
-    /// A `core.entity`'s own description.
-    static let descriptionField = "description"
     /// The type an event is, or descends from; with a task, the types whose `starts_at` is read as a start date.
     static let eventType = TypeID("core.event")
     static let startField = "starts_at"
@@ -377,7 +366,8 @@ nonisolated enum MarfaMapping {
             id: ItemID(row.id), type: type, title: title, name: display?.name, titleRule: titleRule, properties: properties,
             preview: damaged ? MarfaProblems.unreadableMessage : preview, content: content, state: state,
             tier: row.tier.map(tier) ?? .library, tags: Set(row.tags), version: ItemVersion(row.version),
-            created: created, modified: modified, trashed: state == .trashed ? row.trashedDate ?? modified : nil,
+            created: created, modified: modified, occurred: row.occurredDate,
+            trashed: state == .trashed ? row.trashedDate ?? modified : nil,
             edgesOut: edgesOut,
             sync: sync, problem: damaged ? ItemProblem(message: MarfaProblems.unreadableMessage, withholdsText: true) : nil,
             readOnly: row.readOnly, boundEmbeds: embeds, source: row.source.isEmpty ? nil : row.source)

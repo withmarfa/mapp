@@ -64,20 +64,27 @@ nonisolated enum DateDisplay {
             date: style, time: hasTime ? .shortened : .omitted, locale: locale, calendar: calendar, timeZone: calendar.timeZone))
     }
 
+    /// The time of day alone, which a row shows inside the group of a day, where the day is already said.
+    static func timeOfDay(of date: Date, calendar: Calendar = .current, locale: Locale = .current) -> String {
+        time(date, calendar: calendar, locale: locale)
+    }
+
     private static func time(_ date: Date, calendar: Calendar, locale: Locale) -> String {
         date.formatted(Date.FormatStyle(
             date: .omitted, time: .shortened, locale: locale, calendar: calendar, timeZone: calendar.timeZone))
     }
 
     /// As Mail writes it: the time today, "Yesterday", the weekday within the week, and the system's short date
-    /// before that.
+    /// before that. A day to come, such as a due date or the start of an event, is a day as people say it.
     private static func listLabel(_ date: Date, now: Date, calendar: Calendar, locale: Locale) -> String {
         let today = calendar.startOfDay(for: now)
         let day = calendar.startOfDay(for: date)
         let daysAgo = calendar.dateComponents([.day], from: day, to: today).day ?? 0
         var style = Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone)
         switch daysAgo {
-        case ...0:
+        case ..<0:
+            return dayLabel(date, now: now, calendar: calendar, locale: locale)
+        case 0:
             style = style.hour().minute()
         case 1:
             return String(localized: "Yesterday")

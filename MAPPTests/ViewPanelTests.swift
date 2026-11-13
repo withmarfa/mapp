@@ -153,42 +153,31 @@ struct ViewPanelTests {
         #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.columns.isShown(.created) != true)
     }
 
-    @Test func rowsAreStoredAsTheyAreChangedAndEachUndoPutsOneBack() {
+    @Test func densityIsStoredAsItIsChangedAndUndoPutsItBack() {
         let (browser, _, undo) = Self.opened()
-        for edit: (inout ViewRows) -> Void in [
-            { $0.style = .compact }, { $0.setShowsPreview(false, settings: 2) }, { $0.setShowsPictures(false, settings: true) },
-        ] {
-            undo.beginUndoGrouping()
-            browser.changeRows(edit)
-            Self.close(undo)
-        }
-        let stored = { ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.rows ?? ViewRows() }
-        #expect(stored().style == .compact)
-        #expect(stored().showsPreview == false)
-        #expect(stored().showsPictures == false)
-        #expect(browser.rows == stored())
+        undo.beginUndoGrouping()
+        browser.changeDensity(.compact)
+        Self.close(undo)
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.density == .compact)
+        #expect(browser.density == .compact)
         undo.undo()
-        #expect(stored().showsPictures == nil)
-        #expect(stored().showsPreview == false)
-        undo.undo()
-        #expect(stored().showsPreview == nil)
-        #expect(stored().style == .compact)
-        undo.undo()
-        #expect(stored() == ViewRows())
-        #expect(browser.rows == ViewRows())
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.density == nil)
+        #expect(browser.density == nil)
     }
 
-    @Test func aPlaceKeepsItsRowsForTheWindowAndUndoPutsThemBack() {
+    @Test func aPlaceKeepsItsDensityOnThisMacAndUndoPutsItBack() {
         let (browser, _, undo) = Self.opened()
         browser.sidebarItem = .allNotes
         undo.beginUndoGrouping()
-        browser.changeRows { $0.style = .task }
+        browser.changeDensity(.compact)
         Self.close(undo)
-        #expect(browser.rows.style == .task)
-        // Opening the view stored its layout; a place's rows add nothing to it.
-        #expect((ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.rows ?? ViewRows()) == ViewRows())
+        #expect(browser.density == .compact)
+        #expect(PlaceDensities.stored(in: browser.defaults).density(for: .allNotes) == .compact)
+        // Opening the view stored its layout; a place's density adds nothing to it.
+        #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.density == nil)
         undo.undo()
-        #expect(browser.rows == ViewRows())
+        #expect(browser.density == nil)
+        #expect(PlaceDensities.stored(in: browser.defaults).density(for: .allNotes) == nil)
     }
 
     // MARK: Refused and offline writes

@@ -71,11 +71,11 @@ enum SavedViews {
         }
     }
 
-    /// This Mac's settings for a view made of what the window shows: its layout, the columns it shows, its cards and its rows.
+    /// This Mac's settings for a view made of what the window shows: its layout, the columns it shows, its cards and its density.
     static func newViewSettings(_ browser: Browser, in library: any ItemLibrary) -> ViewMacSettings {
         var settings = ViewMacSettings(layout: browser.viewMode)
         settings.cards = browser.cards
-        settings.rows = browser.rows
+        settings.density = browser.density
         if case .view(let id) = browser.item {
             let held = browser.macSettings(for: id)
             settings.columns = held.columns
