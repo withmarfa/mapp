@@ -120,10 +120,10 @@ import UniformTypeIdentifiers
         let event = add("core.event", ["place": .string("Old")])
         let model = try panel(for: event)
         model.name = "New"
-        model.commitName()
+        step { model.commitName() }
         #expect(library.propertiesSet.map(\.changes) == [["place": .string("New")]])
         model.name = "New"
-        model.commitName()
+        step { model.commitName() }
         #expect(library.propertiesSet.count == 1)
     }
 
@@ -132,10 +132,10 @@ import UniformTypeIdentifiers
         let model = try panel(for: event)
         model.name = "Mine"
         _ = library.setItemProperties(event.id, changes: ["place": .string("Theirs")], actionName: "Other", undoManager: nil)
-        model.commitName()
+        step { model.commitName() }
         #expect(model.hasNameConflict && model.notice != nil)
         #expect(library.item(event.id)?.value(of: "place") == .string("Theirs"))
-        model.keepName()
+        step { model.keepName() }
         #expect(library.item(event.id)?.value(of: "place") == .string("Mine"))
         #expect(!model.hasNameConflict)
     }
