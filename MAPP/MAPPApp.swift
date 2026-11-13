@@ -7,6 +7,13 @@ enum Launch {
         LaunchTrace.shared.mark(.appInit)
         // Made first, so it is the shared application whatever asks for one next.
         _ = MAPPApplication.shared
+        #if DEBUG
+        // `-MAPPAppearance dark|light` fixes the app's appearance for a screenshot, whatever the Mac is set to.
+        let arguments = ProcessInfo.processInfo.arguments
+        if let flag = arguments.firstIndex(of: "-MAPPAppearance"), arguments.indices.contains(flag + 1) {
+            NSApp.appearance = NSAppearance(named: arguments[flag + 1] == "dark" ? .darkAqua : .aqua)
+        }
+        #endif
         // Before any icon draws, so a `simple-icons:` type icon draws its mark and not the fallback.
         MarfaBrandIcons.register()
         #if DEBUG
