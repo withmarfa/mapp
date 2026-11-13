@@ -1,6 +1,6 @@
 # Presets and densities
 
-Status: The presets and the two densities are built, not yet released. See [Looks](looks.md).
+Status: The presets and the two densities are built in v0.0.44. See [Looks](looks.md).
 
 Where it lives: `LookPreset` under `MAPP/Model/Looks/`, `Density` and `PlaceDensities` under `MAPP/Model/`, `ItemRow` under `MAPP/Views/`, and the two places that choose a density, `ListsSettings` and `ViewPanelDensity` under `MAPP/Views/`.
 

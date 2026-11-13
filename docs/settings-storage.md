@@ -1,6 +1,6 @@
 # Settings storage
 
-Status: Built in v0.0.43. The store of type looks and the list density are built, not yet released. See [Looks](looks.md).
+Status: Built in v0.0.43. The store of type looks and the list density are built in v0.0.44. See [Looks](looks.md).
 
 Where it lives: `ListKey`, `PageKey`, `OrderKey` and `InterfaceKey` under `MAPP/Views/`, and `PagePlacements`, `ViewLayouts`, `Density`, `SidebarLayouts`, `TypeLooks`, `IncludedSubtypes`, `DateFormat` and `RemotePictureSetting` under `MAPP/Model/`.
 

@@ -1,6 +1,6 @@
 # Looks
 
-Status: The model, the store, Export and Import, the list row, the gallery card, the board card and the table are built, not yet released. Every view reads the look of the type of each item it draws.
+Status: The model, the store, Export and Import and the list row are built in v0.0.44. The gallery card, the board card and the table are built, not yet released. Every view reads the look of the type of each item it draws.
 
 Where it lives: `TypeLook`, `LookPreset`, `TypeLookResolver`, `TypeLooks` and `LooksFile` under `MAPP/Model/Looks/`, `LooksCommands` under `MAPP/Views/`, the row's content (`RowContent`, `RowContents`) under `MAPP/Model/Items/`, `Density` under `MAPP/Model/`, `ItemRow` and `NoteList` under `MAPP/Views/`, the cards' content (`CardContents`) and the table's columns (`ItemTableLayout`) under `MAPP/Model/Items/`, `ViewCards` under `MAPP/Model/`, and `GalleryCard`, `ItemBoard`, `ItemTable`, `ItemTableCell` and `ChipLine` under `MAPP/Views/`.
 
