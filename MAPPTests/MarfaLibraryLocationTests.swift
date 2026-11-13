@@ -3,8 +3,8 @@ import Testing
 import UniformTypeIdentifiers
 @testable import MAPP
 
-/// A Location written through the library: both numbers and the name in one queued edit, one undo step, and a refusal
-/// told rather than half done.
+/// Several properties written through the library, as Location writes them: both numbers and the name in one queued
+/// edit, one undo step, and a refusal told rather than half done.
 @MainActor
 @Suite(.hangLimit) struct MarfaLibraryLocationTests {
     private static let event = TypeID("core.event")
@@ -99,6 +99,27 @@ import UniformTypeIdentifiers
         let (guarded, guardedSource) = try await Self.loaded(readOnly: true)
         #expect(!guarded.setItemProperties(Self.id, changes: both, actionName: "x", undoManager: nil))
         #expect(source.writes.isEmpty && guardedSource.writes.isEmpty)
+    }
+
+    /// A key equal to the stored value still goes while an edit of the item is on its way, since it reverses that edit:
+    /// leaving it out would let the edit in flight land as the value kept.
+    @Test func aKeySetBackWhileAnEditIsOnItsWayIsSent() async throws {
+        let (library, source) = try await Self.loaded()
+        #expect(library.setItemProperties(Self.id, changes: both, actionName: "Edit Location", undoManager: nil))
+        #expect(library.isWritingProperties(of: Self.id))
+        // The stored item has no numbers yet, so taking them away equals what it holds; the name does not.
+        let back: [String: PropertyValue?] = ["latitude": nil, "longitude": nil, "place": .string("Brat")]
+        #expect(library.setItemProperties(Self.id, changes: back, actionName: "Edit Location", undoManager: nil))
+        #expect(source.writes.last == .editProperties(Self.id, back, base: ItemVersion(1), undoing: nil))
+
+        var held = try #require(library.item(Self.id))
+        held.properties = [Property(key: "place", value: .string("Brat"))]
+        source.send(.upserted([held]))
+        for write in source.submitted { source.send(.taken(write.id)) }
+        #expect(await eventually { !library.isWritingProperties(of: Self.id) })
+        let count = source.writes.count
+        #expect(library.setItemProperties(Self.id, changes: back, actionName: "Edit Location", undoManager: nil))
+        #expect(source.writes.count == count, "with nothing on its way, what the item holds is not sent again")
     }
 
     @Test func aChangeThatChangesNothingWritesNothing() async throws {
