@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The bottom line of a row, a gallery card or a board card: the page's own chips at row size, then how many values the
+/// The bottom line of a row or a board card: the page's own chips at row size, then how many values the
 /// line leaves out. A long label gives way before a mark does.
 struct ChipLine: View {
     let chips: [RowContent.Chip]
@@ -24,7 +24,7 @@ struct ChipLine: View {
                 case .option(let label, let tone):
                     PageChip(text: label, kind: .option(tone), size: .row)
                 case .person(let initials, let name):
-                    PagePerson(name: name, initials: initials, size: .row).help(name)
+                    PagePerson(name: name, initials: initials, size: .row)
                 case .tag(let tag):
                     PageChip(text: tag, kind: .tag, size: .row)
                 case .text(let text):
