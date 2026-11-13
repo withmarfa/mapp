@@ -27,7 +27,7 @@ Windows, panes, toolbars, commands and Settings. How things are drawn is in `doc
 
 ## Large lists
 
-A view that lists items must not run every row's body for a change of selection or of one item. The types that keep this (`NoteList`, `SelectableList`, `GalleryCard`, `SoftSelection`, `Browser`'s cached content) say how in their doc comments. Read them before you change a list, and measure with the `Measure` plan.
+A view that lists items must not run every row's body for a change of selection or of one item. The types that keep this (`NoteList`, `SelectableList`, `GalleryCard`, `SoftSelection`, `Browser`'s cached content) say how in their doc comments. Read them before you change a list, and measure with the `Measure` plan. `ItemRow` takes only plain values (`RowContent`, a `Density`, an excerpt) that the list worked out once for each item value (`RowContents`); it reads no library, catalogue or look.
 
 ## Code Review Rules
 
