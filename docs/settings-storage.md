@@ -30,6 +30,12 @@ Column widths are `interfaceDefaultWidth.<column>`, and the right sidebar's widt
 - **A Debug build has its own values.** Its bundle identifier differs from the installed app's, so it never shares defaults, sign-ins or the return address with it. Key anything that must differ on `Bundle.main.bundleIdentifier`, never a literal.
 - **A new field on a stored value is optional.** A value saved before the field existed must still decode.
 
+## The Settings window
+
+Settings is a place in the sidebar, not a separate window. It shows its pages in the list column (`SettingsPage`) and the chosen page in the detail column. The pages are Appearance, Lists, Editor and Sidebar; then Library, This Marfa and Recently Deleted; then About.
+
+The sidebar, list and Settings columns each have a default width a person can change in Settings (`ColumnWidth`): 230, 330 and 280 points, each within a range the column allows.
+
 ## The agreed change
 
 One store of looks, kept on this Mac for each server and exportable, replaces `listTypeStyles`, the row parts of `viewLayouts` (`rows` and `cards`) and the window's `placeRows`. Whether looks sync between Macs through Marfa is not decided. See [Looks](looks.md).
