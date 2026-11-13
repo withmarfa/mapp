@@ -20,6 +20,9 @@ struct LocationSearchResult: Identifiable, Hashable {
 /// A library can take a write after it is made (`MarfaLibrary` queues it), so until the copy shows the panel's last write
 /// the panel shows what it wrote and builds the next change on that, never on a copy that still holds the value from
 /// before. A placement then cleared, or moved back where it was, before the first lands is written, not skipped.
+///
+/// A typed name is written with the next placement, on Return, or as the panel ends, never as the field loses focus: a
+/// click on the map with the name in the field is then one edit and one undo step.
 @MainActor @Observable
 final class LocationPanelModel {
     enum Search: Equatable {

@@ -209,8 +209,8 @@ struct LocationPanelContent: View {
                     .textFieldStyle(.plain)
                     .accessibilityLabel("Name")
                     .focused($focus, equals: .name)
+                    // Not written as the field loses focus: a click on the map would make it an edit of its own.
                     .onSubmit { model.commitName() }
-                    .onChange(of: focus) { old, new in if old == .name, new != .name { model.commitName() } }
                     .padding(.horizontal, 6 * scale)
                     .frame(height: 22 * scale)
                     .background(.quaternary, in: .rect(cornerRadius: 5 * scale, style: .continuous))
