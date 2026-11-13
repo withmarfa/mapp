@@ -100,6 +100,14 @@ struct ItemTableColumnsTests {
         let defaults = try #require(UserDefaults(suiteName: suite))
         defaults.removePersistentDomain(forName: suite)
         defer { defaults.removePersistentDomain(forName: suite) }
+        let allColumns = browser.tableContent(in: library).columns
+        let byDefault = allColumns.filter(\.isShownByDefault)
+        Issue.record(Comment(rawValue: "DIAG trimmed=\(trimmed) default-shown: \(byDefault.map { "\($0.id)[\($0.widths.min),\($0.widths.ideal)]" }.joined(separator: " "))"))
+        if trimmed {
+            var next = TableColumnCustomization<ItemTableRow>()
+            for column in byDefault.dropFirst(6) { next[visibility: column.id] = .hidden }
+            defaults.set(ItemTableColumnLayouts.storing(next, for: .allNotes, in: Data()), forKey: ItemTableColumnLayouts.key)
+        }
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 1400, height: 800), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(rootView: Host(browser: browser).environment(\.library, library).defaultAppStorage(defaults))
@@ -121,16 +129,13 @@ struct ItemTableColumnsTests {
 
         func dump(_ label: String, _ t: NSTableView) {
             let cols = t.tableColumns.map { "\($0.identifier.rawValue.prefix(4))=\($0.width)[\($0.minWidth),\($0.maxWidth)]" }.joined(separator: " ")
-            Issue.record(Comment(rawValue: "DIAG trimmed=\(trimmed) sum=\(t.tableColumns.filter { !$0.isHidden }.map(\.width).reduce(0, +)) \(label) n=\(t.tableColumns.count) table=\(t.frame.width) clip=\(t.enclosingScrollView?.contentView.bounds.width ?? -1) cols: \(cols)"))
-        }
-        let allColumns = browser.tableContent(in: library).columns
-        let byDefault = allColumns.filter(\.isShownByDefault)
-        Issue.record(Comment(rawValue: "DIAG trimmed=\(trimmed) default-shown: \(byDefault.map { "\($0.id)[\($0.widths.min),\($0.widths.ideal)]" }.joined(separator: " "))"))
-        if trimmed {
-            for column in byDefault.dropFirst(6) { store { $0[visibility: column.id] = .hidden } }
+            Issue.record(Comment(rawValue: "DIAG trimmed=\(trimmed) win=\(window.contentView?.frame.width ?? -1) sum=\(t.tableColumns.filter { !$0.isHidden }.map(\.width).reduce(0, +)) \(label) n=\(t.tableColumns.count) table=\(t.frame.width) clip=\(t.enclosingScrollView?.contentView.bounds.width ?? -1) cols: \(cols)"))
         }
         let first = try await table()
         dump("0 initial", first)
+        window.setContentSize(NSSize(width: 1000, height: 800))
+        try await Task.sleep(for: .milliseconds(500))
+        dump("0b window shrunk to 1000", first)
         let expected = ItemTableColumnLayouts.shown(allColumns, in: layout()).map(\.id)
         let initial = first.tableColumns.map(\.identifier)
         // SwiftUI names the table's columns itself, so a column is told by its place: the name first, Created last.
