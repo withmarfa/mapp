@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UniformTypeIdentifiers
 @testable import MAPP
 
 /// A Location written through the library: both numbers and the name in one queued edit, one undo step, and a refusal
