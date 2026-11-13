@@ -8,7 +8,7 @@ nonisolated enum LookDate: Hashable, Sendable {
     case edited
     /// Marfa's own `occurred_at`, which every item has and no type can declare as a field: when the item happened (a
     /// quote was captured, something was copied, a message was sent, a record took place). An item with none shows when
-    /// it was created.
+    /// it was created. `Item` does not hold it yet, so nothing resolves it and a view shows when the item was created.
     case occurred
     /// No date is shown.
     case off

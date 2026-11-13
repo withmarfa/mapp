@@ -40,7 +40,7 @@ The first of these that fits wins, so the order is the rule. A preset names no t
 
 No type Marfa ships gets Record or Clip today; a type with a number and a currency code, or a `source_app`, does.
 
-The dates of a Quote ("captured"), a Clip ("copied"), a Record ("happened") and a Message ("sent") are all Marfa's own `occurred_at` (`LookDate.occurred`), or the created date for an item with none. An Event's Secondary is its time of day (`LookPart.time`) and its place, since the Date top right already shows the day.
+The dates of a Quote ("captured"), a Clip ("copied"), a Record ("happened") and a Message ("sent") are all Marfa's own `occurred_at` (`LookDate.occurred`), or the created date for an item with none. MAPP's `Item` does not hold `occurred_at` yet, so today that is always the created date. An Event's Secondary is its time of day (`LookPart.time`) and its place, since the Date top right already shows the day.
 
 The title is always the item's name. A clipboard item is titled "Clipboard Item", or a name its person gave it, and never its content.
 

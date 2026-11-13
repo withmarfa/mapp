@@ -34,7 +34,7 @@ struct LookPresetTests {
         #expect(info?.fields.first { $0.key == "emails" }?.declaredBy == TypeID("core.entity"))
         #expect(LookPreset.suggested(for: repository, in: catalogue) == .note)
         #expect(LookPreset.suggested(for: TypeID("core.entity.place"), in: catalogue) == .place)
-        // The organization declares them itself.
+        // A bare entity declares them itself.
         #expect(catalogue.itemTypes[TypeID("core.entity")]?.fields.first { $0.key == "emails" }?.declaredBy == TypeID("core.entity"))
         #expect(LookPreset.suggested(for: TypeID("core.entity"), in: catalogue) == .person)
     }

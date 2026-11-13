@@ -22,7 +22,7 @@ A look says how one type is drawn. Every view of that type, whether a list, a ga
 
 A `TypeLook` has three places, and a view adds only its layout and density.
 
-- **Date.** A date field of the type, when the item was created, when it was last edited, when it happened, or none. An item with no value in the field shows when it was last edited. When it happened is Marfa's own `occurred_at`, which every item has and no type declares as a field; an item with none shows when it was created.
+- **Date.** A date field of the type, when the item was created, when it was last edited, when it happened, or none. An item with no value in the field shows when it was last edited. When it happened is Marfa's own `occurred_at`, which every item has and no type declares as a field; an item with none shows when it was created. MAPP's `Item` does not hold `occurred_at` yet, so until it does every such date shows when the item was created.
 - **Secondary.** Up to two parts joined with ", ": a field, a date field's time of day, the item's opening line, the website of its `url`, or a file's kind and size. A time of day is offered only for a date field that includes a time, and an all-day value shows nothing for that part, so an event's Date shows the day and its Secondary "7:30 pm, Brat, Shoreditch".
 - **Facts.** The fields and tags shown after the status, in order; a view shows as many as fit. Later kinds MAPP builds (a count, a reading time, a relation) are new cases.
 
@@ -44,7 +44,7 @@ A look fills a fixed set of places. A place with nothing to show is left out and
 - **Title.** The item's name, as Marfa has it. No gray key or number comes before it, because a number is a property.
 - **Date.** Top right, on every row that has one. It is the date the list is sorted by, otherwise the type's own date: due, published, taken or updated. Inside a day's group it is the time.
 - **Secondary.** One line under the title that the look chooses, such as a repository, a website, an address or a highlight's passage.
-- **Bottom line.** The type's chip, only when the list mixes types. Then the status, then up to two facts, then "+N" for the rest. These are the page's own chips at row size: 20 points high with 11.5-point text. A person is initials only, in the pale circle. Tags do not show in a row, with one exception: the Note preset names `tags` as its fact, because the preset table gives a Note its tags, which is more specific than the general rule. So a Note's row shows its tags at row size, and no other preset puts tags in a row.
+- **Bottom line.** The type's chip, only when the list mixes types. Then the status, then up to two facts, then "+N" for the rest. These are the page's own chips at row size: 20 points high with 11.5-point text. A person is initials only, in the pale circle. Tags do not show in a row, except in a Note's: the Note preset names `tags` as its fact, shown at row size.
 
 Nothing indents a row. No status circle or highlight bar sits at the leading edge.
 

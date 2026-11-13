@@ -61,7 +61,7 @@ nonisolated enum LookPreset: String, CaseIterable, Codable, Identifiable, Hashab
     ///    image has coordinates and no address, so it is not one. Place comes before Person, since a place builds on an
     ///    entity and carries its emails and phones.
     /// 3. **Person:** a person by `PageHeaderKind`, or a type that itself declares `emails` or `phones` (`Field.declaredBy`
-    ///    is the type), as an organization does. A child that only inherits them, such as a repository built on an
+    ///    is the type), as a bare `core.entity` does. A child that only inherits them, such as a repository built on an
     ///    entity, is not a person and takes the preset its own fields suggest.
     /// 4. **Media:** a file type (`Catalogue.isFileType`), or a type whose page is for reading (`PageHeaderKind.reading`,
     ///    a bookmark or media). It comes before Task, since media has a progress status.
