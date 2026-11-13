@@ -153,14 +153,14 @@ struct ItemTableCell: View {
         }
     }
 
-    /// A value that is not picked from a fixed set: people as their initials, a list of words as choices, anything else
+    /// A value that is not picked from a fixed set: people as their initials and name, a list of words as choices, anything else
     /// as plain text with no label.
     @ViewBuilder private func other(_ field: ItemTypeInfo.Field, current: String?) -> some View {
         switch PropertyRow.value(of: field, in: row.item, format: dateFormat) {
         case .people(let names)?:
             HStack(spacing: 3) {
                 ForEach(Array(names.prefix(Self.shownPeople).enumerated()), id: \.offset) { _, name in
-                    PagePerson(name: name, initials: PersonInitials.of(name), size: .row).help(name)
+                    PagePerson(name: name, initials: PersonInitials.of(name), size: .row, showsName: true)
                 }
                 if names.count > Self.shownPeople { Text(verbatim: "+\(names.count - Self.shownPeople)").foregroundStyle(.secondary) }
             }

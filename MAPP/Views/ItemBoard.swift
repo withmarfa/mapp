@@ -33,7 +33,7 @@ struct ItemBoard: View {
                     mixesTypes: Set(items.map(\.type)).count > 1, date: .look, format: dateFormat,
                     day: Calendar.current.startOfDay(for: library.now()))
                 let contents = cardContents.contents(
-                    of: items, in: library, choices: browser.lookChoices, list: list, shape: CardShape(leaving: field.key, groupsByStatus: grouped))
+                    of: items, in: library, looks: browser.looks(in: library), list: list, shape: CardShape(leaving: field.key, groupsByStatus: grouped))
                 board(browser.hidesEmptyGroups ? lanes.filter { !$0.items.isEmpty } : lanes, key: field.key, grouped: grouped, contents: contents)
             } else if items.isEmpty {
                 if browser.isSearching { SearchEmptyState(browser: browser) }

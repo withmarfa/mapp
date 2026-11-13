@@ -47,7 +47,7 @@ struct MAPPApp: App {
 
     var body: some Scene {
         WindowGroup(id: "main") {
-            RootView(settingsRequest: settingsRequest)
+            RootView(settingsRequest: settingsRequest, libraries: libraries)
                 .interfaceTextStyle()
                 // The page's web view is backed by this color, which, unlike the window's default background, is
                 // not tinted by the desktop. Making it the window's background gives the list, Settings and the

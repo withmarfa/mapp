@@ -158,8 +158,9 @@ final class Browser {
     @ObservationIgnored private var fieldsMemo: FieldsMemo?
     /// The content of the list's rows, held between passes (`Browser+Rows`).
     @ObservationIgnored let rowContents = RowContents()
-    /// The person's chosen looks for this library's types, which the window's root keeps current (`RootView`). A table
-    /// reads the looks they resolve to (`looks(in:)`), so a change of choice works it out again.
+    /// The person's chosen looks for this library's types, which the window's root seeds and keeps current (`RootView`).
+    /// The list, the gallery, the board and the table read the looks they resolve to (`looks(in:)`), so a change of
+    /// choice works each out again.
     var lookChoices: [TypeID: TypeLookChoice] = [:]
     @ObservationIgnored var looksMemo: (key: LooksKey, looks: [TypeID: TypeLook])?
     @ObservationIgnored private var stackableMemo: (key: StackableKey, type: String?)?

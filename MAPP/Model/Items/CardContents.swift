@@ -31,8 +31,9 @@ nonisolated extension RowContent {
         for item: Item, look: TypeLook, catalogue: Catalogue, list: RowList, shape: CardShape,
         calendar: Calendar = .current, locale: Locale = .current
     ) -> RowContent {
-        var content = make(for: item, look: look.shaped(by: shape), catalogue: catalogue, list: list, calendar: calendar, locale: locale)
-        content.date = nil
+        var content = make(
+            for: item, look: look.shaped(by: shape), catalogue: catalogue, list: list, includesDate: false, calendar: calendar,
+            locale: locale)
         let status = catalogue.itemTypes[item.type]?.statusField?.key
         if shape.groupsByStatus || (status != nil && status == shape.leaving) {
             content.chips.removeAll { if case .status = $0 { true } else { false } }
@@ -43,49 +44,52 @@ nonisolated extension RowContent {
 
 /// The content of a gallery's or a board's cards, worked out once for each item value rather than each time a card is
 /// drawn, as `RowContents` does for rows. An item that is the same, on the same catalogue, with the same looks, in the
-/// same list and shape, is answered from the last pass, so a change of selection makes no card's content and an edit
-/// to one item makes one. The looks are resolved once for the library's membership and the person's choices.
+/// same list and shape, is answered from the last pass, so a change of selection makes no card's content, an edit to
+/// one item makes one, and a pass that changes nothing makes none. The looks are the browser's (`Browser.looks(in:)`),
+/// resolved once for the library's membership and the person's choices.
 @MainActor
 final class CardContents {
     private struct Basis: Equatable {
         let library: ObjectIdentifier
         let membership: Int
-        let choices: [TypeID: TypeLookChoice]
+        let looks: [TypeID: TypeLook]
         let list: RowList
         let shape: CardShape
     }
 
-    private struct Held {
-        let item: Item
-        let content: RowContent
-    }
-
     private var basis: Basis?
-    private var looks: [TypeID: TypeLook] = [:]
-    private var held: [ItemID: Held] = [:]
+    private var held: [ItemID: Item] = [:]
+    /// The content of each held item, kept beside `held` so a pass that changes nothing answers without building it again.
+    private var made: [ItemID: RowContent] = [:]
+    /// How many contents have been made, for tests to see that a pass that changes nothing makes none.
+    private(set) var builds = 0
 
     /// The content of each item's card. What the last pass held for an item that is gone is let go.
     func contents(
-        of items: [Item], in library: any ItemLibrary, choices: [TypeID: TypeLookChoice], list: RowList, shape: CardShape
+        of items: [Item], in library: any ItemLibrary, looks: [TypeID: TypeLook], list: RowList, shape: CardShape
     ) -> [ItemID: RowContent] {
-        let next = Basis(library: ObjectIdentifier(library), membership: library.membershipRevision, choices: choices, list: list, shape: shape)
+        let next = Basis(library: ObjectIdentifier(library), membership: library.membershipRevision, looks: looks, list: list, shape: shape)
         if next != basis {
             basis = next
-            looks = library.catalogue.looks(choices: choices)
             held = [:]
+            made = [:]
         }
-        var kept: [ItemID: Held] = [:]
-        kept.reserveCapacity(items.count)
         for item in items {
-            if let known = held[item.id], known.item == item {
-                kept[item.id] = known
-                continue
-            }
-            let content = RowContent.card(
+            let id = item.id
+            if held[id] == item { continue }
+            builds += 1
+            made[id] = RowContent.card(
                 for: item, look: looks[item.type] ?? .empty, catalogue: library.catalogue, list: list, shape: shape)
-            kept[item.id] = Held(item: item, content: content)
+            held[id] = item
         }
-        held = kept
-        return kept.mapValues(\.content)
+        // Every item is held now, so more held than listed means some item is gone.
+        if held.count != items.count {
+            let listed = Set(items.map(\.id))
+            for id in held.keys where !listed.contains(id) {
+                held[id] = nil
+                made[id] = nil
+            }
+        }
+        return made
     }
 }

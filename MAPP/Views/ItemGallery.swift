@@ -44,7 +44,7 @@ struct ItemGallery: View {
         // does not say them again.
         let shape = CardShape(dropsOpening: browser.cards.preview == .pictureOrText || browser.cards.preview == .text)
         let list = RowList(date: .look, format: dateFormat, day: Calendar.current.startOfDay(for: library.now()))
-        let contents = cardContents.contents(of: sections.flatMap(\.items), in: library, choices: browser.lookChoices, list: list, shape: shape)
+        let contents = cardContents.contents(of: sections.flatMap(\.items), in: library, looks: browser.looks(in: library), list: list, shape: shape)
         keyboardCollection(sections, ids: ids, plan: plan(for: browser.cards, contents: contents))
         .searchStatus(browser)
         .accessibilityLabel(title)

@@ -5,8 +5,17 @@ struct RootView: View {
     @Environment(Libraries.self) private var libraries
     /// The window's browser lives here, above the library, so what the person was writing outlives a change of
     /// library, which starts the rest of the window afresh.
-    @State private var browser = Browser()
+    @State private var browser: Browser
     let settingsRequest: SettingsRequest
+
+    /// The browser starts holding the looks the person chose, so the first draw of a gallery, a board or a table builds
+    /// once and not again when the choices arrive.
+    init(settingsRequest: SettingsRequest, libraries: Libraries) {
+        self.settingsRequest = settingsRequest
+        let browser = Browser()
+        browser.lookChoices = libraries.typeLooks.choices(for: libraries.libraryKey)
+        _browser = State(initialValue: browser)
+    }
 
     var body: some View {
         Group {
@@ -20,8 +29,8 @@ struct RootView: View {
         .environment(\.library, libraries.current)
         .focusedSceneValue(\.browser, browser)
         .registersMainWindow(browser, with: settingsRequest)
-        // The table, gallery and board draw each type's chosen look, which the browser holds for them to read.
-        .onChange(of: libraries.typeLooks.choices(for: libraries.libraryKey), initial: true) { _, choices in
+        // The table, gallery and board draw each type's chosen look, which the browser holds for them to read, seeded in `init`.
+        .onChange(of: libraries.typeLooks.choices(for: libraries.libraryKey)) { _, choices in
             browser.lookChoices = choices
         }
         .onAppear {

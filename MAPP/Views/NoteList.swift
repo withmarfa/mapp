@@ -13,7 +13,6 @@ struct NoteList: View, Equatable {
     @State private var daysSeen = 0
     @State private var width = ColumnWidth.list.defaultWidth
     @SceneStorage("sidebarHidden") private var isSidebarHidden = false
-    @Environment(Libraries.self) private var libraries: Libraries?
     @AppStorage(ListKey.density) private var settingsDensity = Density.standard
     /// Only watched: a place's density is read from the defaults (`Browser.density`), where another window may change it.
     @AppStorage(PlaceDensities.key) private var placeDensities: Data?
@@ -33,8 +32,7 @@ struct NoteList: View, Equatable {
         // of one item makes the content of that row alone, and a row's body looks nothing up.
         let lines = ListLine.lines(of: sections)
         let list = browser.rowList(of: items, in: library, order: order, now: now, format: dateFormat)
-        let choices = libraries?.typeLooks.choices(for: libraries?.libraryKey ?? "") ?? [:]
-        let contents = browser.rowContents.contents(of: lines.compactMap(\.entry), in: library, choices: choices, list: list)
+        let contents = browser.rowContents.contents(of: lines.compactMap(\.entry), in: library, looks: browser.looks(in: library), list: list)
         let _ = placeDensities
         let density = browser.density ?? settingsDensity
         let results = browser.searchResults(in: library)

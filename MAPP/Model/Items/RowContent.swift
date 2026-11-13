@@ -89,13 +89,14 @@ nonisolated struct RowContent: Hashable, Sendable {
 
     // MARK: Making
 
+    /// `includesDate` is false for a content that never says its date, so the date is not worked out to be dropped.
     static func make(
-        for item: Item, look: TypeLook, catalogue: Catalogue, list: RowList, showsTime: Bool = false,
+        for item: Item, look: TypeLook, catalogue: Catalogue, list: RowList, showsTime: Bool = false, includesDate: Bool = true,
         calendar: Calendar = .current, locale: Locale = .current
     ) -> RowContent {
         let maker = Maker(item: item, info: catalogue.itemTypes[item.type], catalogue: catalogue, list: list, calendar: calendar, locale: locale)
         var content = RowContent(
-            title: item.displayTitle, date: maker.date(of: look, showsTime: showsTime), secondary: maker.secondary(of: look),
+            title: item.displayTitle, date: includesDate ? maker.date(of: look, showsTime: showsTime) : nil, secondary: maker.secondary(of: look),
             typeIcon: catalogue.icon(for: item.type), typeLabel: catalogue.label(for: item.type), mixesTypes: list.mixesTypes)
         maker.addBottomLine(of: look, to: &content)
         return content
