@@ -1,6 +1,6 @@
 # Views and lists
 
-Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built, not yet released. See [Looks](looks.md).
+Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built in v0.0.45. See [Looks](looks.md).
 
 Where it lives: `Browser`, `ItemViewMode`, `ViewLayouts` and `SidebarLayout` under `MAPP/Model/`, with `CardContents` and `ItemTableLayout` under `MAPP/Model/Items/`; `NoteList`, `ItemRow`, `ItemGallery`, `GalleryCard`, `ItemBoard`, `ItemTable`, `ItemTableCell`, `ChipLine`, `ItemTimeline`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
 

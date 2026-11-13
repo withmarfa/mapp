@@ -1,6 +1,6 @@
 # Composed properties
 
-Status: Location is built, not yet released. The other properties are agreed, not built; see "Built today".
+Status: Location is built in v0.0.45. Relation, Count and Reading Time are not built and are being reconsidered; see "Built today".
 
 Where it lives: `PropertyRow` (with its `Value`) under `MAPP/Model/Items/`, and `MarfaMapping` under `MAPP/Model/Marfa/`. Location is `ItemLocation` and `LocationFrame` under `MAPP/Model/Items/`, and `LocationPanelContent` and `LocationPanelModel` under `MAPP/Views/ValueEditing/`. Composed properties are built in a type's look from these.
 
