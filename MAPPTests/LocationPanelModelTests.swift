@@ -230,7 +230,7 @@ import UniformTypeIdentifiers
         let event = add("core.event")
         let written = try panel(for: event)
         written.name = "Mine"
-        written.finish(cancelled: false)
+        step { written.finish(cancelled: false) }
         #expect(library.item(event.id)?.value(of: "place") == .string("Mine"))
         let cancelled = try panel(for: event)
         cancelled.name = "Dropped"
