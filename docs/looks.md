@@ -25,7 +25,7 @@ A `TypeLook` has three places, and a view adds only its layout and density.
 - **Secondary.** Up to two parts joined with ", ": a field, the item's opening line, the website of its `url`, or a file's kind and size.
 - **Facts.** The fields and tags shown after the status, in order; a view shows as many as fit. Later kinds MAPP builds (a count, a reading time, a relation) are new cases.
 
-A type with a status field always shows its status first, so a status is never a fact. A place the type has no field for stays empty: a look never names a field its type lacks, and a chosen field the type lacks is passed over for the preset's.
+A type with a status field always shows its status first, so a status is never a fact. A place the type has no field for stays empty: a look never names a field its type lacks, and a chosen date field the type lacks is replaced by the preset's date, while a chosen part or fact it lacks is left out.
 
 ## Export and import
 

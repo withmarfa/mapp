@@ -25,8 +25,8 @@ nonisolated struct TypeLookResolver {
         return preset
     }
 
-    /// The look of `type`. A choice naming a field the type does not have, or a date it cannot show, is passed over for
-    /// the preset's.
+    /// The look of `type`. A date the type cannot show is replaced by the preset's; a part or fact naming a field the type
+    /// lacks is left out.
     mutating func look(of type: TypeID) -> TypeLook {
         let suggested = preset(of: type)
         let base = suggested.look(for: type, in: catalogue)

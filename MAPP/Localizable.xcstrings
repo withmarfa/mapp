@@ -905,9 +905,6 @@
     "A to Z" : {
 
     },
-    "A type starts from its fields: one with a status gets the Task row, one with pictures the picture row." : {
-
-    },
     "About" : {
       "extractionState" : "manual"
     },
@@ -1657,9 +1654,6 @@
     },
     "Decision" : {
       "extractionState" : "manual"
-    },
-    "Default" : {
-
     },
     "Default Column Widths" : {
       "extractionState" : "manual"
