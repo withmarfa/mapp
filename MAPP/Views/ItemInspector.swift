@@ -423,27 +423,19 @@ struct ItemInspector: View {
 
     // MARK: Contents
 
-    /// The properties that have a value, then any the person added or cleared since the inspector showed this item.
-    private var fields: [ItemTypeInfo.Field] {
-        InspectorFields.properties(of: item, type: type, hidden: hiddenKeys, revealed: revealed)
-    }
-
     /// The item's Location, which stands in the list for the fields it is made of (`ItemLocation`).
     private var location: ItemLocation? { ItemLocation.of(type) }
 
-    /// Whether the list shows the Location: the item holds something it draws, or the person just added it.
-    private var listsLocation: Bool {
+    /// Whether the Add Property menu offers the Location, which the item does not show yet.
+    private var offersLocation: Bool {
         guard let location else { return false }
-        return location.hasValue(in: item) || (item.isEditable && revealed.contains(ItemLocation.rowID))
+        return item.isEditable && !location.isListed(in: item, revealed: revealed)
     }
 
-    /// Whether the Add Property menu offers the Location, which the item does not show yet.
-    private var offersLocation: Bool { location != nil && item.isEditable && !listsLocation }
-
-    /// The list's entries: the fields, with the Location in place of the ones it is made of.
+    /// The properties that have a value, then any the person added or cleared since the inspector showed this item, with
+    /// the Location in place of the fields it is made of.
     private var entries: [ItemLocation.Entry] {
-        guard let location else { return fields.map { .field($0) } }
-        return location.folding(fields, showingCoordinates: showsCoordinates, listsLocation: listsLocation)
+        InspectorFields.entries(of: item, type: type, hidden: hiddenKeys, revealed: revealed, showingCoordinates: showsCoordinates)
     }
 
     private var emptyFields: [ItemTypeInfo.Field] {

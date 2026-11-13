@@ -9,6 +9,7 @@ struct SidebarArrangement: View {
     @CurrentLibrary private var library
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
+    @AppStorage(PageKey.showsCoordinates) private var showsCoordinates = false
     let item: Item
     /// The headings the page reported for the item.
     var outline: [OutlineHeading] = []
@@ -51,8 +52,9 @@ struct SidebarArrangement: View {
         let count: Int? = switch section {
         case .details: nil
         case .properties:
-            InspectorFields.properties(
-                of: item, type: library.catalogue.itemTypes[item.type], hidden: library.hiddenPropertyKeys(of: item)).count
+            InspectorFields.entries(
+                of: item, type: library.catalogue.itemTypes[item.type], hidden: library.hiddenPropertyKeys(of: item),
+                showingCoordinates: showsCoordinates).count
         case .relationships: InspectorFields.relationships(relationships).reduce(0) { $0 + $1.targets.count }
         case .linksInPage: library.bodyMentions(for: item.id).count
         case .linkedFrom:

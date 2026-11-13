@@ -92,6 +92,12 @@ nonisolated struct ItemLocation: Hashable, Sendable {
         keys.contains { InspectorFields.hasValue(item.value(of: $0)) }
     }
 
+    /// Whether a list of the item's properties shows its Location: the item holds something it draws, or the person
+    /// just added it (`revealed` holds `rowID`).
+    func isListed(in item: Item, revealed: Set<String> = []) -> Bool {
+        hasValue(in: item) || (item.isEditable && revealed.contains(Self.rowID))
+    }
+
     // MARK: Reading
 
     /// What the item's two numbers say.

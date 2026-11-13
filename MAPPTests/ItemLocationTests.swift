@@ -193,6 +193,23 @@ struct ItemLocationTests {
         #expect(!unlisted.contains("#location"))
     }
 
+    /// What the inspector lists, and what Customize Sidebar counts beside Properties, is one Location for the fields it
+    /// is made of.
+    @Test func thePropertiesListCountsTheLocationAsOneEntry() throws {
+        var values = Self.london
+        values["place"] = .string("Brat")
+        values["url"] = .string("https://example.com")
+        let event = Self.item("core.event", values)
+        let type = Self.typeInfo("core.event")
+        let hidden = InspectorFields.entries(of: event, type: type, hidden: ["title"], showingCoordinates: false)
+        #expect(hidden.map(\.id) == ["#location", "url"])
+        let shown = InspectorFields.entries(of: event, type: type, hidden: ["title"], showingCoordinates: true).map(\.id)
+        #expect(shown.count == 4 && shown.contains("latitude") && shown.contains("longitude") && !shown.contains("place"))
+        let empty = Self.item("core.event")
+        #expect(InspectorFields.entries(of: empty, type: type, hidden: ["title"], showingCoordinates: false).isEmpty)
+        #expect(InspectorFields.entries(of: empty, type: type, hidden: ["title"], revealed: [ItemLocation.rowID], showingCoordinates: false).map(\.id) == ["#location"])
+    }
+
     // MARK: Points and frames
 
     @Test func aClickBeyondTheDateLineIsBroughtBack() {
