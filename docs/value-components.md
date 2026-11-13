@@ -15,14 +15,14 @@ A value component is one drawing for one kind of value. The same component appea
 | Type | The type's name tinted in its color, with its icon in color. |
 | Linked item | The linked item's type mark and title on the gray of an option chip. The title is underlined under the pointer. |
 | Tag | Gray, after a number sign. |
-| Person | Initials in a pale circle. The page and the right sidebar add the name; a row shows initials only. |
+| Person | Initials in a pale circle with a fine edge. The page and the right sidebar add the name; a row shows initials only. |
 | Filter | Its field in gray, then is or is not, the values and an x. |
 
 Dates, numbers, web addresses and sources are plain text, not chips.
 
 In a row, linked items and tags do not show. A chip is a little smaller in a row (20 points high with 11.5-point text) than on the page (22 points high with 13-point text).
 
-A tint means a type, so no other chip uses a colored fill. A person has no chip and no edge round the initials, and is never colored. Bare chips are not used.
+A tint means a type, so no other chip uses a colored fill. A person has no chip round the name and is never colored. Bare chips are not used.
 
 Agreed, not built: solid options and tags are a setting, off by default.
 
@@ -68,7 +68,7 @@ A value is edited in a panel that opens under it, its leading edge on the value'
 
 One family draws every kind of value: `PageChip` for a type, a linked item, a status, an option, a tag and a plain word, and `PagePerson` and `PersonCircle` for a person. Each takes a size, `.page` or `.row` (`ChipSize`), and its measures come from `ChipLooks`, scaled with the interface's text size. A chip is as tall as its size says, so chips side by side line up.
 
-- The item page's pins and property rows, the right sidebar's values, the value panel's chips, a table's cells and a gallery card's chips draw through the family at page size. The page's web header draws the same measures in HTML.
+- The item page's pins and property rows, the right sidebar's status, choice and tag values, and a gallery card's chips draw through the family at page size. The value panel's chips and a table's cells draw only their marks (status symbol, person circle) through it. The page's web header draws the same measures in HTML.
 - A list row draws a type, a task's priority and its people at row size. Its layout is unchanged.
 - A person is one look everywhere: initials in a pale circle, then the name on the page and in the right sidebar, and the circle alone in a row, with the name in the help. A name with one word, or an email address, gives one initial.
 - A choice the field's list does not hold draws as its word, with the color its word gives it. Several values show as the first two, then a count.
@@ -77,7 +77,7 @@ One family draws every kind of value: `PageChip` for a type, a linked item, a st
 Not yet built:
 
 - A Standard list row shows no status, priority or person. The task, person and highlight rows keep their own layouts.
-- A table's priority is still bars, and a gallery card keeps its own chip layout.
+- A table's priority is still bars, the value panel's chips keep their own shape, and a gallery card keeps its own chip layout.
 - The right sidebar's relationship rows, its people text fields and the Details cells keep their own drawings.
 
 ## Related pages
