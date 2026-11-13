@@ -153,7 +153,7 @@ import Testing
         let (library, source) = try await loaded()
         #expect(!library.canJoinCollection(try #require(library.item(F.n2))))
         #expect(library.addToCollection([F.e1, F.n2], Self.holiday, undoManager: nil))
-        let joined = source.writes.compactMap { write -> ItemID? in if case .link(let draft, _) = write { draft.source } else { nil } }
+        let joined = source.writes.compactMap { write -> ItemID? in if case .link(let draft) = write { draft.source } else { nil } }
         #expect(joined == [F.e1])
         #expect(library.notices.waiting.last?.message == skips(.readOnly))
     }

@@ -165,7 +165,7 @@ extension MarfaEngine {
             case .active, .archived:
                 return [try await copy.items.transition(id.rawValue, to: MarfaMapping.marfaState(state))]
             }
-        case .link(let draft, _):
+        case .link(let draft):
             return [
                 try await copy.edges.create(
                     from: draft.source.rawValue, to: draft.target.rawValue, type: draft.type,

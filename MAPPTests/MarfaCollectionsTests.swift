@@ -83,8 +83,8 @@ import Testing
         undo.endUndoGrouping()
         // Plain note is in Holiday already. The others follow position 2, by title.
         #expect(source.writes == [
-            .link(EdgeDraft(type: "in-collection", source: F.e1, target: Self.holiday, position: 3), undoing: nil),
-            .link(EdgeDraft(type: "in-collection", source: F.n2, target: Self.holiday, position: 4), undoing: nil),
+            .link(EdgeDraft(type: "in-collection", source: F.e1, target: Self.holiday, position: 3)),
+            .link(EdgeDraft(type: "in-collection", source: F.n2, target: Self.holiday, position: 4)),
         ])
         #expect(library.notices.waiting.isEmpty)
     }
@@ -95,7 +95,7 @@ import Testing
         // Plain note is in Holiday already and Archive is a collection, so only the other two join.
         #expect(library.addToCollection([F.e1, F.n2, F.n1, Self.archive], Self.holiday, undoManager: undo))
         #expect(undo.steps == 1)
-        let joined = source.writes.compactMap { write -> ItemID? in if case .link(let draft, _) = write { draft.source } else { nil } }
+        let joined = source.writes.compactMap { write -> ItemID? in if case .link(let draft) = write { draft.source } else { nil } }
         #expect(Set(joined) == [F.e1, F.n2])
         // The source answers with the edges it made, which the undo then removes.
         for id in joined {
@@ -119,8 +119,8 @@ import Testing
         source.clearWrites()
         undo.undo()
         #expect(Set(source.writes) == [
-            .link(EdgeDraft(type: "in-collection", source: F.n1, target: Self.holiday, position: 2), undoing: nil),
-            .link(EdgeDraft(type: "in-collection", source: F.p1, target: Self.holiday, position: 1), undoing: nil),
+            .link(EdgeDraft(type: "in-collection", source: F.n1, target: Self.holiday, position: 2)),
+            .link(EdgeDraft(type: "in-collection", source: F.p1, target: Self.holiday, position: 1)),
         ])
         #expect(!undo.canUndo)
     }
@@ -128,7 +128,7 @@ import Testing
     @Test func addingToACollectionWithNoPositionsSetsNone() async throws {
         let (library, source) = try await loaded()
         #expect(library.addToCollection([F.e1], Self.archive, undoManager: nil))
-        #expect(source.writes == [.link(EdgeDraft(type: "in-collection", source: F.e1, target: Self.archive), undoing: nil)])
+        #expect(source.writes == [.link(EdgeDraft(type: "in-collection", source: F.e1, target: Self.archive))])
     }
 
     @Test func removingUnlinksAndAnUndoPutsThePositionBack() async throws {
@@ -142,7 +142,7 @@ import Testing
         source.clearWrites()
         undo.undo()
         #expect(source.writes == [
-            .link(EdgeDraft(type: "in-collection", source: F.n1, target: Self.holiday, position: 2), undoing: nil),
+            .link(EdgeDraft(type: "in-collection", source: F.n1, target: Self.holiday, position: 2)),
         ])
         // An item in no collection has nothing to remove.
         source.clearWrites()
@@ -192,7 +192,7 @@ import Testing
         #expect(library.collectionMembers([F.n1, Self.holiday]) == [F.n1])
         #expect(library.collectionMembers([Self.archive, Self.oldAlbum]).isEmpty)
         #expect(library.addToCollection(library.collectionMembers([F.f1, Self.archive]), Self.holiday, undoManager: nil))
-        #expect(source.writes == [.link(EdgeDraft(type: "in-collection", source: F.f1, target: Self.holiday, position: 3), undoing: nil)])
+        #expect(source.writes == [.link(EdgeDraft(type: "in-collection", source: F.f1, target: Self.holiday, position: 3))])
     }
 
     @Test func noCatalogueContainerMeansNoCollections() async throws {

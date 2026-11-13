@@ -85,7 +85,7 @@ import Testing
     @Test func aRefusedLinkInAReplacementKeepsTheOldLink() async throws {
         let (library, source) = try await loaded()
         #expect(await library.changeItemRelationship(F.n1, field: "about", adding: [F.p2], removing: [F.p1], undoManager: nil))
-        #expect(await eventually { source.writes == [.link(EdgeDraft(type: "about", source: F.n1, target: F.p2), undoing: nil)] })
+        #expect(await eventually { source.writes == [.link(EdgeDraft(type: "about", source: F.n1, target: F.p2))] })
         let link = try #require(source.submitted.last?.id)
         source.send(.answered(link, .refused(SyncProblem(code: "type_not_permitted", message: "Not permitted."))))
         #expect(await eventually { library.notices.waiting.last != nil })

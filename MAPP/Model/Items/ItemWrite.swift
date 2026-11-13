@@ -46,7 +46,7 @@ nonisolated enum ItemWrite: Hashable, Sendable {
     /// Sent at the version the person was shown, so an item changed elsewhere since is refused rather than erased.
     case purge(ItemID, version: ItemVersion)
     case tag(ItemID, String, on: Bool)
-    case link(EdgeDraft, undoing: WriteID?)
+    case link(EdgeDraft)
     case unlink(EdgeID)
     /// Replaces one end of an edge in one write, so the end that stays never holds no edge or two. Only an edge
     /// whose staying end holds one edge of its type can move.
