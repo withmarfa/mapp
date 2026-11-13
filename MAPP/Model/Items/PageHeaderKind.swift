@@ -17,13 +17,7 @@ nonisolated enum PageHeaderKind: String, Encodable, Sendable {
     case webpage
 
     static func of(_ type: TypeID, in catalogue: Catalogue) -> PageHeaderKind {
-        var visited: Set<TypeID> = []
-        var current: TypeID? = type
-        while let id = current, visited.insert(id).inserted {
-            if let kind = builtIn[id] { return kind }
-            current = catalogue.itemTypes[id]?.parent
-        }
-        return .general
+        ([type] + catalogue.ancestors(of: type)).lazy.compactMap { builtIn[$0] }.first ?? .general
     }
 
     private static let builtIn: [TypeID: PageHeaderKind] = [

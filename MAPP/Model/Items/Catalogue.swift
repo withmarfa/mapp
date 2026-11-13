@@ -18,7 +18,7 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
             case other
         }
 
-        enum TextFormat: Hashable, Sendable { case url, email }
+        enum TextFormat: Hashable, Sendable { case url, email, currency }
 
         let key: String
         let label: String
@@ -27,7 +27,7 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
         let declaredBy: TypeID
         var required = false
         var description: String?
-        /// What a text field holds beyond plain text, where the contract names it: a `url` or an `email`.
+        /// What a text field holds beyond plain text, where the contract names it: a `url`, an `email` or a `currency` code.
         var format: TextFormat?
         /// Whether a number field holds whole numbers only, as a Marfa `integer` does.
         var isInteger = false
@@ -293,15 +293,25 @@ nonisolated struct Catalogue: Hashable, Sendable {
         return found
     }
 
-    /// Whether `type` is below one of `types`; walking up is cheaper than expanding each of them.
-    func isSubtype(_ type: TypeID, ofAnyOf types: Set<TypeID>) -> Bool {
-        var visited: Set<TypeID> = []
-        var current: TypeID? = itemTypes[type]?.parent
-        while let ancestor = current, visited.insert(ancestor).inserted {
-            if types.contains(ancestor) { return true }
+    /// The types above `type`, nearest first, as the catalogue's `parent` links name them: Marfa allows at most ten, with
+    /// no loop, so the walk stops at ten or at a type it has met. A parent the catalogue lacks is still named, as the
+    /// last one, since the link says it exists.
+    func ancestors(of type: TypeID) -> [TypeID] {
+        var found: [TypeID] = []
+        var current = itemTypes[type]?.parent
+        while let ancestor = current, found.count < Self.ancestorLimit, ancestor != type, !found.contains(ancestor) {
+            found.append(ancestor)
             current = itemTypes[ancestor]?.parent
         }
-        return false
+        return found
+    }
+
+    /// The most ancestors Marfa lets a type have.
+    static let ancestorLimit = 10
+
+    /// Whether `type` is below one of `types`.
+    func isSubtype(_ type: TypeID, ofAnyOf types: Set<TypeID>) -> Bool {
+        ancestors(of: type).contains { types.contains($0) }
     }
 
     /// Whether `type` is one of `types`, below one of them, or plays one of `roles`, as an edge type's end names

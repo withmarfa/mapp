@@ -54,23 +54,11 @@ nonisolated extension Catalogue {
     }
 
     private func inheritedIcon(above type: TypeID) -> String? {
-        var next = itemTypes[type]?.parent
-        var seen: Set<TypeID> = [type]
-        while let id = next, seen.insert(id).inserted {
-            if let icon = itemTypes[id]?.icon { return icon }
-            next = itemTypes[id]?.parent
-        }
-        return nil
+        ancestors(of: type).lazy.compactMap { itemTypes[$0]?.icon }.first
     }
 
     private func descends(_ type: TypeID, from ancestor: TypeID) -> Bool {
-        var next = itemTypes[type]?.parent
-        var seen: Set<TypeID> = [type]
-        while let id = next, seen.insert(id).inserted {
-            if id == ancestor { return true }
-            next = itemTypes[id]?.parent
-        }
-        return false
+        ancestors(of: type).contains(ancestor)
     }
 }
 

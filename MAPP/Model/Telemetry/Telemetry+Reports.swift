@@ -71,6 +71,14 @@ nonisolated extension Telemetry {
             during: "read_sidebar_layouts")
     }
 
+    /// Type looks saved in the defaults could not be read. They are moved aside and kept, and looks are worked out from
+    /// the presets again.
+    static func typeLooksUnreadable(reporting: Reporting = .shared) {
+        logger(.navigation).error("saved type looks could not be read; they are kept aside and looks start from the presets")
+        reporting.sink.report(
+            type: "type_looks_unreadable", sentence: "The saved type looks could not be read.", during: "read_type_looks")
+    }
+
     /// The editor's web process ended; `wasReady` says whether the page had loaded first.
     static func editorProcessEnded(wasReady: Bool, reporting: Reporting = .shared) {
         if wasReady {

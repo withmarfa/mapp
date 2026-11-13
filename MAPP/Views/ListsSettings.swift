@@ -1,9 +1,7 @@
 import SwiftUI
 
-/// The Lists page of Settings: the row style every list starts from, what every list shows, and a style for each type.
+/// The Lists page of Settings: the row style every list starts from, and what every list shows.
 struct ListsSettings: View {
-    @Environment(\.library) private var library
-
     var body: some View {
         Form {
             Section("Row Style") { RowStyleTiles() }
@@ -12,9 +10,6 @@ struct ListsSettings: View {
                 OrderOptions()
             }
             .labelStyle(.titleOnly)
-            if let library {
-                TypeStyleSection(library: library)
-            }
         }
         .settingsForm()
     }
@@ -97,36 +92,6 @@ private struct RowStyleSketch: View {
                 line(80)
                 line(30)
             }
-        }
-    }
-}
-
-/// Each type the library holds, with the style its rows take. A type with no choice shows the style its fields start
-/// it from, and picking Default goes back to that.
-private struct TypeStyleSection: View {
-    let library: any ItemLibrary
-    @AppStorage(ListKey.typeStyles) private var choices = ListTypeStyles()
-
-    var body: some View {
-        let catalogue = library.catalogue
-        Section {
-            ForEach(library.itemTypeCounts) { type in
-                let started = ListRowStyle.fromFields(of: type.id, in: catalogue)
-                Picker(selection: Binding<ListRowStyle?> {
-                    choices[type.id] ?? started
-                } set: { choices[type.id] = $0 }) {
-                    Text("Default").tag(ListRowStyle?.none)
-                    Divider()
-                    ForEach(ListRowStyle.allCases) { style in Text(style.title).tag(Optional(style)) }
-                } label: {
-                    Label { Text(verbatim: type.label) } icon: { TypeGlyph(id: type.icon) }
-                }
-                .accessibilityIdentifier("ListStyle")
-            }
-        } header: {
-            Text("For Particular Types")
-        } footer: {
-            Text("A type starts from its fields: one with a status gets the Task row, one with pictures the picture row.")
         }
     }
 }

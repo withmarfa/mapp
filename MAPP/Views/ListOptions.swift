@@ -7,10 +7,8 @@ nonisolated enum ListKey {
     static let showsPictures = "listShowsPictures"
     /// The row style of every list (`ListRowStyle.forEveryList`).
     static let rowStyle = "listRowStyle"
-    /// The style each type was given, as `ListTypeStyles` keeps them.
-    static let typeStyles = "listTypeStyles"
     static let showsTypeWhenMixed = "listShowsTypeWhenMixed"
-    static let all = [previewLines, showsPictures, rowStyle, typeStyles, showsTypeWhenMixed]
+    static let all = [previewLines, showsPictures, rowStyle, showsTypeWhenMixed]
 }
 
 /// What every list's rows show, as Mail offers it for its messages: how many lines of each item's text sit under the
