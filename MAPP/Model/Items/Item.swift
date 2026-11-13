@@ -108,6 +108,9 @@ nonisolated struct Item: Identifiable, Hashable, Sendable {
     var version: ItemVersion
     var created: Date
     var modified: Date
+    /// When the item happened, as Marfa's `occurred_at` says (a quote was captured, a message was sent), or nil where the
+    /// server has none; a look's `occurred` date falls back to `created`.
+    var occurred: Date?
     var trashed: Date?
     var edgesOut: [Edge] = []
     var sync: SyncState = .settled

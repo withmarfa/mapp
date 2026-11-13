@@ -1,8 +1,8 @@
 # Views and lists
 
-Status: Built in v0.0.43. How a row, card or cell is drawn is agreed to change; see [Looks](looks.md).
+Status: Built in v0.0.43. The list row reading a type's look, in two densities, is built, not yet released. How a card or a cell is drawn is agreed to change; see [Looks](looks.md).
 
-Where it lives: `Browser`, `ItemViewMode`, `ViewLayouts` and `SidebarLayout` under `MAPP/Model/`; `NoteList`, `ItemGallery`, `ItemBoard`, `ItemTable`, `ItemTimeline`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
+Where it lives: `Browser`, `ItemViewMode`, `ViewLayouts` and `SidebarLayout` under `MAPP/Model/`; `NoteList`, `ItemRow`, `ItemGallery`, `ItemBoard`, `ItemTable`, `ItemTimeline`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
 
 A view shows a set of items in a layout. This page explains the layouts, what a saved view is, and the controls that change what a list shows.
 
@@ -30,18 +30,18 @@ Agreed, not built:
 A saved view splits between Marfa and the Mac. The rules for each side, and for deleting a view, are in [`MAPP/Model/AGENTS.md`](../MAPP/Model/AGENTS.md).
 
 - **Marfa holds** the view's title, query, sort and group.
-- **The Mac holds** the layout, the table's columns, whether the board hides empty groups, the gallery's cards, the list's rows and the table's widths (`ViewMacSettings`). See [Settings storage](settings-storage.md).
+- **The Mac holds** the layout, the table's columns, whether the board hides empty groups, the gallery's cards, the list's density and the table's widths (`ViewMacSettings`). See [Settings storage](settings-storage.md).
 
 A type's list, and the other places that are not views, can become one with Save as View in the toolbar.
 
 ## Edit View
 
-Edit View opens in the right sidebar, and New View uses the same panel. It holds the view's Name, Layout (a Show As pop-up), Rows (a list only), Sort, Group, and Columns or Cards.
+Edit View opens in the right sidebar, and New View uses the same panel. It holds the view's Name, Layout (a Show As pop-up), Density (a list only), Sort, Group, and Columns or Cards.
 
 - A change applies as it is made, in the window beside the panel. Undo takes changes back.
 - One Done closes the panel.
 - Filters are not in the panel.
-- Rows holds Row Style, the preview, pictures and This Mac.
+- Density holds a pop-up of As in Settings, Standard and Compact.
 - Sort holds a handle, the fixed property, a direction pop-up and an x in a circle, with a gray Add Sort.
 - Group holds Group by and a Hide Empty Groups switch.
 - Columns (a table) or Cards (a gallery) comes last, and Cards has a Size pop-up.
@@ -95,11 +95,11 @@ Settings is a place in the sidebar. See [Settings storage](settings-storage.md) 
 - The pages list is the Settings column, 280 points by default (see [Settings storage](settings-storage.md)), and a page's column is 580 points.
 - Rows are 37 points high, rows of buttons are 44 points, and boxes sit 56 points apart.
 - Push buttons are gray with no edge.
-- The row settings are in the Lists pane, after Appearance.
+- The density setting is in the Lists pane, after Appearance.
 
-## Built today
+## The list's rows
 
-A row takes one of six styles, and the gallery, board and table each draw values their own way. The settings are in Settings > Lists (the Row Style tiles) and in Edit View's Rows. When the look is built, the six styles become two densities. See [Presets and densities](presets-and-densities.md).
+A list row is one view for every type, in Standard or Compact. Settings > Lists holds the Density every list follows, Sort and Group; Edit View's Density picks one for a saved view, and a place that is not a saved view keeps its own on this Mac. A gallery card, a board card and a table cell each draw values their own way. See [Presets and densities](presets-and-densities.md).
 
 ## Related pages
 

@@ -1,8 +1,8 @@
 # Presets and densities
 
-Status: The presets are built, not yet released. Densities are agreed, not built. Today a list row takes one of six row styles; see [Looks](looks.md).
+Status: The presets and the two densities are built, not yet released. See [Looks](looks.md).
 
-Where it lives: `LookPreset` under `MAPP/Model/Looks/`. Until rows read a look, `ListRowStyle`, `ListRowType` and the row facts in `ListRowFacts.swift` under `MAPP/Model/Items/`, and `ListsSettings` and `ViewPanelRows` under `MAPP/Views/`, draw a row. The presets and densities below replace them.
+Where it lives: `LookPreset` under `MAPP/Model/Looks/`, `Density` and `PlaceDensities` under `MAPP/Model/`, `ItemRow` under `MAPP/Views/`, and the two places that choose a density, `ListsSettings` and `ViewPanelDensity` under `MAPP/Views/`.
 
 A preset is the starting look for a type. A density is how much room a row takes. Both are suggestions that a look builds on, not layouts a person has to choose between.
 
@@ -40,22 +40,24 @@ The first of these that fits wins, so the order is the rule. A preset names no t
 
 No type Marfa ships gets Record or Clip today; a type with a number and a currency code, or a `source_app`, does.
 
-The dates of a Quote ("captured"), a Clip ("copied"), a Record ("happened") and a Message ("sent") are all Marfa's own `occurred_at` (`LookDate.occurred`), or the created date for an item with none. MAPP's `Item` does not hold `occurred_at` yet, so today that is always the created date. An Event's Secondary is its time of day (`LookPart.time`) and its place, since the Date top right already shows the day.
+The dates of a Quote ("captured"), a Clip ("copied"), a Record ("happened") and a Message ("sent") are all Marfa's own `occurred_at` (`LookDate.occurred`), or the created date for an item with none. MAPP's `Item` holds it as `occurred`. An Event's Secondary is its time of day (`LookPart.time`) and its place, since the Date top right already shows the day.
 
 The title is always the item's name. A clipboard item is titled "Clipboard Item", or a name its person gave it, and never its content.
 
 ## Densities
 
-There are two: Standard and Compact. A view chooses one.
+There are two: Standard and Compact.
 
 - **Standard.** The row has a Title, a Date, a Secondary line and a bottom line. See [Looks](looks.md).
 - **Compact.** One line: the type's mark, only in a list that mixes types, then the title, then the date.
 
-The Row Style control in Edit View becomes a Density control, and the six row styles go.
+The density a list uses is the first of these that has a choice:
 
-## Built today
+1. A saved view's own, set in Edit View (stored in the view's Mac settings).
+2. For a place that is not a saved view, the place's own, set in Edit View's Density and kept on this Mac for that place.
+3. The Density in Settings > Lists.
 
-Settings and Edit View offer Standard, Compact and With Pictures for every list. Task, Highlight and Person rows are chosen for a view or come from the type's fields, through the preset suggestion above. A saved view's row choices are stored with the view's other settings on the Mac.
+Edit View offers "As in Settings", Standard and Compact; "As in Settings" clears the choice. A search result is always a Standard row, since its excerpt needs the room.
 
 ## Related pages
 

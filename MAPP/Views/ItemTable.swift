@@ -256,9 +256,7 @@ private final class TablePlaceTrace {
 enum ItemTableColumnLayouts {
     static let key = "itemTableColumns"
 
-    static func key(for place: SidebarItem) -> String {
-        (try? JSONEncoder().encode(place)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
-    }
+    static func key(for place: SidebarItem) -> String { place.storageKey }
 
     static func layout(for place: SidebarItem, in stored: Data) -> TableColumnCustomization<ItemTableRow> {
         layouts(in: stored)[key(for: place)] ?? .init()

@@ -24,9 +24,9 @@ Marfa stores no color per type, status or option, no per-field icon or order, an
 
 ## What MAPP owns
 
-- **How each type looks.** Today that is a list row style, the page's pins and property order, and gallery cards. The agreed design replaces these with one look per type; see [Looks](looks.md).
+- **How each type looks.** One look per type, read by the list row, with the page's pins and property order and gallery cards still their own; see [Looks](looks.md).
 - **Layouts.** List, gallery, table, board and timeline, with their columns, cards and rows.
-- **Defaults.** Which properties to pin, which to hide, and which row style a type starts from.
+- **Defaults.** Which properties to pin, which to hide, and which look a type starts from.
 - **Everything drawn.** Chip colors, mark shapes, symbols and spacing. A tone comes from the type's icon id, and an option's dot color comes from its words, because Marfa holds neither.
 
 MAPP keeps all of this on the Mac and never writes it to Marfa. [Settings storage](settings-storage.md) says where each setting lives.
@@ -45,13 +45,12 @@ A type that nobody at WithMarfa defined takes the nearest built-in type above it
 
 ## What decides how an item shows
 
-For a list's row style, the first of these that has a choice wins:
+For a list's density, the first of these that has a choice wins:
 
-1. The saved view's own row style, or a window's choice in a place that is not a saved view.
-2. The style the type's fields suggest (`LookPreset.suggested`, mapped to a row style).
-3. The Row Style in Settings.
+1. The saved view's own density, or a place's own where it is not a saved view.
+2. The Density in Settings.
 
-A person no longer chooses a row style for a type. The agreed design moves the choice from a row style to a type's look, kept per type. See [Looks](looks.md).
+What a row says comes from the type's look (`TypeLooks`), never from a choice of row. A person chooses a look for a type only by importing one; see [Looks](looks.md).
 
 ## Related pages
 

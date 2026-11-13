@@ -4,7 +4,7 @@ import SwiftUI
 /// columns or the gallery's cards. Each change shows at once in the window beside it and, in a saved view, is written
 /// as it is made; Done closes the panel (`ViewPanelToolbar`). Filters are not here: they live in the row above the list
 /// (`FilterChips`). A type's list and the other places that can become a view get the same panel without a name, and
-/// offer Save as View. A list also gets Rows, which a view or a place may set apart from Settings.
+/// offer Save as View. A list also gets Density, which a view or a place may set apart from Settings.
 struct ViewEditPanel: View {
     @CurrentLibrary private var library
     @StoredOrder private var order
@@ -30,7 +30,7 @@ struct ViewEditPanel: View {
                 }
                 ViewPanelLayoutSection(browser: browser, panel: panel)
                 if browser.viewMode == .list {
-                    ViewPanelRows(browser: browser, panel: panel)
+                    ViewPanelDensity(browser: browser, panel: panel)
                 }
                 ViewPanelSort(browser: browser, content: content, sort: arrangement.sort)
                 ViewPanelGroup(browser: browser, content: content, arrangement: arrangement)

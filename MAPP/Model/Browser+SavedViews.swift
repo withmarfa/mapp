@@ -105,7 +105,7 @@ extension Browser {
 
     // MARK: This Mac's settings for a view
 
-    /// The layout, columns, empty groups, cards and rows the window shows for a view, which are what the Mac holds.
+    /// The layout, columns, empty groups, cards and density the window shows for a view, which are what the Mac holds.
     func macSettings(for id: ItemID) -> ViewMacSettings {
         viewSeeds[id]?.mac ?? ViewLayouts.stored(in: defaults).settings(for: id) ?? ViewMacSettings()
     }
@@ -121,31 +121,41 @@ extension Browser {
         if case .view(let id) = item { macSettings(for: id).cards } else { placeCards[item] ?? ViewCards() }
     }
 
-    /// How the list's rows look in the open place: a saved view's choice, else the window's own for the place.
-    var rows: ViewRows {
-        if case .view(let id) = item { macSettings(for: id).rows } else { placeRows[item] ?? ViewRows() }
+    /// How much each row of the list says in the open place: a saved view's own, else the one this Mac keeps for the
+    /// place. Nil follows Settings.
+    var density: Density? {
+        _ = densityRevision
+        if case .view(let id) = item { return macSettings(for: id).density }
+        return placeDensities.density(for: item)
     }
 
-    /// Changes the list's rows. A saved view's change is kept on this Mac as it is made, and a place's lasts as long as
-    /// the window, as its cards and layout do. Undo takes either back.
-    func changeRows(_ change: (inout ViewRows) -> Void) {
+    /// The densities this Mac keeps for places, read each time since every window shares them and another window may have
+    /// changed one. A list that draws by them also watches the key (`PlaceDensities.key`), so it is drawn again then.
+    private var placeDensities: PlaceDensities {
+        PlaceDensities.stored(in: defaults)
+    }
+
+    /// Changes the open place's density, where nil follows Settings. A saved view's is kept on this Mac as it is made,
+    /// like the view's other Mac settings, and a place's is kept for the place. Undo takes either back.
+    func changeDensity(_ density: Density?) {
         if case .view(let id) = item {
-            changeViewSettings(id) { change(&$0.rows) }
-        } else {
-            let before = placeRows[item] ?? ViewRows()
-            var rows = before
-            change(&rows)
-            guard rows != before else { return }
-            setPlaceRows(rows, before: before, in: item)
+            changeViewSettings(id) { $0.density = density }
+            return
+        }
+        let before = self.density
+        let place = item
+        guard density != before else { return }
+        store(density, for: place)
+        registerUndo(String(localized: "Change Density")) { browser in
+            guard browser.item == place else { return }
+            browser.changeDensity(before)
         }
     }
 
-    private func setPlaceRows(_ rows: ViewRows, before: ViewRows, in place: SidebarItem) {
-        placeRows[place] = rows == ViewRows() ? nil : rows
-        registerUndo(String(localized: "Change Rows")) { browser in
-            guard browser.item == place else { return }
-            browser.setPlaceRows(before, before: rows, in: place)
-        }
+    /// Keeps a place's density, which a list reading it is told of.
+    func store(_ density: Density?, for place: SidebarItem) {
+        PlaceDensities.update(in: defaults) { $0.set(density, for: place) }
+        densityRevision += 1
     }
 
     /// Changes what the gallery draws on each card. A saved view's change is kept on this Mac as it is made, and a

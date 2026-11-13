@@ -43,7 +43,7 @@ A status takes the group's symbol, and the status words stay the type's own, so 
 | Completed | `largecircle.fill.circle` | Secondary gray |
 | Canceled | `xmark.circle` | Tertiary gray |
 
-`StatusSymbol` is the one place that maps a group to a symbol and a tint. `StatusMark` draws it in SwiftUI wherever the app shows a status: the page's chip, the right sidebar, a table, a gallery card, a value panel and a task row. The page's web header draws the same four symbols, which the app sends as it sends every other symbol (`PageHeaderIcons`), and colors them from its own system colors.
+`StatusSymbol` is the one place that maps a group to a symbol and a tint. `StatusMark` draws it in SwiftUI wherever the app shows a status: the page's chip, the right sidebar, a table, a gallery card, a value panel and a list row. The page's web header draws the same four symbols, which the app sends as it sends every other symbol (`PageHeaderIcons`), and colors them from its own system colors.
 
 ## Priority
 
@@ -69,14 +69,13 @@ A value is edited in a panel that opens under it, its leading edge on the value'
 One family draws every kind of value: `PageChip` for a type, a linked item, a status, an option, a tag and a plain word, and `PagePerson` and `PersonCircle` for a person. Each takes a size, `.page` or `.row` (`ChipSize`), and its measures come from `ChipLooks`, scaled with the interface's text size. A chip is as tall as its size says, so chips side by side line up.
 
 - The item page's pins and property rows, the right sidebar's status, choice and tag values, and a gallery card's chips draw through the family at page size. The value panel's chips and a table's cells draw only their marks (status symbol, person circle) through it. The page's web header draws the same measures in HTML.
-- A list row draws a type, a task's priority and its people at row size. Its layout is unchanged.
-- A person is one look everywhere: initials in a pale circle, then the name on the page and in the right sidebar, and the circle alone in a row, with the name in the help. A name with one word, or an email address, gives one initial.
+- A list row draws its type, status, options, people and tags through the family at row size (`ItemRow`, `RowContent`), whatever the type; a person is initials only. See [Looks](looks.md).
+- A person is one look everywhere: initials in a pale circle, then the name on the page and in the right sidebar, and the circle alone in a row, with the name for VoiceOver. A name with one word, or an email address, gives one initial.
 - A choice the field's list does not hold draws as its word, with the color its word gives it. Several values show as the first two, then a count.
 - The right sidebar's tag chip carries a number sign and keeps its remove control.
 
 Not yet built:
 
-- A Standard list row shows no status, priority or person. The task, person and highlight rows keep their own layouts.
 - A table's priority is still bars, the value panel's chips keep their own shape, and a gallery card keeps its own chip layout.
 - The right sidebar's relationship rows, its people text fields and the Details cells keep their own drawings.
 

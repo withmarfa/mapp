@@ -26,6 +26,12 @@ struct DateDisplayTests {
 
     // MARK: Automatic and relative keep the app's own wording
 
+    @Test func aListLineForADayToComeIsTheDayAndTheTimeOfDayIsAvailableApart() {
+        let tomorrow = moment(daysAgo: -1)
+        #expect(text(tomorrow, .list, .automatic) == "Tomorrow")
+        #expect(DateDisplay.timeOfDay(of: tomorrow, calendar: calendar, locale: locale) == text(moment(daysAgo: 0), .list, .automatic))
+    }
+
     @Test(arguments: [DateFormat.automatic, .relative])
     func aListLineIsTheTimeTodayThenWordsThenTheShortDate(_ format: DateFormat) {
         #expect(text(moment(daysAgo: 0), .list, format) == "09:12")

@@ -156,6 +156,8 @@ final class Browser {
     @ObservationIgnored private var sectionsMemo: (key: SectionsKey, sections: [NoteSection])?
     @ObservationIgnored private var viewModesMemo: (key: ViewModesKey, modes: [ItemViewMode])?
     @ObservationIgnored private var fieldsMemo: FieldsMemo?
+    /// The content of the list's rows, held between passes (`Browser+Rows`).
+    @ObservationIgnored let rowContents = RowContents()
     @ObservationIgnored private var stackableMemo: (key: StackableKey, type: String?)?
     /// Held by `paletteIndex(in:)`.
     @ObservationIgnored var paletteMemo: (key: PaletteIndexKey, index: PaletteIndex)?
@@ -548,12 +550,6 @@ final class Browser {
         let options: ItemTableOptions
     }
 
-    /// What the rows of the list say about themselves: the type where the list holds several. It reads the items
-    /// shown, so it holds for every place, search results and Include Subtypes alike.
-    func metaContext(for items: [Item]) -> ItemMeta.Context {
-        ItemMeta.Context(mixesTypes: Set(items.lazy.map(\.type)).count > 1)
-    }
-
     private var showsOnlyFavorites: Bool {
         if case .favoriteItem = item { return true }
         return item == .favorites
@@ -671,7 +667,6 @@ final class Browser {
         writingViews = []
         pendingViewWrites = []
         placeCards = [:]
-        placeRows = [:]
         compactBoards = [:]
         timelineFields = [:]
         selection = []
@@ -795,8 +790,9 @@ final class Browser {
     /// window keeps that place's other choices (`Browser+SavedViews`).
     var placeCards: [SidebarItem: ViewCards] = [:]
 
-    /// How a list's rows look in a place that is not a saved view, kept for this window only (`Browser+SavedViews`).
-    var placeRows: [SidebarItem: ViewRows] = [:]
+    /// Counts the changes to the densities this Mac keeps for places, which a list reads to know its own changed
+    /// (`Browser+SavedViews`).
+    var densityRevision = 0
 
     /// Where this Mac's settings for views are kept. A test gives its own.
     @ObservationIgnored var defaults: UserDefaults = .standard
