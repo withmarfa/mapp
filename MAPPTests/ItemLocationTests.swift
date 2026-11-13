@@ -39,13 +39,12 @@ struct ItemLocationTests {
     }
 
     @Test func aNumberFieldIsNeededNotJustTheName() {
-        var type = Self.typeInfo("core.event")!
-        type.fields = type.fields.map { field in
-            var copy = field
-            if field.key == "latitude" { copy = ItemTypeInfo.Field(key: "latitude", label: "Latitude", kind: .text, declaredBy: field.declaredBy) }
+        let specs = LookFixture.specs.map { spec in
+            var copy = spec
+            if spec.id == "core.event" { copy.fields = spec.fields.map { $0.key == "latitude" ? LookFixture.field("latitude") : $0 } }
             return copy
         }
-        #expect(ItemLocation.of(type) == nil)
+        #expect(ItemLocation.of(LookFixture.catalogue(specs).itemTypes[TypeID("core.event")]) == nil)
     }
 
     // MARK: Reading
