@@ -19,7 +19,7 @@ nonisolated struct NumberRule: Hashable, Sendable {
     }
 
     /// The rule for a number only a `Double` holds (`PropertyValue.double`), against bounds a `Decimal` names.
-    func allows(_ number: Double) -> Bool {
+    func allows(stored number: Double) -> Bool {
         if let minimum, number < NSDecimalNumber(decimal: minimum).doubleValue { return false }
         if let maximum, number > NSDecimalNumber(decimal: maximum).doubleValue { return false }
         return !integer || number.rounded() == number
@@ -65,7 +65,7 @@ nonisolated struct ListShape: Hashable, Sendable {
             case (.text, .string): true
             case (.choice(let choices), .string(let text)): choices.contains(text)
             case (.number(let rule), .number(let number)): rule.allows(number)
-            case (.number(let rule), .double(let number)): rule.allows(number)
+            case (.number(let rule), .double(let number)): rule.allows(stored: number)
             case (.boolean, .bool): true
             case (.date(let includesTime), .string(let text)): ItemDate.parse(text).map { includesTime || !$0.hasTime } == true
             default: false

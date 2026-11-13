@@ -191,6 +191,18 @@ struct ListEntryTests {
         #expect(open.allows(0) && !open.allows(-1) && open.allows(1_000_000))
     }
 
+    /// A number beyond Decimal's range is judged as the Double it is stored as, against the same bounds.
+    @Test func aNumberBeyondDecimalsRangeIsJudgedByTheFieldsBounds() {
+        let rating = ItemTypeInfo.Field(
+            key: "rating", label: "Rating", kind: .number, declaredBy: TypeID("core.media"), isInteger: true,
+            minimum: 1, maximum: 5)
+        #expect(!rating.accepts(.double(1e200)))
+        #expect(!rating.accepts(.double(1e-200)))
+        let open = NumberRule(minimum: 0)
+        #expect(open.allows(stored: 1e200) && open.allows(stored: 1e-200) && !open.allows(stored: -1e200))
+        #expect(NumberRule(integer: true).allows(stored: 1e200) && !NumberRule(integer: true).allows(stored: 1e-200))
+    }
+
     @Test func aTypeChangeKeepsOnlyANumberTheNewFieldTakes() {
         let rating = ItemTypeInfo.Field(
             key: "rating", label: "Rating", kind: .number, declaredBy: TypeID("core.media"), isInteger: true,
