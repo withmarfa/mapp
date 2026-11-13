@@ -44,6 +44,7 @@ struct ItemLayoutPanel: View {
 
     @CurrentLibrary private var library
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
+    @AppStorage(PageKey.showsCoordinates) private var showsCoordinates = false
     @State private var arranging = Arranging.page
     let item: Item
     /// The headings the page reported for the item, for the Outline's count in Sidebar.
@@ -91,7 +92,8 @@ struct ItemLayoutPanel: View {
     private var layout: PageLayout {
         let rows = PageLayout.rows(
             of: item, type: library.catalogue.itemTypes[item.type], hidden: library.hiddenPropertyKeys(of: item),
-            relationships: library.relationships(for: item.id), catalogue: library.catalogue)
+            relationships: library.relationships(for: item.id), catalogue: library.catalogue,
+            showsCoordinates: showsCoordinates)
         return PageLayout(rows: rows, placement: placements.placement(of: item.type, in: library.catalogue))
     }
 

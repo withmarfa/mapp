@@ -20,6 +20,9 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
     case parent
     /// The item's type, which no field holds. A person chooses one of the types the item can become.
     case type
+    /// The item's Location: a point on a map and, where the type has one, a name for the place. It is made of fields, so
+    /// it has none of its own, and it is set by clicking a map, not by choosing from a list.
+    case location(ItemLocation)
 
     /// How the field is edited in a panel, or nil where it is not.
     init?(field: ItemTypeInfo.Field) {
@@ -40,7 +43,7 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
         case .status(let field), .choice(let field), .date(let field), .people(let field, _), .text(let field), .number(let field),
              .words(let field):
             field
-        case .tags, .parent, .type: nil
+        case .tags, .parent, .type, .location: nil
         }
     }
 
@@ -50,6 +53,7 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
         case .tags: PagePlacement.tags
         case .parent: PagePlacement.parent
         case .type: PagePlacement.type
+        case .location: ItemLocation.rowID
         default: field?.key ?? ""
         }
     }
@@ -72,7 +76,7 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
     var closesOnChoice: Bool {
         switch self {
         case .status, .choice, .parent, .type: true
-        case .date, .people, .tags, .text, .number, .words: false
+        case .date, .people, .tags, .text, .number, .words, .location: false
         }
     }
 }

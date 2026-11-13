@@ -200,6 +200,8 @@ nonisolated struct PagePlacement: Equatable, Sendable {
     /// An event's time. It leads the pins and is no person's choice, so it is in no placement.
     static let when = "#when"
     static let tags = "#tags"
+    /// The Location row, which stands for an item's latitude and longitude, and its name for the place where it has one.
+    static let location = "#location"
     static let linkedFrom = "#linked"
     /// The relationship the parent is held in.
     static let parent = "child-of"

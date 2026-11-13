@@ -24,6 +24,7 @@ nonisolated enum ValueEditMetrics {
     static func widthBounds(for kind: ValueEditKind) -> ClosedRange<CGFloat>? {
         switch kind {
         case .date: 240...240
+        case .location: 340...340
         case .tags, .words: 194...273
         case .people: 216...308
         case .status, .choice: 192...260

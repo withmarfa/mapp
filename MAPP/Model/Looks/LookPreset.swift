@@ -76,8 +76,7 @@ nonisolated enum LookPreset: String, CaseIterable, Codable, Identifiable, Hashab
         guard let info = catalogue.itemTypes[type] else { return .note }
         if type == MarfaMapping.highlightType || catalogue.isSubtype(type, ofAnyOf: [MarfaMapping.highlightType]) { return .quote }
         let declares = info.declares
-        let hasAddress = [MarfaMapping.streetAddressField, MarfaMapping.localityField, MarfaMapping.postalCodeField].contains(where: declares)
-        if declares(MarfaMapping.latitudeField), declares(MarfaMapping.longitudeField), hasAddress { return .place }
+        if info.isPlace { return .place }
         let header = PageHeaderKind.of(type, in: catalogue)
         let reachesItself = info.fields.contains {
             $0.declaredBy == type && ($0.key == MarfaMapping.emailsField || $0.key == MarfaMapping.phonesField)

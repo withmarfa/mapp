@@ -12,6 +12,7 @@ struct ItemPageHeader: ViewModifier {
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
     @AppStorage(PageKey.titleLines) private var titleLines = TitleLines.standard
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
+    @AppStorage(PageKey.showsCoordinates) private var showsCoordinates = false
     let item: Item
     let editor: EditorController
     let drafts: DetailsPresentation
@@ -30,6 +31,7 @@ struct ItemPageHeader: ViewModifier {
             .onChange(of: interfaceTextSize) { editor.refreshHeader() }
             .onChange(of: titleLines) { editor.refreshHeader() }
             .onChange(of: dateFormat) { editor.refreshHeader() }
+            .onChange(of: showsCoordinates) { editor.refreshHeader() }
             // The page is drawn from the defaults as they are when it is read, so a change made anywhere, in the
             // inspector, in the sheet or from the page's own menu, needs it read again.
             .onChange(of: placements) { editor.refreshHeader() }
@@ -44,11 +46,11 @@ struct ItemPageHeader: ViewModifier {
     /// What the page's header shows for the item, read from the library and the window's drafts as they are now.
     static func header(
         of id: ItemID, in library: any ItemLibrary, drafts: DetailsPresentation, placements: PagePlacements = .stored(),
-        titleLines: Int = TitleLines.stored(), dateFormat: DateFormat = .stored()
+        titleLines: Int = TitleLines.stored(), dateFormat: DateFormat = .stored(), showsCoordinates: Bool = ShowsCoordinates.stored()
     ) -> PageHeader? {
         guard let item = library.item(id) else { return nil }
         let draft = drafts.draft(for: item.id, key: "title")
-        let parts = PageHeaderParts(of: item, in: library, placements: placements, dateFormat: dateFormat, offersEmpty: true)
+        let parts = PageHeaderParts(of: item, in: library, placements: placements, dateFormat: dateFormat, offersEmpty: true, showsCoordinates: showsCoordinates)
         let (type, placement, relationships, now, kind, lead, pins) =
             (parts.type, parts.placement, parts.relationships, parts.now, parts.kind, parts.lead, parts.pins)
         let status = type?.statusField
@@ -157,6 +159,10 @@ struct ItemPageHeader: ViewModifier {
                     kind = item.isEditable ? .parent : nil
                 case PagePlacement.type:
                     kind = library.offersTypeChange(for: [id]) ? .type : nil
+                case ItemLocation.rowID:
+                    // A Location with no point and no way to set one has nothing to open.
+                    let location = ItemLocation.of(library.catalogue.itemTypes[item.type])
+                    kind = location.flatMap { item.isEditable || $0.hasPoint(item) ? ValueEditKind.location($0) : nil }
                 default:
                     let field = library.catalogue.itemTypes[item.type]?.fields.first { $0.key == row }
                     // A yes or no is a toggle, not a panel.
@@ -185,7 +191,8 @@ struct ItemPageHeader: ViewModifier {
                 guard editor.isShowing(id), let item = library.item(id) else { return }
                 let rows = PageLayout.rows(
                     of: item, type: library.catalogue.itemTypes[item.type], hidden: library.hiddenPropertyKeys(of: item),
-                    relationships: library.relationships(for: item.id), catalogue: library.catalogue)
+                    relationships: library.relationships(for: item.id), catalogue: library.catalogue,
+                    showsCoordinates: ShowsCoordinates.stored())
                 PagePlacements.update { placements in
                     let layout = PageLayout(rows: rows, placement: placements.placement(of: item.type, in: library.catalogue))
                     if let moved = layout.listing(order, moving: row) { placements.apply(moved, of: item.type, in: library.catalogue) }

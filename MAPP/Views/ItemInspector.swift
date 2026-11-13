@@ -116,6 +116,7 @@ struct ItemInspectorHost: View {
 struct ItemInspector: View {
     @Environment(\.interfaceTextSize) private var textSize
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
+    @AppStorage(PageKey.showsCoordinates) private var showsCoordinates = false
     let item: Item
     /// Nil for a type the catalogue does not hold, which is shown with no fields.
     let type: ItemTypeInfo?
@@ -217,10 +218,14 @@ struct ItemInspector: View {
     // MARK: Sections
 
     private var properties: some View {
-        InspectorSectionView(.properties, title: "Properties", count: fields.count,
-                             placeholder: fields.isEmpty ? "No Properties" : nil, add: { hovering in
-            if !emptyFields.isEmpty {
+        InspectorSectionView(.properties, title: "Properties", count: entries.count,
+                             placeholder: entries.isEmpty ? "No Properties" : nil, add: { hovering in
+            if !emptyFields.isEmpty || offersLocation {
                 InspectorPlusMenu(accessibilityLabel: "Add Property", identifier: "ItemInspectorAddProperty", isRowHovered: hovering) {
+                    if offersLocation {
+                        Button("Location") { addLocation() }
+                            .accessibilityIdentifier("ItemInspectorAdd.location")
+                    }
                     ForEach(emptyFields) { field in
                         Button(field.label) { add(field) }
                             .accessibilityIdentifier("ItemInspectorAdd.\(field.key)")
@@ -228,17 +233,24 @@ struct ItemInspector: View {
                 }
             }
         }) {
-            ForEach(fields) { field in
-                ItemPropertyRow(definition: field, value: item.value(of: field.key), isEditable: item.isEditable,
-                                // A property the person has touched stays listed, even once cleared.
-                                onChange: { revealed.insert(field.key); return onProperty(field.key, $0) },
-                                item: item.id,
-                                retainedDraft: drafts?.draft(for: item.id, key: field.key),
-                                startsEditing: adding == field.key,
-                                // The window holds the draft, so folding this section does not give it back.
-                                handsOffOnLeave: drafts == nil,
-                                shownOnPage: placement.showsOnPage(field.key), onShowOnPage: showOnPage(field.key),
-                                isWriting: field.kind.isList && isWritingProperties())
+            ForEach(entries) { entry in
+                switch entry {
+                case .location(let spec):
+                    ItemLocationRow(
+                        spec: spec, item: item, shownOnPage: placement.showsOnPage(ItemLocation.rowID),
+                        onShowOnPage: showOnPage(ItemLocation.rowID), startsEditing: adding == ItemLocation.rowID)
+                case .field(let field):
+                    ItemPropertyRow(definition: field, value: item.value(of: field.key), isEditable: item.isEditable,
+                                    // A property the person has touched stays listed, even once cleared.
+                                    onChange: { revealed.insert(field.key); return onProperty(field.key, $0) },
+                                    item: item.id,
+                                    retainedDraft: drafts?.draft(for: item.id, key: field.key),
+                                    startsEditing: adding == field.key,
+                                    // The window holds the draft, so folding this section does not give it back.
+                                    handsOffOnLeave: drafts == nil,
+                                    shownOnPage: placement.showsOnPage(field.key), onShowOnPage: showOnPage(field.key),
+                                    isWriting: field.kind.isList && isWritingProperties())
+                }
             }
         }
     }
@@ -416,16 +428,44 @@ struct ItemInspector: View {
         InspectorFields.properties(of: item, type: type, hidden: hiddenKeys, revealed: revealed)
     }
 
-    private var emptyFields: [ItemTypeInfo.Field] {
-        InspectorFields.addable(of: item, type: type, hidden: hiddenKeys, revealed: revealed)
+    /// The item's Location, which stands in the list for the fields it is made of (`ItemLocation`).
+    private var location: ItemLocation? { ItemLocation.of(type) }
+
+    /// Whether the list shows the Location: the item holds something it draws, or the person just added it.
+    private var listsLocation: Bool {
+        guard let location else { return false }
+        return location.hasValue(in: item) || (item.isEditable && revealed.contains(ItemLocation.rowID))
     }
 
-    private var hasProperties: Bool { !fields.isEmpty || !emptyFields.isEmpty }
+    /// Whether the Add Property menu offers the Location, which the item does not show yet.
+    private var offersLocation: Bool { location != nil && item.isEditable && !listsLocation }
+
+    /// The list's entries: the fields, with the Location in place of the ones it is made of.
+    private var entries: [ItemLocation.Entry] {
+        guard let location else { return fields.map { .field($0) } }
+        return location.folding(fields, showingCoordinates: showsCoordinates, listsLocation: listsLocation)
+    }
+
+    private var emptyFields: [ItemTypeInfo.Field] {
+        let addable = InspectorFields.addable(of: item, type: type, hidden: hiddenKeys, revealed: revealed)
+        guard let location else { return addable }
+        let owned = location.ownedKeys(showingCoordinates: showsCoordinates)
+        return addable.filter { !owned.contains($0.key) }
+    }
+
+    private var hasProperties: Bool { !entries.isEmpty || !emptyFields.isEmpty || offersLocation }
 
     private var hasRelationships: Bool { !shownRelationships.isEmpty || !addable.isEmpty || !mentions.isEmpty || !linked.isEmpty }
 
     /// An item that can take a tag shows the section for adding one; one that can't shows it only if it has tags.
     private var hasTags: Bool { item.canEditTags || !tags.isEmpty }
+
+    private func addLocation() {
+        withAnimation(.snappy(duration: 0.2)) {
+            revealed.insert(ItemLocation.rowID)
+            adding = ItemLocation.rowID
+        }
+    }
 
     private func add(_ field: ItemTypeInfo.Field) {
         withAnimation(.snappy(duration: 0.2)) {

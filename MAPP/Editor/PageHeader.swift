@@ -163,7 +163,7 @@ extension PropertyRow: Encodable {
         var container = encoder.container(keyedBy: Key.self)
         try container.encode(id, forKey: .id)
         try container.encode(label, forKey: .label)
-        try container.encode(value.symbol, forKey: .symbol)
+        try container.encode(symbolName, forKey: .symbol)
         switch value {
         case .status: try container.encode("status", forKey: .kind)
         case .empty: try container.encode("empty", forKey: .kind)

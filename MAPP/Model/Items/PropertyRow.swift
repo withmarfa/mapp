@@ -71,7 +71,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         }
 
         /// Every symbol a row can show, for a page that draws them as images.
-        static let symbols = ["circle.dotted", "square.stack", "link", "tag", "calendar", "globe", "envelope", "phone", "checkmark.square", "text.alignleft", "list.bullet", "person.2", "square.grid.2x2", "dot.radiowaves.left.and.right", "clock"]
+        static let symbols = ["circle.dotted", "square.stack", "link", "tag", "calendar", "globe", "envelope", "phone", "checkmark.square", "text.alignleft", "list.bullet", "person.2", "square.grid.2x2", "dot.radiowaves.left.and.right", "clock", ItemLocation.symbol]
     }
 
     let id: String
@@ -92,6 +92,11 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// priority, by rank (`OptionTone.tone(of:in:isPriority:)`). Empty for any other row, whose values take the color
     /// of their words (`OptionTone.tone(for:)`).
     var optionTones: [TypeTone] = []
+    /// The symbol beside the label where it is not the one the value's kind gives: a Location's pin, whose value is text.
+    var symbol: String?
+
+    /// The symbol drawn beside the label.
+    var symbolName: String { symbol ?? value.symbol }
 
     /// The words of the row's value, for a pin's help and its accessibility label: every value of a list, even where the
     /// pin shows only the first.
@@ -138,12 +143,13 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
     /// shows where the type has one, since its pill is how a status is set from the page. The keys in `hidden` are what
     /// the page shows elsewhere, such as the title and the text. With `offersEmpty`, an editable value the item does not
     /// have yet is a row too, read as Empty, that opens its editor: that is the page's way to give a value to the
-    /// field, the parent and the tags. Empty rows come after the others in each group, so the fold hides them first. The
+    /// field, the parent and the tags. With `showsCoordinates`, the latitude and longitude are rows of their own beside the
+    /// Location that stands for them. Empty rows come after the others in each group, so the fold hides them first. The
     /// block and the pins are both chosen from these.
     static func candidates(
         of item: Item, type: ItemTypeInfo?, hidden: Set<String>, relationships: [ItemRelationship], parentField: String, format: DateFormat,
         tags: [String], typeLabel: String?, typeIcon: String?, sourceName: String?, now: Date, calendar: Calendar, locale: Locale,
-        offersEmpty: Bool = false, changesType: Bool? = nil, isPriority: (ItemTypeInfo.Field) -> Bool = { _ in false },
+        offersEmpty: Bool = false, showsCoordinates: Bool = false, changesType: Bool? = nil, isPriority: (ItemTypeInfo.Field) -> Bool = { _ in false },
         icon: (ItemID) -> String?, isPerson: (ItemID) -> Bool
     ) -> [PropertyRow] {
         var rows: [PropertyRow] = []
@@ -160,7 +166,18 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
         var empty: [PropertyRow] = []
         let parent = relationships.contains { $0.field == parentField && !$0.targets.isEmpty }
         let status = type?.statusField
+        let location = ItemLocation.of(type)
+        let owned = location?.ownedKeys(showingCoordinates: showsCoordinates) ?? []
+        var locationDrawn = false
         for field in type?.fields ?? [] where !hidden.contains(field.key) {
+            if let location, location.keys.contains(field.key) {
+                // One row stands for the point and its name, where the first of them is.
+                if !locationDrawn, let row = location.row(of: item, offersEmpty: offersEmpty) {
+                    if row.isEmpty { empty.append(row) } else { fields.append(row) }
+                }
+                locationDrawn = true
+                if owned.contains(field.key) { continue }
+            }
             if field.key == status?.key {
                 fields.append(PropertyRow(id: field.key, label: field.label, value: .status))
                 if parent { fields.append(parentRow(relationships, parentField)) }

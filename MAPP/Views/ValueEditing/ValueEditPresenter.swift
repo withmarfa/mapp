@@ -167,6 +167,8 @@ final class ValueEditPresenter {
             dismiss(cancelled: true)
             return true
         }
+        // The search and the name field take every other key, and the map none.
+        if case .location = model.kind { return false }
         if let text = session.window?.firstResponder as? NSTextView, text.hasMarkedText() { return false }
         let isReturn = event.keyCode == 36 || event.keyCode == 76
         if model.kind.isTyped {

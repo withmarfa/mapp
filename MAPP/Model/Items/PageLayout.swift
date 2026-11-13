@@ -140,10 +140,13 @@ nonisolated extension PagePlacements {
 
 nonisolated extension PageLayout {
     /// The rows the page can place for `item`, in their default order: its type, source and last edit, the type's fields
-    /// as the catalogue orders them (those `PageCustomization.fields` offers, with the parent after the status), its
+    /// as the catalogue orders them (those `PageCustomization.fields` offers, with the parent after the status, and one Location for the latitude, the longitude and a name for the place), its
     /// other relationships, its tags and Linked From. The type's own rows are there whether or not the item has a
     /// value, and a type with no fields has these built-in rows only.
-    static func rows(of item: Item, type: ItemTypeInfo?, hidden: Set<String>, relationships: [ItemRelationship], catalogue: Catalogue) -> [Row] {
+    static func rows(
+        of item: Item, type: ItemTypeInfo?, hidden: Set<String>, relationships: [ItemRelationship], catalogue: Catalogue,
+        showsCoordinates: Bool = false
+    ) -> [Row] {
         var rows = [Row(id: PagePlacement.type, label: String(localized: "Type"), symbol: "square.grid.2x2")]
         if let source = item.source?.trimmingCharacters(in: .whitespacesAndNewlines), !source.isEmpty {
             rows.append(Row(id: PagePlacement.source, label: String(localized: "Source"), symbol: "dot.radiowaves.left.and.right"))
@@ -155,7 +158,18 @@ nonisolated extension PageLayout {
         }
         var fields: [Row] = []
         let status = type?.statusField?.key
+        let location = ItemLocation.of(type)
+        let owned = location?.ownedKeys(showingCoordinates: showsCoordinates) ?? []
+        var locationListed = false
         for field in PageCustomization.fields(of: item, type: type, hidden: hidden, catalogue: catalogue) {
+            if let location, location.keys.contains(field.key) {
+                // One row stands for the point and its name, where the first of them is.
+                if !locationListed {
+                    fields.append(Row(id: ItemLocation.rowID, label: String(localized: "Location"), symbol: ItemLocation.symbol))
+                    locationListed = true
+                }
+                if owned.contains(field.key) { continue }
+            }
             fields.append(Row(id: field.key, label: field.label, symbol: symbol(of: field)))
             if field.key == status, let parent { fields.append(parent) }
         }
