@@ -45,7 +45,7 @@ enum LooksFiles {
         panel.canChooseDirectories = false
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
-            do {
+            do throws(LooksFileError) {
                 try libraries.typeLooks.importLooks(from: url, into: libraries.libraryKey)
             } catch {
                 libraries.host.notices.tell(String(localized: "Couldn’t Import Looks"), message(for: error, file: url.lastPathComponent))
