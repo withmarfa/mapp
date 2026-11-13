@@ -45,12 +45,12 @@ struct ItemTableCell: View {
     @ViewBuilder private var content: some View {
         switch column.content {
         case .title: title
-        case .type: Label { Text(row.typeLabel) } icon: { TypeGlyph(id: row.typeIcon) }
-            .labelStyle(ItemTableLabelStyle())
-            .foregroundStyle(.secondary)
+        case .type: PageChip(text: row.typeLabel, kind: .type(icon: row.typeIcon), size: .row)
         case .parent: link(row.parent)
         case .created: date(row.item.created, isDue: false)
         case .edited: date(row.item.modified, isDue: false)
+        case .occurred: date(row.item.occurred ?? row.item.created, isDue: false)
+        case .tags: tags
         case .duration(let start, let end):
             if let seconds = ItemTableValue.duration(row, start: start, end: end) {
                 Text(Duration.seconds(seconds), format: .units(allowed: [.days, .hours, .minutes], width: .abbreviated, maximumUnitCount: 2))
@@ -137,14 +137,62 @@ struct ItemTableCell: View {
             }
         case .number:
             if let current { Text(current).monospacedDigit() }
-        case .longText:
-            if let current { Text(current).foregroundStyle(.secondary).truncationMode(.tail) }
+        default:
+            other(field, current: current)
+        }
+    }
+
+    /// The row's tags, as the page's tag chips; the rest are counted.
+    @ViewBuilder private var tags: some View {
+        let tags = row.item.tags.subtracting([ItemTag.favorite]).sorted()
+        if !tags.isEmpty {
+            HStack(spacing: 4) {
+                ForEach(tags.prefix(RowContent.shownTags), id: \.self) { PageChip(text: $0, kind: .tag, size: .row) }
+                if tags.count > RowContent.shownTags { Text(verbatim: "+\(tags.count - RowContent.shownTags)").foregroundStyle(.secondary) }
+            }
+        }
+    }
+
+    /// A value that is not picked from a fixed set: people as their initials, a list of words as choices, anything else
+    /// as plain text with no label.
+    @ViewBuilder private func other(_ field: ItemTypeInfo.Field, current: String?) -> some View {
+        switch PropertyRow.value(of: field, in: row.item, format: dateFormat) {
+        case .people(let names)?:
+            HStack(spacing: 3) {
+                ForEach(Array(names.prefix(Self.shownPeople).enumerated()), id: \.offset) { _, name in
+                    PagePerson(name: name, initials: PersonInitials.of(name), size: .row).help(name)
+                }
+                if names.count > Self.shownPeople { Text(verbatim: "+\(names.count - Self.shownPeople)").foregroundStyle(.secondary) }
+            }
+        case .options(let words)?:
+            let tones = PropertyRow.optionTones(of: field, in: row.item, isPriority: library.catalogue.isPriority(field, of: row.item.type))
+            HStack(spacing: 4) {
+                ForEach(Array(words.prefix(Self.shownOptions).enumerated()), id: \.offset) { index, word in
+                    PageChip(text: word, kind: .option(tones.indices.contains(index) ? tones[index] : OptionTone.tone(for: word)), size: .row)
+                }
+                if words.count > Self.shownOptions { Text(verbatim: "+\(words.count - Self.shownOptions)").foregroundStyle(.secondary) }
+            }
         default:
             if case .list(let shape) = field.kind, let stored = row.item.value(of: field.key), InspectorFields.hasValue(stored) {
-                Text(shape.display(of: stored)).truncationMode(.tail)
+                Text(shape.display(of: stored)).foregroundStyle(.secondary).truncationMode(.tail)
             } else if let current {
-                Text(current).truncationMode(.tail)
+                Text(current).foregroundStyle(.secondary).truncationMode(.tail)
             }
+        }
+    }
+
+    private static let shownPeople = 3
+    private static let shownOptions = 2
+
+    /// A picked value as the page's own chip at row size: a status's symbol in its chip, any other word with a dot.
+    @ViewBuilder private func chip(_ value: String, field: ItemTypeInfo.Field) -> some View {
+        let label = ItemTypeInfo.Field.label(ofOption: value)
+        if column.style == .status {
+            PageChip(text: label, kind: .status(StatusSymbol(group: field.statusGroup(of: value)), chevron: false), size: .row)
+        } else {
+            PageChip(
+                text: label,
+                kind: .option(OptionTone.tone(of: value, in: field, isPriority: column.style == .priority)), size: .row)
         }
     }
 
@@ -153,7 +201,7 @@ struct ItemTableCell: View {
         if editable {
             picker(field, current: current)
         } else if let current {
-            ItemTableCategory(column: column, value: current, title: column.label(ofCategory: current, in: [row]))
+            chip(current, field: field)
         }
     }
 
@@ -173,7 +221,7 @@ struct ItemTableCell: View {
         } label: {
             HStack(spacing: 4) {
                 if let current {
-                    ItemTableCategory(column: column, value: current, title: ItemTypeInfo.Field.label(ofOption: current))
+                    chip(current, field: field)
                 } else if isHovering {
                     Text("Empty").foregroundStyle(.tertiary)
                 }
@@ -222,8 +270,8 @@ struct ItemTableCell: View {
     }
 }
 
-/// A category's mark and name, the same in a cell, a menu and a group's header: a status's symbol, a priority's bars,
-/// a person's initial, or a link's symbol.
+/// A category's mark and name in a group's header and in a menu: a status's symbol, a priority's dot, or the name
+/// alone. A cell draws the page's own chips instead (`ItemTableCell`).
 struct ItemTableCategory: View {
     let column: ItemTableColumn
     let value: String?
@@ -244,7 +292,7 @@ struct ItemTableCategory: View {
             Label {
                 Text(title).foregroundStyle(value == nil ? .secondary : .primary)
             } icon: {
-                PriorityBars(rank: value.map(column.rank(of:)), count: column.field?.options.count ?? 4)
+                if let value, let field = column.field { OptionDot(tone: OptionTone.tone(of: value, in: field, isPriority: true)) }
             }
             .labelStyle(ItemTableLabelStyle())
         default:
@@ -280,16 +328,13 @@ struct ItemTableMenuLabel: View {
     }
 }
 
-/// A priority as signal bars: one filled for the lowest, all of them for the highest, which is also red.
-private struct PriorityBars: View {
-    let rank: Int?
-    let count: Int
+/// A choice's dot, in the color of its tone.
+private struct OptionDot: View {
+    let tone: TypeTone
+    @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        let level = rank.map { Double($0 + 1) / Double(max(count, 1)) } ?? 0
-        Image(systemName: "cellularbars", variableValue: level)
-            .foregroundStyle(level >= 1 ? AnyShapeStyle(.red) : level >= 0.75 ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
-            .accessibilityHidden(true)
+        Circle().fill(tone.color(for: scheme)).frame(width: 8, height: 8).accessibilityHidden(true)
     }
 }
 

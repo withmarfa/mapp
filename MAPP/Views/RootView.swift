@@ -20,6 +20,10 @@ struct RootView: View {
         .environment(\.library, libraries.current)
         .focusedSceneValue(\.browser, browser)
         .registersMainWindow(browser, with: settingsRequest)
+        // The table, gallery and board draw each type's chosen look, which the browser holds for them to read.
+        .onChange(of: libraries.typeLooks.choices(for: libraries.libraryKey), initial: true) { _, choices in
+            browser.lookChoices = choices
+        }
         .onAppear {
             LaunchTrace.shared.mark(.windowShown)
             if settingsRequest.isPending {

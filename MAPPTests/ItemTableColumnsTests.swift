@@ -7,12 +7,12 @@ import Testing
 struct ItemTableColumnsTests {
     private static let catalogue = BigLibrary.catalogue
 
-    /// The columns of a place that mixes types: the name, type, fields, parent and the dates, where Created starts hidden.
+    /// The columns of a place that mixes types, with no look to show any: the name, type and status, then the rest hidden, Created among them.
     private static var columns: [ItemTableColumn] {
         let rows = BigLibrary.items().prefix(300).map {
             ItemTableRow(item: $0, typeLabel: $0.type.rawValue, typeIcon: nil, parent: nil)
         }
-        return ItemTableLayout.columns(for: rows, catalogue: catalogue, hidden: [])
+        return ItemTableLayout.columns(for: rows, catalogue: catalogue, hidden: [], looks: [:])
     }
 
     private static func ids(_ columns: [ItemTableColumn]) -> [String] { columns.map(\.id) }

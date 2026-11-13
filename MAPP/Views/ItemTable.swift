@@ -287,7 +287,6 @@ extension ItemTableColumn {
         case .status: (110, 140, 220)
         case .priority: (90, 110, 160)
         case .choice, .text: (90, 150, 320)
-        case .longText: (160, 280, 900)
         case .date: (90, 116, 200)
         case .duration: (70, 92, 140)
         case .number: (60, 90, 160)

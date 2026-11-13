@@ -16,6 +16,8 @@ struct ItemGallery: View {
     @State private var cursor: ItemID?
     @State private var daysSeen = 0
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
+    /// What each card says, worked out once for each item from its type's look.
+    @State private var cardContents = CardContents()
 
     private static let spacing: CGFloat = 20
     private static let inset: CGFloat = 24
@@ -25,11 +27,12 @@ struct ItemGallery: View {
         let cards: ViewCards
         let columns: Int
         let thumbnailWidth: CGFloat
+        let contents: [ItemID: RowContent]
     }
 
-    private func plan(for cards: ViewCards) -> Plan {
+    private func plan(for cards: ViewCards, contents: [ItemID: RowContent]) -> Plan {
         let columns = max(1, Int((width - 2 * Self.inset + Self.spacing) / (cards.size.columnWidth * InterfaceStyle.scale(for: textSize) + Self.spacing)))
-        return Plan(cards: cards, columns: columns, thumbnailWidth: (width - 2 * Self.inset - CGFloat(columns - 1) * Self.spacing) / CGFloat(columns))
+        return Plan(cards: cards, columns: columns, thumbnailWidth: (width - 2 * Self.inset - CGFloat(columns - 1) * Self.spacing) / CGFloat(columns), contents: contents)
     }
 
     var body: some View {
@@ -37,7 +40,12 @@ struct ItemGallery: View {
         let sections = browser.sections(in: library, order: order, now: library.now())
         let ids = Cost.measure(.galleryBody) { sections.flatMap { $0.items.map(\.id) } }
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
-        keyboardCollection(sections, ids: ids, plan: plan(for: browser.cards))
+        // The picture's opening lines are drawn on the card when the preview allows them, so the line under the title
+        // does not say them again.
+        let shape = CardShape(dropsOpening: browser.cards.preview == .pictureOrText || browser.cards.preview == .text)
+        let list = RowList(date: .look, format: dateFormat, day: Calendar.current.startOfDay(for: library.now()))
+        let contents = cardContents.contents(of: sections.flatMap(\.items), in: library, choices: browser.lookChoices, list: list, shape: shape)
+        keyboardCollection(sections, ids: ids, plan: plan(for: browser.cards, contents: contents))
         .searchStatus(browser)
         .accessibilityLabel(title)
         .onChange(of: browser.isSearchExpanded) {
@@ -119,7 +127,7 @@ struct ItemGallery: View {
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Self.spacing), count: plan.columns), spacing: Self.spacing + 4) {
                 ForEach(section.items) { item in
-                    card(item, ids: ids, plan: plan).id(item.id)
+                    if let content = plan.contents[item.id] { card(item, content: content, ids: ids, plan: plan).id(item.id) }
                 }
             }
             .accessibilityElement(children: .contain)
@@ -166,14 +174,10 @@ struct ItemGallery: View {
         .onCommand(#selector(NSResponder.deleteToBeginningOfLine(_:)), perform: deleteSelection)
     }
 
-    private func card(_ item: Item, ids: [ItemID], plan: Plan) -> some View {
-        let now = library.now()
-        let chips = plan.cards.properties.flatMap {
-            GalleryChip.chips(for: $0, of: item, in: library, format: dateFormat, now: now)
-        }
-        return GalleryCell(
-            item: item, browser: browser, order: order, day: daysSeen, dateFormat: dateFormat, width: plan.thumbnailWidth,
-            cards: plan.cards, chips: chips, pane: pane,
+    private func card(_ item: Item, content: RowContent, ids: [ItemID], plan: Plan) -> some View {
+        GalleryCell(
+            item: item, browser: browser, order: order, width: plan.thumbnailWidth, cards: plan.cards,
+            content: content, pane: pane,
             select: { id, extending, toggling in select(id, ids: ids, extending: extending, toggling: toggling) })
     }
 
@@ -199,11 +203,9 @@ private struct GalleryCell: View {
     let item: Item
     let browser: Browser
     let order: NoteOrder
-    let day: Int
-    let dateFormat: DateFormat
     let width: CGFloat
     let cards: ViewCards
-    let chips: [GalleryChip]
+    let content: RowContent
     var pane: FocusState<Browser.Pane?>.Binding
     let select: (ItemID, _ extending: Bool, _ toggling: Bool) -> Void
 
@@ -215,7 +217,7 @@ private struct GalleryCell: View {
             select(item.id, modifiers.contains(.shift), modifiers.contains(.command))
             pane.wrappedValue = .list
         } label: {
-            GalleryCard(item: item, browser: browser, order: order, day: day, dateFormat: dateFormat, width: width, cards: cards, chips: chips)
+            GalleryCard(item: item, browser: browser, width: width, cards: cards, content: content)
                 .equatable()
         }
         .buttonStyle(.plain)

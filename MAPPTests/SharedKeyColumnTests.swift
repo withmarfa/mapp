@@ -39,7 +39,7 @@ struct SharedKeyColumnTests {
             Self.info(Self.ticket, fields: [Self.status([("open", .notStarted), ("shut", .completed)], by: Self.ticket)]),
         ])
         let rows = [Self.row(Self.item("a", Self.other)), Self.row(Self.item("b", Self.ticket))]
-        let columns = ItemTableLayout.columns(for: rows, catalogue: catalogue, hidden: [])
+        let columns = ItemTableLayout.columns(for: rows, catalogue: catalogue, hidden: [], looks: [:])
         let column = try #require(columns.first { $0.id == "field.state" })
         #expect(column.style == .status)
         #expect(column.field?.isStatus == true)
@@ -53,7 +53,7 @@ struct SharedKeyColumnTests {
             Self.info(Self.task, fields: []),
         ])
         let rows = [Self.row(Self.item("a", Self.other)), Self.row(Self.item("b", Self.ticket))]
-        let columns = ItemTableLayout.columns(for: rows, catalogue: catalogue, hidden: [])
+        let columns = ItemTableLayout.columns(for: rows, catalogue: catalogue, hidden: [], looks: [:])
         #expect(columns.first { $0.id == "field.priority" }?.style == .priority)
     }
 
@@ -61,7 +61,7 @@ struct SharedKeyColumnTests {
         let catalogue = Catalogue(itemTypes: [
             Self.info(Self.ticket, fields: [.init(key: "assignee", label: "Assignee", kind: .text, declaredBy: Self.ticket)]),
         ])
-        let columns = ItemTableLayout.columns(for: [Self.row(Self.item("a", Self.ticket))], catalogue: catalogue, hidden: [])
+        let columns = ItemTableLayout.columns(for: [Self.row(Self.item("a", Self.ticket))], catalogue: catalogue, hidden: [], looks: [:])
         #expect(columns.first { $0.id == "field.assignee" }?.style == .text)
     }
 
@@ -72,7 +72,7 @@ struct SharedKeyColumnTests {
         ])
         let ticket = Self.row(Self.item("a", Self.ticket))
         let meeting = Self.row(Self.item("b", Self.meeting))
-        let column = try #require(ItemTableLayout.columns(for: [ticket, meeting], catalogue: catalogue, hidden: [])
+        let column = try #require(ItemTableLayout.columns(for: [ticket, meeting], catalogue: catalogue, hidden: [], looks: [:])
             .first { $0.id == "field.state" })
         #expect(column.field?.options == ["planned", "held", "open", "shut"])
         #expect(column.field(for: ticket, catalogue: catalogue)?.options == ["open", "shut"])
@@ -102,29 +102,5 @@ struct SharedKeyColumnTests {
         ])
         let lanes = ItemBoardLayout.lanes(items: [Self.item("a", Self.ticket)], key: "size", catalogue: catalogue)
         #expect(lanes.map(\.id) == [.option("small"), .option("large"), .option("medium"), .missing])
-    }
-
-    // MARK: Gallery start dates
-
-    @Test @MainActor func aStartDateIsTheDeclaredStartsAtOfAnEventOrTaskType() {
-        let startsAt = { (type: TypeID) in ItemTypeInfo.Field(key: "starts_at", label: "Starts", kind: .date(includesTime: true), declaredBy: type) }
-        let catalogue = Catalogue(itemTypes: [
-            Self.info(Self.event, fields: [startsAt(Self.event)]),
-            Self.info(Self.meeting, fields: [startsAt(Self.meeting)], parent: Self.event),
-            Self.info(Self.plain, fields: [startsAt(Self.plain),
-                .init(key: "start", label: "Start", kind: .date(includesTime: false), declaredBy: Self.plain)]),
-        ])
-        let library = FakeItemLibrary()
-        library.catalogue = catalogue
-        let day = "2026-11-02"
-        func date(_ type: TypeID) -> Date? {
-            let item = Self.item("x", type, ["starts_at": .string(day), "start": .string(day)])
-            return GalleryKind.startDate(of: item, info: catalogue.itemTypes[type], in: library)
-        }
-        #expect(date(Self.event) != nil)
-        #expect(date(Self.meeting) != nil)
-        // A type outside event and task ancestry is not read, whatever its fields are called.
-        #expect(date(Self.plain) == nil)
-        #expect(date(TypeID("example.unknown")) == nil)
     }
 }
