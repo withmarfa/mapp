@@ -150,7 +150,7 @@ nonisolated enum LookPreset: String, CaseIterable, Codable, Identifiable, Hashab
     func look(for type: TypeID, in catalogue: Catalogue) -> TypeLook {
         let surface = LookSurface(type, in: catalogue)
         let template = template
-        let date = template.dateFields.first { surface.offers(.field($0)) }.map(LookDate.field) ?? template.fallback
+        let date = template.dateFields.first { surface.offers(LookDate.field($0)) }.map { LookDate.field($0) } ?? template.fallback
         let secondary = template.slots.compactMap { $0.first(where: surface.offers) }
         var facts = template.facts.compactMap { $0.first(where: surface.offers) }
         if self == .record, let info = surface.info { facts = Self.amounts(of: info) }
