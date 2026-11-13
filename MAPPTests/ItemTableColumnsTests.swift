@@ -91,7 +91,7 @@ struct ItemTableColumnsTests {
     }
 
     @MainActor
-    @Test func theWindowsTableHoldsOnlyShownColumnsAndKeepsAHiddenOnesWidth() async throws {
+    @Test(arguments: [1400.0, 900.0, 700.0, 500.0]) func theWindowsTableHoldsOnlyShownColumnsAndKeepsAHiddenOnesWidth(windowWidth: Double) async throws {
         let (library, _) = try await BigLibrary.loaded()
         let browser = Browser()
         browser.sidebarItem = .allNotes
@@ -100,7 +100,7 @@ struct ItemTableColumnsTests {
         let defaults = try #require(UserDefaults(suiteName: suite))
         defaults.removePersistentDomain(forName: suite)
         defer { defaults.removePersistentDomain(forName: suite) }
-        let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 1400, height: 800), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: windowWidth, height: 800), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(rootView: Host(browser: browser).environment(\.library, library).defaultAppStorage(defaults))
         window.makeKeyAndOrderFront(nil)
@@ -131,8 +131,8 @@ struct ItemTableColumnsTests {
         func dump(_ label: String, _ t: NSTableView) {
             let cols = t.tableColumns.map { "\($0.identifier.rawValue)=\($0.width)[\($0.minWidth),\($0.maxWidth)]hidden:\($0.isHidden)" }.joined(separator: " ")
             let stored = (try? JSONEncoder().encode(layout())).flatMap { String(data: $0, encoding: .utf8) } ?? "nil"
-            Issue.record(Comment(rawValue: "DIAG \(label) table=\(t.frame.width) clip=\(t.enclosingScrollView?.contentView.bounds.width ?? -1) style=\(t.columnAutoresizingStyle.rawValue) cols: \(cols)"))
-            Issue.record(Comment(rawValue: "DIAG \(label) stored: \(stored)"))
+            Issue.record(Comment(rawValue: "DIAG w=\(Int(windowWidth)) sum=\(t.tableColumns.filter { !$0.isHidden }.map(\.width).reduce(0, +)) \(label) table=\(t.frame.width) clip=\(t.enclosingScrollView?.contentView.bounds.width ?? -1) style=\(t.columnAutoresizingStyle.rawValue) cols: \(cols)"))
+            Issue.record(Comment(rawValue: "DIAG w=\(Int(windowWidth)) sum=\(t.tableColumns.filter { !$0.isHidden }.map(\.width).reduce(0, +)) \(label) stored: \(stored)"))
         }
         let first = try await table()
         dump("0 initial", first)
