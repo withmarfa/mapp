@@ -108,6 +108,7 @@ nonisolated extension PropertyValue {
         case .null: ""
         case .bool(let value): value ? String(localized: "Yes") : String(localized: "No")
         case .number(let value): value.formatted(.number)
+        case .double(let value): value.readable
         case .string(let value): value
         case .array(let values): values.map(\.displayText).joined(separator: ", ")
         case .object(let values):

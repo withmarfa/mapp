@@ -738,7 +738,7 @@ import Observation
         case .string(let text): [text]
         case .array(let values): values.flatMap(texts(in:))
         case .object(let fields): fields.sorted { $0.key < $1.key }.flatMap { texts(in: $0.value) }
-        case .null, .bool, .number: []
+        case .null, .bool, .number, .double: []
         }
     }
 

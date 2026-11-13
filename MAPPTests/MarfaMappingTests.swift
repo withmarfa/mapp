@@ -411,6 +411,17 @@ struct MarfaMappingTests {
         #expect(MarfaMapping.json(.number(Decimal(string: "9223372036854775808")!)) != .integer(.max))
     }
 
+    @Test func aNumberBeyondDecimalsRangeGoesBackAsStored() {
+        // Decimal holds no number above about 1e165 or nearer zero than about 1e-128; read through one, these were NaN.
+        for number in [1e200, -1e200, 1e-200, 5e-324, Double.greatestFiniteMagnitude] {
+            #expect(MarfaMapping.value(.number(number)) == .double(number), "\(number)")
+            #expect(MarfaMapping.json(MarfaMapping.value(.number(number))) == .number(number), "\(number)")
+        }
+        let entry: JSONValue = .array([.object(JSONObject([("reading", .number(1e200))]))])
+        #expect(MarfaMapping.json(MarfaMapping.value(entry)) == entry)
+        #expect(MarfaMapping.value(.number(123.456)) == .number(Decimal(string: "123.456")!))
+    }
+
     // MARK: Verdicts and sync
 
     @Test func aRefusalIsReadIntoItsParts() {

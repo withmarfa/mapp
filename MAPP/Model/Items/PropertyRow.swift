@@ -251,6 +251,7 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
             return shape.rowValue(of: main)
         case (.boolean, .bool(let flag)): return .boolean(flag)
         case (.number, .number(let number)): return .text(number.formatted())
+        case (.number, .double(let number)): return .text(number.readable)
         case (.date, .string(let text)): return .date(ItemDate.parse(text)?.text(format: format) ?? text)
         case (.choice, .string(let text)): return .options([ItemTypeInfo.Field.label(ofOption: text)])
         case (.text, .string(let text)):

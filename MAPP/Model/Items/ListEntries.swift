@@ -18,6 +18,13 @@ nonisolated struct NumberRule: Hashable, Sendable {
         return rounded == number
     }
 
+    /// The rule for a number only a `Double` holds (`PropertyValue.double`), against bounds a `Decimal` names.
+    func allows(stored number: Double) -> Bool {
+        if let minimum, number < NSDecimalNumber(decimal: minimum).doubleValue { return false }
+        if let maximum, number > NSDecimalNumber(decimal: maximum).doubleValue { return false }
+        return !integer || number.rounded() == number
+    }
+
     /// Why `allows` refuses a number, in the words the person is told.
     var requirement: String? {
         switch (minimum, maximum, integer) {
@@ -58,6 +65,7 @@ nonisolated struct ListShape: Hashable, Sendable {
             case (.text, .string): true
             case (.choice(let choices), .string(let text)): choices.contains(text)
             case (.number(let rule), .number(let number)): rule.allows(number)
+            case (.number(let rule), .double(let number)): rule.allows(stored: number)
             case (.boolean, .bool): true
             case (.date(let includesTime), .string(let text)): ItemDate.parse(text).map { includesTime || !$0.hasTime } == true
             default: false
@@ -124,6 +132,7 @@ nonisolated struct ListShape: Hashable, Sendable {
         case .string(let string):
             if case .choice = member.kind { shown = ItemTypeInfo.Field.label(ofOption: string) } else { shown = string }
         case .number(let number): shown = PropertyNumber.editing(number)
+        case .double(let number): shown = number.readable
         case .bool(let flag): shown = flag ? String(localized: "Yes") : String(localized: "No")
         default: return nil
         }

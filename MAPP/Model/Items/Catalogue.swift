@@ -119,6 +119,7 @@ nonisolated extension ItemTypeInfo.Field {
     func accepts(_ value: PropertyValue) -> Bool {
         switch (kind, value) {
         case (.number, .number(let number)): return numberRule.allows(number)
+        case (.number, .double(let number)): return numberRule.allows(stored: number)
         case (.list(let shape), .array(let entries)): return holds(entries.count) && entries.allSatisfy(shape.accepts)
         case (.words, .array(let words)): return holds(words.count) && kind.accepts(value)
         default: return kind.accepts(value)
