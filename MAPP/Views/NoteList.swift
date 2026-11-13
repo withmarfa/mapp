@@ -16,7 +16,6 @@ struct NoteList: View, Equatable {
     @AppStorage(ListKey.previewLines) private var previewLines = ListKey.defaultPreviewLines
     @AppStorage(ListKey.showsPictures) private var showsPictures = true
     @AppStorage(ListKey.rowStyle) private var rowStyle = ListRowStyle.standard
-    @AppStorage(ListKey.typeStyles) private var typeStyles = ListTypeStyles()
     @AppStorage(ListKey.showsTypeWhenMixed) private var showsType = true
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
 
@@ -35,7 +34,7 @@ struct NoteList: View, Equatable {
         // catalogue work of its own. The view's own choice of style, preview and pictures (Edit View's Rows) comes first.
         let rows = browser.rows
         let styles: [TypeID: ListRowType] = ListRowType.types(
-            of: Set<TypeID>(items.map(\.type)), view: rows.style, choices: typeStyles, rowStyle: rowStyle, in: library.catalogue)
+            of: Set<TypeID>(items.map(\.type)), view: rows.style, rowStyle: rowStyle, in: library.catalogue)
         let results = browser.searchResults(in: library)
         let excerpts = results?.excerpts ?? [:]
         let isPending = results?.isPending == true

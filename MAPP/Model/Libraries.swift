@@ -34,6 +34,9 @@ import os
     /// What each library's person chose to show in the sidebar.
     let sidebarLayouts: SidebarLayouts
 
+    /// The look each library's person chose for its types.
+    let typeLooks: TypeLooks
+
     /// Asks every open page for its last edit and answers whether they all handed it over. A test gives its own, since
     /// the real one waits on every page in the process, those of tests running beside it too.
     private let handOverPages: (QuitTrace, @escaping (Bool) -> Void) -> Void
@@ -51,6 +54,7 @@ import os
         self.handOverPages = handOverPages.map { injected in { _, done in injected(done) } }
             ?? { trace, done in EditorController.flushAll(trace: trace, then: done) }
         sidebarLayouts = SidebarLayouts(defaults: defaults)
+        typeLooks = TypeLooks(defaults: defaults)
         marfaSettings = MarfaSettingsModel(host: host)
         instanceSettings = InstanceSettingsModel(provider: { [host] in host.instanceConfigTarget() })
         instanceSettings.onSaved = { [host] answer, settings in host.instanceSaved(answer, changing: settings) }
@@ -91,15 +95,15 @@ import os
         mode == .marfa ? host.library : nil
     }
 
-    /// Names the library the windows read by its server's address, so its sidebar layout is its own.
-    var sidebarLayoutKey: String {
+    /// Names the library the windows read by its server's address, so its sidebar layout and its type looks are its own.
+    var libraryKey: String {
         "marfa:" + (host.configuredConnection?.address.absoluteString ?? "")
     }
 
-    var sidebarLayout: SidebarLayout { sidebarLayouts.layout(for: sidebarLayoutKey) }
+    var sidebarLayout: SidebarLayout { sidebarLayouts.layout(for: libraryKey) }
 
     func updateSidebarLayout(_ change: (inout SidebarLayout) -> Void) {
-        sidebarLayouts.update(sidebarLayoutKey, change)
+        sidebarLayouts.update(libraryKey, change)
     }
 
     /// Ends the open value panel and hands every open page's last edit to the library it came from, and returns once each library keeps its

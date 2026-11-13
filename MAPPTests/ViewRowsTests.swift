@@ -40,7 +40,7 @@ struct ViewRowsTests {
     @Test func aStyleOfTheViewIsTheFirstThatResolves() {
         var rows = ViewRows()
         rows.style = .compact
-        #expect(ListRowStyle.resolve(view: rows.style, type: .task, fields: .person, rowStyle: .withPictures) == .compact)
+        #expect(ListRowStyle.resolve(view: rows.style, fields: .person, rowStyle: .withPictures) == .compact)
         rows.style = nil
         #expect(ListRowStyle.resolve(view: rows.style, rowStyle: .withPictures) == .withPictures)
     }

@@ -41,11 +41,38 @@ nonisolated enum MarfaMapping {
     static let startLocationField = "start_location"
     static let locatorTypeField = "locator_type"
     static let excerptEdge = "excerpt-of"
+    static let highlightType = TypeID("core.highlight")
     /// A `core.entity`'s own description.
     static let descriptionField = "description"
     /// The type an event is, or descends from; with a task, the types whose `starts_at` is read as a start date.
     static let eventType = TypeID("core.event")
     static let startField = "starts_at"
+    /// The fields a look's presets read (`LookPreset`). Some are Marfa's core names (`from`, `emails`, `street_address`);
+    /// the others (`project`, `category`) are what a connector's or a person's type may carry. A type that has
+    /// none of them has an empty place, never a guess.
+    static let fromField = "from"
+    static let projectField = "project"
+    static let repositoryField = "repository"
+    static let placeField = "place"
+    static let attendeesField = "attendees"
+    static let jobTitleField = "job_title"
+    static let organizationField = "organization"
+    static let emailsField = "emails"
+    static let phonesField = "phones"
+    static let streetAddressField = "street_address"
+    static let localityField = "locality"
+    static let postalCodeField = "postal_code"
+    static let latitudeField = "latitude"
+    static let longitudeField = "longitude"
+    static let categoryField = "category"
+    static let passageField = "text"
+    static let publishedField = "published_at"
+    static let durationField = "duration"
+    static let authorField = "author"
+    static let urlField = "url"
+    /// What a clipboard item would name for the app it came from; no shipped type has it.
+    static let sourceAppField = "source_app"
+
     /// The `in-collection` property that orders a collection's members.
     static let positionProperty = "position"
 
@@ -238,6 +265,7 @@ nonisolated enum MarfaMapping {
         switch name {
         case "url": return .url
         case "email": return .email
+        case "currency": return .currency
         default: return nil
         }
     }

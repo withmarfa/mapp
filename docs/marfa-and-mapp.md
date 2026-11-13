@@ -2,7 +2,7 @@
 
 Status: Built in v0.0.43. The rule that MAPP owns how a type looks, one look per type, is agreed and not built; see [Looks](looks.md).
 
-Where it lives: `Catalogue`, `ItemTypeInfo`, `PageHeaderKind`, `ListRowStyle.fromFields` and `MarfaMapping`, under `MAPP/Model/`.
+Where it lives: `Catalogue`, `ItemTypeInfo`, `PageHeaderKind`, `LookPreset` and `MarfaMapping`, under `MAPP/Model/`.
 
 Marfa holds what a thing is. MAPP decides how it looks. This page explains where the line sits, so you know which side a change belongs on.
 
@@ -39,7 +39,7 @@ Three places read a type's ancestry because the page needs a starting point:
 
 - `Catalogue.isTask` treats a child of `core.task` as a task, so a task row can read its due date and priority.
 - `PageHeaderKind` walks up the parents to choose a header for the item page.
-- `ListRowStyle.fromFields` walks up the parents to choose a row's starting style.
+- `LookPreset.suggested` reads a type's fields, and walks up the parents for the highlight type, to choose a type's starting look.
 
 A type that nobody at WithMarfa defined takes the nearest built-in type above it through the `parent` chain.
 
@@ -48,11 +48,10 @@ A type that nobody at WithMarfa defined takes the nearest built-in type above it
 For a list's row style, the first of these that has a choice wins:
 
 1. The saved view's own row style, or a window's choice in a place that is not a saved view.
-2. The style the person gave that type in Settings.
-3. The style the type's fields suggest (`ListRowStyle.fromFields`).
-4. The Row Style in Settings.
+2. The style the type's fields suggest (`LookPreset.suggested`, mapped to a row style).
+3. The Row Style in Settings.
 
-The agreed design keeps this order of authority but moves the choice from a row style to a type's look. See [Looks](looks.md).
+A person no longer chooses a row style for a type. The agreed design moves the choice from a row style to a type's look, kept per type. See [Looks](looks.md).
 
 ## Related pages
 

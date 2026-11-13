@@ -21,11 +21,7 @@ struct ListRowStyleTests {
     }
 
     @Test func theViewsChoiceWinsOverEverythingBelowIt() {
-        #expect(ListRowStyle.resolve(view: .compact, type: .task, fields: .person, rowStyle: .withPictures) == .compact)
-    }
-
-    @Test func theTypesChoiceWinsOverItsFieldsAndTheRowStyle() {
-        #expect(ListRowStyle.resolve(type: .standard, fields: .task, rowStyle: .compact) == .standard)
+        #expect(ListRowStyle.resolve(view: .compact, fields: .person, rowStyle: .withPictures) == .compact)
     }
 
     @Test func theFieldsWinOverTheRowStyle() {
@@ -48,27 +44,16 @@ struct ListRowStyleTests {
     }
 
     @Test func aListResolvesEachTypeOnceAndAViewsChoiceTakesAllOfThem() {
-        var choices = ListTypeStyles()
-        choices[TypeID("core.note")] = .compact
         let types = [TypeID("core.note"), TypeID("core.task"), TypeID("core.file.image")]
-        let own = ListRowStyle.styles(of: types, choices: choices, rowStyle: .standard, in: catalogue)
+        let own = ListRowStyle.styles(of: types, rowStyle: .compact, in: catalogue)
         #expect(own == [TypeID("core.note"): .compact, TypeID("core.task"): .task, TypeID("core.file.image"): .withPictures])
-        let chosen = ListRowStyle.styles(of: types, view: .standard, choices: choices, rowStyle: .compact, in: catalogue)
+        let chosen = ListRowStyle.styles(of: types, view: .standard, rowStyle: .compact, in: catalogue)
         #expect(Set(chosen.values) == [.standard])
-    }
-
-    @Test func typeChoicesAreKeptAsOneSettingAndASpoiledOneReadsAsNone() throws {
-        var choices = ListTypeStyles()
-        choices[TypeID("core.task")] = .compact
-        let again = try #require(ListTypeStyles(rawValue: choices.rawValue))
-        #expect(again[TypeID("core.task")] == .compact)
-        #expect(ListTypeStyles(rawValue: "not json")?[TypeID("core.task")] == nil)
-        #expect(ListTypeStyles(rawValue: #"{"core.task":"gone"}"#)?[TypeID("core.task")] == nil)
     }
 
     @Test func theListSettingsAreAllResetTogether() {
         #expect(Set(ListKey.all) == [
-            ListKey.previewLines, ListKey.showsPictures, ListKey.rowStyle, ListKey.typeStyles, ListKey.showsTypeWhenMixed,
+            ListKey.previewLines, ListKey.showsPictures, ListKey.rowStyle, ListKey.showsTypeWhenMixed,
         ])
     }
 
@@ -111,7 +96,7 @@ struct ListRowStyleTests {
     @Test func aRowWithNoPictureDrawsTheListsRowStyleNotAlwaysStandard() {
         for fallback in [ListRowStyle.standard, .compact] {
             let types = ListRowType.types(
-                of: [TypeID("acme.scan"), TypeID("core.note")], choices: ListTypeStyles(), rowStyle: fallback,
+                of: [TypeID("acme.scan"), TypeID("core.note")], rowStyle: fallback,
                 in: Catalogue(itemTypes: [info("core.file"), info("acme.scan", parent: "core.file"), info("core.note")]))
             let scan = types[TypeID("acme.scan")]!
             #expect(scan.style == .withPictures)
@@ -130,12 +115,6 @@ struct ListRowStyleTests {
         #expect(ListRowStyle.fromFields(of: TypeID("acme.scan"), in: catalogue) == .withPictures)
         #expect(ListRowStyle.fromFields(of: TypeID("core.file.image"), in: catalogue) == .withPictures)
         #expect(ListRowStyle.fromFields(of: TypeID("core.note"), in: catalogue) == nil)
-    }
-
-    @Test func storedTypeChoicesAreWrittenInOneOrder() {
-        var choices = ListTypeStyles()
-        for type in ["core.task", "core.note", "acme.a", "core.file.image"] { choices[TypeID(type)] = .compact }
-        #expect(choices.rawValue == #"{"acme.a":"compact","core.file.image":"compact","core.note":"compact","core.task":"compact"}"#)
     }
 }
 

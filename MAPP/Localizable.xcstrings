@@ -13,8 +13,20 @@
     "“%@” changes to %@. Older versions of items may be removed for good the next time the server tidies up, so Version History will show fewer." : {
       "extractionState" : "manual"
     },
+    "“%@” could not be read. No looks were changed." : {
+
+    },
     "“%@” couldn’t be attached. %@" : {
       "extractionState" : "manual"
+    },
+    "Couldn’t Export Looks" : {
+
+    },
+    "Couldn’t Import Looks" : {
+
+    },
+    "Export Looks…" : {
+
     },
     "“%@” has changed since, and can’t go back to its type." : {
       "extractionState" : "manual"
@@ -22,8 +34,14 @@
     "“%@” has changed since, so that can’t be put back here. Earlier versions are in Version History." : {
       "extractionState" : "manual"
     },
+    "Import Looks…" : {
+
+    },
     "“%@” is larger than %@ or can’t be read." : {
       "extractionState" : "manual"
+    },
+    "“%@” is not a looks file that MAPP can read. No looks were changed." : {
+
     },
     "“%@” isn’t a time, so the time wasn’t changed." : {
 
@@ -31,8 +49,17 @@
     "“%@” isn’t part of this list. Remove it to save the list." : {
       "extractionState" : "manual"
     },
+    "Looks can be imported once the library has loaded." : {
+
+    },
+    "MAPP Looks" : {
+
+    },
     "“%@” may remove items sooner than the server’s current setting." : {
       "extractionState" : "manual"
+    },
+    "The looks could not be written to “%@”. Choose another place and try again." : {
+
     },
     "“%@” was attached to “%@” but isn’t in its text, because the note was no longer open for editing." : {
       "extractionState" : "manual"
@@ -881,9 +908,6 @@
     "A to Z" : {
 
     },
-    "A type starts from its fields: one with a status gets the Task row, one with pictures the picture row." : {
-
-    },
     "About" : {
       "extractionState" : "manual"
     },
@@ -1634,9 +1658,6 @@
     "Decision" : {
       "extractionState" : "manual"
     },
-    "Default" : {
-
-    },
     "Default Column Widths" : {
       "extractionState" : "manual"
     },
@@ -1994,9 +2015,6 @@
 
     },
     "For notes and items. Lists always keep their background." : {
-
-    },
-    "For Particular Types" : {
 
     },
     "Format" : {

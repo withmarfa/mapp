@@ -61,13 +61,20 @@ import Testing
         let bench = try HostBench()
         let libraries = try libraries(bench)
         try await libraries.host.connect(address: address, key: "key")
-        #expect(libraries.sidebarLayoutKey == "marfa:\(address)")
+        #expect(libraries.libraryKey == "marfa:\(address)")
         libraries.updateSidebarLayout { $0.setHidden(.favorites, true) }
         #expect(libraries.sidebarLayout.isHidden(.favorites))
 
         try await libraries.host.changeAddress(to: "http://second.test:8210", key: "other")
-        #expect(libraries.sidebarLayoutKey == "marfa:http://second.test:8210")
+        #expect(libraries.libraryKey == "marfa:http://second.test:8210")
         #expect(!libraries.sidebarLayout.isHidden(.favorites), "another server's sidebar is its own")
+
+        libraries.typeLooks.importLooks(
+            LooksFile(looks: [TypeID("core.note"): TypeLook(date: .created, secondary: [], facts: [])]), into: libraries.libraryKey,
+            in: LookFixture.catalogue())
+        #expect(libraries.typeLooks.choices(for: libraries.libraryKey).count == 1)
+        try await libraries.host.changeAddress(to: address, key: "key")
+        #expect(libraries.typeLooks.choices(for: libraries.libraryKey).isEmpty, "another server's looks are its own")
     }
 
     @Test func connectingChoosesTheServersLibraryAndDisconnectingAsksForOneAgain() async throws {

@@ -35,7 +35,7 @@ nonisolated enum InspectorFields {
             components.scheme = "mailto"
             components.path = text
             return components.url
-        case nil:
+        case .currency?, nil:
             return nil
         }
     }

@@ -20,7 +20,7 @@ A value component is one drawing for one kind of value. The same component appea
 
 Dates, numbers, web addresses and sources are plain text, not chips.
 
-In a row, linked items and tags do not show. A chip is a little smaller in a row (20 points high with 11.5-point text) than on the page (22 points high with 13-point text).
+In a row, linked items do not show, and tags show only in a Note's (a Note look's `tags` fact; see [Looks](looks.md)). A chip is a little smaller in a row (20 points high with 11.5-point text) than on the page (22 points high with 13-point text).
 
 A tint means a type, so no other chip uses a colored fill. A person has no chip round the name and is never colored. Bare chips are not used.
 
