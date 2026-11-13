@@ -2,7 +2,7 @@
 
 Status: Built in v0.0.43. How a row, card or cell is drawn is agreed to change; see [Looks](looks.md).
 
-Where it lives: `Browser`, `ItemViewMode`, `ViewLayouts` and `SidebarLayout` under `MAPP/Model/`; `NoteList`, `ItemGallery`, `ItemBoard`, `ItemTable`, `ItemTimeline`, `ViewEditPanel`, `FilterRow`, `FilterChips`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
+Where it lives: `Browser`, `ItemViewMode`, `ViewLayouts` and `SidebarLayout` under `MAPP/Model/`; `NoteList`, `ItemGallery`, `ItemBoard`, `ItemTable`, `ItemTimeline`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
 
 A view shows a set of items in a layout. This page explains the layouts, what a saved view is, and the controls that change what a list shows.
 
@@ -52,7 +52,7 @@ The funnel that writes each part where it belongs, and what it does when a write
 
 ## Filters
 
-Filters live in one row above the list (`FilterRow` and `FilterChips`) as squared 26-point chips: the field in gray, is or is not, the values and an x, then a square plus of the same height. A chip opens its value panel, with no counts, and the plus opens Filter By under it. A saved view opens with its row hidden.
+Filters live in one row above the list (`FilterRow` and `FilterChipsBar`) as squared 26-point chips: the field in gray, is or is not, the values and an x, then a square plus of the same height. A chip opens its value panel, with no counts, and the plus opens Filter By under it. A saved view opens with its row hidden.
 
 There is no filter button in the list's toolbar, which holds Search and View Options. View Options opens with Show Filters or Hide Filters, then Sort by, Group by and Edit View. When filters apply, its button is tinted and shows the count. The View menu has Show or Hide Filters, Add Filter and Clear Filters.
 

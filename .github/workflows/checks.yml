@@ -11,6 +11,9 @@ name: Checks
 # - The UI tests are only built here; they take over the keyboard and mouse, so they run locally when a change
 #   needs them.
 # - A change to a workflow is checked by actionlint.
+# - The instruction check (`Scripts/check-instructions.py`) is cheap, so it runs on drafts too. It runs for any
+#   Markdown file, `project.pbxproj`, Swift or editor source (a renamed type can leave a doc stale), the script
+#   or this workflow.
 # - Xcode Cloud archives tagged releases only.
 # The final job, "Checks", always runs; make it the one required check.
 on:
@@ -35,6 +38,7 @@ jobs:
       logic: ${{ steps.filter.outputs.logic }}
       release: ${{ steps.filter.outputs.release }}
       workflows: ${{ steps.filter.outputs.workflows }}
+      instructions: ${{ steps.filter.outputs.instructions }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -65,6 +69,10 @@ jobs:
           fi
           if echo "$files" | grep -qE '^\.github/(workflows/|actionlint\.ya?ml$)'; then
             echo "workflows=true" >> "$GITHUB_OUTPUT"
+          fi
+          # Docs name types and files in the source, so a source change can make a doc untrue.
+          if echo "$files" | grep -qE '(\.md|\.swift|project\.pbxproj)$|^(editor/src/|Scripts/check-instructions\.py$|\.github/workflows/checks\.yml$)'; then
+            echo "instructions=true" >> "$GITHUB_OUTPUT"
           fi
 
   editor:
@@ -115,6 +123,18 @@ jobs:
           echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  actionlint.tar.gz" | sha256sum --check
           tar -xzf actionlint.tar.gz actionlint
       - run: ./actionlint -color
+
+  instructions:
+    name: Instructions
+    needs: changes
+    if: needs.changes.outputs.instructions == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 Scripts/check-instructions.py
 
   swift:
     name: Unit tests
@@ -186,7 +206,7 @@ jobs:
 
   checks:
     name: Checks
-    needs: [changes, editor, actionlint, swift, release]
+    needs: [changes, editor, actionlint, instructions, swift, release]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
