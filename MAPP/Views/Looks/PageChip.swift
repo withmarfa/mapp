@@ -84,7 +84,8 @@ struct PageChip: View {
         .padding(.trailing, looks.padding * scale)
         .frame(height: looks.height(for: size) * CGFloat(textSize) / 13)
         .background(fill(looks: looks), in: shape)
-        .onHover { if isLink { isHovering = $0 } }
+        // Only a link underlines under the pointer, so only a link chip tracks it: a row of chips stays cheap.
+        .background { if isLink { Color.clear.onHover { isHovering = $0 } } }
         .overlay {
             if case .status = kind {
                 shape.strokeBorder(looks.edge(for: scheme), lineWidth: looks.statusEdgeWidth)
@@ -156,17 +157,16 @@ struct PersonCircle: View {
     var body: some View {
         let looks = ChipLooks.current
         let scale = CGFloat(textSize) / 13
-        if let initials {
-            Text(verbatim: initials)
-                .font(.system(size: looks.personInitialsSize(for: size) * scale, weight: .medium))
-                .foregroundStyle(onAccent ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-                .frame(width: looks.personCircle(for: size) * scale, height: looks.personCircle(for: size) * scale)
-                .background(onAccent ? Color.white.opacity(0.22) : looks.optionFill(for: scheme), in: Circle())
-                .overlay { Circle().strokeBorder(onAccent ? Color.clear : looks.edge(for: scheme), lineWidth: looks.statusEdgeWidth) }
-                .accessibilityHidden(true)
-        }
+        // A name with no letters keeps its circle, so the person still reads as a person and rows stay aligned.
+        Text(verbatim: initials ?? "")
+            .font(.system(size: looks.personInitialsSize(for: size) * scale, weight: .medium))
+            .foregroundStyle(onAccent ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+            .frame(width: looks.personCircle(for: size) * scale, height: looks.personCircle(for: size) * scale)
+            .background(onAccent ? Color.white.opacity(0.22) : looks.optionFill(for: scheme), in: Circle())
+            .overlay { Circle().strokeBorder(onAccent ? Color.clear : looks.edge(for: scheme), lineWidth: looks.statusEdgeWidth) }
+            .accessibilityHidden(true)
     }
 }
 
