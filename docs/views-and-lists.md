@@ -38,7 +38,7 @@ A type's list, and the other places that are not views, can become one with Save
 
 Edit View opens in the right sidebar, and New View uses the same panel. It holds the view's Name, Layout (a Show As pop-up), Rows (a list only), Sort, Group, and Columns or Cards.
 
-- A change applies as it is made, in the window beside the panel, and is written to a saved view at once. Undo takes changes back.
+- A change applies as it is made, in the window beside the panel. Undo takes changes back.
 - One Done closes the panel.
 - Filters are not in the panel.
 - Rows holds Row Style, the preview, pictures and This Mac.

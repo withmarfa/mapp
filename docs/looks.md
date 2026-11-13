@@ -38,7 +38,7 @@ A row never shows the tier. Inbox is a view of the feed tier, not a fact about a
 
 ## Built today
 
-A list row takes one of six styles: Standard, Compact, With Pictures, Task, Highlight and Person (`ListRowStyle`). Settings offers the first three for every list. The others come from a type's fields or from a choice for a type or a view.
+A list row takes one of six styles: Standard, Compact, With Pictures, Task, Highlight and Person (`ListRowStyle`). Settings > Lists offers the first three under In Every List. The others come from a type's fields, or from a choice for a type (For Particular Types) or for a view.
 
 The style resolves as described in [Marfa and MAPP](marfa-and-mapp.md). In a list that mixes types, each row takes the style of its own type, so rows can differ within one list.
 

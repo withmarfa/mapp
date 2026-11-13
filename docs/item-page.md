@@ -12,19 +12,22 @@ The item page shows one item: its title, its pinned properties, its text and its
 - **Pins** sit directly under the title, with nothing between the title and the pins. A page pins at most four properties (`PagePlacement.pinLimit`). With no choice made, a type pins its own list first, then the status, the parent and the last edit. An event's time is the first pin and takes one of the four, so no event page has a date tile.
 - A pin that holds a list shows its first value and "+N more" (`PagePins.listLimit`). Its help carries every value. A pin that is too long is cut with an ellipsis and shows whole on hover.
 - A pin that is stale, or that the header draws itself, is not drawn, and a stale one stays in storage. A pinned row is not also in the property block, and the pin an event's time pushes out goes back to the block.
-- A pin sits in a slot 150 points wide at 13-point text, so a pin stays in the same place from page to page. Pins wrap only where no slot is left.
+- A pin sits in a slot 150 points wide at 13-point text, so a pin stays in the same place from page to page. Slots fill a row while another fits and wrap only where none does, by the width of the page's column and not the window's.
 - A pin with nothing to show reads as the gray word Empty where the person can set a value, and is left out where they cannot. No dotted place or placeholder box stands in for one.
 - A pin's key carries the same icon as its row, at the key's size. Every value is 13-point text whatever its kind, and the label column of a row is 120 points wide.
 - Nothing repeats a logo beside a key that already shows it.
+- A person's email and phone are rows of the property block that open a mail or phone link, never chips in the header.
 - The header's chips are the value components. See [Value components](value-components.md).
 
 Agreed, not built:
 
 - Type, source and updated are the default pins, in place of the defaults above.
 - A pin shows at most two labels or people before "+N", and the gaps between pins stay tight so that four fit as often as possible. Today a pin shows one.
+- When four slots do not fit a row, two do. Today the row takes as many as fit.
 - A cover or a picture sits beside the title: a wide picture stays low (280 points), and a square or tall one is smaller. There is no landscape cover for now. The text under a cover is the page's own text.
 - A banner is a component only. Where it lives (an item, an extension, a type or a view) is open.
 - A document is drawn as paper on a gray surface, with the paper's edge on the title's, and a document's pages take the list pane's place.
+- A viewer's zoom shows the percentage only, and a full-screen picture closes from the right. Viewers are experimental.
 - A page for a saved web page shows only a byline on the line above its title.
 
 ## Property block
@@ -83,7 +86,7 @@ Version History opens as its own workspace (`VersionHistoryWorkspace`): a thread
 
 - **Link looks** are a setting (Settings > Editor > Links, `LinkLook`), and Mark is the default. Mark is the type's icon in color, then the title with a dotted line. The others are Underline, Tinted Pill, Pill, Quiet and Text. In every look the pointer is a hand, and a link to an item that does not exist keeps its dashed line, which Mark draws as lighter dots.
 - **Highlights** are yellow. Agreed, not built: soft yellow, the accent color and a color of the person's own are settings. A pen-style highlight is dropped.
-- **Tables** in the text are a box with a lighter gray header and lines between the columns, with lighter grips and more room above. Inkkit draws them, and MAPP sets only their spacing, grip color and header through Inkkit's tokens (`editor/src/style.css`).
+- **Tables** in the text are a box with a gray header and lines between the columns, with lighter grips and more room above. Inkkit draws them, and MAPP sets only their spacing, grip color and header through Inkkit's tokens (`editor/src/style.css`). The header's weight is 500 today; the agreed weight is regular.
 - **A caption** under a picture is light gray, and a file's name is a link with a hover state. Agreed, not built.
 - **Every look is a setting with a default.** MAPP gives Inkkit the look it draws with.
 
@@ -97,7 +100,7 @@ Gaps on the page come from a 4-point step, with named gaps between the title and
 
 ## Rules that hold on the page
 
-- The row of actions above the title takes no room. It shows with the pointer over it or the title, with keyboard focus in it, and while Customize Layout is on. Linked From and Customize Layout live in it.
+- Linked From and Customize Layout live in a row of actions above the title that takes no room. When it shows is in [`editor/AGENTS.md`](../editor/AGENTS.md).
 - A person's name and the status words are Marfa's. The look changes how they are drawn, not what they say.
 - Dates follow the person's Date Format choice (`dateFormat`).
 
