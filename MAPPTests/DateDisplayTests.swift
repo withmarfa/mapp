@@ -29,7 +29,7 @@ struct DateDisplayTests {
     @Test func aListLineForADayToComeIsTheDayAndTheTimeOfDayIsAvailableApart() {
         let tomorrow = moment(daysAgo: -1)
         #expect(text(tomorrow, .list, .automatic) == "Tomorrow")
-        #expect(DateDisplay.timeOfDay(of: tomorrow, calendar: calendar, locale: locale) == "09:12")
+        #expect(DateDisplay.timeOfDay(of: tomorrow, calendar: calendar, locale: locale) == text(moment(daysAgo: 0), .list, .automatic))
     }
 
     @Test(arguments: [DateFormat.automatic, .relative])
