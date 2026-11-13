@@ -5,8 +5,11 @@ import SwiftUI
 struct ViewPanelDensity: View {
     let browser: Browser
     let panel: ViewPanel
+    /// Only watched: another window may change a place's density, which `browser.density` reads from the defaults.
+    @AppStorage(PlaceDensities.key) private var placeDensities: Data?
 
     var body: some View {
+        let _ = placeDensities
         let density = browser.density
         ViewPanelSection(title: "Density", note: panel.purpose == .place ? nil : "This Mac") {
             InspectorBox {

@@ -129,12 +129,10 @@ extension Browser {
         return placeDensities.density(for: item)
     }
 
-    /// The densities this Mac keeps for places, read once and kept until one changes.
+    /// The densities this Mac keeps for places, read each time since every window shares them and another window may have
+    /// changed one. A list that draws by them also watches the key (`PlaceDensities.key`), so it is drawn again then.
     private var placeDensities: PlaceDensities {
-        if let densityMemo { return densityMemo }
-        let read = PlaceDensities.stored(in: defaults)
-        densityMemo = read
-        return read
+        PlaceDensities.stored(in: defaults)
     }
 
     /// Changes the open place's density, where nil follows Settings. A saved view's is kept on this Mac as it is made,
@@ -157,7 +155,6 @@ extension Browser {
     /// Keeps a place's density, which a list reading it is told of.
     func store(_ density: Density?, for place: SidebarItem) {
         PlaceDensities.update(in: defaults) { $0.set(density, for: place) }
-        densityMemo = nil
         densityRevision += 1
     }
 

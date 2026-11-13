@@ -793,12 +793,9 @@ final class Browser {
     /// Counts the changes to the densities this Mac keeps for places, which a list reads to know its own changed
     /// (`Browser+SavedViews`).
     var densityRevision = 0
-    @ObservationIgnored var densityMemo: PlaceDensities?
 
     /// Where this Mac's settings for views are kept. A test gives its own.
-    @ObservationIgnored var defaults: UserDefaults = .standard {
-        didSet { densityMemo = nil }
-    }
+    @ObservationIgnored var defaults: UserDefaults = .standard
     @ObservationIgnored var isApplyingLayout = false
 
     /// The order and grouping each view opened with (`Browser+SavedViews`).

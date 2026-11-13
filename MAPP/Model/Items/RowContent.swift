@@ -53,7 +53,8 @@ nonisolated struct RowContent: Hashable, Sendable {
         case option(label: String, tone: TypeTone)
         case person(initials: String?, name: String)
         case tag(String)
-        /// A date or a number, in plain secondary text.
+        /// A plain fact in secondary text, led by its field's label ("Location 1712") unless it is a flag, which is the
+        /// label alone ("Archived").
         case text(String)
     }
 
@@ -160,7 +161,7 @@ nonisolated struct RowContent: Hashable, Sendable {
             switch part {
             case .field(let key):
                 guard let field = field(key) else { return nil }
-                return fieldText(field)
+                return isBody(field) ? Self.line(item.preview) : fieldText(field)
             case .time(let key):
                 guard case .date(includesTime: true)? = field(key)?.kind, let moment = fieldMoment(key), moment.hasTime else { return nil }
                 return DateDisplay.timeOfDay(of: moment.date, calendar: calendar, locale: locale)
@@ -186,6 +187,12 @@ nonisolated struct RowContent: Hashable, Sendable {
 
         private func field(_ key: String) -> ItemTypeInfo.Field? {
             info?.fields.first { $0.key == key }
+        }
+
+        /// Whether the field holds the item's text. An item keeps that apart from its properties, so a look that names it
+        /// reads the item's preview, its opening line.
+        private func isBody(_ field: ItemTypeInfo.Field) -> Bool {
+            field.key == info?.bodyKey
         }
 
         /// A field's value as one piece of text: a list's first entry, a date as the list writes it.
@@ -217,6 +224,7 @@ nonisolated struct RowContent: Hashable, Sendable {
                 let (chips, left) = chips(of: fact, skipping: status?.key)
                 guard !chips.isEmpty else { continue }
                 facts += 1
+                // A fact's leftover counts whether it shows or not; one that does not show counts what it would have shown too.
                 content.more += left
                 if facts <= RowContent.shownFacts { content.chips += chips } else { content.more += chips.count }
             }
@@ -229,11 +237,16 @@ nonisolated struct RowContent: Hashable, Sendable {
                 let tags = item.tags.subtracting([ItemTag.favorite]).sorted()
                 return (tags.prefix(RowContent.shownTags).map(Chip.tag), max(0, tags.count - RowContent.shownTags))
             case .field(let key):
-                guard key != status, let field = field(key), !field.isStatus,
-                      let value = PropertyRow.value(of: field, in: item, format: list.format)
-                else { return ([], 0) }
+                guard key != status, let field = field(key), !field.isStatus else { return ([], 0) }
+                if isBody(field) { return Self.fact(field.label, Self.line(item.preview)) }
+                guard let value = PropertyRow.value(of: field, in: item, format: list.format) else { return ([], 0) }
                 return chips(of: value, field: field)
             }
+        }
+
+        /// A plain fact: the field's label, then its value, and nothing where there is no value.
+        private static func fact(_ label: String, _ value: String?) -> (chips: [Chip], left: Int) {
+            value.map { ([.text("\(label) \($0)")], 0) } ?? ([], 0)
         }
 
         private func chips(of value: PropertyRow.Value, field: ItemTypeInfo.Field) -> (chips: [Chip], left: Int) {
@@ -246,11 +259,11 @@ nonisolated struct RowContent: Hashable, Sendable {
                 let tones = PropertyRow.optionTones(of: field, in: item, isPriority: catalogue.isPriority(field, of: field.declaredBy))
                 return ([.option(label: first, tone: tones.first ?? OptionTone.tone(for: first))], words.count - 1)
             case .text(let text), .url(let text), .email(let text), .phone(let text):
-                return Self.line(text).map { ([.text($0)], 0) } ?? ([], 0)
+                return Self.fact(field.label, Self.line(text))
             case .date:
-                return fieldMoment(field.key).map { ([.text(text(of: $0))], 0) } ?? ([], 0)
+                return Self.fact(field.label, fieldMoment(field.key).map(text(of:)))
             case .boolean(let flag):
-                return ([.text(flag ? String(localized: "Yes") : String(localized: "No"))], 0)
+                return flag ? ([.text(field.label)], 0) : ([], 0)
             case .status, .parent, .type, .source, .items, .tags, .when, .empty:
                 return ([], 0)
             }

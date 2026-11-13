@@ -171,7 +171,7 @@ struct PersonCircle: View {
 }
 
 /// A person: initials in the pale circle, then the name, with no chip round it. In a row, the initials alone, with the
-/// name for VoiceOver; the row puts it in the help.
+/// name for VoiceOver.
 struct PagePerson: View {
     let name: String
     let initials: String?

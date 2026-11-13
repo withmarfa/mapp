@@ -180,6 +180,18 @@ struct ViewPanelTests {
         #expect(PlaceDensities.stored(in: browser.defaults).density(for: .allNotes) == nil)
     }
 
+    @Test func aPlacesDensityChangedInAnotherWindowIsReadAtOnce() {
+        let (browser, _, _) = Self.opened()
+        browser.sidebarItem = .allNotes
+        #expect(browser.density == nil)
+        let other = Browser()
+        other.defaults = browser.defaults
+        other.store(.compact, for: .allNotes)
+        #expect(browser.density == .compact)
+        PlaceDensities.update(in: browser.defaults) { $0.set(nil, for: .allNotes) }
+        #expect(browser.density == nil)
+    }
+
     // MARK: Refused and offline writes
 
     @Test func aRefusedWriteKeepsTheWindowsChoiceAndLeavesTheViewAlone() async {

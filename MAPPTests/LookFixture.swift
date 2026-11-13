@@ -9,10 +9,14 @@ enum LookFixture {
         let id: String
         var parent: String?
         var fields: [ItemTypeInfo.Field] = []
+        /// The field that holds the item's text, as the type's display hints name it.
+        var bodyField: String?
     }
 
-    static func field(_ key: String, _ kind: ItemTypeInfo.Field.Kind = .text, format: ItemTypeInfo.Field.TextFormat? = nil) -> ItemTypeInfo.Field {
-        var field = ItemTypeInfo.Field(key: key, label: key, kind: kind, declaredBy: TypeID("test"))
+    static func field(
+        _ key: String, _ kind: ItemTypeInfo.Field.Kind = .text, format: ItemTypeInfo.Field.TextFormat? = nil, label: String? = nil
+    ) -> ItemTypeInfo.Field {
+        var field = ItemTypeInfo.Field(key: key, label: label ?? key, kind: kind, declaredBy: TypeID("test"))
         field.format = format
         return field
     }
@@ -59,8 +63,8 @@ enum LookFixture {
             field("url", format: .url), field("body"), field("title"), field("author"), field("published_at", date),
         ]),
         Spec(id: "core.highlight", fields: [
-            field("text"), field("note"), field("color", .choice(["yellow"])), field("start_location"),
-        ]),
+            field("text", label: "Text"), field("note"), field("color", .choice(["yellow"])), field("start_location"),
+        ], bodyField: "text"),
         Spec(id: "core.media", fields: [
             field("title"), field("body"), field("author"), field("url", format: .url), field("published_at", date),
             field("progress", .status([StatusWord(value: "planned", group: .notStarted)])), field("rating", .number),
@@ -95,7 +99,7 @@ enum LookFixture {
         }
         return Catalogue(itemTypes: specs.map { spec in
             ItemTypeInfo(
-                id: TypeID(spec.id), label: spec.id, fields: fields(of: spec), titleField: nil, bodyField: nil,
+                id: TypeID(spec.id), label: spec.id, fields: fields(of: spec), titleField: nil, bodyField: spec.bodyField,
                 parent: spec.parent.map { TypeID($0) })
         })
     }

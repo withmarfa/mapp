@@ -15,6 +15,8 @@ struct NoteList: View, Equatable {
     @SceneStorage("sidebarHidden") private var isSidebarHidden = false
     @Environment(Libraries.self) private var libraries: Libraries?
     @AppStorage(ListKey.density) private var settingsDensity = Density.standard
+    /// Only watched: a place's density is read from the defaults (`Browser.density`), where another window may change it.
+    @AppStorage(PlaceDensities.key) private var placeDensities: Data?
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
 
     static func == (a: NoteList, b: NoteList) -> Bool { a.browser === b.browser && a.order == b.order }
@@ -33,6 +35,7 @@ struct NoteList: View, Equatable {
         let list = browser.rowList(of: items, in: library, order: order, now: now, format: dateFormat)
         let choices = libraries?.typeLooks.choices(for: libraries?.libraryKey ?? "") ?? [:]
         let contents = browser.rowContents.contents(of: lines.compactMap(\.entry), in: library, choices: choices, list: list)
+        let _ = placeDensities
         let density = browser.density ?? settingsDensity
         let results = browser.searchResults(in: library)
         let excerpts = results?.excerpts ?? [:]

@@ -23,12 +23,13 @@ final class RowContents {
     private struct Held {
         let item: Item
         let showsTime: Bool
-        let content: RowContent
     }
 
     private var basis: Basis?
     private var looks: [TypeID: TypeLook] = [:]
     private var held: [ItemID: Held] = [:]
+    /// The content of each held item, kept beside `held` so a pass that changes nothing answers without building it again.
+    private var made: [ItemID: RowContent] = [:]
 
     /// The content of each entry's row. What the last pass held for an item that is gone is let go.
     func contents(
@@ -39,20 +40,24 @@ final class RowContents {
             basis = next
             looks = library.catalogue.looks(choices: choices)
             held = [:]
+            made = [:]
         }
-        var kept: [ItemID: Held] = [:]
-        kept.reserveCapacity(entries.count)
         for entry in entries {
-            if let known = held[entry.item.id], known.item == entry.item, known.showsTime == entry.showsTime {
-                kept[entry.item.id] = known
-                continue
-            }
+            let id = entry.item.id
+            if let known = held[id], known.item == entry.item, known.showsTime == entry.showsTime { continue }
             let look = looks[entry.item.type] ?? .empty
-            let content = RowContent.make(
+            made[id] = RowContent.make(
                 for: entry.item, look: look, catalogue: library.catalogue, list: list, showsTime: entry.showsTime)
-            kept[entry.item.id] = Held(item: entry.item, showsTime: entry.showsTime, content: content)
+            held[id] = Held(item: entry.item, showsTime: entry.showsTime)
         }
-        held = kept
-        return kept.mapValues(\.content)
+        // Every entry is held now, so more held than listed means some item is gone.
+        if held.count != entries.count {
+            let listed = Set(entries.map(\.item.id))
+            for id in held.keys where !listed.contains(id) {
+                held[id] = nil
+                made[id] = nil
+            }
+        }
+        return made
     }
 }

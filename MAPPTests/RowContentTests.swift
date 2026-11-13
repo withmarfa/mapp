@@ -31,6 +31,11 @@ struct RowContentTests {
             return spec
         }
         specs.append(LookFixture.make("test.bare"))
+        specs.append(LookFixture.make("test.board", [
+            LookFixture.field("location", label: "Location"), LookFixture.field("due", LookFixture.day, label: "Due"),
+            LookFixture.field("archived", .boolean, label: "Archived"), LookFixture.field("size", .number, label: "Size"),
+            LookFixture.field("kind", .choice(["a"]), label: "Kind"),
+        ]))
         specs.append(LookFixture.make("test.ledger", [
             LookFixture.field("amount", .number), LookFixture.field("currency", format: .currency), LookFixture.field("fee", .number),
             LookFixture.field("category"),
@@ -54,9 +59,9 @@ struct RowContentTests {
     }
 
     private static func make(
-        _ item: Item, mixed: Bool = false, date: RowDateSource = .look, showsTime: Bool = false
+        _ item: Item, look: TypeLook? = nil, mixed: Bool = false, date: RowDateSource = .look, showsTime: Bool = false
     ) -> RowContent {
-        let look = LookFixture.look(item.type.rawValue, in: catalogue)
+        let look = look ?? LookFixture.look(item.type.rawValue, in: catalogue)
         let list = RowList(mixesTypes: mixed, date: date, day: calendar.startOfDay(for: now))
         return RowContent.make(
             for: item, look: look, catalogue: catalogue, list: list, showsTime: showsTime, calendar: calendar, locale: locale)
@@ -114,12 +119,93 @@ struct RowContentTests {
             Property(key: "fee", value: .number(1)),
         ])
         let content = Self.make(ledger)
-        #expect(content.chips == [.text("12"), .text("GBP")])
+        #expect(content.chips == [.text("amount 12"), .text("currency GBP")])
         #expect(content.more == 1)
         let meeting = Self.item("core.event", [Property(key: "attendees", value: Self.people(["Ada Lovelace", "Alan Turing", "Grace Hopper"]))])
         let people = Self.make(meeting)
         #expect(people.chips == [.person(initials: "AL", name: "Ada Lovelace")])
         #expect(people.more == 2)
+    }
+
+    @Test func aHiddenFactCountsEveryValueItHoldsIncludingWhatItLeavesOut() {
+        let look = TypeLook(date: .off, secondary: [], facts: [.field("amount"), .field("currency"), .tags])
+        let ledger = Self.item(
+            "test.ledger", [Property(key: "amount", value: .number(12)), Property(key: "currency", value: .string("GBP"))],
+            tags: ["a", "b", "c", "d", "e"])
+        let content = Self.make(ledger, look: look)
+        #expect(content.chips == [.text("amount 12"), .text("currency GBP")])
+        #expect(content.more == 5)
+    }
+
+    @Test func aShownFactCountsWhatItLeavesOutOnceAndAHiddenOneCountsItsShownValuesToo() {
+        let look = TypeLook(date: .off, secondary: [], facts: [.tags, .field("amount"), .field("fee")])
+        let ledger = Self.item(
+            "test.ledger", [Property(key: "amount", value: .number(12)), Property(key: "fee", value: .number(1))],
+            tags: ["a", "b", "c", "d", "e"])
+        let content = Self.make(ledger, look: look)
+        #expect(content.chips == [.tag("a"), .tag("b"), .tag("c"), .text("amount 12")])
+        #expect(content.more == 3)
+    }
+
+    // MARK: Plain facts
+
+    @Test func aTextNumberOrDateFactShowsItsLabelThenItsValue() {
+        let board = Self.item("test.board", [
+            Property(key: "location", value: .string("1712")), Property(key: "due", value: .string("2026-11-14")),
+            Property(key: "size", value: .number(40)),
+        ])
+        let due = ItemDate.parse("2026-11-14", calendar: Self.calendar)!.date
+        func chips(_ key: String) -> [RowContent.Chip] {
+            Self.make(board, look: TypeLook(date: .off, secondary: [], facts: [.field(key)])).chips
+        }
+        #expect(chips("location") == [.text("Location 1712")])
+        #expect(chips("due") == [.text("Due \(Self.listLabel(due, hasTime: false))")])
+        #expect(chips("size") == [.text("Size 40")])
+    }
+
+    @Test func aFlagShowsItsLabelOnlyWhenTrue() {
+        func chips(_ flag: Bool?) -> [RowContent.Chip] {
+            let properties = flag.map { [Property(key: "archived", value: .bool($0))] } ?? []
+            let look = TypeLook(date: .off, secondary: [], facts: [.field("archived")])
+            return Self.make(Self.item("test.board", properties), look: look).chips
+        }
+        #expect(chips(true) == [.text("Archived")])
+        #expect(chips(false).isEmpty)
+        #expect(chips(nil).isEmpty)
+    }
+
+    @Test func aChoiceStaysItsValueAlone() {
+        let board = Self.item("test.board", [Property(key: "kind", value: .string("a"))])
+        let chips = Self.make(board, look: TypeLook(date: .off, secondary: [], facts: [.field("kind")])).chips
+        #expect(chips == [.option(label: "A", tone: OptionTone.tone(for: "A"))])
+    }
+
+    @Test func aFactWithNoValueLeavesNoLabelAlone() {
+        let board = Self.item("test.board", [Property(key: "location", value: .string("  "))])
+        #expect(Self.make(board, look: TypeLook(date: .off, secondary: [], facts: [.field("location"), .field("due")])).chips.isEmpty)
+    }
+
+    @Test func aTagsAndAPeopleFactStayValuesAlone() {
+        let task = Self.item("core.task", [Property(key: "assignees", value: Self.people(["Ada Lovelace"]))], tags: ["a"])
+        let chips = Self.make(task, look: TypeLook(date: .off, secondary: [], facts: [.field("assignees"), .tags])).chips
+        #expect(chips == [.person(initials: "AL", name: "Ada Lovelace"), .tag("a")])
+    }
+
+    // MARK: A passage
+
+    @Test func aHighlightsPassageIsItsOpeningLineWhereItsTextFieldIsNamed() {
+        let highlight = Self.item("core.highlight", [Property(key: "start_location", value: .string("p. 12"))], preview: " A passage worth keeping \n")
+        let content = Self.make(highlight)
+        #expect(content.secondary == "A passage worth keeping")
+        #expect(content.chips == [.text("start_location p. 12")])
+    }
+
+    @Test func aFactThatNamesTheTextFieldReadsTheOpeningLineAndOneWithNoTextHasNone() {
+        let look = TypeLook(date: .off, secondary: [], facts: [.field("text")])
+        let passage = Self.item("core.highlight", preview: "A passage worth keeping")
+        #expect(Self.make(passage, look: look).chips == [.text("Text A passage worth keeping")])
+        #expect(Self.make(Self.item("core.highlight"), look: look).chips.isEmpty)
+        #expect(Self.make(Self.item("core.highlight"), look: TypeLook(date: .off, secondary: [.field("text")], facts: [])).secondary == nil)
     }
 
     @Test func aNotesTagsShowInSortedOrderWithTheRestCounted() {
@@ -219,5 +305,21 @@ struct RowContentTests {
         let second = contents.contents(of: [RowContents.Entry(item: renamed, showsTime: false)], in: library, choices: [:], list: list)
         #expect(second[note.id]?.title == "Second")
         #expect(contents.contents(of: [], in: library, choices: [:], list: list).isEmpty)
+    }
+
+    @Test func anItemThatIsGoneIsLetGoAndOneThatStaysIsKept() {
+        let kept = Self.item("core.note", title: "Kept", modified: Self.now)
+        let gone = Self.item("core.note", title: "Gone", modified: Self.now)
+        let library = FakeItemLibrary(items: [kept, gone], now: Self.now)
+        let contents = RowContents()
+        let list = RowList(day: Self.calendar.startOfDay(for: Self.now))
+        let both = contents.contents(
+            of: [kept, gone].map { RowContents.Entry(item: $0, showsTime: false) }, in: library, choices: [:], list: list)
+        #expect(Set(both.keys) == [kept.id, gone.id])
+        let one = contents.contents(of: [RowContents.Entry(item: kept, showsTime: false)], in: library, choices: [:], list: list)
+        #expect(Set(one.keys) == [kept.id])
+        #expect(one[kept.id] == both[kept.id])
+        let again = contents.contents(of: [RowContents.Entry(item: kept, showsTime: true)], in: library, choices: [:], list: list)
+        #expect(again[kept.id]?.title == "Kept")
     }
 }

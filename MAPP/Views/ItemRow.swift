@@ -27,13 +27,15 @@ struct ItemRow: View {
             if isCompact { compact } else { standard }
         }
         .padding(.vertical, isCompact ? 3 : 6)
+        // One piece of text, which is how a row is found by its words (`value`) in the accessibility tree.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(content.spoken)
+        .accessibilityAddTraits(.isStaticText)
     }
 
     private var compact: some View {
         HStack(spacing: 8) {
-            if content.mixesTypes { TypeMark(icon: content.typeIcon).help(content.typeLabel) }
+            if content.mixesTypes { TypeMark(icon: content.typeIcon) }
             Text(content.title)
                 .interfaceFont(.body)
                 .lineLimit(1)
@@ -99,7 +101,7 @@ private struct RowChips: View {
                 case .option(let label, let tone):
                     PageChip(text: label, kind: .option(tone), size: .row)
                 case .person(let initials, let name):
-                    PagePerson(name: name, initials: initials, size: .row).help(name)
+                    PagePerson(name: name, initials: initials, size: .row)
                 case .tag(let tag):
                     PageChip(text: tag, kind: .tag, size: .row)
                 case .text(let text):
