@@ -49,6 +49,9 @@
     "“%@” isn’t part of this list. Remove it to save the list." : {
       "extractionState" : "manual"
     },
+    "Looks can be imported once the library has loaded." : {
+
+    },
     "MAPP Looks" : {
 
     },

@@ -38,7 +38,11 @@ enum LooksFiles {
     }
 
     static func importLooks(into libraries: Libraries) {
-        guard libraries.current != nil else { return }
+        guard let current = libraries.current else { return }
+        guard !current.catalogue.itemTypes.isEmpty else {
+            libraries.host.notices.tell(String(localized: "Couldn’t Import Looks"), notLoadedMessage)
+            return
+        }
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.json]
         panel.allowsMultipleSelection = false
@@ -53,10 +57,14 @@ enum LooksFiles {
         }
     }
 
+    private static var notLoadedMessage: String { String(localized: "Looks can be imported once the library has loaded.") }
+
     private static func message(for error: LooksFileError, file: String) -> String {
         switch error {
         case .unreadable:
             String(localized: "“\(file)” could not be read. No looks were changed.")
+        case .notLoaded:
+            notLoadedMessage
         case .notALooksFile, .unwritable:
             String(localized: "“\(file)” is not a looks file that MAPP can read. No looks were changed.")
         }

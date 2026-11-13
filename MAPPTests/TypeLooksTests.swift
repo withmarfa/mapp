@@ -234,6 +234,18 @@ struct TypeLooksTests {
         #expect(defaults.data(forKey: TypeLooks.defaultsKey) == nil)
     }
 
+    @Test func aLibraryWhoseCatalogueHasNotLoadedIsRefusedAndNothingIsWritten() throws {
+        let (store, defaults) = store("unloaded")
+        defer { clean(defaults, "unloaded") }
+        let url = try temporaryFile(try file(["core.note": chosenLook]).encoded())
+        defer { try? FileManager.default.removeItem(at: url) }
+        #expect(throws: LooksFileError.notLoaded) { try store.importLooks(from: url, into: one, in: Catalogue()) }
+        #expect(store.choices(for: one).isEmpty)
+        #expect(defaults.data(forKey: TypeLooks.defaultsKey) == nil)
+        try store.importLooks(from: url, into: one, in: catalogue)
+        #expect(store.choices(for: one)[TypeID("core.note")] != nil, "the same file is kept once the catalogue has loaded")
+    }
+
     @Test func aFileThatCannotBeReadIsRefused() throws {
         let (store, defaults) = store("missing")
         defer { clean(defaults, "missing") }
@@ -378,6 +390,48 @@ struct TypeLooksTests {
             TypeID("core.task"): TypeLookChoice(date: .created), TypeID("aic.ticket.task"): TypeLookChoice(date: .off),
         ])
         #expect(store.looks(in: catalogue, library: one) == looks)
+    }
+
+    @Test func aParentIsMeasuredBeforeItsChildWhateverTheirIdentifiersSortTo() {
+        let (store, defaults) = store("parentfirst")
+        defer { clean(defaults, "parentfirst") }
+        let catalogue = LookFixture.catalogue([note("a.child", parent: "b.parent"), note("b.parent")])
+        let preset = LookFixture.look("b.parent", in: catalogue)
+        #expect(preset.date == .edited)
+        let moved = TypeLook(date: .created, secondary: preset.secondary, facts: preset.facts)
+        store.importLooks(file(["a.child": moved, "b.parent": moved]), into: one, in: catalogue)
+        #expect(store.choices(for: one) == [TypeID("b.parent"): TypeLookChoice(date: .created)], "the child stores nothing")
+    }
+
+    /// Below ten ancestors the old order was right; past ten, types tie on the count and fell back to their names, so a
+    /// child whose identifier sorts first was measured against its parent's old look.
+    @Test func aParentIsMeasuredBeforeItsChildInAChainDeeperThanTheAncestorLimit() {
+        let (store, defaults) = store("deep")
+        defer { clean(defaults, "deep") }
+        // The deeper the type, the earlier its identifier sorts.
+        func id(_ depth: Int) -> String { "t\(99 - depth)" }
+        let catalogue = LookFixture.catalogue((0...12).map { note(id($0), parent: $0 == 0 ? nil : id($0 - 1)) })
+        #expect([10, 11, 12].map { catalogue.ancestors(of: TypeID(id($0))).count } == [10, 10, 10], "these three tie on ancestors")
+        #expect(id(12) < id(11) && id(11) < id(10))
+        let preset = LookFixture.look(id(10), in: catalogue)
+        let moved = TypeLook(date: .created, secondary: preset.secondary, facts: preset.facts)
+        store.importLooks(file([id(10): moved, id(11): moved, id(12): moved]), into: one, in: catalogue)
+        #expect(store.choices(for: one) == [TypeID(id(10)): TypeLookChoice(date: .created)])
+        #expect(store.looks(in: catalogue, library: one)[TypeID(id(12))] == moved)
+    }
+
+    @Test func aChildKeepsItsParentsOldLookAsItsOwnChoiceWhenTheParentMoves() {
+        let (store, defaults) = store("oldparent")
+        defer { clean(defaults, "oldparent") }
+        let catalogue = LookFixture.catalogue([note("a.child", parent: "b.parent"), note("b.parent")])
+        let old = LookFixture.look("b.parent", in: catalogue)
+        let moved = TypeLook(date: .created, secondary: old.secondary, facts: old.facts)
+        store.importLooks(file(["b.parent": moved, "a.child": old]), into: one, in: catalogue)
+        #expect(store.choices(for: one) == [
+            TypeID("b.parent"): TypeLookChoice(date: .created), TypeID("a.child"): TypeLookChoice(date: .edited),
+        ])
+        #expect(store.looks(in: catalogue, library: one)[TypeID("a.child")] == old)
+        #expect(store.looks(in: catalogue, library: one)[TypeID("b.parent")] == moved)
     }
 
     @Test func importKeepsAnUnknownTypesWholeLookSinceNothingCanBeMeasured() {

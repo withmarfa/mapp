@@ -104,7 +104,8 @@ final class TypeLooks {
                 known.append(type)
             }
         }
-        known.sort { (catalogue.ancestors(of: $0).count, $0.rawValue) < (catalogue.ancestors(of: $1).count, $1.rawValue) }
+        let depths = Dictionary(uniqueKeysWithValues: known.map { ($0, Self.depth(of: $0, in: catalogue)) })
+        known.sort { (depths[$0] ?? 0, $0.rawValue) < (depths[$1] ?? 0, $1.rawValue) }
         for type in known {
             guard let look = file.looks[type.rawValue] else { continue }
             let baseline = resolver.baseline(of: type)
@@ -119,6 +120,16 @@ final class TypeLooks {
         guard kept != chosen[library] else { return }
         chosen[library] = kept
         save()
+    }
+
+    /// How many types lie above `type` along the catalogue's `parent` links, however long the chain: `ancestors(of:)` stops
+    /// at Marfa's limit of ten, where deeper types would tie. A parent the catalogue lacks counts as the last one, and a
+    /// loop ends the walk.
+    private static func depth(of type: TypeID, in catalogue: Catalogue) -> Int {
+        var seen: Set<TypeID> = [type]
+        var current = type
+        while let parent = catalogue.itemTypes[current]?.parent, seen.insert(parent).inserted { current = parent }
+        return seen.count - 1
     }
 
     private func save() {

@@ -8,6 +8,8 @@ nonisolated enum LooksFileError: Error, Equatable, Sendable {
     case unreadable
     /// The file is not a looks file this version reads. Nothing was kept.
     case notALooksFile
+    /// The library's types have not loaded, so there is nothing to measure the file against. Nothing was kept.
+    case notLoaded
 }
 
 extension TypeLooks {
@@ -23,9 +25,10 @@ extension TypeLooks {
         }
     }
 
-    /// Keeps what differs in the file at `url` on `library` (`importLooks(_:into:in:)`). A file that cannot be read, or is
-    /// not a looks file, is refused and nothing is kept.
+    /// Keeps what differs in the file at `url` on `library` (`importLooks(_:into:in:)`). A catalogue that has not loaded, a
+    /// file that cannot be read and one that is not a looks file are refused and nothing is kept.
     func importLooks(from url: URL, into library: String, in catalogue: Catalogue) throws(LooksFileError) {
+        guard !catalogue.itemTypes.isEmpty else { throw .notLoaded }
         let data: Data
         do {
             let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
