@@ -139,9 +139,10 @@ extension MarfaLibrary {
                 return false
             }
         }
-        let changed = changes.filter { item.value(of: $0.key) != $0.value }
-        guard !changed.isEmpty || (!changes.isEmpty && isWritingProperties(of: id)) else { return true }
-        let sent = changed.isEmpty ? changes : changed
+        // A value equal to the stored one still goes while an edit of the item is on its way, since it may reverse that
+        // edit: leaving it out would let the edit in flight land as the value kept.
+        let sent = isWritingProperties(of: id) ? changes : changes.filter { item.value(of: $0.key) != $0.value }
+        guard !sent.isEmpty else { return true }
         let old = Dictionary(uniqueKeysWithValues: sent.keys.map { ($0, item.value(of: $0)) })
         editProperties(id, to: sent, from: old, actionName: actionName, undoManager: undoManager)
         return true

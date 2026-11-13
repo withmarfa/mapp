@@ -148,7 +148,8 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Several properties of one item in one edit and one undo step named `actionName`, each given its value or, where
     /// the change is nil, taken away. Nothing is sent unless every one can be: the item takes edits and each key is a
     /// property of its type that takes the value. A change to what the item already holds is left out, so a call that
-    /// changes nothing sends nothing and is still taken.
+    /// changes nothing sends nothing and is still taken, except while an edit of the item is on its way
+    /// (`isWritingProperties(of:)`): then every change goes, since one may reverse that edit.
     @discardableResult
     func setItemProperties(_ id: ItemID, changes: [String: PropertyValue?], actionName: String, undoManager: UndoManager?) -> Bool
     /// Whether an edit of the properties of `id` is still on its way into the library, so the item does not show it
