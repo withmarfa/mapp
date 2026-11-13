@@ -113,6 +113,15 @@ struct ItemTableColumnsTests {
         func layout() -> TableColumnCustomization<ItemTableRow> {
             ItemTableColumnLayouts.layout(for: .allNotes, in: defaults.data(forKey: ItemTableColumnLayouts.key) ?? Data())
         }
+        /// The width the table has written for a column. A layout offers no way to read one, so this reads the form it encodes to.
+        func storedWidth(of id: String) -> Double? {
+            guard let data = try? JSONEncoder().encode(layout()),
+                  let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let states = root["perColumnState"] as? [[String: Any]],
+                  let index = states.firstIndex(where: { ($0["base"] as? [String: Any])?["explicit"] as? [String: String] == ["_0": id] }),
+                  states.indices.contains(index + 1) else { return nil }
+            return states[index + 1]["currentWidth"] as? Double
+        }
         func store(_ change: (inout TableColumnCustomization<ItemTableRow>) -> Void) {
             var next = layout()
             change(&next)
@@ -130,16 +139,16 @@ struct ItemTableColumnsTests {
         try #require(await eventually { first.tableColumns.count == expected.count + 1 })
         let created = try #require(first.tableColumns.last)
         #expect(!initial.contains(created.identifier))
-        // The layout already differs from the default, since it shows Created, so wait for the width itself.
-        let shown = layout()
+        // The table also writes the other columns' widths when Created arrives, so wait for Created's own.
         created.width = 160
-        try #require(await eventually { layout() != shown })
+        try #require(await eventually { storedWidth(of: "created") == 160 })
 
         store { $0[visibility: "created"] = .hidden }
         try #require(await eventually { first.tableColumns.count == expected.count })
         titleColumn.width += 40
         // Nothing to wait for: this gives the table's write-back time to have happened, if it is going to.
         try await Task.sleep(for: .milliseconds(300))
+        #expect(storedWidth(of: "created") == 160)
 
         store { $0[visibility: "created"] = .visible }
         try #require(await eventually { first.tableColumns.count == expected.count + 1 })
