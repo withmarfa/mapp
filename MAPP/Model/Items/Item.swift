@@ -13,6 +13,9 @@ nonisolated indirect enum PropertyValue: Hashable, Sendable {
     case null
     case bool(Bool)
     case number(Decimal)
+    /// A stored number that no `Decimal` gives back exactly, such as 1e200 or 1e-200, which lie beyond its range.
+    /// It is held as the server stored it, so a list written back whole sends it unchanged.
+    case double(Double)
     case string(String)
     case array([PropertyValue])
     case object([String: PropertyValue])
@@ -21,6 +24,12 @@ nonisolated indirect enum PropertyValue: Hashable, Sendable {
         guard case .string(let value) = self else { return nil }
         return value
     }
+}
+
+nonisolated extension Double {
+    /// A number only a `Double` holds, as a person reads it: in scientific notation, since written out it runs to
+    /// hundreds of digits or shows as zero.
+    var readable: String { formatted(.number.notation(.scientific)) }
 }
 
 nonisolated struct Property: Identifiable, Hashable, Sendable {

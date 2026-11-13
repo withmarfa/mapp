@@ -13,7 +13,7 @@ nonisolated enum InspectorFields {
         case .string(let text)?: !text.isEmpty
         case .array(let values)?: !values.isEmpty
         case .object(let fields)?: !fields.isEmpty
-        case .bool?, .number?: true
+        case .bool?, .number?, .double?: true
         }
     }
 

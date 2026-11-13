@@ -491,8 +491,7 @@ nonisolated enum MarfaMapping {
         case .null: .null
         case .bool(let bool): .bool(bool)
         case .integer(let integer): .number(Decimal(integer))
-        // Through its shortest text, since Decimal(Double) keeps the binary error: 0.1 would read 0.1000…05.
-        case .number(let number): .number(Decimal(string: "\(number)") ?? Decimal(number))
+        case .number(let number): self.number(number)
         case .string(let string): .string(string)
         case .array(let values): .array(values.map(self.value))
         case .object(let object): .object(Dictionary(object.map { ($0.key, self.value($0.value)) }, uniquingKeysWith: { first, _ in first }))
@@ -506,10 +505,18 @@ nonisolated enum MarfaMapping {
         case .number(let number):
             // Through its text, not a Double, so an integer above 2^53 goes back exactly as it came.
             if let integer = integer(number) { .integer(integer) } else { .number(NSDecimalNumber(decimal: number).doubleValue) }
+        case .double(let number): .number(number)
         case .string(let string): .string(string)
         case .array(let values): .array(values.map(json))
         case .object(let object): .object(JSONObject(object.sorted { $0.key < $1.key }.map { ($0.key, json($0.value)) }))
         }
+    }
+
+    /// The number through its shortest text, since Decimal(Double) keeps the binary error: 0.1 would read 0.1000…05.
+    /// One that text does not give back exactly is kept as the Double, never as Decimal's NaN or zero.
+    private static func number(_ number: Double) -> PropertyValue {
+        guard let decimal = Decimal(string: "\(number)"), !decimal.isNaN, Double("\(decimal)") == number else { return .double(number) }
+        return .number(decimal)
     }
 
     /// The number as an Int64 where it is a whole number in Int64's range.

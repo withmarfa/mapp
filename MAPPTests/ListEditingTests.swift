@@ -413,6 +413,29 @@ import Testing
         #expect(store.writes.isEmpty)
     }
 
+    @Test func aNumberBeyondDecimalsRangeIsWrittenBackAsStoredWhenAnotherEntryChanges() throws {
+        let field = TypeField(
+            name: "readings", type: "array", declaredBy: "t",
+            definition: ["items_type": "object", "items_fields": ["value": ["type": "number"], "label": ["type": "string"]]])
+        let shape = try Self.shape(field)
+        let stored: JSONValue = .array([
+            .object(JSONObject([("value", .number(1e200))])), .object(JSONObject([("value", .number(2))])),
+        ])
+        let store = Store(MarfaMapping.value(stored))
+        let editing = ListEditing()
+        let ids = editing.rows(of: store.value).map(\.id)
+        let entries = ListEntries.entries(of: store.value).compactMap(ListEntries.object)
+        #expect(shape.text(of: try Self.member(shape, "value"), in: entries[0]) == 1e200.readable)
+
+        editing.type("home", into: ListEditing.Slot(entry: ids[1], member: "label"), in: store.value)
+        #expect(editing.commit(try Self.member(shape, "label"), of: ids[1], in: shape, value: store.value, write: store.write))
+        let written = try #require(store.writes.last?.map(MarfaMapping.json))
+        #expect(written == .array([
+            .object(JSONObject([("value", .number(1e200))])),
+            .object(JSONObject([("label", .string("home")), ("value", .integer(2))])),
+        ]))
+    }
+
     // MARK: Lists Marfa refuses
 
     @Test func aMemberTheListDoesNotDeclareCanBeRemovedButNothingElseIsWrittenBesideIt() throws {

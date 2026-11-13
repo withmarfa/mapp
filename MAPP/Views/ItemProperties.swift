@@ -462,6 +462,7 @@ nonisolated enum ItemValueText {
         case .null: "null"
         case .bool(let value): value ? "true" : "false"
         case .number(let value): NSDecimalNumber(decimal: value).stringValue
+        case .double(let value): "\(value)"
         case .string(let value): value
         case .array(let values): values.map(string).joined(separator: ", ")
         case .object(let fields): fields.keys.sorted().map { "\($0): \(string(fields[$0]!))" }.joined(separator: ", ")

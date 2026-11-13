@@ -254,6 +254,7 @@ nonisolated enum MarfaProblems {
         case .null: nil
         case .bool(let bool): bool ? "true" : "false"
         case .number(let number): "\(number)"
+        case .double(let number): "\(number)"
         case .string(let string): string
         case .array(let values): values.compactMap(text).joined(separator: ", ")
         case .object(let object):
