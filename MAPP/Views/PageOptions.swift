@@ -14,7 +14,7 @@ enum PageKey {
 }
 
 /// Reads the Show Coordinates setting where the page's rows are made, which are not views.
-nonisolated enum ShowsCoordinates {
+enum ShowsCoordinates {
     static func stored(in defaults: UserDefaults = .standard) -> Bool { defaults.bool(forKey: PageKey.showsCoordinates) }
 }
 

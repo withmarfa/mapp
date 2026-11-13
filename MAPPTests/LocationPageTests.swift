@@ -67,7 +67,7 @@ struct LocationPageTests {
         #expect(shown.contains("latitude") && shown.contains("longitude") && shown.contains("#location"))
     }
 
-    @Test func showCoordinatesIsOffUntilTheStoredSettingSaysOtherwise() throws {
+    @MainActor @Test func showCoordinatesIsOffUntilTheStoredSettingSaysOtherwise() throws {
         let suite = "LocationPageTests-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
