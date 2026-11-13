@@ -323,6 +323,8 @@ struct MainView: View {
                     browser.sidebarItem = .itemType("core.task")
                     browser.set(layout: .board)
                 }
+                if let place = SampleLibrary.launchPlace { browser.sidebarItem = place }
+                if let layout = SampleLibrary.launchLayout { browser.set(layout: layout) }
                 #endif
             }
         }
