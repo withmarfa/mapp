@@ -55,6 +55,16 @@ nonisolated enum InspectorFields {
         }
     }
 
+    /// What the inspector lists under Properties: `properties`, with the item's Location in place of the fields it is
+    /// made of (`ItemLocation.folding`) where it holds one or the person just added it.
+    static func entries(
+        of item: Item, type: ItemTypeInfo?, hidden: Set<String>, revealed: Set<String> = [], showingCoordinates: Bool
+    ) -> [ItemLocation.Entry] {
+        let fields = properties(of: item, type: type, hidden: hidden, revealed: revealed)
+        guard let location = ItemLocation.of(type) else { return fields.map { .field($0) } }
+        return location.folding(fields, showingCoordinates: showingCoordinates, listsLocation: location.isListed(in: item, revealed: revealed))
+    }
+
     /// The empty fields the Add Property menu offers, in the catalogue's order: those the item can take a value
     /// for and the inspector does not list yet. A list or an object is shown but not edited, so it is not offered.
     static func addable(of item: Item, type: ItemTypeInfo?, hidden: Set<String>, revealed: Set<String> = []) -> [ItemTypeInfo.Field] {

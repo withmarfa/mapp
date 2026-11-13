@@ -118,7 +118,7 @@ import Testing
         func relink(as group: UndoGroup) -> WriteID {
             let id = WriteID()
             let draft = EdgeDraft(type: MarfaMapping.parentEdge, source: parent.id, target: item.id)
-            source.submit(.link(draft, undoing: nil), as: id, undoing: group)
+            source.submit(.link(draft), as: id, undoing: group)
             return id
         }
 

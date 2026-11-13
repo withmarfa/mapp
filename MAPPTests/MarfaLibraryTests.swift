@@ -634,7 +634,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         undo.beginUndoGrouping()
         #expect(await library.changeItemRelationship(F.t1, field: "child-of", adding: [F.p1], removing: [], undoManager: undo))
         let toProject = EdgeDraft(type: "parent-of", source: F.p1, target: F.t1)
-        #expect(await eventually { source.writes == [.link(toProject, undoing: nil)] }, "sent \(source.writes)")
+        #expect(await eventually { source.writes == [.link(toProject)] }, "sent \(source.writes)")
         source.send(.taken(try #require(source.submitted.last?.id)))
         undo.endUndoGrouping()
 
@@ -645,12 +645,12 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         undo.undo()
         #expect(source.writes == [.unlink(EdgeID("c7"))])
         undo.undo()
-        #expect(source.writes.last == .link(EdgeDraft(type: "parent-of", source: F.e1, target: F.t1), undoing: nil))
+        #expect(source.writes.last == .link(EdgeDraft(type: "parent-of", source: F.e1, target: F.t1)))
 
         // A field that holds many adds and removes in one change.
         source.clearWrites()
         #expect(await library.changeItemRelationship(F.n1, field: "about", adding: [F.p2], removing: [F.p1], undoManager: nil))
-        #expect(await eventually { source.writes == [.link(EdgeDraft(type: "about", source: F.n1, target: F.p2), undoing: nil)] })
+        #expect(await eventually { source.writes == [.link(EdgeDraft(type: "about", source: F.n1, target: F.p2))] })
         // The old link goes once the source has taken the new one.
         source.send(.answered(try #require(source.submitted.last?.id), .accepted))
         #expect(await eventually { source.writes.last == .unlink(EdgeID("a1")) })
@@ -747,7 +747,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         try #require(await eventually { library.relationshipChangesInFlight == 2 })
         #expect(source.writes.isEmpty, "nothing is written before the core has answered")
         source.holdingChecks.withLock { $0 = false }
-        try #require(await eventually { source.writes == [.link(EdgeDraft(type: "about", source: F.n1, target: F.p2), undoing: nil)] })
+        try #require(await eventually { source.writes == [.link(EdgeDraft(type: "about", source: F.n1, target: F.p2))] })
         // The copy shows the first change and has taken it; only then is the second worked out.
         let link = try #require(source.submitted.last?.id)
         source.send(.upserted([Self.note(about: [F.p1, F.p2])]))
@@ -755,8 +755,8 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(await first.value)
         #expect(await second.value)
         #expect(source.writes == [
-            .link(EdgeDraft(type: "about", source: F.n1, target: F.p2), undoing: nil),
-            .link(EdgeDraft(type: "about", source: F.n1, target: F.e1), undoing: nil),
+            .link(EdgeDraft(type: "about", source: F.n1, target: F.p2)),
+            .link(EdgeDraft(type: "about", source: F.n1, target: F.e1)),
         ], "sent \(source.writes)")
     }
 
@@ -793,8 +793,8 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.send(.taken(added))
         #expect(await library.changeItemRelationship(F.n1, field: "about", adding: [F.e1], removing: [], undoManager: nil))
         #expect(source.writes == [
-            .link(EdgeDraft(type: "about", source: F.n1, target: F.p2), undoing: nil),
-            .link(EdgeDraft(type: "about", source: F.n1, target: F.e1), undoing: nil),
+            .link(EdgeDraft(type: "about", source: F.n1, target: F.p2)),
+            .link(EdgeDraft(type: "about", source: F.n1, target: F.e1)),
         ], "sent \(source.writes)")
     }
 
@@ -885,7 +885,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(!finished.isSet, "the flush returned with the change not yet written")
         source.holdingChecks.withLock { $0 = false }
         await finishing.value
-        #expect(source.writes == [.link(EdgeDraft(type: "about", source: F.n1, target: F.p2), undoing: nil)], "sent \(source.writes)")
+        #expect(source.writes == [.link(EdgeDraft(type: "about", source: F.n1, target: F.p2))], "sent \(source.writes)")
         #expect(await change.value)
         #expect(library.notices.waiting.isEmpty)
     }

@@ -18,7 +18,7 @@ struct PageHeaderParts {
     let pins: PagePins
 
     /// `offersEmpty` is for the page that edits values: a value the item does not have yet reads Empty there.
-    init(of item: Item, in library: any ItemLibrary, placements: PagePlacements, dateFormat: DateFormat, offersEmpty: Bool = false) {
+    init(of item: Item, in library: any ItemLibrary, placements: PagePlacements, dateFormat: DateFormat, offersEmpty: Bool = false, showsCoordinates: Bool = false) {
         type = library.catalogue.itemTypes[item.type]
         placement = placements.placement(of: item.type, in: library.catalogue)
         relationships = library.relationships(for: item.id)
@@ -31,7 +31,7 @@ struct PageHeaderParts {
             parentField: PagePlacement.parent, format: dateFormat, tags: library.tags(of: item),
             typeLabel: type.map { ItemPageHeader.localized($0.label) }, typeIcon: library.catalogue.icon(for: item.type),
             sourceName: item.source.map { library.sources.name($0) }, now: now, calendar: .current, locale: .current,
-            offersEmpty: offersEmpty, changesType: library.offersTypeChange(for: [item.id]),
+            offersEmpty: offersEmpty, showsCoordinates: showsCoordinates, changesType: library.offersTypeChange(for: [item.id]),
             isPriority: { library.catalogue.isPriority($0, of: $0.declaredBy) }, icon: { Self.typeIcon(of: $0, in: library) }, isPerson: { Self.isPerson($0, in: library) })
         pins = PagePins.resolve(
             for: item, type: type, placement: placement, lead: lead, relationships: relationships, candidates: candidates, offersEmpty: offersEmpty,

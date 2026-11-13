@@ -16,6 +16,7 @@ The item page shows one item: its title, its pinned properties, its text and its
 - A pin with nothing to show reads as the gray word Empty where the person can set a value, and is left out where they cannot. No dotted place or placeholder box stands in for one.
 - A pin's key carries the same icon as its row, at the key's size. Every value is 13-point text whatever its kind, and the label column of a row is 120 points wide.
 - Nothing repeats a logo beside a key that already shows it.
+- A type with a latitude and a longitude shows one Location row in place of them, which opens a map to set the pin on. It can be pinned like any row, and a pinned Location shows the place's name. The numbers are rows of their own only while Show Coordinates is on. See [Composed properties](composed-properties.md).
 - A person's email and phone are rows of the property block that open a mail or phone link, never chips in the header.
 - The header's chips are the value components. See [Value components](value-components.md).
 
@@ -49,6 +50,7 @@ The right sidebar (`ItemInspector`) always lists every property, in sections: De
 - Each section is a grouped box on the sidebar's background, under a label that reads its name and then its count. The chevron that folds the box is trailing, at the far end of the row.
 - Inside a grouped box, dividers stop short of both edges.
 - Details holds its facts as cells.
+- An item's Location is its name beside a small pin and opens the same map as the page's Location.
 - Each kind of link is its own section.
 - Copy in the sidebar is a few words, never several lines of guidance. A button's copy stays tight, such as "Restore Version".
 - Pop-up arrows are gray, not blue.

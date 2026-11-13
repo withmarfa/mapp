@@ -51,7 +51,7 @@ nonisolated struct EventHeader: Hashable, Sendable {
         inEndZone.timeZone = endZone
         var end = text("ends_at").flatMap { ItemDate.parse($0, calendar: inEndZone) }?.date
         if end == nil, case .number(let seconds)? = item.value(of: "duration") {
-            end = start.date.addingTimeInterval((seconds as NSDecimalNumber).doubleValue)
+            end = start.date.addingTimeInterval(seconds.nearestDouble)
         }
         if let finish = end, finish <= start.date { end = nil }
 

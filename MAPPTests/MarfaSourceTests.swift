@@ -626,7 +626,7 @@ struct MarfaSourceOfflineTests {
         _ = try #require(await log.wait { $0.snapshot != nil })
         let ids = try await parentAndChild(source, log, "parent", "other", "child")
         let (parent, other, child) = (ids[0], ids[1], ids[2])
-        source.submit(.link(EdgeDraft(type: "references", source: parent, target: other), undoing: nil), as: WriteID())
+        source.submit(.link(EdgeDraft(type: "references", source: parent, target: other)), as: WriteID())
         let references = try #require(await Self.edge(of: "references", from: parent, in: source))
         let parentOf = try #require(await Self.edge(of: MarfaMapping.parentEdge, from: parent, in: source))
 
@@ -777,7 +777,7 @@ struct MarfaSourceOfflineTests {
         // Tagged, but not yet linked: no original is known.
         _ = try #require(await log.wait { $0.snapshot?.items.first { $0.id == copy } != nil })
         #expect(log.current.snapshot?.items.first { $0.id == original }?.sync != .conflicted(sibling: copy, fields: []))
-        source.submit(.link(EdgeDraft(type: "derived-from", source: copy, target: original), undoing: nil), as: WriteID())
+        source.submit(.link(EdgeDraft(type: "derived-from", source: copy, target: original)), as: WriteID())
         let linked = try #require(await log.wait { state in
             if case .conflicted(let sibling, _)? = state.snapshot?.items.first(where: { $0.id == original })?.sync {
                 sibling == copy

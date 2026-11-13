@@ -8,7 +8,14 @@ enum PageKey {
     static let readingWidth = "readingWidth"
     static let titleLines = "titleLines"
     static let linkLook = LinkLook.key
-    static let all = [fullWidth, textSize, checksSpelling, readingWidth, titleLines, linkLook]
+    /// Whether a Location's latitude and longitude show as rows of their own. Off, they are drawn by the Location row alone.
+    static let showsCoordinates = "showsCoordinates"
+    static let all = [fullWidth, textSize, checksSpelling, readingWidth, titleLines, linkLook, showsCoordinates]
+}
+
+/// Reads the Show Coordinates setting where the page's rows are made, which are not views.
+enum ShowsCoordinates {
+    static func stored(in defaults: UserDefaults = .standard) -> Bool { defaults.bool(forKey: PageKey.showsCoordinates) }
 }
 
 /// How many lines an item page's title shows before an ellipsis cuts it, while the title is not being edited.

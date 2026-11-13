@@ -129,6 +129,36 @@ extension MarfaLibrary {
         }
     }
 
+    @discardableResult
+    func setItemProperties(_ id: ItemID, changes: [String: PropertyValue?], actionName: String, undoManager: UndoManager?) -> Bool {
+        guard let item = item(id), item.isEditable, let type = catalogue.itemTypes[item.type] else { return false }
+        for (key, value) in changes {
+            guard key != MarfaMapping.bodyField(of: type), let field = type.fields.first(where: { $0.key == key }) else { return false }
+            if let value, !field.accepts(value) {
+                notices.tell(String(localized: "Invalid Property"), String(localized: "The value does not match this property's type."))
+                return false
+            }
+        }
+        // A value equal to the stored one still goes while an edit of the item is on its way, since it may reverse that
+        // edit: leaving it out would let the edit in flight land as the value kept.
+        let sent = isWritingProperties(of: id) ? changes : changes.filter { item.value(of: $0.key) != $0.value }
+        guard !sent.isEmpty else { return true }
+        let old = Dictionary(uniqueKeysWithValues: sent.keys.map { ($0, item.value(of: $0)) })
+        editProperties(id, to: sent, from: old, actionName: actionName, undoManager: undoManager)
+        return true
+    }
+
+    /// Made at the version held when it runs, so an undo goes on top of whatever came after the edit.
+    private func editProperties(
+        _ id: ItemID, to changes: [String: PropertyValue?], from old: [String: PropertyValue?], actionName: String, undoManager: UndoManager?
+    ) {
+        guard let version = item(id)?.version else { return }
+        submitPropertyEdit(.editProperties(id, changes, base: version, undoing: nil), of: id, failing: String(localized: "Can’t Edit This Property"))
+        registerUndo(undoManager, name: actionName) { [weak undoManager] library in
+            library.editProperties(id, to: old, from: changes, actionName: actionName, undoManager: undoManager)
+        }
+    }
+
     // MARK: Types
 
     /// Each item moves in one edit, its title and text going to the new type's keys (`TypeChange`), and all of them

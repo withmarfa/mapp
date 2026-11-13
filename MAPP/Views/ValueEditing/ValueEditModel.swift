@@ -69,9 +69,14 @@ final class ValueEditModel {
     /// A change to the parent that has not been answered yet.
     private(set) var isSaving = false
     @ObservationIgnored private var isFinished = false
+    /// The Location panel's own state, for a request of that kind.
+    @ObservationIgnored private(set) var location: LocationPanelModel?
 
     init(_ request: ValueEditRequest) {
         self.request = request
+        if case .location(let spec) = request.kind, let item = request.item {
+            location = LocationPanelModel(spec: spec, item: item, library: request.library, undoManager: request.undoManager)
+        }
         let items = request.library.items(in: .allNotes)
         switch request.kind {
         case .people(let field, let shape):
@@ -161,11 +166,13 @@ final class ValueEditModel {
         }
     }
 
-    /// Whether the item can still take the edit. An editor for an item that cannot closes itself.
+    /// Whether the item can still take the edit. An editor for an item that cannot closes itself, except a Location
+    /// panel, which an item that cannot be edited still opens to show its point.
     var isEditable: Bool {
         if kind == .type { return library.offersTypeChange(for: request.typeTargets) }
         guard let id = request.item else { return true }
         guard let item = library.item(id) else { return false }
+        if case .location(let spec) = kind { return item.isEditable || spec.hasPoint(item) }
         return kind == .tags ? item.canEditTags : item.isEditable
     }
 
@@ -208,7 +215,7 @@ final class ValueEditModel {
     var hasSearch: Bool {
         switch kind {
         case .people, .tags, .words, .parent, .status, .choice, .type: true
-        case .date, .text, .number: false
+        case .date, .text, .number, .location: false
         }
     }
 
@@ -271,7 +278,7 @@ final class ValueEditModel {
         case .tags: tagRows
         case .words: wordRows
         case .parent: parentRows
-        case .text, .number: []
+        case .text, .number, .location: []
         }
     }
 
@@ -496,7 +503,7 @@ final class ValueEditModel {
         case .words: activateWord(id)
         case .parent: activateParent(id)
         case .type: activateType(id)
-        case .text, .number: break
+        case .text, .number, .location: break
         }
     }
 
@@ -663,7 +670,7 @@ final class ValueEditModel {
             let types = Set(request.typeTargets.compactMap { library.item($0)?.type })
             guard types.count == 1, let type = types.first else { return [] }
             return [ValueChip(id: Self.typePrefix + type.rawValue, title: library.catalogue.label(for: type), mark: .type(icon: library.catalogue.icon(for: type)), isRemovable: false)]
-        case .date, .text, .number:
+        case .date, .text, .number, .location:
             return []
         }
     }
@@ -776,6 +783,7 @@ final class ValueEditModel {
     /// themselves; ending the panel any other way (a click elsewhere, a resized window, another item) never loses it.
     func finish(cancelled: Bool) {
         isFinished = true
+        location?.finish(cancelled: cancelled)
         guard !cancelled else {
             // The time field loses focus as the panel goes, which would otherwise write what was cancelled.
             timeDraft = nil

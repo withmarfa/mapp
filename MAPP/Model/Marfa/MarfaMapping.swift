@@ -503,8 +503,8 @@ nonisolated enum MarfaMapping {
         case .null: .null
         case .bool(let bool): .bool(bool)
         case .number(let number):
-            // Through its text, not a Double, so an integer above 2^53 goes back exactly as it came.
-            if let integer = integer(number) { .integer(integer) } else { .number(NSDecimalNumber(decimal: number).doubleValue) }
+            // An integer stays an integer, so one above 2^53 goes back exactly as it came.
+            if let integer = integer(number) { .integer(integer) } else { .number(number.nearestDouble) }
         case .double(let number): .number(number)
         case .string(let string): .string(string)
         case .array(let values): .array(values.map(json))

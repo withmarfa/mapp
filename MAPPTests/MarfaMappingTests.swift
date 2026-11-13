@@ -401,6 +401,13 @@ struct MarfaMappingTests {
         #expect(MarfaMapping.value(MarfaMapping.json(nested)) == nested)
     }
 
+    /// NSDecimalNumber's doubleValue lands an ulp off for many decimals, so -0.0788 would be stored as -0.07880000000000001.
+    @Test func aDecimalGoesOutAsTheNearestDouble() {
+        for text in ["-0.0788", "-0.054289", "-74.005974", "51.5246", "0.1"] {
+            #expect(MarfaMapping.json(.number(Decimal(string: text)!)) == .number(Double(text)!), "\(text)")
+        }
+    }
+
     @Test func aLargeIntegerGoesBackAsTheSameInteger() {
         // 2^53 + 1 is the first integer a Double cannot hold, so a list edit that rewrote it through one would change it.
         for integer in [Int64(9_007_199_254_740_993), .max, .min, -9_007_199_254_740_993] {

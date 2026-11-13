@@ -443,7 +443,7 @@ extension MarfaLibrary {
         _ change: RelationshipChange, name: String, failing title: String = String(localized: "Can’t Change This Relationship"),
         undoManager: UndoManager?
     ) -> Set<WriteID> {
-        var links = change.adding.map { submit(.link($0, undoing: nil), failing: title) }
+        var links = change.adding.map { submit(.link($0), failing: title) }
         links += change.moving.map { submit(.moveEdge($0.edge, end: $0.end, to: $0.to), failing: title) }
         var sent = Set(links)
         if links.isEmpty {

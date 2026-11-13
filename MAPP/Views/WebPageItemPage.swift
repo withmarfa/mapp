@@ -476,6 +476,7 @@ private struct WebPageHeader: View {
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     @AppStorage(PagePlacements.key) private var placements = PagePlacements()
     @AppStorage(PageKey.titleLines) private var titleLines = TitleLines.standard
+    @AppStorage(PageKey.showsCoordinates) private var showsCoordinates = false
     @StoredPageStyle private var style
     let item: Item
     let inset: CGFloat
@@ -485,7 +486,7 @@ private struct WebPageHeader: View {
     let reading: Bool
 
     var body: some View {
-        let parts = PageHeaderParts(of: item, in: library, placements: placements, dateFormat: dateFormat)
+        let parts = PageHeaderParts(of: item, in: library, placements: placements, dateFormat: dateFormat, showsCoordinates: showsCoordinates)
         let step = CGFloat(interfaceTextSize) * 4 / 13
         let textSize = CGFloat(style.textSize)
         let statusField = parts.type?.statusField

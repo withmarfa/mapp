@@ -143,7 +143,7 @@ extension MarfaEngine {
             item(id)
         case .transition(let id, _), .tag(let id, _, _):
             place(id.rawValue)
-        case .link(let draft, _):
+        case .link(let draft):
             place(draft.source.rawValue)
             place(draft.target.rawValue)
             let ends: Set<String> = [draft.source.rawValue, draft.target.rawValue]

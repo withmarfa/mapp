@@ -42,7 +42,7 @@ final class ValueEditPanelSession: ValueEditSession {
         guard let parent = anchor.window else { return }
         self.parent = parent
         savedResponder = parent.firstResponder
-        let host = NSHostingView(rootView: ValueEditContent(model: model).interfaceTextStyle())
+        let host = NSHostingView(rootView: Self.content(of: model))
         host.sizingOptions = []
         let panel = ValueEditPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.isOpaque = false
@@ -58,6 +58,13 @@ final class ValueEditPanelSession: ValueEditSession {
         layout()
         parent.addChildWindow(panel, ordered: .above)
         panel.makeKeyAndOrderFront(nil)
+    }
+
+    /// The Location panel is a map with its own fields, so it draws itself; every other value draws the rows.
+    @MainActor
+    private static func content(of model: ValueEditModel) -> AnyView {
+        if let location = model.location { return AnyView(LocationPanelContent(model: location, panel: model).interfaceTextStyle()) }
+        return AnyView(ValueEditContent(model: model).interfaceTextStyle())
     }
 
     /// The panel's ground: the system's glass, or, in Solid, the window's own color. Either is cut to the panel's corners
@@ -138,6 +145,7 @@ final class ValueEditPanelSession: ValueEditSession {
     private var estimatedHeight: CGFloat {
         switch model.kind {
         case .date: 420
+        case .location: LocationMetrics.estimatedHeight
         default: CGFloat(model.rows.count) * ValueEditMetrics.rowHeight + 2 * ValueEditMetrics.padding + (model.hasSearch ? 64 : 0)
         }
     }

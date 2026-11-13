@@ -367,6 +367,61 @@ final class FakeItemLibrary: ItemLibrary {
     func wasRefused(creating id: ItemID) -> Bool { refusedCreations.contains(id) }
     func setItemProperty(_ id: ItemID, key: String, value: PropertyValue?, undoManager: UndoManager?) -> Bool { false }
 
+    /// Every call of `setItemProperties`, in order, with the changes as asked.
+    private(set) var propertiesSet: [(id: ItemID, changes: [String: PropertyValue?], actionName: String)] = []
+    /// Whether `setItemProperties` takes an edit; one it takes is made on the item, and its undo step is registered.
+    var acceptsProperties = true
+    /// While set, an edit `setItemProperties` takes stays on its way, as a library that queues it keeps it: the item does
+    /// not show it and `isWritingProperties(of:)` is true, until `landPropertyWrites()`.
+    var holdsPropertyWrites = false
+    private var heldPropertyWrites: [(id: ItemID, changes: [String: PropertyValue?])] = []
+
+    /// The edits on their way reach the items, in the order they were made.
+    func landPropertyWrites() {
+        for (id, changes) in heldPropertyWrites {
+            if let index = items.firstIndex(where: { $0.id == id }) { apply(changes, to: index) }
+        }
+        heldPropertyWrites = []
+        writingProperties = []
+    }
+
+    func setItemProperties(_ id: ItemID, changes: [String: PropertyValue?], actionName: String, undoManager: UndoManager?) -> Bool {
+        guard acceptsProperties, let index = items.firstIndex(where: { $0.id == id }), items[index].isEditable else { return false }
+        let old = Dictionary(uniqueKeysWithValues: changes.keys.map { ($0, items[index].value(of: $0)) })
+        guard !changes.isEmpty, isWritingProperties(of: id) || changes.contains(where: { old[$0.key] != $0.value }) else { return true }
+        write(id, changes, from: old, at: index, actionName: actionName, undoManager: undoManager)
+        return true
+    }
+
+    /// Sends the edit, and registers an undo that sends the reverse and registers the redo, whatever the item holds by
+    /// then, as the library's does. It puts back the values the edit found, as a library whose edits all land does.
+    private func write(
+        _ id: ItemID, _ changes: [String: PropertyValue?], from old: [String: PropertyValue?], at index: Int, actionName: String,
+        undoManager: UndoManager?
+    ) {
+        propertiesSet.append((id, changes, actionName))
+        if holdsPropertyWrites {
+            heldPropertyWrites.append((id, changes))
+            writingProperties.insert(id)
+        } else {
+            apply(changes, to: index)
+        }
+        undoManager?.registerUndo(withTarget: self) { library in
+            guard let index = library.items.firstIndex(where: { $0.id == id }) else { return }
+            library.write(id, old, from: changes, at: index, actionName: actionName, undoManager: undoManager)
+        }
+        undoManager?.setActionName(actionName)
+    }
+
+    private func apply(_ changes: [String: PropertyValue?], to index: Int) {
+        for (key, value) in changes {
+            items[index].properties.removeAll { $0.key == key }
+            if let value { items[index].properties.append(Property(key: key, value: value)) }
+        }
+        items[index].version = ItemVersion(items[index].version.rawValue + 1)
+        items[index].modified = now()
+    }
+
     func isWritingProperties(of id: ItemID) -> Bool { writingProperties.contains(id) }
     func tookPropertyWrite(_ mark: Int) -> Bool { false }
     func changeItemRelationship(_ id: ItemID, field: String, adding: [ItemID], removing: [ItemID], undoManager: UndoManager?) async -> Bool {

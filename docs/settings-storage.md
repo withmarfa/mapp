@@ -12,7 +12,7 @@ A setting has one scope. Pick the narrowest scope that matches what the person w
 
 | Scope | Where | Settings |
 | --- | --- | --- |
-| Every window | One key in the defaults. | `listDensity`, `dateFormat`, `noteSort`, `groupsByDate`, the page options in `PageKey` (`titleLines`, `linkLook`, `fullWidthPages` and others), `remotePictures`, the interface options in `InterfaceKey`. |
+| Every window | One key in the defaults. | `listDensity`, `dateFormat`, `noteSort`, `groupsByDate`, the page options in `PageKey` (`titleLines`, `linkLook`, `fullWidthPages`, `showsCoordinates` and others), `remotePictures`, the interface options in `InterfaceKey`. |
 | A type | One value keyed by type identifier. | `pagePlacements` (pins, shown rows, property order, sidebar sections, where Linked From goes), `includedSubtypes`. |
 | A saved view | One value keyed by the view's item identifier. | `viewLayouts`: a `ViewMacSettings` with the layout, columns, whether the board hides empty groups, the gallery's cards, the list's density and the table's widths. |
 | A place | A key built from the place. | `itemTableColumns` (the table's columns for each place), `placeDensities` (the density of a place that is not a saved view), `indexLayout.<place>` and `indexWidth.<place>`. |
