@@ -22,7 +22,7 @@ A look says how one type is drawn. Every view of that type, whether a list, a ga
 
 A `TypeLook` has three places, and a view adds only its layout and density.
 
-- **Date.** A date field of the type, when the item was created, when it was last edited, when it happened, or none. An item with no value in the field shows when it was last edited. When it happened is Marfa's own `occurred_at`, which every item has and no type declares as a field; an item with none shows when it was created.  MAPP's `Item` holds it as `occurred`.
+- **Date.** A date field of the type, when the item was created, when it was last edited, when it happened, or none. An item with no value in the field shows when it was last edited. When it happened is Marfa's own `occurred_at`, which every item has and no type declares as a field; an item with none shows when it was created. MAPP's `Item` holds it as `occurred`.
 - **Secondary.** Up to two parts joined with ", ": a field, a date field's time of day, the item's opening line, the website of its `url`, or a file's kind and size. A time of day is offered only for a date field that includes a time, and an all-day value shows nothing for that part, so an event's Date shows the day and its Secondary "7:30 pm, Brat, Shoreditch".
 - **Facts.** The fields and tags shown after the status, in order; a view shows as many as fit. Later kinds MAPP builds (a count, a reading time, a relation) are new cases.
 
