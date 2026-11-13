@@ -66,6 +66,10 @@ import UniformTypeIdentifiers
         #expect(library.propertiesSet.count == 1)
         #expect(library.propertiesSet[0].changes["place"] == .some(.string("Brat, Redchurch Street")))
         #expect(model.name == "Brat, Redchurch Street")
+        // One undo step takes back the name with the point.
+        undo.undo()
+        #expect(model.point == nil && model.name.isEmpty)
+        #expect(!undo.canUndo)
     }
 
     @Test func movingThePinWritesOnlyWhatMoved() throws {
