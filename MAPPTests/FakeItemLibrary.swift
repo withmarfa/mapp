@@ -371,13 +371,31 @@ final class FakeItemLibrary: ItemLibrary {
     private(set) var propertiesSet: [(id: ItemID, changes: [String: PropertyValue?], actionName: String)] = []
     /// Whether `setItemProperties` takes an edit; one it takes is made on the item, and its undo step is registered.
     var acceptsProperties = true
+    /// While set, an edit `setItemProperties` takes stays on its way, as a library that queues it keeps it: the item does
+    /// not show it and `isWritingProperties(of:)` is true, until `landPropertyWrites()`.
+    var holdsPropertyWrites = false
+    private var heldPropertyWrites: [(id: ItemID, changes: [String: PropertyValue?])] = []
+
+    /// The edits on their way reach the items, in the order they were made.
+    func landPropertyWrites() {
+        for (id, changes) in heldPropertyWrites {
+            if let index = items.firstIndex(where: { $0.id == id }) { apply(changes, to: index) }
+        }
+        heldPropertyWrites = []
+        writingProperties = []
+    }
 
     func setItemProperties(_ id: ItemID, changes: [String: PropertyValue?], actionName: String, undoManager: UndoManager?) -> Bool {
         guard acceptsProperties, let index = items.firstIndex(where: { $0.id == id }), items[index].isEditable else { return false }
         let old = Dictionary(uniqueKeysWithValues: changes.keys.map { ($0, items[index].value(of: $0)) })
-        guard !changes.filter({ old[$0.key] != $0.value }).isEmpty else { return true }
+        guard !changes.isEmpty, isWritingProperties(of: id) || changes.contains(where: { old[$0.key] != $0.value }) else { return true }
         propertiesSet.append((id, changes, actionName))
-        apply(changes, to: index)
+        if holdsPropertyWrites {
+            heldPropertyWrites.append((id, changes))
+            writingProperties.insert(id)
+        } else {
+            apply(changes, to: index)
+        }
         undoManager?.registerUndo(withTarget: self) { library in
             _ = library.setItemProperties(id, changes: old, actionName: actionName, undoManager: undoManager)
         }

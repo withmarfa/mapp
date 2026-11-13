@@ -89,6 +89,61 @@ import UniformTypeIdentifiers
         #expect(model.point == LocationPoint(latitude: 51.5246, longitude: -0.0788))
     }
 
+    // MARK: While a write is on its way
+
+    @Test func clearingBeforeThePlacementLandsIsSentAndWins() throws {
+        let event = add("core.event")
+        let model = try panel(for: event)
+        library.holdsPropertyWrites = true
+        step { model.place(Self.point(51.5246, -0.0788)) }
+        #expect(model.point == LocationPoint(latitude: 51.5246, longitude: -0.0788))
+        step { model.clear() }
+        #expect(library.propertiesSet.count == 2)
+        #expect(library.propertiesSet.last?.changes == ["latitude": nil, "longitude": nil])
+        #expect(model.point == nil && !model.hasLocation)
+        library.landPropertyWrites()
+        #expect(library.item(event.id)?.value(of: "latitude") == nil)
+        #expect(model.point == nil)
+    }
+
+    @Test func placingBackAtTheStoredPointBeforeTheMoveLandsIsSent() throws {
+        let event = add("core.event", london)
+        let model = try panel(for: event)
+        library.holdsPropertyWrites = true
+        step { model.place(Self.point(40.7, -74)) }
+        step { model.place(Self.point(51.5246, -0.0788)) }
+        #expect(library.propertiesSet.count == 2)
+        #expect(library.propertiesSet.last?.changes == ["latitude": Self.number("51.5246"), "longitude": Self.number("-0.0788")])
+        #expect(model.point == LocationPoint(latitude: 51.5246, longitude: -0.0788))
+        library.landPropertyWrites()
+        #expect(library.item(event.id)?.value(of: "latitude") == Self.number("51.5246"))
+    }
+
+    @Test func placingTwiceAtTheSamePointWhileTheFirstIsOnItsWayWritesOnce() throws {
+        let model = try panel(for: add("core.event"))
+        library.holdsPropertyWrites = true
+        step { model.place(Self.point(51.5246, -0.0788)) }
+        step { model.place(Self.point(51.5246, -0.0788)) }
+        #expect(library.propertiesSet.count == 1)
+    }
+
+    @Test func aNameWrittenShowsWhileItsWriteIsOnItsWay() throws {
+        let event = add("core.event", ["place": .string("Old")])
+        let model = try panel(for: event)
+        library.holdsPropertyWrites = true
+        model.name = "New"
+        step { model.commitName() }
+        #expect(library.propertiesSet.map(\.changes) == [["place": .string("New")]])
+        #expect(model.name == "New")
+        // The next edit starts from what the person typed, not the stored name, so it is no conflict.
+        model.name = "Newer"
+        step { model.commitName() }
+        #expect(!model.hasNameConflict)
+        #expect(library.propertiesSet.last?.changes == ["place": .string("Newer")])
+        library.landPropertyWrites()
+        #expect(model.name == "Newer")
+    }
+
     // MARK: Clearing
 
     @Test func clearingRemovesBothNumbersInOneStepAndKeepsTheName() throws {
@@ -138,6 +193,50 @@ import UniformTypeIdentifiers
         step { model.keepName() }
         #expect(library.item(event.id)?.value(of: "place") == .string("Mine"))
         #expect(!model.hasNameConflict)
+    }
+
+    @Test func placingThePinKeepsTheChoiceOverANameThatChanged() throws {
+        let event = add("core.event", ["place": .string("Old")])
+        let model = try panel(for: event)
+        model.name = "Mine"
+        _ = library.setItemProperties(event.id, changes: ["place": .string("Theirs")], actionName: "Other", undoManager: nil)
+        step { model.commitName() }
+        step { model.place(Self.point(51.5246, -0.0788)) }
+        #expect(library.propertiesSet.last?.changes["place"] == nil)
+        #expect(model.hasNameConflict && model.notice != nil)
+    }
+
+    @Test func aNameThatChangedUnderTheTextIsHandedOverWhenThePanelEnds() throws {
+        let event = add("core.event", ["place": .string("Old")])
+        let model = try panel(for: event)
+        model.name = "Mine"
+        _ = library.setItemProperties(event.id, changes: ["place": .string("Theirs")], actionName: "Other", undoManager: nil)
+        model.finish(cancelled: false)
+        #expect(library.item(event.id)?.value(of: "place") == .string("Theirs"))
+        #expect(library.notices.waiting.count == 1)
+        #expect(library.notices.waiting.first?.text == "place: Mine")
+    }
+
+    @Test func aNameTheLibraryRefusesIsHandedOverWhenThePanelEnds() throws {
+        let event = add("core.event")
+        let model = try panel(for: event)
+        model.name = "Mine"
+        library.acceptsProperties = false
+        model.finish(cancelled: false)
+        #expect(library.notices.waiting.first?.text == "place: Mine")
+    }
+
+    @Test func aNameWrittenAsThePanelEndsAndOneCancelledAreNotHandedOver() throws {
+        let event = add("core.event")
+        let written = try panel(for: event)
+        written.name = "Mine"
+        written.finish(cancelled: false)
+        #expect(library.item(event.id)?.value(of: "place") == .string("Mine"))
+        let cancelled = try panel(for: event)
+        cancelled.name = "Dropped"
+        cancelled.finish(cancelled: true)
+        #expect(library.item(event.id)?.value(of: "place") == .string("Mine"))
+        #expect(library.notices.waiting.isEmpty)
     }
 
     @Test func aPlaceAndAnImageHaveNoNameToType() throws {
