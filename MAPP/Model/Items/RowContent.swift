@@ -196,7 +196,7 @@ nonisolated struct RowContent: Hashable, Sendable {
             switch value {
             case .people(let words), .options(let words): return words.first
             case .text(let text), .url(let text), .email(let text), .phone(let text), .date(let text): return Self.line(text)
-            case .boolean, .status, .parent, .type, .source, .items, .tags, .when: return nil
+            case .boolean, .status, .parent, .type, .source, .items, .tags, .when, .empty: return nil
             }
         }
 
@@ -251,7 +251,7 @@ nonisolated struct RowContent: Hashable, Sendable {
                 return fieldMoment(field.key).map { ([.text(text(of: $0))], 0) } ?? ([], 0)
             case .boolean(let flag):
                 return ([.text(flag ? String(localized: "Yes") : String(localized: "No"))], 0)
-            case .status, .parent, .type, .source, .items, .tags, .when:
+            case .status, .parent, .type, .source, .items, .tags, .when, .empty:
                 return ([], 0)
             }
         }
