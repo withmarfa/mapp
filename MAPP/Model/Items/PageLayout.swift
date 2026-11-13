@@ -140,9 +140,10 @@ nonisolated extension PagePlacements {
 
 nonisolated extension PageLayout {
     /// The rows the page can place for `item`, in their default order: its type, source and last edit, the type's fields
-    /// as the catalogue orders them (those `PageCustomization.fields` offers, with the parent after the status, and one Location for the latitude, the longitude and a name for the place), its
-    /// other relationships, its tags and Linked From. The type's own rows are there whether or not the item has a
-    /// value, and a type with no fields has these built-in rows only.
+    /// as the catalogue orders them (those `PageCustomization.fields` offers, with the parent after the status and one
+    /// Location for the latitude, the longitude and a name for the place), its other relationships, its tags and Linked
+    /// From. The type's own rows are there whether or not the item has a value, and a type with no fields has these
+    /// built-in rows only. The latitude and longitude are rows of their own with `showsCoordinates`.
     static func rows(
         of item: Item, type: ItemTypeInfo?, hidden: Set<String>, relationships: [ItemRelationship], catalogue: Catalogue,
         showsCoordinates: Bool = false
