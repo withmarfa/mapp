@@ -11,9 +11,10 @@
   --inkkit-monospace-font: ui-monospace, 'SF Mono', Menlo, monospace;
   /* No diagram variable is set here: diagrams draw with Pele and Inkkit's own tokens. */
   /* The header's system colors: the label levels and the separator a pin is drawn in, the placeholder text color,
-     red, and the status marks. */
+     red, and the blue of a status in progress. */
   --label-primary: rgb(0 0 0 / 0.85);
   --label-secondary: rgb(0 0 0 / 0.5);
+  --label-tertiary: rgb(0 0 0 / 0.26);
   --label-quinary: rgb(0 0 0 / 0.05);
   --fill-secondary: rgb(0 0 0 / 0.078);
   --fill-tertiary: rgb(0 0 0 / 0.047);
@@ -21,7 +22,7 @@
   --separator: rgb(0 0 0 / 0.1);
   --placeholder: rgb(0 0 0 / 0.498);
   --error: rgb(255 56 60);
-  --status-red: rgb(255 56 60);
+  --status-blue: rgb(0 122 255);
   --link: var(--inkkit-accent-color);
   /* Selected text: the accent over the page while the editor has the keyboard, and a quiet grey of the text's own
      color while the window is in the background, the header's title has the keyboard or the editor was blurred.
@@ -37,7 +38,9 @@
   :root {
     --label-primary: rgb(255 255 255 / 0.85);
     --label-secondary: rgb(255 255 255 / 0.55);
+    --label-tertiary: rgb(255 255 255 / 0.25);
     --label-quinary: rgb(255 255 255 / 0.05);
+    --status-blue: rgb(10 132 255);
     --fill-secondary: rgb(255 255 255 / 0.078);
     --fill-tertiary: rgb(255 255 255 / 0.047);
     --label-placeholder: rgb(255 255 255 / 0.25);
@@ -414,7 +417,6 @@ body[data-text='none'] #editor {
   --c-initials: calc(var(--chip-person-initials-size, 8px) * var(--chip-scale));
   --c-person-gap: calc(var(--chip-person-gap, 6px) * var(--chip-scale));
   --c-dot: calc(7px * var(--chip-scale));
-  --c-ring: calc(12px * var(--chip-scale));
 }
 
 .item-chip {
@@ -605,35 +607,21 @@ body[data-text='none'] #editor {
   display: none;
 }
 
-/* The status mark: a ring in the group's color, with half or all of it filled, or a slash across it. */
+/* The status mark: the group's SF Symbol, which the app draws, as a mask in its tint. It takes the symbol's own size,
+   which the app sends already scaled to the interface's text size. */
 .item-status-mark {
-  --mark: var(--label-secondary);
-  position: relative;
   flex: none;
-  box-sizing: border-box;
-  width: var(--c-ring);
-  height: var(--c-ring);
-  border: calc(var(--chip-scale) * 1.5px) solid var(--mark);
-  border-radius: 50%;
+  background: var(--label-secondary);
+  -webkit-mask: center / contain no-repeat;
+  mask: center / contain no-repeat;
 }
 
-.item-status-mark[data-fill='half'] {
-  background: linear-gradient(90deg, var(--mark) 50%, transparent 50%);
+.item-status-mark[data-tint='blue'] {
+  background: var(--status-blue);
 }
 
-.item-status-mark[data-fill='full'] {
-  background: var(--mark);
-}
-
-.item-status-mark[data-fill='slash']::after {
-  content: '';
-  position: absolute;
-  inset-inline: calc(var(--chip-scale) * 1px);
-  top: 50%;
-  height: calc(var(--chip-scale) * 1.5px);
-  margin-top: calc(var(--chip-scale) * -0.75px);
-  background: var(--mark);
-  transform: rotate(-45deg);
+.item-status-mark[data-tint='tertiary'] {
+  background: var(--label-tertiary);
 }
 
 /* The caret and selection show text focus; embedded controls keep their keyboard rings. */

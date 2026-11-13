@@ -18,7 +18,7 @@ enum GalleryKind: Equatable {
         let info = library.catalogue.itemTypes[item.type]
         if let field = info?.statusField, let value = PagePins.statusValue(of: item, in: field) {
             return .task(GalleryStatus(
-                label: ItemTypeInfo.Field.label(ofOption: value), mark: PageHeader.Mark(group: field.statusGroup(of: value))))
+                label: ItemTypeInfo.Field.label(ofOption: value), symbol: StatusSymbol(group: field.statusGroup(of: value))))
         }
         if let date = startDate(of: item, info: info, in: library) { return .event(GalleryEventDate(date: date)) }
         return .note
@@ -49,7 +49,7 @@ struct GalleryCardFacts {
 
 struct GalleryStatus: Equatable {
     let label: String
-    let mark: PageHeader.Mark
+    let symbol: StatusSymbol
 }
 
 struct GalleryEventDate: Equatable {
@@ -152,7 +152,8 @@ private struct GalleryChipView: View {
         case .plain: PageChip(text: chip.text, kind: .plain)
         case .option(let tone): PageChip(text: chip.text, kind: .option(tone))
         case .tag: PageChip(text: chip.text, kind: .tag)
-        case .status(let mark): PageChip(text: chip.text, kind: .status(mark, chevron: false))
+        case .status(let symbol): PageChip(text: chip.text, kind: .status(symbol, chevron: false))
+        case .person(let initials): PagePerson(name: chip.text, initials: initials)
         case .link(let icon): PageChip(text: chip.text, kind: .link(icon: icon))
         }
     }
@@ -290,7 +291,7 @@ private struct GalleryAccessory: View {
         switch kind {
         case .task(let status):
             HStack(spacing: 5 * unit) {
-                StatusMark(mark: status.mark, size: 10 * unit)
+                StatusMark(status.symbol, size: 10 * unit)
                 Text(status.label).font(.system(size: 10 * unit, weight: .medium)).lineLimit(1)
             }
             .padding(.horizontal, 8 * unit)
@@ -307,34 +308,5 @@ private struct GalleryAccessory: View {
         case .note, .file:
             EmptyView()
         }
-    }
-}
-
-/// The status ring the page header draws, in its color, with half or all of it filled.
-struct StatusMark: View {
-    let mark: PageHeader.Mark
-    let size: CGFloat
-
-    private var color: Color {
-        switch mark.tone {
-        case .blue: .blue
-        case .red: .red
-        case .green: .green
-        case .gray, .neutral: Color.secondary
-        }
-    }
-
-    var body: some View {
-        Circle().strokeBorder(color, lineWidth: 1.5)
-            .overlay {
-                switch mark.fill {
-                case .none: EmptyView()
-                case .full: Circle().fill(color)
-                case .half: Circle().fill(color).mask(alignment: .leading) { Rectangle().frame(width: size / 2) }
-                case .slash: Capsule().fill(color).frame(width: size - 2, height: 1.5).rotationEffect(.degrees(-45))
-                }
-            }
-            .frame(width: size, height: size)
-            .accessibilityHidden(true)
     }
 }

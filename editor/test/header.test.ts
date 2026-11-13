@@ -21,7 +21,7 @@ const ticket: HeaderModel = {
     label: 'In Progress',
     enabled: true,
     empty: false,
-    mark: { tone: 'blue', fill: 'half' },
+    mark: { symbol: 'circle.lefthalf.filled', tint: 'blue' },
   },
   parent: { label: 'Field Research', enabled: true, empty: false },
   pins: [],
@@ -102,23 +102,30 @@ test('the header shows the item it is given, and nothing before', () => {
   expect(root.hidden).toBe(true)
 })
 
-test('a status in a row with no value is drawn empty, and a status pin carries its mark', () => {
+test('a status in a row with no value is drawn empty, and a status pin carries its symbol in its tint', () => {
+  const symbol = { url: 'data:image/png;base64,BBBB', width: 15, height: 16 }
+  header.setIcons({
+    ...icons,
+    symbols: { 'circle.lefthalf.filled': symbol, 'largecircle.fill.circle': icon },
+  })
   header.set(ticket)
   const mark = () => pin('ItemStatusPin').querySelector<HTMLElement>('.item-status-mark')!
   expect(pin('ItemParentPin').classList.contains('empty')).toBe(false)
-  expect(mark().dataset.tone).toBe('blue')
-  expect(mark().dataset.fill).toBe('half')
+  expect(mark().dataset.tint).toBe('blue')
+  expect(mark().hidden).toBe(false)
+  expect(mark().style.width).toBe('15px')
+  expect(mark().style.height).toBe('16px')
   header.set({
     ...ticket,
     status: {
       label: 'Completed',
       enabled: true,
       empty: false,
-      mark: { tone: 'green', fill: 'full' },
+      mark: { symbol: 'largecircle.fill.circle', tint: 'secondary' },
     },
   })
-  expect(mark().dataset.tone).toBe('green')
-  expect(mark().dataset.fill).toBe('full')
+  expect(mark().dataset.tint).toBe('secondary')
+  expect(mark().style.width).toBe('13px')
   // Both open a menu, and both are announced as one.
   expect(pin('ItemParentPin').getAttribute('aria-haspopup')).toBe('menu')
   expect(pin('ItemStatusPin').getAttribute('aria-haspopup')).toBe('menu')

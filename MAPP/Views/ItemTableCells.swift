@@ -222,7 +222,7 @@ struct ItemTableCell: View {
     }
 }
 
-/// A category's mark and name, the same in a cell, a menu and a group's header: a status's ring, a priority's bars,
+/// A category's mark and name, the same in a cell, a menu and a group's header: a status's symbol, a priority's bars,
 /// a person's initial, or a link's symbol.
 struct ItemTableCategory: View {
     let column: ItemTableColumn
@@ -237,7 +237,7 @@ struct ItemTableCategory: View {
             Label {
                 Text(title)
             } icon: {
-                StatusMark(mark: PageHeader.Mark(group: statusGroup), size: 12)
+                StatusMark(group: statusGroup, size: 12)
             }
             .labelStyle(ItemTableLabelStyle())
         case .priority:
@@ -259,7 +259,7 @@ struct ItemTableCategory: View {
     }
 }
 
-/// A category as a menu item: a menu shows images but not views, so a status's ring is drawn into one.
+/// A category as a menu item: a menu shows images but not views, so a status's symbol is drawn into one.
 struct ItemTableMenuLabel: View {
     let column: ItemTableColumn
     let value: String?
@@ -267,14 +267,14 @@ struct ItemTableMenuLabel: View {
 
     var body: some View {
         if column.style == .status {
-            Label { Text(title) } icon: { Self.ring(for: value.flatMap { column.field?.statusGroup(of: $0) }) }
+            Label { Text(title) } icon: { Self.symbol(for: value.flatMap { column.field?.statusGroup(of: $0) }) }
         } else {
             ItemTableCategory(column: column, value: value, title: title)
         }
     }
 
-    private static func ring(for group: StatusGroup?) -> Image {
-        let renderer = ImageRenderer(content: StatusMark(mark: PageHeader.Mark(group: group), size: 12).padding(1))
+    private static func symbol(for group: StatusGroup?) -> Image {
+        let renderer = ImageRenderer(content: StatusMark(group: group, size: 12).padding(1))
         renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
         return renderer.nsImage.map { Image(nsImage: $0) } ?? Image(systemName: "circle")
     }

@@ -1,6 +1,6 @@
 # Views
 
-Windows, panes, toolbars, commands and Settings. How things are drawn is in `docs/`: read the matching page before you change a list row, a chip, the item page, a panel or a view's controls, and note its status line, because a page marked "Agreed, not built" describes where the code is going, and its "Built today" says what the code does now.
+Windows, panes, toolbars, commands and Settings. How things are drawn is in `docs/`: read the matching page before you change a list row, a chip, the item page, a panel or a view's controls, and note its status line, because a page marked "Agreed, not built" describes where the code is going, and its "Built today" or "Built, not yet released" says what the code does now.
 
 - Chips and values: [value-components](../../docs/value-components.md).
 - Rows, cards and densities: [looks](../../docs/looks.md) and [presets-and-densities](../../docs/presets-and-densities.md).

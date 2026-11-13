@@ -38,6 +38,10 @@ struct ChipValueTests {
         #expect(PersonInitials.of("   \n ") == nil)
     }
 
+    @Test func anEmailAddressGivesOneInitialFromItsFirstLetter() {
+        #expect(PersonInitials.of("mira@example.com") == "M")
+    }
+
     @Test func anAccentedLetterWrittenAsTwoScalarsIsOneInitial() {
         #expect(PersonInitials.of("e\u{301}mile") == "E\u{301}")
     }

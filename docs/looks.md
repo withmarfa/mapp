@@ -42,7 +42,7 @@ A list row takes one of six styles: Standard, Compact, With Pictures, Task, High
 
 The style resolves as described in [Marfa and MAPP](marfa-and-mapp.md). In a list that mixes types, each row takes the style of its own type, so rows can differ within one list.
 
-The six styles differ in ways a look removes. A Task row shows due, finish and repeat facts in place of the modified date. A Standard row shows the type's pill under the preview, and a Compact row shows a type mark at the leading edge. A gallery card, a table cell and a board card each draw status, priority, people and type in their own way.
+The six styles differ in ways a look removes. A Task row shows due, finish and repeat facts in place of the modified date. A Standard row shows the type's chip, at row size, under the preview, and a Compact row shows a type mark at the leading edge. A gallery card, a table cell and a board card each draw status, priority, people and type in their own way.
 
 When the look is built, the six row styles go. The Row Style control in Edit View becomes a Density control, and the type styles in Settings become looks.
 

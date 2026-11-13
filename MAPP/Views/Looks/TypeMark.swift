@@ -38,29 +38,3 @@ struct TypeMark: View {
             .accessibilityHidden(true)
     }
 }
-
-/// A type's name in a small pill of its tone, the page's type chip at the size of a list row's line of facts. It reads
-/// a table and two constants, as the mark does, so it is cheap in a row.
-struct TypePill: View {
-    let icon: String?
-    let label: String
-
-    @Environment(\.colorScheme) private var scheme
-
-    var body: some View {
-        let tone = TypeTone(icon: icon)
-        HStack(spacing: 3) {
-            Image(typeGlyph: icon)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 10, height: 10)
-                .accessibilityHidden(true)
-            Text(verbatim: label).lineLimit(1)
-        }
-        .foregroundStyle(tone.ink(ChipLooks.current, for: scheme))
-        .padding(.leading, 4)
-        .padding(.trailing, 6)
-        .padding(.vertical, 1.5)
-        .background(tone.fill(scheme == .dark ? ChipLooks.current.typeTintOpacityDark : ChipLooks.current.typeTintOpacity, for: scheme), in: .rect(cornerRadius: 4, style: .continuous))
-    }
-}

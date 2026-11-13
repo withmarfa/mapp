@@ -1,5 +1,10 @@
 import SwiftUI
 
+/// The two sizes a chip is drawn at: on the page and in the right sidebar, and, a little smaller, in a list row.
+enum ChipSize: Hashable, Sendable {
+    case page, row
+}
+
 /// Every chip look, size and type color, as a named value with a default, in this one place. `current` is what is in
 /// force: the defaults, and in a Debug build the values of the tuning panel's `Chips` knobs. Values come from the
 /// design's "Round nine" CSS (`[data-chips="set"]`).
@@ -19,6 +24,14 @@ struct ChipLooks: Equatable, Sendable {
     var personCircle = 17.0
     var personInitialsSize = 8.0
     var personGap = 6.0
+    /// A status chip's symbol, as a font size, at the page size.
+    var statusSymbolSize = 14.0
+    /// What differs in a list row: the chip's height and text size, and a person's circle and its initials. Every other
+    /// measure (padding, gaps, marks) follows the height (`unit(for:)`).
+    var rowHeight = 20.0
+    var rowTextSize = 11.5
+    var rowPersonCircle = 20.0
+    var rowPersonInitialsSize = 9.0
     /// A type chip's fill in light, as the tone's opacity.
     var typeTintOpacity = 0.13
     /// The same in dark.
@@ -51,6 +64,14 @@ struct ChipLooks: Equatable, Sendable {
     var chevronOpacity = 0.5
 
     static let defaults = ChipLooks()
+
+    func height(for size: ChipSize) -> Double { size == .page ? height : rowHeight }
+    func textSize(for size: ChipSize) -> Double { size == .page ? textSize : rowTextSize }
+    func personCircle(for size: ChipSize) -> Double { size == .page ? personCircle : rowPersonCircle }
+    func personInitialsSize(for size: ChipSize) -> Double { size == .page ? personInitialsSize : rowPersonInitialsSize }
+
+    /// What a measure of the page size is multiplied by at `size`, so a row's chip keeps the page chip's proportions.
+    func unit(for size: ChipSize) -> Double { height(for: size) / height }
 
     #if DEBUG
     static var current: ChipLooks { Tuning.shared.chipLooks }

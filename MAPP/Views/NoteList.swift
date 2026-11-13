@@ -312,8 +312,8 @@ private struct RowPicture: View {
     }
 }
 
-/// The pieces that say what an item is, side by side with room between them. A type shows as a small version of the
-/// page's type chip, its name in its color; a piece with a symbol keeps the symbol. A long label gives way before the
+/// The pieces that say what an item is, side by side with room between them. A type shows as the page's type chip at
+/// row size, its name in its color; a piece with a symbol keeps the symbol. A long label gives way before the
 /// mark does.
 struct ItemMetaLine: View {
     let meta: ItemMeta
@@ -329,7 +329,7 @@ struct ItemMetaLine: View {
                     }
                     .foregroundStyle(.secondary)
                 case .type(let id):
-                    TypePill(icon: id, label: piece.label)
+                    PageChip(text: piece.label, kind: .type(icon: id), size: .row)
                 }
             }
         }
