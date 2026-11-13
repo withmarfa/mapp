@@ -129,9 +129,9 @@ struct LocationPanelContent: View {
             Map(position: $position, interactionModes: [.pan, .zoom]) {
                 if let point = model.point {
                     Annotation("Location", coordinate: point.coordinate, anchor: .bottom) { pin(at: point, proxy: proxy) }
+                        .annotationTitles(.hidden)
                 }
             }
-            .annotationTitles(.hidden)
             .mapStyle(.standard)
             .mapControls { MapZoomStepper() }
             .onMapCameraChange(frequency: .onEnd) { model.visibleRegion = $0.region }
