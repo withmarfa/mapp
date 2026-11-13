@@ -18,6 +18,12 @@ import WebKit
 /// aside, and the analysis bounds what feeds the paths in Readability that take the square of their input: its
 /// expressions for a `srcset`, a lazy picture's attributes and a `meta` property, and its comparison of a title with a
 /// heading. The rest of Readability's time follows the document's size and `maxElements`; nothing proves a limit on it.
+///
+/// Every script that runs on a document (`SafeDOM`, `MailColumn`, `PageAnalyzer.script`, `SourceLook.script`,
+/// `SealedWebPage.makeRoom`) reads it only through `SafeDOM`'s captured getters and methods, never through a property
+/// of an element or of `document`, because the document can name something else with those words (`<img name=cloneNode>`,
+/// a form control named `children`). Readability is Mozilla's and reads what it likes, so a vendored update needs its
+/// expressions read for the same fault.
 enum PageAnalyzer {
     /// The longest an analysis may take before the document is taken to have no article.
     static let timeLimit = Duration.seconds(15)

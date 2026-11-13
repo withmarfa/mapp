@@ -10,7 +10,8 @@ The item page shows one item: its title, its pinned properties, its text and its
 
 - **The title** has no line under it. It shows two lines before it is cut, and Settings > Editor > Page Layout raises that to as many as five (`titleLines`).
 - **Pins** sit directly under the title. A page pins at most four properties (`PagePlacement.pinLimit`). With no choice made, a type pins its own list first, then the status, the parent and the last edit. An event's time is the first pin and takes one of the four.
-- A pin that holds a list shows its first value and "+N more" (`PagePins.listLimit`).
+- A pin that holds a list shows its first value and "+N more" (`PagePins.listLimit`). Its help carries every value.
+- A pin that is stale, or that the header draws itself, is not drawn, and a stale one stays in storage. A pinned row is not also in the property block, and the pin an event's time pushes out goes back to the block.
 - A pin sits in a slot 150 points wide at 13-point text, so a pin stays in the same place from page to page. Pins wrap only where no slot is left.
 - A pin with nothing to show reads as the grey word Empty where the person can set a value, and is left out where they cannot. No dotted place or placeholder box stands in for one.
 - A pin's key carries the same icon as its row.

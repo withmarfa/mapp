@@ -34,6 +34,15 @@ Edit View opens in the right sidebar. It holds the view's Name, Layout, Rows (a 
 - One Done closes the panel.
 - Filters are not in the panel.
 
+## How an edit is saved
+
+Every change in Edit View shows in the window at once. `Browser.choicesChanged()` compares the window's choices with the last it saw and writes each part where it belongs.
+
+- **Marfa's part** (name, query, sort and group) is written at once through the library, one write at a time for each view. A write is based on the version the window read, so a change made elsewhere is refused, never overwritten. A refused write keeps the window's choice and tells the person.
+- **The Mac's part** is stored as it is made, with its own undo step, and never written to Marfa.
+- **Column widths** are the one part kept at once (`Browser.keepWidths`), and only from a drag of a divider. The app owns the column order and visibility, because `TableColumnCustomization` cannot separate them from widths.
+- **A layout the Mac holds none of** stays empty and follows the window. The app's own change of layout goes through `Browser.set(layout:)`, so it is never taken for the person's.
+
 ## Filters
 
 Filters live in one row above the list (`FilterRow` and `FilterChips`) as squared 26-point chips. There is no filter button in the list's toolbar. View Options opens with Show Filters or Hide Filters, and the View menu has Show or Hide Filters, Add Filter and Clear Filters.
