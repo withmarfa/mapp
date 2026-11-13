@@ -12,6 +12,7 @@ struct CommandPalette: View {
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openWindow) private var openWindow
     @Environment(MarfaHost.self) private var host: MarfaHost?
+    @Environment(Libraries.self) private var libraries: Libraries?
     @StoredOrder private var order
     @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
     @AppStorage(PageKey.fullWidth) private var fullWidth = PageStyle().fullWidth
@@ -562,6 +563,10 @@ struct CommandPalette: View {
             }
             if let host, host.canRefresh {
                 add(String(localized: "Refresh"), "arrow.clockwise", "⌘R") { host.refresh() }
+            }
+            if let libraries {
+                add(String(localized: "Export Looks…"), "square.and.arrow.up") { LooksFiles.export(from: libraries) }
+                add(String(localized: "Import Looks…"), "square.and.arrow.down") { LooksFiles.importLooks(into: libraries) }
             }
             // The palette holds the keyboard itself, so the page counts as focused where it was when the palette opened.
             let zoom = TextZoom.acting(pageFocused: returnFocus == .page)
