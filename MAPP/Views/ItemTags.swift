@@ -149,34 +149,21 @@ struct ItemTagsSection: View {
     }
 }
 
-/// One tag, with the button that removes it.
+/// One tag as the page draws it, with the button that removes it.
 private struct TagChip: View {
-    @Environment(\.interfaceTextSize) private var textSize
     let tag: String
     /// Nil for a tag that can't be removed.
     let onRemove: (() -> Void)?
 
     var body: some View {
-        HStack(spacing: 4) {
-            Text(tag)
-                .lineLimit(1)
-                .truncationMode(.middle)
-                .textSelection(.enabled)
-            if let onRemove {
-                Button(action: onRemove) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 9 * InterfaceStyle.scale(for: textSize), weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .help("Remove Tag")
-                .accessibilityLabel("Remove Tag \(tag)")
-                .accessibilityIdentifier("ItemTagRemove.\(tag)")
+        PageChip(
+            text: tag, kind: .tag,
+            removal: onRemove.map {
+                PageChip.Removal(help: "Remove Tag", label: "Remove Tag \(tag)", identifier: "ItemTagRemove.\(tag)", action: $0)
             }
-        }
-        .interfaceFont(.body)
-        .inspectorChip()
+        )
+        .help(tag)
+        .textSelection(.enabled)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("ItemTag.\(tag)")
     }

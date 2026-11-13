@@ -1,7 +1,7 @@
 import MarfaIcons
 import SwiftUI
 
-/// The mark at the start of a row or a chip: a status ring, a person's initials, a tag, a choice's dot, a type's icon or
+/// The mark at the start of a row or a chip: a status symbol, a person's initials, a tag, a choice's dot, a type's icon or
 /// a symbol. It takes the same room whatever it is, so titles in a list start at one edge.
 struct ValueMarkView: View {
     let mark: ValueListRow.Mark
@@ -14,14 +14,9 @@ struct ValueMarkView: View {
         case .none:
             EmptyView()
         case .status(let group):
-            StatusMark(mark: .init(group: group), size: 10 * scale).frame(width: 14 * scale)
+            StatusMark(group: group, size: 12 * scale, onAccent: onAccent).frame(width: 14 * scale)
         case .person(let initials):
-            Text(verbatim: initials)
-                .font(.system(size: 8 * scale, weight: .semibold))
-                .frame(width: 18 * scale, height: 18 * scale)
-                .background(.quaternary, in: .circle)
-                .foregroundStyle(onAccent ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-                .accessibilityHidden(true)
+            PersonCircle(initials: initials.isEmpty ? nil : initials, onAccent: onAccent)
         case .tag:
             glyph("tag")
         case .symbol(let name):

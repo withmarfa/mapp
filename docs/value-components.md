@@ -1,8 +1,8 @@
 # Value components
 
-Status: Agreed, not built. The page and its pins already draw chips this way (built in v0.0.43); the other places do not yet. See "Built today".
+Status: Built, not yet released. Each kind of value below is drawn by one component wherever the app shows it, except where "Not yet built" says otherwise.
 
-Where it lives: `PageChip`, `PagePerson`, `ChipLooks`, `TypeMark`, `TypeTone` and `OptionTone` under `MAPP/Views/Looks/`, `StatusMark` in `MAPP/Views/GalleryCards.swift`, and `editor/src/header.ts` for the page's web header.
+Where it lives: `PageChip`, `PagePerson`, `PersonCircle`, `StatusMark`, `ChipLooks`, `TypeMark`, `TypeTone` and `OptionTone` under `MAPP/Views/Looks/`, `StatusSymbol` under `MAPP/Model/Items/`, and `editor/src/header.ts` for the page's web header.
 
 A value component is one drawing for one kind of value. The same component appears on the page, in the right sidebar, in a row, a card and a table cell, and in the panel that edits the value, so a status looks like a status everywhere.
 
@@ -34,14 +34,16 @@ Every component works in light and in dark.
 
 ## Status
 
-A status takes the group's symbol, and the status words stay the type's own, so a GitHub issue still says Closed.
+A status takes the group's symbol, and the status words stay the type's own, so a GitHub issue still says Closed. A status no group claims draws as not started. A word too long for its chip is cut with an ellipsis and its whole word is in the help.
 
 | Group | SF Symbol | Color |
 | --- | --- | --- |
-| Not started | `circle` | Default |
+| Not started | `circle` | Secondary gray |
 | In progress | `circle.lefthalf.filled` | Blue |
 | Completed | `largecircle.fill.circle` | Secondary gray |
 | Canceled | `xmark.circle` | Tertiary gray |
+
+`StatusSymbol` is the one place that maps a group to a symbol and a tint. `StatusMark` draws it in SwiftUI wherever the app shows a status: the page's chip, the right sidebar, a table, a gallery card, a value panel and a task row. The page's web header draws the same four symbols, which the app sends as it sends every other symbol (`PageHeaderIcons`), and colors them from its own system colors.
 
 ## Priority
 
@@ -62,11 +64,21 @@ A value is edited in a panel that opens under it, its leading edge on the value'
 - The panel is glass by default. A Solid choice in Appearance makes it the window's own color.
 - Change Type is a panel like status. See [Item page](item-page.md).
 
-## Built today
+## Built, not yet released
 
-The page's pins and property rows draw these chips in SwiftUI (`PageChip`, `PagePerson`, `PagePinsView`) and in the web header (`editor/src/header.ts`), from the sizes and fills of `ChipLooks`. Every chip is 22 points tall so chips side by side line up.
+One family draws every kind of value: `PageChip` for a type, a linked item, a status, an option, a tag and a plain word, and `PagePerson` and `PersonCircle` for a person. Each takes a size, `.page` or `.row` (`ChipSize`), and its measures come from `ChipLooks`, scaled with the interface's text size. A chip is as tall as its size says, so chips side by side line up.
 
-The other places draw a value in their own way. Status is a ring with a fill in `StatusMark` and in the page's chip, not a symbol. A Standard list row shows no status, priority or person. A gallery card and a table cell draw people and types differently from the page. The right sidebar shows a priority as plain text. These places adopt the components when the look is built.
+- The item page's pins and property rows, the right sidebar's values, the value panel's chips, a table's cells and a gallery card's chips draw through the family at page size. The page's web header draws the same measures in HTML.
+- A list row draws a type, a task's priority and its people at row size. Its layout is unchanged.
+- A person is one look everywhere: initials in a pale circle, then the name on the page and in the right sidebar, and the circle alone in a row, with the name in the help. A name with one word, or an email address, gives one initial.
+- A choice the field's list does not hold draws as its word, with the color its word gives it. Several values show as the first two, then a count.
+- The right sidebar's tag chip carries a number sign and keeps its remove control.
+
+Not yet built:
+
+- A Standard list row shows no status, priority or person. The task, person and highlight rows keep their own layouts.
+- A table's priority is still bars, and a gallery card keeps its own chip layout.
+- The right sidebar's relationship rows, its people text fields and the Details cells keep their own drawings.
 
 ## Related pages
 

@@ -4,10 +4,9 @@ import { dragRows } from './row-drag'
 /** The symbol a row's key shows under the pointer, a key of `HeaderIcons.symbols`. */
 const rowGrip = 'line.3.horizontal'
 
-/** How a status pin draws its mark: the color the status carries (a tone's name, or `neutral` for the text's own
- *  color) and how the ring is filled. */
-export type HeaderTone = 'neutral' | 'blue' | 'red' | 'green' | 'gray'
-export type HeaderFill = 'none' | 'half' | 'full' | 'slash'
+/** How a status pin draws its mark: the SF Symbol of the status's group, a key of `HeaderIcons.symbols`, and the tint
+ *  the page colors it in, from its own system colors. */
+export type HeaderTint = 'blue' | 'secondary' | 'tertiary'
 
 /** Every chip look as CSS custom properties, resolved by the app for light and for dark: the sizes and fills
  *  (`--chip-*`) and each tone's colors (`--tone-<name>`, `--tone-<name>-ink`, `--tone-<name>-mark`, `--tone-<name>-chip`). The page applies
@@ -24,7 +23,7 @@ export interface HeaderPin {
   enabled: boolean
   empty: boolean
   /** Only the status pin has a mark. */
-  mark?: { tone: HeaderTone; fill: HeaderFill }
+  mark?: { symbol: string; tint: HeaderTint }
   /** Only the parent pin has these: the parent's type icon, a key of `HeaderIcons.symbols`, and its tone's name. */
   icon?: string | null
   tone?: string | null
@@ -673,6 +672,7 @@ export class ItemHeader {
     const style = this.root.style
     const footerStyle = this.footer.style
     this.symbols = icons.symbols ?? {}
+    this.drawStatusMark()
     this.drawParentIcon()
     this.drawn = ''
     this.redraw()
@@ -685,6 +685,18 @@ export class ItemHeader {
       footerStyle.setProperty(`--icon-${name}-width`, `${icon.width}px`)
       footerStyle.setProperty(`--icon-${name}-height`, `${icon.height}px`)
     }
+  }
+
+  /** The status pin's symbol is the one the app drew for the group, in the tint the app chose, since the catalogue holds
+   *  neither. */
+  private drawStatusMark() {
+    const mark = this.statusPin.querySelector<HTMLElement>('.item-status-mark')!
+    const status = this.model?.status?.mark
+    const icon = status ? this.symbols[status.symbol] : undefined
+    maskSymbol(mark, icon)
+    mark.dataset.tint = status?.tint ?? 'secondary'
+    mark.style.width = icon ? `${icon.width}px` : ''
+    mark.style.height = icon ? `${icon.height}px` : ''
   }
 
   /** The parent chip's symbol is the icon of the parent's own type. */
@@ -711,16 +723,7 @@ export class ItemHeader {
     pin.querySelector('.item-pin-label')!.textContent = model?.empty
       ? this.labels.empty
       : (model?.label ?? '')
-    // The status ring is drawn here, from the tone and fill the app chose, since the catalogue holds no colors.
-    const mark = pin.querySelector<HTMLElement>('.item-status-mark')
-    if (mark) {
-      const tone = model?.mark?.tone ?? 'neutral'
-      mark.dataset.tone = tone
-      mark.dataset.fill = model?.mark?.fill ?? 'none'
-      if (tone !== 'neutral' && /^[a-z]+$/.test(tone))
-        mark.style.setProperty('--mark', `var(--tone-${tone})`)
-      else mark.style.removeProperty('--mark')
-    }
+    if (pin === this.statusPin) this.drawStatusMark()
     if (pin === this.parentPin) {
       useTone(pin, model?.tone)
       this.drawParentIcon()

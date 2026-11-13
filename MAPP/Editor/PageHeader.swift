@@ -6,34 +6,23 @@ import SwiftUI
 /// (`PagePins`) and the rows of the property block. The page draws it above the note so the two scroll as one
 /// surface; what it does stays native.
 nonisolated struct PageHeader: Encodable, Equatable, Sendable {
-    /// A status's ring: its color and how it is filled. The catalogue holds neither, so they follow the group the
-    /// type puts it in, and a status no group claims gets the plain ring. A tone is one of `TypeTone`'s names, or
-    /// `neutral` for the ring in the text's own color.
-    struct Mark: Encodable, Hashable, Sendable {
-        enum Tone: String, Encodable, Sendable { case neutral, blue, green, red, gray }
-        enum Fill: String, Encodable, Sendable { case none, half, full, slash }
-        var tone: Tone
-        var fill: Fill
-
-        init(tone: Tone, fill: Fill) {
-            self.tone = tone
-            self.fill = fill
-        }
-
-        init(group: StatusGroup?) {
-            switch group {
-            case .inProgress: self.init(tone: .blue, fill: .half)
-            case .completed: self.init(tone: .green, fill: .full)
-            case .canceled: self.init(tone: .gray, fill: .slash)
-            case .notStarted, nil: self.init(tone: .neutral, fill: .none)
-            }
-        }
-    }
-
     /// The status or the parent as the menu the page opens from it, wherever the page draws it. The page draws the
     /// button; the app builds the menu. An empty status, in the property block, has no value yet: the page reads it
     /// as every empty value reads, and `label` is then unused. A parent exists only with a value.
     struct Pin: Encodable, Equatable, Sendable {
+        /// A status's symbol, as the page names it among the images the app sends (`PageHeaderIcons.symbols`), and the
+        /// tint it takes from the page's colors. The catalogue holds neither: they follow the group the type puts the
+        /// status in (`StatusSymbol`).
+        struct Mark: Encodable, Hashable, Sendable {
+            var symbol: String
+            var tint: StatusSymbol.Tint
+
+            init(_ status: StatusSymbol) {
+                symbol = status.systemName
+                tint = status.tint
+            }
+        }
+
         var label: String
         var enabled: Bool
         var empty = false
@@ -256,7 +245,7 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
     }
 
     var indicator: Icon
-    /// The symbols of the property rows by SF Symbol name, and the icons of the types by `TypeIconKey`.
+    /// The symbols of the property rows and of the four statuses by SF Symbol name, and the icons of the types by `TypeIconKey`.
     var symbols: [String: Icon]
 
     /// The symbol on the callout that says pictures at web addresses are not loaded, kept with the row symbols.
@@ -284,6 +273,10 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
             symbols[name] = Self.symbol(name, size: size, weight: .regular)
         }
         symbols[Self.closeSymbol] = Self.symbol(Self.closeSymbol, size: size * 9 / 13, weight: .bold)
+        // A status's four symbols at the size a status chip draws them, which the page uses as they come.
+        for name in StatusSymbol.systemNames {
+            symbols[name] = Self.symbol(name, size: ChipLooks.current.statusSymbolSize * InterfaceStyle.scale(for: textSize), weight: .regular)
+        }
         for name in typeIcons {
             if Self.drawn.types[name] == nil { Self.drawn.types[name] = Self.typeIcon(name, size: size) }
             symbols[TypeIconKey.value(for: name)] = Self.drawn.types[name]

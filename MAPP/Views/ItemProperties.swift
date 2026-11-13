@@ -36,7 +36,7 @@ struct ItemPropertyRow: View {
     @State private var anchor = ValueEditAnchorBox()
     /// Whether a link's text is being edited, as opposed to followed.
     @State private var editing = false
-    /// A status field's value has the status's ring.
+    /// A status field's value has the status's symbol.
     private var isStatus: Bool { definition.isStatus }
     @FocusState private var isFocused: Bool
     private var input: ItemPropertyDraft { retainedDraft ?? localDraft }
@@ -128,10 +128,11 @@ struct ItemPropertyRow: View {
             InspectorText(text: dateText, keepsOneLine: true, endsAtTrailingEdge: true)
                 .accessibilityIdentifier("ItemProperty.\(definition.key)")
         } else if isStatus, let text = value?.string {
-            statusLabel(Text(verbatim: ItemTypeInfo.Field.label(ofOption: text)))
+            statusLabel(ItemTypeInfo.Field.label(ofOption: text))
                 .accessibilityIdentifier("ItemProperty.\(definition.key)")
         } else if case .choice = definition.kind, let text = value?.string {
-            InspectorText(text: ItemTypeInfo.Field.label(ofOption: text), endsAtTrailingEdge: true)
+            optionChip(of: text)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityIdentifier("ItemProperty.\(definition.key)")
         } else if !shownText.isEmpty {
             InspectorText(text: shownText, endsAtTrailingEdge: true).accessibilityIdentifier("ItemProperty.\(definition.key)")
@@ -149,25 +150,35 @@ struct ItemPropertyRow: View {
         return input.isDirty && isEditable ? input.text : currentText
     }
 
-    private var statusMark: PageHeader.Mark { .init(group: value?.string.flatMap(definition.statusGroup(of:))) }
+    private var statusSymbol: StatusSymbol { StatusSymbol(group: value?.string.flatMap(definition.statusGroup(of:))) }
 
-    /// The status's ring, then its word.
-    private func statusLabel(_ text: Text?) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
-            StatusMark(mark: statusMark, size: 10 * InterfaceStyle.scale(for: textSize))
-                .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
-            if let text { text } else { InspectorPlaceholder(text: "Empty") }
+    /// The status as the page draws it: a chip with its group's symbol and the type's own word, cut with an ellipsis
+    /// where it does not fit, with the whole word in its help.
+    @ViewBuilder private func statusLabel(_ text: String?) -> some View {
+        if let text {
+            PageChip(text: text, kind: .status(statusSymbol, chevron: false))
+                .help(text)
+        } else {
+            InspectorPlaceholder(text: "Empty")
         }
-        .lineLimit(1)
-        .truncationMode(.tail)
+    }
+
+    /// A choice as the page draws it: a chip with a dot in the color its field gives the option.
+    private func optionChip(of word: String) -> some View {
+        let label = ItemTypeInfo.Field.label(ofOption: word)
+        let isPriority = library?.catalogue.isPriority(definition, of: definition.declaredBy) ?? false
+        return PageChip(text: label, kind: .option(OptionTone.tone(of: word, in: definition, isPriority: isPriority)))
+            .help(label)
     }
 
     /// A value at rest in the row that opens its panel: its text, cut at `lines`, or Empty.
-    @ViewBuilder private func choiceLabel(_ text: Text?, lines: Int) -> some View {
+    @ViewBuilder private func choiceLabel(_ text: String?, lines: Int) -> some View {
         if isStatus {
             statusLabel(text)
+        } else if case .choice = definition.kind, let word = value?.string, text != nil {
+            optionChip(of: word)
         } else if let text {
-            text.lineLimit(lines).truncationMode(.tail).fixedSize(horizontal: false, vertical: true)
+            Text(verbatim: text).lineLimit(lines).truncationMode(.tail).fixedSize(horizontal: false, vertical: true)
         } else {
             InspectorPlaceholder(text: "Empty")
         }
@@ -322,7 +333,7 @@ struct ItemPropertyRow: View {
         default: "Opens a field to type in"
         }
         return Button { openEditor() } label: {
-            choiceLabel(text.map { Text(verbatim: $0) }, lines: kind.isTyped || isWords ? 3 : 1)
+            choiceLabel(text, lines: kind.isTyped || isWords ? 3 : 1)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(.rect)
         }

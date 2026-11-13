@@ -86,7 +86,7 @@ struct ItemPageHeader: ViewModifier {
                 let value = PagePins.statusValue(of: item, in: field)
                 // With nothing to pick from, the pin only shows the status the item has.
                 return PageHeader.Pin(label: value.map { ItemTypeInfo.Field.label(ofOption: $0) } ?? "",
-                                      enabled: item.isEditable && field.isPicked, empty: value == nil, mark: .init(group: value.flatMap(field.statusGroup(of:))))
+                                      enabled: item.isEditable && field.isPicked, empty: value == nil, mark: .init(StatusSymbol(group: value.flatMap(field.statusGroup(of:)))))
             },
             parent: parent.flatMap { parent in
                 guard let target = parent.targets.first else { return nil }

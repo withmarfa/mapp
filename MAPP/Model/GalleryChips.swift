@@ -29,8 +29,10 @@ nonisolated struct GalleryChip: Hashable, Sendable {
         /// A choice or one word of a list, with a dot in its own color: the one the field gives it, else its words'.
         case option(TypeTone)
         case tag
-        /// A status with the ring of its group.
-        case status(PageHeader.Mark)
+        /// A status with the symbol of its group.
+        case status(StatusSymbol)
+        /// A person, with the initials in the pale circle.
+        case person(initials: String?)
         /// An item this one links to, with its type's mark.
         case link(icon: String?)
     }
@@ -87,8 +89,8 @@ nonisolated struct GalleryChip: Hashable, Sendable {
     ) -> [GalleryChip] {
         if field.isStatus {
             guard let word = PagePins.statusValue(of: item, in: field) else { return [] }
-            let mark = PageHeader.Mark(group: field.statusGroup(of: word))
-            return [GalleryChip(text: ItemTypeInfo.Field.label(ofOption: word), look: .status(mark))]
+            let symbol = StatusSymbol(group: field.statusGroup(of: word))
+            return [GalleryChip(text: ItemTypeInfo.Field.label(ofOption: word), look: .status(symbol))]
         }
         guard let value = PropertyRow.value(of: field, in: item, format: format) else { return [] }
         switch value {
@@ -98,8 +100,14 @@ nonisolated struct GalleryChip: Hashable, Sendable {
             return words.enumerated().map { index, word in
                 GalleryChip(text: word, look: .option(tones.indices.contains(index) ? tones[index] : OptionTone.tone(for: word)))
             }
-        case .people(let names): return names.map { GalleryChip(text: $0, look: .plain) }
-        case .items(let targets): return targets.map { GalleryChip(text: $0.title, look: .link(icon: $0.icon)) }
+        case .people(let names): return names.map { GalleryChip(text: $0, look: .person(initials: PersonInitials.of($0))) }
+        case .items(let targets):
+            return targets.map {
+                switch $0.kind {
+                case .link: GalleryChip(text: $0.title, look: .link(icon: $0.icon))
+                case .person: GalleryChip(text: $0.title, look: .person(initials: PersonInitials.of($0.title)))
+                }
+            }
         case .date(let text), .text(let text), .url(let text), .email(let text), .phone(let text):
             return [GalleryChip(text: text.trimmingCharacters(in: .whitespacesAndNewlines), look: .plain)]
         case .boolean(let flag):

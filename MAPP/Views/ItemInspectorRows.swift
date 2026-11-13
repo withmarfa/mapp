@@ -35,9 +35,6 @@ enum InspectorMetrics {
     static let cellValueLines = 2
     /// The room between a link row's mark and its title, and between its title and its date.
     static let markGap: CGFloat = 8
-    static let chipRadius: CGFloat = 7
-    /// A chip's horizontal padding, both sides together.
-    static let chipPadding: CGFloat = 16
     /// How far a row's hover fill reaches past its content, so the content stays level with the headings.
     static let rowInset: CGFloat = 6
     static let rowRadius: CGFloat = 6
@@ -515,15 +512,6 @@ struct InspectorRowButtonStyle: ButtonStyle {
                 .padding(.vertical, -4)
                 .onHover { hovering = $0 }
         }
-    }
-}
-
-extension View {
-    /// A quietly filled, rounded chip around the view, for a value that has a shape of its own, such as a tag.
-    func inspectorChip() -> some View {
-        padding(.horizontal, InspectorMetrics.chipPadding / 2)
-            .padding(.vertical, 3)
-            .background(.quinary, in: .rect(cornerRadius: InspectorMetrics.chipRadius, style: .continuous))
     }
 }
 

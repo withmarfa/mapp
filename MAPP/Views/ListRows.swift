@@ -32,11 +32,9 @@ struct TaskRow: View {
     let task: TaskRowFacts
     let meta: ItemMeta
 
-    @Environment(\.colorScheme) private var scheme
-
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 10) {
-            StatusMark(mark: .init(group: task.statusGroup), size: 14)
+            StatusMark(group: task.statusGroup, size: 14)
                 .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 5 }
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.displayTitle)
@@ -46,8 +44,13 @@ struct TaskRow: View {
                     HStack(spacing: 10) {
                         if let due = task.due { dueChip(due) }
                         if let finish = task.finish { Text(finish).foregroundStyle(.secondary) }
-                        if let priority = task.priority { priorityDot(priority, tone: task.priorityTone) }
-                        if let people = task.people { peopleView(people) }
+                        if let priority = task.priority {
+                            PageChip(text: ItemTypeInfo.Field.label(ofOption: priority), kind: .option(task.priorityTone ?? .neutral), size: .row)
+                        }
+                        if let people = task.people {
+                            PagePerson(name: people.label, initials: people.initials, size: .row)
+                                .help(people.label)
+                        }
                         if let repeats = task.repeats {
                             Label(repeats, systemImage: "repeat").foregroundStyle(.secondary)
                         }
@@ -70,24 +73,6 @@ struct TaskRow: View {
                 in: Capsule())
     }
 
-    private func priorityDot(_ value: String, tone: TypeTone?) -> some View {
-        HStack(spacing: 4) {
-            Circle().fill((tone ?? .neutral).color(for: scheme)).frame(width: 7, height: 7)
-            Text(ItemTypeInfo.Field.label(ofOption: value)).foregroundStyle(.secondary)
-        }
-    }
-
-    private func peopleView(_ people: TaskRowFacts.People) -> some View {
-        HStack(spacing: 4) {
-            if let initials = people.initials {
-                Text(initials)
-                    .font(.system(size: 8, weight: .semibold))
-                    .frame(width: 16, height: 16)
-                    .background(Color.secondary.opacity(0.2), in: Circle())
-            }
-            Text(people.label).foregroundStyle(.secondary)
-        }
-    }
 }
 
 /// The passage first, with a rule in the highlight's color, then its source and place and the date.
@@ -143,12 +128,7 @@ struct PersonRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Text(facts.initials ?? "")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.secondary)
-                .frame(width: 30, height: 30)
-                .background(Color.secondary.opacity(0.18), in: Circle())
-                .accessibilityHidden(true)
+            PersonCircle(initials: facts.initials, size: .row)
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.displayTitle)
                     .interfaceFont(.body.weight(.semibold))
