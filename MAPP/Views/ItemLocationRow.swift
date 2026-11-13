@@ -43,7 +43,7 @@ struct ItemLocationRow: View {
             }
         }
         if canOpen {
-            Button { openPanel() } label: { content.contentShape(.rect) }
+            Button { openPanel() } label: { content.frame(maxWidth: .infinity, alignment: .leading).contentShape(.rect) }
                 .buttonStyle(.plain)
                 .focusEffectDisabled()
                 .accessibilityLabel("Location")
