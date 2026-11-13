@@ -111,12 +111,6 @@ nonisolated struct ItemLocation: Hashable, Sendable {
         case unplaceable(String)
     }
 
-    /// A stored number as the nearest Double. Converting through text keeps `51.5246` as that Double, where the number's own
-    /// conversion multiplies and lands a hair away.
-    private static func degrees(_ number: Decimal) -> Double {
-        Double("\(number)") ?? NSDecimalNumber(decimal: number).doubleValue
-    }
-
     func reading(of item: Item) -> Reading {
         let north = item.value(of: latitude.key), east = item.value(of: longitude.key)
         let hasNorth = InspectorFields.hasValue(north), hasEast = InspectorFields.hasValue(east)
@@ -125,7 +119,7 @@ nonisolated struct ItemLocation: Hashable, Sendable {
         let held = "\(text(north)), \(text(east))"
         guard hasNorth, hasEast else { return .partial(held) }
         if case .number(let degreesNorth)? = north, case .number(let degreesEast)? = east,
-           let point = LocationPoint(latitude: Self.degrees(degreesNorth), longitude: Self.degrees(degreesEast)) {
+           let point = LocationPoint(latitude: degreesNorth.nearestDouble, longitude: degreesEast.nearestDouble) {
             return .point(point)
         }
         return .unplaceable(held)

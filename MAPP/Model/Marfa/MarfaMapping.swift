@@ -503,13 +503,8 @@ nonisolated enum MarfaMapping {
         case .null: .null
         case .bool(let bool): .bool(bool)
         case .number(let number):
-            // An integer stays an integer, so one above 2^53 goes back exactly as it came. Any other number goes through its
-            // text, since NSDecimalNumber's doubleValue can land an ulp away: -0.0788 would go out as -0.07880000000000001.
-            if let integer = integer(number) {
-                .integer(integer)
-            } else {
-                .number(Double("\(number)") ?? NSDecimalNumber(decimal: number).doubleValue)
-            }
+            // An integer stays an integer, so one above 2^53 goes back exactly as it came.
+            if let integer = integer(number) { .integer(integer) } else { .number(number.nearestDouble) }
         case .double(let number): .number(number)
         case .string(let string): .string(string)
         case .array(let values): .array(values.map(json))

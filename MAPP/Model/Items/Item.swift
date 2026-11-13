@@ -32,6 +32,13 @@ nonisolated extension Double {
     var readable: String { formatted(.number.notation(.scientific)) }
 }
 
+nonisolated extension Decimal {
+    /// The nearest Double, which every stored number shown or sent as a Double goes through. Converting through the
+    /// number's text keeps `-0.0788` as that Double, where NSDecimalNumber's `doubleValue` multiplies and can land an ulp
+    /// away, at -0.07880000000000001.
+    var nearestDouble: Double { Double("\(self)") ?? NSDecimalNumber(decimal: self).doubleValue }
+}
+
 nonisolated struct Property: Identifiable, Hashable, Sendable {
     let key: String
     let value: PropertyValue
