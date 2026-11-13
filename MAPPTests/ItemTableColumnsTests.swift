@@ -91,7 +91,7 @@ struct ItemTableColumnsTests {
     }
 
     @MainActor
-    @Test func theWindowsTableHoldsOnlyShownColumnsAndKeepsAHiddenOnesWidth() async throws {
+    @Test(arguments: [false, true]) func theWindowsTableHoldsOnlyShownColumnsAndKeepsAHiddenOnesWidth(trimmed: Bool) async throws {
         let (library, _) = try await BigLibrary.loaded()
         let browser = Browser()
         browser.sidebarItem = .allNotes
@@ -119,8 +119,19 @@ struct ItemTableColumnsTests {
             defaults.set(ItemTableColumnLayouts.storing(next, for: .allNotes, in: defaults.data(forKey: ItemTableColumnLayouts.key) ?? Data()), forKey: ItemTableColumnLayouts.key)
         }
 
+        func dump(_ label: String, _ t: NSTableView) {
+            let cols = t.tableColumns.map { "\($0.identifier.rawValue.prefix(4))=\($0.width)[\($0.minWidth),\($0.maxWidth)]" }.joined(separator: " ")
+            Issue.record(Comment(rawValue: "DIAG trimmed=\(trimmed) sum=\(t.tableColumns.filter { !$0.isHidden }.map(\.width).reduce(0, +)) \(label) n=\(t.tableColumns.count) table=\(t.frame.width) clip=\(t.enclosingScrollView?.contentView.bounds.width ?? -1) cols: \(cols)"))
+        }
+        let allColumns = browser.tableContent(in: library).columns
+        let byDefault = allColumns.filter(\.isShownByDefault)
+        Issue.record(Comment(rawValue: "DIAG trimmed=\(trimmed) default-shown: \(byDefault.map { "\($0.id)[\($0.widths.min),\($0.widths.ideal)]" }.joined(separator: " "))"))
+        if trimmed {
+            for column in byDefault.dropFirst(6) { store { $0[visibility: column.id] = .hidden } }
+        }
         let first = try await table()
-        let expected = ItemTableColumnLayouts.shown(browser.tableContent(in: library).columns, in: .init()).map(\.id)
+        dump("0 initial", first)
+        let expected = ItemTableColumnLayouts.shown(allColumns, in: layout()).map(\.id)
         let initial = first.tableColumns.map(\.identifier)
         // SwiftUI names the table's columns itself, so a column is told by its place: the name first, Created last.
         #expect(initial.count == expected.count)
@@ -128,6 +139,7 @@ struct ItemTableColumnsTests {
 
         store { $0[visibility: "created"] = .visible }
         try #require(await eventually { first.tableColumns.count == expected.count + 1 })
+        dump("1 created shown", first)
         let created = try #require(first.tableColumns.last)
         #expect(!initial.contains(created.identifier))
         // The layout already differs from the default, since it shows Created, so wait for the width itself.
@@ -137,12 +149,14 @@ struct ItemTableColumnsTests {
 
         store { $0[visibility: "created"] = .hidden }
         try #require(await eventually { first.tableColumns.count == expected.count })
+        dump("3 created hidden", first)
         titleColumn.width += 40
         // Nothing to wait for: this gives the table's write-back time to have happened, if it is going to.
         try await Task.sleep(for: .milliseconds(300))
 
         store { $0[visibility: "created"] = .visible }
         try #require(await eventually { first.tableColumns.count == expected.count + 1 })
+        dump("5 created back", first)
         let back = try #require(first.tableColumns.last)
         #expect(back.width == 160)
         #expect(first.tableColumns.first?.width == titleColumn.width)
