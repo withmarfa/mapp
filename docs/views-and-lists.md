@@ -1,8 +1,8 @@
 # Views and lists
 
-Status: Built in v0.0.43. The list row reading a type's look, in two densities, is built, not yet released. How a card or a cell is drawn is agreed to change; see [Looks](looks.md).
+Status: Built in v0.0.43. The list row, the gallery card, the board card and the table reading a type's look are built, not yet released; see [Looks](looks.md).
 
-Where it lives: `Browser`, `ItemViewMode`, `ViewLayouts` and `SidebarLayout` under `MAPP/Model/`; `NoteList`, `ItemRow`, `ItemGallery`, `ItemBoard`, `ItemTable`, `ItemTimeline`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
+Where it lives: `Browser`, `ItemViewMode`, `ViewLayouts` and `SidebarLayout` under `MAPP/Model/`, with `CardContents` and `ItemTableLayout` under `MAPP/Model/Items/`; `NoteList`, `ItemRow`, `ItemGallery`, `GalleryCard`, `ItemBoard`, `ItemTable`, `ItemTableCell`, `ChipLine`, `ItemTimeline`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
 
 A view shows a set of items in a layout. This page explains the layouts, what a saved view is, and the controls that change what a list shows.
 
@@ -11,17 +11,15 @@ A view shows a set of items in a layout. This page explains the layouts, what a 
 An item list takes one of five layouts (`ItemViewMode`): list, gallery, table, board and timeline.
 
 - The list takes the rows described in [Looks](looks.md).
-- The gallery's card always shows its title. Its words sit under the card in the same place every time: at most two lines of title and one of context. The panel chooses the preview, fit, size, subtext and properties.
-- The board shows its columns, which are the groups of its grouping field. A person can hide the groups that have no items.
-- The table has one left edge, and its columns are the type's properties, shown, ordered and sized as the person arranged them.
+- The gallery's card shows the item's picture, or its opening lines when it has none, then its title on up to two lines and the one line of context its type's look gives it. An item with neither a picture nor text shows its type's mark. A favorite's star sits on the picture and nothing else does. The panel chooses the preview, fit and size; the look chooses what the card says.
+- The board shows its columns, which are the groups of its grouping field. A person can hide the groups that have no items. A card is the title, the look's context line and the bottom line (the type only where the board mixes types, the status, two facts and "+N"), without the field the board is grouped by: a board grouped by status leaves the status off every card, and one grouped by priority leaves the priority off. A compact board shows the title alone, with the type's mark where the board mixes types.
+- The table has one left edge. After the name it shows the look's status and facts as columns drawn with the same chips as a row (a status, an option, a person's initials, the type as a chip, a plain value with no label), then the look's date. Every other property sits behind View Options and starts hidden. A table of several types shows the union of their looks, the status first. A column no row has a value in starts hidden. Columns a saved view chose win over the look, and the person can show, order and size any of them.
+- A list of several types draws each item from its own type's look in every layout.
 - The timeline groups items by day. A calendar is a separate view that is not built.
 - A gallery, table or board has no row of new-item chips above it.
 
 Agreed, not built:
 
-- A gallery card allows one line of context. Today the context allows two.
-- Only a favorite or a badge sits on a gallery card's picture. Today the star sits beside the context line.
-- A table shows the type as a chip, not an SF Symbol.
 - A table keeps one left edge for the title, chips, headers, group names and rows, and a group's chevron hangs in the margin.
 - The timeline starts from today's agenda and uses the window's width, and choosing a row, card or event opens the right sidebar.
 
@@ -44,7 +42,7 @@ Edit View opens in the right sidebar, and New View uses the same panel. It holds
 - Density holds a pop-up of As in Settings, Standard and Compact.
 - Sort holds a handle, the fixed property, a direction pop-up and an x in a circle, with a gray Add Sort.
 - Group holds Group by and a Hide Empty Groups switch.
-- Columns (a table) or Cards (a gallery) comes last, and Cards has a Size pop-up.
+- Columns (a table) or Cards (a gallery) comes last. Cards has Preview and Size pop-ups and a Fit Picture switch; what a card says comes from its type's look, not from the view.
 
 ## How an edit is saved
 
@@ -99,7 +97,7 @@ Settings is a place in the sidebar. See [Settings storage](settings-storage.md) 
 
 ## The list's rows
 
-A list row is one view for every type, in Standard or Compact. Settings > Lists holds the Density every list follows, Sort and Group; Edit View's Density picks one for a saved view, and a place that is not a saved view keeps its own on this Mac. A gallery card, a board card and a table cell each draw values their own way. See [Presets and densities](presets-and-densities.md).
+A list row is one view for every type, in Standard or Compact. Settings > Lists holds the Density every list follows, Sort and Group; Edit View's Density picks one for a saved view, and a place that is not a saved view keeps its own on this Mac. A gallery card, a board card and a table cell draw the same look in their own layout. See [Presets and densities](presets-and-densities.md).
 
 ## Related pages
 

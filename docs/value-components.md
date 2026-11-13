@@ -1,8 +1,8 @@
 # Value components
 
-Status: Built, not yet released. Each kind of value below is drawn by one component wherever the app shows it, except where "Not yet built" says otherwise.
+Status: Built, not yet released. Each kind of value below is drawn by one component wherever the app shows it, except where "Not yet built" says otherwise. A gallery card, a board card and a table cell read the type's look and draw its values through the same family.
 
-Where it lives: `PageChip`, `PagePerson`, `PersonCircle`, `StatusMark`, `ChipLooks`, `TypeMark`, `TypeTone` and `OptionTone` under `MAPP/Views/Looks/`, `StatusSymbol` under `MAPP/Model/Items/`, and `editor/src/header.ts` for the page's web header.
+Where it lives: `PageChip`, `PagePerson`, `PersonCircle`, `StatusMark`, `ChipLine`, `ChipLooks`, `TypeMark`, `TypeTone` and `OptionTone` under `MAPP/Views/Looks/`, `StatusSymbol` under `MAPP/Model/Items/`, and `editor/src/header.ts` for the page's web header.
 
 A value component is one drawing for one kind of value. The same component appears on the page, in the right sidebar, in a row, a card and a table cell, and in the panel that edits the value, so a status looks like a status everywhere.
 
@@ -68,15 +68,15 @@ A value is edited in a panel that opens under it, its leading edge on the value'
 
 One family draws every kind of value: `PageChip` for a type, a linked item, a status, an option, a tag and a plain word, and `PagePerson` and `PersonCircle` for a person. Each takes a size, `.page` or `.row` (`ChipSize`), and its measures come from `ChipLooks`, scaled with the interface's text size. A chip is as tall as its size says, so chips side by side line up.
 
-- The item page's pins and property rows, the right sidebar's status, choice and tag values, and a gallery card's chips draw through the family at page size. The value panel's chips and a table's cells draw only their marks (status symbol, person circle) through it. The page's web header draws the same measures in HTML.
-- A list row draws its type, status, options, people and tags through the family at row size (`ItemRow`, `RowContent`), whatever the type; a person is initials only. See [Looks](looks.md).
+- The item page's pins and property rows and the right sidebar's status, choice and tag values draw through the family at page size. The value panel's chips draw only their marks (status symbol, person circle) through it. The page's web header draws the same measures in HTML.
+- A list row, a board card and a table cell draw their type, status, options, people and tags through the family at row size, whatever the type; a person is initials only. A row and a board card share one bottom line (`ChipLine`, from `RowContent`); a table cell draws the same chips for one column's value. A table's priority is an option chip like any other choice. A gallery card draws no chips: its picture, title and Secondary line say what its look gives it. See [Looks](looks.md).
 - A person is one look everywhere: initials in a pale circle, then the name on the page and in the right sidebar, and the circle alone in a row, with the name for VoiceOver. A name with one word, or an email address, gives one initial.
 - A choice the field's list does not hold draws as its word, with the color its word gives it. Several values show as the first two, then a count.
 - The right sidebar's tag chip carries a number sign and keeps its remove control.
 
 Not yet built:
 
-- A table's priority is still bars, the value panel's chips keep their own shape, and a gallery card keeps its own chip layout.
+- The value panel's chips keep their own shape.
 - The right sidebar's relationship rows, its people text fields and the Details cells keep their own drawings.
 
 ## Related pages

@@ -16,7 +16,7 @@ This page defines the words MAPP uses. Each entry names who owns the thing, Marf
 | Edge | Marfa | A typed link from one item to another. MAPP shows an edge's name as Marfa words it. | [Marfa and MAPP](marfa-and-mapp.md) |
 | Item | Marfa | A record in a library: a type, properties, a text body and edges. | [Marfa and MAPP](marfa-and-mapp.md) |
 | Layout | MAPP | How a list of items is drawn: list, gallery, table, board or timeline (`ItemViewMode`). | [Views and lists](views-and-lists.md) |
-| Look | MAPP | How one type is drawn in every view: its date, the line under the title and its facts. The model, its store and the list row are built, not yet released; cards and tables do not read it yet. | [Looks](looks.md) |
+| Look | MAPP | How one type is drawn in every view: its date, the line under the title and its facts. Every view reads it, built and not yet released. | [Looks](looks.md) |
 | Pin | MAPP | A property shown under an item page's title, at most four per type (`PagePins`). | [Item page](item-page.md) |
 | Place | MAPP | Somewhere the sidebar can open: Inbox, a type, a source, a collection, a saved view (`SidebarItem`). | [Views and lists](views-and-lists.md) |
 | Preset | MAPP | The starting look that a type takes from its fields (`LookPreset`). Built, not yet released. | [Presets and densities](presets-and-densities.md) |

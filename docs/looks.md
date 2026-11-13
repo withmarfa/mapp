@@ -1,8 +1,8 @@
 # Looks
 
-Status: The model, the store, Export and Import and the list row are built, not yet released. Cards and tables do not read a look yet: a gallery card, a board card and a table cell each draw status, priority, people and type in their own way.
+Status: The model, the store, Export and Import, the list row, the gallery card, the board card and the table are built, not yet released. Every view reads the look of the type of each item it draws.
 
-Where it lives: `TypeLook`, `LookPreset`, `TypeLookResolver`, `TypeLooks` and `LooksFile` under `MAPP/Model/Looks/`, `LooksCommands` under `MAPP/Views/`, the row's content (`RowContent`, `RowContents`) under `MAPP/Model/Items/`, `Density` under `MAPP/Model/`, `ItemRow` and `NoteList` under `MAPP/Views/`, and, until cards read a look, `ViewCards` under `MAPP/Model/` with `GalleryCard` and `ItemBoard` under `MAPP/Views/`.
+Where it lives: `TypeLook`, `LookPreset`, `TypeLookResolver`, `TypeLooks` and `LooksFile` under `MAPP/Model/Looks/`, `LooksCommands` under `MAPP/Views/`, the row's content (`RowContent`, `RowContents`) under `MAPP/Model/Items/`, `Density` under `MAPP/Model/`, `ItemRow` and `NoteList` under `MAPP/Views/`, the cards' content (`CardContents`) and the table's columns (`ItemTableLayout`) under `MAPP/Model/Items/`, `ViewCards` under `MAPP/Model/`, and `GalleryCard`, `ItemBoard`, `ItemTable`, `ItemTableCell` and `ChipLine` under `MAPP/Views/`.
 
 A look says how one type is drawn. Every view of that type, whether a list, a gallery, a board, a table or the page, reads the same look, so one item never changes character between views.
 
@@ -52,10 +52,12 @@ A row never shows the tier. Inbox is a view of the feed tier, not a fact about a
 
 ## One look in every view
 
+Each view resolves the looks once for a catalogue revision and the person's choices (`Browser.looks(in:)`, `CardContents`, `RowContents`), and never in a card's or a cell's body. A list of several types draws each item from its own type's look.
+
 - **List.** The row above.
-- **Gallery card.** The picture, or the item's opening lines when it has none, so a title never shows twice. Then the title on up to two lines, then the Secondary line.
-- **Board card.** The title, the Secondary line and the bottom line, without the field the board is grouped by.
-- **Table.** The title column, then the look's facts as columns, drawn with the same chips. See [Value components](value-components.md).
+- **Gallery card.** The picture, or the item's opening lines when it has none, so a title never shows twice. An item with neither shows its type's mark. Then the title on up to two lines, then the Secondary line. The Secondary line leaves out the opening line while the picture area shows it. A card says no date and no status. A favorite's star is the one mark on the picture. The view chooses the preview, whether a picture is fitted and the card's size.
+- **Board card.** The title, the Secondary line and the bottom line, without the field the board is grouped by. The bottom line is the row's: the type only where the board mixes types, the status, two facts and "+N". A board grouped by status leaves the status off every card, whichever field holds it. A compact board keeps a title-only card, with the type's mark where the board mixes types. A card says no date.
+- **Table.** The title column, then the look's facts as columns, drawn with the same chips: a status or a priority as a chip, a choice as an option chip, people as initials, the type as a chip, a date or a number as plain text with no label. The look's date follows the facts. The columns of several types are the union of their looks, the status first and the rest in the order the looks give them. A look's column that no row fills starts hidden. Every other property, the parent, Created, Edited, Happened and Tags among them, waits behind View Options. A saved view's chosen columns win over the look. See [Value components](value-components.md).
 
 ## How a row is made
 
