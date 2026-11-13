@@ -19,6 +19,12 @@
     "“%@” changes to %@. Older versions of items may be removed for good the next time the server tidies up, so Version History will show fewer." : {
       "extractionState" : "manual"
     },
+    "Clear Location" : {
+      "extractionState" : "manual"
+    },
+    "Click the map to place the pin; drag it to adjust." : {
+      "extractionState" : "manual"
+    },
     "“%@” could not be read. No looks were changed." : {
 
     },
@@ -30,6 +36,9 @@
     },
     "Couldn’t Import Looks" : {
 
+    },
+    "Edit Location" : {
+      "extractionState" : "manual"
     },
     "Export Looks…" : {
 
@@ -58,14 +67,53 @@
     "Looks can be imported once the library has loaded." : {
 
     },
+    "Map" : {
+      "extractionState" : "manual"
+    },
     "MAPP Looks" : {
 
     },
     "“%@” may remove items sooner than the server’s current setting." : {
       "extractionState" : "manual"
     },
+    "Name of the place" : {
+      "extractionState" : "manual"
+    },
+    "No places found." : {
+      "extractionState" : "manual"
+    },
+    "Only one of the two coordinates is set, so there is no point to show." : {
+      "extractionState" : "manual"
+    },
+    "Opens a map" : {
+      "extractionState" : "manual"
+    },
+    "Search for a Place" : {
+      "extractionState" : "manual"
+    },
+    "Search isn’t available right now." : {
+      "extractionState" : "manual"
+    },
+    "Searching…" : {
+      "extractionState" : "manual"
+    },
+    "Show Coordinates" : {
+      "extractionState" : "manual"
+    },
+    "The location couldn’t be saved." : {
+      "extractionState" : "manual"
+    },
     "The looks could not be written to “%@”. Choose another place and try again." : {
 
+    },
+    "These coordinates are not a place on Earth, so they cannot be shown on the map." : {
+      "extractionState" : "manual"
+    },
+    "This name changed while you were editing. Your edit hasn’t been saved." : {
+      "extractionState" : "manual"
+    },
+    "Use Current Name" : {
+      "extractionState" : "manual"
     },
     "“%@” was attached to “%@” but isn’t in its text, because the note was no longer open for editing." : {
       "extractionState" : "manual"
