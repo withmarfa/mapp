@@ -16,11 +16,6 @@ nonisolated struct LooksFile: Codable, Equatable, Sendable {
         self.looks = Dictionary(looks.map { ($0.key.rawValue, $0.value) }, uniquingKeysWith: { first, _ in first })
     }
 
-    /// The looks as the file holds them, each as a complete choice.
-    var choices: [TypeID: TypeLookChoice] {
-        Dictionary(looks.map { (TypeID($0.key), TypeLookChoice($0.value)) }, uniquingKeysWith: { first, _ in first })
-    }
-
     /// The file's text: readable, with its keys in a fixed order so two exports of one set of looks are alike.
     func encoded() throws -> Data {
         let encoder = JSONEncoder()

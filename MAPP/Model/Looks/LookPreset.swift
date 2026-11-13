@@ -22,6 +22,8 @@ nonisolated struct LookSurface: Sendable {
     func offers(_ part: LookPart) -> Bool {
         switch part {
         case .field(let key): field(key) != nil
+        case .time(let key):
+            if case .date(includesTime: true)? = field(key)?.kind { true } else { false }
         case .opening: true
         case .site: field(MarfaMapping.urlField) != nil
         case .file: isFile
@@ -58,10 +60,13 @@ nonisolated enum LookPreset: String, CaseIterable, Codable, Identifiable, Hashab
     /// 2. **Place:** `latitude` and `longitude` with an address field (street, locality or postal code). An event or an
     ///    image has coordinates and no address, so it is not one. Place comes before Person, since a place builds on an
     ///    entity and carries its emails and phones.
-    /// 3. **Person:** a person by `PageHeaderKind`, or any type with `emails` or `phones`.
+    /// 3. **Person:** a person by `PageHeaderKind`, or a type that itself declares `emails` or `phones` (`Field.declaredBy`
+    ///    is the type), as an organization does. A child that only inherits them, such as a repository built on an
+    ///    entity, is not a person and takes the preset its own fields suggest.
     /// 4. **Media:** a file type (`Catalogue.isFileType`), or a type whose page is for reading (`PageHeaderKind.reading`,
     ///    a bookmark or media). It comes before Task, since media has a progress status.
-    /// 5. **Record:** a currency code and a number, or an `occurred_at` date and a number.
+    /// 5. **Record:** a number with a currency code. A record's date is Marfa's own `occurred_at` (`LookDate.occurred`),
+    ///    which no type declares, so it cannot tell a record.
     /// 6. **Task:** a status field, whatever it is called.
     /// 7. **Event:** a start date (`Catalogue.isStartDate`). A task has one too, and has been taken already.
     /// 8. **Message:** a `from` field.
@@ -74,11 +79,12 @@ nonisolated enum LookPreset: String, CaseIterable, Codable, Identifiable, Hashab
         let hasAddress = [MarfaMapping.streetAddressField, MarfaMapping.localityField, MarfaMapping.postalCodeField].contains(where: declares)
         if declares(MarfaMapping.latitudeField), declares(MarfaMapping.longitudeField), hasAddress { return .place }
         let header = PageHeaderKind.of(type, in: catalogue)
-        if header == .person || declares(MarfaMapping.emailsField) || declares(MarfaMapping.phonesField) { return .person }
+        let reachesItself = info.fields.contains {
+            $0.declaredBy == type && ($0.key == MarfaMapping.emailsField || $0.key == MarfaMapping.phonesField)
+        }
+        if header == .person || reachesItself { return .person }
         if catalogue.isFileType(type) || header == .reading { return .media }
-        let hasNumber = info.fields.contains { $0.kind == .number }
-        let hasCurrency = info.fields.contains { $0.format == .currency }
-        if hasNumber, hasCurrency || declares(MarfaMapping.occurredField) { return .record }
+        if info.fields.contains(where: { $0.kind == .number }), info.fields.contains(where: { $0.format == .currency }) { return .record }
         if info.statusField != nil { return .task }
         if info.fields.contains(where: { catalogue.isStartDate($0, of: type) }) { return .event }
         if declares(MarfaMapping.fromField) { return .message }
@@ -105,9 +111,10 @@ nonisolated enum LookPreset: String, CaseIterable, Codable, Identifiable, Hashab
         let fact = LookFact.field
         switch self {
         case .note:
+            // The preset table gives a Note its tags, so its row shows them though no other preset's does.
             return Template(fallback: .edited, slots: [[.opening]], facts: [[.tags]])
         case .message:
-            return Template(dateFields: [MarfaMapping.sentField], fallback: .created, slots: [[field(MarfaMapping.fromField)]])
+            return Template(fallback: .occurred, slots: [[field(MarfaMapping.fromField)]])
         case .task:
             return Template(
                 dateFields: [MarfaMapping.dueField], fallback: .edited,
@@ -116,7 +123,7 @@ nonisolated enum LookPreset: String, CaseIterable, Codable, Identifiable, Hashab
         case .event:
             return Template(
                 dateFields: [MarfaMapping.startField], fallback: .edited,
-                slots: [[field(MarfaMapping.startField)], [field(MarfaMapping.placeField)]],
+                slots: [[.time(MarfaMapping.startField)], [field(MarfaMapping.placeField)]],
                 facts: [[fact(MarfaMapping.attendeesField)]])
         case .person:
             return Template(
@@ -132,16 +139,13 @@ nonisolated enum LookPreset: String, CaseIterable, Codable, Identifiable, Hashab
                 slots: [[.file, .site], [field(MarfaMapping.authorField)]], facts: [[fact(MarfaMapping.durationField)]])
         case .quote:
             return Template(
-                fallback: .created, slots: [[field(MarfaMapping.passageField), .opening]],
+                fallback: .occurred, slots: [[field(MarfaMapping.passageField), .opening]],
                 facts: [[fact(MarfaMapping.startLocationField)]])
         case .clip:
-            return Template(
-                dateFields: [MarfaMapping.copiedField], fallback: .created, slots: [[.opening]],
-                facts: [[fact(MarfaMapping.sourceAppField)]])
+            return Template(fallback: .occurred, slots: [[.opening]], facts: [[fact(MarfaMapping.sourceAppField)]])
         case .record:
             // The numbers are the type's own, so they are added from its fields below.
-            return Template(
-                dateFields: [MarfaMapping.occurredField], fallback: .created, slots: [[field(MarfaMapping.categoryField)]])
+            return Template(fallback: .occurred, slots: [[field(MarfaMapping.categoryField)]])
         }
     }
 

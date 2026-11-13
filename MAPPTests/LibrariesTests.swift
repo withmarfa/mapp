@@ -70,7 +70,8 @@ import Testing
         #expect(!libraries.sidebarLayout.isHidden(.favorites), "another server's sidebar is its own")
 
         libraries.typeLooks.importLooks(
-            LooksFile(looks: [TypeID("core.note"): TypeLook(date: .created, secondary: [], facts: [])]), into: libraries.libraryKey)
+            LooksFile(looks: [TypeID("core.note"): TypeLook(date: .created, secondary: [], facts: [])]), into: libraries.libraryKey,
+            in: LookFixture.catalogue())
         #expect(libraries.typeLooks.choices(for: libraries.libraryKey).count == 1)
         try await libraries.host.changeAddress(to: address, key: "key")
         #expect(libraries.typeLooks.choices(for: libraries.libraryKey).isEmpty, "another server's looks are its own")

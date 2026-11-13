@@ -2,7 +2,8 @@ import Foundation
 @testable import MAPP
 
 /// A catalogue of Marfa's core types, written from the fields the contract gives them, and the types built on them
-/// that a looks test needs. A child carries the fields it inherits, as the server's catalogue gives them.
+/// that a looks test needs. A child carries the fields it inherits, as the server's catalogue gives them, each declared by
+/// the type that first names it.
 enum LookFixture {
     struct Spec {
         let id: String
@@ -31,6 +32,7 @@ enum LookFixture {
         Spec(id: "core.entity.person", parent: "core.entity", fields: [
             field("given_name"), field("family_name"), field("organization"), field("job_title"), field("birthday", day),
         ]),
+        Spec(id: "acme.repository", parent: "core.entity", fields: [field("full_name"), field("language"), field("url", format: .url)]),
         Spec(id: "core.entity.place", parent: "core.entity", fields: [
             field("street_address"), field("locality"), field("region"), field("postal_code"), field("country"),
             field("latitude", .number), field("longitude", .number),
@@ -72,12 +74,23 @@ enum LookFixture {
         Spec(id: "aic.agent.session", parent: "core.event", fields: [field("body")]),
     ]
 
+    private static func declared(_ field: ItemTypeInfo.Field, by id: String) -> ItemTypeInfo.Field {
+        var copy = ItemTypeInfo.Field(key: field.key, label: field.label, kind: field.kind, declaredBy: TypeID(id))
+        copy.format = field.format
+        return copy
+    }
+
+    /// The look of the type `id`, resolved with `choices`.
+    static func look(_ id: String, in catalogue: Catalogue, choices: [TypeID: TypeLookChoice] = [:]) -> TypeLook {
+        catalogue.looks(choices: choices)[TypeID(id)]!
+    }
+
     /// The catalogue of `specs`, each type's fields with its ancestors' before its own.
     static func catalogue(_ specs: [Spec] = specs) -> Catalogue {
         let byID = Dictionary(uniqueKeysWithValues: specs.map { ($0.id, $0) })
         func fields(of spec: Spec, depth: Int = 0) -> [ItemTypeInfo.Field] {
             let inherited = depth < 12 ? spec.parent.flatMap { byID[$0] }.map { fields(of: $0, depth: depth + 1) } ?? [] : []
-            let own = spec.fields.filter { field in !inherited.contains { $0.key == field.key } }
+            let own = spec.fields.filter { field in !inherited.contains { $0.key == field.key } }.map { declared($0, by: spec.id) }
             return inherited + own
         }
         return Catalogue(itemTypes: specs.map { spec in

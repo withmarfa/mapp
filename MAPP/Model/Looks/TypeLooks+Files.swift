@@ -23,9 +23,9 @@ extension TypeLooks {
         }
     }
 
-    /// Keeps every look in the file at `url` as chosen on `library`. A file that cannot be read, or is not a looks file,
-    /// is refused and nothing is kept.
-    func importLooks(from url: URL, into library: String) throws(LooksFileError) {
+    /// Keeps what differs in the file at `url` on `library` (`importLooks(_:into:in:)`). A file that cannot be read, or is
+    /// not a looks file, is refused and nothing is kept.
+    func importLooks(from url: URL, into library: String, in catalogue: Catalogue) throws(LooksFileError) {
         let data: Data
         do {
             let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
@@ -37,6 +37,6 @@ extension TypeLooks {
             throw .unreadable
         }
         guard let file = LooksFile.read(data) else { throw .notALooksFile }
-        importLooks(file, into: library)
+        importLooks(file, into: library, in: catalogue)
     }
 }

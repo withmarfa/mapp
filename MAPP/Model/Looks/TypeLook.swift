@@ -1,11 +1,15 @@
 import Foundation
 
-/// The date a type's rows, cards and table show: a date field of the type, when the item was made or last changed, or
-/// none. An item that holds no value in the field shows when it was last changed.
+/// The date a type's rows, cards and table show: a date field of the type, when the item was made or last changed, when
+/// it happened, or none. An item that holds no value in the field shows when it was last changed.
 nonisolated enum LookDate: Hashable, Sendable {
     case field(String)
     case created
     case edited
+    /// Marfa's own `occurred_at`, which every item has and no type can declare as a field: when the item happened (a
+    /// quote was captured, something was copied, a message was sent, a record took place). An item with none shows when
+    /// it was created.
+    case occurred
     /// No date is shown.
     case off
 }
@@ -14,6 +18,9 @@ nonisolated enum LookDate: Hashable, Sendable {
 nonisolated enum LookPart: Hashable, Sendable {
     /// A field of the type, shown as its value.
     case field(String)
+    /// A date field of the type, shown as its time of day alone, so a day shown elsewhere is not shown twice. It is only
+    /// for a field that includes a time, and an all-day value shows nothing for this part.
+    case time(String)
     /// The item's opening line, as the server gives it (`Item.preview`).
     case opening
     /// The website a web address names, worked out from the type's `url`.
@@ -75,7 +82,7 @@ nonisolated struct TypeLookChoice: Hashable, Sendable {
 
 // MARK: Stored words
 
-/// The words a look is stored and exported in: `field:due_at`, `opening`, `tags`. A word this version does not know
+/// The words a look is stored and exported in: `field:due_at`, `time:starts_at`, `opening`, `tags`. A word this version does not know
 /// makes the whole look unreadable, never a look with a place missing.
 nonisolated protocol LookWord: Codable, Sendable {
     var word: String { get }
@@ -96,9 +103,8 @@ nonisolated extension LookWord {
         try container.encode(word)
     }
 
-    /// The key after `field:`, where the word names a field.
-    fileprivate static func fieldKey(in word: String) -> String? {
-        let prefix = "field:"
+    /// The key after `prefix` (`field:` or `time:`), where the word names a field.
+    fileprivate static func fieldKey(in word: String, after prefix: String = "field:") -> String? {
         guard word.hasPrefix(prefix), word.count > prefix.count else { return nil }
         return String(word.dropFirst(prefix.count))
     }
@@ -110,6 +116,7 @@ nonisolated extension LookDate: LookWord {
         case .field(let key): "field:" + key
         case .created: "created"
         case .edited: "edited"
+        case .occurred: "occurred"
         case .off: "none"
         }
     }
@@ -118,6 +125,7 @@ nonisolated extension LookDate: LookWord {
         switch word {
         case "created": self = .created
         case "edited": self = .edited
+        case "occurred": self = .occurred
         case "none": self = .off
         default:
             guard let key = Self.fieldKey(in: word) else { return nil }
@@ -130,6 +138,7 @@ nonisolated extension LookPart: LookWord {
     var word: String {
         switch self {
         case .field(let key): "field:" + key
+        case .time(let key): "time:" + key
         case .opening: "opening"
         case .site: "site"
         case .file: "file"
@@ -142,8 +151,13 @@ nonisolated extension LookPart: LookWord {
         case "site": self = .site
         case "file": self = .file
         default:
-            guard let key = Self.fieldKey(in: word) else { return nil }
-            self = .field(key)
+            if let key = Self.fieldKey(in: word) {
+                self = .field(key)
+            } else if let key = Self.fieldKey(in: word, after: "time:") {
+                self = .time(key)
+            } else {
+                return nil
+            }
         }
     }
 }

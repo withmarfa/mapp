@@ -68,12 +68,9 @@ final class TypeLooks {
         Dictionary(uniqueKeysWithValues: (chosen[library] ?? [:]).map { (TypeID($0.key), $0.value) })
     }
 
-    /// The look of `type` on `library`.
-    func look(of type: TypeID, in catalogue: Catalogue, library: String) -> TypeLook {
-        catalogue.look(of: type, choices: choices(for: library))
-    }
-
-    /// The look of every type the catalogue holds, on `library`.
+    /// The look of every type the catalogue holds, on `library`, each type's preset worked out once. This is the one way to
+    /// resolve looks: a caller holds the result for the catalogue's revision and these choices, and never resolves in a
+    /// row's body. A type the catalogue lacks has no entry.
     func looks(in catalogue: Catalogue, library: String) -> [TypeID: TypeLook] {
         catalogue.looks(choices: choices(for: library))
     }
@@ -88,12 +85,39 @@ final class TypeLooks {
         return LooksFile(looks: kept.merging(looks(in: catalogue, library: library)) { _, resolved in resolved })
     }
 
-    /// Keeps every look in `file` as chosen on `library`, including those of types the server does not have yet, and
-    /// leaves the other types' choices as they were.
-    func importLooks(_ file: LooksFile, into library: String) {
+    /// Keeps, for each type in `file` and each of its places, only a value that differs from what this Mac works out for
+    /// the place without a choice (the preset, and what the types above chose), and clears the place's choice where it does
+    /// not. So importing an export of this Mac changes nothing, and a later better preset still reaches every place nobody
+    /// chose. A type is measured against its parents' choices as this import leaves them, so the parents go first.
+    ///
+    /// A type the catalogue lacks has nothing to measure against, so the file's whole look is kept for the type to take
+    /// when it appears. The choices of types the file does not hold are left as they were.
+    func importLooks(_ file: LooksFile, into library: String, in catalogue: Catalogue) {
+        var resolver = TypeLookResolver(catalogue: catalogue, choices: choices(for: library))
         var types = chosen[library] ?? [:]
-        for (type, choice) in file.choices { types[type.rawValue] = choice }
-        chosen[library] = types
+        var known: [TypeID] = []
+        for (word, look) in file.looks {
+            let type = TypeID(word)
+            if catalogue.itemTypes[type] == nil {
+                types[word] = TypeLookChoice(look)
+            } else {
+                known.append(type)
+            }
+        }
+        known.sort { (catalogue.ancestors(of: $0).count, $0.rawValue) < (catalogue.ancestors(of: $1).count, $1.rawValue) }
+        for type in known {
+            guard let look = file.looks[type.rawValue] else { continue }
+            let baseline = resolver.baseline(of: type)
+            let choice = TypeLookChoice(
+                date: look.date == baseline.date ? nil : look.date,
+                secondary: look.secondary == baseline.secondary ? nil : look.secondary,
+                facts: look.facts == baseline.facts ? nil : look.facts)
+            resolver.choices[type] = choice.isEmpty ? nil : choice
+            types[type.rawValue] = choice.isEmpty ? nil : choice
+        }
+        let kept: [String: TypeLookChoice]? = types.isEmpty ? nil : types
+        guard kept != chosen[library] else { return }
+        chosen[library] = kept
         save()
     }
 

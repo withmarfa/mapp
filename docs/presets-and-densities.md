@@ -29,16 +29,18 @@ The first of these that fits wins, so the order is the rule. A preset names no t
 
 1. **Quote.** The type is, or is below, `core.highlight`.
 2. **Place.** `latitude` and `longitude` with a street, locality or postal code. An event or an image has coordinates and no address. Place comes before Person, since a place builds on an entity and carries its emails and phones.
-3. **Person.** A person by header, or any type with `emails` or `phones`. A bare `core.entity` is a Person, since it stands for people and organizations.
+3. **Person.** A person by header, or a type that itself declares `emails` or `phones` (`Field.declaredBy` is the type). A bare `core.entity` declares them, so it is a Person, since it stands for people and organizations. A child that only inherits them, such as a repository under an entity, is not: its own fields suggest its preset, which here is Note.
 4. **Media.** A file type, or a type whose page is for reading (a bookmark, media). It comes before Task, since media has a progress status.
-5. **Record.** A number with a currency code (a string field of the `currency` format), or with `occurred_at`.
+5. **Record.** A number with a currency code (a string field of the `currency` format). A record's date is Marfa's own `occurred_at`, which every item has and no type declares, so it cannot tell a record.
 6. **Task.** A status field, whatever it is called.
 7. **Event.** A `starts_at` field on an event.
 8. **Message.** A `from` field.
 9. **Clip.** A `source_app` field.
 10. **Note.** Anything else, a type with no fields, and a type the server lacks.
 
-No type Marfa ships gets Record or Clip today; a type built on `occurred_at` and numbers, or on `source_app`, does.
+No type Marfa ships gets Record or Clip today; a type with a number and a currency code, or a `source_app`, does.
+
+The dates of a Quote ("captured"), a Clip ("copied"), a Record ("happened") and a Message ("sent") are all Marfa's own `occurred_at` (`LookDate.occurred`), or the created date for an item with none. An Event's Secondary is its time of day (`LookPart.time`) and its place, since the Date top right already shows the day.
 
 The title is always the item's name. A clipboard item is titled "Clipboard Item", or a name its person gave it, and never its content.
 

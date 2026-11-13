@@ -48,10 +48,9 @@ nonisolated enum MarfaMapping {
     static let eventType = TypeID("core.event")
     static let startField = "starts_at"
     /// The fields a look's presets read (`LookPreset`). Some are Marfa's core names (`from`, `emails`, `street_address`);
-    /// the others (`project`, `category`, `sent_at`) are what a connector's or a person's type may carry. A type that has
+    /// the others (`project`, `category`) are what a connector's or a person's type may carry. A type that has
     /// none of them has an empty place, never a guess.
     static let fromField = "from"
-    static let sentField = "sent_at"
     static let projectField = "project"
     static let repositoryField = "repository"
     static let placeField = "place"
@@ -71,11 +70,8 @@ nonisolated enum MarfaMapping {
     static let durationField = "duration"
     static let authorField = "author"
     static let urlField = "url"
-    /// What a clipboard item or a record would name for where it came from and when it was copied; no shipped type has
-    /// them. `occurred_at` is reserved by Marfa for every item, so no type can declare it as a field.
+    /// What a clipboard item would name for the app it came from; no shipped type has it.
     static let sourceAppField = "source_app"
-    static let copiedField = "copied_at"
-    static let occurredField = "occurred_at"
 
     /// The `in-collection` property that orders a collection's members.
     static let positionProperty = "position"
