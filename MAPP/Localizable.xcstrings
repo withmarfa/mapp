@@ -2029,6 +2029,9 @@
     "Grouping by %@" : {
       "extractionState" : "manual"
     },
+    "Happened" : {
+      "extractionState" : "manual"
+    },
     "Happening now" : {
       "extractionState" : "manual"
     },
@@ -2076,9 +2079,6 @@
     },
     "Hide from Sidebar" : {
 
-    },
-    "Hide Property" : {
-      "extractionState" : "manual"
     },
     "Hide Views from Sidebar" : {
 
@@ -3358,9 +3358,6 @@
     "Show Original" : {
 
     },
-    "Show Property" : {
-      "extractionState" : "manual"
-    },
     "Show Reader" : {
 
     },
@@ -3501,9 +3498,6 @@
     },
     "Strikethrough" : {
 
-    },
-    "Subtext" : {
-      "extractionState" : "manual"
     },
     "Suggestions" : {
 
@@ -3773,9 +3767,6 @@
       "extractionState" : "manual"
     },
     "The title “%@” for “%@” couldn’t be saved. Open the item to change the title or discard your changes." : {
-      "extractionState" : "manual"
-    },
-    "The title always shows." : {
       "extractionState" : "manual"
     },
     "The title could not be saved. Enter a title." : {
@@ -4109,9 +4100,6 @@
       "extractionState" : "manual",
       "generatesSymbol" : false
     },
-    "Type and Date" : {
-      "extractionState" : "manual"
-    },
     "Type to narrow the list" : {
 
     },
@@ -4119,9 +4107,6 @@
 
     },
     "Unavailable" : {
-      "extractionState" : "manual"
-    },
-    "Under the Card" : {
       "extractionState" : "manual"
     },
     "Underline" : {
