@@ -32,7 +32,7 @@ final class ItemTableContent {
         defer { Cost.record(.tableContent, since: start) }
         allRows = ItemTableRow.rows(of: items, in: library)
         let hidden = allRows.first.map { library.hiddenPropertyKeys(of: $0.item) } ?? []
-        columns = ItemTableLayout.columns(for: allRows, catalogue: library.catalogue, hidden: hidden)
+        columns = ItemTableLayout.columns(for: allRows, catalogue: library.catalogue, hidden: hidden, looks: browser.looks(in: library))
         options = browser.tableOptions[browser.item] ?? ItemTableOptions()
         // Relevance is the order the rows come in, which the sort leaves alone when it is empty.
         sort = browser.ordersByRelevance ? [] : ItemTableLayout.sort(options, columns: columns, keepsGivenOrder: browser.keepsPlaceOrder)

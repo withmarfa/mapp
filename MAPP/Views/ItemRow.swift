@@ -67,7 +67,7 @@ struct ItemRow: View {
                     .lineLimit(1)
             }
             if !content.chips.isEmpty || content.more > 0 {
-                RowChips(content: content)
+                ChipLine(content: content)
                     .padding(.top, 1)
             }
         }
@@ -80,38 +80,6 @@ struct ItemRow: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .layoutPriority(1)
-        }
-    }
-}
-
-/// The bottom line of a row: the page's own chips at row size. A long label gives way before a mark does.
-private struct RowChips: View {
-    let content: RowContent
-    @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
-
-    var body: some View {
-        let size = ChipLooks.current.rowTextSize * CGFloat(textSize) / 13
-        HStack(spacing: 6) {
-            ForEach(Array(content.chips.enumerated()), id: \.offset) { _, chip in
-                switch chip {
-                case .type(let icon, let label):
-                    PageChip(text: label, kind: .type(icon: icon), size: .row)
-                case .status(let symbol, let label):
-                    PageChip(text: label, kind: .status(symbol, chevron: false), size: .row)
-                case .option(let label, let tone):
-                    PageChip(text: label, kind: .option(tone), size: .row)
-                case .person(let initials, let name):
-                    PagePerson(name: name, initials: initials, size: .row)
-                case .tag(let tag):
-                    PageChip(text: tag, kind: .tag, size: .row)
-                case .text(let text):
-                    Text(verbatim: text).font(.system(size: size)).foregroundStyle(.secondary).lineLimit(1)
-                }
-            }
-            if content.more > 0 {
-                Text(verbatim: "+\(content.more)").font(.system(size: size)).foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
-            }
         }
     }
 }

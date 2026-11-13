@@ -18,6 +18,20 @@ nonisolated enum SampleLibrary {
     /// Also asks for the tasks and events a board and a timeline show.
     static var withCollections: Bool { ProcessInfo.processInfo.arguments.contains("-MAPPCollectionSample") }
 
+    /// With the sample flag, `-MAPPOpenPlace <type id>` opens that type's place (`items` opens Items) and
+    /// `-MAPPLayout list|gallery|table|board` the layout, for a screenshot of one view.
+    static var launchPlace: SidebarItem? {
+        argument(after: "-MAPPOpenPlace").map { $0 == "items" ? .allNotes : .itemType($0) }
+    }
+
+    static var launchLayout: ItemViewMode? { argument(after: "-MAPPLayout").flatMap(ItemViewMode.init(rawValue:)) }
+
+    private static func argument(after flag: String) -> String? {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard isRequested, let at = arguments.firstIndex(of: flag), arguments.indices.contains(at + 1) else { return nil }
+        return arguments[at + 1]
+    }
+
     /// The address the sample answers at. Nothing is ever sent to it.
     static let connection: MarfaConnection = {
         do {

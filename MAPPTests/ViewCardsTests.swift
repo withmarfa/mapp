@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import MAPP
 
-/// What a gallery's card settings hold, how they read back, and which chips a card gets from an item.
+/// What a gallery's card settings hold and how they read back. What a card says is its type's look.
 @MainActor
 struct ViewCardsTests {
     // MARK: The settings
@@ -12,8 +12,6 @@ struct ViewCardsTests {
         #expect(cards.preview == .pictureOrText)
         #expect(!cards.fitsPicture)
         #expect(cards.size == .medium)
-        #expect(cards.subtext == .typeAndDate)
-        #expect(cards.properties.isEmpty)
         #expect(ViewMacSettings().cards == cards)
     }
 
@@ -24,9 +22,7 @@ struct ViewCardsTests {
     }
 
     @Test func settingsRoundTripThroughTheStoredText() throws {
-        var cards = ViewCards(preview: .text, fitsPicture: true, size: .large, subtext: .date)
-        cards.setShown("field.status", true)
-        cards.setShown("tags", true)
+        let cards = ViewCards(preview: .text, fitsPicture: true, size: .large)
         let settings = ViewMacSettings(cards: cards)
         let layouts = ViewLayouts(["view": settings])
         let read = try #require(ViewLayouts(rawValue: layouts.rawValue))
@@ -39,7 +35,14 @@ struct ViewCardsTests {
         #expect(cards.preview == .pictureOrText)
         #expect(cards.size == .large)
         #expect(!cards.fitsPicture)
-        #expect(cards.properties == ["tags"])
+    }
+
+    @Test func theSubtextAndPropertiesAnEarlierVersionKeptAreLeftUnread() throws {
+        let text = #"{"preview":"text","subtext":"date","properties":["tags","field.status"],"size":"small"}"#
+        let cards = try JSONDecoder().decode(ViewCards.self, from: Data(text.utf8))
+        #expect(cards == ViewCards(preview: .text, size: .small))
+        let written = String(decoding: try JSONEncoder().encode(cards), as: UTF8.self)
+        #expect(!written.contains("subtext") && !written.contains("properties"))
     }
 
     @Test func settingsStoredBeforeCardsExistOpenWithTheDefaults() throws {
@@ -55,137 +58,5 @@ struct ViewCardsTests {
         taken.take(choicesOf: other)
         #expect(taken.cards.size == .small)
         #expect(taken.widths == Data([1]))
-    }
-
-    @Test func aPropertyShowsOnceAndAfterTheOthers() {
-        var cards = ViewCards()
-        cards.setShown("a", true)
-        cards.setShown("b", true)
-        cards.setShown("a", true)
-        #expect(cards.properties == ["a", "b"])
-        #expect(cards.shows("a"))
-        cards.setShown("a", false)
-        #expect(cards.properties == ["b"])
-        #expect(!cards.shows("a"))
-    }
-
-    @Test func aPropertyMovesBeforeAnotherOrLast() {
-        var cards = ViewCards(properties: ["a", "b", "c"])
-        cards.move("c", before: "a")
-        #expect(cards.properties == ["c", "a", "b"])
-        cards.move("c", before: nil)
-        #expect(cards.properties == ["a", "b", "c"])
-        cards.move("z", before: "a")
-        cards.move("a", before: "a")
-        #expect(cards.properties == ["a", "b", "c"])
-    }
-
-    // MARK: The properties on offer
-
-    private static let task = TypeID("core.task")
-
-    private static func item(
-        _ title: String, type: TypeID = task, properties: [Property] = [], tags: Set<String> = [], parent: ItemID? = nil
-    ) -> Item {
-        let edges = parent.map {
-            [Edge(id: EdgeID("child-\(title)"), type: "child-of", source: ItemID(title), target: .item($0), origin: .body)]
-        } ?? []
-        return Item(
-            id: ItemID(title), type: type, title: title, name: title, titleRule: .property("title"),
-            properties: [Property(key: "title", value: .string(title))] + properties, tags: tags,
-            version: ItemVersion(1), created: .now, modified: .now, edgesOut: edges)
-    }
-
-    private static func row(_ item: Item) -> ItemTableRow {
-        ItemTableRow(item: item, typeLabel: "Task", typeIcon: nil, parent: nil)
-    }
-
-    private static func offered(_ items: [Item]) -> [GalleryProperty] {
-        let rows = items.map(row)
-        let columns = ItemTableLayout.columns(for: rows, catalogue: FakeItemLibrary.testCatalogue, hidden: [])
-        return GalleryProperty.offered(columns: columns, rows: rows)
-    }
-
-    @Test func aPlaceOffersItsColumnsExceptTheNameAndTheType() {
-        let ids = Self.offered([Self.item("A", properties: [Property(key: "status", value: .string("todo"))])]).map(\.id)
-        #expect(ids.contains("field.status"))
-        #expect(!ids.contains("title"))
-        #expect(!ids.contains("type"))
-    }
-
-    @Test func tagsAreOfferedOnlyWhereAnItemHoldsOne() {
-        #expect(!Self.offered([Self.item("A")]).map(\.id).contains(GalleryProperty.tagsID))
-        #expect(!Self.offered([Self.item("A", tags: [ItemTag.favorite])]).map(\.id).contains(GalleryProperty.tagsID))
-        #expect(Self.offered([Self.item("A", tags: ["work"])]).map(\.id).contains(GalleryProperty.tagsID))
-    }
-
-    // MARK: The chips
-
-    private static func chips(_ property: String, of item: Item, in library: FakeItemLibrary = FakeItemLibrary()) -> [GalleryChip] {
-        GalleryChip.chips(for: property, of: item, in: library, format: .automatic, now: .now)
-    }
-
-    @Test func aTagIsATagChipAndTheFavoriteMarkIsNone() {
-        let item = Self.item("A", tags: ["work", ItemTag.favorite, "home"])
-        let chips = Self.chips(GalleryProperty.tagsID, of: item)
-        #expect(chips.map(\.text) == ["home", "work"])
-        #expect(chips.allSatisfy { $0.look == .tag })
-    }
-
-    @Test func aTasksPriorityChipTakesItsColorFromItsRankAsEveryOtherPriorityDoes() {
-        let item = Self.item("A", properties: [Property(key: "priority", value: .string("low"))])
-        let chips = Self.chips("field.priority", of: item)
-        #expect(chips == [GalleryChip(text: ItemTypeInfo.Field.label(ofOption: "low"), look: .option(.purple))])
-        #expect(OptionTone.tone(for: "Low") == .purple)
-    }
-
-    @Test func aChoiceOfAnythingButAPriorityTakesTheColorOfItsWords() {
-        let field = ItemTypeInfo.Field(key: "kind", label: "Kind", kind: .choice(["high", "low"]), declaredBy: TypeID("test.project"))
-        let item = Item(
-            id: ItemID("P"), type: TypeID("test.project"), title: "P", titleRule: .property("title"),
-            properties: [Property(key: "kind", value: .string("high"))], version: ItemVersion(1), created: .now, modified: .now)
-        let library = FakeItemLibrary()
-        library.catalogue = Catalogue(itemTypes: [
-            ItemTypeInfo(id: TypeID("test.project"), label: "Project", fields: [field], titleField: "title", bodyField: nil, parent: nil)])
-        #expect(Self.chips("field.kind", of: item, in: library) == [GalleryChip(text: "High", look: .option(OptionTone.tone(for: "High")))])
-    }
-
-    @Test func aTextValueIsAPlainChip() {
-        let item = Self.item("A", properties: [Property(key: "assignee", value: .string("Sam"))])
-        #expect(Self.chips("field.assignee", of: item) == [GalleryChip(text: "Sam", look: .plain)])
-    }
-
-    @Test func aPropertyTheItemDoesNotHoldDrawsNothing() {
-        let item = Self.item("A")
-        #expect(Self.chips("field.priority", of: item).isEmpty)
-        #expect(Self.chips(GalleryProperty.tagsID, of: item).isEmpty)
-        #expect(Self.chips("parent", of: item).isEmpty)
-    }
-
-    @Test func aPropertyTheItemsTypeDoesNotHaveDrawsNothing() {
-        let note = Self.item("A", type: TypeID("core.note"), properties: [Property(key: "priority", value: .string("high"))])
-        #expect(Self.chips("field.priority", of: note).isEmpty)
-        #expect(Self.chips("field.nothing-like-it", of: note).isEmpty)
-        #expect(Self.chips("something else", of: note).isEmpty)
-    }
-
-    @Test func aValueThatIsOnlySpaceIsNoChip() {
-        let item = Self.item("A", properties: [Property(key: "assignee", value: .string("   "))])
-        #expect(Self.chips("field.assignee", of: item).isEmpty)
-    }
-
-    @Test func aParentIsALinkChipWithItsTitle() {
-        let parent = Self.item("Parent", type: FakeItemLibrary.collectionType)
-        let child = Self.item("Child", parent: parent.id)
-        let library = FakeItemLibrary(items: [parent, child])
-        let chips = Self.chips("parent", of: child, in: library)
-        #expect(chips.map(\.text) == ["Parent"])
-    }
-
-    @Test func theDatesAreChipsAndNeverEmpty() {
-        let item = Self.item("A")
-        #expect(Self.chips("created", of: item).count == 1)
-        #expect(Self.chips("edited", of: item).count == 1)
-        #expect(Self.chips("duration", of: item).isEmpty)
     }
 }

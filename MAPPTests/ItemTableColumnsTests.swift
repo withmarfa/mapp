@@ -7,12 +7,12 @@ import Testing
 struct ItemTableColumnsTests {
     private static let catalogue = BigLibrary.catalogue
 
-    /// The columns of a place that mixes types: the name, type, fields, parent and the dates, where Created starts hidden.
+    /// The columns of a place that mixes types, with no look to show any: the name, type and status, then the rest hidden, Created among them.
     private static var columns: [ItemTableColumn] {
         let rows = BigLibrary.items().prefix(300).map {
             ItemTableRow(item: $0, typeLabel: $0.type.rawValue, typeIcon: nil, parent: nil)
         }
-        return ItemTableLayout.columns(for: rows, catalogue: catalogue, hidden: [])
+        return ItemTableLayout.columns(for: rows, catalogue: catalogue, hidden: [], looks: [:])
     }
 
     private static func ids(_ columns: [ItemTableColumn]) -> [String] { columns.map(\.id) }
@@ -100,7 +100,10 @@ struct ItemTableColumnsTests {
         let defaults = try #require(UserDefaults(suiteName: suite))
         defaults.removePersistentDomain(forName: suite)
         defer { defaults.removePersistentDomain(forName: suite) }
-        let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 1400, height: 800), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        // Narrower than the table's columns at their smallest, so the table scrolls whatever the display. A table whose
+        // columns fit its window is fitted again by AppKit each time a column comes or goes, which sets every width afresh
+        // and writes them to the layout, so a width comes back only where the columns overflow.
+        let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 700, height: 800), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = NSHostingView(rootView: Host(browser: browser).environment(\.library, library).defaultAppStorage(defaults))
         window.makeKeyAndOrderFront(nil)
@@ -112,6 +115,15 @@ struct ItemTableColumnsTests {
         }
         func layout() -> TableColumnCustomization<ItemTableRow> {
             ItemTableColumnLayouts.layout(for: .allNotes, in: defaults.data(forKey: ItemTableColumnLayouts.key) ?? Data())
+        }
+        /// The width the table has written for a column. A layout offers no way to read one, so this reads the form it encodes to.
+        func storedWidth(of id: String) -> Double? {
+            guard let data = try? JSONEncoder().encode(layout()),
+                  let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let states = root["perColumnState"] as? [[String: Any]],
+                  let index = states.firstIndex(where: { ($0["base"] as? [String: Any])?["explicit"] as? [String: String] == ["_0": id] }),
+                  states.indices.contains(index + 1) else { return nil }
+            return states[index + 1]["currentWidth"] as? Double
         }
         func store(_ change: (inout TableColumnCustomization<ItemTableRow>) -> Void) {
             var next = layout()
@@ -130,16 +142,16 @@ struct ItemTableColumnsTests {
         try #require(await eventually { first.tableColumns.count == expected.count + 1 })
         let created = try #require(first.tableColumns.last)
         #expect(!initial.contains(created.identifier))
-        // The layout already differs from the default, since it shows Created, so wait for the width itself.
-        let shown = layout()
+        // The table also writes the other columns' widths when Created arrives, so wait for Created's own.
         created.width = 160
-        try #require(await eventually { layout() != shown })
+        try #require(await eventually { storedWidth(of: "created") == 160 })
 
         store { $0[visibility: "created"] = .hidden }
         try #require(await eventually { first.tableColumns.count == expected.count })
         titleColumn.width += 40
         // Nothing to wait for: this gives the table's write-back time to have happened, if it is going to.
         try await Task.sleep(for: .milliseconds(300))
+        #expect(storedWidth(of: "created") == 160)
 
         store { $0[visibility: "created"] = .visible }
         try #require(await eventually { first.tableColumns.count == expected.count + 1 })

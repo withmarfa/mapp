@@ -298,13 +298,13 @@ struct RowContentTests {
         let contents = RowContents()
         let list = RowList(day: Self.calendar.startOfDay(for: Self.now))
         let entries = [RowContents.Entry(item: note, showsTime: false)]
-        let first = contents.contents(of: entries, in: library, choices: [:], list: list)
+        let first = contents.contents(of: entries, in: library, looks: [:], list: list)
         #expect(first[note.id]?.title == "First")
         var renamed = note
         renamed.name = "Second"
-        let second = contents.contents(of: [RowContents.Entry(item: renamed, showsTime: false)], in: library, choices: [:], list: list)
+        let second = contents.contents(of: [RowContents.Entry(item: renamed, showsTime: false)], in: library, looks: [:], list: list)
         #expect(second[note.id]?.title == "Second")
-        #expect(contents.contents(of: [], in: library, choices: [:], list: list).isEmpty)
+        #expect(contents.contents(of: [], in: library, looks: [:], list: list).isEmpty)
     }
 
     @Test func anItemThatIsGoneIsLetGoAndOneThatStaysIsKept() {
@@ -314,12 +314,12 @@ struct RowContentTests {
         let contents = RowContents()
         let list = RowList(day: Self.calendar.startOfDay(for: Self.now))
         let both = contents.contents(
-            of: [kept, gone].map { RowContents.Entry(item: $0, showsTime: false) }, in: library, choices: [:], list: list)
+            of: [kept, gone].map { RowContents.Entry(item: $0, showsTime: false) }, in: library, looks: [:], list: list)
         #expect(Set(both.keys) == [kept.id, gone.id])
-        let one = contents.contents(of: [RowContents.Entry(item: kept, showsTime: false)], in: library, choices: [:], list: list)
+        let one = contents.contents(of: [RowContents.Entry(item: kept, showsTime: false)], in: library, looks: [:], list: list)
         #expect(Set(one.keys) == [kept.id])
         #expect(one[kept.id] == both[kept.id])
-        let again = contents.contents(of: [RowContents.Entry(item: kept, showsTime: true)], in: library, choices: [:], list: list)
+        let again = contents.contents(of: [RowContents.Entry(item: kept, showsTime: true)], in: library, looks: [:], list: list)
         #expect(again[kept.id]?.title == "Kept")
     }
 }

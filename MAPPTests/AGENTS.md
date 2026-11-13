@@ -41,7 +41,7 @@ Replace `test` with `build` to build only. `Scripts/measure-ui.sh` times the win
 
 - `FakeItemLibrary` holds items in memory for view models and the editor.
 - `FakeItemSource` is a source a test drives, for `MarfaLibrary`.
-- A Debug build launched with `-MAPPSampleLibrary` uses a sample library held in memory, beside `-MAPPSampleUnconfigured`, `-MAPPCollectionSample` or `-MAPPSelectItem <item id>`. UI tests open it through `XCUIApplication.sample()`. With `MAPP_TEST_MARFA_URL` and `MAPP_TEST_MARFA_KEY` set, it connects to that test server and keeps the key in memory only.
+- A Debug build launched with `-MAPPSampleLibrary` uses a sample library held in memory, beside `-MAPPSampleUnconfigured`, `-MAPPCollectionSample`, `-MAPPSelectItem <item id>` or `-MAPPOpenPlace <type id>` with `-MAPPLayout <layout>`, and `-MAPPAppearance dark|light`. UI tests open it through `XCUIApplication.sample()`. With `MAPP_TEST_MARFA_URL` and `MAPP_TEST_MARFA_KEY` set, it connects to that test server and keeps the key in memory only.
 
 ## Tests never touch real data
 

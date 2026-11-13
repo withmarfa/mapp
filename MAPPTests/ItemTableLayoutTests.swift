@@ -46,8 +46,12 @@ struct ItemTableLayoutTests {
         return ItemTableRow(item: item, typeLabel: type, typeIcon: nil, parent: link(parent))
     }
 
-    private static func columns(_ rows: [ItemTableRow]) -> [ItemTableColumn] {
-        ItemTableLayout.columns(for: rows, catalogue: catalogue, hidden: [])
+    /// What the ticket's look shows beyond its status: its priority and when it was edited.
+    private static let ticketLook = TypeLook(date: .edited, secondary: [], facts: [.field("priority")])
+
+    private static func columns(_ rows: [ItemTableRow], looks: [TypeID: TypeLook]? = nil) -> [ItemTableColumn] {
+        ItemTableLayout.columns(
+            for: rows, catalogue: catalogue, hidden: [], looks: looks ?? [TypeID("aic.ticket.task"): ticketLook])
     }
 
     // MARK: What the header may change
@@ -77,10 +81,12 @@ struct ItemTableLayoutTests {
 
     // MARK: Columns
 
-    @Test func aTypesFieldsFollowTheNameLeadingWithStatusAndPriority() {
+    @Test func aTypesLookLeadsAfterTheNameWithTheStatusAndTheRestWaitsInOrder() {
         let rows = [Self.row("A", status: "pending", priority: "low", parent: "P")]
         let ids = Self.columns(rows).map(\.id)
-        #expect(ids == ["title", "field.status", "field.priority", "parent", "field.notes", "field.description", "edited", "created"])
+        #expect(ids == [
+            "title", "field.status", "field.priority", "edited", "parent", "field.description", "field.notes", "created", "occurred", "tags",
+        ])
     }
 
     @Test func aTableOfSeveralTypesNamesEachRowsType() {
@@ -88,21 +94,22 @@ struct ItemTableLayoutTests {
         #expect(ids.prefix(2) == ["title", "type"])
     }
 
-    @Test func quietFieldsAndEmptyOnesStartHidden() {
+    @Test func whatTheLookDoesNotShowStartsHidden() {
         let columns = Self.columns([Self.row("A", status: "pending", notes: "Some notes")])
         let shown = Dictionary(uniqueKeysWithValues: columns.map { ($0.id, $0.isShownByDefault) })
         #expect(shown["field.status"] == true)
-        #expect(shown["field.priority"] == false)
+        #expect(shown["field.priority"] == false, "the look shows it, but no row has one")
         #expect(shown["field.notes"] == false)
         #expect(shown["created"] == false)
+        let bare = Self.columns([Self.row("A", status: "pending", notes: "Some notes")], looks: [:])
+        #expect(bare.filter(\.isShownByDefault).map(\.id) == ["title", "field.status"])
     }
 
-    @Test func theParentColumnShowsWhereItemsAreFiled() {
+    @Test func theParentColumnWaitsBehindViewOptionsWhereverItemsAreFiled() {
         let filed = Self.columns([Self.row("A", parent: "Epic")])
-        #expect(filed.first { $0.id == "parent" }?.isShownByDefault == true)
-        let loose = Self.columns([Self.row("A")])
-        #expect(loose.first { $0.id == "parent" }?.isShownByDefault == false)
-        #expect(!Self.columns([Self.row("A", parent: "Epic")]).contains { $0.id == "collection" })
+        #expect(filed.first { $0.id == "parent" }?.isShownByDefault == false)
+        #expect(!filed.contains { $0.id == "collection" })
+        #expect(Self.columns([Self.row("A")]).contains { $0.id == "parent" })
     }
 
     // MARK: Sorting
@@ -185,7 +192,7 @@ struct ItemTableLayoutTests {
             properties: [Property(key: "status", value: .string("canceled"))], version: ItemVersion(1), created: .now, modified: .now)
         #expect(catalogue.statusGroup(of: item) == nil, "a choice has no groups, so a canceled event is not folded away")
         let row = ItemTableRow(item: item, typeLabel: "Event", typeIcon: nil, parent: nil)
-        let columns = ItemTableLayout.columns(for: [row], catalogue: catalogue, hidden: [])
+        let columns = ItemTableLayout.columns(for: [row], catalogue: catalogue, hidden: [], looks: [:])
         let status = try #require(columns.first { $0.id == "field.status" })
         #expect(ItemTableLayout.collapsed(ItemTableOptions(), groups: ItemTableLayout.groups(of: [row], by: status), by: status).isEmpty)
     }

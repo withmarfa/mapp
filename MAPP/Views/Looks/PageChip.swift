@@ -171,20 +171,24 @@ struct PersonCircle: View {
 }
 
 /// A person: initials in the pale circle, then the name, with no chip round it. In a row, the initials alone, with the
-/// name for VoiceOver.
+/// name for VoiceOver, unless the name is asked for (`showsName`).
 struct PagePerson: View {
     let name: String
     let initials: String?
     var size: ChipSize = .page
+    /// Whether the name is written beside the initials at row size, as a table cell does: a table is not a row, and a
+    /// person there is read by name. The page's person always has it.
+    var showsName = false
 
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
 
     var body: some View {
         let looks = ChipLooks.current
         let scale = CGFloat(textSize) / 13
+        let named = size == .page || showsName
         HStack(spacing: looks.personGap * scale) {
             PersonCircle(initials: initials, size: size)
-            if size == .page {
+            if named {
                 Text(verbatim: name)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -192,7 +196,7 @@ struct PagePerson: View {
         }
         .font(.system(size: looks.textSize(for: size) * scale))
         .foregroundStyle(.primary)
-        .padding(.trailing, size == .page ? 2 * scale : 0)
+        .padding(.trailing, named ? 2 * scale : 0)
         .frame(height: looks.height(for: size) * scale)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(name)

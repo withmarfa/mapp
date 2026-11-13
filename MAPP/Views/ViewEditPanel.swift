@@ -37,7 +37,7 @@ struct ViewEditPanel: View {
                 if browser.viewMode == .table {
                     ViewPanelColumns(browser: browser, panel: panel, content: content)
                 } else if browser.viewMode == .gallery {
-                    ViewPanelCards(browser: browser, panel: panel, content: content)
+                    ViewPanelCards(browser: browser, panel: panel)
                 }
             }
             .padding(.horizontal, 16)
