@@ -12,7 +12,9 @@ nonisolated enum LocationMetrics {
 
 /// The Location panel: a search that moves an Apple map, the map with the item's pin, the place's name where the type has
 /// one, the Show Coordinates switch and Clear Location. The map is always an Apple map with its logo and legal link in
-/// view. The person places the pin by clicking and adjusts it by dragging; a search result only moves the map.
+/// view. The person places the pin by clicking where there is none and moves it only by dragging it, so a click or a
+/// double-click that zooms never moves a point; a search result only moves the map. An item that cannot be edited shows
+/// the map and its point, with no search.
 struct LocationPanelContent: View {
     let model: LocationPanelModel
     let panel: ValueEditModel
@@ -37,8 +39,10 @@ struct LocationPanelContent: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            searchField
-            Divider().padding(.vertical, 4 * scale)
+            if model.canEdit {
+                searchField
+                Divider().padding(.vertical, 4 * scale)
+            }
             map
             if model.canEdit { hint }
             if let problem = model.problem { problemLine(problem) }
@@ -54,7 +58,7 @@ struct LocationPanelContent: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { panel.measure(.total, $0) }
         .task {
             await Task.yield()
-            focus = .search
+            if model.canEdit { focus = .search }
         }
     }
 
@@ -135,11 +139,15 @@ struct LocationPanelContent: View {
             .mapStyle(.standard)
             .mapControls { MapZoomStepper() }
             .onMapCameraChange(frequency: .onEnd) { model.visibleRegion = $0.region }
-            .onTapGesture { screen in
-                guard model.canEdit, let coordinate = proxy.convert(screen, from: .local),
-                      let point = LocationPoint(clicked: coordinate.latitude, longitude: coordinate.longitude) else { return }
-                model.place(point)
-            }
+            // A double-click is the map's zoom, so it comes first and its first click is never taken as a click.
+            .gesture(
+                TapGesture(count: 2).exclusively(before: SpatialTapGesture(coordinateSpace: .local))
+                    .onEnded { tap in
+                        guard case .second(let click) = tap, model.canEdit, model.point == nil,
+                              let coordinate = proxy.convert(click.location, from: .local),
+                              let point = LocationPoint(clicked: coordinate.latitude, longitude: coordinate.longitude) else { return }
+                        model.place(point)
+                    })
         }
         .frame(height: LocationMetrics.mapHeight * scale)
         .clipShape(.rect(cornerRadius: 8 * scale, style: .continuous))
@@ -165,14 +173,14 @@ struct LocationPanelContent: View {
                         model.place(moved)
                     },
                 including: model.canEdit ? .all : .none)
-            // A click on the pin is not a click on the map under it.
-            .onTapGesture {}
             .accessibilityLabel("Pin")
             .accessibilityIdentifier("LocationPin")
     }
 
     private var hint: some View {
-        Text("Click the map to place the pin; drag it to adjust.")
+        Group {
+            if model.point == nil { Text("Click the map to place the pin.") } else { Text("Drag the pin to move it.") }
+        }
             .font(.system(size: 11 * scale))
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)

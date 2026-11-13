@@ -22,7 +22,7 @@
     "Clear Location" : {
       "extractionState" : "manual"
     },
-    "Click the map to place the pin; drag it to adjust." : {
+    "Click the map to place the pin." : {
       "extractionState" : "manual"
     },
     "“%@” could not be read. No looks were changed." : {
@@ -36,6 +36,9 @@
     },
     "Couldn’t Import Looks" : {
 
+    },
+    "Drag the pin to move it." : {
+      "extractionState" : "manual"
     },
     "Edit Location" : {
       "extractionState" : "manual"
