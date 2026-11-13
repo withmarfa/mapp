@@ -37,7 +37,7 @@ In Xcode Cloud, `ci_scripts/ci_post_clone.sh` writes `Config/Local.xcconfig` fro
 
 ## Contributing
 
-[AGENTS.md](AGENTS.md) covers conventions, architecture, and the rules for each part of the code.
+[AGENTS.md](AGENTS.md) covers conventions and the rules for each part of the code, and [docs/](docs/) explains the concepts and the agreed design.
 
 ## License
 

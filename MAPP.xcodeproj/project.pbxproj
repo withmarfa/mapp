@@ -49,6 +49,8 @@
 				Model/CLAUDE.md,
 				Model/Marfa/AGENTS.md,
 				Model/Marfa/CLAUDE.md,
+				Views/AGENTS.md,
+				Views/CLAUDE.md,
 			);
 			target = 3303FCF83066ED46005D07A2 /* MAPP */;
 		};

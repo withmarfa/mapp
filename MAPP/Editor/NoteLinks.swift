@@ -7,6 +7,9 @@ nonisolated enum NoteLinks {
     /// Whether `[[inner]]` is one link the core reads with exactly this name and alias, so the text survives
     /// as written: no `]]`, line break or padding in it. Marfa has no escape in a link and Inkkit reads a backslash
     /// literally too, so a backslash is part of the text for both and is never added or taken away.
+    /// Marfa's core and Inkkit both read a lone bracket, `|` and `#` alike, but not doubled brackets inside a link: Inkkit
+    /// keeps the paragraph as exact source and draws no link (`[[[[c]]`, `[[c[[]]`), or ends the link early (`[[a[[b]]`,
+    /// `[[a]]b]]`), and the core does not read those as a link to the title either, so this asks the core and refuses.
     static func spells(_ inner: String, as name: String, alias: String? = nil) -> Bool {
         guard !name.isEmpty else { return false }
         let text = "[[\(inner)]]"
