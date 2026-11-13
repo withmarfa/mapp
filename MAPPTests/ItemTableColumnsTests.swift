@@ -131,8 +131,8 @@ struct ItemTableColumnsTests {
         func dump(_ label: String, _ t: NSTableView) {
             let cols = t.tableColumns.map { "\($0.identifier.rawValue)=\($0.width)[\($0.minWidth),\($0.maxWidth)]hidden:\($0.isHidden)" }.joined(separator: " ")
             let stored = (try? JSONEncoder().encode(layout())).flatMap { String(data: $0, encoding: .utf8) } ?? "nil"
-            print("DIAG \(label) table=\(t.frame.width) clip=\(t.enclosingScrollView?.contentView.bounds.width ?? -1) style=\(t.columnAutoresizingStyle.rawValue) cols: \(cols)")
-            print("DIAG \(label) stored: \(stored)")
+            Issue.record(Comment(rawValue: "DIAG \(label) table=\(t.frame.width) clip=\(t.enclosingScrollView?.contentView.bounds.width ?? -1) style=\(t.columnAutoresizingStyle.rawValue) cols: \(cols)"))
+            Issue.record(Comment(rawValue: "DIAG \(label) stored: \(stored)"))
         }
         let first = try await table()
         dump("0 initial", first)
