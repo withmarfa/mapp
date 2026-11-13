@@ -19,6 +19,7 @@ MAPP is a native macOS markdown notes app with a sidebar, a list and a page, lik
 - Claude Code reads `AGENTS.md` only when no `CLAUDE.md` exists in or above the working directory, so each link is what delivers its file. Codex loads no nested file below where it starts, so the table above is how it finds the rest.
 - Keep each file under 200 lines and each chain from this file to a nested one under 32,000 bytes, since Codex stops reading at 32 KiB (32,768 bytes). Detail about one type belongs in its doc comment, and a concept in `docs/`, stated once and linked.
 - List a new `AGENTS.md` under `MAPP/` and its link in the MAPP target's membership exceptions in `project.pbxproj`, or the build fails on duplicate resources.
+- Run `python3 Scripts/check-instructions.py` after changing an instruction file, a doc or a name a doc cites. It checks the limits above, the links, the membership exceptions and that each name on a doc's "Where it lives" line exists. CI runs it as `Instructions`, on drafts too.
 
 ## Working here
 
