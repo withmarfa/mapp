@@ -64,9 +64,10 @@ nonisolated enum DateDisplay {
             date: style, time: hasTime ? .shortened : .omitted, locale: locale, calendar: calendar, timeZone: calendar.timeZone))
     }
 
-    /// The time of day alone, which a row shows inside the group of a day, where the day is already said.
+    /// The time of day alone, which a row shows inside the group of a day, where the day is already said. It is
+    /// written as a list line writes the time today, so a row reads the same in any group.
     static func timeOfDay(of date: Date, calendar: Calendar = .current, locale: Locale = .current) -> String {
-        time(date, calendar: calendar, locale: locale)
+        date.formatted(Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone).hour().minute())
     }
 
     private static func time(_ date: Date, calendar: Calendar, locale: Locale) -> String {
