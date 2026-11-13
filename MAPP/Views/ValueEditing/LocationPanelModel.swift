@@ -13,9 +13,13 @@ struct LocationSearchResult: Identifiable, Hashable {
     let point: LocationPoint
 }
 
-/// What the Location panel holds: the item's point and name as the library has them, what is typed, and a search that
+/// What the Location panel holds: the item's point and name as the panel last left them, what is typed, and a search that
 /// only moves the map. The person puts the pin on the map themselves, so the only things written are the latitude and
 /// longitude of a point they chose and a name they typed (`ItemLocation`).
+///
+/// A library can take a write after it is made (`MarfaLibrary` queues it), so until the copy shows the panel's last write
+/// the panel shows what it wrote and builds the next change on that, never on a copy that still holds the value from
+/// before. A placement then cleared, or moved back where it was, before the first lands is written, not skipped.
 @MainActor @Observable
 final class LocationPanelModel {
     enum Search: Equatable {
@@ -26,18 +30,15 @@ final class LocationPanelModel {
         case failed
     }
 
-    /// What a write on its way will make the point, until the library's copy shows it.
-    private enum Pending {
-        case point(LocationPoint)
-        case cleared
-    }
-
     let spec: ItemLocation
     let itemID: ItemID
     @ObservationIgnored private let library: any ItemLibrary
     @ObservationIgnored private let undoManager: UndoManager?
     @ObservationIgnored private var searchTask: Task<Void, Never>?
-    @ObservationIgnored private var pending: Pending?
+    /// What the panel wrote, by key, since the library last held all of it: the two numbers and the name.
+    @ObservationIgnored private var written: [String: PropertyValue?] = [:]
+    /// The library's mark for the panel's last write (`ItemLibrary.lastPropertyWrite`), nil where it keeps none.
+    @ObservationIgnored private var writtenMark: Int?
     @ObservationIgnored private var nameBase = ""
     /// The map's view as it last settled, so a search looks near where the person is looking.
     @ObservationIgnored var visibleRegion: MKCoordinateRegion?
@@ -60,34 +61,39 @@ final class LocationPanelModel {
 
     // MARK: Item
 
-    private var item: Item? { library.item(itemID) }
+    /// Whether the panel's last write is still on its way, so the library's copy may not show it yet.
+    private var isWaiting: Bool {
+        guard !written.isEmpty, library.isWritingProperties(of: itemID) else { return false }
+        if let writtenMark, library.tookPropertyWrite(writtenMark) { return false }
+        return true
+    }
+
+    /// The item as the panel last left it: the library's copy, with what the panel wrote laid over it while that is on
+    /// its way. Everything the panel shows and every change it makes is read from this.
+    private var item: Item? {
+        _ = writes
+        guard var item = library.item(itemID) else { return nil }
+        guard isWaiting else { return item }
+        for (key, value) in written {
+            item.properties.removeAll { $0.key == key }
+            if let value { item.properties.append(Property(key: key, value: value)) }
+        }
+        return item
+    }
 
     /// Whether the person can change the item's Location. An item that cannot be edited shows its point and nothing more.
     var canEdit: Bool { item?.isEditable ?? false }
 
     var reading: ItemLocation.Reading { item.map(spec.reading(of:)) ?? .none }
 
-    /// The point on the map: the one the panel wrote while the library still has it on its way, else the item's own.
+    /// The point on the map, or nil where there is none to draw.
     var point: LocationPoint? {
-        _ = writes
-        if let pending, library.isWritingProperties(of: itemID) {
-            switch pending {
-            case .point(let point): return point
-            case .cleared: return nil
-            }
-        }
-        if case .point(let point) = reading { return point }
-        return nil
+        if case .point(let point) = reading { point } else { nil }
     }
 
     /// Whether there is a Location to clear: a point, or numbers that are no point.
     var hasLocation: Bool {
-        _ = writes
-        if let pending, library.isWritingProperties(of: itemID) {
-            if case .point = pending { return true } else { return false }
-        }
-        if case .none = reading { return false }
-        return true
+        if case .none = reading { false } else { true }
     }
 
     /// Why the panel cannot draw what the item holds, or nil.
@@ -130,7 +136,8 @@ final class LocationPanelModel {
         return item.value(of: key)?.string ?? ""
     }
 
-    /// The name in the field: what the person is typing, else what the item holds, which follows a change made elsewhere.
+    /// The name in the field: what the person is typing, else the name as the panel last left it, which follows a change
+    /// made elsewhere once nothing the panel wrote is on its way.
     var name: String {
         get { isNameDirty ? typedName : heldName }
         set {
@@ -145,10 +152,10 @@ final class LocationPanelModel {
 
     /// Writes the name that was typed. A name the item changed under the text waits for the person to say which they mean.
     func commitName(overwriting: Bool = false) {
-        guard isNameDirty, let item else { return }
-        guard canEdit else { return }
+        guard isNameDirty, canEdit, let item else { return }
         guard let changes = spec.naming(typedName, in: item) else {
             isNameDirty = false
+            if hasNameConflict { useHeldName() }
             return
         }
         if !overwriting, heldName != nameBase {
@@ -176,25 +183,28 @@ final class LocationPanelModel {
     func place(_ point: LocationPoint) {
         guard canEdit, let item else { return }
         let typed = isNameDirty && !hasNameConflict ? typedName : nil
-        let changes = spec.placing(point, name: typed, in: item)
-        if write(changes) {
-            pending = .point(point)
-            if typed != nil { isNameDirty = false }
-        }
+        if write(spec.placing(point, name: typed, in: item)), typed != nil { isNameDirty = false }
     }
 
     /// Takes both numbers away, and leaves the name, which is the person's own words.
     func clear() {
         guard canEdit, let item else { return }
-        if write(spec.clearing(item)) { pending = .cleared }
+        write(spec.clearing(item))
     }
 
+    @discardableResult
     private func write(_ changes: [String: PropertyValue?]) -> Bool {
         guard !changes.isEmpty else { return true }
+        // Read before the write, which the library then has on its way too.
+        let wasWaiting = isWaiting
         let taken = library.setItemProperties(
             itemID, changes: changes, actionName: String(localized: "Edit Location"), undoManager: undoManager)
         if taken {
-            notice = nil
+            if !wasWaiting { written = [:] }
+            written.merge(changes) { _, new in new }
+            writtenMark = library.lastPropertyWrite
+            // A name that changed under the text keeps its choice until the person makes it.
+            if !hasNameConflict { notice = nil }
             writes += 1
         } else {
             notice = canEdit ? String(localized: "The location couldn’t be saved.") : PropertyLoss.notEditable.reason
@@ -202,10 +212,18 @@ final class LocationPanelModel {
         return taken
     }
 
-    /// The panel is ending. A name that was typed is written unless the person cancelled it; a point is already written.
+    /// The panel is ending. A name that was typed is written unless the person cancelled it; one that cannot be, as it
+    /// changed meanwhile or was refused, goes back to the person through `Notices.notKept`, since the panel's own notice
+    /// goes with it. A point is already written.
     func finish(cancelled: Bool) {
         searchTask?.cancel()
-        if !cancelled { commitName() }
+        guard !cancelled else { return }
+        commitName()
+        guard isNameDirty, case .typed(let field) = spec.name else { return }
+        let loss: PropertyLoss = hasNameConflict ? .conflict : canEdit ? .notSaved : .notEditable
+        library.notices.notKept(String(localized: "Property Not Saved"), text: "\(field.label): \(typedName)", reason: loss.reason)
+        isNameDirty = false
+        hasNameConflict = false
     }
 
     // MARK: Search
