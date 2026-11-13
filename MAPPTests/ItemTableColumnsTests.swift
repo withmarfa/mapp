@@ -128,7 +128,14 @@ struct ItemTableColumnsTests {
             defaults.set(ItemTableColumnLayouts.storing(next, for: .allNotes, in: defaults.data(forKey: ItemTableColumnLayouts.key) ?? Data()), forKey: ItemTableColumnLayouts.key)
         }
 
+        func dump(_ label: String, _ t: NSTableView) {
+            let cols = t.tableColumns.map { "\($0.identifier.rawValue)=\($0.width)[\($0.minWidth),\($0.maxWidth)]\($0.isHidden ? \"H\" : \"\")" }.joined(separator: " ")
+            let stored = (try? JSONEncoder().encode(layout())).flatMap { String(data: $0, encoding: .utf8) } ?? "nil"
+            print("DIAG \(label) table=\(t.frame.width) clip=\(t.enclosingScrollView?.contentView.bounds.width ?? -1) style=\(t.columnAutoresizingStyle.rawValue) cols: \(cols)")
+            print("DIAG \(label) stored: \(stored)")
+        }
         let first = try await table()
+        dump("0 initial", first)
         let expected = ItemTableColumnLayouts.shown(browser.tableContent(in: library).columns, in: .init()).map(\.id)
         let initial = first.tableColumns.map(\.identifier)
         // SwiftUI names the table's columns itself, so a column is told by its place: the name first, Created last.
@@ -137,21 +144,28 @@ struct ItemTableColumnsTests {
 
         store { $0[visibility: "created"] = .visible }
         try #require(await eventually { first.tableColumns.count == expected.count + 1 })
+        dump("1 created shown", first)
         let created = try #require(first.tableColumns.last)
         #expect(!initial.contains(created.identifier))
         // The table also writes the other columns' widths when Created arrives, so wait for Created's own.
         created.width = 160
         try #require(await eventually { storedWidth(of: "created") == 160 })
+        dump("2 created set to 160", first)
 
         store { $0[visibility: "created"] = .hidden }
         try #require(await eventually { first.tableColumns.count == expected.count })
+        dump("3 created hidden", first)
         titleColumn.width += 40
         // Nothing to wait for: this gives the table's write-back time to have happened, if it is going to.
         try await Task.sleep(for: .milliseconds(300))
+        dump("4 title widened", first)
         #expect(storedWidth(of: "created") == 160)
 
         store { $0[visibility: "created"] = .visible }
         try #require(await eventually { first.tableColumns.count == expected.count + 1 })
+        dump("5 created back", first)
+        try await Task.sleep(for: .milliseconds(500))
+        dump("6 created back +500ms", first)
         let back = try #require(first.tableColumns.last)
         #expect(back.width == 160)
         #expect(first.tableColumns.first?.width == titleColumn.width)
