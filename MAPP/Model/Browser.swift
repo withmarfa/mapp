@@ -158,6 +158,10 @@ final class Browser {
     @ObservationIgnored private var fieldsMemo: FieldsMemo?
     /// The content of the list's rows, held between passes (`Browser+Rows`).
     @ObservationIgnored let rowContents = RowContents()
+    /// The person's chosen looks for this library's types, which the window's root keeps current (`RootView`). A table
+    /// reads the looks they resolve to (`looks(in:)`), so a change of choice works it out again.
+    var lookChoices: [TypeID: TypeLookChoice] = [:]
+    @ObservationIgnored var looksMemo: (key: LooksKey, looks: [TypeID: TypeLook])?
     @ObservationIgnored private var stackableMemo: (key: StackableKey, type: String?)?
     /// Held by `paletteIndex(in:)`.
     @ObservationIgnored var paletteMemo: (key: PaletteIndexKey, index: PaletteIndex)?
@@ -495,7 +499,7 @@ final class Browser {
     func tableContent(in library: any ItemLibrary) -> ItemTableContent {
         let keyed = (tableOptions[item] ?? ItemTableOptions()).settled
         let derived = derivedKey(in: library)
-        let key = TableKey(derived: derived.key, options: keyed)
+        let key = TableKey(derived: derived.key, options: keyed, choices: lookChoices)
         if let held = tableMemo, held.key == key { return held.content }
         let content = ItemTableContent(browser: self, library: library, items: derived.items ?? items(in: library))
         tableMemo = (key, content)
@@ -548,6 +552,7 @@ final class Browser {
     private struct TableKey: Equatable {
         let derived: DerivedKey
         let options: ItemTableOptions
+        let choices: [TypeID: TypeLookChoice]
     }
 
     private var showsOnlyFavorites: Bool {

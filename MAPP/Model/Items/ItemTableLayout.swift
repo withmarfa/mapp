@@ -36,13 +36,17 @@ extension ItemTableRow {
 nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
     enum Content: Hashable, Sendable {
         case title, type, parent, created, edited
+        /// When the item happened (Marfa's `occurred_at`), which a record's look shows as its date.
+        case occurred
+        /// The item's tags, which a note's look shows as its fact.
+        case tags
         /// The time between two date fields, as a session's start and end.
         case duration(start: String, end: String)
         case field(ItemTypeInfo.Field)
     }
 
     enum Style: Hashable, Sendable {
-        case title, status, priority, choice, date, number, boolean, link, text, longText, duration
+        case title, status, priority, choice, date, number, boolean, link, text, duration
 
         /// How much a style says about its column, where types give one key different styles: a status, then a
         /// priority, then the rest.
@@ -70,7 +74,7 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
     var isCategorical: Bool {
         switch style {
         case .status, .priority, .choice, .boolean, .link: true
-        case .title, .date, .number, .text, .longText, .duration: content == .type
+        case .title, .date, .number, .text, .duration: content == .type
         }
     }
 
@@ -80,6 +84,10 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
     static let edited = ItemTableColumn(id: "edited", label: String(localized: "Edited"), content: .edited, style: .date)
     static let created = ItemTableColumn(
         id: "created", label: String(localized: "Created"), content: .created, style: .date, isShownByDefault: false)
+    static let occurred = ItemTableColumn(
+        id: "occurred", label: String(localized: "Happened"), content: .occurred, style: .date, isShownByDefault: false)
+    static let tags = ItemTableColumn(
+        id: "tags", label: String(localized: "Tags"), content: .tags, style: .text, isShownByDefault: false)
 }
 
 // MARK: Values
@@ -150,7 +158,7 @@ nonisolated extension ItemTableColumn {
         case .type: return row.item.type.rawValue
         case .parent: return row.parent?.id.rawValue
         case .field(let field): return ItemTableValue.string(row, key: field.key)
-        case .title, .created, .edited, .duration: return nil
+        case .title, .created, .edited, .occurred, .tags, .duration: return nil
         }
     }
 
@@ -162,7 +170,7 @@ nonisolated extension ItemTableColumn {
         case .field:
             if style == .boolean { return value == "true" ? String(localized: "Yes") : String(localized: "No") }
             return ItemTypeInfo.Field.label(ofOption: value)
-        case .title, .created, .edited, .duration: return value
+        case .title, .created, .edited, .occurred, .tags, .duration: return value
         }
     }
 
@@ -173,6 +181,10 @@ nonisolated extension ItemTableColumn {
         case .parent: return row.parent.map { .text($0.title) }
         case .created: return .date(row.item.created)
         case .edited: return .date(row.item.modified)
+        case .occurred: return .date(row.item.occurred ?? row.item.created)
+        case .tags:
+            let tags = row.item.tags.subtracting([ItemTag.favorite])
+            return tags.isEmpty ? nil : .text(tags.sorted().joined(separator: " "))
         case .duration(let start, let end): return ItemTableValue.duration(row, start: start, end: end).map { .number(Decimal($0)) }
         case .field(let field):
             guard let value = row.item.value(of: field.key), InspectorFields.hasValue(value) else { return nil }
@@ -316,32 +328,27 @@ nonisolated struct ItemTableGroup: Identifiable, Hashable, Sendable {
 }
 
 nonisolated enum ItemTableLayout {
-    /// After the status, the priority and the due date (by their roles), the dates a table leads with, in this order,
-    /// wherever a type has them.
-    private static let leading = ["starts_at", "ends_at", "completed_at", "occurred_at"]
-    /// Fields that read as a paragraph or as bookkeeping, shown only when the person asks.
-    private static let quiet: Set<String> = ["notes", "url", "precision"]
-
-    /// The table's columns for these rows: the name, then the type where the rows mix types, then status, priority
-    /// and due date, then where each item is filed, then the other fields their types have, and when it was edited.
-    /// A field few of the rows fill starts hidden, as do the quiet ones; the person can show any of them.
-    static func columns(for rows: [ItemTableRow], catalogue: Catalogue, hidden: Set<String>) -> [ItemTableColumn] {
+    /// The table's columns for these rows: the name, then the type where the rows mix types, then what the types' looks
+    /// show (`TypeLook`): the status of each type that has one, then the facts in the order the looks give them, then
+    /// their dates. The columns of several types are the union of their looks. Every other column starts hidden and the
+    /// person can show any of them. A look's column that no row fills starts hidden too, as an empty column says nothing.
+    static func columns(
+        for rows: [ItemTableRow], catalogue: Catalogue, hidden: Set<String>, looks: [TypeID: TypeLook]
+    ) -> [ItemTableColumn] {
+        let types = Set(rows.map(\.item.type)).sorted { $0.rawValue < $1.rawValue }
         var columns: [ItemTableColumn] = [.title]
-        let types = Set(rows.map(\.item.type))
         if types.count > 1 { columns.append(.type) }
 
         var fields: [String: ItemTypeInfo.Field] = [:]
         var styles: [String: ItemTableColumn.Style] = [:]
-        var dueDates: Set<String> = []
         var order: [String] = []
-        for type in types.sorted(by: { $0.rawValue < $1.rawValue }) {
+        for type in types {
             let info = catalogue.itemTypes[type]
             let page: Set<String> = [info?.titleKey, info?.bodyKey].compactMap { $0 }.reduce(into: []) { $0.insert($1) }
             for field in info?.fields ?? [] {
                 if hidden.contains(field.key) || page.contains(field.key) || ["title", "body"].contains(field.key) { continue }
                 if field.kind.isOutsideForms { continue }
                 let fieldStyle = style(of: field, in: type, catalogue: catalogue)
-                if catalogue.isDueDate(field, of: type) { dueDates.insert(field.key) }
                 if let known = fields[field.key] {
                     if fieldStyle.specificity > styles[field.key]!.specificity {
                         // A status or priority in one type outranks the plain field another type calls the same.
@@ -358,57 +365,88 @@ nonisolated enum ItemTableLayout {
                 order.append(field.key)
             }
         }
-        let filled = Dictionary(uniqueKeysWithValues: order.map { key in
-            (key, rows.count(where: { InspectorFields.hasValue($0.item.value(of: key)) }))
-        })
-        // Fields that only some types have, or few items fill, would make a mixed table wide and mostly empty.
-        let threshold = max(1, rows.count / 10)
-        func lead(_ key: String) -> Int {
-            switch styles[key] {
-            case .status: return 0
-            case .priority: return 1
-            default: return dueDates.contains(key) ? 2 : (leading.firstIndex(of: key).map { $0 + 3 } ?? Int.max)
+
+        var used: Set<String> = []
+        func add(_ column: ItemTableColumn, shown: Bool) {
+            var column = column
+            column.isShownByDefault = shown
+            columns.append(column)
+            if shown { used.insert(column.id) }
+        }
+        func fieldColumn(_ key: String) -> ItemTableColumn? {
+            fields[key].map { ItemTableColumn(id: "field." + key, label: $0.label, content: .field($0), style: styles[key]!) }
+        }
+        func isFilled(_ key: String) -> Bool { rows.contains { InspectorFields.hasValue($0.item.value(of: key)) } }
+
+        // The status of each type that has one comes first.
+        for type in types {
+            guard let key = catalogue.itemTypes[type]?.statusField?.key, !used.contains("field." + key),
+                  isFilled(key), let column = fieldColumn(key) else { continue }
+            add(column, shown: true)
+        }
+        // Then the facts and the dates of the looks, in order, each once.
+        for entry in shown(by: looks, of: types) {
+            switch entry {
+            case .field(let key):
+                guard !used.contains("field." + key), isFilled(key), let column = fieldColumn(key) else { continue }
+                add(column, shown: true)
+            case .tags:
+                guard rows.contains(where: { !$0.item.tags.subtracting([ItemTag.favorite]).isEmpty }) else { continue }
+                add(.tags, shown: true)
+            case .created: add(.created, shown: true)
+            case .edited: add(.edited, shown: true)
+            case .occurred: add(.occurred, shown: true)
             }
         }
-        let sorted = order.sorted { a, b in
-            let (x, y) = (lead(a), lead(b))
-            if x != y { return x < y }
-            if (a == "description") != (b == "description") { return b == "description" }
-            return order.firstIndex(of: a)! < order.firstIndex(of: b)!
-        }
-        // What state comes first, then where the item is filed, then its dates and its prose.
-        let firstStyles: Set<ItemTableColumn.Style> = [.status, .priority]
-        let isFirst = { (key: String) in styles[key].map(firstStyles.contains) ?? false }
-        let (people, rest) = (sorted.filter(isFirst), sorted.filter { !isFirst($0) })
-        for key in people {
-            columns.append(column(for: fields[key]!, style: styles[key]!, filled: filled[key, default: 0], threshold: threshold))
-        }
 
-        // The parent is worth showing where enough rows have one, such as a ticket's epic.
+        // What the looks do not show waits behind View Options. Where each item is filed is one of those.
         var parent = ItemTableColumn.parent
         // The column is headed with Marfa's name for the child end of the parent link.
         if let name = catalogue.edgeTypes[MarfaMapping.parentEdge]?.reverseLabel { parent.label = name }
-        parent.isShownByDefault = rows.count(where: { $0.parent != nil }) >= threshold
-        columns.append(parent)
-
-        for key in rest {
-            columns.append(column(for: fields[key]!, style: styles[key]!, filled: filled[key, default: 0], threshold: threshold))
-            if key == "starts_at", fields["ends_at"] != nil {
-                columns.append(ItemTableColumn(
+        add(parent, shown: false)
+        for key in order where !used.contains("field." + key) {
+            if let column = fieldColumn(key) { add(column, shown: false) }
+            if key == MarfaMapping.startField, fields[MarfaMapping.endField] != nil {
+                add(ItemTableColumn(
                     id: "duration", label: String(localized: "Duration"),
-                    content: .duration(start: "starts_at", end: "ends_at"), style: .duration,
-                    isShownByDefault: filled["ends_at", default: 0] >= threshold))
+                    content: .duration(start: MarfaMapping.startField, end: MarfaMapping.endField), style: .duration), shown: false)
             }
         }
-        columns.append(.edited)
-        columns.append(.created)
+        for column in [ItemTableColumn.edited, .created, .occurred, .tags] where !used.contains(column.id) {
+            add(column, shown: false)
+        }
         return columns
     }
 
-    private static func column(for field: ItemTypeInfo.Field, style: ItemTableColumn.Style, filled: Int, threshold: Int) -> ItemTableColumn {
-        var column = ItemTableColumn(id: "field." + field.key, label: field.label, content: .field(field), style: style)
-        column.isShownByDefault = !quiet.contains(field.key) && filled >= threshold
-        return column
+    /// What a look shows of a column that is not a field's, or a field it shows: a fact or a date.
+    private enum Shown: Hashable {
+        case field(String)
+        case tags, created, edited, occurred
+    }
+
+    /// The facts of the types' looks in order, type by type, then their dates, each once.
+    private static func shown(by looks: [TypeID: TypeLook], of types: [TypeID]) -> [Shown] {
+        var facts: [Shown] = []
+        var dates: [Shown] = []
+        for type in types {
+            let look = looks[type] ?? .empty
+            for fact in look.facts {
+                let entry: Shown = switch fact {
+                case .field(let key): .field(key)
+                case .tags: .tags
+                }
+                if !facts.contains(entry) { facts.append(entry) }
+            }
+            let date: Shown? = switch look.date {
+            case .field(let key): .field(key)
+            case .created: .created
+            case .edited: .edited
+            case .occurred: .occurred
+            case .off: nil
+            }
+            if let date, !dates.contains(date) { dates.append(date) }
+        }
+        return facts + dates.filter { !facts.contains($0) }
     }
 
     /// How a column of `field`, as `type` declares it, reads. A status is the field's kind, whatever its name; a
@@ -421,9 +459,7 @@ nonisolated enum ItemTableLayout {
         case .date: return .date
         case .status: return .status
         case .choice: return catalogue.isPriority(field, of: type) ? .priority : .choice
-        case .text:
-            return field.key == "description" || field.key == "notes" ? .longText : .text
-        case .other, .words, .list: return .text
+        case .text, .other, .words, .list: return .text
         }
     }
 
