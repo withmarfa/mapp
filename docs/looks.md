@@ -27,6 +27,8 @@ A look fills a fixed set of places. A place with nothing to show is left out and
 
 Nothing indents a row. No status circle or highlight bar sits at the leading edge.
 
+A row never shows the tier. Inbox is a view of the feed tier, not a fact about a row. A row's preview starts from the item's text, not from its first heading. Marfa's core works out the preview and MAPP shows it; the preview rule is agreed, not built.
+
 ## One look in every view
 
 - **List.** The row above.

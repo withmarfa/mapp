@@ -16,6 +16,8 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 - **Chips squeezed to a few letters.** Fit whole chips, then show "+N".
 - **A person drawn smaller than the chips beside it.**
 - **A bordered plus button for an empty value.** An empty value is the gray word Empty.
+- **Bare chips.**
+- **Pen-style highlights.** Highlights are yellow, with other colors as settings.
 
 ## The item page
 
@@ -43,6 +45,8 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 - **Gallery text centered under the card, or over the picture.**
 - **Gallery cards too wide or too tall, and pictures at landscape height.**
 - **A board without its columns.**
+- **An agenda narrowed to a column.** The timeline uses the window's width.
+- **A thumbnail column of a new kind beside a document.**
 - **A flat, squared or hand-drawn segmented control.** MAPP uses the system's. See [Views and lists](views-and-lists.md).
 - **A separate filter button in the list toolbar.** Filters live in the row above the list.
 

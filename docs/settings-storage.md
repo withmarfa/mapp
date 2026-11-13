@@ -23,18 +23,17 @@ Column widths are `interfaceDefaultWidth.<column>`, and the right sidebar's widt
 
 ## Rules
 
-- **Nothing goes to Marfa.** Marfa has no per-field icon, color or order, and a saved view holds no layout. A setting for how something looks stays on the Mac. See [Marfa and MAPP](marfa-and-mapp.md).
+The rules that apply to every setting are in the `AGENTS.md` files: [that nothing goes to Marfa](../AGENTS.md), [how a saved view's Mac settings are kept and forgotten](../MAPP/Model/AGENTS.md), and [how a Debug build keeps its own values](../AGENTS.md). Three more belong to this page.
+
 - **A type's setting has no inheritance today.** `pagePlacements` for a child type does not read its parent's. The agreed look store follows the `parent` chain; see [Looks](looks.md).
 - **Unreadable stored text is set aside, not dropped.** When a stored value cannot be decoded, MAPP keeps the text under a `...SetAside` key (`pagePlacementsSetAside`, `viewLayoutsSetAside`, `sidebarLayoutsSetAside`) and starts from the defaults, so a person's arrangement can be recovered.
-- **A saved view's Mac settings go only when the person deletes the view.** `Browser.forgetView`, reached from `Browser.deleteView`, is the one place that forgets them, because a view missing from a list proves nothing when a read failed.
-- **A Debug build has its own values.** Its bundle identifier differs from the installed app's, so it never shares defaults, sign-ins or the return address with it. Key anything that must differ on `Bundle.main.bundleIdentifier`, never a literal.
 - **A new field on a stored value is optional.** A value saved before the field existed must still decode.
 
 ## The Settings window
 
 Settings is a place in the sidebar, not a separate window. It shows its pages in the list column (`SettingsPage`) and the chosen page in the detail column. The pages are Appearance, Lists, Editor and Sidebar; then Library, This Marfa and Recently Deleted; then About.
 
-The sidebar, list and Settings columns each have a default width a person can change in Settings (`ColumnWidth`): 230, 330 and 280 points, each within a range the column allows.
+The sidebar, list and Settings columns each have a default width a person can change in Settings (`ColumnWidth`): 230, 330 and 280 points, each within a range the column allows. The measurements of a page's rows and boxes are in [Views and lists](views-and-lists.md).
 
 ## The agreed change
 

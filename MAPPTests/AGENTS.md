@@ -20,7 +20,7 @@ TEST_RUNNER_MARFA_API_URL=<address> TEST_RUNNER_MARFA_API_KEY=<key> TEST_RUNNER_
   xcodebuild -project MAPP.xcodeproj -scheme MAPP -testPlan Live -destination 'platform=macOS' -derivedDataPath build test
 ```
 
-`Scripts/measure-ui.sh` times the window on a test instance's library, with the screen to itself; its header says how.
+Replace `test` with `build` to build only. `Scripts/measure-ui.sh` times the window on a test instance's library, with the screen to itself; its header says how.
 
 ## Test plans
 

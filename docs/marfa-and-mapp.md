@@ -10,7 +10,8 @@ Marfa holds what a thing is. MAPP decides how it looks. This page explains where
 
 Marfa is the server. MAPP reads and writes it through the `marfa-swift` package's working copy.
 
-- **Items and types.** An item has a type, properties, a text body and edges. A type has a label, fields, a parent, status words and an icon.
+- **Items and types.** An item has a type, properties, a text body and edges. A type has a label, fields, a parent, status words and an icon. A field's name carries down the type chain, so a child type has its parent's fields.
+- **Read-only.** `read_only` is per item, not per type or field.
 - **Field kinds.** A field has a kind (string, number, date, enum, status, list of entries, and so on) and an optional `format`. There is no kind for a location, a color or a duration.
 - **Status groups.** Every status word belongs to one of four fixed groups: not started, in progress, completed or canceled. A type can add words but not groups.
 - **Edges.** A link between two items is an edge with a name and a reverse name. A field cannot point at an item.

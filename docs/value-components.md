@@ -10,18 +10,27 @@ A value component is one drawing for one kind of value. The same component appea
 
 | Kind | Drawing |
 | --- | --- |
-| Status | A symbol for its group, in a chip with a fine gray edge. |
-| Priority and other options | A dot in the option's color, then the word. |
+| Status | A symbol for its group, in a chip with a fine gray edge, and a faint fill in dark. |
+| Priority and other options | A dot in the option's color, then the word. A list of options, such as a repository's labels, takes the dot too. |
 | Type | The type's name tinted in its color, with its icon in color. |
 | Linked item | The linked item's type mark and title on the gray of an option chip. The title is underlined under the pointer. |
 | Tag | Gray, after a number sign. |
 | Person | Initials in a pale circle. The page and the right sidebar add the name; a row shows initials only. |
+| Filter | Its field in gray, then is or is not, the values and an x. |
 
 Dates, numbers, web addresses and sources are plain text, not chips.
 
 In a row, linked items and tags do not show. A chip is a little smaller in a row (20 points high with 11.5-point text) than on the page (22 points high with 13-point text).
 
-A tint means a type, so no other chip uses a colored fill. A person has no chip and no edge round the initials.
+A tint means a type, so no other chip uses a colored fill. A person has no chip and no edge round the initials, and is never colored. Bare chips are not used.
+
+Agreed, not built: solid options and tags are a setting, off by default.
+
+## Type marks
+
+A type's mark is its icon on a pale rounded square of the same color (`TypeMark`), the same everywhere, with no shadow. Built in v0.0.43. In light the icon sits 22 percent toward black from the tint's color. In dark it sits 8 percent toward white and stays under a brightness ceiling, so the bright tones sit level with the others (`ChipLooks.inkDepth`, `inkDepthDark`, `inkCeilingDark`).
+
+Every component works in light and in dark.
 
 ## Status
 
@@ -46,10 +55,12 @@ An empty value is the gray word Empty, in rows and pins. It is never a bordered 
 
 A value is edited in a panel that opens under it, its leading edge on the value's (`ValueEditPresenter`). The chosen values sit as chips in the field at the top, each with an x.
 
+- A status is edited by its groups, with each of the type's words under its group, as Marfa defines status.
 - Lists are flush left, with no column for a tick, and show ten rows at most.
 - A value that takes one choice (status, priority, parent, type) closes on a pick and has no Not Set row. A value that takes several (tags, people) stays open.
 - A date has its shortcuts, a calendar that MAPP draws with the day as a circle, a Time row that stays empty until set, and Not Set.
 - The panel is glass by default. A Solid choice in Appearance makes it the window's own color.
+- Change Type is a panel like status. See [Item page](item-page.md).
 
 ## Built today
 
