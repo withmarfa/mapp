@@ -93,6 +93,23 @@ import UniformTypeIdentifiers
         #expect(model.point == LocationPoint(latitude: 51.5246, longitude: -0.0788))
     }
 
+    /// An Undo sends its write even where the item already holds what it puts back, as the library's does, and leaves
+    /// a Redo.
+    @Test func anUndoIsSentAndLeavesARedoWhereTheItemAlreadyHoldsItsValues() throws {
+        let event = add("core.event")
+        let model = try panel(for: event)
+        step { model.place(Self.point(51.5246, -0.0788)) }
+        // Another device takes the location away before the person chooses Undo.
+        let index = try #require(library.items.firstIndex { $0.id == event.id })
+        library.items[index].properties.removeAll { $0.key == "latitude" || $0.key == "longitude" }
+        undo.undo()
+        #expect(library.propertiesSet.count == 2)
+        #expect(library.propertiesSet.last?.changes == ["latitude": nil, "longitude": nil])
+        #expect(undo.canRedo)
+        undo.redo()
+        #expect(model.point == LocationPoint(latitude: 51.5246, longitude: -0.0788))
+    }
+
     // MARK: While a write is on its way
 
     @Test func clearingBeforeThePlacementLandsIsSentAndWins() throws {

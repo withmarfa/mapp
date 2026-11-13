@@ -389,6 +389,16 @@ final class FakeItemLibrary: ItemLibrary {
         guard acceptsProperties, let index = items.firstIndex(where: { $0.id == id }), items[index].isEditable else { return false }
         let old = Dictionary(uniqueKeysWithValues: changes.keys.map { ($0, items[index].value(of: $0)) })
         guard !changes.isEmpty, isWritingProperties(of: id) || changes.contains(where: { old[$0.key] != $0.value }) else { return true }
+        write(id, changes, from: old, at: index, actionName: actionName, undoManager: undoManager)
+        return true
+    }
+
+    /// Sends the edit, and registers an undo that sends the reverse and registers the redo, whatever the item holds by
+    /// then, as the library's does. It puts back the values the edit found, as a library whose edits all land does.
+    private func write(
+        _ id: ItemID, _ changes: [String: PropertyValue?], from old: [String: PropertyValue?], at index: Int, actionName: String,
+        undoManager: UndoManager?
+    ) {
         propertiesSet.append((id, changes, actionName))
         if holdsPropertyWrites {
             heldPropertyWrites.append((id, changes))
@@ -397,10 +407,10 @@ final class FakeItemLibrary: ItemLibrary {
             apply(changes, to: index)
         }
         undoManager?.registerUndo(withTarget: self) { library in
-            _ = library.setItemProperties(id, changes: old, actionName: actionName, undoManager: undoManager)
+            guard let index = library.items.firstIndex(where: { $0.id == id }) else { return }
+            library.write(id, old, from: changes, at: index, actionName: actionName, undoManager: undoManager)
         }
         undoManager?.setActionName(actionName)
-        return true
     }
 
     private func apply(_ changes: [String: PropertyValue?], to index: Int) {
