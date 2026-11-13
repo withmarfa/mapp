@@ -97,7 +97,7 @@ struct TypeLooksTests {
     @Test func aChosenFieldTheTypeLacksIsPassedOver() {
         let catalogue = LookFixture.catalogue([note("a")])
         let choices = [TypeID("a"): TypeLookChoice(
-            date: .field("nope"), secondary: [.field("nope"), .site, .opening], facts: [.field("nope"), .tags])]
+            date: .field("nope"), secondary: [.field("nope"), .opening], facts: [.field("nope"), .tags])]
         #expect(catalogue.look(of: TypeID("a"), choices: choices) == TypeLook(date: .edited, secondary: [.opening], facts: [.tags]))
     }
 
