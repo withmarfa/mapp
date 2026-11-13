@@ -1,14 +1,14 @@
 # Presets and densities
 
-Status: Agreed, not built. Today a list row takes one of six row styles; see [Looks](looks.md).
+Status: The presets are built, not yet released. Densities are agreed, not built. Today a list row takes one of six row styles; see [Looks](looks.md).
 
-Where it lives: `ListRowStyle`, `ListRowType` and the row facts in `ListRowFacts.swift` under `MAPP/Model/Items/`, and `ListsSettings` and `ViewPanelRows` under `MAPP/Views/`. The presets and densities below replace them.
+Where it lives: `LookPreset` under `MAPP/Model/Looks/`. Until rows read a look, `ListRowStyle`, `ListRowType` and the row facts in `ListRowFacts.swift` under `MAPP/Model/Items/`, and `ListsSettings` and `ViewPanelRows` under `MAPP/Views/`, draw a row. The presets and densities below replace them.
 
 A preset is the starting look for a type. A density is how much room a row takes. Both are suggestions that a look builds on, not layouts a person has to choose between.
 
 ## Presets
 
-A new type gets a preset from its fields. A child type starts from its parent's look instead, place by place. How a preset is chosen from a type's fields is decided when the feature is built.
+A type gets a preset from its fields (`LookPreset.suggested`), and the preset fills each place of the look from the fields the type has; a place the type has no field for stays empty. A child type takes its parent's look instead, place by place, unless its own fields suggest another preset. See [Looks](looks.md).
 
 | Preset | For | Secondary | Bottom line | Date |
 | --- | --- | --- | --- | --- |
@@ -23,6 +23,23 @@ A new type gets a preset from its fields. A child type starts from its parent's 
 | Clip | Clipboard items | What was copied | The app it came from | Copied |
 | Record | Transactions, workouts, measurements | Category | The amount or the numbers | Happened |
 
+### How a preset is chosen
+
+The first of these that fits wins, so the order is the rule. A preset names no type: it reads fields and their kinds. The exceptions are the highlight type, a file type (`Catalogue.isFileType`) and a person (`PageHeaderKind`), which no field tells.
+
+1. **Quote.** The type is, or is below, `core.highlight`.
+2. **Place.** `latitude` and `longitude` with a street, locality or postal code. An event or an image has coordinates and no address. Place comes before Person, since a place builds on an entity and carries its emails and phones.
+3. **Person.** A person by header, or any type with `emails` or `phones`. A bare `core.entity` is a Person, since it stands for people and organizations.
+4. **Media.** A file type, or a type whose page is for reading (a bookmark, media). It comes before Task, since media has a progress status.
+5. **Record.** A number with a currency code (a string field of the `currency` format), or with `occurred_at`.
+6. **Task.** A status field, whatever it is called.
+7. **Event.** A `starts_at` field on an event.
+8. **Message.** A `from` field.
+9. **Clip.** A `source_app` field.
+10. **Note.** Anything else, a type with no fields, and a type the server lacks.
+
+No type Marfa ships gets Record or Clip today; a type built on `occurred_at` and numbers, or on `source_app`, does.
+
 The title is always the item's name. A clipboard item is titled "Clipboard Item", or a name its person gave it, and never its content.
 
 ## Densities
@@ -36,7 +53,7 @@ The Row Style control in Edit View becomes a Density control, and the six row st
 
 ## Built today
 
-Settings and Edit View offer Standard, Compact and With Pictures for every list. Task, Highlight and Person rows are chosen for a type or a view, or come from the type's fields. A person's choice for each type is stored as `listTypeStyles`, and a saved view's row choices are stored with the view's other settings on the Mac.
+Settings and Edit View offer Standard, Compact and With Pictures for every list. Task, Highlight and Person rows are chosen for a view or come from the type's fields, through the preset suggestion above. A saved view's row choices are stored with the view's other settings on the Mac.
 
 ## Related pages
 
