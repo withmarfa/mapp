@@ -13,7 +13,7 @@ The item page shows one item: its title, its pinned properties, its text and its
 - A pin that holds a list shows its first value and "+N more" (`PagePins.listLimit`). Its help carries every value.
 - A pin that is stale, or that the header draws itself, is not drawn, and a stale one stays in storage. A pinned row is not also in the property block, and the pin an event's time pushes out goes back to the block.
 - A pin sits in a slot 150 points wide at 13-point text, so a pin stays in the same place from page to page. Pins wrap only where no slot is left.
-- A pin with nothing to show reads as the grey word Empty where the person can set a value, and is left out where they cannot. No dotted place or placeholder box stands in for one.
+- A pin with nothing to show reads as the gray word Empty where the person can set a value, and is left out where they cannot. No dotted place or placeholder box stands in for one.
 - A pin's key carries the same icon as its row.
 - The header's chips are the value components. See [Value components](value-components.md).
 
@@ -49,7 +49,7 @@ Version History opens as its own workspace (`VersionHistoryWorkspace`): a thread
 
 ## Rules that hold on the page
 
-- The row of actions above the title shows only while the pointer is over the header.
+- The row of actions above the title takes no room. It shows with the pointer over it or the title, with keyboard focus in it, and while Customize Layout is on.
 - A person's name and the status words are Marfa's. The look changes how they are drawn, not what they say.
 - Dates follow the person's Date Format choice (`dateFormat`).
 

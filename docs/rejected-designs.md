@@ -8,14 +8,14 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 
 ## Chips and values
 
-- **A type in a neutral chip with a grey edge.** A tint means a type; see [Value components](value-components.md).
-- **A tag drawn with the tag symbol or an outline.** A tag is grey, after a number sign.
-- **A person in a grey chip.** A person is initials in a pale circle, with no chip and no edge.
+- **A type in a neutral chip with a gray edge.** A tint means a type; see [Value components](value-components.md).
+- **A tag drawn with the tag symbol or an outline.** A tag is gray, after a number sign.
+- **A person in a gray chip.** A person is initials in a pale circle, with no chip and no edge.
 - **Glass type marks with a drop shadow.**
-- **A chip taller than its neighbours.** Chips side by side must line up, so every chip is one height.
+- **A chip taller than its neighbors.** Chips side by side must line up, so every chip is one height.
 - **Chips squeezed to a few letters.** Fit whole chips, then show "+N".
 - **A person drawn smaller than the chips beside it.**
-- **A bordered plus button for an empty value.** An empty value is the grey word Empty.
+- **A bordered plus button for an empty value.** An empty value is the gray word Empty.
 
 ## The item page
 
@@ -38,7 +38,7 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 - **A type tile at the trailing edge of a row, or a large leading type tile.**
 - **A person's name in a row.** A row shows initials only.
 - **A clipboard item titled with its content.** It is titled "Clipboard Item", or a name its person gave it.
-- **A grey key, such as a number, before a title.** A number is a property.
+- **A gray key, such as a number, before a title.** A number is a property.
 - **Sources as cards with a type breakdown bar.**
 - **Gallery text centered under the card, or over the picture.**
 - **Gallery cards too wide or too tall, and pictures at landscape height.**

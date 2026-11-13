@@ -10,11 +10,11 @@ A value component is one drawing for one kind of value. The same component appea
 
 | Kind | Drawing |
 | --- | --- |
-| Status | A symbol for its group, in a chip with a fine grey edge. |
+| Status | A symbol for its group, in a chip with a fine gray edge. |
 | Priority and other options | A dot in the option's color, then the word. |
 | Type | The type's name tinted in its color, with its icon in color. |
-| Linked item | The linked item's type mark and title on the grey of an option chip. The title is underlined under the pointer. |
-| Tag | Grey, after a number sign. |
+| Linked item | The linked item's type mark and title on the gray of an option chip. The title is underlined under the pointer. |
+| Tag | Gray, after a number sign. |
 | Person | Initials in a pale circle. The page and the right sidebar add the name; a row shows initials only. |
 
 Dates, numbers, web addresses and sources are plain text, not chips.
@@ -31,8 +31,8 @@ A status takes the group's symbol, and the status words stay the type's own, so 
 | --- | --- | --- |
 | Not started | `circle` | Default |
 | In progress | `circle.lefthalf.filled` | Blue |
-| Completed | `largecircle.fill.circle` | Secondary grey |
-| Canceled | `xmark.circle` | Tertiary grey |
+| Completed | `largecircle.fill.circle` | Secondary gray |
+| Canceled | `xmark.circle` | Tertiary gray |
 
 ## Priority
 
@@ -40,7 +40,7 @@ A task's priority takes its color from its rank, never from its word: Low purple
 
 ## Empty values
 
-An empty value is the grey word Empty, in rows and pins. It is never a bordered plus button.
+An empty value is the gray word Empty, in rows and pins. It is never a bordered plus button.
 
 ## Editing
 

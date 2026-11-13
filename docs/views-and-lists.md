@@ -51,7 +51,7 @@ View Options also holds Include Subtypes, which lets a type's list show the item
 
 ## Sidebar
 
-The sidebar has three groups of places: Library (All, Sources and Collections), Views (Inbox, Recents, Favorites and the saved views) and Types. A person hides or moves a place in Customize Sidebar, and the arrangement is kept for each server (`sidebarLayouts`).
+The sidebar has three groups of places: Library (Items, Sources and Collections), Views (Inbox, Recents, Favorites and the saved views) and Types. A person hides or moves a place in Settings > Sidebar, and the arrangement is kept for each server (`sidebarLayouts`).
 
 ## Command palette
 
