@@ -25,8 +25,8 @@ MAPP is a native macOS markdown notes app with a sidebar, a list and a page, lik
 
 - Use American English. Put no time estimates, absolute paths, machine or account names or credentials in any file. A comment says only why.
 - Use scoped lowercase Conventional Commits in the present tense: `feat(app):`, `fix(editor):`.
-- Work on a branch in a worktree under `.claude/worktrees/` and reach `main` through a pull request, squash-merged once the tests pass and a reviewer has read it. Then run `git worktree remove`, `git branch -D` (a squash-merge looks unmerged) and `git pull --ff-only`.
-- CI (`.github/workflows/checks.yml`) runs on a pull request that is ready, each check only when its files changed, and retries nothing; `Checks` is the one job to require. A draft runs no Swift job: run the tests yourself and mark it ready once reviewed.
+- Work on a branch in a worktree under `.claude/worktrees/` and reach `main` through a pull request. Merge it as `.agents/skills/land-a-pull-request/SKILL.md` says: by hand once the ready run's `Checks` passes, or with an admin merge in its five cases.
+- CI (`.github/workflows/checks.yml`) runs each check only when its files changed, and retries nothing; `Checks` is the one required check. A draft runs no Swift job, but `Checks` still reports green on it.
 - Keep no legacy: no shims, deprecation aliases or migration paths.
 
 ## Platform
