@@ -31,7 +31,7 @@ Agreed, not built:
 A saved view splits between Marfa and the Mac. The rules for each side, and for deleting a view, are in [`MAPP/Model/AGENTS.md`](../MAPP/Model/AGENTS.md).
 
 - **Marfa holds** the view's title, query, sort and group.
-- **The Mac holds** the layout, the table's columns, whether the board hides empty groups, the gallery's cards, the list's density and the table's widths (`ViewMacSettings`). See [Settings storage](settings-storage.md).
+- **The Mac holds** the layout, the table's columns, whether the board hides empty groups, the gallery's cards, the calendar's Week or Month, the list's density and the table's widths (`ViewMacSettings`). See [Settings storage](settings-storage.md).
 
 A type's list, and the other places that are not views, can become one with Save as View in the toolbar. The view keeps the filters, the sort and the grouping the window shows:
 

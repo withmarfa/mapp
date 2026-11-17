@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The calendar layout: a week of day columns with hours, or a month of days, with each item where its type's date puts
@@ -122,9 +123,13 @@ private extension Color {
 }
 
 private extension Calendar {
-    func hourText(_ hour: Int, on day: Date) -> String {
-        let date = self.date(bySettingHour: hour, minute: 0, second: 0, of: day) ?? day
-        return date.formatted(Date.FormatStyle(calendar: self, timeZone: timeZone).hour())
+    /// The label of an hour on the clock, read on a day that has no daylight saving change, so the hour a change skips
+    /// still has its label.
+    func hourText(_ hour: Int) -> String {
+        var plain = Calendar(identifier: .gregorian)
+        plain.timeZone = .gmt
+        let date = plain.date(from: DateComponents(year: 2001, month: 1, day: 1, hour: hour)) ?? Date(timeIntervalSinceReferenceDate: TimeInterval(hour * 3600))
+        return date.formatted(Date.FormatStyle(locale: locale ?? .current, calendar: plain, timeZone: .gmt).hour())
     }
 }
 
@@ -224,7 +229,7 @@ private struct CalendarWeekView: View {
         return HStack(spacing: 0) {
             ZStack(alignment: .topTrailing) {
                 ForEach(1..<24, id: \.self) { hour in
-                    Text(calendar.hourText(hour, on: week.interval.start))
+                    Text(calendar.hourText(hour))
                         .interfaceFont(.system(size: 10.5))
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
@@ -252,9 +257,12 @@ private struct CalendarWeekView: View {
                     let slot = (width - 6) / CGFloat(block.columns)
                     let top = CGFloat(block.startMinute) / 60 * Self.hourHeight
                     let tall = max(CGFloat(block.endMinute - block.startMinute) / 60 * Self.hourHeight, 20)
+                    let blockWidth = max(slot - 2, 8)
                     CalendarCell(browser: browser, id: block.entry.id, help: block.entry.title, open: open) { isSelected in
-                        CalendarBlockLabel(entry: block.entry, isSelected: isSelected, calendar: calendar, showsTime: tall >= 34)
-                            .frame(width: max(slot - 2, 8), height: tall - 1, alignment: .topLeading)
+                        CalendarBlockLabel(
+                            entry: block.entry, isSelected: isSelected, calendar: calendar, showsTime: tall >= 34, width: blockWidth,
+                            height: tall - 1)
+                            .frame(width: blockWidth, height: tall - 1, alignment: .topLeading)
                             .calendarFill(isSelected, radius: 6)
                             .shadow(color: isSelected ? .black.opacity(0.18) : .clear, radius: 3, y: 2)
                     }
@@ -272,19 +280,39 @@ private struct CalendarWeekView: View {
     }
 }
 
-/// What a block says: its title on up to two lines and its start.
+/// What a block says: its title on up to two lines, by word and ending in an ellipsis where it is cut, and its start.
 private struct CalendarBlockLabel: View {
     let entry: CalendarEntry
     let isSelected: Bool
     let calendar: Calendar
     let showsTime: Bool
+    let width: CGFloat
+    let height: CGFloat
+    @Environment(\.interfaceTextSize) private var textSize
+
+    private static let padding = EdgeInsets(top: 4, leading: 6, bottom: 4, trailing: 6)
 
     var body: some View {
+        let scale = InterfaceStyle.scale(for: textSize)
+        let font = NSFont.systemFont(ofSize: 11.5 * scale, weight: .medium)
+        let room = height - Self.padding.top - Self.padding.bottom - (showsTime ? 12 * scale : 0)
+        let lineCount = max(1, min(2, Int(room / (14 * scale))))
+        // A point is kept back so a line that measures as fitting is not cut by the text's own rounding.
+        let lines = CalendarLayout.titleLines(
+            entry.title, lines: lineCount, fitting: width - Self.padding.leading - Self.padding.trailing - 1
+        ) { ($0 as NSString).size(withAttributes: [.font: font]).width }
         VStack(alignment: .leading, spacing: 1) {
-            Text(verbatim: entry.title)
-                .interfaceFont(.system(size: 11.5, weight: .medium))
-                .lineLimit(2)
-                .foregroundStyle(isSelected ? Color.white : .primary)
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                    Text(verbatim: line)
+                        .interfaceFont(.system(size: 11.5, weight: .medium))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .foregroundStyle(isSelected ? Color.white : .primary)
+                }
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(verbatim: entry.title))
             if showsTime {
                 Text(verbatim: DateDisplay.timeOfDay(of: entry.start, calendar: calendar))
                     .interfaceFont(.system(size: 10.5))
@@ -292,8 +320,7 @@ private struct CalendarBlockLabel: View {
                     .foregroundStyle(isSelected ? Color.white.opacity(0.85) : .secondary)
             }
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 4)
+        .padding(Self.padding)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }

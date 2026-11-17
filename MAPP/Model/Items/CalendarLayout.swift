@@ -99,6 +99,27 @@ nonisolated enum CalendarLayout {
         entry.start < nextDay(day, calendar: calendar) && entry.end > day
     }
 
+    /// A title broken at word boundaries into at most `lines` lines, for a block too narrow for it on one. Each line but
+    /// the last takes the words that fit `width` by `measure`, and the last takes every word left, for the view to end
+    /// with an ellipsis. A word wider than the line stands alone and is cut by its own ellipsis, never split mid-word.
+    static func titleLines(_ title: String, lines: Int, fitting width: CGFloat, measure: (String) -> CGFloat) -> [String] {
+        let words = title.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard lines > 1, words.count > 1 else { return [words.joined(separator: " ")] }
+        var result: [String] = []
+        var current = ""
+        for (offset, word) in words.enumerated() {
+            let candidate = current.isEmpty ? word : current + " " + word
+            if current.isEmpty || measure(candidate) <= width {
+                current = candidate
+                continue
+            }
+            result.append(current)
+            if result.count == lines - 1 { return result + [words[offset...].joined(separator: " ")] }
+            current = word
+        }
+        return result + [current]
+    }
+
     static func precedes(_ lhs: CalendarEntry, _ rhs: CalendarEntry) -> Bool {
         if lhs.isAllDay != rhs.isAllDay { return lhs.isAllDay }
         if lhs.start != rhs.start { return lhs.start < rhs.start }
@@ -144,9 +165,10 @@ nonisolated struct CalendarWeek: Equatable, Sendable {
     static func make(entries: [CalendarEntry], around anchor: Date, calendar: Calendar, now: Date) -> CalendarWeek {
         let interval = CalendarLayout.interval(of: .week, containing: anchor, calendar: calendar)
         let today = calendar.startOfDay(for: now)
+        let inWeek = entries.filter { $0.start < interval.end && $0.end > interval.start }
         let days = CalendarLayout.days(in: interval, calendar: calendar).map { day -> Day in
             let next = calendar.date(byAdding: .day, value: 1, to: day) ?? day.addingTimeInterval(86_400)
-            let here = entries.filter { CalendarLayout.covers($0, day: day, calendar: calendar) }
+            let here = inWeek.filter { CalendarLayout.covers($0, day: day, calendar: calendar) }
             let whole = here.filter(\.isAllDay).sorted(by: CalendarLayout.precedes)
             let timed = here.filter { !$0.isAllDay }.sorted(by: CalendarLayout.precedes).map { entry in
                 Block(
@@ -246,11 +268,12 @@ nonisolated struct CalendarMonth: Equatable, Sendable {
         var weekStart = first
         while weekStart < month.end, weeks.count < 7 {
             let week = CalendarLayout.interval(of: .week, containing: weekStart, calendar: calendar)
+            let inWeek = entries.filter { $0.start < week.end && $0.end > week.start }
             weeks.append(CalendarLayout.days(in: week, calendar: calendar).map { day in
                 Day(
-                    date: day, isInMonth: month.contains(day) || day == month.start, isToday: day == today,
+                    date: day, isInMonth: day >= month.start && day < month.end, isToday: day == today,
                     isWeekend: calendar.isDateInWeekend(day),
-                    entries: entries.filter { CalendarLayout.covers($0, day: day, calendar: calendar) }.sorted(by: CalendarLayout.precedes))
+                    entries: inWeek.filter { CalendarLayout.covers($0, day: day, calendar: calendar) }.sorted(by: CalendarLayout.precedes))
             })
             weekStart = week.end
         }

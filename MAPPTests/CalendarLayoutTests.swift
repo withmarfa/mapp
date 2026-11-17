@@ -260,4 +260,26 @@ struct CalendarLayoutTests {
         let month = CalendarLayout.moved(start, by: -1, scale: .month, calendar: calendar)
         #expect(calendar.component(.month, from: month) == 10)
     }
+
+    @Test func theFirstDayOfTheNextMonthIsNotInTheMonth() {
+        // November 2026 ends on a Monday, so its last row also holds 1 December.
+        let calendar = Self.calendar(firstWeekday: 2)
+        let days = Self.month([], around: "2026-11-04", calendar).weeks.flatMap { $0 }
+        let december = days.filter { calendar.component(.month, from: $0.date) == 12 }
+        #expect(!december.isEmpty && december.allSatisfy { !$0.isInMonth })
+        #expect(days.filter(\.isInMonth).count == 30)
+    }
+
+    @Test func aTitleBreaksAtWordsAndNeverInsideOne() {
+        func lines(_ title: String, _ count: Int, _ width: CGFloat) -> [String] {
+            CalendarLayout.titleLines(title, lines: count, fitting: width) { CGFloat($0.count) * 6 }
+        }
+        #expect(lines("Planning sync", 2, 200) == ["Planning sync"])
+        // "Morning" is wider than the line: it stands alone, for its own ellipsis, and "review" follows.
+        #expect(lines("Morning review", 2, 30) == ["Morning", "review"])
+        // The last line takes every word left, for the view to end with an ellipsis.
+        #expect(lines("Weekly planning meeting notes", 2, 100) == ["Weekly planning", "meeting notes"])
+        #expect(lines("Weekly planning meeting notes", 1, 100) == ["Weekly planning meeting notes"])
+        #expect(lines("Retrospective", 2, 30) == ["Retrospective"])
+    }
 }

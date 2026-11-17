@@ -19,7 +19,7 @@ nonisolated enum SampleLibrary {
     static var withCollections: Bool { ProcessInfo.processInfo.arguments.contains("-MAPPCollectionSample") }
 
     /// With the sample flag, `-MAPPOpenPlace <type id>` opens that type's place (`items` opens Items) and
-    /// `-MAPPLayout list|gallery|table|board` the layout, for a screenshot of one view.
+    /// `-MAPPLayout list|gallery|table|board|timeline|calendar` the layout, for a screenshot of one view.
     static var launchPlace: SidebarItem? {
         argument(after: "-MAPPOpenPlace").map { $0 == "items" ? .allNotes : .itemType($0) }
     }
