@@ -156,8 +156,8 @@ nonisolated enum Words {
 
     /// What to tell a person whose copy a different version of the app made, and so cannot be opened. Only that
     /// version can send the changes in it that the server has not taken, so the way forward is through it. A count
-    /// that can't be read stays unread after that version sends everything, and the package never removes a copy it
-    /// can't count, so the way out then is to remove the copy's folder.
+    /// that can't be read stays unread after that version sends everything, and the package never removes a copy whose
+    /// changes it can't read, so the way out then is to remove the copy's folder.
     static func otherVersion(unsent: UInt64?) -> String {
         let lead = String(localized: "This version of MAPP can’t read the copy of your library on this Mac, because a different version made it.")
         switch unsent {
@@ -174,8 +174,8 @@ nonisolated enum Words {
         }
     }
 
-    /// The package removes a copy only when it can count the changes in it, so a copy it can't count is left for the
-    /// person, who is shown where it is.
+    /// The package removes a copy only against the list of the changes in it, so a copy whose changes can't be listed
+    /// is left for the person, who is shown where it is.
     static func cannotDiscard(folder: String) -> String {
         String(localized: "MAPP can’t read the copy of your library on this Mac, so it can’t tell what the copy holds and won’t discard it. If you remove it yourself, quit MAPP first, then move the folder “\(folder)” to the Trash. Anything in it that hasn’t reached the server is lost.")
     }

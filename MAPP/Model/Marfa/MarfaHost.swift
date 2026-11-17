@@ -72,8 +72,8 @@ import Observation
         /// It holds `now` changes the server has not taken, not only the ones the person was shown and agreed to
         /// lose. Connecting to the address again opens it and sends them.
         case changed(now: UInt64)
-        /// Its changes can't be counted, and the package never removes a copy it can't count. `folder` is where it
-        /// is, for the person to remove.
+        /// Its changes can't be read, and the package never removes a copy whose changes it can't read. `folder` is
+        /// where it is, for the person to remove.
         case unreadable(folder: String)
         /// It is a folder's store, which is not MAPP's to remove.
         case notMapps(folder: String)
