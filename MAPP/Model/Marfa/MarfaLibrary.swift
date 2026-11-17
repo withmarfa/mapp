@@ -915,7 +915,7 @@ import Observation
         case .files: return active(withSubtypesOf: MarfaMapping.fileType)
         // The active items filed in the collection through `in-collection`.
         case .collection(let id):
-            return Set(index.links(to: id, type: MarfaMapping.collectionEdge).map(\.source)).intersection(index.ids(in: .active))
+            return Set(index.links(to: id, type: MarfaMapping.collectionEdge).map(\.from)).intersection(index.ids(in: .active))
         case .recentlyDeleted: return index.ids(in: .trashed)
         }
     }
@@ -1168,6 +1168,6 @@ import Observation
         // The index is not observed. A file attached or taken off changes an edge; a change to the file itself is
         // followed through its own record, which a reader of the list reads with `item(_:)`.
         _ = linksRevision
-        return index.links(to: id, type: MarfaMapping.attachmentEdge).map(\.source)
+        return index.links(to: id, type: MarfaMapping.attachmentEdge).map(\.from)
     }
 }

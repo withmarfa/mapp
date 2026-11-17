@@ -163,7 +163,7 @@ nonisolated struct ItemBody: Hashable, Sendable {
     let version: ItemVersion
 }
 
-nonisolated enum EdgeTarget: Hashable, Sendable {
+nonisolated enum EdgeTo: Hashable, Sendable {
     case item(ItemID)
     /// A reference no item answers to, or more than one does, kept as spelled so it can be shown and fixed.
     case unresolved(spelling: String, ambiguous: Bool)
@@ -184,8 +184,8 @@ nonisolated enum EdgeOrigin: Hashable, Sendable {
 nonisolated struct Edge: Identifiable, Hashable, Sendable {
     let id: EdgeID
     let type: String
-    let source: ItemID
-    let target: EdgeTarget
+    let from: ItemID
+    let to: EdgeTo
     let origin: EdgeOrigin
     /// The edge's `position` property, where it has one, as an `in-collection` edge orders a collection's members.
     var position: Double? = nil
@@ -195,7 +195,7 @@ nonisolated extension Item {
     /// The item this one is filed under: the target of its `child-of` edge.
     var parentID: ItemID? {
         edgesOut.lazy.compactMap { edge -> ItemID? in
-            guard edge.type == "child-of", case .item(let id) = edge.target else { return nil }
+            guard edge.type == "child-of", case .item(let id) = edge.to else { return nil }
             return id
         }.first
     }
@@ -203,7 +203,7 @@ nonisolated extension Item {
     /// The collections this item is in: the targets of its `in-collection` edges, in the order it holds them.
     var collectionIDs: [ItemID] {
         edgesOut.compactMap { edge -> ItemID? in
-            guard edge.type == MarfaMapping.collectionEdge, case .item(let id) = edge.target else { return nil }
+            guard edge.type == MarfaMapping.collectionEdge, case .item(let id) = edge.to else { return nil }
             return id
         }
     }

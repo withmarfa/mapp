@@ -566,7 +566,7 @@ struct MarfaSourceOfflineTests {
         source.submit(
             .create(id: child, ItemDraft(type: Self.note, title: "MAPPTEST \(name)", body: "Queued", parent: ids[0])), as: WriteID())
         _ = try #require(await log.wait { state in
-            state.snapshot?.items.first { $0.id == child }?.edgesOut.contains { $0.target == .item(ids[0]) } == true
+            state.snapshot?.items.first { $0.id == child }?.edgesOut.contains { $0.to == .item(ids[0]) } == true
         })
         return ids
     }
@@ -585,12 +585,12 @@ struct MarfaSourceOfflineTests {
         let edge = try #require(try await source.copy.edges.from(first.rawValue).first { $0.edgeType == MarfaMapping.parentEdge })
 
         let write = WriteID()
-        source.submit(.moveEdge(EdgeID(edge.id), end: .source, to: second), as: write)
+        source.submit(.moveEdge(EdgeID(edge.id), end: .from, to: second), as: write)
         let moved = try #require(await log.wait { state in
-            state.snapshot?.items.first { $0.id == child }?.edgesOut.contains { $0.target == .item(second) } == true
+            state.snapshot?.items.first { $0.id == child }?.edgesOut.contains { $0.to == .item(second) } == true
         })
         let held = try #require(moved.snapshot?.items.first { $0.id == child }?.edgesOut)
-        #expect(!held.contains { $0.target == .item(first) })
+        #expect(!held.contains { $0.to == .item(first) })
         #expect(held.count == 1)
         let kinds = try await source.copy.queue.all().map(\.kind)
         #expect(kinds.filter { $0 == .updateEdge }.count == 1)
@@ -614,9 +614,9 @@ struct MarfaSourceOfflineTests {
         let edge = try #require(try await source.copy.edges.from(first.rawValue).first { $0.edgeType == MarfaMapping.parentEdge })
         for step in 0..<16 {
             let parent = step.isMultiple(of: 2) ? second : first
-            source.submit(.moveEdge(EdgeID(edge.id), end: .source, to: parent), as: WriteID())
+            source.submit(.moveEdge(EdgeID(edge.id), end: .from, to: parent), as: WriteID())
             let shown = await log.wait { state in
-                state.snapshot?.items.first { $0.id == child }?.edgesOut.map(\.target) == [.item(parent)]
+                state.snapshot?.items.first { $0.id == child }?.edgesOut.map(\.to) == [.item(parent)]
             }
             #expect(shown != nil, "after move \(step) the child shows \(parent == second ? "parent two" : "parent one")")
             if shown == nil { break }
@@ -634,16 +634,16 @@ struct MarfaSourceOfflineTests {
         _ = try #require(await log.wait { $0.snapshot != nil })
         let ids = try await parentAndChild(source, log, "parent", "other", "child")
         let (parent, other, child) = (ids[0], ids[1], ids[2])
-        source.submit(.link(EdgeDraft(type: "references", source: parent, target: other)), as: WriteID())
+        source.submit(.link(EdgeDraft(type: "references", from: parent, to: other)), as: WriteID())
         let references = try #require(await Self.edge(of: "references", from: parent, in: source))
         let parentOf = try #require(await Self.edge(of: MarfaMapping.parentEdge, from: parent, in: source))
 
         // A type whose end that stays can hold many has no end to replace.
         let notReplaceable = WriteID()
-        source.submit(.moveEdge(EdgeID(references.id), end: .target, to: child), as: notReplaceable)
+        source.submit(.moveEdge(EdgeID(references.id), end: .to, to: child), as: notReplaceable)
         // A move that would leave the edge running from an item to itself.
         let selfLoop = WriteID()
-        source.submit(.moveEdge(EdgeID(parentOf.id), end: .source, to: child), as: selfLoop)
+        source.submit(.moveEdge(EdgeID(parentOf.id), end: .from, to: child), as: selfLoop)
         let answered = try #require(await log.wait { $0.answer(to: notReplaceable) != nil && $0.answer(to: selfLoop) != nil })
         var validation = try #require(MarfaEngine.moveProblem(.validation(code: "validation_error", message: "", details: nil, server: nil)))
         var cycle = try #require(MarfaEngine.moveProblem(.validation(code: "edge_cycle", message: "", details: nil, server: nil)))
@@ -655,7 +655,7 @@ struct MarfaSourceOfflineTests {
         #expect(try await source.copy.queue.all().filter { $0.kind == .updateEdge }.isEmpty)
         // Both links are where they were.
         let held = try #require(answered.snapshot?.items.first { $0.id == child }?.edgesOut)
-        #expect(held.contains { $0.target == .item(parent) })
+        #expect(held.contains { $0.to == .item(parent) })
         await source.close()
     }
 
@@ -674,12 +674,12 @@ struct MarfaSourceOfflineTests {
         let before = try await source.copy.queue.all()
 
         let write = WriteID()
-        source.submit(.moveEdge(EdgeID(edge.id), end: .source, to: parent), as: write)
+        source.submit(.moveEdge(EdgeID(edge.id), end: .from, to: parent), as: write)
         let answered = try #require(await log.wait { $0.answer(to: write) != nil })
         #expect(answered.answer(to: write) == .accepted)
         #expect(try await source.copy.queue.all().map(\.id) == before.map(\.id))
         let held = try #require(answered.snapshot?.items.first { $0.id == child }?.edgesOut)
-        #expect(held.contains { $0.target == .item(parent) })
+        #expect(held.contains { $0.to == .item(parent) })
         await source.close()
     }
 
@@ -739,9 +739,9 @@ struct MarfaSourceOfflineTests {
         let (first, second, child) = (ids[0], ids[1], ids[2])
         let edge = try #require(try await source.copy.edges.from(first.rawValue).first { $0.edgeType == MarfaMapping.parentEdge })
         let write = WriteID()
-        source.submit(.moveEdge(EdgeID(edge.id), end: .source, to: second), as: write)
+        source.submit(.moveEdge(EdgeID(edge.id), end: .from, to: second), as: write)
         _ = try #require(await log.wait { state in
-            state.snapshot?.items.first { $0.id == child }?.edgesOut.contains { $0.target == .item(second) } == true
+            state.snapshot?.items.first { $0.id == child }?.edgesOut.contains { $0.to == .item(second) } == true
         })
         let queued = try await source.copy.queue.all()
         let move = try #require(queued.first { $0.kind == .updateEdge })
@@ -760,7 +760,7 @@ struct MarfaSourceOfflineTests {
         let after = try await source.copy.queue.all()
         #expect(Set(after.map(\.id)) == Set(queued.filter { $0.id != move.id }.map(\.id)), "only the answered write left the queue")
         let shown = try #require(log.current.snapshot?.items.first { $0.id == child })
-        #expect(shown.edgesOut.contains { $0.target == .item(second) })
+        #expect(shown.edgesOut.contains { $0.to == .item(second) })
         #expect(shown.sync != .settled)
         await source.close()
     }
@@ -785,7 +785,7 @@ struct MarfaSourceOfflineTests {
         // Tagged, but not yet linked: no original is known.
         _ = try #require(await log.wait { $0.snapshot?.items.first { $0.id == copy } != nil })
         #expect(log.current.snapshot?.items.first { $0.id == original }?.sync != .conflicted(sibling: copy, fields: []))
-        source.submit(.link(EdgeDraft(type: "derived-from", source: copy, target: original)), as: WriteID())
+        source.submit(.link(EdgeDraft(type: "derived-from", from: copy, to: original)), as: WriteID())
         let linked = try #require(await log.wait { state in
             if case .conflicted(let sibling, _)? = state.snapshot?.items.first(where: { $0.id == original })?.sync {
                 sibling == copy
@@ -900,7 +900,7 @@ extension LiveMarfaTests {
             let filed = try #require(await log.wait { state in
                 [parent, child].allSatisfy { id in state.snapshot?.items.first { $0.id == id }?.sync == .settled }
                     && state.snapshot?.items.first { $0.id == child }?.edgesOut.contains {
-                        $0.type == "child-of" && $0.target == .item(parent)
+                        $0.type == "child-of" && $0.to == .item(parent)
                     } == true
             })
             let snapshot = try #require(filed.snapshot)
@@ -928,7 +928,7 @@ extension LiveMarfaTests {
             let again = ChangeLog(reopened)
             let repainted = try #require(await again.wait { $0.painted != nil })
             #expect(repainted.painted?.items.count == count)
-            #expect(repainted.painted?.items.first { $0.id == child }?.edgesOut.contains { $0.target == .item(parent) } == true)
+            #expect(repainted.painted?.items.first { $0.id == child }?.edgesOut.contains { $0.to == .item(parent) } == true)
             #expect(atOpen != .online, "a copy is not online before the server has answered")
             await reopened.close()
         }
@@ -1232,7 +1232,7 @@ extension LiveMarfaTests {
                     as: WriteID())
                 _ = try #require(await log.wait { state in
                     state.snapshot?.items.first { $0.id == child }?.sync == .settled
-                        && state.snapshot?.items.first { $0.id == child }?.edgesOut.contains { $0.target == .item(first) } == true
+                        && state.snapshot?.items.first { $0.id == child }?.edgesOut.contains { $0.to == .item(first) } == true
                 })
                 await source.flush()
                 // A read while the copy fills again is refused as incomplete, so it is asked until it answers.
@@ -1244,7 +1244,7 @@ extension LiveMarfaTests {
                 let edge = try #require(held)
 
                 let move = WriteID(), tagged = WriteID()
-                source.submit(.moveEdge(EdgeID(edge), end: .source, to: second), as: move)
+                source.submit(.moveEdge(EdgeID(edge), end: .from, to: second), as: move)
                 source.submit(.tag(child, ItemTag.favorite, on: true), as: tagged)
                 let done = try #require(await log.wait { state in
                     state.answer(to: move) != nil && state.answer(to: tagged) != nil
@@ -1258,8 +1258,8 @@ extension LiveMarfaTests {
                 }
                 #expect(unavailable.isEmpty, "\(unavailable)")
                 let moved = try #require(done.snapshot?.items.first { $0.id == child })
-                #expect(moved.edgesOut.contains { $0.target == .item(second) })
-                #expect(!moved.edgesOut.contains { $0.target == .item(first) })
+                #expect(moved.edgesOut.contains { $0.to == .item(second) })
+                #expect(!moved.edgesOut.contains { $0.to == .item(first) })
                 #expect(moved.isFavorite)
                 // The copy fills again after the move is answered, and a read made meanwhile is refused as incomplete.
                 #expect(await LiveMarfa.until {
@@ -1288,7 +1288,7 @@ extension LiveMarfaTests {
                 let edge = try #require(try await source.copy.edges.from(a.rawValue).first { $0.toId == b.rawValue })
                 // `c` is below `b`, so it cannot become `b`'s parent.
                 let move = WriteID()
-                source.submit(.moveEdge(EdgeID(edge.id), end: .source, to: c), as: move)
+                source.submit(.moveEdge(EdgeID(edge.id), end: .from, to: c), as: move)
                 let refused = try #require(await log.wait { $0.answer(to: move) != nil })
                 guard case .refused(let problem)? = refused.answer(to: move) else {
                     Issue.record("the move was answered \(String(describing: refused.answer(to: move)))")
@@ -1296,7 +1296,7 @@ extension LiveMarfaTests {
                 }
                 #expect(problem.code == "edge_cycle")
                 _ = try #require(await log.wait { state in
-                    state.snapshot?.items.first { $0.id == b }?.edgesOut.contains { $0.target == .item(a) } == true
+                    state.snapshot?.items.first { $0.id == b }?.edgesOut.contains { $0.to == .item(a) } == true
                 })
                 #expect(try await source.copy.edges.from(a.rawValue).contains { $0.toId == b.rawValue })
             }

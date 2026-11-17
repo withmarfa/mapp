@@ -168,7 +168,7 @@ extension MarfaEngine {
         case .link(let draft):
             return [
                 try await copy.edges.create(
-                    from: draft.source.rawValue, to: draft.target.rawValue, type: draft.type,
+                    from: draft.from.rawValue, to: draft.to.rawValue, type: draft.type,
                     properties: draft.position.map { [MarfaMapping.positionProperty: .number($0)] } ?? [:])
             ]
         case .unlink(let edgeID):
@@ -177,7 +177,7 @@ extension MarfaEngine {
             guard let edge = edges[edgeID.rawValue] else {
                 throw MarfaError.notFound(code: "edge_not_found", message: String(localized: "This link isn’t in the library."), server: nil)
             }
-            let move: EdgeEdit.Move = end == .source ? .from(to.rawValue) : .to(to.rawValue)
+            let move: EdgeEdit.Move = end == .from ? .from(to.rawValue) : .to(to.rawValue)
             do {
                 // The copy's own version of the edge, since the move is refused on any other; an edge it shows
                 // moved by a move still waiting is read from its new ends.

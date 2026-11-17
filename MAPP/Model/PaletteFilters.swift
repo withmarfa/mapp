@@ -67,7 +67,7 @@ nonisolated struct PaletteFilters: Equatable, Sendable {
             && holds(.collection) {
                 // Reads the edges in place: no list of the item's collections is built for each item.
                 item.edgesOut.contains { edge in
-                    guard edge.type == MarfaMapping.collectionEdge, case .item(let id) = edge.target else { return false }
+                    guard edge.type == MarfaMapping.collectionEdge, case .item(let id) = edge.to else { return false }
                     return collections.contains(id)
                 }
             }

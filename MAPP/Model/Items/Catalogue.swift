@@ -181,7 +181,7 @@ nonisolated extension ItemTypeInfo.Field {
 }
 
 nonisolated struct EdgeTypeInfo: Identifiable, Hashable, Sendable {
-    enum End: Hashable, Sendable { case source, target }
+    enum End: Hashable, Sendable { case from, to }
 
     enum Cardinality: Hashable, Sendable { case one, many }
 
@@ -198,13 +198,13 @@ nonisolated struct EdgeTypeInfo: Identifiable, Hashable, Sendable {
     let reverseName: String?
     /// How many of this edge the end it is written at may hold, which decides whether its field takes a list.
     let cardinality: Cardinality
-    let writtenAt: End
+    let writtenFrom: End
     /// The types each end may be, with their subtypes, and the roles a type may play to be one. An end naming
     /// neither allows any type.
-    let sourceTypes: Set<TypeID>
-    let targetTypes: Set<TypeID>
-    var sourceRoles: Set<String> = []
-    var targetRoles: Set<String> = []
+    let fromTypes: Set<TypeID>
+    let toTypes: Set<TypeID>
+    var fromRoles: Set<String> = []
+    var toRoles: Set<String> = []
     var description: String?
     /// How many of this edge the end it is not written at may hold.
     var reverseCardinality: Cardinality = .many
@@ -219,11 +219,11 @@ nonisolated struct EdgeTypeInfo: Identifiable, Hashable, Sendable {
     var isTwoWay: Bool { label == reverseLabel }
 
     /// The name of the end an item holds, as Marfa gives it.
-    func label(atTarget: Bool) -> String { atTarget ? reverseLabel : label }
+    func label(atTo: Bool) -> String { atTo ? reverseLabel : label }
 
     /// How many edges of this type one item holds as its source, or as its target.
-    func cardinality(atTarget: Bool) -> Cardinality {
-        (writtenAt == .target) == atTarget ? cardinality : reverseCardinality
+    func cardinality(atTo: Bool) -> Cardinality {
+        (writtenFrom == .to) == atTo ? cardinality : reverseCardinality
     }
 }
 
@@ -375,8 +375,8 @@ nonisolated struct Catalogue: Hashable, Sendable {
     /// Whether `type` may be the source of an edge of type `info`: its source end admits the type, and where the type is
     /// flat, its target end does not.
     func admits(_ type: TypeID, source info: EdgeTypeInfo) -> Bool {
-        guard admits(type, types: info.sourceTypes, roles: info.sourceRoles) else { return false }
-        return !info.flat || !admits(type, types: info.targetTypes, roles: info.targetRoles)
+        guard admits(type, types: info.fromTypes, roles: info.fromRoles) else { return false }
+        return !info.flat || !admits(type, types: info.toTypes, roles: info.toRoles)
     }
 
     /// The edge type an item writes under `name`, and whether `name` is its reverse.

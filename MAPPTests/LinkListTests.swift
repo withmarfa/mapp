@@ -42,7 +42,7 @@ import Testing
 
     private static func note(_ number: Int, state: ItemState = .active, about: ItemID? = F.p1) -> Item {
         let id = ItemID("note-\(number)")
-        let edges = about.map { [Edge(id: EdgeID("about-\(number)"), type: "about", source: id, target: .item($0), origin: .property("about"))] } ?? []
+        let edges = about.map { [Edge(id: EdgeID("about-\(number)"), type: "about", from: id, to: .item($0), origin: .property("about"))] } ?? []
         return F.item(id, F.note, "Note \(number)", age: 100 + number, state: state, edges: edges)
     }
 
@@ -90,7 +90,7 @@ import Testing
     @Test func aLinkToAnItemTheLibraryDoesNotHoldIsMissingAndKeepsItsID() async throws {
         let stray = ItemID("not-held")
         let holder = F.item(ItemID("holder"), F.note, "Holder", age: 50, edges: [
-            Edge(id: EdgeID("stray"), type: "about", source: ItemID("holder"), target: .item(stray), origin: .property("about"))
+            Edge(id: EdgeID("stray"), type: "about", from: ItemID("holder"), to: .item(stray), origin: .property("about"))
         ])
         let (library, _) = try await Self.loaded([holder])
         let group = try #require(library.relationships(for: holder.id).first { $0.field == "about" })

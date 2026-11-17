@@ -150,12 +150,12 @@ struct MarfaMappingTests {
     @Test func anEdgeIsHeldAsManyTimesAsTheOtherEndAllows() throws {
         let parent = try #require(Self.catalogue.edgeTypes["parent-of"])
         #expect(parent.reverseName == "child-of")
-        #expect(parent.writtenAt == .target)
+        #expect(parent.writtenFrom == .to)
         #expect(parent.cardinality == .one)
-        #expect(parent.sourceTypes.isEmpty && parent.targetTypes.isEmpty)
+        #expect(parent.fromTypes.isEmpty && parent.toTypes.isEmpty)
         #expect(Self.catalogue.edgeTypes["references"]?.cardinality == .many)
         #expect(Self.catalogue.edgeTypes["supersedes"]?.cardinality == .one)
-        #expect(Self.catalogue.edgeTypes["in-folder"]?.targetTypes == [TypeID("system.folder")])
+        #expect(Self.catalogue.edgeTypes["in-folder"]?.toTypes == [TypeID("system.folder")])
         #expect(Self.catalogue.edgeType(named: "child-of")?.isReverse == true)
     }
 
@@ -164,17 +164,17 @@ struct MarfaMappingTests {
     /// each source holds one.
     @Test func eachEndSaysHowManyEdgesOfATypeItHolds() throws {
         let parent = try #require(Self.catalogue.edgeTypes["parent-of"])
-        #expect(parent.cardinality(atTarget: true) == .one)
-        #expect(parent.cardinality(atTarget: false) == .many)
+        #expect(parent.cardinality(atTo: true) == .one)
+        #expect(parent.cardinality(atTo: false) == .many)
         let supersedes = try #require(Self.catalogue.edgeTypes["supersedes"])
-        #expect(supersedes.cardinality(atTarget: true) == .one)
-        #expect(supersedes.cardinality(atTarget: false) == .one)
+        #expect(supersedes.cardinality(atTo: true) == .one)
+        #expect(supersedes.cardinality(atTo: false) == .one)
         let references = try #require(Self.catalogue.edgeTypes["references"])
-        #expect(references.cardinality(atTarget: true) == .many)
-        #expect(references.cardinality(atTarget: false) == .many)
+        #expect(references.cardinality(atTo: true) == .many)
+        #expect(references.cardinality(atTo: false) == .many)
         let thread = MarfaMapping.edgeType(EdgeType(id: "in-thread", label: "In thread", cardinality: "many-to-one"))
-        #expect(thread.cardinality(atTarget: false) == .one)
-        #expect(thread.cardinality(atTarget: true) == .many)
+        #expect(thread.cardinality(atTo: false) == .one)
+        #expect(thread.cardinality(atTo: true) == .many)
     }
 
     @Test func typesCarryTheRestOfTheirDefinition() throws {
@@ -255,12 +255,12 @@ struct MarfaMappingTests {
                 EdgeType(id: "open", label: "Open", cardinality: "many-to-many", fromTypeConstraints: ["*"], toTypeConstraints: ["*", "role:x"])
             ])
         let inCollection = try #require(catalogue.edgeTypes["in-collection"])
-        #expect(inCollection.targetTypes.isEmpty && inCollection.targetRoles == ["container"])
-        #expect(inCollection.sourceTypes.isEmpty && inCollection.sourceRoles.isEmpty)
+        #expect(inCollection.toTypes.isEmpty && inCollection.toRoles == ["container"])
+        #expect(inCollection.fromTypes.isEmpty && inCollection.fromRoles.isEmpty)
         let mixed = try #require(catalogue.edgeTypes["mixed"])
-        #expect(mixed.sourceTypes == [TypeID("core.note")] && mixed.sourceRoles == ["container"])
+        #expect(mixed.fromTypes == [TypeID("core.note")] && mixed.fromRoles == ["container"])
         let open = try #require(catalogue.edgeTypes["open"])
-        #expect(open.sourceTypes.isEmpty && open.sourceRoles.isEmpty && open.targetTypes.isEmpty && open.targetRoles.isEmpty)
+        #expect(open.fromTypes.isEmpty && open.fromRoles.isEmpty && open.toTypes.isEmpty && open.toRoles.isEmpty)
     }
 
     // MARK: Items
@@ -382,9 +382,9 @@ struct MarfaMappingTests {
         let held: Set<String> = ["project", "ticket", "decision"]
         let ticket = Self.item(Self.row("ticket"), edges: edges, held: held)
         #expect(ticket.edgesOut == [
-            MAPP.Edge(id: EdgeID("e1"), type: "child-of", source: ItemID("ticket"), target: .item(ItemID("project")),
+            MAPP.Edge(id: EdgeID("e1"), type: "child-of", from: ItemID("ticket"), to: .item(ItemID("project")),
                  origin: .property("child-of")),
-            MAPP.Edge(id: EdgeID("e2"), type: "references", source: ItemID("ticket"), target: .item(ItemID("decision")),
+            MAPP.Edge(id: EdgeID("e2"), type: "references", from: ItemID("ticket"), to: .item(ItemID("decision")),
                  origin: .body)
         ])
         let project = Self.item(Self.row("project", type: "aic.project"), edges: edges, held: held)

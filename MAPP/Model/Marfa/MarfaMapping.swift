@@ -269,11 +269,11 @@ nonisolated enum MarfaMapping {
         let other = type.writtenFrom == .to ? ends.last : ends.first
         return EdgeTypeInfo(
             id: type.id, label: type.label, reverseLabel: type.reverseLabel, reverseName: type.reverseName,
-            cardinality: held == "one" ? .one : .many, writtenAt: type.writtenFrom == .to ? .target : .source,
-            sourceTypes: constraints(type.fromTypeConstraints).types,
-            targetTypes: constraints(type.toTypeConstraints).types,
-            sourceRoles: constraints(type.fromTypeConstraints).roles,
-            targetRoles: constraints(type.toTypeConstraints).roles,
+            cardinality: held == "one" ? .one : .many, writtenFrom: type.writtenFrom == .to ? .to : .from,
+            fromTypes: constraints(type.fromTypeConstraints).types,
+            toTypes: constraints(type.toTypeConstraints).types,
+            fromRoles: constraints(type.fromTypeConstraints).roles,
+            toRoles: constraints(type.toTypeConstraints).roles,
             description: type.description, reverseCardinality: other == "one" ? .one : .many,
             cascadeOnDelete: cascade(type.cascadeOnDelete), properties: type.properties.map { field($0) }, flat: type.flat)
     }
@@ -418,13 +418,13 @@ nonisolated enum MarfaMapping {
     ) -> [Edge] {
         edges.compactMap { edge in
             let info = catalogue.edgeTypes[edge.edgeType]
-            let atTarget = info?.writtenAt == .target
-            guard (atTarget ? edge.toId : edge.fromId) == id else { return nil }
-            let other = atTarget ? edge.fromId : edge.toId
+            let atTo = info?.writtenFrom == .to
+            guard (atTo ? edge.toId : edge.fromId) == id else { return nil }
+            let other = atTo ? edge.fromId : edge.toId
             guard isHeld(other) else { return nil }
-            let name = atTarget ? info?.reverseName ?? edge.edgeType : edge.edgeType
+            let name = atTo ? info?.reverseName ?? edge.edgeType : edge.edgeType
             return Edge(
-                id: EdgeID(edge.id), type: name, source: ItemID(id), target: .item(ItemID(other)),
+                id: EdgeID(edge.id), type: name, from: ItemID(id), to: .item(ItemID(other)),
                 origin: edge.edgeType == bodyLinkEdge ? .body : .property(name),
                 position: edge.properties[positionProperty]?.number)
         }
@@ -438,7 +438,7 @@ nonisolated enum MarfaMapping {
         var found: [Edge] = []
         for (kind, names) in [(bodyLinkEdge, bodyLinks.links), (attachmentEdge, bodyLinks.embeds)] {
             for (position, name) in names.enumerated() {
-                let target: EdgeTarget
+                let target: EdgeTo
                 switch name.target {
                 case .item: continue
                 case .pending: target = .pending(spelling: name.name)
@@ -447,7 +447,7 @@ nonisolated enum MarfaMapping {
                 case .refused(let reason): target = .refused(spelling: name.name, reason: reason)
                 }
                 found.append(Edge(
-                    id: EdgeID("\(id)#\(kind)#\(position)"), type: kind, source: ItemID(id), target: target,
+                    id: EdgeID("\(id)#\(kind)#\(position)"), type: kind, from: ItemID(id), to: target,
                     origin: .body))
             }
         }
@@ -560,6 +560,7 @@ nonisolated enum MarfaMapping {
         case .accepted: .accepted
         case .merged(let fields): .merged(fields: fields)
         case .conflicted(let sibling?, let fields, _): .conflicted(sibling: ItemID(sibling), fields: fields)
+        // An item conflict always names the copy it wrote; one that names none is a table row's, which MAPP never writes.
         case .conflicted(nil, let fields, _): .merged(fields: fields)
         case .refused(let refusal): .refused(problem(refusal))
         case .blocked(let reason, let refusal): .blocked(blockedReason(reason), refusal.map(problem))

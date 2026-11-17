@@ -132,7 +132,7 @@ struct SidebarTests {
     @Test func theCollectionsIndexListsContainerItemsByTitle() {
         let project = FakeItemLibrary.note("Project", modified: start)
         var child = FakeItemLibrary.note("Child", modified: start)
-        child.edgesOut = [Edge(id: EdgeID("c"), type: "child-of", source: child.id, target: .item(project.id), origin: .property("child-of"))]
+        child.edgesOut = [Edge(id: EdgeID("c"), type: "child-of", from: child.id, to: .item(project.id), origin: .property("child-of"))]
         let library = FakeItemLibrary(items: [
             project, child, FakeItemLibrary.collection("Reading"), FakeItemLibrary.collection("Home"),
             FakeItemLibrary.collection("Gone", state: .trashed),

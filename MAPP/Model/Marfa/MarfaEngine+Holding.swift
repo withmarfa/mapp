@@ -144,12 +144,12 @@ extension MarfaEngine {
         case .transition(let id, _), .tag(let id, _, _):
             place(id.rawValue)
         case .link(let draft):
-            place(draft.source.rawValue)
-            place(draft.target.rawValue)
-            let ends: Set<String> = [draft.source.rawValue, draft.target.rawValue]
-            let between = edges.edges(touching: draft.source.rawValue)
+            place(draft.from.rawValue)
+            place(draft.to.rawValue)
+            let ends: Set<String> = [draft.from.rawValue, draft.to.rawValue]
+            let between = edges.edges(touching: draft.from.rawValue)
                 .filter { $0.edgeType == draft.type && Set([$0.fromId, $0.toId]) == ends }
-            stand.faces["links \(draft.type) \(draft.source.rawValue) \(draft.target.rawValue)"] = .links(between.map(\.id).sorted())
+            stand.faces["links \(draft.type) \(draft.from.rawValue) \(draft.to.rawValue)"] = .links(between.map(\.id).sorted())
         case .unlink(let id):
             edge(id.rawValue)
         case .moveEdge(let id, _, let to):

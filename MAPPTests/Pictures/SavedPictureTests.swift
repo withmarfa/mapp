@@ -102,7 +102,7 @@ import Testing
         let index = try #require(library.items.firstIndex { $0.id == file })
         let edge = library.items[index].edgesOut[0]
         library.items[index].edgesOut = [
-            Edge(id: edge.id, type: "references", source: edge.source, target: edge.target, origin: edge.origin)
+            Edge(id: edge.id, type: "references", from: edge.from, to: edge.to, origin: edge.origin)
         ]
 
         #expect(library.savedPictures(of: note, at: address("https://example.com/a.png")).isEmpty)

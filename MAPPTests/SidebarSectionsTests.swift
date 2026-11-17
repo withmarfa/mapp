@@ -216,7 +216,7 @@ struct SidebarSectionsTests {
         collection.name = "Garden"
         library.items.append(collection)
         library.items[library.items.firstIndex { $0.id == note.id }!].edgesOut = [
-            Edge(id: EdgeID("c"), type: MarfaMapping.collectionEdge, source: note.id, target: .item(collection.id), origin: .property("in-collection")),
+            Edge(id: EdgeID("c"), type: MarfaMapping.collectionEdge, from: note.id, to: .item(collection.id), origin: .property("in-collection")),
         ]
         func pull(_ title: String, source: String?) -> MAPP.Item {
             var item = FakeItemLibrary.note(title, modified: .distantPast)

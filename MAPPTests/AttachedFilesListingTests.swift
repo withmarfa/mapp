@@ -17,7 +17,7 @@ import UniformTypeIdentifiers
     private static func attachment(_ id: ItemID, to parent: ItemID, tier: Tier, type: TypeID = F.image) -> Item {
         F.item(
             id, type, id.rawValue, age: 20, tier: tier,
-            edges: [Edge(id: EdgeID("\(id.rawValue)#at"), type: "attached-to", source: id, target: .item(parent), origin: .property("attached-to"))],
+            edges: [Edge(id: EdgeID("\(id.rawValue)#at"), type: "attached-to", from: id, to: .item(parent), origin: .property("attached-to"))],
             titleRule: .firstLine, content: .file(.png, byteCount: 0))
     }
 
@@ -88,7 +88,7 @@ import UniformTypeIdentifiers
         #expect(library.count(in: .inbox) == 3)
 
         var attached = try #require(library.item(Self.alone))
-        attached.edgesOut = [Edge(id: EdgeID("late"), type: "attached-to", source: Self.alone, target: .item(F.n1), origin: .property("attached-to"))]
+        attached.edgesOut = [Edge(id: EdgeID("late"), type: "attached-to", from: Self.alone, to: .item(F.n1), origin: .property("attached-to"))]
         source.send(.upserted([attached]))
         #expect(await eventually { !ids(.inbox, in: library).contains(Self.alone) })
         #expect(library.count(in: .inbox) == 2)
@@ -125,10 +125,10 @@ import UniformTypeIdentifiers
         var catalogue = F.catalogue
         catalogue.edgeTypes["attached-to"] = EdgeTypeInfo(
             id: "attached-to", label: "Attached to", reverseLabel: "Attachments", reverseName: "has-attachment", cardinality: .many,
-            writtenAt: .source, sourceTypes: [MarfaMapping.fileType], targetTypes: [])
+            writtenFrom: .from, fromTypes: [MarfaMapping.fileType], toTypes: [])
         let file = F.item(ItemID("held-at-parent"), F.image, "held", age: 20, tier: .feed, titleRule: .firstLine, content: .file(.png, byteCount: 0))
         var parent = try #require(F.items.first { $0.id == F.n2 })
-        parent.edgesOut = [Edge(id: EdgeID("hap"), type: "has-attachment", source: F.n2, target: .item(file.id), origin: .property("attached-to"))]
+        parent.edgesOut = [Edge(id: EdgeID("hap"), type: "has-attachment", from: F.n2, to: .item(file.id), origin: .property("attached-to"))]
         let source = FakeItemSource()
         let library = MarfaLibrary(source: source, notices: Notices())
         source.send(.loaded(SourceSnapshot(items: F.items.filter { $0.id != F.n2 } + [parent, file], catalogue: catalogue)))

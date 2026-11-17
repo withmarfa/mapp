@@ -117,7 +117,7 @@ import Testing
         @discardableResult
         func relink(as group: UndoGroup) -> WriteID {
             let id = WriteID()
-            let draft = EdgeDraft(type: MarfaMapping.parentEdge, source: parent.id, target: item.id)
+            let draft = EdgeDraft(type: MarfaMapping.parentEdge, from: parent.id, to: item.id)
             source.submit(.link(draft), as: id, undoing: group)
             return id
         }

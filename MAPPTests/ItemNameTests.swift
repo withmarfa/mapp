@@ -43,8 +43,8 @@ import Testing
 
     @Test func aRelationshipTargetIsNamedByTheCoresName() async throws {
         var holder = F.item(F.n3, F.note, "Holder", age: 4, edges: [
-            Edge(id: EdgeID("a1"), type: "about", source: F.n3, target: .item(F.n1), origin: .property("about")),
-            Edge(id: EdgeID("a2"), type: "about", source: F.n3, target: .item(F.p1), origin: .property("about")),
+            Edge(id: EdgeID("a1"), type: "about", from: F.n3, to: .item(F.n1), origin: .property("about")),
+            Edge(id: EdgeID("a2"), type: "about", from: F.n3, to: .item(F.p1), origin: .property("about")),
         ])
         holder.name = "Holder"
         let source = FakeItemSource()
