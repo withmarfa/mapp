@@ -78,21 +78,30 @@ struct GalleryCard: View, Equatable {
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
-    /// The title, then the line its type's look gives it. The title keeps the room of two lines and the Secondary line
-    /// that of one, so the cards of a row are one height whatever their titles are.
+    /// The title, then the line its type's look gives it, the Secondary line directly under the title. The block keeps
+    /// the room of two title lines and one Secondary line, so the cards of a row are one height whatever their titles are.
     private var words: some View {
         let large = cards.size == .large
-        return VStack(alignment: .leading, spacing: 2) {
-            Text(content.title)
-                .interfaceFont(large ? .body.weight(.medium) : .callout.weight(.medium))
-                .lineLimit(2, reservesSpace: true)
-                .multilineTextAlignment(.leading)
-            Text(verbatim: content.secondary ?? " ")
-                .interfaceFont(large ? .callout : .subheadline)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+        let titleFont = large ? Font.body.weight(.medium) : Font.callout.weight(.medium)
+        let secondaryFont = large ? Font.callout : Font.subheadline
+        return ZStack(alignment: .topLeading) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: "A\nA").interfaceFont(titleFont).lineLimit(2)
+                Text(verbatim: " ").interfaceFont(secondaryFont).lineLimit(1)
+            }
+            .hidden()
+            VStack(alignment: .leading, spacing: 2) {
+                Text(content.title)
+                    .interfaceFont(titleFont)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Text(verbatim: content.secondary ?? " ")
+                    .interfaceFont(secondaryFont)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            .foregroundStyle(.primary)
         }
-        .foregroundStyle(.primary)
     }
 }
 

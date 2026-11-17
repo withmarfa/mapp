@@ -271,6 +271,9 @@ nonisolated final class MarfaSource: ItemSource {
             throw SourceFailure(kind: .missing, message: String(localized: "This item has no file."))
         }
         let name = Self.keptName(title: row.title, mimeType: row.properties[MarfaMapping.mimeTypeField]?.string)
+        #if DEBUG
+        if let url = SampleGallery.url(forBlob: hash) { return url }
+        #endif
         do {
             return try await MarfaEngine.asking {
                 try await copy.blobs.withFile(hash) { try await Self.keptCopy(of: $0, hash: hash, name: name) }

@@ -53,7 +53,7 @@ nonisolated enum SampleLibrary {
             edges: edges ?? (given == nil ? memberships(now: now) + (gallery ? SampleGallery.edges(now: now) : []) : []),
             itemTypes: itemTypes + (gallery ? SampleGallery.types : []),
             edgeTypes: edgeTypes, views: views, displays: display)
-        if gallery { SampleGallery.store(in: fake.copy) }
+        if gallery { SampleGallery.writeFiles() }
         let server = SampleServer(copy: fake.copy)
         let source = MarfaSource(
             copy: fake.copy, connection: connection, reading: server, refreshing: server)

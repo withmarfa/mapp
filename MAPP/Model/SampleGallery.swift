@@ -97,18 +97,18 @@ nonisolated enum SampleGallery {
         }
     }
 
-    /// Puts each file's bytes in the copy, where the hash in its item finds them.
-    static func store(in copy: WorkingCopy) {
-        let directory = FileManager.default.temporaryDirectory.appending(path: "mapp-gallery-sample")
+    private static var directory: URL { FileManager.default.temporaryDirectory.appending(path: "mapp-gallery-sample") }
+
+    /// Writes each file's bytes where `url(forBlob:)` finds them: the fake working copy has no blobs to fetch.
+    static func writeFiles() {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let urls = files.map { file -> (URL, String) in
-            let url = directory.appending(path: file.id)
-            try? file.data.write(to: url)
-            return (url, file.mime)
-        }
-        Task {
-            for (url, mime) in urls { _ = try? await copy.blobs.put(file: url, mimeType: mime) }
-        }
+        for file in files { try? file.data.write(to: directory.appending(path: file.id)) }
+    }
+
+    /// The generated file whose blob hash is `hash`, when the gallery sample is on.
+    static func url(forBlob hash: String) -> URL? {
+        guard isRequested, let file = files.first(where: { $0.hash == hash }) else { return nil }
+        return directory.appending(path: file.id)
     }
 
     private static func picture(top: (Double, Double, Double), bottom: (Double, Double, Double)) -> Data {
