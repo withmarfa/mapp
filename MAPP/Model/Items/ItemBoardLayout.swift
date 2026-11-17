@@ -15,6 +15,8 @@ nonisolated struct ItemBoardLane: Identifiable, Hashable, Sendable {
 
     let id: ID
     let title: String
+    /// The status mark its header carries, on a board of a status field or of status groups.
+    var symbol: StatusSymbol?
     var items: [Item]
     /// Whether a card can be dropped here. A lane of a board that mixes status fields takes a card only where every
     /// type has a word in the group, and never the lane of items with no status.
@@ -68,14 +70,12 @@ nonisolated enum ItemBoardLayout {
         eligibleFields(of: item.type, catalogue: catalogue).first(where: \.isStatus)
     }
 
-    /// Whether the board of `items` sorts by `key`'s status groups: the items' types have status fields of more than
-    /// one key, so no one field's words can be every card's lane. One shared field keeps its own words.
+    /// Whether the board of `items` sorts by Marfa's status groups: it mixes types and groups by a status field, so no
+    /// one type's words can be every card's lane. A board of one type keeps that type's own words.
     static func groupsByStatus(items: [Item], key: String, catalogue: Catalogue) -> Bool {
-        var keys: Set<String> = []
-        for type in Set(items.map(\.type)) {
-            if let field = eligibleFields(of: type, catalogue: catalogue).first(where: \.isStatus) { keys.insert(field.key) }
-        }
-        return keys.count > 1 && keys.contains(key)
+        let types = Set(items.map(\.type))
+        guard types.count > 1 else { return false }
+        return types.contains { eligibleFields(of: $0, catalogue: catalogue).first(where: \.isStatus)?.key == key }
     }
 
     /// The key whose value puts an item in the Invalid Value lane: its own status field where the board sorts by
@@ -86,7 +86,8 @@ nonisolated enum ItemBoardLayout {
     }
 
     private static func groupedLane(for item: Item, catalogue: Catalogue) -> ItemBoardLane.ID {
-        guard let field = statusField(of: item, catalogue: catalogue) else { return .notApplicable }
+        // A type with no status is the lane of items with none.
+        guard let field = statusField(of: item, catalogue: catalogue) else { return .missing }
         guard let value = item.value(of: field.key), value != .null else { return .missing }
         guard case .string(let text) = value else { return .invalid }
         guard !text.isEmpty else { return .missing }
@@ -109,9 +110,11 @@ nonisolated enum ItemBoardLayout {
     static func lanes(items: [Item], key: String, catalogue: Catalogue) -> [ItemBoardLane] {
         if groupsByStatus(items: items, key: key, catalogue: catalogue) { return groupLanes(items: items, catalogue: catalogue) }
         var values: [(word: String, bucket: StatusBucket)] = []
+        var isStatus = false
         var seen: Set<String> = []
         for type in Set(items.map(\.type)).sorted(by: { $0.rawValue < $1.rawValue }) {
             for field in eligibleFields(of: type, catalogue: catalogue) where field.key == key {
+                if field.isStatus { isStatus = true }
                 for word in field.options where !word.isEmpty && seen.insert(word).inserted {
                     values.append((word, field.isStatus ? field.statusBucket(of: word) : .other))
                 }
@@ -121,7 +124,9 @@ nonisolated enum ItemBoardLayout {
         values = values.enumerated().sorted { ($0.element.bucket.rank, $0.offset) < ($1.element.bucket.rank, $1.offset) }.map(\.element)
         let groups = Dictionary(grouping: items) { lane(for: $0, key: key, catalogue: catalogue) }
         var lanes = values.map { entry in
-            ItemBoardLane(id: .option(entry.word), title: ItemTypeInfo.Field.label(ofOption: entry.word), items: [])
+            ItemBoardLane(
+                id: .option(entry.word), title: ItemTypeInfo.Field.label(ofOption: entry.word),
+                symbol: isStatus ? StatusSymbol(group: statusGroup(of: entry.bucket)) : nil, items: [])
         }
         lanes.append(ItemBoardLane(id: .missing, title: String(localized: "No Value"), items: []))
         if groups[.invalid] != nil {
@@ -138,27 +143,28 @@ nonisolated enum ItemBoardLayout {
     }
 
     /// The lanes of a board whose types keep their status in different fields: Marfa's four status groups, which
-    /// every type shares, then No Status, and Invalid Value and Not Applicable where an item needs them.
+    /// every type shares, then No Status (which holds a type with no status too), and Invalid Value where an item needs it.
     private static func groupLanes(items: [Item], catalogue: Catalogue) -> [ItemBoardLane] {
         let groups = Dictionary(grouping: items) { groupedLane(for: $0, catalogue: catalogue) }
         let types = Set(items.map(\.type))
         let fields = types.compactMap { type in eligibleFields(of: type, catalogue: catalogue).first(where: \.isStatus) }
         var lanes = StatusGroup.allCases.map { group in
-            ItemBoardLane(id: .group(group), title: StatusBucket.group(group).title, items: [],
+            ItemBoardLane(id: .group(group), title: StatusBucket.group(group).title, symbol: StatusSymbol(group: group), items: [],
                           takesItems: fields.allSatisfy { firstWord($0, in: group) != nil })
         }
         lanes.append(ItemBoardLane(id: .missing, title: String(localized: "No Status"), items: [], takesItems: false))
         if groups[.invalid] != nil {
             lanes.append(ItemBoardLane(id: .invalid, title: String(localized: "Invalid Value"), items: [], takesItems: false))
         }
-        if groups[.notApplicable] != nil {
-            lanes.append(ItemBoardLane(id: .notApplicable, title: String(localized: "Not Applicable"), items: [], takesItems: false))
-        }
         return lanes.map { lane in
             var lane = lane
             lane.items = sorted(groups[lane.id] ?? [])
             return lane
         }
+    }
+
+    private static func statusGroup(of bucket: StatusBucket) -> StatusGroup? {
+        if case .group(let group) = bucket { group } else { nil }
     }
 
     /// The word a card takes on moving into `group`: the first its type declares there.

@@ -27,6 +27,8 @@ nonisolated enum ViewDraft {
         /// Set where the window shows the list's own order, which a list or gallery that is neither sorted nor grouped by a
         /// column does: the order it shows, and whether it shows sections by date.
         var dated: Dated?
+        /// Whether the window lists a type's subtypes' items with its own (Include Subtypes, `Browser.stacksSubtypes`).
+        var includesSubtypes = false
     }
 
     /// The list's own order, which stands for a view with no sort or grouping of its own.
@@ -77,7 +79,9 @@ nonisolated enum ViewDraft {
     /// latest edits, Recently Deleted, an index, and a single favorite. A view lists active items, as MAPP's places
     /// do. A collection's view lists its members, though by the view's own order, since a view cannot sort by an
     /// edge's position.
-    static func query(for place: SidebarItem, catalogue: Catalogue, views: [LibraryView]) -> LibraryViewQuery? {
+    static func query(
+        for place: SidebarItem, catalogue: Catalogue, views: [LibraryView], includingSubtypes: Bool = false
+    ) -> LibraryViewQuery? {
         let active: Set<ItemState> = [.active]
         switch place {
         case .allNotes: return LibraryViewQuery(states: active)
@@ -86,8 +90,9 @@ nonisolated enum ViewDraft {
             return LibraryViewQuery(states: active, filter: text(of: FilterCondition(field: .tags, operator: .contains, value: .text(ItemTag.favorite))))
         case .itemType(let raw):
             let type = TypeID(raw)
-            // Marfa takes a type with its subtypes, and a type's place holds the type's own items alone.
-            let own = catalogue.descendants(of: type).isEmpty ? nil : text(of: FilterCondition(field: .system(.type), operator: .eq, value: .text(raw)))
+            // Marfa takes a type with its subtypes, so a type's view holds them as the window does with Include Subtypes
+            // on; otherwise a type's place holds the type's own items alone, which an exact-type condition says.
+            let own = includingSubtypes || catalogue.descendants(of: type).isEmpty ? nil : text(of: FilterCondition(field: .system(.type), operator: .eq, value: .text(raw)))
             return LibraryViewQuery(types: [type], states: active, filter: own)
         case .files: return LibraryViewQuery(types: [TypeID.file], states: active)
         case .source(let name): return LibraryViewQuery(states: active, filter: text(of: FilterCondition(field: .system(.source), operator: .eq, value: .text(name))))
@@ -103,7 +108,7 @@ nonisolated enum ViewDraft {
     /// applies the filters; and each layout gives the order and grouping it shows, never the table's when the table
     /// is not showing.
     static func draft(_ window: Window, catalogue: Catalogue, views: [LibraryView]) -> Draft? {
-        guard let base = query(for: window.place, catalogue: catalogue, views: views) else { return nil }
+        guard let base = query(for: window.place, catalogue: catalogue, views: views, includingSubtypes: window.includesSubtypes) else { return nil }
         var unkept: [Unkept] = []
         if let search = window.search { unkept.append(.search(search)) }
         let filtered: (query: LibraryViewQuery, unkept: [Unkept])
@@ -127,11 +132,12 @@ nonisolated enum ViewDraft {
             let group = group(window.grouping)
             return (sort.sort, group.group, sort.unkept + group.unkept)
         case .list(let order):
-            let sort = switch order.sort {
-            case .title: LibraryViewSort(field: "title", ascending: true)
-            case .dateEdited: LibraryViewSort(field: "updated_at", ascending: false)
-            case .dateCreated: LibraryViewSort(field: "created_at", ascending: false)
+            let field = switch order.sort {
+            case .title: "title"
+            case .dateEdited: "updated_at"
+            case .dateCreated: "created_at"
             }
+            let sort = LibraryViewSort(field: field, ascending: order.sort == .title)
             // Today, Yesterday and the rest are the list's own sections, which no bucket of a view's grouping matches.
             return ([sort], nil, order.groupsByDate && order.sort != .title ? [.dateSections] : [])
         case .board(let key, let label):
@@ -221,43 +227,75 @@ nonisolated enum ViewDraft {
         return combined(parsed, adding: choices, columns: columns, keeping: base)
     }
 
-    /// The query with the window's filters added to a place's own. A Type filter that keeps types goes into the
-    /// query's types, which Marfa takes with their subtypes, so it is not kept for a type that has any, nor beside
-    /// the types the place already lists.
+    /// The query with the window's filters added to a place's own (a new view). A Type filter makes the saved query's types the
+    /// window's chosen types, replacing the place's own type terms and types. Marfa takes a type with its subtypes,
+    /// so a chosen type that has any stays a filter, as the exact-type condition the window applied.
     static func adding(
         _ choices: [String: FilterChoice], to query: LibraryViewQuery, columns: [ItemTableColumn], catalogue: Catalogue
     ) -> (query: LibraryViewQuery, unkept: [Unkept]) {
         var query = query
         var choices = choices
-        var unkept: [Unkept] = []
-        if let column = columns.first(where: { $0.id == typeColumnID }), let choice = choices[typeColumnID], !choice.isNegated {
-            choices[typeColumnID] = nil
+        if columns.contains(where: { $0.id == typeColumnID }), let choice = choices[typeColumnID], !choice.isNegated {
             let chosen = choice.values.subtracting([""])
-            if !chosen.isEmpty {
-                if let types = types(keeping: chosen, beside: query.types, catalogue: catalogue) {
-                    query.types = types
+            if chosen.isEmpty {
+                choices[typeColumnID] = nil
+            } else if let parsed = try? terms(of: query.filter) {
+                // A place's own exact-type terms, such as a type's own items without its subtypes.
+                let own = parsed.terms.filter { $0.column == typeColumnID && !$0.isNegated && $0.value?.isEmpty == false }
+                let ownTypes = Set(own.compactMap(\.value))
+                if parsed.join != .all && parsed.terms.count > 1 || ownTypes.isEmpty {
+                    let narrowed = narrowing(chosen, listed: query.types, catalogue: catalogue)
+                    if let types = narrowed.types { query.types = types }
+                    if !narrowed.asFilter { choices[typeColumnID] = nil }
+                } else if chosen == ownTypes {
+                    choices[typeColumnID] = nil
+                } else if chosen.isSubset(of: ownTypes) {
+                    // Fewer than the place's own, which stay and are narrowed by the filter.
                 } else {
-                    unkept.append(.filter(column: label(of: column)))
+                    let rest = parsed.terms.filter { term in !own.contains(term) }
+                    query.filter = rest.isEmpty ? nil : try? FilterExpression(join: parsed.join, conditions: rest.map(\.condition)).encoded()
+                    let narrowed = narrowing(chosen, listed: query.types, catalogue: catalogue)
+                    if let types = narrowed.types { query.types = types }
+                    if !narrowed.asFilter { choices[typeColumnID] = nil }
                 }
             }
         }
         let result = filtered(query.filter, adding: choices, columns: columns)
         query.filter = result.filter
-        return (query, unkept + result.unkept)
+        return (query, result.unkept)
     }
 
-    /// The types a Type filter keeps, as a query lists them, or nil where Marfa cannot say so: it lists a type with
-    /// its subtypes, and the query's own types are kept whole.
-    private static func types(keeping chosen: Set<String>, beside listed: [TypeID], catalogue: Catalogue) -> [TypeID]? {
-        if !listed.isEmpty { return Set(listed.map(\.rawValue)) == chosen ? listed : nil }
-        guard chosen.allSatisfy({ catalogue.descendants(of: TypeID($0)).isEmpty }) else { return nil }
-        return chosen.sorted().map { TypeID($0) }
+    /// How a Type filter of exactly these types is saved beside the types a new view lists: the types the query then
+    /// lists (nil where they stay), and whether the filter stays as an exact-type condition. Marfa lists a type with
+    /// its subtypes, so a chosen type that has any cannot be said by the types alone and stays an exact-type
+    /// condition. The listed types stay only where the chosen ones are within their subtrees and some have subtypes
+    /// (the listed types then hold them and the condition narrows); otherwise the chosen types become the listed ones.
+    private static func narrowing(_ chosen: Set<String>, listed: [TypeID], catalogue: Catalogue) -> (types: [TypeID]?, asFilter: Bool) {
+        let hasSubtypes = chosen.contains { !catalogue.descendants(of: TypeID($0)).isEmpty }
+        let sorted = chosen.sorted().map { TypeID($0) }
+        let scope = Set(listed).union(listed.flatMap { catalogue.descendants(of: $0) })
+        if !listed.isEmpty, !chosen.allSatisfy({ scope.contains(TypeID($0)) }) { return (sorted, hasSubtypes) }
+        if hasSubtypes { return (nil, true) }
+        return (Set(listed.map(\.rawValue)) == chosen ? nil : sorted, false)
+    }
+
+    /// Whether an existing view keeps the types it lists where a Type filter of exactly these types is saved: they lie
+    /// within the listed types' subtrees, and are not just those types again with no subtypes (which hides nothing).
+    /// The filter is then an exact-type condition beside the view's own types.
+    private static func keepsListedTypes(_ chosen: Set<String>, listed: [TypeID], catalogue: Catalogue) -> Bool {
+        guard !listed.isEmpty else { return false }
+        let scope = Set(listed).union(listed.flatMap { catalogue.descendants(of: $0) })
+        guard chosen.allSatisfy({ scope.contains(TypeID($0)) }) else { return false }
+        let hasSubtypes = chosen.contains { !catalogue.descendants(of: TypeID($0)).isEmpty }
+        return hasSubtypes || Set(listed.map(\.rawValue)) != chosen
     }
 
     /// The types a view lists, shown as a Type filter where it lists several and none has subtypes: the items are
-    /// then all of those types, so the filter hides nothing until it is changed.
+    /// then all of those types, so the filter hides nothing until it is changed. A view whose filter has a condition
+    /// on the type shows that condition as its Type filter instead, so its types are not seeded.
     static func seededTypes(of query: LibraryViewQuery, catalogue: Catalogue) -> [String]? {
         guard query.types.count > 1, query.types.allSatisfy({ catalogue.descendants(of: $0).isEmpty }) else { return nil }
+        if let parsed = try? terms(of: query.filter), parsed.terms.contains(where: { $0.column == typeColumnID }) { return nil }
         return query.types.map(\.rawValue)
     }
 
@@ -622,7 +660,8 @@ nonisolated enum ViewDraft {
     }
 
     /// The view's query with the window's filters in place of the conditions the window showed: the conditions
-    /// it could not show stay as they are, in order. A window filter the view
+    /// it could not show stay as they are, in order. A Type filter within the view's listed types leaves them as
+    /// they are and is saved as an exact-type condition (`keepsListedTypes`); one outside them replaces them. A window filter the view
     /// cannot hold leaves the query whole, so a filter is never dropped for one the window could not save.
     static func replacing(
         _ query: LibraryViewQuery, with choices: [String: FilterChoice], columns: [ItemTableColumn], seededTypes: [String]?,
@@ -647,15 +686,22 @@ nonisolated enum ViewDraft {
         guard window != seeded else { return (query, []) }
 
         var result = query
-        if let column = filterable[typeColumnID] {
+        if filterable[typeColumnID] != nil {
             if let choice = window[typeColumnID], !choice.isNegated {
-                window[typeColumnID] = nil
                 let chosen = choice.values.subtracting([""])
-                if !chosen.isEmpty, chosen != Set(query.types.map(\.rawValue)) {
-                    guard let types = types(keeping: chosen, beside: [], catalogue: catalogue) else {
-                        return (query, [.filter(column: label(of: column))])
+                if chosen.isEmpty {
+                    window[typeColumnID] = nil
+                } else {
+                    // The view keeps the types it lists where the chosen ones lie within them, and the filter is saved as an
+                    // exact-type condition, a chip the view still shows when reopened. The types are replaced only where a
+                    // chosen type lies outside them, since the two together would list nothing.
+                    if keepsListedTypes(chosen, listed: query.types, catalogue: catalogue) {
+                        // The view's own types stay.
+                    } else {
+                        let narrowed = narrowing(chosen, listed: query.types, catalogue: catalogue)
+                        if let types = narrowed.types { result.types = types }
+                        if !narrowed.asFilter { window[typeColumnID] = nil }
                     }
-                    result.types = types
                 }
             } else if seededTypes != nil {
                 result.types = []

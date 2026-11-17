@@ -61,18 +61,36 @@ struct ItemBoard: View {
     /// Set from the toolbar's View Options (`ItemBoardOptions`).
     private var compact: Bool { browser.compactBoards[browser.item, default: false] }
 
+    private static let laneGap: CGFloat = 12
+    private static let edge: CGFloat = 20
+
+    /// The lanes share the width the window gives them, down to the narrowest a card reads in and up to the widest a
+    /// lane of few cards looks well at. More lanes than fit scroll.
+    private func laneWidth(count: Int, in width: CGFloat) -> CGFloat {
+        let lanes = CGFloat(max(count, 1))
+        let share = (width - 2 * Self.edge - Self.laneGap * (lanes - 1)) / lanes
+        return min(max(share, compact ? 200 : 236), compact ? 260 : 340)
+    }
+
     private func board(_ lanes: [ItemBoardLane], key: String, grouped: Bool, contents: [ItemID: RowContent]) -> some View {
         let ids = lanes.flatMap { $0.items.map(\.id) }
         return ScrollViewReader { proxy in
-            ScrollView(.horizontal) {
-                HStack(alignment: .top, spacing: 16) {
-                    ForEach(lanes) { lane in
-                        laneView(lane, lanes: lanes, key: key, grouped: grouped, ids: ids, contents: contents)
+            GeometryReader { geometry in
+                ScrollView(.horizontal) {
+                    HStack(alignment: .top, spacing: Self.laneGap) {
+                        ForEach(lanes) { lane in
+                            laneView(lane, lanes: lanes, key: key, grouped: grouped, ids: ids, contents: contents)
+                                .frame(width: laneWidth(count: lanes.count, in: geometry.size.width))
+                        }
                     }
+                    .padding(.horizontal, Self.edge)
+                    .padding(.bottom, Self.edge)
+                    .padding(.top, 8)
+                    // The window's own width at least, so a few lanes stay at the left.
+                    .frame(minWidth: geometry.size.width, alignment: .leading)
                 }
-                .padding(20)
+                .bandsToolbar()
             }
-            .bandsToolbar()
             .focusable()
             .focusEffectDisabled()
             .focused(pane, equals: .list)
@@ -102,20 +120,24 @@ struct ItemBoard: View {
         _ lane: ItemBoardLane, lanes: [ItemBoardLane], key: String, grouped: Bool, ids: [ItemID], contents: [ItemID: RowContent]
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(spacing: 7) {
+                if let symbol = lane.symbol { StatusMark(symbol, size: 12) }
                 Text(verbatim: lane.title)
-                    .interfaceFont(.headline)
-                    .lineLimit(2)
-                Spacer(minLength: 8)
+                    .interfaceFont(.body.weight(.semibold))
+                    .lineLimit(1)
                 Text(lane.items.count, format: .number)
+                    .interfaceFont(.callout)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
             }
-            .padding(14)
+            .padding(.horizontal, 4)
+            .padding(.top, 12)
+            .padding(.bottom, 10)
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
             ScrollView {
-                LazyVStack(spacing: compact ? 8 : 12) {
+                LazyVStack(spacing: compact ? 8 : 10) {
                     ForEach(lane.items) { item in
                         if let content = contents[item.id] {
                             card(item, content: content, lane: lane, lanes: lanes, key: key, grouped: grouped, ids: ids).id(item.id)
@@ -125,14 +147,14 @@ struct ItemBoard: View {
                         Text("No Items")
                             .interfaceFont(.callout)
                             .foregroundStyle(.tertiary)
-                            .frame(maxWidth: .infinity, minHeight: 84)
+                            .frame(maxWidth: .infinity, minHeight: 72)
                     }
                 }
-                .padding(.horizontal, 10)
-                .padding(.bottom, 12)
             }
+            .scrollIndicators(.hidden)
         }
-        .frame(width: compact ? 244 : 292)
+        .padding(.horizontal, 8)
+        .padding(.bottom, 8)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(Color.primary.opacity(0.04), in: .rect(cornerRadius: 12))
         .accessibilityElement(children: .contain)
@@ -258,7 +280,7 @@ private struct BoardCell<Actions: View>: View {
         }
         .buttonStyle(.plain)
         .focusable(false)
-        .contentShape(.rect(cornerRadius: 9))
+        .contentShape(.rect(cornerRadius: 10))
         .simultaneousGesture(TapGesture(count: 2).onEnded { open() })
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityAction(named: Text("Open")) { open() }
@@ -274,9 +296,9 @@ private struct BoardSelection: View {
 
     var body: some View {
         if browser.selection.contains(id) {
-            RoundedRectangle(cornerRadius: 9)
+            RoundedRectangle(cornerRadius: 10)
                 .fill(Color.accentColor.opacity(0.12))
-                .overlay { RoundedRectangle(cornerRadius: 9).strokeBorder(Color.accentColor, lineWidth: 2) }
+                .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(Color.accentColor, lineWidth: 2) }
                 .allowsHitTesting(false)
         }
     }
@@ -296,7 +318,7 @@ private struct BoardCard: View, Equatable {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: compact ? 6 : 8) {
+        VStack(alignment: .leading, spacing: compact ? 4 : 4) {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 if compact, content.mixesTypes {
                     TypeGlyph(id: content.typeIcon)
@@ -304,21 +326,22 @@ private struct BoardCard: View, Equatable {
                         .accessibilityLabel(content.typeLabel)
                 }
                 Text(verbatim: content.title)
-                    .interfaceFont(.headline)
+                    .interfaceFont(.body.weight(.medium))
                     .foregroundStyle(.primary)
-                    .lineLimit(compact ? 2 : 3)
+                    .lineLimit(3)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if !item.isEditable { Image(systemName: "lock").interfaceFont(.caption).foregroundStyle(.secondary).accessibilityLabel("Read Only") }
             }
             if !compact {
                 if let secondary = content.secondary {
                     Text(verbatim: secondary)
-                        .interfaceFont(.subheadline)
+                        .interfaceFont(.callout)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }
                 if !content.chips.isEmpty || content.more > 0 {
                     ChipLine(content: content)
+                        .padding(.top, 4)
                 }
             }
             if let invalidValue {
@@ -328,9 +351,12 @@ private struct BoardCard: View, Equatable {
                     .lineLimit(2)
             }
         }
-        .padding(compact ? 11 : 14)
-        .background(Color(nsColor: .controlBackgroundColor), in: .rect(cornerRadius: 9))
-        .overlay { RoundedRectangle(cornerRadius: 9).strokeBorder(Color.primary.opacity(0.08), lineWidth: 1) }
+        .padding(.horizontal, 11)
+        .padding(.vertical, compact ? 8 : 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor), in: .rect(cornerRadius: 10))
+        .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5) }
+        .shadow(color: .black.opacity(0.04), radius: 1, y: 1)
         .accessibilityElement(children: .combine)
     }
 }

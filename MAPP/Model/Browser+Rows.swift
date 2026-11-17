@@ -1,15 +1,18 @@
 import Foundation
 
 extension Browser {
-    /// What the list tells its rows about itself: whether it holds several types, which date it is sorted by, and the day.
+    /// What the list tells its rows about itself: whether its rows name their type, which date it is sorted by, and the day.
+    /// A list grouped by type names each type once, in its group's header, so its rows leave the type off.
     /// It reads the items shown, so it holds for every place, search results and Include Subtypes alike. The sort is the
     /// table's resolved one, since a saved view stores its sort by column identifier alone.
     func rowList(
         of items: [Item], in library: any ItemLibrary, order: NoteOrder, now: Date, format: DateFormat, calendar: Calendar = .current
     ) -> RowList {
         let arranged = listShape?.arranged == true && !ordersByRelevance
+        var groupedByType = false
+        if arranged, case .column(let id) = tableOptions[item]?.grouping { groupedByType = id == ItemTableColumn.type.id }
         return RowList(
-            mixesTypes: Set(items.lazy.map(\.type)).count > 1,
+            mixesTypes: !groupedByType && Set(items.lazy.map(\.type)).count > 1,
             date: RowDateSource.of(
                 sort: arranged ? tableContent(in: library).sort.first : nil, order: order,
                 ordersItself: keepsPlaceOrder || ordersByRelevance),
