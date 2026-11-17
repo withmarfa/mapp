@@ -25,16 +25,25 @@ struct ItemTableCell: View {
     /// reaches out by it, so the tint fills the cell to its edges; the content is padded in by the same amount, and the
     /// cell's control is pulled back out, so the content keeps the column's text edge.
     @State private var bleed = CellBleed.zero
-    /// The content's least height, which with the table's own room above and below makes a row 36 points, as the board draws it.
+    /// The content's least height. With the 3 points of room the cell keeps above and below it and the table's own room
+    /// beyond that, it makes a row 36 points, as the board draws it.
     private static let minimumHeight: CGFloat = 22
 
     var body: some View {
         content
             .lineLimit(1)
             .frame(maxWidth: .infinity, minHeight: Self.minimumHeight, maxHeight: .infinity, alignment: .leading)
-            // A cell that offers an edit carries its own padding, inside its control, so the whole cell answers a click.
-            .padding(.vertical, offersEdit ? 0 : 3)
-            .background { CellBleedProbe(bleed: $bleed) }
+            // The same room for every cell, whether or not it offers an edit, so the probe measures the same frame throughout.
+            .padding(.vertical, 3)
+            .background { if offersEdit { CellBleedProbe(bleed: $bleed) } }
+            // One anchor for a field's cell however it reads, so a panel opened from it outlives the first value written.
+            .background {
+                if isField {
+                    ValueEditAnchor(box: anchor)
+                        .padding(.horizontal, -bleed.horizontal)
+                        .padding(.vertical, -bleed.vertical)
+                }
+            }
             .onHover { setHovering($0) }
             .onDisappear { setHovering(false) }
             // A panel laid over the table gets the pointer and sends no exit to the cell beneath it.
@@ -49,12 +58,14 @@ struct ItemTableCell: View {
     /// The cell's field as the row's own type declares it.
     private var rowField: ItemTypeInfo.Field? { column.field(for: row, catalogue: library.catalogue) }
 
-    /// Whether the cell is a value picked from a menu that this item's type declares and that can be changed.
+    private var isField: Bool {
+        if case .field = column.content { true } else { false }
+    }
+
+    /// Whether the cell is a value picked from a menu that this row's own field declares and that can be changed.
     private var offersPicker: Bool {
-        switch column.style {
-        case .status, .priority, .choice: rowField != nil && row.item.isEditable
-        default: false
-        }
+        guard let rowField, row.item.isEditable else { return false }
+        return column.picksFrom(rowField)
     }
 
     /// The panel an empty cell opens to take a first value, where its property can be edited for this item.
@@ -116,7 +127,6 @@ struct ItemTableCell: View {
         .focusEffectDisabled()
         .padding(.horizontal, -bleed.horizontal)
         .padding(.vertical, -bleed.vertical)
-        .background { ValueEditAnchor(box: anchor) }
         .accessibilityLabel(Text(kind.field?.label ?? ""))
         .accessibilityValue(Text("Not Set"))
         .accessibilityHint(Text("Opens a panel to add a value"))
@@ -136,10 +146,6 @@ struct ItemTableCell: View {
 
     private var title: some View {
         HStack(spacing: 8) {
-            TypeGlyph(id: row.typeIcon)
-                .foregroundStyle(.secondary)
-                .frame(width: 16)
-                .accessibilityHidden(true)
             Text(row.item.displayTitle)
                 .fontWeight(.medium)
                 .foregroundStyle(row.item.isUntitled ? .secondary : .primary)
@@ -186,7 +192,7 @@ struct ItemTableCell: View {
         let current = ItemTableValue.string(row, key: field.key)
         let declares = library.catalogue.itemTypes[row.item.type]?.declares(field.key) ?? false
         let editable = declares && row.item.isEditable
-        switch column.style {
+        switch column.style(for: field) {
         case .status, .priority, .choice:
             picked(field, current: current, editable: editable)
         case .boolean:

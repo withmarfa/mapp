@@ -166,7 +166,7 @@ struct ItemTableColumnsTests {
         let browser = Browser()
         browser.sidebarItem = inSavedView ? .view(ItemID("view-1")) : .allNotes
         browser.viewMode = .table
-        let suite = "MAPP.ItemTableColumnsTests.wide"
+        let suite = "MAPP.ItemTableColumnsTests.wide.\(inSavedView ? "view" : "all")"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defaults.removePersistentDomain(forName: suite)
         defer { defaults.removePersistentDomain(forName: suite) }
