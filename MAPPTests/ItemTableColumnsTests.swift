@@ -177,6 +177,7 @@ struct ItemTableColumnsTests {
         defer { window.performClose(nil); window.contentView = nil }
         let expected = ItemTableColumnLayouts.shown(browser.tableContent(in: library).columns, in: .init()).map(\.id)
         try #require(await eventually { window.contentView.flatMap { Self.tableView(in: $0) }.map { !$0.tableColumns.isEmpty } ?? false })
+        // Nothing to wait for: this gives the table time to add or hide columns after its first layout, if it is going to.
         try await Task.sleep(for: .milliseconds(500))
         let table = try #require(window.contentView.flatMap { Self.tableView(in: $0) })
         #expect(table.tableColumns.filter { !$0.isHidden }.count == expected.count)
