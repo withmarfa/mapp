@@ -27,6 +27,8 @@ nonisolated enum ViewDraft {
         /// Set where the window shows the list's own order, which a list or gallery that is neither sorted nor grouped by a
         /// column does: the order it shows, and whether it shows sections by date.
         var dated: Dated?
+        /// Whether the window lists a type's subtypes' items with its own (Include Subtypes, `Browser.stacksSubtypes`).
+        var includesSubtypes = false
     }
 
     /// The list's own order, which stands for a view with no sort or grouping of its own.
@@ -77,7 +79,9 @@ nonisolated enum ViewDraft {
     /// latest edits, Recently Deleted, an index, and a single favorite. A view lists active items, as MAPP's places
     /// do. A collection's view lists its members, though by the view's own order, since a view cannot sort by an
     /// edge's position.
-    static func query(for place: SidebarItem, catalogue: Catalogue, views: [LibraryView]) -> LibraryViewQuery? {
+    static func query(
+        for place: SidebarItem, catalogue: Catalogue, views: [LibraryView], includingSubtypes: Bool = false
+    ) -> LibraryViewQuery? {
         let active: Set<ItemState> = [.active]
         switch place {
         case .allNotes: return LibraryViewQuery(states: active)
@@ -86,8 +90,9 @@ nonisolated enum ViewDraft {
             return LibraryViewQuery(states: active, filter: text(of: FilterCondition(field: .tags, operator: .contains, value: .text(ItemTag.favorite))))
         case .itemType(let raw):
             let type = TypeID(raw)
-            // Marfa takes a type with its subtypes, and a type's place holds the type's own items alone.
-            let own = catalogue.descendants(of: type).isEmpty ? nil : text(of: FilterCondition(field: .system(.type), operator: .eq, value: .text(raw)))
+            // Marfa takes a type with its subtypes, so a type's view holds them as the window does with Include Subtypes
+            // on; otherwise a type's place holds the type's own items alone, which an exact-type condition says.
+            let own = includingSubtypes || catalogue.descendants(of: type).isEmpty ? nil : text(of: FilterCondition(field: .system(.type), operator: .eq, value: .text(raw)))
             return LibraryViewQuery(types: [type], states: active, filter: own)
         case .files: return LibraryViewQuery(types: [TypeID.file], states: active)
         case .source(let name): return LibraryViewQuery(states: active, filter: text(of: FilterCondition(field: .system(.source), operator: .eq, value: .text(name))))
@@ -103,7 +108,7 @@ nonisolated enum ViewDraft {
     /// applies the filters; and each layout gives the order and grouping it shows, never the table's when the table
     /// is not showing.
     static func draft(_ window: Window, catalogue: Catalogue, views: [LibraryView]) -> Draft? {
-        guard let base = query(for: window.place, catalogue: catalogue, views: views) else { return nil }
+        guard let base = query(for: window.place, catalogue: catalogue, views: views, includingSubtypes: window.includesSubtypes) else { return nil }
         var unkept: [Unkept] = []
         if let search = window.search { unkept.append(.search(search)) }
         let filtered: (query: LibraryViewQuery, unkept: [Unkept])

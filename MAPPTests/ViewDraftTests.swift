@@ -25,11 +25,11 @@ struct ViewDraftTests {
     private static func window(
         _ place: SidebarItem, sort: [ItemTableComparator] = [], grouping: ItemTableColumn? = nil,
         filters: [String: Set<String>] = [:], negated: Set<String> = [], search: String? = nil, layout: ViewDraft.Layout = .table,
-        timelineDate: String? = nil
+        timelineDate: String? = nil, includesSubtypes: Bool = false
     ) -> ViewDraft.Window {
         ViewDraft.Window(
             place: place, columns: columns, sort: sort, grouping: grouping, filters: filters, negated: negated, search: search,
-            layout: layout, timelineDate: timelineDate)
+            layout: layout, timelineDate: timelineDate, includesSubtypes: includesSubtypes)
     }
 
     /// A filter added to `base` as a place's filter, through the same call a new view's draft makes.
@@ -382,6 +382,25 @@ struct ViewDraftTests {
     }
 
     // MARK: Types
+
+    @Test func aTypesPlaceWithIncludeSubtypesOnSavesTheTypeWithItsSubtypes() throws {
+        // Marfa lists a type with its subtypes, so the types alone hold what the window shows.
+        let on = try #require(Self.draft(Self.window(.itemType("aic.ticket"), includesSubtypes: true)))
+        #expect(on.query.types == [Self.ticket])
+        #expect(on.query.filter == nil)
+        #expect(on.unkept.isEmpty)
+        // Filtered to one subtype, the window shows that subtype's items, which the types say.
+        let sub = try #require(Self.draft(Self.window(.itemType("aic.ticket"), filters: ["type": ["aic.ticket.task"]], includesSubtypes: true)))
+        #expect(sub.query.types == [Self.ticketTask])
+        #expect(sub.query.filter == nil)
+        // Filtered to the parent alone, the window shows the parent's own items, so it stays exact.
+        let parent = try #require(Self.draft(Self.window(.itemType("aic.ticket"), filters: ["type": ["aic.ticket"]], includesSubtypes: true)))
+        #expect(parent.query.filter == #"type eq "aic.ticket""#)
+        // Off, the type's own items alone, as before.
+        let off = try #require(Self.draft(Self.window(.itemType("aic.ticket"), includesSubtypes: false)))
+        #expect(off.query.types == [Self.ticket])
+        #expect(off.query.filter == #"type eq "aic.ticket""#)
+    }
 
     @Test func aTypeFilterGoesIntoTheQueryTypes() throws {
         let window = Self.window(.allNotes, filters: ["type": ["core.task"]])

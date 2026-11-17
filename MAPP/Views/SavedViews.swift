@@ -39,7 +39,8 @@ enum SavedViews {
             place: browser.item, columns: content.columns, sort: layoutShows.sort, grouping: grouping,
             filters: options.filters, negated: options.negated, search: search.isEmpty ? nil : search,
             layout: layout(of: browser, in: library, order: nil), timelineDate: browser.timelineFields[browser.item],
-            seededTypes: seededTypes, dated: layoutShows.isDated ? ViewDraft.Dated(sort: layoutShows.sort, hasSections: layoutShows.grouping == .date) : nil)
+            seededTypes: seededTypes, dated: layoutShows.isDated ? ViewDraft.Dated(sort: layoutShows.sort, hasSections: layoutShows.grouping == .date) : nil,
+            includesSubtypes: browser.stacksSubtypes(in: library))
     }
 
     /// What the window shows in the layout it shows it in, with that layout's own order and grouping, so a new
