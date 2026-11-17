@@ -203,14 +203,61 @@ struct ItemTimelineTests {
         #expect(group.rows.map(\.id.rawValue) == ["note"])
     }
 
-    @Test func daysFromTodayComeFirstThenEarlierDaysLatestFirst() {
+    @Test func daysFromTodayComeFirstThenAnEarlierHeaderAndTheDaysBeforeLatestFirst() {
         let items = [
             Self.item("older", type: Self.task, date: .string("2026-10-20")),
             Self.item("yesterday", type: Self.task, date: .string("2026-10-23")),
             Self.item("next", type: Self.task, date: .string("2026-10-26")),
             Self.item("today", type: Self.task, date: .string("2026-10-24")),
+            Self.item("undated", type: Self.task),
         ]
-        #expect(Self.ids(Self.groups(items, today: Self.day("2026-10-24"))) == [["today"], ["next"], ["yesterday"], ["older"]])
+        let groups = Self.groups(items, today: Self.day("2026-10-24"))
+        #expect(Self.ids(groups) == [["today"], ["next"], [], ["yesterday"], ["older"], ["undated"]])
+        #expect(groups.map(\.id) == [
+            .day(Self.day("2026-10-24")), .day(Self.day("2026-10-26")), .earlier,
+            .day(Self.day("2026-10-23")), .day(Self.day("2026-10-20")), .missing,
+        ])
+    }
+
+    @Test func theEarlierHeaderMarksOnlyATurnFromDaysAheadToDaysBefore() {
+        let past = [Self.item("a", type: Self.task, date: .string("2026-10-20")), Self.item("b", type: Self.task, date: .string("2026-10-22"))]
+        #expect(Self.groups(past, today: Self.day("2026-10-24")).map(\.id) == [.day(Self.day("2026-10-22")), .day(Self.day("2026-10-20"))])
+        let ahead = [Self.item("c", type: Self.task, date: .string("2026-10-25"))]
+        #expect(!Self.groups(ahead, today: Self.day("2026-10-24")).contains { $0.id == .earlier })
+    }
+
+    @Test func anAllDayLabelBelongsToAnEventAlone() throws {
+        let items = [
+            Self.item("holiday", ["starts_at": .string("2026-10-24"), "all_day": .bool(true)]),
+            Self.item("due", type: Self.task, date: .string("2026-10-24")),
+        ]
+        let rows = try #require(Self.groups(items).first).rows
+        #expect(Dictionary(uniqueKeysWithValues: rows.map { ($0.id.rawValue, $0.isEvent) }) == ["holiday": true, "due": false])
+        for row in rows { guard case .dated(_, true, _) = row.value else { Issue.record("Both sit on a day alone"); return } }
+    }
+
+    @Test func anAllDayEventNamingNoZoneKeepsItsDayInAnyCalendarOfTheMac() throws {
+        let item = Self.item("holiday", ["starts_at": .string("2026-10-24"), "all_day": .bool(true)])
+        let look = Self.looks[Self.event]!
+        var tokyo = Calendar(identifier: .gregorian)
+        tokyo.timeZone = TimeZone(identifier: "Asia/Tokyo")!
+        var buddhist = Calendar(identifier: .buddhist)
+        buddhist.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        var tokyoBuddhist = Calendar(identifier: .buddhist)
+        tokyoBuddhist.timeZone = tokyo.timeZone
+        for mac in [tokyo, buddhist, tokyoBuddhist] {
+            guard case .placed(let found) = ItemPlacement.of(item, look: look, field: nil, catalogue: Self.catalogue, calendar: mac) else {
+                Issue.record("The day is placed")
+                return
+            }
+            var gregorian = Calendar(identifier: .gregorian)
+            gregorian.timeZone = mac.timeZone
+            let parts = gregorian.dateComponents([.year, .month, .day, .hour], from: found.start)
+            #expect((parts.year, parts.month, parts.day, parts.hour) == (2026, 10, 24, 0))
+            let after = gregorian.dateComponents([.month, .day], from: try #require(found.end))
+            #expect((after.month, after.day) == (10, 25))
+            #expect(!found.hasTime)
+        }
     }
 
     @Test func theNowLineSitsBeforeTheNextTimedRow() throws {

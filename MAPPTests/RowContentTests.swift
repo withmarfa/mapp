@@ -72,6 +72,26 @@ struct RowContentTests {
             of: date, hasTime: hasTime, place: hasTime ? .list : .table, format: .standard, now: now, calendar: calendar, locale: locale)
     }
 
+    // MARK: A time the list's date column says
+
+    @Test func aTimeIsLeftOutOnlyWhereTheListsDateColumnSaysThatField() {
+        let event = Self.item("core.event", [
+            Property(key: "starts_at", value: .string("2026-11-20T19:30:00Z")), Property(key: "ends_at", value: .string("2026-11-20T21:00:00Z")),
+        ])
+        let look = TypeLook(date: .field("starts_at"), secondary: [.time("starts_at"), .time("ends_at")], facts: [])
+        func secondary(_ list: RowList) -> String? {
+            RowContent.make(for: event, look: look, catalogue: Self.catalogue, list: list, calendar: Self.calendar, locale: Self.locale).secondary
+        }
+        let day = Self.calendar.startOfDay(for: Self.now)
+        let alone = secondary(RowList(day: day))
+        #expect(alone?.split(separator: ",").count == 2, "a list with no date column keeps both times")
+        let byLook = secondary(RowList(datesApart: true, day: day))
+        #expect(byLook?.split(separator: ",").count == 1, "placed by the look's start, only the end is left")
+        let byEnd = secondary(RowList(datesApart: true, placedField: "ends_at", day: day))
+        #expect(byEnd?.split(separator: ",").count == 1)
+        #expect(byEnd != byLook, "placed by Ends, the start is left and the end is dropped")
+    }
+
     // MARK: What a row holds
 
     @Test func aVeryLongTitleIsKeptWhole() {

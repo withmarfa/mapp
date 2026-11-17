@@ -11,12 +11,16 @@ nonisolated struct ItemTimelineRow: Identifiable, Hashable, Sendable {
 
     let item: Item
     let value: Value
+    /// Whether the item is an event, which alone is said to be "all day" where it holds no time.
+    var isEvent = false
     var id: ItemID { item.id }
 }
 
 nonisolated struct ItemTimelineGroup: Identifiable, Hashable, Sendable {
     enum ID: Hashable, Sendable {
         case day(Date), missing, invalid, notApplicable
+        /// The header where the days ahead end and the days before today begin. It holds no rows.
+        case earlier
     }
 
     let id: ID
@@ -55,8 +59,8 @@ nonisolated enum ItemTimelineLayout {
         return selected
     }
 
-    /// The days of the items, from `today` on first and then the days before it, the latest first, so the timeline
-    /// opens on today's agenda; an item with no date, or an invalid one, follows. Inside a day a whole-day item leads,
+    /// The days of the items, from `today` on first and then, after an `Earlier` header, the days before it, the latest
+    /// first, so the timeline opens on today's agenda; an item with no date, or an invalid one, follows. Inside a day a whole-day item leads,
     /// then the rest by time.
     static func groups(
         for items: [Item], field: String?, looks: [TypeID: TypeLook], catalogue: Catalogue, today: Date? = nil,
@@ -64,14 +68,17 @@ nonisolated enum ItemTimelineLayout {
     ) -> [ItemTimelineGroup] {
         var groups: [ItemTimelineGroup.ID: [ItemTimelineRow]] = [:]
         for item in items {
-            let value = value(of: item, look: looks[item.type] ?? .empty, field: field, catalogue: catalogue, calendar: calendar)
+            let outcome = ItemPlacement.of(item, look: looks[item.type] ?? .empty, field: field, catalogue: catalogue, calendar: calendar)
+            let value = value(from: outcome)
+            var isEvent = false
+            if case .placed(let placement) = outcome { isEvent = placement.isEvent }
             let id: ItemTimelineGroup.ID = switch value {
             case .dated(let date, _, _): .day(calendar.startOfDay(for: date))
             case .missing: .missing
             case .invalid: .invalid
             case .notApplicable: .notApplicable
             }
-            groups[id, default: []].append(ItemTimelineRow(item: item, value: value))
+            groups[id, default: []].append(ItemTimelineRow(item: item, value: value, isEvent: isEvent))
         }
         let start = calendar.startOfDay(for: today ?? .now)
         let days = groups.keys.compactMap { id -> Date? in
@@ -80,15 +87,23 @@ nonisolated enum ItemTimelineLayout {
         }
         let ahead = days.filter { $0 >= start }.sorted()
         let behind = days.filter { $0 < start }.sorted(by: >)
-        return ((ahead + behind).map(ItemTimelineGroup.ID.day) + [.missing, .invalid, .notApplicable]).compactMap { id in
-            groups[id].map { ItemTimelineGroup(id: id, rows: $0.sorted(by: precedes)) }
+        // Where days ahead are followed by days before, a header marks the turn.
+        let turn: [ItemTimelineGroup.ID] = ahead.isEmpty || behind.isEmpty ? [] : [.earlier]
+        let order = ahead.map(ItemTimelineGroup.ID.day) + turn + behind.map(ItemTimelineGroup.ID.day)
+        return (order + [.missing, .invalid, .notApplicable]).compactMap { id in
+            if id == .earlier { return ItemTimelineGroup(id: id, rows: []) }
+            return groups[id].map { ItemTimelineGroup(id: id, rows: $0.sorted(by: precedes)) }
         }
     }
 
     static func value(
         of item: Item, look: TypeLook, field: String?, catalogue: Catalogue, calendar: Calendar = .current
     ) -> ItemTimelineRow.Value {
-        switch ItemPlacement.of(item, look: look, field: field, catalogue: catalogue, calendar: calendar) {
+        value(from: ItemPlacement.of(item, look: look, field: field, catalogue: catalogue, calendar: calendar))
+    }
+
+    private static func value(from outcome: ItemPlacement.Outcome) -> ItemTimelineRow.Value {
+        switch outcome {
         case .placed(let placement): .dated(placement.start, dateOnly: !placement.hasTime, raw: placement.raw)
         case .missing: .missing
         case .invalid(let raw): .invalid(raw)

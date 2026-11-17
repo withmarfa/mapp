@@ -1827,6 +1827,9 @@
     "Each server has its own copy on this Mac." : {
       "extractionState" : "manual"
     },
+    "Earlier" : {
+      "extractionState" : "manual"
+    },
     "Earlier versions of “%@”." : {
       "extractionState" : "manual"
     },

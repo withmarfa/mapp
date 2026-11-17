@@ -33,6 +33,8 @@ nonisolated struct ItemPlacement: Hashable, Sendable {
     let hasTime: Bool
     /// The value as the item holds it, for a help tag.
     let raw: String
+    /// Whether the item is an event, which alone is said to be "all day".
+    var isEvent = false
 
     /// Where `item` sits, by the date its `look` names or, where the person chose one, by `field`.
     static func of(
@@ -40,18 +42,15 @@ nonisolated struct ItemPlacement: Hashable, Sendable {
     ) -> Outcome {
         let info = catalogue.itemTypes[item.type]
         func hasDate(_ key: String) -> Bool { info?.fields.contains { $0.key == key && $0.kind.isDate } == true }
-        func instant(_ date: Date) -> Outcome {
-            .placed(ItemPlacement(start: date, end: nil, hasTime: true, raw: ""))
+        func instant(_ date: Date?) -> Outcome {
+            date.map { .placed(ItemPlacement(start: $0, end: nil, hasTime: true, raw: "")) } ?? .missing
         }
         if let field {
             return hasDate(field) ? value(of: field, in: item, calendar: calendar) : .notApplicable
         }
         switch look.date {
-        case .off: return .missing
-        case .created: return instant(item.created)
-        case .edited: return instant(item.trashed ?? item.modified)
-        case .occurred: return instant(item.occurred ?? item.created)
         case .field(let key): return hasDate(key) ? value(of: key, in: item, calendar: calendar) : .missing
+        case .off, .created, .edited, .occurred: return instant(ItemMoment.stamp(look.date, of: item))
         }
     }
 
@@ -66,43 +65,23 @@ nonisolated struct ItemPlacement: Hashable, Sendable {
 
     /// An event's start, which is read with the zone, the all-day flag and the end the event holds beside it.
     private static func event(startingAt text: String, parsed: ItemDate, of item: Item, calendar: Calendar) -> Outcome {
-        func held(_ key: String) -> String? {
-            item.value(of: key)?.string.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.flatMap { $0.isEmpty ? nil : $0 }
+        guard let span = EventSpan(item: item, calendar: calendar) else {
+            return .placed(ItemPlacement(start: parsed.date, end: nil, hasTime: parsed.hasTime, raw: text, isEvent: true))
         }
-        var allDay = false
-        if case .bool(let flag)? = item.value(of: "all_day") { allDay = flag }
-        let wholeDays = allDay || held("precision") == "day" || !parsed.hasTime
+        let placed = span.placed(on: calendar)
+        return .placed(ItemPlacement(start: placed.start, end: placed.end, hasTime: placed.hasTime, raw: text, isEvent: true))
+    }
+}
 
-        // A whole day belongs to the zone it is lived in, and with none named, to UTC. A timed event with none is an
-        // instant, which needs no zone to be placed.
-        let named = held("timezone").flatMap { TimeZone(identifier: $0) }
-        var inZone = Calendar(identifier: .gregorian)
-        inZone.timeZone = named ?? (allDay ? TimeZone(identifier: "UTC")! : calendar.timeZone)
-        var inEndZone = inZone
-        if let endZone = held("end_timezone").flatMap({ TimeZone(identifier: $0) }) { inEndZone.timeZone = endZone }
-
-        let zonedStart = ItemDate.parse(text, calendar: inZone) ?? parsed
-        var finish = held(MarfaMapping.endField).flatMap { ItemDate.parse($0, calendar: inEndZone) }?.date
-        if finish == nil, case .number(let seconds)? = item.value(of: "duration") {
-            finish = zonedStart.date.addingTimeInterval(seconds.nearestDouble)
+/// The moments every item has, which a look or a list can name: when it was created, last changed, or happened.
+nonisolated enum ItemMoment {
+    /// The moment `date` names, nil for a field, which only the item's type can read, and for no date at all.
+    static func stamp(_ date: LookDate, of item: Item) -> Date? {
+        switch date {
+        case .created: item.created
+        case .edited: item.trashed ?? item.modified
+        case .occurred: item.occurred ?? item.created
+        case .field, .off: nil
         }
-        if let later = finish, later <= zonedStart.date { finish = nil }
-
-        guard wholeDays else {
-            return .placed(ItemPlacement(start: zonedStart.date, end: finish, hasTime: true, raw: text))
-        }
-        // The days as the event's zone counts them, laid on the Mac's calendar as the same days.
-        func day(_ date: Date, in zoned: Calendar) -> Date {
-            calendar.date(from: zoned.dateComponents([.year, .month, .day], from: date)).map { calendar.startOfDay(for: $0) } ?? date
-        }
-        let first = day(zonedStart.date, in: inZone)
-        var last = first
-        if let later = finish {
-            // A run of whole days ends at the midnight that closes its last day.
-            let closes = inEndZone.startOfDay(for: later) == later
-            last = max(first, day(closes ? later.addingTimeInterval(-1) : later, in: inEndZone))
-        }
-        let end = calendar.date(byAdding: .day, value: 1, to: last)
-        return .placed(ItemPlacement(start: first, end: end, hasTime: false, raw: text))
     }
 }

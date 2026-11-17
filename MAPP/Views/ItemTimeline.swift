@@ -2,8 +2,6 @@ import SwiftUI
 
 struct ItemTimeline: View {
     @CurrentLibrary private var library
-    /// The window's, which the right sidebar is shown through.
-    @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     @Bindable var browser: Browser
     var pane: FocusState<Browser.Pane?>.Binding
     @State private var daysSeen = 0
@@ -22,7 +20,7 @@ struct ItemTimeline: View {
         let groups = ItemTimelineLayout.groups(
             for: items, field: field, looks: looks, catalogue: library.catalogue, today: now)
         let list = RowList(
-            mixesTypes: Set(items.map(\.type)).count > 1, date: .look, format: dateFormat, datesApart: true, day: Calendar.current.startOfDay(for: now))
+            mixesTypes: Set(items.map(\.type)).count > 1, date: .look, format: dateFormat, datesApart: true, placedField: field, day: Calendar.current.startOfDay(for: now))
         let contents = rowContents.contents(of: items, in: library, looks: looks, list: list, shape: CardShape())
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
 
@@ -41,10 +39,7 @@ struct ItemTimeline: View {
         .filteredEmptyState(browser)
         .navigationTitle(title)
         .navigationSubtitle(Text("^[\(items.count) item](inflect: true)").editedSubtitle(browser.hasViewChanges))
-        // Choosing a row shows it in the right sidebar.
-        .onChange(of: browser.selection) { _, selection in
-            if selection.count == 1, browser.showsCollection { details?.isPresented = true }
-        }
+        .background(ChosenRowOpensSidebar(browser: browser))
         .toolbar(removing: browser.isSearchExpanded ? .title : nil)
         .onChange(of: browser.isSearchExpanded) {
             if !browser.isSearchExpanded { browser.focusRequest = .list }
@@ -58,16 +53,20 @@ struct ItemTimeline: View {
     private enum Line: Identifiable {
         case row(ItemTimelineRow, startsDay: Bool, endsDay: Bool)
         case now(Date, startsDay: Bool)
+        /// The header where the days ahead end and the days before begin.
+        case earlier
 
         var id: String {
             switch self {
             case .row(let row, _, _): row.id.rawValue
             case .now: "now"
+            case .earlier: "earlier"
             }
         }
     }
 
     private func lines(of group: ItemTimelineGroup, now: Date) -> [Line] {
+        if group.id == .earlier { return [.earlier] }
         var lines = group.rows.enumerated().map { index, row in
             Line.row(row, startsDay: index == 0, endsDay: index == group.rows.count - 1)
         }
@@ -104,6 +103,15 @@ struct ItemTimeline: View {
                             .accessibilityAction(named: Text("Open")) { open([row.id]) }
                             .listRowSeparator(endsDay ? .visible : .hidden, edges: .bottom)
                         }
+                    case .earlier:
+                        Text("Earlier")
+                            .interfaceFont(.headline)
+                            .foregroundStyle(.secondary)
+                            .padding(.top, 6)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .selectionDisabled()
+                            .listRowSeparator(.hidden)
+                            .accessibilityAddTraits(.isHeader)
                     case .now(let date, let startsDay):
                         HStack(spacing: 0) {
                             dayRail(group.id)
@@ -153,7 +161,7 @@ struct ItemTimeline: View {
             switch row.value {
             case .dated(let date, let dateOnly, let raw):
                 if dateOnly {
-                    Text("All day")
+                    if row.isEvent { Text("All day") }
                 } else {
                     Text(verbatim: DateDisplay.timeOfDay(of: date)).monospacedDigit().help(raw)
                 }
@@ -192,6 +200,8 @@ struct ItemTimeline: View {
                     .interfaceFont(.caption)
                     .foregroundStyle(.secondary)
             }
+        case .earlier:
+            EmptyView()
         case .missing:
             Text("No Date").interfaceFont(.headline).foregroundStyle(.secondary)
         case .invalid:
@@ -205,5 +215,19 @@ struct ItemTimeline: View {
         guard ids.count == 1 else { return }
         browser.selection = ids
         browser.openCollectionSelection()
+    }
+}
+
+/// Opens the right sidebar when a row is chosen. It reads the selection itself, so the timeline's body does not, and a
+/// change of selection does not work out every row again.
+private struct ChosenRowOpensSidebar: View {
+    /// The window's, which the right sidebar is shown through.
+    @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
+    let browser: Browser
+
+    var body: some View {
+        Color.clear.onChange(of: browser.selection) { _, selection in
+            if selection.count == 1, browser.showsCollection { details?.isPresented = true }
+        }
     }
 }
