@@ -42,7 +42,7 @@ Edit View opens in the right sidebar, and New View uses the same panel. It holds
 - Density holds a pop-up of As in Settings, Standard and Compact.
 - Sort holds a handle, the fixed property, a direction pop-up and an x in a circle, with a gray Add Sort.
 - Group holds Group by and a Hide Empty Groups switch.
-- Columns (a table) or Cards (a gallery) comes last. Cards has Preview, Size and Shape pop-ups and a Fit Picture switch; Shape and Fit Picture are off where there is no picture area, and a gallery has no Density; what a card says comes from its type's look, not from the view.
+- Columns (a table) or Cards (a gallery) comes last. Cards has Preview, Size and Shape pop-ups and a Fit Picture switch; Shape is off when the preview is None, Fit Picture is off unless the preview can show a picture, and a gallery has no Density; what a card says comes from its type's look, not from the view.
 
 ## How an edit is saved
 
