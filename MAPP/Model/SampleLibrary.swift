@@ -19,7 +19,7 @@ nonisolated enum SampleLibrary {
     static var withCollections: Bool { ProcessInfo.processInfo.arguments.contains("-MAPPCollectionSample") }
 
     /// With the sample flag, `-MAPPOpenPlace <type id>` opens that type's place (`items` opens Items) and
-    /// `-MAPPLayout list|gallery|table|board` the layout, for a screenshot of one view.
+    /// `-MAPPLayout list|gallery|table|board|timeline|calendar` the layout, for a screenshot of one view.
     static var launchPlace: SidebarItem? {
         argument(after: "-MAPPOpenPlace").map { $0 == "items" ? .allNotes : .itemType($0) }
     }
@@ -114,6 +114,8 @@ nonisolated enum SampleLibrary {
                 TypeField(name: "title", type: "string", required: true, declaredBy: "core.event"),
                 TypeField(name: "body", type: "string", declaredBy: "core.event"),
                 TypeField(name: "starts_at", type: "datetime", declaredBy: "core.event"),
+                TypeField(name: "ends_at", type: "datetime", declaredBy: "core.event"),
+                TypeField(name: "all_day", type: "boolean", declaredBy: "core.event"),
                 TypeField(
                     name: "attendees", type: "array", declaredBy: "core.event",
                     definition: ["items_type": "object", "items_fields": [
@@ -304,6 +306,22 @@ nonisolated enum SampleLibrary {
             let created = date(daysAgo: 7, hour: 9)
             rows.append(row("event-\(index + 1)", type: "core.event", properties: properties, created: created, edited: created))
         }
+        for (offset, span) in eventSpans.enumerated() {
+            let first = calendar.date(byAdding: .day, value: span.day, to: now) ?? now
+            var properties: JSONObject = ["title": .string(span.title)]
+            if span.allDays > 0 {
+                properties["starts_at"] = .string(ItemDate.day(first, calendar: calendar))
+                properties["all_day"] = true
+                let after = calendar.date(byAdding: .day, value: span.allDays, to: first) ?? first
+                properties["ends_at"] = .string(ItemDate.day(after, calendar: calendar))
+            } else {
+                let start = calendar.date(bySettingHour: span.hour, minute: span.minute, second: 0, of: first) ?? first
+                properties["starts_at"] = .string(stamp(start))
+                properties["ends_at"] = .string(stamp(start.addingTimeInterval(TimeInterval(span.minutes * 60))))
+            }
+            let created = date(daysAgo: 7, hour: 9)
+            rows.append(row("event-\(sessions.count + offset + 1)", type: "core.event", properties: properties, created: created, edited: created))
+        }
         let met = date(daysAgo: 20, hour: 9)
         rows.append(row("person-1", type: "core.entity.person", properties: [
             "title": "Ruth Okonjo", "job_title": "Editor",
@@ -415,6 +433,16 @@ nonisolated private let sessions: [(title: String, day: Int?, hour: Int, body: S
     ("Board interaction review", 2, 14, "A sample planning session. Open this page from the timeline and return without losing your place."),
     ("Look back at the week", -1, 16, "A sample planning session. Open this page from the timeline and return without losing your place."),
     ("Schedule the next comparison", nil, 9, "This session has no date yet. It remains visible below the dated sessions."),
+]
+
+/// Events with an end, a whole day or a run of days, so a calendar shows overlap and the rows above the hours. A whole-day event
+/// counts `allDays` days from `day`; any other lasts `minutes` from its hour and minute.
+nonisolated private let eventSpans: [(title: String, day: Int, hour: Int, minute: Int, minutes: Int, allDays: Int)] = [
+    ("Planning sync", 0, 9, 30, 60, 0),
+    ("Design crit", 0, 10, 0, 90, 0),
+    ("Team offsite", 1, 0, 0, 0, 2),
+    ("Release night", 2, 22, 0, 240, 0),
+    ("Quarterly review", -2, 13, 0, 120, 0),
 ]
 
 nonisolated private let kitchenQuotes = """

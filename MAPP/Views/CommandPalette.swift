@@ -527,7 +527,8 @@ struct CommandPalette: View {
             addLayout(.gallery, String(localized: "View as Gallery"), "square.grid.2x2", "⌘2")
             addLayout(.table, String(localized: "View as Table"), "tablecells", "⌘3")
             addLayout(.board, String(localized: "View as Board"), "rectangle.split.3x1", "⌘4")
-            addLayout(.timeline, String(localized: "View as Timeline"), "calendar", "⌘5")
+            addLayout(.timeline, String(localized: "View as Timeline"), ItemViewMode.timeline.symbol, "⌘5")
+            addLayout(.calendar, String(localized: "View as Calendar"), ItemViewMode.calendar.symbol, "⌘6")
             if browser.stackableType(in: library) != nil {
                 let isOn = browser.stacksSubtypes(in: library)
                 add(isOn ? String(localized: "Show This Type Only") : String(localized: "Include Subtypes"), IncludeSubtypes.symbol) {

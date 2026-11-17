@@ -219,8 +219,8 @@ struct ItemTimeline: View {
 }
 
 /// Opens the right sidebar when a row is chosen. It reads the selection itself, so the timeline's body does not, and a
-/// change of selection does not work out every row again.
-private struct ChosenRowOpensSidebar: View {
+/// change of selection does not work out every row again. The calendar uses it too.
+struct ChosenRowOpensSidebar: View {
     /// The window's, which the right sidebar is shown through.
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     let browser: Browser

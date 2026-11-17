@@ -65,6 +65,8 @@ enum SavedViews {
             let fields = browser.boardFieldChoices(in: library)
             let field = ItemBoardLayout.selectedField(browser.boardFieldKey(in: browser.item), available: fields)
             return .board(key: field?.key, label: field?.label ?? "")
+        case .calendar:
+            return .calendar
         case .timeline:
             let fields = browser.timelineFieldChoices(in: library)
             let key = ItemTimelineLayout.selectedField(browser.timelineFields[browser.item], fields: fields)
@@ -77,10 +79,12 @@ enum SavedViews {
         var settings = ViewMacSettings(layout: browser.viewMode)
         settings.cards = browser.cards
         settings.density = browser.density
+        if browser.viewMode == .calendar { settings.calendarScale = browser.calendarScale }
         if case .view(let id) = browser.item {
             let held = browser.macSettings(for: id)
             settings.columns = held.columns
             settings.hidesEmptyGroups = held.hidesEmptyGroups
+            settings.calendarScale = held.calendarScale
         } else {
             let stored = browser.defaults.data(forKey: ItemTableColumnLayouts.key) ?? Data()
             let layout = ItemTableColumnLayouts.layout(for: browser.item, in: stored)

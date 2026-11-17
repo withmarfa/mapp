@@ -25,7 +25,7 @@ struct ItemViewModeTests {
 
     @Test func eachGroupingLayoutNeedsItsOwnKindOfField() {
         #expect(ItemViewMode.available(forTypes: [Self.task], catalogue: Self.catalogue) == [.list, .gallery, .table, .board])
-        #expect(ItemViewMode.available(forTypes: [Self.event], catalogue: Self.catalogue) == [.list, .gallery, .table, .timeline])
+        #expect(ItemViewMode.available(forTypes: [Self.event], catalogue: Self.catalogue) == [.list, .gallery, .table, .timeline, .calendar])
     }
 
     @Test func mixedPlacesOfferEverythingAnyTypeCanShow() {

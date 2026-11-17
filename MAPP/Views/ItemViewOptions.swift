@@ -16,6 +16,7 @@ struct ItemViewOptions: View {
             choice("as Table", systemImage: ItemViewMode.table.symbol, .table, key: "3")
             choice("as Board", systemImage: ItemViewMode.board.symbol, .board, key: "4")
             choice("as Timeline", systemImage: ItemViewMode.timeline.symbol, .timeline, key: "5")
+            choice("as Calendar", systemImage: ItemViewMode.calendar.symbol, .calendar, key: "6")
         }
         .disabled(browser == nil)
     }
@@ -27,6 +28,7 @@ struct ItemViewOptions: View {
         case .table: "ViewAsTable"
         case .board: "ViewAsBoard"
         case .timeline: "ViewAsTimeline"
+        case .calendar: "ViewAsCalendar"
         }
     }
 
@@ -102,12 +104,19 @@ struct ViewOptionsMenu: View {
 struct CurrentViewOptions: View {
     /// Nil while no window is in front, when the list's order is still the app's to change.
     let browser: Browser?
+    var bindsKeys = false
 
     var body: some View {
         switch browser?.viewMode {
         case .table: if let browser { ItemTableViewOptions(browser: browser) }
         case .board: if let browser { ItemBoardOptions(browser: browser) }
         case .timeline: if let browser { ItemTimelineOptions(browser: browser) }
+        case .calendar:
+            if let browser {
+                ItemCalendarOptions(browser: browser, bindsKeys: bindsKeys)
+                Divider()
+                IncludeSubtypesOption(browser: browser)
+            }
         // A collection keeps the order Marfa gives its members, so the app's order does not apply there.
         case .list, .gallery, nil:
             // A saved view has its own sort and group, which the list and the gallery take as the table does.

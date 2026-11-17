@@ -59,6 +59,7 @@ struct WindowToolbar: CustomizableToolbarContent {
         }
         ToolbarSpacer(.flexible)
         if let browser {
+            CalendarToolbarItems(browser: browser)
             ViewChangeItems(browser: browser)
         }
         if let browser, !hasListColumn {

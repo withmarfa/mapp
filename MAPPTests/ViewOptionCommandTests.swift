@@ -37,6 +37,20 @@ struct ViewOptionCommandTests {
         #expect(Self.titles(browser, library).contains("Comfortable Cards"))
     }
 
+    @Test func theCalendarsCommandsMoveFromTheWeekTheLibrarysClockShows() throws {
+        let clock = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        let library = FakeItemLibrary(items: [Self.task("A", status: "todo")], now: clock)
+        let browser = Self.browser(.calendar, in: library)
+        let commands = ViewOptionCommand.commands(for: browser, in: library, storedColumns: .constant(Data()))
+        let next = try #require(commands.first { $0.title == "Next Week" })
+        next.action()
+        let expected = try #require(Calendar.current.date(byAdding: .weekOfYear, value: 1, to: clock))
+        #expect(browser.calendarDay == expected, "a week on from the clock's, not from the wall clock")
+        let today = try #require(ViewOptionCommand.commands(for: browser, in: library, storedColumns: .constant(Data())).first { $0.title == "Go to Today" })
+        today.action()
+        #expect(browser.calendarDay == nil)
+    }
+
     @Test func theListTheGalleryAndSettingsOfferNoViewOptionCommands() {
         let library = FakeItemLibrary(items: [Self.task("A", status: "todo")])
         for mode in [ItemViewMode.list, .gallery] {

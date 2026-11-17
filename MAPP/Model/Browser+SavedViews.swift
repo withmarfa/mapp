@@ -121,6 +121,38 @@ extension Browser {
         if case .view(let id) = item { macSettings(for: id).cards } else { placeCards[item] ?? ViewCards() }
     }
 
+    /// Whether the calendar shows a week or a month in the open place: a saved view's choice on this Mac, else the
+    /// window's own for the place. A week until chosen.
+    var calendarScale: CalendarScale {
+        if case .view(let id) = item { macSettings(for: id).calendarScale ?? .week } else { placeCalendarScales[item] ?? .week }
+    }
+
+    /// Changes the calendar's scale. A saved view keeps it on this Mac as it is made, and a place's lasts as long as the
+    /// window. Undo takes either back.
+    func changeCalendarScale(_ scale: CalendarScale) {
+        if case .view(let id) = item {
+            changeViewSettings(id) { $0.calendarScale = scale }
+            return
+        }
+        let before = calendarScale
+        guard scale != before else { return }
+        let place = item
+        placeCalendarScales[place] = scale
+        registerUndo(String(localized: "Change Calendar")) { browser in
+            guard browser.item == place else { return }
+            browser.changeCalendarScale(before)
+        }
+    }
+
+    /// Moves the calendar by whole weeks or months, or back to the one that holds today with `steps` nil.
+    func moveCalendar(by steps: Int?, now: Date, calendar: Calendar = .current) {
+        guard let steps else {
+            calendarDay = nil
+            return
+        }
+        calendarDay = CalendarLayout.moved(calendarDay ?? now, by: steps, scale: calendarScale, calendar: calendar)
+    }
+
     /// How much each row of the list says in the open place: a saved view's own, else the one this Mac keeps for the
     /// place. Nil follows Settings.
     var density: Density? {

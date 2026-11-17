@@ -15,6 +15,7 @@ struct ViewOptionCommand {
         case .table: return table(browser, library, storedColumns)
         case .board: return board(browser, library)
         case .timeline: return timeline(browser, library)
+        case .calendar: return calendar(browser, library)
         case .list, .gallery: return []
         }
     }
@@ -108,6 +109,20 @@ struct ViewOptionCommand {
             browser.compactBoards[place] = !compact
         })
         return commands
+    }
+
+    private static func calendar(_ browser: Browser, _ library: any ItemLibrary) -> [ViewOptionCommand] {
+        let scale = browser.calendarScale
+        let unit = scale == .week ? String(localized: "Week") : String(localized: "Month")
+        return [
+            ViewOptionCommand(title: String(localized: "Go to Today"), systemImage: "calendar") { browser.moveCalendar(by: nil, now: library.now()) },
+            ViewOptionCommand(title: String(localized: "Previous \(unit)"), systemImage: "chevron.left") { browser.moveCalendar(by: -1, now: library.now()) },
+            ViewOptionCommand(title: String(localized: "Next \(unit)"), systemImage: "chevron.right") { browser.moveCalendar(by: 1, now: library.now()) },
+            ViewOptionCommand(
+                title: scale == .week ? String(localized: "Show Month") : String(localized: "Show Week"),
+                systemImage: "calendar"
+            ) { browser.changeCalendarScale(scale == .week ? .month : .week) },
+        ]
     }
 
     private static func timeline(_ browser: Browser, _ library: any ItemLibrary) -> [ViewOptionCommand] {

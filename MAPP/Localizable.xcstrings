@@ -4,6 +4,15 @@
     "" : {
 
     },
+    "as Calendar" : {
+      "extractionState" : "manual"
+    },
+    "Calendar" : {
+      "extractionState" : "manual"
+    },
+    "Change Calendar" : {
+      "extractionState" : "manual"
+    },
     "Change Density" : {
 
     },
@@ -52,6 +61,9 @@
     "“%@” has changed since, so that can’t be put back here. Earlier versions are in Version History." : {
       "extractionState" : "manual"
     },
+    "Go to Today" : {
+      "extractionState" : "manual"
+    },
     "Import Looks…" : {
 
     },
@@ -79,7 +91,16 @@
     "“%@” may remove items sooner than the server’s current setting." : {
       "extractionState" : "manual"
     },
+    "Month" : {
+      "extractionState" : "manual"
+    },
     "Name of the place" : {
+      "extractionState" : "manual"
+    },
+    "Next" : {
+      "extractionState" : "manual"
+    },
+    "Next %@" : {
       "extractionState" : "manual"
     },
     "No places found." : {
@@ -91,6 +112,18 @@
     "Opens a map" : {
       "extractionState" : "manual"
     },
+    "Previous" : {
+      "extractionState" : "manual"
+    },
+    "Previous %@" : {
+      "extractionState" : "manual"
+    },
+    "Previous Week" : {
+      "extractionState" : "manual"
+    },
+    "Scale" : {
+      "extractionState" : "manual"
+    },
     "Search for a Place" : {
       "extractionState" : "manual"
     },
@@ -100,7 +133,16 @@
     "Searching…" : {
       "extractionState" : "manual"
     },
+    "Show a Week or a Month" : {
+      "extractionState" : "manual"
+    },
     "Show Coordinates" : {
+      "extractionState" : "manual"
+    },
+    "Show Month" : {
+      "extractionState" : "manual"
+    },
+    "Show Week" : {
       "extractionState" : "manual"
     },
     "The location couldn’t be saved." : {
@@ -4287,6 +4329,9 @@
     "View as Board" : {
       "extractionState" : "manual"
     },
+    "View as Calendar" : {
+      "extractionState" : "manual"
+    },
     "View as Cards" : {
       "extractionState" : "manual"
     },
@@ -4356,6 +4401,12 @@
     },
     "Web Address" : {
 
+    },
+    "Week" : {
+      "extractionState" : "manual"
+    },
+    "Week %lld" : {
+      "extractionState" : "manual"
     },
     "Weekly" : {
 

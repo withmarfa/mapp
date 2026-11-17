@@ -106,7 +106,7 @@ struct AppCommands: Commands {
                     // A table, board or timeline with an item page open has no view options to offer.
                     if browser.offersViewOptions, !browser.showsSidebarIndex {
                         FilterCommands(browser: browser)
-                        CurrentViewOptions(browser: browser)
+                        CurrentViewOptions(browser: browser, bindsKeys: true)
                     }
                 } else {
                     CurrentViewOptions(browser: nil)
