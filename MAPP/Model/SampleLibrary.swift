@@ -59,14 +59,18 @@ nonisolated enum SampleLibrary {
     }
 
     /// What the fake copy answers `items.displays` with, shaped like the core's: the title, else the first line of the
-    /// body, as the name, and the body (at most 240 characters) as the preview. It strips no Markdown.
+    /// body, as the name, and the body as the preview, leaving out the line a name came from and every line before it
+    /// (`device/item-preview-after-name`), joined with single spaces and cut at 240 characters with an ellipsis
+    /// (`device/item-preview-text`). It strips no Markdown.
     @Sendable nonisolated static func display(_ input: ItemDisplayInput) -> ItemDisplay {
         let title = input.properties["title"]?.string?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let body = input.properties["body"]?.string ?? ""
-        let firstLine = body.split(whereSeparator: \.isNewline)
-            .lazy.map { $0.trimmingCharacters(in: .whitespaces) }.first { !$0.isEmpty } ?? ""
-        let name = title.isEmpty ? firstLine : title
-        let preview = String(body.trimmingCharacters(in: .whitespacesAndNewlines).prefix(240))
+        let lines = (input.properties["body"]?.string ?? "").split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+        let first = lines.firstIndex { !$0.isEmpty }
+        let name = title.isEmpty ? first.map { lines[$0] } ?? "" : title
+        let rest = title.isEmpty ? first.map { lines[($0 + 1)...] } ?? [] : lines[...]
+        var preview = rest.joined(separator: " ").split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        if preview.count > 240 { preview = String(preview.prefix(239)) + "\u{2026}" }
         return ItemDisplay(name: name.isEmpty ? nil : name, preview: preview.isEmpty ? nil : preview)
     }
 

@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 import Testing
 @testable import MAPP
 
@@ -12,6 +13,22 @@ import Testing
         source.refresh()
         try #require(await eventually { library.isLoaded })
         return (library, source)
+    }
+
+    @Test func aPreviewLeavesOutTheLineTheNameCameFromAndJoinsTheRestWithSpaces() {
+        func display(_ properties: JSONObject) -> ItemDisplay {
+            SampleLibrary.display(ItemDisplayInput(type: "core.note", properties: properties))
+        }
+        let untitled = display(["body": .string("Morning walk\n\nSun on the hill.\nBirds everywhere.")])
+        #expect(untitled.name == "Morning walk")
+        #expect(untitled.preview == "Sun on the hill. Birds everywhere.")
+        let titled = display(["title": .string("Walk"), "body": .string("Morning walk\nSun on the hill.")])
+        #expect(titled.name == "Walk")
+        #expect(titled.preview == "Morning walk Sun on the hill.")
+        let oneLine = display(["body": .string("Only a line")])
+        #expect(oneLine.name == "Only a line" && oneLine.preview == nil)
+        let long = display(["title": .string("T"), "body": .string(String(repeating: "word ", count: 100))])
+        #expect(long.preview?.count == 240 && long.preview?.hasSuffix("\u{2026}") == true)
     }
 
     /// Text typed into a note the page opened before its create was answered, saved after each answer as the page
