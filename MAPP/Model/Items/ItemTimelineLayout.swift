@@ -60,8 +60,8 @@ nonisolated enum ItemTimelineLayout {
     }
 
     /// The days of the items, from `today` on first and then, after an `Earlier` header, the days before it, the latest
-    /// first, so the timeline opens on today's agenda; an item with no date, or an invalid one, follows. Inside a day a whole-day item leads,
-    /// then the rest by time.
+    /// first, so the timeline opens on today's agenda; an item with no date, or an invalid one, follows. Inside a day a
+    /// whole-day item leads, then the rest by time.
     static func groups(
         for items: [Item], field: String?, looks: [TypeID: TypeLook], catalogue: Catalogue, today: Date? = nil,
         calendar: Calendar = .current
