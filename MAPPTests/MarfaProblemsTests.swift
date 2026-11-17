@@ -165,6 +165,30 @@ struct MarfaProblemsTests {
         #expect(report.problems[1].dependents == ["behind"])
         #expect(report.problems[2].dependents.isEmpty)
         #expect(report.problems[2].actions == [.discard])
+        // Shown alone, it says why in the app's words, not the queue's sentence.
+        #expect(report.problems[2].reason?.unsent == .afterRefusal)
+        #expect(report.problems[2].reason?.message == Words.unsent(.afterRefusal))
+        #expect(report.problems[2].reason?.code.contains(" ") == false)
+    }
+
+    /// A write the copy would not send for its own size also carries no code, but is refused for itself, so it is
+    /// shown on its own with its sizes even when it went with a refused write.
+    @Test func aWriteTooLargeToSendIsShownOnItsOwnWithItsSizes() throws {
+        let server = Refusal(reason: "type_not_permitted", code: "type_not_permitted")
+        let tooLarge = Refusal(
+            reason: "This write is 2,000,001 bytes as a request, and this server takes 2,000,000. Make it smaller to send it.",
+            requestLimit: RequestLimit(size: 2_000_001, limit: 2_000_000))
+        let report = Self.report([
+            Self.write("create", .refused(server), kind: .createItem, body: Self.task, at: "2026-10-06T08:00:00Z"),
+            Self.write("big", .refused(tooLarge), body: ["properties": ["body": "A very long note"]], dependsOn: ["create"])
+        ])
+        #expect(report.problems.map(\.id) == [.write("create"), .write("big")])
+        #expect(report.problems[0].dependents.isEmpty)
+        let big = report.problems[1]
+        #expect(big.reason?.unsent == .tooLarge(size: 2_000_001, limit: 2_000_000))
+        #expect(big.reason?.code == "over_request_limit")
+        #expect(big.copyText.contains("A very long note"))
+        #expect(big.actions == [.discard])
     }
 
     /// Each later write's values win, field by field, as the queue would have sent them.
@@ -273,6 +297,23 @@ struct UnsentTextsTests {
     @Test func aWriteWithNothingWrittenInItShowsNothing() {
         let empty = Self.write("empty", body: ["properties": ["body": .null]], at: "2026-10-06T10:00:00Z")
         #expect(MarfaProblems.unsentTexts([empty], catalogue: Self.catalogue).isEmpty)
+    }
+
+    /// A store this version can't open is listed from its own words: every write by id, and the text of each create or
+    /// edit that carried any, in queue order, whatever kind or body this build can't read.
+    @Test func aStoreReadWithoutOpeningItListsEveryWriteAndTheTextItCan() {
+        let writes = [
+            UnsentWrite(id: "made", kind: "create_item", body: #"{"type":"core.note","properties":{"body":"Book the hotel"}}"#),
+            UnsentWrite(id: "edited", kind: "update_item", itemId: "item", body: #"{"properties":{"body":"Second thought"}}"#),
+            UnsentWrite(id: "old-kind", kind: "merge_metadata", body: #"{"properties":{"body":"Unknown"}}"#),
+            UnsentWrite(id: "garbled", kind: "update_item", body: "not json"),
+            UnsentWrite(id: "tagged", kind: "add_tag", body: #"{"tags":["x"]}"#)
+        ]
+        let unsent = MarfaProblems.unsentChanges(writes)
+        #expect(unsent.ids == ["made", "edited", "old-kind", "garbled", "tagged"])
+        #expect(unsent.texts.map(\.id) == ["made", "edited"])
+        #expect(unsent.texts.map(\.change) == [.create, .edit])
+        #expect(unsent.texts.map(\.content.plainText) == ["Book the hotel", "Second thought"])
     }
 
     @Test func whatIsShownDoesNotChangeWhatTheyAgreedTo() {

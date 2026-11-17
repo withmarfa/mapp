@@ -173,13 +173,9 @@ struct DepartureSheet: View {
         if case .otherVersion = model.host.state { true } else { false }
     }
 
-    private var otherVersionUnsent: UInt64? {
-        if case .otherVersion(let unsent) = model.host.state { unsent } else { nil }
-    }
-
-    /// Whether the person has been shown how many changes they would lose. The package removes a copy only
-    /// against that number, so a copy whose changes can't be counted is kept, never discarded.
-    private var canDiscard: Bool { departure.unsent != nil || otherVersionUnsent != nil }
+    /// Whether the person has been shown the changes they would lose. The package removes a copy only against
+    /// the writes read from it, so a copy whose changes can't be listed is kept, never discarded.
+    private var canDiscard: Bool { departure.unsent != nil }
 
     /// Where the copy is, for the person to remove when MAPP can't.
     private var copyFolder: String {
@@ -197,8 +193,6 @@ struct DepartureSheet: View {
             if let unsent = departure.unsent {
                 Text(Words.notSent(unsent.count))
                 changes(unsent)
-            } else if let held = otherVersionUnsent {
-                Text(Words.notSent(Int(clamping: held)))
             } else {
                 Text(Words.cannotDiscard(folder: copyFolder))
             }

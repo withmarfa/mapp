@@ -440,13 +440,45 @@ struct MarfaMappingTests {
             isTrashed: true)))
         let unsent = Refusal(reason: "the create_item it waits for was refused")
         #expect(MarfaMapping.outcome(.refused(unsent)) == .refused(SyncProblem(
-            code: "the create_item it waits for was refused", message: nil)))
+            code: "refused_with_dependency", message: Words.unsent(.afterRefusal), unsent: .afterRefusal)))
         #expect(MarfaMapping.outcome(.conflicted(siblingId: "s", fields: ["body"])) ==
             .conflicted(sibling: ItemID("s"), fields: ["body"]))
         #expect(MarfaMapping.outcome(.blocked(reason: .keySpent)) == .blocked(.keySpent, nil))
         #expect(MarfaMapping.outcome(.blocked(reason: .failingAlone)) == .blocked(.failingAlone, nil))
         #expect(MarfaMapping.outcome(.blocked(reason: .instanceChanged)) == .blocked(.instanceChanged, nil))
+        #expect(MarfaMapping.outcome(.blocked(reason: .recordUnread)) == .blocked(.recordUnread, nil))
         #expect(MarfaMapping.outcome(.dead) == .dead)
+    }
+
+    /// The copy refuses a write larger than the server takes before sending it, with no code and its reason in
+    /// English. The person is told the sizes in the app's words, wherever the refusal is shown.
+    @Test func aWriteTooLargeToSendIsToldWithItsSizes() throws {
+        let refusal = Refusal(
+            reason: "This write is 3,145,729 bytes as a request, and this server takes 3,145,728. Make it smaller to send it.",
+            requestLimit: RequestLimit(size: 3_145_729, limit: 3_145_728))
+        guard case .refused(let problem) = MarfaMapping.outcome(.refused(refusal)) else {
+            Issue.record("expected a refusal")
+            return
+        }
+        #expect(problem.unsent == .tooLarge(size: 3_145_729, limit: 3_145_728))
+        #expect(problem.code == "over_request_limit")
+        let message = try #require(problem.message)
+        #expect(message.contains(3_145_729.formatted()) && message.contains(3_145_728.formatted()))
+        #expect(!message.localizedCaseInsensitiveContains("write"), "the queue's word is not the person's")
+
+        let entry = SyncProblemEntry(
+            id: .write("w"), itemID: ItemID("item"), kind: .refused, change: .edit, reason: problem,
+            content: SyncContent(title: "Plan", body: "A very long note"), actions: MarfaProblems.actions(for: .refused))
+        let wording = ProblemWording(entry) { _ in nil }
+        #expect(wording.explanation.hasPrefix(message), "Settings says why, not only that it was refused")
+        #expect(!wording.explanation.contains("The server refused it"), "the copy refused it, not the server")
+    }
+
+    /// Only a table row's conflict names no copy, and MAPP writes no rows, so such an answer leaves the item as
+    /// merged rather than pointing at a copy that does not exist.
+    @Test func aConflictNamingNoCopyIsReadAsMerged() {
+        #expect(MarfaMapping.outcome(.conflicted(siblingId: nil, fields: ["title"])) == .merged(fields: ["title"]))
+        #expect(MarfaMapping.outcome(.conflicted(siblingId: nil, fields: [])).syncState == .settled)
     }
 
     private static func write(_ id: String, on item: String, _ verdict: Verdict? = nil) -> QueuedWrite {

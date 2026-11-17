@@ -19,19 +19,25 @@ extension LiveMarfaTests {
             try await withPurgedItem { connection, keys, location, id, version in
                 let source = try await MarfaSource.open(connection, signIns: keys, location: location)
                 try await closing(source) {
-                    let library = MarfaLibrary(source: source, notices: Notices())
+                    let notices = Notices()
+                    let library = MarfaLibrary(source: source, notices: notices)
                     source.refresh()
                     try #require(await eventually { library.isLoaded && library.item(id) == nil }, "the copy never heard of the purge")
                     let typed = "MAPPTEST purged elsewhere, then everything typed after"
                     let log = ChangeLog(source)
-                    let edit = WriteID()
-                    source.submit(.editProperties(id, ["title": .string(typed)], base: version, undoing: nil), as: edit)
-                    let answered = try #require(await log.wait { $0.answer(to: edit) != nil })
-                    guard case .refused(let problem)? = answered.answer(to: edit) else {
-                        Issue.record("expected a refusal, got \(String(describing: answered.answer(to: edit)))")
-                        return
-                    }
+                    // As a property editor still showing the item saves, by the library, which follows the answer.
+                    library.submitPropertyEdit(
+                        .editProperties(id, ["title": .string(typed)], base: version, undoing: nil), of: id,
+                        failing: "Can’t Edit This Property")
+                    let answered = try #require(await log.wait { state in
+                        state.changes.contains { if case .answered(_, .refused) = $0 { true } else { false } }
+                    })
+                    guard let problem = answered.changes.lazy.compactMap({ change -> SyncProblem? in
+                        if case .answered(_, .refused(let problem)) = change { problem } else { nil }
+                    }).first else { return }
                     #expect(problem.notQueued, "the package refused it before queueing, so no queue holds the text")
+                    #expect(await eventually { notices.waiting.contains { $0.isNotKept && $0.text?.contains(typed) == true } },
+                        "what the person typed is given back")
                     #expect(source.syncReport.problems.allSatisfy { $0.itemID != id })
                     #expect(try await source.copy.queue.all().allSatisfy { $0.itemId != id.rawValue })
                 }

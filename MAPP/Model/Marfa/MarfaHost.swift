@@ -28,8 +28,8 @@ import Observation
         /// Left on disk, so connecting the same address again goes on from it and sends what waits.
         case keepCopy
         /// Removed with the writes the person was shown in `changesWaiting`, which they agreed to lose. A write
-        /// not among them, such as a late save, keeps the copy and the person is asked again. Nil is only for a
-        /// copy another version made, and agrees to the count it reported; with none, the choice is refused.
+        /// not among them, such as a late save, keeps the copy and the person is asked again. Nil, where they
+        /// were shown none, is refused.
         case discardCopy(UnsentChanges?)
     }
 
@@ -79,38 +79,27 @@ import Observation
         case notMapps(folder: String)
     }
 
-    /// What the person agreed to lose with a copy they discard.
-    nonisolated enum Agreed: Hashable, Sendable {
-        /// The writes they were shown, by queue id.
-        case ids(Set<String>)
-        /// How many a copy another version made held, which the app cannot list.
-        case count(UInt64)
+    /// What the person agreed to lose with a copy they discard: the writes they were shown, by queue id. A count
+    /// confirms nothing, since another write can take the place of one that was sent.
+    nonisolated struct Agreed: Hashable, Sendable {
+        var ids: Set<String>
+
+        init(ids: Set<String>) {
+            self.ids = ids
+        }
+
+        /// A mark that is not a list of ids agrees to lose nothing, so a copy holding any change is kept.
+        init(stored: Any) {
+            ids = Set(stored as? [String] ?? [])
+        }
 
         /// Whether a copy holding `held` loses nothing beyond what was agreed: a write sent meanwhile is no loss.
         func covers(_ held: [String]) -> Bool {
-            switch self {
-            case .ids(let ids): Set(held).isSubset(of: ids)
-            case .count(let count): UInt64(held.count) <= count
-            }
+            Set(held).isSubset(of: ids)
         }
 
         /// As it is kept in the defaults, so a removal that stops part way is finished at the next launch.
-        var stored: Any {
-            switch self {
-            case .ids(let ids): ids.sorted()
-            case .count(let count): Int(clamping: count)
-            }
-        }
-
-        init?(stored: Any) {
-            if let ids = stored as? [String] {
-                self = .ids(Set(ids))
-            } else if let count = stored as? Int, count >= 0 {
-                self = .count(UInt64(count))
-            } else {
-                return nil
-            }
-        }
+        var stored: [String] { ids.sorted() }
     }
 
     private static let addressKey = "MarfaAddress"
@@ -310,7 +299,8 @@ import Observation
         if let source {
             try await close(source, for: choice)
         } else if choice == nil, hasCopy(connection) {
-            throw .changesWaiting(nil)
+            let unsent = await Self.unsentChanges(in: location.store(for: connection))
+            if unsent?.ids.isEmpty != true { throw .changesWaiting(unsent) }
         }
         detach()
         forgetName(of: connection)
@@ -367,7 +357,8 @@ import Observation
                 let unsent = await current.unsentWrites()
                 if unsent?.ids.isEmpty != true { throw Problem.changesWaiting(unsent) }
             } else if current == nil, choice == nil, hasCopy(old) {
-                throw Problem.changesWaiting(nil)
+                let unsent = await Self.unsentChanges(in: location.store(for: old))
+                if unsent?.ids.isEmpty != true { throw Problem.changesWaiting(unsent) }
             }
             fresh = !hasCopy(connection)
         } catch {
@@ -408,7 +399,7 @@ import Observation
                 // The move is abandoned, so the copy and the sign-in made for it go too.
                 await opened.close()
                 await endSignIn(of: connection)
-                if fresh { _ = await removeCopy(connection, agreed: .ids([])) }
+                if fresh { _ = await removeCopy(connection, agreed: Agreed(ids: [])) }
                 throw error
             }
         }
@@ -425,8 +416,8 @@ import Observation
         switch (choice, unsent) {
         case (nil, let unsent?): unsent.ids.isEmpty
         case (nil, nil): false
-        case (.discardCopy(let agreed), let unsent?): agreed.map { unsent.ids.isSubset(of: $0.ids) } ?? true
-        case (.discardCopy(let agreed), nil): agreed == nil
+        case (.discardCopy(let agreed?), let unsent?): unsent.ids.isSubset(of: agreed.ids)
+        case (.discardCopy, _): false
         case (.keepCopy, _): true
         }
     }
@@ -503,12 +494,12 @@ import Observation
     /// only if every write not sent is one the person agreed to lose: none, without a choice.
     private func close(_ source: any ItemSource, for choice: DisconnectChoice?) async throws(Problem) {
         guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current note before changing libraries.")) }
-        let agreed: UnsentChanges?
+        let agreed: UnsentChanges
         switch choice {
         case .keepCopy:
             await source.close()
             return
-        case .discardCopy(let shown): agreed = shown
+        case .discardCopy(let shown): agreed = shown ?? UnsentChanges(ids: [])
         case nil: agreed = UnsentChanges(ids: [])
         }
         if case .waiting(let unsent) = await source.close(agreeing: agreed) { throw .changesWaiting(unsent) }

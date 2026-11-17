@@ -139,6 +139,17 @@ nonisolated enum Words {
         String(localized: "\(count) changes on this Mac haven’t reached the server.")
     }
 
+    /// Why the copy on this Mac kept a change from the server without sending it. The person can only discard it,
+    /// so the way forward is to make the change again.
+    static func unsent(_ unsent: SyncProblem.Unsent) -> String {
+        switch unsent {
+        case .tooLarge(let size, let limit):
+            String(localized: "This change is \(size.formatted()) bytes, more than the \(limit.formatted()) bytes the server takes at once, so it wasn’t sent. Make it again in smaller parts.")
+        case .afterRefusal:
+            String(localized: "It went with an earlier change that wasn’t sent, so it wasn’t sent either. Make it again.")
+        }
+    }
+
     static func moreNotShown(_ count: Int) -> String {
         String(localized: "And \(count) more changes whose text can’t be shown.")
     }
@@ -262,6 +273,8 @@ nonisolated struct ProblemWording: Hashable, Sendable {
                 explanation = String(localized: "MAPP doesn’t have permission for “\(grant.name)”. Ask whoever runs the server to allow it, then make the change again.")
             } else if reason?.isTrashed == true {
                 explanation = String(localized: "The item is in Recently Deleted on the server, so it can’t be changed. Restore it, then make the change again.")
+            } else if let unsent = reason?.unsent {
+                explanation = Words.unsent(unsent)
             } else if let message = reason?.message, !message.isEmpty {
                 explanation = String(localized: "The server refused it: \(message)")
             } else {

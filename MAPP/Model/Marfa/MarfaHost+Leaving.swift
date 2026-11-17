@@ -4,22 +4,28 @@ import Marfa
 /// Leaving a copy: what the person agreed to lose with it, and ending its sign-in and, where it was discarded, the
 /// copy itself.
 extension MarfaHost {
-    /// What the person agreed to lose when they chose to discard the copy: the changes they were shown, none where
-    /// nothing waited, or, for a copy another version made, which the app cannot list, the count it held. Nil where
-    /// they chose to keep it. The package removes a copy only when what it holds is what was read from it, so a copy
-    /// whose changes were not shown is refused here, before anything is left.
+    /// What the person agreed to lose when they chose to discard the copy: the changes they were shown, or none
+    /// where nothing waited. Nil where they chose to keep it. The package removes a copy only when what it holds is
+    /// what was read from it, so a copy whose changes were not shown is refused here, before anything is left.
     func agreedLoss(_ choice: DisconnectChoice?, of connection: MarfaConnection) throws(Problem) -> Agreed? {
         switch choice {
         case .keepCopy:
             return nil
         case nil:
-            return .ids([])
+            return Agreed(ids: [])
         case .discardCopy(let shown?):
-            return .ids(shown.ids)
+            return Agreed(ids: shown.ids)
         case .discardCopy(nil):
-            if case .otherVersion(let held?) = state { return .count(held) }
             throw .cannotDiscard(folder: location.directory(for: connection).path)
         }
+    }
+
+    /// The changes a copy that is not open holds, as its removal will check them: a copy another version made, one
+    /// another program holds, or one that would not open. Nil where the package can't read them, so the person
+    /// can only keep it.
+    nonisolated static func unsentChanges(in store: URL) async -> UnsentChanges? {
+        guard let held = try? await WorkingCopy.unsentWrites(in: store) else { return nil }
+        return MarfaProblems.unsentChanges(held.writes)
     }
 
     /// Removes the store when every change it holds that the server has not taken is one the person agreed to lose.
@@ -30,7 +36,7 @@ extension MarfaHost {
             held = try await WorkingCopy.unsentWrites(in: store)
         } catch let error as MarfaError {
             switch error {
-            case .readingHandle, .invalid: throw error
+            case .readingHandle, .storeBusy, .invalid: throw error
             default: throw MarfaError.unsentDiffers(path: store.path, unsent: nil, message: "")
             }
         } catch {
@@ -74,7 +80,7 @@ extension MarfaHost {
     }
 
     private var discarded: [String: Agreed] {
-        (defaults.dictionary(forKey: Self.discardedKey) ?? [:]).compactMapValues(Agreed.init(stored:))
+        (defaults.dictionary(forKey: Self.discardedKey) ?? [:]).mapValues(Agreed.init(stored:))
     }
 
     private func markDiscarded(_ connection: MarfaConnection, agreed: Agreed?) {
@@ -122,7 +128,7 @@ extension MarfaHost {
                 }
             }
             return .removed
-        } catch MarfaError.readingHandle {
+        } catch MarfaError.readingHandle, MarfaError.storeBusy {
             return .failed(Words.inUse)
         } catch MarfaError.unsentDiffers(_, let now?, _) {
             if !retrying { return await removeCopy(connection, agreed: agreed, retrying: true) }

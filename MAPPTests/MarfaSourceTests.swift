@@ -397,6 +397,14 @@ struct MarfaSourceOfflineTests {
         await again.close()
     }
 
+    /// The package's own sentence for a busy store names the store, not what the person can do about it.
+    @Test func aStoreAnotherProgramHoldsIsToldAsInUse() {
+        let busy = MarfaSource.failure(opening: .storeBusy(message: "database is locked"))
+        #expect(busy == SourceFailure(kind: .inUse, message: Words.inUse))
+        #expect(MarfaSource.failure(opening: .readingHandle(message: "reader")) == busy)
+        #expect(MarfaSource.failure(opening: .storageFull(message: "full")).kind == .failed)
+    }
+
     @Test
     func aBodyForATypeWithoutABodyFieldIsRefused() async throws {
         let root = scratch()

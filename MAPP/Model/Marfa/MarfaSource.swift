@@ -11,7 +11,8 @@ nonisolated struct UnsentChanges: Sendable {
         let id: String
         var change: SyncProblemEntry.Change
         var content: SyncContent
-        var date: Date
+        /// Nil for a store read without opening it, whose writes say no date and are listed in queue order.
+        var date: Date?
     }
 
     var ids: Set<String>
@@ -106,12 +107,8 @@ nonisolated final class MarfaSource: ItemSource {
         let copy: WorkingCopy
         do {
             copy = try await openCopy(connection, server: server, location: location)
-        } catch MarfaError.wrongSchema(_, _, let unsent, let message) {
-            throw SourceFailure(kind: .otherVersion(unsent: unsent), message: message)
-        } catch MarfaError.readingHandle {
-            throw SourceFailure(kind: .inUse, message: Words.inUse)
         } catch let error as MarfaError {
-            throw SourceFailure(kind: .failed, message: error.message)
+            throw failure(opening: error)
         }
         // A second opener of a store only reads it, and every write it made would be refused.
         guard copy.handle == .writer else {
@@ -121,6 +118,16 @@ nonisolated final class MarfaSource: ItemSource {
         let source = MarfaSource(copy: copy, connection: connection)
         source.events.yield(.paint)
         return source
+    }
+
+    /// Another program holding the store, as its writer or mid-write, is the same to the person: another copy of
+    /// MAPP has the library open.
+    nonisolated static func failure(opening error: MarfaError) -> SourceFailure {
+        switch error {
+        case .wrongSchema(_, _, let unsent, let message): SourceFailure(kind: .otherVersion(unsent: unsent), message: message)
+        case .readingHandle, .storeBusy: SourceFailure(kind: .inUse, message: Words.inUse)
+        default: SourceFailure(kind: .failed, message: error.message)
+        }
     }
 
     /// The package refuses a copy a different version of the app made, removing nothing, with the count of changes

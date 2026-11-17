@@ -36,14 +36,26 @@ nonisolated final class FakeMarfaSource: MAPP.ItemSource {
 
     /// The text of the first writes the report counts, as the copy reads it from its queue.
     let unsentTexts = Mutex<[SyncContent]>([])
+    /// The copy's store, whose own writes the queue names first, so a discard of what it reports names the
+    /// store's writes and their removal is checked by id, as a real copy's is.
+    let store = Mutex<URL?>(nil)
 
-    /// One write for each the report counts.
+    /// The ids of the writes the store holds now.
+    var storeWrites: [String] {
+        get async throws {
+            guard let store = store.withLock({ $0 }), FileManager.default.fileExists(atPath: store.path) else { return [] }
+            return try await WorkingCopy.unsentWrites(in: store).writes.map(\.id)
+        }
+    }
+
+    /// One write for each the report counts: the store's own, then made-up ones.
     func unsentWrites() async -> UnsentChanges? {
         let report = report.value
-        guard report.queueRead else { return nil }
-        var unsent = UnsentChanges.fake(report.changesNotSent)
-        unsent.texts = unsentTexts.withLock { $0 }.enumerated().map { index, content in
-            UnsentChanges.Text(id: "w\(index)", change: .edit, content: content, date: Date(timeIntervalSinceReferenceDate: Double(index)))
+        guard report.queueRead, let stored = try? await storeWrites else { return nil }
+        let names = (0..<report.changesNotSent).map { $0 < stored.count ? stored[$0] : "w\($0)" }
+        var unsent = UnsentChanges(ids: Set(names))
+        unsent.texts = unsentTexts.withLock { $0 }.enumerated().filter { $0.offset < names.count }.map { index, content in
+            UnsentChanges.Text(id: names[index], change: .edit, content: content, date: Date(timeIntervalSinceReferenceDate: Double(index)))
         }
         return unsent
     }
@@ -150,6 +162,7 @@ nonisolated final class FakeServers: Sendable {
                 await copy.close()
             }
             let source = FakeMarfaSource(connection: connection)
+            source.store.withLock { $0 = store }
             self.made.withLock { $0.append(source) }
             return source
         }
@@ -191,20 +204,10 @@ nonisolated extension MarfaHost.DisconnectChoice {
         try? FileManager.default.removeItem(at: root)
     }
 
-    /// The fake source names the writes it reports `w0`, `w1` and so on, which the copy's queue does not, so the
-    /// copy's own writes stand in for those names in order.
-    static func standIn(for agreed: MarfaHost.Agreed, in store: URL) async throws -> MarfaHost.Agreed {
-        guard case .ids(let ids) = agreed else { return agreed }
-        let named = ids.filter { $0.wholeMatch(of: /w\d+/) != nil }
-        guard !named.isEmpty else { return agreed }
-        let held = try await WorkingCopy.unsentWrites(in: store).writes.map(\.id)
-        return .ids(ids.subtracting(named).union(held.prefix(named.count)))
-    }
-
     func host(opener: MarfaHost.Opener? = nil, remover: MarfaHost.Remover? = nil) -> MarfaHost {
         MarfaHost(
             defaults: defaults, signIns: signIns, location: location, opener: opener ?? servers.opener, describer: servers.describer,
-            remover: remover ?? { try await MarfaHost.removeStore($0, agreedToLose: Self.standIn(for: $1, in: $0)) })
+            remover: remover ?? { try await MarfaHost.removeStore($0, agreedToLose: $1) })
     }
 
     var savedAddress: String? { defaults.string(forKey: "MarfaAddress") }

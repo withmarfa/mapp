@@ -568,11 +568,25 @@ nonisolated enum MarfaMapping {
         }
     }
 
+    /// The server's refusal always carries its code. One without was made by the copy, which never sent the write,
+    /// and its `reason` is an English sentence, so the person is told in the app's words instead.
     static func problem(_ refusal: Marfa.Refusal) -> SyncProblem {
-        SyncProblem(
-            code: refusal.code ?? refusal.reason, message: refusal.message,
+        let unsent: SyncProblem.Unsent? =
+            if let limit = refusal.requestLimit { .tooLarge(size: limit.size, limit: limit.limit) }
+            else if refusal.code == nil { .afterRefusal }
+            else { nil }
+        return SyncProblem(
+            code: refusal.code ?? unsentCode(unsent), message: unsent.map(Words.unsent) ?? refusal.message,
+            unsent: unsent,
             fields: Dictionary(refusal.fields.map { ($0.field, $0.message) }, uniquingKeysWith: { first, _ in first }),
             isTrashed: refusal.trashed, grant: refusal.grant.map(grant))
+    }
+
+    private static func unsentCode(_ unsent: SyncProblem.Unsent?) -> String {
+        switch unsent {
+        case .tooLarge: "over_request_limit"
+        case .afterRefusal, nil: "refused_with_dependency"
+        }
     }
 
     private static func grant(_ grant: MissingGrant) -> SyncProblem.Grant {

@@ -89,7 +89,27 @@ nonisolated enum MarfaProblems {
             let content = content(of: write.body, type: type, catalogue: catalogue)
             guard !content.plainText.isEmpty else { return nil }
             return UnsentChanges.Text(id: write.id, change: change(write.kind), content: content, date: MarfaMapping.date(write.queuedAt))
-        }.sorted { $0.date < $1.date }
+        }.sorted { ($0.date ?? .distantPast) < ($1.date ?? .distantPast) }
+    }
+
+    /// The changes in a store read without opening it, such as one another version made, by the ids its removal
+    /// confirms, with the text of each create or edit that carried any, in queue order. Only the store's own words
+    /// are known, so fields are named by their keys.
+    static func unsentChanges(_ writes: [UnsentWrite]) -> UnsentChanges {
+        let texts = writes.compactMap { write -> UnsentChanges.Text? in
+            let change: SyncProblemEntry.Change
+            switch write.kind {
+            case "create_item": change = .create
+            case "update_item": change = .edit
+            default: return nil
+            }
+            guard let body = try? JSONObject(json: write.body) else { return nil }
+            let type = body["type"]?.string.map { TypeID($0) }
+            let content = content(of: body, type: type, catalogue: Catalogue())
+            guard !content.plainText.isEmpty else { return nil }
+            return UnsentChanges.Text(id: write.id, change: change, content: content, date: nil)
+        }
+        return UnsentChanges(ids: Set(writes.map(\.id)), texts: texts)
     }
 
     /// A write the queue refused without sending, because a write it waits on was refused, died or is blocked,
@@ -140,9 +160,9 @@ nonisolated enum MarfaProblems {
         return body
     }
 
-    /// The queue's own refusal carries only its reason; the server's carries its code.
+    /// Refused unsent for a write it went with, not for a fault of its own such as its size.
     private static func isRefusedUnsent(_ write: QueuedWrite) -> Bool {
-        if case .refused(let refusal) = write.verdict { refusal.code == nil } else { false }
+        if case .refused(let refusal) = write.verdict { MarfaMapping.problem(refusal).unsent == .afterRefusal } else { false }
     }
 
     static func entry(

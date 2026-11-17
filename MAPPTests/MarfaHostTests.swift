@@ -125,12 +125,20 @@ import Testing
     }
 
     /// The copy stays on disk and the person decides: keeping it loses nothing, and a discard needs the answer to
-    /// the question about the changes in it.
+    /// the question about the changes in it, which lists them from the store this version can't open.
     @Test func aCopyADifferentVersionMadeKeepsItsChangesUntilThePersonChooses() async throws {
         let bench = try HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
         bench.signIns.save("k", for: first.address)
+        let store = bench.location.store(for: first)
         try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
+        let copy = try await WorkingCopy.open(store: store)
+        for index in 0..<3 {
+            _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": .string("unsent \(index)")]))
+        }
+        let held = try await copy.queue.all().map(\.id)
+        await copy.close()
+        try MarfaSourceOfflineTests.makeItAnEarlierVersion(store)
         bench.servers.failure.withLock { $0 = SourceFailure(kind: .otherVersion(unsent: 3), message: "The package’s words.") }
         let host = bench.host()
 
@@ -140,7 +148,10 @@ import Testing
         #expect(host.waitingChanges == 3)
         #expect(Libraries.mode(hasSource: false, isConfigured: true, state: host.state, isLaunching: false, isBusy: false) == .failed)
 
-        await expect(.changesWaiting(nil)) { () throws(MarfaHost.Problem) in try await host.disconnect() }
+        await expect(.changesWaiting(UnsentChanges(ids: Set(held)))) { () throws(MarfaHost.Problem) in try await host.disconnect() }
+        await expect(.cannotDiscard(folder: bench.location.directory(for: first).path)) { () throws(MarfaHost.Problem) in
+            try await host.disconnect(.discardCopy(nil))
+        }
         #expect(host.connection == first)
         #expect(bench.hasCopy(first))
         #expect(try bench.signIns.key(for: first.address) == "k")
@@ -189,12 +200,12 @@ import Testing
         try #require(host.state == .otherVersion(unsent: 1))
 
         await expect(.notRemoved(signIn: nil, copy: Words.inUse)) { () throws(MarfaHost.Problem) in
-            try await host.disconnect(.discardCopy(nil))
+            try await host.disconnect(.discardNothing)
         }
         #expect(FileManager.default.fileExists(atPath: store.path))
     }
 
-    /// The package removes a copy only against a count of its changes, so a copy that can't be opened, and whose
+    /// The package removes a copy only against the list of its changes, so a copy that can't be opened, and whose
     /// changes nobody could count, is never discarded: the person is told where it is, and nothing is left.
     @Test
     func aCopyThatCannotBeOpenedIsNotDiscardedAndThePersonIsToldWhereItIs() async throws {
@@ -208,6 +219,7 @@ import Testing
         let host = bench.host()
         await host.launch()
 
+        await expect(.changesWaiting(nil)) { () throws(MarfaHost.Problem) in try await host.disconnect() }
         await expect(.cannotDiscard(folder: bench.location.directory(for: first).path)) { () throws(MarfaHost.Problem) in
             try await host.disconnect(.discardCopy(nil))
         }
@@ -217,10 +229,10 @@ import Testing
         #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies") == nil)
     }
 
-    /// Even when a count was shown, a copy the package can't read to count is kept, and not marked to go: the
-    /// next connection opens or refuses it as it did.
+    /// Even when a list was shown, a copy the package can't read by then is kept, and not marked to go: the next
+    /// connection opens or refuses it as it did.
     @Test
-    func aCopyThePackageCannotCountIsKeptWhateverTheCountShown() async throws {
+    func aCopyThePackageCannotReadIsKeptWhateverWasShown() async throws {
         let bench = try HostBench()
         bench.defaults.set("http://first.test:8210", forKey: "MarfaAddress")
         bench.signIns.save("k", for: first.address)
@@ -232,14 +244,14 @@ import Testing
         await host.launch()
 
         await expect(.copyKept(.unreadable(folder: bench.location.directory(for: first).path), signIn: nil)) { () throws(MarfaHost.Problem) in
-            try await host.disconnect(.discardCopy(nil))
+            try await host.disconnect(.discardCopy(UnsentChanges(ids: ["a", "b"])))
         }
         #expect(FileManager.default.fileExists(atPath: store.path))
         #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies")?.isEmpty ?? true)
     }
 
-    /// The person agreed to lose the number of changes they were shown. A copy holding another number is kept,
-    /// and they are told the number it holds.
+    /// The person agreed to lose the writes they were shown, by id. A copy holding as many writes, but not those, is
+    /// kept, and they are told how many it holds.
     @Test
     func aCopyHoldingOtherChangesThanThePersonWasShownIsKept() async throws {
         let bench = try HostBench()
@@ -251,14 +263,16 @@ import Testing
         for index in 0..<2 {
             _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": .string("unsent \(index)")]))
         }
+        let held = try await copy.queue.all().map(\.id)
         await copy.close()
-        bench.servers.failure.withLock { $0 = SourceFailure(kind: .otherVersion(unsent: 1), message: "The package’s words.") }
+        bench.servers.failure.withLock { $0 = SourceFailure(kind: .otherVersion(unsent: 2), message: "The package’s words.") }
         let host = bench.host()
         await host.launch()
-        try #require(host.state == .otherVersion(unsent: 1))
+        try #require(host.state == .otherVersion(unsent: 2))
 
+        let shown = UnsentChanges(ids: [held[0], "sent-and-replaced"])
         await expect(.copyKept(.changed(now: 2), signIn: nil)) { () throws(MarfaHost.Problem) in
-            try await host.disconnect(.discardCopy(nil))
+            try await host.disconnect(.discardCopy(shown))
         }
         let kept = try await WorkingCopy.open(store: store)
         #expect(try await kept.queue.all().count == 2, "no change was lost")
@@ -338,7 +352,28 @@ import Testing
         await expect(.copyKept(.changed(now: 2), signIn: nil)) { () throws(MarfaHost.Problem) in
             try await host.connect(address: "http://first.test:8210", key: "k")
         }
-        #expect(asked.withLock { $0 } == [.ids(["a", "b", "c"]), .ids(["a", "b", "c"])])
+        #expect(asked.withLock { $0 } == [MarfaHost.Agreed(ids: ["a", "b", "c"]), MarfaHost.Agreed(ids: ["a", "b", "c"])])
+    }
+
+    /// A mark that names no writes, such as a number, confirms none: a copy holding a change is kept with it.
+    @Test
+    func aMarkThatIsNotAListOfWritesConfirmsNone() async throws {
+        let bench = try HostBench()
+        let store = bench.location.store(for: first)
+        try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
+        let copy = try await WorkingCopy.open(store: store)
+        _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": "unsent"]))
+        await copy.close()
+        bench.defaults.set(["http://first.test:8210": 1], forKey: "MarfaDiscardedCopies")
+        let host = bench.host()
+
+        await expect(.copyKept(.changed(now: 1), signIn: nil)) { () throws(MarfaHost.Problem) in
+            try await host.connect(address: "http://first.test:8210", key: "k")
+        }
+        let kept = try await WorkingCopy.open(store: store)
+        #expect(try await kept.queue.all().count == 1, "no change was lost")
+        await kept.close()
+        #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies")?.isEmpty ?? true)
     }
 
     /// The package refuses a folder's store, which can't be made here, so its answer is given to the host. The
@@ -368,8 +403,14 @@ import Testing
         try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
         let copy = try await WorkingCopy.open(store: store)
         _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": "unsent"]))
+        let held = try await copy.queue.all().map(\.id)
         await copy.close()
         try MarfaSourceOfflineTests.makeItAnEarlierVersion(store)
+        bench.servers.failure.withLock { $0 = SourceFailure(kind: .otherVersion(unsent: 1), message: "The package’s words.") }
+        let host = bench.host()
+        await host.launch()
+        let shown = UnsentChanges(ids: Set(held))
+        await expect(.changesWaiting(shown)) { () throws(MarfaHost.Problem) in try await host.disconnect() }
         let holder: OtherProcessLock
         do {
             holder = try await OtherProcessLock(store)
@@ -378,15 +419,12 @@ import Testing
             return
         }
         defer { holder.release() }
-        bench.servers.failure.withLock { $0 = SourceFailure(kind: .otherVersion(unsent: 1), message: "The package’s words.") }
-        let host = bench.host()
-        await host.launch()
 
         await expect(.notRemoved(signIn: nil, copy: Words.inUse)) { () throws(MarfaHost.Problem) in
-            try await host.disconnect(.discardCopy(nil))
+            try await host.disconnect(.discardCopy(shown))
         }
         #expect(FileManager.default.fileExists(atPath: store.path))
-        #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies") as? [String: Int] == ["http://first.test:8210": 1])
+        #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies") as? [String: [String]] == ["http://first.test:8210": held])
 
         // Once that process lets go, the copy marked to go is removed before the address opens again.
         holder.release()
@@ -712,7 +750,9 @@ import Testing
         source.report.set(SyncReport(waiting: 2, queueRead: true))
         #expect(await eventually { host.waitingChanges == 2 })
 
-        await expect(.changesWaiting(.fake(2))) { () throws(MarfaHost.Problem) in try await host.disconnect() }
+        let held = try await source.storeWrites
+        try #require(held.count == 2)
+        await expect(.changesWaiting(UnsentChanges(ids: Set(held)))) { () throws(MarfaHost.Problem) in try await host.disconnect() }
         #expect(host.connection == first)
         #expect(host.source === source)
         #expect(!source.calls.contains("close"))
@@ -730,7 +770,7 @@ import Testing
         try await host.connect(address: "http://first.test:8210", key: "k")
         try #require(bench.servers.last).report.set(SyncReport(waiting: 2, queueRead: true))
         #expect(await eventually { host.waitingChanges == 2 })
-        try await host.disconnect(.discardCopy(.fake(2)))
+        try await host.disconnect(.discardCopy(UnsentChanges(ids: Set(held))))
         #expect(!bench.hasCopy(first))
     }
 
