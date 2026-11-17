@@ -282,7 +282,7 @@ final class FakeItemLibrary: ItemLibrary {
 
     func attachments(of id: ItemID) -> [ItemID] {
         items.filter { file in
-            file.edgesOut.contains { $0.type == MarfaMapping.attachmentEdge && $0.target == .item(id) }
+            file.edgesOut.contains { $0.type == MarfaMapping.attachmentEdge && $0.to == .item(id) }
         }.map(\.id)
     }
 
@@ -682,7 +682,7 @@ final class FakeItemLibrary: ItemLibrary {
                 skips.skip(reason)
                 continue
             }
-            items[index].edgesOut.removeAll { $0.type == MarfaMapping.collectionEdge && $0.target == .item(collection) }
+            items[index].edgesOut.removeAll { $0.type == MarfaMapping.collectionEdge && $0.to == .item(collection) }
             removed = true
         }
         tellSkipped(skips, didChange: removed, failing: "Can’t Remove from Collection")

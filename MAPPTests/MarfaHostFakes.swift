@@ -38,17 +38,17 @@ nonisolated final class FakeMarfaSource: MAPP.ItemSource {
     let unsentTexts = Mutex<[SyncContent]>([])
 
     /// One write for each the report counts.
-    func unsentWrites() async -> UnsentWrites? {
+    func unsentWrites() async -> UnsentChanges? {
         let report = report.value
         guard report.queueRead else { return nil }
-        var unsent = UnsentWrites.fake(report.changesNotSent)
+        var unsent = UnsentChanges.fake(report.changesNotSent)
         unsent.texts = unsentTexts.withLock { $0 }.enumerated().map { index, content in
-            UnsentWrites.Text(id: "w\(index)", change: .edit, content: content, date: Date(timeIntervalSinceReferenceDate: Double(index)))
+            UnsentChanges.Text(id: "w\(index)", change: .edit, content: content, date: Date(timeIntervalSinceReferenceDate: Double(index)))
         }
         return unsent
     }
 
-    func close(agreeing agreed: UnsentWrites?) async -> CloseOutcome {
+    func close(agreeing agreed: UnsentChanges?) async -> CloseOutcome {
         let unsent = await unsentWrites()
         let covered = if let unsent { agreed.map { unsent.ids.isSubset(of: $0.ids) } ?? true } else { agreed == nil }
         guard covered else { return .waiting(unsent) }
@@ -98,9 +98,9 @@ nonisolated final class FakeMarfaSource: MAPP.ItemSource {
     }
 }
 
-nonisolated extension UnsentWrites {
-    static func fake(_ count: Int) -> UnsentWrites {
-        UnsentWrites(ids: Set((0..<count).map { "w\($0)" }))
+nonisolated extension UnsentChanges {
+    static func fake(_ count: Int) -> UnsentChanges {
+        UnsentChanges(ids: Set((0..<count).map { "w\($0)" }))
     }
 }
 
@@ -158,7 +158,7 @@ nonisolated final class FakeServers: Sendable {
 
 nonisolated extension MarfaHost.DisconnectChoice {
     /// A discard of a copy the person was shown nothing waiting in.
-    static var discardNothing: Self { .discardCopy(UnsentWrites(ids: [])) }
+    static var discardNothing: Self { .discardCopy(UnsentChanges(ids: [])) }
 }
 
 /// Leaves the library as a person does: asked what waits, they discard exactly that.
@@ -194,7 +194,7 @@ nonisolated extension MarfaHost.DisconnectChoice {
     func host(opener: MarfaHost.Opener? = nil, remover: MarfaHost.Remover? = nil) -> MarfaHost {
         MarfaHost(
             defaults: defaults, signIns: signIns, location: location, opener: opener ?? servers.opener, describer: servers.describer,
-            remover: remover ?? { try await WorkingCopy.remove(store: $0, unsent: $1) })
+            remover: remover ?? { try await MarfaHost.removeStore($0, agreedToLose: $1) })
     }
 
     var savedAddress: String? { defaults.string(forKey: "MarfaAddress") }

@@ -26,10 +26,10 @@ actor MarfaEngine {
         case release(String, CheckedContinuation<Result<Bool, SourceFailure>, Never>)
         /// The writes not sent, read from the queue once every event before it is taken, so every write
         /// submitted before it counts; nil where the queue cannot be read.
-        case unsent(CheckedContinuation<UnsentWrites?, Never>)
+        case unsent(CheckedContinuation<UnsentChanges?, Never>)
         /// Closes, as `close` does, only if every write not sent, read from the queue in the same step, is one
         /// of those agreed to; nil agrees to whatever the copy holds.
-        case closeAgreeing(UnsentWrites?, CheckedContinuation<CloseOutcome, Never>)
+        case closeAgreeing(UnsentChanges?, CheckedContinuation<CloseOutcome, Never>)
         /// The verdict on a write made at the server at once rather than queued, such as a purge.
         case answer(WriteID, WriteOutcome)
         /// Attaches a file, which the package queues as an upload, a file item and an edge.
@@ -137,7 +137,7 @@ actor MarfaEngine {
     var linkedOriginals: [String: String] = [:]
     var linkedCopies: [String: [String]] = [:]
     /// The items an edge move touched, read again once its answer is taken: the two ends it left and the one it went
-    /// to, since a refusal puts the edge back and the answer names only its source.
+    /// to, since a refusal puts the edge back and the answer names only its `from` end.
     var movedEnds: [String: Set<String>] = [:]
     /// The app's writes queued and not yet answered.
     var writes = MarfaWriteRecord()
@@ -304,12 +304,12 @@ actor MarfaEngine {
     }
 
     /// Read from the queue itself, since the last report can hold a count from before a read that failed.
-    private func unsentWrites() async -> UnsentWrites? {
+    private func unsentWrites() async -> UnsentChanges? {
         await besideTheLaneQueued()
         guard let queue = try? await Self.asking({ try await copy.queue.all() }) else { return nil }
         let named = Set(queue.compactMap(\.itemId))
         let types = Dictionary(uniqueKeysWithValues: named.compactMap { id in rows[id].map { (id, TypeID($0.type)) } })
-        return UnsentWrites(
+        return UnsentChanges(
             ids: MarfaProblems.unsent(queue), texts: MarfaProblems.unsentTexts(queue, catalogue: catalogue, types: types))
     }
 

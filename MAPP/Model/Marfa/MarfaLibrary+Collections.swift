@@ -74,7 +74,7 @@ extension MarfaLibrary {
         }
         tellSkipped(skips, didChange: !drafts.isEmpty, failing: title)
         guard !drafts.isEmpty else { return false }
-        drafts.sort { $0.from.rawValue < $1.source.rawValue }
+        drafts.sort { $0.from.rawValue < $1.from.rawValue }
         relink(RelationshipChange(removing: drafts), name: String(localized: "Remove from Collection"), failing: title, undoManager: undoManager)
         return true
     }

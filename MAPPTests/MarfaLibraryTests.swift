@@ -697,7 +697,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         library.notices.answerAll()
         #expect(await library.changeItemRelationship(ItemID("c"), field: "supersedes", adding: [F.t1], removing: [ItemID("a")], undoManager: nil))
         #expect(await eventually { source.writes == [.moveEdge(EdgeID("s1"), end: .to, to: F.t1)] }, "sent \(source.writes)")
-        #expect(source.asked.withLock { $0 } == [.moved(EdgeID("s1"), .target, F.t1)])
+        #expect(source.asked.withLock { $0 } == [.moved(EdgeID("s1"), .to, F.t1)])
     }
 
     /// The core is asked of a replacement as a move and of every other link as a new one, whichever the picker asks.
@@ -706,7 +706,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(await library.relationshipVerdict(for: F.t1, field: "child-of", to: F.p2) == .taken)
         #expect(await library.relationshipVerdict(for: F.n1, field: "about", to: F.p2) == .taken)
         #expect(source.asked.withLock { $0 }
-            == [.moved(EdgeID("c2"), .source, F.p2), .added(EdgeDraft(type: "about", from: F.n1, to: F.p2))])
+            == [.moved(EdgeID("c2"), .from, F.p2), .added(EdgeDraft(type: "about", from: F.n1, to: F.p2))])
         // The core refuses the move: the row is refused with its words, and a change is told the same and sends nothing.
         source.moveRefusals.withLock { $0[EdgeID("c2")] = "That would close a cycle." }
         #expect(await library.relationshipVerdict(for: F.t1, field: "child-of", to: F.p2) == .refused("That would close a cycle."))

@@ -8,7 +8,7 @@ import Foundation
 extension MarfaLibrary {
     static let inversePrefix = "inverse:"
 
-    /// A relationship field as one item sees it: the edge type, and whether the item is the edge's target.
+    /// A relationship field as one item sees it: the edge type, and whether the item is the edge's `to` end.
     nonisolated struct FieldEnd {
         let info: EdgeTypeInfo
         let atTo: Bool
@@ -56,9 +56,9 @@ extension MarfaLibrary {
     }
 
     /// Whether an item of `type` may hold the end `atTo` names of the edge type `info`. The core refuses a flat
-    /// edge type's source a type its target end admits, so the field is not offered there.
+    /// edge type's `from` end a type its `to` end admits, so the field is not offered there.
     private func admits(_ type: TypeID, _ info: EdgeTypeInfo, atTo: Bool) -> Bool {
-        atTo ? admits(type, constraint(of: info, atTo: true)) : catalogue.admits(type, source: info)
+        atTo ? admits(type, constraint(of: info, atTo: true)) : catalogue.admits(type, from: info)
     }
 
     /// What the core says of linking `id` through `field` to `other`, as the change would be made: a field that holds one
@@ -110,8 +110,8 @@ extension MarfaLibrary {
         }
     }
 
-    /// The name Marfa gives the end of the link this field is: the edge type's `label` on its source end and its
-    /// `reverseLabel` on its target end.
+    /// The name Marfa gives the end of the link this field is: the edge type's `label` on its `from` end and its
+    /// `reverseLabel` on its `to` end.
     private func label(_ end: FieldEnd) -> String {
         end.info.label(atTo: end.atTo)
     }

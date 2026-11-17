@@ -215,8 +215,8 @@ nonisolated final class FailingSearchSource: MAPP.ItemSource {
     func queueSubmitted() async {}
     func close() async {}
     func refresh() {}
-    func unsentWrites() async -> UnsentWrites? { nil }
-    func close(agreeing agreed: UnsentWrites?) async -> CloseOutcome { .closed }
+    func unsentWrites() async -> UnsentChanges? { nil }
+    func close(agreeing agreed: UnsentChanges?) async -> CloseOutcome { .closed }
 }
 
 extension LiveMarfaTests {

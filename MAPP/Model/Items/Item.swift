@@ -180,7 +180,7 @@ nonisolated enum EdgeOrigin: Hashable, Sendable {
 
 /// An edge as the item that writes it holds it, following Marfa's folder rule: it sits in the `edgesOut` of the
 /// item at the end its type is written at, named as that end writes it. A child's `child-of` is in the child's
-/// `edgesOut` with the parent as its target; `Catalogue.edgeType(named:)` gives the canonical direction.
+/// `edgesOut` with the parent as its `to` end; `Catalogue.edgeType(named:)` gives the canonical direction.
 nonisolated struct Edge: Identifiable, Hashable, Sendable {
     let id: EdgeID
     let type: String
@@ -192,7 +192,7 @@ nonisolated struct Edge: Identifiable, Hashable, Sendable {
 }
 
 nonisolated extension Item {
-    /// The item this one is filed under: the target of its `child-of` edge.
+    /// The item this one is filed under: the `to` end of its `child-of` edge.
     var parentID: ItemID? {
         edgesOut.lazy.compactMap { edge -> ItemID? in
             guard edge.type == "child-of", case .item(let id) = edge.to else { return nil }

@@ -10,7 +10,7 @@ struct MarfaHostOfflineTests {
 
     /// The choice the person makes after being shown `problem`.
     private static func discard(after problem: MarfaHost.Problem?) -> MarfaHost.DisconnectChoice {
-        if case .changesWaiting(let shown) = problem { .discardCopy(shown ?? UnsentWrites(ids: [])) } else { .discardCopy(UnsentWrites(ids: [])) }
+        if case .changesWaiting(let shown) = problem { .discardCopy(shown ?? UnsentChanges(ids: [])) } else { .discardCopy(UnsentChanges(ids: [])) }
     }
 
     private static func count(_ problem: MarfaHost.Problem) -> Int? {

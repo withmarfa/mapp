@@ -262,7 +262,7 @@ nonisolated enum MarfaMapping {
     }
 
     static func edgeType(_ type: Marfa.EdgeType) -> EdgeTypeInfo {
-        // Cardinality is given from source to target; the end that writes the edge holds as many as the other
+        // Cardinality is given from the `from` end to the `to` end; the end that writes the edge holds as many as the other
         // side of it allows.
         let ends = type.cardinality.split(separator: "-to-").map(String.init)
         let held = type.writtenFrom == .to ? ends.first : ends.last
@@ -438,16 +438,16 @@ nonisolated enum MarfaMapping {
         var found: [Edge] = []
         for (kind, names) in [(bodyLinkEdge, bodyLinks.links), (attachmentEdge, bodyLinks.embeds)] {
             for (position, name) in names.enumerated() {
-                let target: EdgeTo
+                let to: EdgeTo
                 switch name.target {
                 case .item: continue
-                case .pending: target = .pending(spelling: name.name)
-                case .missing: target = .unresolved(spelling: name.name, ambiguous: false)
-                case .ambiguous: target = .unresolved(spelling: name.name, ambiguous: true)
-                case .refused(let reason): target = .refused(spelling: name.name, reason: reason)
+                case .pending: to = .pending(spelling: name.name)
+                case .missing: to = .unresolved(spelling: name.name, ambiguous: false)
+                case .ambiguous: to = .unresolved(spelling: name.name, ambiguous: true)
+                case .refused(let reason): to = .refused(spelling: name.name, reason: reason)
                 }
                 found.append(Edge(
-                    id: EdgeID("\(id)#\(kind)#\(position)"), type: kind, from: ItemID(id), to: target,
+                    id: EdgeID("\(id)#\(kind)#\(position)"), type: kind, from: ItemID(id), to: to,
                     origin: .body))
             }
         }

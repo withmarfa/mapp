@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 
 /// The writes a copy holds that the server has not taken, by their queue ids, so what the person agrees to lose
 /// covers those and no write that arrives after.
-nonisolated struct UnsentWrites: Sendable {
+nonisolated struct UnsentChanges: Sendable {
     /// What the person wrote in one of the writes, to show before they agree to lose it.
     nonisolated struct Text: Hashable, Sendable, Identifiable {
         let id: String
@@ -21,15 +21,15 @@ nonisolated struct UnsentWrites: Sendable {
     var count: Int { ids.count }
 }
 
-nonisolated extension UnsentWrites: Hashable {
-    static func == (lhs: UnsentWrites, rhs: UnsentWrites) -> Bool { lhs.ids == rhs.ids }
+nonisolated extension UnsentChanges: Hashable {
+    static func == (lhs: UnsentChanges, rhs: UnsentChanges) -> Bool { lhs.ids == rhs.ids }
     func hash(into hasher: inout Hasher) { hasher.combine(ids) }
 }
 
 nonisolated enum CloseOutcome: Hashable, Sendable {
     case closed
     /// Kept open for writes not agreed to; nil where the queue could not be read.
-    case waiting(UnsentWrites?)
+    case waiting(UnsentChanges?)
 }
 
 /// How the library's server stands, for the app to show beside the library: the one record of it. An open copy
@@ -448,7 +448,7 @@ nonisolated final class MarfaSource: ItemSource {
 
     /// The writes not sent once every write submitted before this call is in the queue; nil where the queue
     /// cannot be read.
-    func unsentWrites() async -> UnsentWrites? {
+    func unsentWrites() async -> UnsentChanges? {
         await withCheckedContinuation { continuation in
             if case .terminated = events.yield(.unsent(continuation)) { continuation.resume(returning: nil) }
         }
@@ -457,7 +457,7 @@ nonisolated final class MarfaSource: ItemSource {
     /// Closes, as `close()` does, only if every write not sent, once every write submitted before this call is
     /// in the queue, is one of `agreed`, deciding and closing in one step; nil agrees to whatever the copy
     /// holds. Otherwise it stays open and answers what is not sent.
-    func close(agreeing agreed: UnsentWrites?) async -> CloseOutcome {
+    func close(agreeing agreed: UnsentChanges?) async -> CloseOutcome {
         let outcome = await withCheckedContinuation { continuation in
             if case .terminated = events.yield(.closeAgreeing(agreed, continuation)) {
                 continuation.resume(returning: .closed)

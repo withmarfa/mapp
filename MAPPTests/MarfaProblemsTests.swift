@@ -276,7 +276,7 @@ struct UnsentTextsTests {
     }
 
     @Test func whatIsShownDoesNotChangeWhatTheyAgreedTo() {
-        #expect(UnsentWrites(ids: ["a"], texts: []) == UnsentWrites(ids: ["a"]))
-        #expect(UnsentWrites(ids: ["a"]) != UnsentWrites(ids: ["a", "b"]))
+        #expect(UnsentChanges(ids: ["a"], texts: []) == UnsentChanges(ids: ["a"]))
+        #expect(UnsentChanges(ids: ["a"]) != UnsentChanges(ids: ["a", "b"]))
     }
 }

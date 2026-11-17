@@ -275,7 +275,7 @@ import Testing
         let copy = try await WorkingCopy.open(store: store)
         _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": "unsent"]))
         await copy.close()
-        bench.defaults.set(["http://first.test:8210": 0], forKey: "MarfaDiscardedCopies")
+        bench.defaults.set(["http://first.test:8210": [String]()], forKey: "MarfaDiscardedCopies")
         let host = bench.host()
 
         await expect(.copyKept(.changed(now: 1), signIn: nil)) { () throws(MarfaHost.Problem) in
@@ -294,7 +294,7 @@ import Testing
         let directory = bench.location.directory(for: first)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try Data("left behind".utf8).write(to: directory.appending(path: "leftover"))
-        bench.defaults.set(["http://first.test:8210": 3], forKey: "MarfaDiscardedCopies")
+        bench.defaults.set(["http://first.test:8210": ["a", "b", "c"]], forKey: "MarfaDiscardedCopies")
         let host = bench.host()
 
         try await host.connect(address: "http://first.test:8210", key: "k")
@@ -312,8 +312,9 @@ import Testing
         try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
         let copy = try await WorkingCopy.open(store: store)
         _ = try await copy.items.create(Draft(type: "core.note", properties: ["body": "unsent"]))
+        let held = try await copy.queue.all().map(\.id)
         await copy.close()
-        bench.defaults.set(["http://first.test:8210": 2], forKey: "MarfaDiscardedCopies")
+        bench.defaults.set(["http://first.test:8210": held + ["sent-meanwhile"]], forKey: "MarfaDiscardedCopies")
         let host = bench.host()
 
         try await host.connect(address: "http://first.test:8210", key: "k")
@@ -321,24 +322,23 @@ import Testing
         #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies")?.isEmpty ?? true)
     }
 
-    /// The retry is made once, with the count the copy held: a copy that gains a change between the two asks is
-    /// kept, not asked again without end.
+    /// A copy whose changes moved between the read and the removal is asked again once, and kept if it still
+    /// differs, not asked again without end.
     @Test
     func aRetryThatFindsMoreChangesKeepsTheCopy() async throws {
         let bench = try HostBench()
         try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
-        bench.defaults.set(["http://first.test:8210": 3], forKey: "MarfaDiscardedCopies")
-        let asked = Mutex<[UInt64]>([])
+        bench.defaults.set(["http://first.test:8210": ["a", "b", "c"]], forKey: "MarfaDiscardedCopies")
+        let asked = Mutex<[Set<String>]>([])
         let host = bench.host(remover: { _, agreed in
             asked.withLock { $0.append(agreed) }
-            let held: UInt64 = agreed == 3 ? 1 : 2
-            throw MarfaError.unsentDiffers(path: "p", unsent: held, agreed: agreed, message: "")
+            throw MarfaError.unsentDiffers(path: "p", unsent: 2, message: "")
         })
 
         await expect(.copyKept(.changed(now: 2), signIn: nil)) { () throws(MarfaHost.Problem) in
             try await host.connect(address: "http://first.test:8210", key: "k")
         }
-        #expect(asked.withLock { $0 } == [3, 1])
+        #expect(asked.withLock { $0 } == [["a", "b", "c"], ["a", "b", "c"]])
     }
 
     /// The package refuses a folder's store, which can't be made here, so its answer is given to the host. The
@@ -348,7 +348,7 @@ import Testing
         let bench = try HostBench()
         let directory = bench.location.directory(for: first)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        bench.defaults.set(["http://first.test:8210": 0], forKey: "MarfaDiscardedCopies")
+        bench.defaults.set(["http://first.test:8210": [String]()], forKey: "MarfaDiscardedCopies")
         let host = bench.host(remover: { _, _ in throw MarfaError.invalid(message: "is a folder’s store") })
 
         await expect(.copyKept(.notMapps(folder: directory.path), signIn: nil)) { () throws(MarfaHost.Problem) in
@@ -386,7 +386,7 @@ import Testing
             try await host.disconnect(.discardCopy(nil))
         }
         #expect(FileManager.default.fileExists(atPath: store.path))
-        #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies") as? [String: Int] == ["http://first.test:8210": 1])
+        #expect((bench.defaults.dictionary(forKey: "MarfaDiscardedCopies") as? [String: [String]])?.mapValues(\.count) == ["http://first.test:8210": 1])
 
         // Once that process lets go, the copy marked to go is removed before the address opens again.
         holder.release()

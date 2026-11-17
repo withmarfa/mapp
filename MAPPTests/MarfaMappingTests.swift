@@ -356,7 +356,7 @@ struct MarfaMappingTests {
             Self.row("n"), edges: [Self.edge("e", "references", from: "n", to: "plan")], catalogue: Self.catalogue,
             bodyLinks: links, isHeld: { $0 == "plan" })
         // Those that name an item are the copy's own edges; the rest are the package's word that none is there.
-        #expect(item.edgesOut.map(\.target) == [
+        #expect(item.edgesOut.map(\.to) == [
             .item(ItemID("plan")), .unresolved(spelling: "Plan", ambiguous: false), .pending(spelling: "Later"), .unresolved(spelling: "Nowhere", ambiguous: false),
             .unresolved(spelling: "Twin", ambiguous: true), .refused(spelling: "Banned", reason: "forbidden"),
             .unresolved(spelling: "dog.png", ambiguous: false)

@@ -3,7 +3,7 @@ import Foundation
 /// Which items each place holds, and every edge in its canonical direction, kept up to date one item at a time so
 /// a read costs what it returns rather than a pass over the library.
 nonisolated struct MarfaItemIndex {
-    /// An edge from its source to its target as its type names them, whichever end holds it.
+    /// An edge from its `from` end to its `to` end as its type names them, whichever end holds it.
     struct Link: Hashable, Sendable {
         let id: EdgeID
         let type: String

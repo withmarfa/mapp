@@ -95,7 +95,7 @@ import Testing
         // Plain note is in Holiday already and Archive is a collection, so only the other two join.
         #expect(library.addToCollection([F.e1, F.n2, F.n1, Self.archive], Self.holiday, undoManager: undo))
         #expect(undo.steps == 1)
-        let joined = source.writes.compactMap { write -> ItemID? in if case .link(let draft) = write { draft.source } else { nil } }
+        let joined = source.writes.compactMap { write -> ItemID? in if case .link(let draft) = write { draft.from } else { nil } }
         #expect(Set(joined) == [F.e1, F.n2])
         // The source answers with the edges it made, which the undo then removes.
         for id in joined {

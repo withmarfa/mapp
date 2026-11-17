@@ -78,7 +78,7 @@ nonisolated enum MarfaProblems {
     /// agree to lose it. A write that only changes a tag or a link has none to show.
     static func unsentTexts(
         _ queue: [QueuedWrite], catalogue: Catalogue, types: [String: TypeID] = [:]
-    ) -> [UnsentWrites.Text] {
+    ) -> [UnsentChanges.Text] {
         let held = unsent(queue)
         return queue.filter { held.contains($0.id) }.compactMap { write in
             switch write.kind {
@@ -88,7 +88,7 @@ nonisolated enum MarfaProblems {
             let type = write.body["type"]?.string.map { TypeID($0) } ?? write.itemId.flatMap { types[$0] }
             let content = content(of: write.body, type: type, catalogue: catalogue)
             guard !content.plainText.isEmpty else { return nil }
-            return UnsentWrites.Text(id: write.id, change: change(write.kind), content: content, date: MarfaMapping.date(write.queuedAt))
+            return UnsentChanges.Text(id: write.id, change: change(write.kind), content: content, date: MarfaMapping.date(write.queuedAt))
         }.sorted { $0.date < $1.date }
     }
 

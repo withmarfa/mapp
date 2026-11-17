@@ -375,7 +375,7 @@ import Testing
             let unresolved = answer.links.filter { !$0.target.isItem }.count
             let embeds = answer.embeds.map { BoundEmbed(text: $0.text, resolution: MarfaMapping.resolution(of: $0.target)) }
             let shown = item.edgesOut.filter { edge in
-                if case .item = edge.target { false } else { edge.origin == .body && edge.type == MarfaMapping.bodyLinkEdge }
+                if case .item = edge.to { false } else { edge.origin == .body && edge.type == MarfaMapping.bodyLinkEdge }
             }.count
             #expect(shown == unresolved, "\(id) shows \(shown) unresolved links, the copy answered \(unresolved)")
             #expect(item.boundEmbeds == embeds, "\(id) shows embeds \(item.boundEmbeds), the copy answered \(embeds)")

@@ -272,7 +272,7 @@ import Testing
         // A `parent-of` is held by the child.
         try await scene.wait("what changed") { state in
             state.item(titled: "Renamed") != nil && state.item(titled: "First") == nil
-                && state.item(titled: "Child")?.edgesOut.contains { $0.target == .item(ItemID(parent)) } == true
+                && state.item(titled: "Child")?.edgesOut.contains { $0.to == .item(ItemID(parent)) } == true
         }
         #expect(scene.reads.whole == whole, "no whole read")
         #expect(scene.reads.named == 1)

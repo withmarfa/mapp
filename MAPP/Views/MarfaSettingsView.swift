@@ -237,7 +237,7 @@ struct DepartureSheet: View {
         .accessibilityIdentifier("DepartureSheet")
     }
 
-    @ViewBuilder private func changes(_ unsent: UnsentWrites) -> some View {
+    @ViewBuilder private func changes(_ unsent: UnsentChanges) -> some View {
         if !unsent.texts.isEmpty {
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
