@@ -90,7 +90,7 @@ extension MarfaLibrary {
     }
 
     /// The edge is checked to the id the item will be given, which the copy does not hold yet: the core then judges
-    /// the parent (held, not in the bin, a type that may be one, not flat) and skips the target's type.
+    /// the parent (held, not in the bin, a type that may be one, not flat) and skips the to item's type.
     func newChildVerdict(under parent: ItemID) async -> EdgeVerdict {
         await source.edgeVerdict(EdgeDraft(type: MarfaMapping.parentEdge, from: parent, to: ItemID.mint(at: now())))
     }
@@ -274,8 +274,8 @@ extension MarfaLibrary {
     /// Changes the field of `id` by what the person changed: `adding` items to link and `removing` items to unlink,
     /// relative to what they saw, never the whole list they saw, which a change made since would be undone by.
     /// A link is removed freely; the core judges every link added, and how many an end may hold.
-    /// An end that holds one link of its type has it replaced by moving the edge's other end (`edges/move-target`,
-    /// `edges/move-source`), so a new parent is one write and the child never holds none or two (`edges/move-no-gap`):
+    /// An end that holds one link of its type has it replaced by moving the edge's other end (`edges/move-to`,
+    /// `edges/move-from`), so a new parent is one write and the child never holds none or two (`edges/move-no-gap`):
     /// a replacement is a move, and so is taking an item whose own link points elsewhere, as a child chosen under a
     /// project. A link a third item holds as its own is never taken from it.
     ///

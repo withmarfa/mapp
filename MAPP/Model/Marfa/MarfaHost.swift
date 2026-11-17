@@ -306,7 +306,7 @@ import Observation
         try begin()
         defer { isBusy = false }
         await dropPendingSignIn()
-        let agreed = try await agreedLoss(choice, of: connection)
+        let agreed = try agreedLoss(choice, of: connection)
         if let source {
             try await close(source, for: choice)
         } else if choice == nil, hasCopy(connection) {
@@ -361,7 +361,7 @@ import Observation
         let current = source
         let fresh: Bool
         do throws(Problem) {
-            agreed = try await agreedLoss(choice, of: old)
+            agreed = try agreedLoss(choice, of: old)
             if current != nil { guard await handOverEdits() else { throw Problem.unavailable(message: String(localized: "Finish editing the current note before changing libraries.")) } }
             if let current, choice == nil {
                 let unsent = await current.unsentWrites()

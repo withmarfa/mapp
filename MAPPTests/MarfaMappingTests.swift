@@ -159,9 +159,9 @@ struct MarfaMappingTests {
         #expect(Self.catalogue.edgeType(named: "child-of")?.isReverse == true)
     }
 
-    /// A move replaces an end only where the end that stays holds one edge of the type (`edges/move-target`,
-    /// `edges/move-source`): the target for `parent-of` (each child has one parent), the source for a type where
-    /// each source holds one.
+    /// A move replaces an end only where the end that stays holds one edge of the type (`edges/move-to`,
+    /// `edges/move-from`): the to item for `parent-of` (each child has one parent), the from item for a type where
+    /// each from item holds one.
     @Test func eachEndSaysHowManyEdgesOfATypeItHolds() throws {
         let parent = try #require(Self.catalogue.edgeTypes["parent-of"])
         #expect(parent.cardinality(atTo: true) == .one)

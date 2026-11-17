@@ -200,7 +200,7 @@ nonisolated extension Item {
         }.first
     }
 
-    /// The collections this item is in: the targets of its `in-collection` edges, in the order it holds them.
+    /// The collections this item is in: the to items of its `in-collection` edges, in the order it holds them.
     var collectionIDs: [ItemID] {
         edgesOut.compactMap { edge -> ItemID? in
             guard edge.type == MarfaMapping.collectionEdge, case .item(let id) = edge.to else { return nil }

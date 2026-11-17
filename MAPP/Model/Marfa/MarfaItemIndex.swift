@@ -84,7 +84,7 @@ nonisolated struct MarfaItemIndex {
     }
 
     /// An edge sits with the item at the end its type is written at, under the reverse name there where the type
-    /// has one; a type the catalogue does not know is taken as written at its source.
+    /// has one; a type the catalogue does not know is taken as written at its from item.
     static func link(_ edge: Edge, catalogue: Catalogue) -> Link? {
         guard case .item(let other) = edge.to else { return nil }
         guard let (info, isReverse) = catalogue.edgeType(named: edge.type) else {
