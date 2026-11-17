@@ -228,9 +228,8 @@ nonisolated enum ViewDraft {
     }
 
     /// The query with the window's filters added to a place's own. A Type filter makes the saved query's types the
-    /// window's chosen types: where they are not all within what the place lists, they replace the place's own type
-    /// terms and types. Marfa takes a type with its subtypes, so a chosen type that has any stays a filter, as the
-    /// exact-type condition the window applied.
+    /// window's chosen types, replacing the place's own type terms and types. Marfa takes a type with its subtypes,
+    /// so a chosen type that has any stays a filter, as the exact-type condition the window applied.
     static func adding(
         _ choices: [String: FilterChoice], to query: LibraryViewQuery, columns: [ItemTableColumn], catalogue: Catalogue
     ) -> (query: LibraryViewQuery, unkept: [Unkept]) {
@@ -268,9 +267,9 @@ nonisolated enum ViewDraft {
 
     /// How a Type filter of exactly these types is saved beside the types a query lists: the types the query then
     /// lists (nil where they stay), and whether the filter stays as an exact-type condition. Marfa lists a type with
-    /// its subtypes, so a chosen type that has any, or any not within the listed types' subtrees, cannot be said by
-    /// the listed types alone: the listed types become the chosen ones where some are not within, and the exact-type
-    /// condition stays where a chosen type has subtypes.
+    /// its subtypes, so a chosen type that has any cannot be said by the types alone and stays an exact-type
+    /// condition. The listed types stay only where the chosen ones are within their subtrees and some have subtypes
+    /// (the listed types then hold them and the condition narrows); otherwise the chosen types become the listed ones.
     private static func narrowing(_ chosen: Set<String>, listed: [TypeID], catalogue: Catalogue) -> (types: [TypeID]?, asFilter: Bool) {
         let hasSubtypes = chosen.contains { !catalogue.descendants(of: TypeID($0)).isEmpty }
         let sorted = chosen.sorted().map { TypeID($0) }
