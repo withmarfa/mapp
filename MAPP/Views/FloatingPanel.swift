@@ -32,7 +32,13 @@ extension View {
     func floatingPanelSurface(width: CGFloat) -> some View {
         frame(width: width)
             .fixedSize(horizontal: false, vertical: true)
-            .modifier(FloatingPanelSurface())
+            .modifier(FloatingPanelSurface(cornerRadius: FloatingPanelMetrics.cornerRadius, isNested: false))
+    }
+
+    /// The same surface for a panel inside a floating panel, as Actions is in the palette: its own corners, and a
+    /// shadow small enough to lift it off the rows under it.
+    func nestedPanelSurface(cornerRadius: CGFloat) -> some View {
+        modifier(FloatingPanelSurface(cornerRadius: cornerRadius, isNested: true))
     }
 }
 
@@ -43,7 +49,10 @@ enum FloatingPanelMetrics {
 }
 
 private struct FloatingPanelSurface: ViewModifier {
-    private let shape = RoundedRectangle(cornerRadius: FloatingPanelMetrics.cornerRadius, style: .continuous)
+    let cornerRadius: CGFloat
+    let isNested: Bool
+
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: cornerRadius, style: .continuous) }
 
     func body(content: Content) -> some View {
         #if DEBUG
@@ -51,7 +60,7 @@ private struct FloatingPanelSurface: ViewModifier {
         #else
         content
             .glassEffect(.regular, in: shape)
-            .shadow(color: .black.opacity(0.18), radius: 30, y: 12)
+            .modifier(Lift(opacity: 0.18, isNested: isNested))
         #endif
     }
 
@@ -64,38 +73,36 @@ private struct FloatingPanelSurface: ViewModifier {
         case .glass:
             content
                 .glassEffect(.regular, in: shape)
-                .shadow(color: .black.opacity(0.18), radius: 30, y: 12)
+                .modifier(Lift(opacity: 0.18, isNested: isNested))
         case .clearGlass:
             // Clear glass needs a dimming layer to keep text legible over a bright page, and light text over it.
             content
                 .glassEffect(.clear, in: shape)
                 .background(.black.opacity(0.35), in: shape)
                 .environment(\.colorScheme, .dark)
-                .shadow(color: .black.opacity(0.18), radius: 30, y: 12)
+                .modifier(Lift(opacity: 0.18, isNested: isNested))
         case .thickMaterial:
             content
                 .background(.thickMaterial, in: shape)
                 .overlay { edge(.primary.opacity(0.12)) }
-                .shadow(color: .black.opacity(0.2), radius: 30, y: 12)
+                .modifier(Lift(opacity: 0.2, isNested: isNested))
         case .popover:
             content
-                .background { VisualEffectBackground(material: .popover, cornerRadius: FloatingPanelMetrics.cornerRadius) }
+                .background { VisualEffectBackground(material: .popover, cornerRadius: cornerRadius) }
                 .overlay { edge(.primary.opacity(0.12)) }
-                .shadow(color: .black.opacity(0.2), radius: 30, y: 12)
+                .modifier(Lift(opacity: 0.2, isNested: isNested))
         case .hud:
             content
-                .background {
-                    VisualEffectBackground(material: .hudWindow, cornerRadius: FloatingPanelMetrics.cornerRadius, appearance: .vibrantDark)
-                }
+                .background { VisualEffectBackground(material: .hudWindow, cornerRadius: cornerRadius, appearance: .vibrantDark) }
                 .overlay { edge(.white.opacity(0.14)) }
                 .environment(\.colorScheme, .dark)
-                .shadow(color: .black.opacity(0.3), radius: 30, y: 12)
+                .modifier(Lift(opacity: 0.3, isNested: isNested))
         case .opaque:
             content
                 .background(Color(nsColor: .windowBackgroundColor), in: shape)
                 .overlay { edge(.primary.opacity(0.1)) }
                 .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
-                .shadow(color: .black.opacity(0.3), radius: 40, y: 20)
+                .modifier(Lift(opacity: 0.3, isNested: isNested))
         }
     }
 
@@ -103,6 +110,20 @@ private struct FloatingPanelSurface: ViewModifier {
         shape.strokeBorder(color, lineWidth: 1).allowsHitTesting(false)
     }
     #endif
+}
+
+/// The shadow that lifts a panel off the window, or a nested panel off the rows under it.
+private struct Lift: ViewModifier {
+    let opacity: Double
+    let isNested: Bool
+
+    func body(content: Content) -> some View {
+        if isNested {
+            content.shadow(color: .black.opacity(opacity * 0.7), radius: 12, y: 4)
+        } else {
+            content.shadow(color: .black.opacity(opacity), radius: 30, y: 12)
+        }
+    }
 }
 
 #if DEBUG

@@ -54,6 +54,10 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 
 - **An Actions panel floating above the palette's bar.** Actions takes the bar's place. See [Views and lists](views-and-lists.md).
 - **A filter button in the command palette.** Only Search Notes has one.
+- **A wide pill for the palette's filter button.** It is as wide as it is tall.
+- **Showing the palette's filters by making the palette taller.** The row takes its room from the list.
+- **A palette's bar floating over the results.** Rows ran under it; the bar has its own strip.
+- **Actions morphing out of the bar's glass.** A Liquid Glass morph around Actions' field hung the app when Actions opened; it grows with an ordinary transition.
 - **A divider under the palette's field.**
 - **Large type marks in Search Notes rows.** Its rows use the command palette's small mark.
 

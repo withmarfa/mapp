@@ -34,20 +34,21 @@ enum PaletteMetrics {
     static let markInset: CGFloat = listInset + rowInset
     static let markWidth: CGFloat = 20
     static let markGap: CGFloat = 10
+    /// The tallest the results grow, the filter row included when it shows.
+    static let resultsHeight: CGFloat = 460
 }
 
-/// The bar that floats over the foot of the results: the filter button in Search Notes, and Open and Actions.
+/// The bar on its own strip under the results: the filter button in Search Notes, and Open and Actions.
 enum PaletteBar {
-    /// The bar's glass, by what it is, so Actions grows out of the bar's own glass and goes back into it.
-    nonisolated enum Glass: Hashable, Sendable { case filters, open, actions }
-
     static let inset: CGFloat = 10
     static let spacing: CGFloat = 8
     /// The bar's height: the system's large glass button.
-    static let height: CGFloat = 32
-    /// What the last row has to clear.
+    static let height: CGFloat = 28
+    /// The strip the bar stands on, under the last row.
     static let clearance: CGFloat = height + inset * 2
-    static let morph = Animation.smooth(duration: 0.3)
+    /// How far up from the list's foot a row fades out.
+    static let fade: CGFloat = 14
+    static let grow = Animation.snappy(duration: 0.18)
 }
 
 struct PaletteSectionHeader: View {
@@ -160,7 +161,6 @@ struct PaletteFooter: View {
     let openTitle: String
     let onOpen: () -> Void
     let onActions: () -> Void
-    let namespace: Namespace.ID
 
     var body: some View {
         HStack(spacing: PaletteBar.spacing) {
@@ -170,7 +170,6 @@ struct PaletteFooter: View {
                     KeyCap(key: "↩")
                 }
             }
-            .glassEffectID(PaletteBar.Glass.open, in: namespace)
             .accessibilityIdentifier("CommandPaletteOpen")
             Button(action: onActions) {
                 HStack(spacing: 6) {
@@ -181,7 +180,6 @@ struct PaletteFooter: View {
                     }
                 }
             }
-            .glassEffectID(PaletteBar.Glass.actions, in: namespace)
             .accessibilityIdentifier("CommandPaletteActions")
         }
         .buttonStyle(.glass)
@@ -190,7 +188,7 @@ struct PaletteFooter: View {
     }
 }
 
-/// The round glass button at the bar's left in Search Notes that shows and hides the filter row, with the number of
+/// The glass button at the bar's left in Search Notes that shows and hides the filter row, with the number of
 /// filters set beside its symbol.
 struct PaletteFilterButton: View {
     let count: Int
@@ -199,19 +197,18 @@ struct PaletteFilterButton: View {
 
     var body: some View {
         Button(action: toggle) {
-            if count > 0 {
-                HStack(spacing: 4) {
-                    Image(systemName: "line.3.horizontal.decrease")
-                    Text(count, format: .number)
-                }
-            } else {
+            HStack(spacing: 4) {
                 Image(systemName: "line.3.horizontal.decrease")
+                if count > 0 { Text(count, format: .number) }
             }
+            .padding(.horizontal, count > 0 ? 9 : 0)
+            .frame(minWidth: PaletteBar.height, minHeight: PaletteBar.height)
+            .contentShape(.capsule)
+            // Drawn here, since the glass button style pads an icon out to a wide pill: as tall as Open and Actions,
+            // and as round, but only as wide as it is tall.
+            .glassEffect(.regular.interactive(), in: .capsule)
         }
-        .buttonStyle(.glass)
-        .buttonBorderShape(count > 0 ? .capsule : .circle)
-        .controlSize(.large)
-        .frame(height: PaletteBar.height)
+        .buttonStyle(.plain)
         // As the list's View Options button shows filters: the glass stays, and the symbol and count take the accent.
         .foregroundStyle(count > 0 ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary))
         .accessibilityLabel(isOn ? "Hide Filters" : "Show Filters")
@@ -404,7 +401,7 @@ enum PaletteFocus: Hashable {
     case field, actions
 }
 
-/// What can be done to the chosen row: the bar's glass grown into a panel with the row's title, its actions, and a
+/// What can be done to the chosen row: a panel grown out of the bar with the row's title, its actions, and a
 /// field that narrows them. Escape puts the panel away and leaves the palette.
 struct PaletteActionsPanel: View {
     let title: String
@@ -455,11 +452,11 @@ struct PaletteActionsPanel: View {
                 .onSubmit(submit)
                 .onExitCommand(perform: close)
                 .padding(.horizontal, 12)
-                .padding(.vertical, 9)
+                .padding(.vertical, 13)
                 .accessibilityIdentifier("CommandPaletteActionsField")
         }
         .frame(width: 300)
-        .glassEffect(.regular, in: .rect(cornerRadius: 16))
+        .nestedPanelSurface(cornerRadius: 16)
         .task {
             try? await Task.sleep(for: .milliseconds(50))
             focus.wrappedValue = .actions
