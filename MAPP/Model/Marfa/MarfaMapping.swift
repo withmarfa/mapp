@@ -555,37 +555,44 @@ nonisolated enum MarfaMapping {
 
     // MARK: Verdicts and sync
 
-    static func outcome(_ verdict: Marfa.Verdict) -> WriteOutcome {
+    /// `afterRefusal`: a write the refused one waited on was refused or died, which only the queue can tell
+    /// (`MarfaProblems.waitsOnStopped`).
+    static func outcome(_ verdict: Marfa.Verdict, afterRefusal: Bool = false) -> WriteOutcome {
         switch verdict {
         case .accepted: .accepted
         case .merged(let fields): .merged(fields: fields)
         case .conflicted(let sibling?, let fields, _): .conflicted(sibling: ItemID(sibling), fields: fields)
         // An item conflict always names the copy it wrote; one that names none is a table row's, which MAPP never writes.
         case .conflicted(nil, let fields, _): .merged(fields: fields)
-        case .refused(let refusal): .refused(problem(refusal))
-        case .blocked(let reason, let refusal): .blocked(blockedReason(reason), refusal.map(problem))
+        case .refused(let refusal): .refused(problem(refusal, afterRefusal: afterRefusal))
+        case .blocked(let reason, let refusal): .blocked(blockedReason(reason), refusal.map { problem($0) })
         case .dead: .dead
         }
     }
 
-    /// The server's refusal always carries its code. One without was made by the copy, which never sent the write,
-    /// and its `reason` is an English sentence, so the person is told in the app's words instead.
-    static func problem(_ refusal: Marfa.Refusal) -> SyncProblem {
+    /// A refusal with no code is either the server's answer with none, stored as a one-word reason, or the copy's
+    /// own, never sent, with an English sentence as its reason. The copy's is told in the app's words: too large, or
+    /// after a write it waited on (`afterRefusal`, which the caller reads from the queue), or otherwise as not sent.
+    static func problem(_ refusal: Marfa.Refusal, afterRefusal: Bool = false) -> SyncProblem {
+        let sentence = refusal.reason.contains(where: \.isWhitespace)
         let unsent: SyncProblem.Unsent? =
             if let limit = refusal.requestLimit { .tooLarge(size: limit.size, limit: limit.limit) }
-            else if refusal.code == nil { .afterRefusal }
+            else if refusal.code != nil { nil }
+            else if afterRefusal { .afterRefusal }
+            else if sentence { .notSent(reason: refusal.reason) }
             else { nil }
         return SyncProblem(
-            code: refusal.code ?? unsentCode(unsent), message: unsent.map(Words.unsent) ?? refusal.message,
-            unsent: unsent,
+            code: refusal.code ?? unsent.map(unsentCode) ?? refusal.reason,
+            message: unsent.map(Words.unsent) ?? refusal.message, unsent: unsent,
             fields: Dictionary(refusal.fields.map { ($0.field, $0.message) }, uniquingKeysWith: { first, _ in first }),
             isTrashed: refusal.trashed, grant: refusal.grant.map(grant))
     }
 
-    private static func unsentCode(_ unsent: SyncProblem.Unsent?) -> String {
+    private static func unsentCode(_ unsent: SyncProblem.Unsent) -> String {
         switch unsent {
         case .tooLarge: "over_request_limit"
-        case .afterRefusal, nil: "refused_with_dependency"
+        case .afterRefusal: "refused_with_dependency"
+        case .notSent: "refused_unsent"
         }
     }
 

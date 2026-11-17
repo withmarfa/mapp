@@ -144,10 +144,27 @@ nonisolated enum Words {
     static func unsent(_ unsent: SyncProblem.Unsent) -> String {
         switch unsent {
         case .tooLarge(let size, let limit):
-            String(localized: "This change is \(size.formatted()) bytes, more than the \(limit.formatted()) bytes the server takes at once, so it wasn’t sent. Make it again in smaller parts.")
+            let (sizeText, limitText) = sizes(size, limit)
+            return String(localized: "This change is \(sizeText), more than the \(limitText) the server takes at once, so it wasn’t sent. Make it again in smaller parts.")
         case .afterRefusal:
-            String(localized: "It went with an earlier change that wasn’t sent, so it wasn’t sent either. Make it again.")
+            return String(localized: "It went with an earlier change that wasn’t sent, so it wasn’t sent either. Make it again.")
+        case .notSent:
+            return String(localized: "MAPP couldn’t send this change.")
         }
+    }
+
+    /// Two sizes as Finder shows them, with the exact bytes added where they would otherwise read the same.
+    static func sizes(_ size: UInt64, _ limit: UInt64) -> (String, String) {
+        let shown = [size, limit].map { Int64(clamping: $0).formatted(.byteCount(style: .file)) }
+        guard shown[0] == shown[1] else { return (shown[0], shown[1]) }
+        let exact = ByteCountFormatStyle(style: .file, includesActualByteCount: true)
+        return (Int64(clamping: size).formatted(exact), Int64(clamping: limit).formatted(exact))
+    }
+
+    /// The copy's own reason for not sending a change, as a sentence.
+    static func unsentReason(_ reason: String) -> String {
+        let sentence = reason.prefix(1).uppercased() + reason.dropFirst()
+        return sentence.hasSuffix(".") ? sentence : sentence + "."
     }
 
     static func moreNotShown(_ count: Int) -> String {
@@ -281,6 +298,7 @@ nonisolated struct ProblemWording: Hashable, Sendable {
                 explanation = String(localized: "The server refused it.")
             }
             details = (reason?.fields ?? [:]).sorted { $0.key < $1.key }.map { "\(entry.fieldLabels[$0.key] ?? $0.key): \($0.value)" }
+            if case .notSent(let why)? = reason?.unsent { details.append(Words.unsentReason(why)) }
             if canCopyText { explanation += " " + String(localized: "To keep what you wrote, copy it before you discard this change.") }
         case .blocked(let reason):
             headline = Self.stoppedHeadline(name: name)

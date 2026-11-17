@@ -439,7 +439,7 @@ struct MarfaMappingTests {
             code: "validation_error", message: "Bad status", fields: ["status": "not one of open, done"],
             isTrashed: true)))
         let unsent = Refusal(reason: "the create_item it waits for was refused")
-        #expect(MarfaMapping.outcome(.refused(unsent)) == .refused(SyncProblem(
+        #expect(MarfaMapping.outcome(.refused(unsent), afterRefusal: true) == .refused(SyncProblem(
             code: "refused_with_dependency", message: Words.unsent(.afterRefusal), unsent: .afterRefusal)))
         #expect(MarfaMapping.outcome(.conflicted(siblingId: "s", fields: ["body"])) ==
             .conflicted(sibling: ItemID("s"), fields: ["body"]))
@@ -448,6 +448,29 @@ struct MarfaMappingTests {
         #expect(MarfaMapping.outcome(.blocked(reason: .instanceChanged)) == .blocked(.instanceChanged, nil))
         #expect(MarfaMapping.outcome(.blocked(reason: .recordUnread)) == .blocked(.recordUnread, nil))
         #expect(MarfaMapping.outcome(.dead) == .dead)
+    }
+
+    /// The copy also refuses writes unsent for reasons of their own, such as a delete with no confirmed version,
+    /// with no code. Without a refused write it waited on, it is told only that it wasn't sent, never that an
+    /// earlier change took it down.
+    @Test func aRefusalWithNoCodeIsNotToldAsAfterAnother() {
+        let reason = "the delete has no confirmed server version to remove; read the item before deleting it"
+        let problem = MarfaMapping.problem(Refusal(reason: reason))
+        #expect(problem.unsent == .notSent(reason: reason))
+        #expect(problem.code == "refused_unsent")
+        #expect(problem.message == Words.unsent(.notSent(reason: reason)))
+        #expect(problem.message?.contains("earlier change") == false)
+        // A code wins over the queue's say: the server refused it for itself.
+        let server = MarfaMapping.problem(Refusal(reason: "validation_error", code: "validation_error"), afterRefusal: true)
+        #expect(server.unsent == nil)
+    }
+
+    /// The server's answer with no `error.code` is stored with a one-word reason, and was sent: the server refused it.
+    @Test func aServerAnswerWithNoCodeIsTheServersRefusal() {
+        let problem = MarfaMapping.problem(Refusal(reason: "unknown", message: "Not allowed here."))
+        #expect(problem.unsent == nil)
+        #expect(problem.code == "unknown")
+        #expect(problem.message == "Not allowed here.")
     }
 
     /// The copy refuses a write larger than the server takes before sending it, with no code and its reason in
@@ -463,7 +486,9 @@ struct MarfaMappingTests {
         #expect(problem.unsent == .tooLarge(size: 3_145_729, limit: 3_145_728))
         #expect(problem.code == "over_request_limit")
         let message = try #require(problem.message)
-        #expect(message.contains(3_145_729.formatted()) && message.contains(3_145_728.formatted()))
+        let (size, limit) = Words.sizes(3_145_729, 3_145_728)
+        #expect(size != limit, "sizes that would read the same carry their bytes")
+        #expect(message.contains(size) && message.contains(limit))
         #expect(!message.localizedCaseInsensitiveContains("write"), "the queue's word is not the person's")
 
         let entry = SyncProblemEntry(

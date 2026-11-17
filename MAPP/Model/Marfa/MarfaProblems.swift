@@ -44,6 +44,7 @@ nonisolated enum MarfaProblems {
         }
 
         let roots = foldedRoots(stopped)
+        let byID = Dictionary(stopped.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         var dependents: [String: [QueuedWrite]] = [:]
         for write in stopped {
             if let root = roots[write.id] { dependents[root, default: []].append(write) }
@@ -51,7 +52,9 @@ nonisolated enum MarfaProblems {
         var problems = stopped.filter { roots[$0.id] == nil }.compactMap { write -> SyncProblemEntry? in
             let type = write.body["type"]?.string.map { TypeID($0) } ?? write.itemId.flatMap { types[$0] }
             let folded = dependents[write.id] ?? []
-            var entry = entry(for: write, body: merged(write, with: folded), type: type, catalogue: catalogue)
+            var entry = entry(
+                for: write, body: merged(write, with: folded), type: type, catalogue: catalogue,
+                afterRefusal: waitsOnStopped(write, among: { byID[$0] }))
             entry?.dependents = folded.map(\.id)
             return entry
         }
@@ -112,8 +115,8 @@ nonisolated enum MarfaProblems {
         return UnsentChanges(ids: Set(writes.map(\.id)), texts: texts)
     }
 
-    /// A write the queue refused without sending, because a write it waits on was refused, died or is blocked,
-    /// is shown with that write: discarding a refusal takes it too, and releasing a stopped write releases it.
+    /// A write the queue refused without sending, because a write it waits on was refused or died, is shown with
+    /// that write: discarding a refusal takes it too. A write refused unsent for any other reason stands alone.
     static func foldedRoots(_ stopped: [QueuedWrite]) -> [String: String] {
         let byID = Dictionary(stopped.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         var roots: [String: String] = [:]
@@ -121,8 +124,8 @@ nonisolated enum MarfaProblems {
             var current = write
             var seen: Set<String> = [write.id]
             var root: String?
-            while isRefusedUnsent(current),
-                let next = current.dependsOn.first(where: { byID[$0] != nil && !seen.contains($0) }),
+            while isRefusedAfterRefusal(current, among: { byID[$0] }),
+                let next = current.dependsOn.first(where: { !seen.contains($0) && isStopped(byID[$0]) }),
                 let ahead = byID[next]
             {
                 seen.insert(next)
@@ -160,24 +163,40 @@ nonisolated enum MarfaProblems {
         return body
     }
 
-    /// Refused unsent for a write it went with, not for a fault of its own such as its size.
-    private static func isRefusedUnsent(_ write: QueuedWrite) -> Bool {
-        if case .refused(let refusal) = write.verdict { MarfaMapping.problem(refusal).unsent == .afterRefusal } else { false }
+    /// Whether a write the copy refused may have been refused for another's sake: one it waits on, found by
+    /// `lookup`, was refused or died. The copy refuses a write for that and for reasons of its own alike, with
+    /// no code, so only the queue tells them apart.
+    static func waitsOnStopped(_ write: QueuedWrite, among lookup: (String) -> QueuedWrite?) -> Bool {
+        write.dependsOn.contains { isStopped(lookup($0)) }
     }
 
+    private static func isStopped(_ write: QueuedWrite?) -> Bool {
+        switch write?.verdict {
+        case .refused, .dead: true
+        default: false
+        }
+    }
+
+    /// Refused unsent for a write it went with, not for a fault of its own such as its size.
+    private static func isRefusedAfterRefusal(_ write: QueuedWrite, among writes: (String) -> QueuedWrite?) -> Bool {
+        guard case .refused(let refusal) = write.verdict else { return false }
+        return MarfaMapping.problem(refusal, afterRefusal: waitsOnStopped(write, among: writes)).unsent == .afterRefusal
+    }
+
+    /// `afterRefusal`: a write it waits on was refused or died (`waitsOnStopped`).
     static func entry(
-        for write: QueuedWrite, body: JSONObject? = nil, type: TypeID?, catalogue: Catalogue
+        for write: QueuedWrite, body: JSONObject? = nil, type: TypeID?, catalogue: Catalogue, afterRefusal: Bool = false
     ) -> SyncProblemEntry? {
         let kind: SyncProblemEntry.Kind
         let reason: SyncProblem
         switch write.verdict {
         case .refused(let refusal):
             kind = .refused
-            reason = MarfaMapping.problem(refusal)
+            reason = MarfaMapping.problem(refusal, afterRefusal: afterRefusal)
         case .blocked(let marfaReason, let refusal):
             let blocked = MarfaMapping.blockedReason(marfaReason)
             kind = .blocked(blocked)
-            var problem = refusal.map(MarfaMapping.problem) ?? SyncProblem(code: blocked.rawValue)
+            var problem = refusal.map { MarfaMapping.problem($0) } ?? SyncProblem(code: blocked.rawValue)
             problem.code = blocked.rawValue
             reason = problem
         case .dead:

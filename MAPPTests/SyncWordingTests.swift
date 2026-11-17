@@ -159,11 +159,34 @@ struct ProblemWordingTests {
 
     @Test func aChangeTooLargeToSendSaysItsSizesAndHowToKeepTheText() {
         let reason = SyncProblem(
-            code: "over_request_limit", message: Words.unsent(.tooLarge(size: 2_500_000, limit: 2_000_000)),
-            unsent: .tooLarge(size: 2_500_000, limit: 2_000_000))
+            code: "over_request_limit", message: Words.unsent(.tooLarge(size: 12_000_000, limit: 10_000_000)),
+            unsent: .tooLarge(size: 12_000_000, limit: 10_000_000))
         let wording = wording(entry(.refused, reason: reason))
-        #expect(wording.explanation.hasPrefix("This change is \(2_500_000.formatted()) bytes, more than the \(2_000_000.formatted()) bytes"))
+        let size = Int64(12_000_000).formatted(.byteCount(style: .file))
+        let limit = Int64(10_000_000).formatted(.byteCount(style: .file))
+        #expect(wording.explanation.hasPrefix("This change is \(size), more than the \(limit) the server takes at once"))
         #expect(wording.explanation.contains("copy it before you discard"))
+        #expect(wording.actions.map(\.action) == [.discard])
+    }
+
+    /// Sizes that round to the same words would say the change is no larger than the limit, so they carry their bytes.
+    @Test func sizesThatReadTheSameCarryTheirBytes() {
+        let (size, limit) = Words.sizes(2_000_001, 2_000_000)
+        #expect(size != limit)
+        #expect(size.contains(Int64(2_000_001).formatted(.byteCount(style: .file))))
+    }
+
+    /// A change the copy refused for a reason of its own says only that it wasn't sent, with the copy's reason
+    /// beside it, never that an earlier change or the server refused it.
+    @Test func aChangeNotSentForItsOwnReasonSaysSo() {
+        let why = "the delete has no confirmed server version to remove; read the item before deleting it"
+        let reason = SyncProblem(code: "refused_unsent", message: Words.unsent(.notSent(reason: why)), unsent: .notSent(reason: why))
+        let wording = wording(entry(.refused, reason: reason))
+        #expect(wording.explanation.hasPrefix("MAPP couldn’t send this change."))
+        #expect(!wording.explanation.contains("earlier change"))
+        #expect(!wording.explanation.contains("The server refused it"))
+        #expect(wording.explanation.contains("copy it before you discard"))
+        #expect(wording.details == ["The delete has no confirmed server version to remove; read the item before deleting it."])
         #expect(wording.actions.map(\.action) == [.discard])
     }
 
@@ -258,7 +281,9 @@ struct ProblemWordingTests {
             .blocked(.conflictUnresolved), .blocked(.failingAlone), .blocked(.instanceChanged), .blocked(.recordUnread), .dead,
             .conflicted(sibling: ItemID("c"), original: nil)
         ]
-        let unsent: [SyncProblem.Unsent] = [.tooLarge(size: 2_000_001, limit: 2_000_000), .afterRefusal]
+        let unsent: [SyncProblem.Unsent] = [
+            .tooLarge(size: 2_000_001, limit: 2_000_000), .afterRefusal, .notSent(reason: "the bytes are gone")
+        ]
         let entries = kinds.map { entry($0) } + unsent.map {
             entry(.refused, reason: SyncProblem(code: "unsent", message: Words.unsent($0), unsent: $0))
         }

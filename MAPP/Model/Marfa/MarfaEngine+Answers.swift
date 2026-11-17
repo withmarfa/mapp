@@ -42,6 +42,7 @@ extension MarfaEngine {
         var ids: Set<String> = []
         // The copy lets an item go once its delete is answered.
         var leaving: Set<String> = []
+        let answeredNow = Dictionary(writes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         for answer in writes {
             if let itemID = answer.itemId, [.deleteItem, .restoreItem].contains(answer.kind) { leaving.insert(itemID) }
             guard let verdict = answer.verdict else { continue }
@@ -49,7 +50,8 @@ extension MarfaEngine {
             // The copy clears a refused write that carried no content as it hands it over, so no read of the queue
             // finds it again.
             if case .refused = verdict { refusals[answer.id] = answer }
-            let outcome = MarfaMapping.outcome(verdict)
+            let outcome = MarfaMapping.outcome(
+                verdict, afterRefusal: MarfaProblems.waitsOnStopped(answer, among: { answeredNow[$0] ?? refusals[$0] }))
             ids.formUnion(movedEnds.removeValue(forKey: answer.id) ?? [])
             if let itemID = answer.itemId {
                 ids.insert(itemID)

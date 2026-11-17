@@ -17,8 +17,10 @@ nonisolated struct SyncProblem: Hashable, Sendable {
     enum Unsent: Hashable, Sendable {
         /// Larger than the server takes in one request, both in bytes.
         case tooLarge(size: UInt64, limit: UInt64)
-        /// A write it went only with was refused, died or was taken back.
+        /// A write it waited on was refused or died.
         case afterRefusal
+        /// For a reason of its own, such as a delete with no confirmed version, in the copy's English sentence.
+        case notSent(reason: String)
     }
 
     /// The server's code verbatim, the contract's name for a blocked reason, or a source's own code for a write

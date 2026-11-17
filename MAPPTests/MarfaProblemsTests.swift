@@ -165,10 +165,53 @@ struct MarfaProblemsTests {
         #expect(report.problems[1].dependents == ["behind"])
         #expect(report.problems[2].dependents.isEmpty)
         #expect(report.problems[2].actions == [.discard])
-        // Shown alone, it says why in the app's words, not the queue's sentence.
-        #expect(report.problems[2].reason?.unsent == .afterRefusal)
-        #expect(report.problems[2].reason?.message == Words.unsent(.afterRefusal))
+        #expect(report.problems[0].reason?.unsent == nil)
+        // The write it waited on is not in the queue, so nothing shows it went with another: it is told only as not sent.
+        #expect(report.problems[2].reason?.unsent == .notSent(reason: "the create_item it waits for was refused"))
         #expect(report.problems[2].reason?.code.contains(" ") == false)
+    }
+
+    /// The copy refuses a delete with no confirmed version unsent and with no code. It waited on nothing refused,
+    /// so it is its own row, worded as not sent, never as after an earlier change, even beside unrelated refusals.
+    @Test func aRefusalWithNoCodeAndNoRefusedDependencyStandsAlone() throws {
+        let server = Refusal(reason: "type_not_permitted", code: "type_not_permitted")
+        let reason = "the delete has no confirmed server version to remove; read the item before deleting it"
+        let report = Self.report([
+            Self.write("create", .refused(server), kind: .createItem, body: Self.task, at: "2026-10-06T08:00:00Z"),
+            Self.write("done", .accepted, kind: .updateItem, on: "other", at: "2026-10-06T08:30:00Z"),
+            Self.write("delete", .refused(Refusal(reason: reason)), kind: .deleteItem, on: "other", dependsOn: ["done"])
+        ])
+        #expect(report.problems.map(\.id) == [.write("create"), .write("delete")])
+        #expect(report.problems[0].dependents.isEmpty)
+        let delete = try #require(report.problems.last)
+        #expect(delete.reason?.unsent == .notSent(reason: reason))
+        #expect(delete.reason?.message == Words.unsent(.notSent(reason: reason)))
+        #expect(delete.actions == [.discard])
+        let wording = ProblemWording(delete) { _ in nil }
+        #expect(!wording.explanation.contains("earlier change"))
+    }
+
+    /// A write refused unsent with no code after a write it waited on was refused is that one's dependent.
+    @Test func aRefusalAfterARefusedDependencyIsFoldedUnderIt() throws {
+        let server = Refusal(reason: "type_not_permitted", code: "type_not_permitted")
+        let unsent = Refusal(reason: "the create_item it waits for was refused")
+        let report = Self.report([
+            Self.write("create", .refused(server), kind: .createItem, body: Self.task, at: "2026-10-06T08:00:00Z"),
+            Self.write("edit", .refused(unsent), body: ["properties": ["body": "More"]], dependsOn: ["create"])
+        ])
+        let entry = try #require(report.problems.first)
+        #expect(report.problems.count == 1)
+        #expect(entry.id == .write("create"))
+        #expect(entry.dependents == ["edit"])
+        #expect(MarfaProblems.waitsOnStopped(Self.write("edit", .refused(unsent), dependsOn: ["create"])) { id in
+            id == "create" ? Self.write("create", .refused(server)) : nil
+        })
+        // Read alone, as the queue shows it, it is worded after the refusal it went with.
+        let alone = MarfaProblems.entry(
+            for: Self.write("edit", .refused(unsent), dependsOn: ["create"]), type: nil, catalogue: Self.catalogue,
+            afterRefusal: true)
+        #expect(alone?.reason?.unsent == .afterRefusal)
+        #expect(alone?.reason?.message == Words.unsent(.afterRefusal))
     }
 
     /// A write the copy would not send for its own size also carries no code, but is refused for itself, so it is
