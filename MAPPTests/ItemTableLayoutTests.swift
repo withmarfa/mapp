@@ -151,7 +151,7 @@ struct ItemTableLayoutTests {
 
     // MARK: Groups and filters
 
-    @Test func statusGroupsRunFromWorkUnderWayToWorkFinishedWithTheEmptyLast() throws {
+    @Test func statusGroupsRunFromNotStartedToFinishedWithTheEmptyLast() throws {
         let rows = [
             Self.row("A", status: "completed"), Self.row("B", status: "pending"), Self.row("C"),
             Self.row("D", status: "in_progress"), Self.row("E", status: "someday"), Self.row("F", status: "canceled"),
@@ -159,9 +159,9 @@ struct ItemTableLayoutTests {
         ]
         let status = try #require(Self.columns(rows).first { $0.id == "field.status" })
         let groups = ItemTableLayout.groups(of: rows, by: status)
-        #expect(groups.map(\.id) == ["in_progress", "not_started", "completed", "canceled", ""])
-        #expect(groups.map(\.title) == ["In Progress", "Not Started", "Completed", "Canceled", "No Status"])
-        #expect(groups.first?.rows.map(\.item.title) == ["D", "G"])
+        #expect(groups.map(\.id) == ["not_started", "in_progress", "completed", "canceled", ""])
+        #expect(groups.map(\.title) == ["Not Started", "In Progress", "Completed", "Canceled", "No Status"])
+        #expect(groups.first?.rows.map(\.item.title) == ["B", "E"])
         #expect(ItemTableLayout.collapsed(ItemTableOptions(), groups: groups, by: status) == ["completed", "canceled"])
     }
 

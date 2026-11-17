@@ -123,10 +123,10 @@ struct ItemBoard: View {
             HStack(spacing: 7) {
                 if let symbol = lane.symbol { StatusMark(symbol, size: 12) }
                 Text(verbatim: lane.title)
-                    .interfaceFont(.headline)
+                    .interfaceFont(.body.weight(.semibold))
                     .lineLimit(1)
                 Text(lane.items.count, format: .number)
-                    .interfaceFont(.subheadline)
+                    .interfaceFont(.callout)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
@@ -326,16 +326,16 @@ private struct BoardCard: View, Equatable {
                         .accessibilityLabel(content.typeLabel)
                 }
                 Text(verbatim: content.title)
-                    .interfaceFont(.headline)
+                    .interfaceFont(.body.weight(.medium))
                     .foregroundStyle(.primary)
-                    .lineLimit(2)
+                    .lineLimit(3)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if !item.isEditable { Image(systemName: "lock").interfaceFont(.caption).foregroundStyle(.secondary).accessibilityLabel("Read Only") }
             }
             if !compact {
                 if let secondary = content.secondary {
                     Text(verbatim: secondary)
-                        .interfaceFont(.subheadline)
+                        .interfaceFont(.callout)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
                 }

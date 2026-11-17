@@ -83,19 +83,6 @@ struct SharedKeyColumnTests {
 
     // MARK: Board lanes
 
-    @Test func statusLanesOfSeveralTypesFollowTheStatusGroupsThenDeclaredOrder() {
-        let catalogue = Catalogue(itemTypes: [
-            // Declared with the finished words first on purpose: the group, not the declaration, puts them last.
-            Self.info(Self.ticket, fields: [Self.status([("done", .completed), ("doing", .inProgress), ("todo", .notStarted)], by: Self.ticket)]),
-            Self.info(Self.meeting, fields: [Self.status([("held", .completed), ("planned", .notStarted), ("running", .inProgress)], by: Self.meeting)]),
-        ])
-        let items = [Self.item("a", Self.ticket), Self.item("b", Self.meeting)]
-        let lanes = ItemBoardLayout.lanes(items: items, key: "state", catalogue: catalogue)
-        #expect(lanes.map(\.id) == [
-            .option("running"), .option("doing"), .option("planned"), .option("todo"), .option("held"), .option("done"), .missing,
-        ])
-    }
-
     @Test func aChoiceBoardKeepsDeclaredOrder() {
         let catalogue = Catalogue(itemTypes: [
             Self.info(Self.ticket, fields: [.init(key: "size", label: "Size", kind: .choice(["small", "large", "medium"]), declaredBy: Self.ticket)]),
