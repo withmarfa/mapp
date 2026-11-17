@@ -78,10 +78,11 @@ private struct AppearanceSettings: View {
             }
             Section {
                 ValuePanelOptions()
+                PaletteMaterialOptions()
             } header: {
                 Text("Panels")
             } footer: {
-                Text("The panels that open under a date, status, tags, or other value. Solid uses the window color instead of glass.")
+                Text("Value panels open under a date, status, tags, or other value. Palettes are the command palette, Search Notes, and New Item. Translucent uses the system’s popover material, and Solid uses the window color.")
             }
             Section {
                 ToolbarOptions()

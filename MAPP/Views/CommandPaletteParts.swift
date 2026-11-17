@@ -34,20 +34,20 @@ enum PaletteMetrics {
     static let markInset: CGFloat = listInset + rowInset
     static let markWidth: CGFloat = 20
     static let markGap: CGFloat = 10
-    /// The tallest the results grow, the filter row included when it shows.
+    /// The tallest the results grow, the filter row included; the bar adds its own height under them.
     static let resultsHeight: CGFloat = 460
 }
 
-/// The bar on its own strip under the results: the filter button in Search Notes, and Open and Actions.
+/// The bar at the foot of the results, which rows scroll under: the filter button in Search Notes, and Open and Actions.
 enum PaletteBar {
     static let inset: CGFloat = 10
     static let spacing: CGFloat = 8
-    /// The bar's height: the system's large glass button.
-    static let height: CGFloat = 28
-    /// The strip the bar stands on, under the last row.
-    static let clearance: CGFloat = height + inset * 2
-    /// How far up from the list's foot a row fades out.
-    static let fade: CGFloat = 14
+    /// The label size of the bar's buttons, a point larger than a large control's.
+    static let fontSize: CGFloat = 14
+    /// A bar button's label height, a point taller than a large control's.
+    static let labelHeight: CGFloat = 19
+    /// The bar's height: what the large glass style pads a label of `labelHeight` out to, as measured on screen.
+    static let height: CGFloat = labelHeight + 12
     static let grow = Animation.snappy(duration: 0.18)
 }
 
@@ -142,16 +142,20 @@ struct PaletteRow: View {
     }
 }
 
-/// A key of a shortcut, drawn as a small cap.
+/// A key of a shortcut, drawn as a small outlined cap.
 struct KeyCap: View {
     let key: String
 
     var body: some View {
         Text(key)
-            .font(.system(size: 11, weight: .medium))
+            .font(.system(size: 10, weight: .medium))
             .foregroundStyle(.secondary)
-            .frame(minWidth: 18, minHeight: 18)
-            .background(.quaternary, in: .rect(cornerRadius: 5, style: .continuous))
+            .padding(.horizontal, 3)
+            .frame(minWidth: 16, minHeight: 16)
+            .overlay {
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .strokeBorder(.secondary.opacity(0.6), lineWidth: 1)
+            }
             .accessibilityHidden(true)
     }
 }
@@ -169,6 +173,7 @@ struct PaletteFooter: View {
                     Text(openTitle)
                     KeyCap(key: "↩")
                 }
+                .frame(minHeight: PaletteBar.labelHeight)
             }
             .accessibilityIdentifier("CommandPaletteOpen")
             Button(action: onActions) {
@@ -179,9 +184,11 @@ struct PaletteFooter: View {
                         KeyCap(key: "K")
                     }
                 }
+                .frame(minHeight: PaletteBar.labelHeight)
             }
             .accessibilityIdentifier("CommandPaletteActions")
         }
+        .font(.system(size: PaletteBar.fontSize))
         .buttonStyle(.glass)
         .controlSize(.large)
         .frame(height: PaletteBar.height)
@@ -201,6 +208,7 @@ struct PaletteFilterButton: View {
                 Image(systemName: "line.3.horizontal.decrease")
                 if count > 0 { Text(count, format: .number) }
             }
+            .font(.system(size: PaletteBar.fontSize))
             .padding(.horizontal, count > 0 ? 9 : 0)
             .frame(minWidth: PaletteBar.height, minHeight: PaletteBar.height)
             .contentShape(.capsule)
@@ -234,7 +242,7 @@ struct PaletteFilterRow: View {
 
     var body: some View {
         FilterChipsBar(
-            chips: chips, leadingInset: PaletteMetrics.markInset, showsHelp: false, anchors: anchors,
+            chips: chips, leadingInset: PaletteMetrics.markInset, showsHelp: false, addSide: PaletteBar.height, anchors: anchors,
             open: { id in PaletteFilters.Field(rawValue: id).map(openValues) },
             remove: { id in if let field = PaletteFilters.Field(rawValue: id) { remove(field) } },
             add: openFields

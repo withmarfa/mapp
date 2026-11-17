@@ -67,19 +67,15 @@ extension Knob.Value {
 /// `body` redraws when it changes.
 @Observable
 final class Tuning {
-    /// Add a knob here to show it in the panel; remove it here when it is settled. Today it holds the palette's
-    /// material (`FloatingPanelMaterial`) and the `Chips` group, which adjusts `ChipLooks`: when a chip value is
-    /// settled, delete its knob and keep its named default there.
+    /// Add a knob here to show it in the panel; remove it here when it is settled. Today it holds the `Chips` group,
+    /// which adjusts `ChipLooks`: when a chip value is settled, delete its knob and keep its named default there.
     ///
     /// To add one: declare it with `Knob.slider`, `.toggle` or `.picker`, with the code's own constant as its
     /// default, and list it here. Read it in the view with `number(_:)`, `choice(_:as:)` or, for a toggle,
     /// `tuning[knob] == .flag(true)`, behind `#if DEBUG` with the constant in the `#else`, so Release keeps the
     /// constant. The `Copy` button turns the values into text to paste into a chat. Settle a knob by deleting its
     /// declaration, its use and this entry in one change; none stays as a setting. Panel text is not localized.
-    static let shared = Tuning(knobs: [paletteMaterial] + Chips.fields.map(\.knob))
-
-    /// What the command palette, Search Notes and quick add stand on, which share one surface.
-    static let paletteMaterial = Knob.picker("Palettes", "Palette material", FloatingPanelMaterial.glass)
+    static let shared = Tuning(knobs: Chips.fields.map(\.knob))
 
     static let prefix = "tuning."
 

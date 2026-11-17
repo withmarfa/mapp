@@ -26,9 +26,8 @@ struct FloatingPanel<Content: View>: View {
 }
 
 extension View {
-    /// The surface a floating panel's content sits on, `width` wide and as tall as the content: the regular Liquid
-    /// Glass the system gives popovers and other floating controls that hold text, with its own edge, and a
-    /// shadow that lifts it off the window.
+    /// The surface a floating panel's content sits on, `width` wide and as tall as the content, in the material the
+    /// person chose in Settings (`PaletteMaterial`), with its own edge and a shadow that lifts it off the window.
     func floatingPanelSurface(width: CGFloat) -> some View {
         frame(width: width)
             .fixedSize(horizontal: false, vertical: true)
@@ -51,65 +50,34 @@ enum FloatingPanelMetrics {
 private struct FloatingPanelSurface: ViewModifier {
     let cornerRadius: CGFloat
     let isNested: Bool
+    @AppStorage(InterfaceKey.paletteMaterial) private var material = PaletteMaterial.standard
 
     private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: cornerRadius, style: .continuous) }
 
+    /// Glass draws its own edge; the other materials take a hairline so the panel keeps its shape over a page.
     func body(content: Content) -> some View {
-        #if DEBUG
-        tuned(content, Tuning.shared.choice(Tuning.paletteMaterial, as: FloatingPanelMaterial.self) ?? .glass)
-        #else
-        content
-            .glassEffect(.regular, in: shape)
-            .modifier(Lift(opacity: 0.18, isNested: isNested))
-        #endif
-    }
-
-    #if DEBUG
-    /// The surface for a material the Tuning panel chose. Each keeps the panel's shape; the edge and the shadow
-    /// follow the material, since a material without glass has no edge of its own.
-    @ViewBuilder
-    private func tuned(_ content: Content, _ material: FloatingPanelMaterial) -> some View {
         switch material {
         case .glass:
             content
                 .glassEffect(.regular, in: shape)
                 .modifier(Lift(opacity: 0.18, isNested: isNested))
-        case .clearGlass:
-            // Clear glass needs a dimming layer to keep text legible over a bright page, and light text over it.
-            content
-                .glassEffect(.clear, in: shape)
-                .background(.black.opacity(0.35), in: shape)
-                .environment(\.colorScheme, .dark)
-                .modifier(Lift(opacity: 0.18, isNested: isNested))
-        case .thickMaterial:
-            content
-                .background(.thickMaterial, in: shape)
-                .overlay { edge(.primary.opacity(0.12)) }
-                .modifier(Lift(opacity: 0.2, isNested: isNested))
-        case .popover:
+        case .translucent:
             content
                 .background { VisualEffectBackground(material: .popover, cornerRadius: cornerRadius) }
-                .overlay { edge(.primary.opacity(0.12)) }
+                .overlay { edge }
                 .modifier(Lift(opacity: 0.2, isNested: isNested))
-        case .hud:
-            content
-                .background { VisualEffectBackground(material: .hudWindow, cornerRadius: cornerRadius, appearance: .vibrantDark) }
-                .overlay { edge(.white.opacity(0.14)) }
-                .environment(\.colorScheme, .dark)
-                .modifier(Lift(opacity: 0.3, isNested: isNested))
-        case .opaque:
+        case .solid:
             content
                 .background(Color(nsColor: .windowBackgroundColor), in: shape)
-                .overlay { edge(.primary.opacity(0.1)) }
+                .overlay { edge }
                 .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
                 .modifier(Lift(opacity: 0.3, isNested: isNested))
         }
     }
 
-    private func edge(_ color: Color) -> some View {
-        shape.strokeBorder(color, lineWidth: 1).allowsHitTesting(false)
+    private var edge: some View {
+        shape.strokeBorder(.primary.opacity(0.1), lineWidth: 1).allowsHitTesting(false)
     }
-    #endif
 }
 
 /// The shadow that lifts a panel off the window, or a nested panel off the rows under it.
@@ -126,23 +94,11 @@ private struct Lift: ViewModifier {
     }
 }
 
-#if DEBUG
-/// The materials the Tuning panel offers for the floating panels, named as the panel lists them.
-enum FloatingPanelMaterial: String, CaseIterable {
-    case glass = "Liquid Glass, regular (ships now)"
-    case clearGlass = "Liquid Glass, clear and dimmed"
-    case thickMaterial = "Thick material"
-    case popover = "Popover material"
-    case hud = "HUD material (always dark)"
-    case opaque = "Opaque window background"
-}
-
 /// An AppKit material behind the panel, blending with the window beneath it, rounded to the panel's corners by a
 /// mask, which is how `NSVisualEffectView` takes a shape.
 private struct VisualEffectBackground: NSViewRepresentable {
     let material: NSVisualEffectView.Material
     let cornerRadius: CGFloat
-    var appearance: NSAppearance.Name?
 
     func makeNSView(context: Context) -> NSVisualEffectView {
         let view = NSVisualEffectView()
@@ -153,7 +109,6 @@ private struct VisualEffectBackground: NSViewRepresentable {
 
     func updateNSView(_ view: NSVisualEffectView, context: Context) {
         view.material = material
-        view.appearance = appearance.flatMap(NSAppearance.init(named:))
         view.maskImage = Self.mask(cornerRadius)
     }
 
@@ -169,4 +124,3 @@ private struct VisualEffectBackground: NSViewRepresentable {
         return image
     }
 }
-#endif

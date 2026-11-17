@@ -214,11 +214,12 @@ struct CommandPalette: View {
         .accessibilityLabel("Command Palette")
     }
 
-    /// The rows, or "No Results", over the bar's own strip, so no row is ever under the bar. Actions takes the bar's
-    /// place: it grows up out of the bar and shrinks back into it, so there is only ever one layer over the rows.
+    /// The rows, or "No Results", with the bar at their foot. Rows scroll under the bar and fade and blur out there,
+    /// as the system's soft scroll edge effect draws them. Actions takes the bar's place: it grows up out of the bar
+    /// and shrinks back into it, so there is only ever one layer over the rows.
     private func results(_ sections: [Section], rows: [Entry], chosen: Int, target: Entry?) -> some View {
-        ZStack(alignment: .bottom) {
-            VStack(spacing: 0) {
+        ZStack(alignment: .bottomTrailing) {
+            Group {
                 if rows.isEmpty {
                     Text("No Results")
                         .foregroundStyle(.secondary)
@@ -226,7 +227,23 @@ struct CommandPalette: View {
                 } else {
                     list(sections, chosen: chosen)
                 }
-                Color.clear.frame(height: PaletteBar.clearance)
+            }
+            .safeAreaBar(edge: .bottom, spacing: 0) {
+                // Kept in place while Actions is out, so the rows above do not move.
+                HStack(alignment: .bottom, spacing: PaletteBar.spacing) {
+                    if mode == .search {
+                        PaletteFilterButton(count: filterState.filters.count, isOn: showsFilters) { showsFilters.toggle() }
+                    }
+                    Spacer(minLength: 0)
+                    if let row = rows.indices.contains(chosen) ? rows[chosen] : nil {
+                        PaletteFooter(
+                            openTitle: openTitle(for: row), onOpen: { run(rows, at: chosen) },
+                            onActions: { toggleActions(rows, chosen: chosen) })
+                    }
+                }
+                .opacity(target == nil ? 1 : 0)
+                .allowsHitTesting(target == nil)
+                .padding(PaletteBar.inset)
             }
             if actionsFor != nil {
                 // A click beside the panel puts it away and keeps the palette.
@@ -234,28 +251,16 @@ struct CommandPalette: View {
                     .contentShape(.rect)
                     .onTapGesture { closeActions() }
             }
-            HStack(alignment: .bottom, spacing: PaletteBar.spacing) {
-                if mode == .search, target == nil {
-                    PaletteFilterButton(count: filterState.filters.count, isOn: showsFilters) { showsFilters.toggle() }
-                        .transition(.opacity)
-                }
-                Spacer(minLength: 0)
-                if let target {
-                    PaletteActionsPanel(
-                        title: target.title, actions: actions(for: target),
-                        perform: { perform($0, on: target) }, submit: { performHighlighted(on: target) }, close: { closeActions() },
-                        query: actionsField, highlighted: $actionsHighlighted, focus: $focus
-                    )
-                    // Grows up and to the left out of where Actions stood, and shrinks back into it.
-                    .transition(.scale(scale: 0.5, anchor: .bottomTrailing).combined(with: .opacity))
-                } else if let row = rows.indices.contains(chosen) ? rows[chosen] : nil {
-                    PaletteFooter(
-                        openTitle: openTitle(for: row), onOpen: { run(rows, at: chosen) },
-                        onActions: { toggleActions(rows, chosen: chosen) })
-                    .transition(.opacity)
-                }
+            if let target {
+                PaletteActionsPanel(
+                    title: target.title, actions: actions(for: target),
+                    perform: { perform($0, on: target) }, submit: { performHighlighted(on: target) }, close: { closeActions() },
+                    query: actionsField, highlighted: $actionsHighlighted, focus: $focus
+                )
+                .padding(PaletteBar.inset)
+                // Grows up and to the left out of where Actions stood, and shrinks back into it.
+                .transition(.scale(scale: 0.5, anchor: .bottomTrailing).combined(with: .opacity))
             }
-            .padding(PaletteBar.inset)
         }
         .frame(minHeight: actionsFor == nil ? 0 : 340)
     }
@@ -287,15 +292,7 @@ struct CommandPalette: View {
                 }
                 .padding(.horizontal, PaletteMetrics.listInset)
             }
-            // A row cut by the list's foot fades into the bar's strip rather than ending on a hard edge.
-            .contentMargins(.bottom, PaletteBar.fade / 2, for: .scrollContent)
-            .mask {
-                VStack(spacing: 0) {
-                    Color.black
-                    LinearGradient(colors: [.black, .clear], startPoint: .top, endPoint: .bottom)
-                        .frame(height: PaletteBar.fade)
-                }
-            }
+            .scrollEdgeEffectStyle(.soft, for: .bottom)
             .frame(maxHeight: PaletteMetrics.resultsHeight - (mode == .search && showsFilters ? filterRowHeight : 0))
             .onChange(of: scrollTarget) { if let scrollTarget { proxy.scrollTo(scrollTarget) } }
         }
