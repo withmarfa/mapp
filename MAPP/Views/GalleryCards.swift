@@ -78,30 +78,25 @@ struct GalleryCard: View, Equatable {
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
-    /// The title, then the line its type's look gives it, the Secondary line directly under the title. The block keeps
-    /// the room of two title lines and one Secondary line, so the cards of a row are one height whatever their titles are.
+    /// The title, then the line its type's look gives it, the Secondary line directly under the title. A card takes the
+    /// room its words need; every picture area in a row is one height, and a row is as tall as its tallest card.
     private var words: some View {
         let large = cards.size == .large
         let titleFont = large ? Font.body.weight(.medium) : Font.callout.weight(.medium)
         let secondaryFont = large ? Font.callout : Font.subheadline
-        return ZStack(alignment: .topLeading) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: "A\nA").interfaceFont(titleFont).lineLimit(2)
-                Text(verbatim: " ").interfaceFont(secondaryFont).lineLimit(1)
-            }
-            .hidden()
-            VStack(alignment: .leading, spacing: 2) {
-                Text(content.title)
-                    .interfaceFont(titleFont)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                Text(verbatim: content.secondary ?? " ")
+        return VStack(alignment: .leading, spacing: 2) {
+            Text(content.title)
+                .interfaceFont(titleFont)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+            if let secondary = content.secondary {
+                Text(verbatim: secondary)
                     .interfaceFont(secondaryFont)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            .foregroundStyle(.primary)
         }
+        .foregroundStyle(.primary)
     }
 }
 
@@ -201,7 +196,7 @@ private struct GalleryThumbnail: View {
             switch CardFace.fallback(preview: cards.preview, isFile: item.isFile, text: item.preview) {
             case .fileIcon:
                 if case .file(let type) = facts.kind { FileGlyph(type: type) }
-            case .text: OpeningLines(text: item.preview, unit: unit)
+            case .text: OpeningLines(text: item.preview, unit: cards.size == .large ? 12.0 / 11 : 1)
             case .picture, .placeholder: QuietMark(icon: facts.icon)
             }
         }
@@ -231,9 +226,9 @@ private struct OpeningLines: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 9.5 * unit))
+            .font(.system(size: 11 * unit))
             .foregroundStyle(.secondary)
-            .lineSpacing(1.5 * unit)
+            .lineSpacing(2 * unit)
             .padding(12 * unit)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .mask {

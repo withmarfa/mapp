@@ -1,9 +1,11 @@
 #if DEBUG
 import AppKit
+import AVFoundation
 import CoreGraphics
 import CryptoKit
 import Foundation
 import Marfa
+import UniformTypeIdentifiers
 import MarfaTesting
 
 /// Pictures, a PDF and bookmarks for a screenshot of the gallery: made here, so no picture ships. A debug build asks for
@@ -22,6 +24,9 @@ nonisolated enum SampleGallery {
         let favorite: Bool
         let daysAgo: Int
         let attachedTo: String?
+
+        /// Quick Look picks a preview by the extension, so the file keeps one.
+        var fileName: String { id + "." + (UTType(mimeType: mime)?.preferredFilenameExtension ?? "bin") }
 
         var hash: String { "sha256:" + SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined() }
     }
@@ -64,6 +69,8 @@ nonisolated enum SampleGallery {
         File(id: "pdf-quotation", title: "Kitchen quotation, Harbour Joinery", type: "core.file", mime: "application/pdf",
              data: document(title: "Kitchen quotation", lines: ["Harbour Joinery", "Worktops, units and fitting", "Total: 14,200", "Lead time: eight weeks"]),
              favorite: false, daysAgo: 3, attachedTo: nil),
+        File(id: "video-resize", title: "Live resize at 120 Hz", type: "core.file", mime: "video/mp4",
+             data: video(top: (0.2, 0.35, 0.55), bottom: (0.85, 0.6, 0.35)), favorite: false, daysAgo: 4, attachedTo: nil),
         File(id: "cover-bm", title: "cover.png", type: "core.file.image", mime: "image/png",
              data: picture(top: (0.35, 0.5, 0.75), bottom: (0.12, 0.2, 0.4)), favorite: false, daysAgo: 4, attachedTo: "bm-desk"),
     ]
@@ -102,13 +109,13 @@ nonisolated enum SampleGallery {
     /// Writes each file's bytes where `url(forBlob:)` finds them: the fake working copy has no blobs to fetch.
     static func writeFiles() {
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        for file in files { try? file.data.write(to: directory.appending(path: file.id)) }
+        for file in files { try? file.data.write(to: directory.appending(path: file.fileName)) }
     }
 
     /// The generated file whose blob hash is `hash`, when the gallery sample is on.
     static func url(forBlob hash: String) -> URL? {
         guard isRequested, let file = files.first(where: { $0.hash == hash }) else { return nil }
-        return directory.appending(path: file.id)
+        return directory.appending(path: file.fileName)
     }
 
     private static func picture(top: (Double, Double, Double), bottom: (Double, Double, Double)) -> Data {
@@ -122,6 +129,46 @@ nonisolated enum SampleGallery {
         }
         guard let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff) else { return Data() }
         return bitmap.representation(using: .png, properties: [:]) ?? Data()
+    }
+
+    /// A one-second clip of a single gradient, written to a temporary file and read back.
+    private static func video(top: (Double, Double, Double), bottom: (Double, Double, Double)) -> Data {
+        let url = FileManager.default.temporaryDirectory.appending(path: "mapp-gallery-sample-\(UUID().uuidString).mp4")
+        defer { try? FileManager.default.removeItem(at: url) }
+        guard let writer = try? AVAssetWriter(outputURL: url, fileType: .mp4) else { return Data() }
+        let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
+            AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: 640, AVVideoHeightKey: 480])
+        let adaptor = AVAssetWriterInputPixelBufferAdaptor(assetWriterInput: input, sourcePixelBufferAttributes: [
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32ARGB, kCVPixelBufferWidthKey as String: 640, kCVPixelBufferHeightKey as String: 480])
+        writer.add(input)
+        writer.startWriting()
+        writer.startSession(atSourceTime: .zero)
+        var buffer: CVPixelBuffer?
+        CVPixelBufferCreate(nil, 640, 480, kCVPixelFormatType_32ARGB, nil, &buffer)
+        guard let buffer else { return Data() }
+        CVPixelBufferLockBaseAddress(buffer, [])
+        if let base = CVPixelBufferGetBaseAddress(buffer) {
+            let bytes = base.assumingMemoryBound(to: UInt8.self)
+            let rowBytes = CVPixelBufferGetBytesPerRow(buffer)
+            for y in 0..<480 {
+                let t = Double(y) / 479
+                let color = [top.0 + (bottom.0 - top.0) * t, top.1 + (bottom.1 - top.1) * t, top.2 + (bottom.2 - top.2) * t].map { UInt8($0 * 255) }
+                for x in 0..<640 {
+                    let at = y * rowBytes + x * 4
+                    bytes[at] = 255; bytes[at + 1] = color[0]; bytes[at + 2] = color[1]; bytes[at + 3] = color[2]
+                }
+            }
+        }
+        CVPixelBufferUnlockBaseAddress(buffer, [])
+        for frame in 0..<30 {
+            while !input.isReadyForMoreMediaData { Thread.sleep(forTimeInterval: 0.01) }
+            adaptor.append(buffer, withPresentationTime: CMTime(value: CMTimeValue(frame), timescale: 30))
+        }
+        input.markAsFinished()
+        let done = DispatchSemaphore(value: 0)
+        writer.finishWriting { done.signal() }
+        done.wait()
+        return (try? Data(contentsOf: url)) ?? Data()
     }
 
     private static func document(title: String, lines: [String]) -> Data {

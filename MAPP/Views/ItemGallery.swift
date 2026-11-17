@@ -118,13 +118,13 @@ struct ItemGallery: View {
     }
 
     private func sectionGrid(_ section: NoteSection, ids: [ItemID], plan: Plan) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             if let group = section.group {
                 Text(group.title())
-                    .interfaceFont(.callout.weight(.semibold))
+                    .interfaceFont(.body.weight(.semibold))
                     .accessibilityAddTraits(.isHeader)
             }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Self.spacing), count: plan.columns), spacing: Self.spacing + 4) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Self.spacing, alignment: .top), count: plan.columns), spacing: Self.spacing + 4) {
                 ForEach(section.items) { item in
                     if let content = plan.contents[item.id] { card(item, content: content, ids: ids, plan: plan).id(item.id) }
                 }
