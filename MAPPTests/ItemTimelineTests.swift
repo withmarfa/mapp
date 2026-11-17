@@ -152,6 +152,18 @@ struct ItemTimelineTests {
         #expect(try #require(Self.groups([whole]).first).id == .day(Self.day("2026-10-24")))
     }
 
+    @Test func aWholeDayWithNoEndStaysOneDayWhateverItsEndZone() throws {
+        // Kiritimati is a day ahead of Pago Pago, so the first day's midnight there already names the next date.
+        let day = Self.item("dateline", [
+            "starts_at": .string("2026-10-24"), "all_day": .bool(true),
+            "timezone": .string("Pacific/Pago_Pago"), "end_timezone": .string("Pacific/Kiritimati"),
+        ])
+        let placement = ItemPlacement.of(day, look: Self.looks[Self.event]!, field: nil, catalogue: Self.catalogue, calendar: Self.calendar())
+        guard case .placed(let found) = placement else { Issue.record("The day is placed"); return }
+        #expect(found.start == Self.day("2026-10-24"))
+        #expect(found.end == Self.day("2026-10-25"), "one day, ending at the start of the next")
+    }
+
     @Test func anEventOverSeveralDaysIsPlacedOnItsStartDay() throws {
         let run = Self.item("conference", [
             "starts_at": .string("2026-10-24"), "ends_at": .string("2026-10-27"), "all_day": .bool(true),

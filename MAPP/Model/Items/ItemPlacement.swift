@@ -33,7 +33,7 @@ nonisolated struct ItemPlacement: Hashable, Sendable {
     let hasTime: Bool
     /// The value as the item holds it, for a help tag.
     let raw: String
-    /// Whether the item is an event, which alone is said to be "all day".
+    /// Whether the item is placed by its start (an event, or any item with a start), which alone is said to be "all day".
     var isEvent = false
 
     /// Where `item` sits, by the date its `look` names or, where the person chose one, by `field`.

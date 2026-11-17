@@ -77,7 +77,8 @@ nonisolated struct EventSpan: Sendable {
             local.date(from: zoned.dateComponents([.year, .month, .day], from: date)).map { calendar.startOfDay(for: $0) } ?? date
         }
         let first = day(start, in: inZone)
-        let last = max(first, day(lastDay, in: inEndZone))
+        // With no end, the last day is the first: read in an end zone a day ahead, it would name the next date.
+        let last = end == nil ? first : max(first, day(lastDay, in: inEndZone))
         return (first, calendar.date(byAdding: .day, value: 1, to: last), false)
     }
 }
