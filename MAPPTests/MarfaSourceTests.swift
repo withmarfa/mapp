@@ -904,7 +904,9 @@ extension LiveMarfaTests {
                     } == true
             })
             let snapshot = try #require(filed.snapshot)
-            #expect(snapshot.items.allSatisfy { !$0.title.isEmpty })
+            // A library may hold untitled notes, so what is read back is the titles of the notes made here.
+            #expect(snapshot.items.first { $0.id == parent }?.title == "MAPPTEST parent \(token)")
+            #expect(snapshot.items.first { $0.id == child }?.title == "MAPPTEST child \(token)")
             let beneath = try await source.copy.items.list(ListFilters(beneath: parent.rawValue)).map { ItemID($0.id) }
             #expect(Set(beneath).subtracting([parent]) == [child])
 
