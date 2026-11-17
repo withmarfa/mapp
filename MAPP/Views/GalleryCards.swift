@@ -78,25 +78,31 @@ struct GalleryCard: View, Equatable {
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
-    /// The title, then the line its type's look gives it, the Secondary line directly under the title. A card takes the
-    /// room its words need; every picture area in a row is one height, and a row is as tall as its tallest card.
+    /// The title, then the line its type's look gives it, the Secondary line directly under the title. Every card reserves two title
+    /// lines and one Secondary line, so every row is one height.
     private var words: some View {
         let large = cards.size == .large
         let titleFont = large ? Font.body.weight(.medium) : Font.callout.weight(.medium)
         let secondaryFont = large ? Font.callout : Font.subheadline
-        return VStack(alignment: .leading, spacing: 2) {
-            Text(content.title)
-                .interfaceFont(titleFont)
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
-            if let secondary = content.secondary {
-                Text(verbatim: secondary)
-                    .interfaceFont(secondaryFont)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
+        // The words sit at the top of a block that always holds two title lines and one Secondary line.
+        return ZStack(alignment: .topLeading) {
+            lines(titleFont: titleFont, secondaryFont: secondaryFont, title: "", secondary: " ", reserves: true).hidden()
+            lines(titleFont: titleFont, secondaryFont: secondaryFont, title: content.title, secondary: content.secondary ?? "", reserves: false)
         }
         .foregroundStyle(.primary)
+    }
+
+    private func lines(titleFont: Font, secondaryFont: Font, title: String, secondary: String, reserves: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(verbatim: title)
+                .interfaceFont(titleFont)
+                .lineLimit(2, reservesSpace: reserves)
+                .multilineTextAlignment(.leading)
+            Text(verbatim: secondary)
+                .interfaceFont(secondaryFont)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
     }
 }
 
@@ -225,7 +231,7 @@ private struct OpeningLines: View {
     let unit: CGFloat
 
     var body: some View {
-        Text(text)
+        Text(OpeningText.attributed(from: text))
             .font(.system(size: 11 * unit))
             .foregroundStyle(.secondary)
             .lineSpacing(2 * unit)
