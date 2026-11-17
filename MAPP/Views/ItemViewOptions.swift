@@ -62,10 +62,14 @@ struct ViewModeMenu: View {
 /// (`CurrentViewOptions`), since a toolbar can be hidden or customized.
 struct ViewOptionsMenu: View {
     @CurrentLibrary private var library
+    @Environment(\.controlActiveState) private var activeState
     let browser: Browser
 
     var body: some View {
         let count = browser.filterCount
+        // Only an active window tints the button. In any other state it sets no style of its own, so it dims as its
+        // neighbours do.
+        let tinted = count > 0 && activeState != .inactive
         Menu {
             if browser.offersViewOptions {
                 Button(browser.toggleFiltersTitle) { browser.toggleFilterRow() }
@@ -83,7 +87,7 @@ struct ViewOptionsMenu: View {
                 Image(systemName: "slider.horizontal.3")
                 if count > 0 { Text("\(count)").font(.caption.monospacedDigit()) }
             }
-            .foregroundStyle(count > 0 ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary))
+            .tintedWhen(tinted)
             .accessibilityLabel(count > 0 ? Text("View Options, \(count) filters applied") : Text("View Options"))
         }
         .menuIndicator(.hidden)
@@ -167,5 +171,12 @@ struct ItemTimelineOptions: View {
         .pickerStyle(.menu)
         .disabled(fields.isEmpty)
         .accessibilityIdentifier("TimelineDateField")
+    }
+}
+
+private extension View {
+    /// The accent color when `tinted`, and no style of its own otherwise, which a toolbar dims with its window.
+    @ViewBuilder func tintedWhen(_ tinted: Bool) -> some View {
+        if tinted { foregroundStyle(Color.accentColor) } else { self }
     }
 }
