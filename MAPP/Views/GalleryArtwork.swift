@@ -20,12 +20,24 @@ enum GalleryArtworkCache {
         let item: ItemID
         let version: ItemVersion
         let embeds: [EmbedState]
+        /// The image files attached to it, which a bookmark's cover is: each one's version and whether it is in the bin.
+        let attached: [Attached]
+    }
+
+    nonisolated struct Attached: Hashable, Sendable {
+        let file: ItemID
+        let version: ItemVersion
+        let trashed: Bool
     }
 
     /// Reads the embeds' files from the library, so a view calling it follows them as it follows its item.
-    static func basis(of item: Item, in library: any ItemLibrary) -> Basis {
+    /// `attachments` are the items attached to it, which the caller read once (`CardAttachments`).
+    static func basis(of item: Item, attachments: [Item], in library: any ItemLibrary) -> Basis {
         let embeds = item.boundEmbeds.prefix(GalleryPreview.embedLimit).map { library.embedState(of: $0) }
-        return Basis(item: item.id, version: item.version, embeds: embeds)
+        let attached = attachments
+            .filter(\.isFile).map { Attached(file: $0.id, version: $0.version, trashed: $0.state == .trashed) }
+            .sorted { $0.file.rawValue < $1.file.rawValue }
+        return Basis(item: item.id, version: item.version, embeds: embeds, attached: attached)
     }
 
     nonisolated private final class Key: NSObject {
@@ -58,6 +70,7 @@ enum GalleryArtworkCache {
     private static let storage: NSCache<Key, Entry> = {
         let cache = NSCache<Key, Entry>()
         cache.countLimit = 900
+        cache.totalCostLimit = 160 << 20
         return cache
     }()
 
@@ -81,40 +94,110 @@ enum GalleryArtworkCache {
         case failed
     }
 
-    static func outcome(for item: Item, width: CGFloat, scale: CGFloat, in library: any ItemLibrary) async -> Outcome {
+    /// How many pictures are made at once, so a screenful of cards does not fetch and decode every file together.
+    static let gate = PreviewGate(limit: 3)
+
+    static func outcome(for item: Item, attachments: [Item], width: CGFloat, scale: CGFloat, in library: any ItemLibrary) async -> Outcome {
         let bucket = bucket(width)
-        let key = Key(basis(of: item, in: library), Int(bucket))
+        let key = Key(basis(of: item, attachments: attachments, in: library), Int(bucket))
         if let entry = storage.object(forKey: key) { return entry.artwork.map(Outcome.picture) ?? .none }
-        guard let made = await make(for: item, width: bucket, scale: scale, in: library) else { return .failed }
-        if !Task.isCancelled { storage.setObject(Entry(made), forKey: key) }
+        // A card that leaves the screen cancels its task, which ends the wait for a place or the work in it.
+        guard let made = try? await gate.run({ await make(for: item, attachments: attachments, width: bucket, scale: scale, in: library) }),
+              !Task.isCancelled
+        else { return .failed }
+        storage.setObject(Entry(made), forKey: key, cost: made.map { $0.image.bytesPerRow * $0.image.height } ?? 1)
         return made.map(Outcome.picture) ?? .none
     }
 
     /// Nil when there is no picture or it couldn't be made now (`outcome` tells the two apart).
-    static func artwork(for item: Item, width: CGFloat, scale: CGFloat, in library: any ItemLibrary) async -> GalleryArtwork? {
-        if case .picture(let artwork) = await outcome(for: item, width: width, scale: scale, in: library) { artwork } else { nil }
+    static func artwork(for item: Item, attachments: [Item], width: CGFloat, scale: CGFloat, in library: any ItemLibrary) async -> GalleryArtwork? {
+        if case .picture(let artwork) = await outcome(for: item, attachments: attachments, width: width, scale: scale, in: library) { artwork } else { nil }
     }
 
     /// Nil for a picture that couldn't be made now; `.some(nil)` for an item with none.
-    private static func make(for item: Item, width: CGFloat, scale: CGFloat, in library: any ItemLibrary) async -> GalleryArtwork?? {
+    private static func make(for item: Item, attachments: [Item], width: CGFloat, scale: CGFloat, in library: any ItemLibrary) async -> GalleryArtwork?? {
         if case .file(let type, _) = item.content, !type.conforms(to: .image) {
             let url: URL?
             do { url = try await GalleryPreview.fileURL(of: item, in: library) } catch { return nil }
             guard let url, !Task.isCancelled else { return .some(nil) }
-            return .some(await quickLook(at: url, width: width, scale: scale).map { GalleryArtwork(image: $0, isDocument: true) })
+            let isVideo = CardPicture.kind(of: type) == .video
+            let image = await quickLook(at: url, width: width, height: isVideo ? width * 0.75 : width * 1.5, scale: scale)
+            return .some(image.map { GalleryArtwork(image: $0, isDocument: !isVideo) })
         }
         // Twice the side, as a tall picture fills a square by its width; a list row's is far smaller than a card's.
-        switch await GalleryPreview.image(for: item, maxPixels: min(800, Int(width * scale * 2)), in: library) {
+        switch await GalleryPreview.image(for: item, attachments: attachments, maxPixels: min(800, Int(width * scale * 2)), in: library) {
         case .image(let image): return GalleryArtwork(image: image, isDocument: false)
         case .none: return .some(nil)
         case .failed: return nil
         }
     }
 
-    /// A tall request, since a page fits inside it by its height; the card then fills its frame from the page's top.
-    @concurrent private static func quickLook(at url: URL, width: CGFloat, scale: CGFloat) async -> CGImage? {
-        let request = QLThumbnailGenerator.Request(
-            fileAt: url, size: CGSize(width: width, height: width * 1.5), scale: scale, representationTypes: .thumbnail)
-        return try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request).cgImage
+    /// A document's request is tall, since a page fits inside it by its height; the card then fills its frame from the
+    /// page's top. A video's is wide, as its frame is.
+    @concurrent private static func quickLook(at url: URL, width: CGFloat, height: CGFloat, scale: CGFloat) async -> CGImage? {
+        let request = ThumbnailRequest(QLThumbnailGenerator.Request(
+            fileAt: url, size: CGSize(width: width, height: height), scale: scale, representationTypes: .thumbnail))
+        // The generator keeps working on a request after its task is cancelled unless it is told to stop.
+        return await withTaskCancellationHandler {
+            try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request.value).cgImage
+        } onCancel: {
+            QLThumbnailGenerator.shared.cancel(request.value)
+        }
+    }
+}
+
+private nonisolated struct ThumbnailRequest: @unchecked Sendable {
+    let value: QLThumbnailGenerator.Request
+    init(_ value: QLThumbnailGenerator.Request) { self.value = value }
+}
+
+/// Lets a few pieces of work run at once and the rest wait their turn in order. A waiting caller whose task is
+/// cancelled leaves the queue at once and holds no place.
+actor PreviewGate {
+    private let limit: Int
+    private var running = 0
+    private var waiting: [(id: UUID, continuation: CheckedContinuation<Void, any Error>)] = []
+
+    init(limit: Int) { self.limit = limit }
+
+    nonisolated(nonsending) func run<T>(_ work: () async -> T) async throws -> T {
+        try await acquire()
+        let result = await work()
+        await release()
+        return result
+    }
+
+    fileprivate func acquire() async throws {
+        try Task.checkCancellation()
+        if running < limit {
+            running += 1
+            return
+        }
+        let id = UUID()
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                if Task.isCancelled {
+                    continuation.resume(throwing: CancellationError())
+                } else {
+                    waiting.append((id, continuation))
+                }
+            }
+        } onCancel: {
+            Task { await self.leave(id) }
+        }
+    }
+
+    private func leave(_ id: UUID) {
+        guard let index = waiting.firstIndex(where: { $0.id == id }) else { return }
+        waiting.remove(at: index).continuation.resume(throwing: CancellationError())
+    }
+
+    fileprivate func release() {
+        if waiting.isEmpty {
+            running -= 1
+        } else {
+            // The place passes straight to the next in line.
+            waiting.removeFirst().continuation.resume()
+        }
     }
 }

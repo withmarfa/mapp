@@ -11,7 +11,7 @@ A view shows a set of items in a layout. This page explains the layouts, what a 
 An item list takes one of five layouts (`ItemViewMode`): list, gallery, table, board and timeline.
 
 - The list takes the rows described in [Looks](looks.md).
-- The gallery's card shows the item's picture, or its opening lines when it has none, then its title on up to two lines and the one line of context its type's look gives it. An item with neither a picture nor text shows its type's mark. A favorite's star sits on the picture and nothing else does. The panel chooses the preview, fit and size; the look chooses what the card says.
+- The gallery's card shows the item's picture, or its opening lines when it has none, then its title on up to two lines (two lines of room on every card) and the one line of context its type's look gives it. An item with neither a picture nor text shows its type's mark. A favorite's star sits on the picture and nothing else does. The panel chooses the preview, fit, shape and size; the look chooses what the card says.
 - The board shows its columns, which are the groups of its grouping field. A person can hide the groups that have no items. A card is the title, the look's context line and the bottom line (the type only where the board mixes types, the status, two facts and "+N"), without the field the board is grouped by: a board grouped by status leaves the status off every card, and one grouped by priority leaves the priority off. A compact board shows the title alone, with the type's mark where the board mixes types.
 - The table's rows are 36 points high and it has one left edge, shared by the title, chips, headers, group names and rows. A group's chevron hangs in the margin before it, inside the pane with room at its left.
 - A table cell whose value is picked from a menu (a status, a priority or a choice), and an empty cell that takes a value, fills with a tint across the whole cell under the pointer, and the chip in it does not move. An empty cell of a date, words, text, number or people value reads "Empty" under the pointer and opens that value's panel on a click, as the item page's row does, where the item's type declares the property and the item can be edited. An empty status, priority or choice changes in place.
@@ -43,7 +43,7 @@ Edit View opens in the right sidebar, and New View uses the same panel. It holds
 - Density holds a pop-up of As in Settings, Standard and Compact.
 - Sort holds a handle, the fixed property, a direction pop-up and an x in a circle, with a gray Add Sort.
 - Group holds Group by and a Hide Empty Groups switch.
-- Columns (a table) or Cards (a gallery) comes last. Cards has Preview and Size pop-ups and a Fit Picture switch; what a card says comes from its type's look, not from the view.
+- Columns (a table) or Cards (a gallery) comes last. Cards has Preview, Size and Shape pop-ups and a Fit Picture switch; Shape is off when the preview is None, Fit Picture is off unless the preview can show a picture, and a gallery has no Density; what a card says comes from its type's look, not from the view.
 
 ## How an edit is saved
 

@@ -19,7 +19,7 @@ struct ItemGallery: View {
     /// What each card says, worked out once for each item from its type's look.
     @State private var cardContents = CardContents()
 
-    private static let spacing: CGFloat = 20
+    private static let spacing: CGFloat = 16
     private static let inset: CGFloat = 24
 
     /// What the view chose for its cards and the grid it makes: a larger card means fewer columns across the same width.
@@ -28,11 +28,14 @@ struct ItemGallery: View {
         let columns: Int
         let thumbnailWidth: CGFloat
         let contents: [ItemID: RowContent]
+        /// Each note's attached files, read once here so no card reads the library's links.
+        let attachments: [ItemID: [Item]]
     }
 
-    private func plan(for cards: ViewCards, contents: [ItemID: RowContent]) -> Plan {
+    private func plan(for cards: ViewCards, contents: [ItemID: RowContent], attachments: [ItemID: [Item]]) -> Plan {
         let columns = max(1, Int((width - 2 * Self.inset + Self.spacing) / (cards.size.columnWidth * InterfaceStyle.scale(for: textSize) + Self.spacing)))
-        return Plan(cards: cards, columns: columns, thumbnailWidth: (width - 2 * Self.inset - CGFloat(columns - 1) * Self.spacing) / CGFloat(columns), contents: contents)
+        return Plan(cards: cards, columns: columns, thumbnailWidth: (width - 2 * Self.inset - CGFloat(columns - 1) * Self.spacing) / CGFloat(columns), contents: contents,
+            attachments: attachments)
     }
 
     var body: some View {
@@ -45,7 +48,8 @@ struct ItemGallery: View {
         let shape = CardShape(dropsOpening: browser.cards.preview == .pictureOrText || browser.cards.preview == .text)
         let list = RowList(date: .look, format: dateFormat, day: Calendar.current.startOfDay(for: library.now()))
         let contents = cardContents.contents(of: sections.flatMap(\.items), in: library, looks: browser.looks(in: library), list: list, shape: shape)
-        keyboardCollection(sections, ids: ids, plan: plan(for: browser.cards, contents: contents))
+        let attachments = CardAttachments.of(sections.flatMap(\.items), in: library, showsPicture: browser.cards.preview.showsPicture)
+        keyboardCollection(sections, ids: ids, plan: plan(for: browser.cards, contents: contents, attachments: attachments))
         .searchStatus(browser)
         .accessibilityLabel(title)
         .onChange(of: browser.isSearchExpanded) {
@@ -79,7 +83,7 @@ struct ItemGallery: View {
     private func collection(_ sections: [NoteSection], ids: [ItemID], plan: Plan) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 28) {
+                LazyVStack(alignment: .leading, spacing: 24) {
                     ForEach(sections) { section in
                         sectionGrid(section, ids: ids, plan: plan)
                     }
@@ -121,11 +125,10 @@ struct ItemGallery: View {
         VStack(alignment: .leading, spacing: 12) {
             if let group = section.group {
                 Text(group.title())
-                    .interfaceFont(.headline)
-                    .foregroundStyle(.secondary)
+                    .interfaceFont(.body.weight(.semibold))
                     .accessibilityAddTraits(.isHeader)
             }
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Self.spacing), count: plan.columns), spacing: Self.spacing + 4) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Self.spacing, alignment: .top), count: plan.columns), spacing: Self.spacing + 4) {
                 ForEach(section.items) { item in
                     if let content = plan.contents[item.id] { card(item, content: content, ids: ids, plan: plan).id(item.id) }
                 }
@@ -177,7 +180,7 @@ struct ItemGallery: View {
     private func card(_ item: Item, content: RowContent, ids: [ItemID], plan: Plan) -> some View {
         GalleryCell(
             item: item, browser: browser, order: order, width: plan.thumbnailWidth, cards: plan.cards,
-            content: content, pane: pane,
+            content: content, attachments: plan.attachments[item.id] ?? [], pane: pane,
             select: { id, extending, toggling in select(id, ids: ids, extending: extending, toggling: toggling) })
     }
 
@@ -206,6 +209,7 @@ private struct GalleryCell: View {
     let width: CGFloat
     let cards: ViewCards
     let content: RowContent
+    let attachments: [Item]
     var pane: FocusState<Browser.Pane?>.Binding
     let select: (ItemID, _ extending: Bool, _ toggling: Bool) -> Void
 
@@ -217,7 +221,7 @@ private struct GalleryCell: View {
             select(item.id, modifiers.contains(.shift), modifiers.contains(.command))
             pane.wrappedValue = .list
         } label: {
-            GalleryCard(item: item, browser: browser, width: width, cards: cards, content: content)
+            GalleryCard(item: item, browser: browser, width: width, cards: cards, content: content, attachments: attachments)
                 .equatable()
         }
         .buttonStyle(.plain)

@@ -113,7 +113,7 @@ import Testing
         let item = try #require(library.item(note))
 
         func picture() async -> String {
-            switch await GalleryPreview.image(for: item, in: library) {
+            switch await GalleryPreview.image(for: item, attachments: CardAttachments.of(item, in: library), in: library) {
             case .image(let image): "\(image.width)"
             case .none: "none"
             case .failed: "failed"
@@ -129,10 +129,10 @@ import Testing
         library.bindEmbed("![[Photo.png]]", in: note, file: try file("Photo.png", EmbedFixtures.png(width: 5, height: 2)))
         let item = try #require(library.item(note))
         library.fetchFails = true
-        #expect(await GalleryArtworkCache.artwork(for: item, width: 200, scale: 2, in: library) == nil)
+        #expect(await GalleryArtworkCache.artwork(for: item, attachments: CardAttachments.of(item, in: library), width: 200, scale: 2, in: library) == nil)
 
         library.fetchFails = false
-        #expect(await GalleryArtworkCache.artwork(for: item, width: 200, scale: 2, in: library)?.image.width == 5)
+        #expect(await GalleryArtworkCache.artwork(for: item, attachments: CardAttachments.of(item, in: library), width: 200, scale: 2, in: library)?.image.width == 5)
     }
 
     @Test func aFailedPictureIsToldApartFromAnItemWithNone() async throws {
@@ -144,14 +144,14 @@ import Testing
             case .failed: "failed"
             }
         }
-        #expect(name(await GalleryArtworkCache.outcome(for: bare, width: 200, scale: 2, in: library)) == "none")
+        #expect(name(await GalleryArtworkCache.outcome(for: bare, attachments: CardAttachments.of(bare, in: library), width: 200, scale: 2, in: library)) == "none")
 
         library.bindEmbed("![[Photo.png]]", in: note, file: try file("Photo.png", EmbedFixtures.png(width: 5, height: 2)))
         let item = try #require(library.item(note))
         library.fetchFails = true
-        #expect(name(await GalleryArtworkCache.outcome(for: item, width: 200, scale: 2, in: library)) == "failed")
+        #expect(name(await GalleryArtworkCache.outcome(for: item, attachments: CardAttachments.of(item, in: library), width: 200, scale: 2, in: library)) == "failed")
         library.fetchFails = false
-        #expect(name(await GalleryArtworkCache.outcome(for: item, width: 200, scale: 2, in: library)) == "picture")
+        #expect(name(await GalleryArtworkCache.outcome(for: item, attachments: CardAttachments.of(item, in: library), width: 200, scale: 2, in: library)) == "picture")
     }
 
     /// Binning, renaming or restoring the file changes nothing of the note, so the card follows the file itself.
@@ -159,8 +159,8 @@ import Testing
         let id = try #require(library.bindEmbed("![[Photo.png]]", in: note, file: try file("Photo.png", EmbedFixtures.png(width: 5, height: 2))))
         let item = try #require(library.item(note))
         let index = try #require(library.items.firstIndex { $0.id == id })
-        func picture() async -> Int? { await GalleryArtworkCache.artwork(for: item, width: 200, scale: 2, in: library)?.image.width }
-        func basis() -> GalleryArtworkCache.Basis { GalleryArtworkCache.basis(of: item, in: library) }
+        func picture() async -> Int? { await GalleryArtworkCache.artwork(for: item, attachments: CardAttachments.of(item, in: library), width: 200, scale: 2, in: library)?.image.width }
+        func basis() -> GalleryArtworkCache.Basis { GalleryArtworkCache.basis(of: item, attachments: CardAttachments.of(item, in: library), in: library) }
         func peek() -> Int? { GalleryArtworkCache.peek(basis(), width: 200)?.image.width }
 
         #expect(await picture() == 5)

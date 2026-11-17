@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import SwiftUI
 import Testing
+import UniformTypeIdentifiers
 @testable import MAPP
 
 extension Tag {
@@ -308,6 +309,24 @@ struct NavigationCostTests {
             }
             try await step("tasks (gallery)") { browser.sidebarItem = .itemType("aic.ticket.task") }
             try await step("all items (gallery)") { browser.sidebarItem = .allNotes }
+        }
+    }
+
+    /// The gallery while a link changes: a file is attached to one note, then taken off, which should make that note's
+    /// card again and no other card.
+    @Test func aHostedWindowOnTheGalleryWhileALinkChanges() async throws {
+        try await hosted { browser, library, source, step in
+            try await step("decisions (list)") { browser.sidebarItem = .itemType("aic.decision") }
+            try await step("gallery") { browser.viewMode = .gallery }
+            let host = try #require(library.items(in: .itemType("aic.decision")).first)
+            var file = LibraryFixture.item(
+                ItemID("attached-file"), BigLibrary.note, "Photo.png", age: 0, properties: [Property(key: "title", value: .string("Photo.png"))],
+                content: .file(.png, byteCount: 10))
+            file.edgesOut = [Edge(id: EdgeID("attached-file#attached-to"), type: MarfaMapping.attachmentEdge, source: file.id, target: .item(host.id), origin: .property("attached-to"))]
+            try await step("attach a file to one decision") { source.send(.upserted([file])) }
+            file.edgesOut = []
+            file.modified = Date(timeIntervalSince1970: 3_000_000)
+            try await step("take it off") { source.send(.upserted([file])) }
         }
     }
 
