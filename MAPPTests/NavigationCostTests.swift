@@ -322,7 +322,7 @@ struct NavigationCostTests {
             var file = LibraryFixture.item(
                 ItemID("attached-file"), BigLibrary.note, "Photo.png", age: 0, properties: [Property(key: "title", value: .string("Photo.png"))],
                 content: .file(.png, byteCount: 10))
-            file.edgesOut = [Edge(id: EdgeID("attached-file#attached-to"), type: MarfaMapping.attachmentEdge, source: file.id, target: .item(host.id), origin: .property("attached-to"))]
+            file.edgesOut = [Edge(id: EdgeID("attached-file#attached-to"), type: MarfaMapping.attachmentEdge, from: file.id, to: .item(host.id), origin: .property("attached-to"))]
             try await step("attach a file to one decision") { source.send(.upserted([file])) }
             file.edgesOut = []
             file.modified = Date(timeIntervalSince1970: 3_000_000)
