@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import SwiftUI
 import Testing
 @testable import MAPP
 
@@ -105,5 +106,24 @@ import Testing
         #expect(await eventually { Set(library.items(in: .view(made.id)).map(\.id)) == notes })
         #expect(!notes.isEmpty)
         #expect(await eventually { !library.items(in: .view(ItemID("view-recent-notes"))).isEmpty })
+    }
+
+    /// A sample launch starts as a first launch does: a table's columns and a saved view's layout that an earlier run
+    /// chose, which the defaults keep between runs, never decide which columns the table opens with.
+    @Test func aSampleLaunchForgetsTheColumnsAnEarlierRunChose() throws {
+        let suite = "MAPP.SampleLibraryTests.columns"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        var layout = TableColumnCustomization<ItemTableRow>()
+        layout[visibility: "field.status"] = .hidden
+        let place = SidebarItem.itemType("core.task")
+        defaults.set(ItemTableColumnLayouts.storing(layout, for: place, in: Data()), forKey: ItemTableColumnLayouts.key)
+        defaults.set(Data("{}".utf8), forKey: ViewLayouts.key)
+
+        SampleLibrary.forgetStoredChoices(in: defaults)
+
+        #expect(defaults.object(forKey: ItemTableColumnLayouts.key) == nil)
+        #expect(defaults.object(forKey: ViewLayouts.key) == nil)
     }
 }

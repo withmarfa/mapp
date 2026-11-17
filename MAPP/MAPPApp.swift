@@ -130,7 +130,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 $0.hasPrefix("NSSplitView Subview Frames") || $0.hasPrefix("NSToolbar Configuration")
                     || $0.hasPrefix("\(InterfaceKey.inspectorAppOpen).")
             }
-            for key in OrderKey.all + PageKey.all + ListKey.all + [PlaceDensities.key] + InterfaceKey.all + kept { defaults.removeObject(forKey: key) }
+            SampleLibrary.forgetStoredChoices(in: defaults)
+            for key in kept { defaults.removeObject(forKey: key) }
         }
         #endif
         super.init()
