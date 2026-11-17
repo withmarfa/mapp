@@ -30,6 +30,8 @@ struct CommandPalette: View {
     /// The row Actions is open for, by its identifier, or nil while it is shut.
     @State private var actionsFor: String?
     @State private var showsFilters = false
+    /// The filter row's height, which the list gives up while the row shows, so showing filters never grows the palette.
+    @State private var filterRowHeight: CGFloat = 0
     /// The filters and the panel open for one, which last until the palette is put away.
     @State private var filterState = PaletteFilterState()
     /// Where the keyboard was before the palette took it, and goes back to once the palette is put away.
@@ -48,8 +50,6 @@ struct CommandPalette: View {
     @State private var searched = SearchResults.none
     /// What `searched` lists once the filters have narrowed it: filtered when the answer or the filters change, never by the body.
     @State private var searchedItems: [Item] = []
-    /// The height of the buttons that float over the results, with their margin: what the last row must clear.
-    @State private var floatingHeight: CGFloat = 56
 
     private typealias Entry = PaletteEntry
     private typealias Section = PaletteSections.Section<PaletteEntry>
@@ -97,9 +97,11 @@ struct CommandPalette: View {
         let chosen = rows.indices.contains(highlighted) ? highlighted : max(rows.count - 1, 0)
         let target = actionsFor.flatMap { id in rows.first { $0.id == id } }
         VStack(spacing: 0) {
-            HStack(spacing: 8) {
+            HStack(spacing: PaletteMetrics.markGap) {
+                // In the rows' mark column, so the typed words start where the titles do.
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
+                    .frame(width: PaletteMetrics.markWidth)
                 TextField(mode == .search ? "Search Notes" : "Search Commands and Notes", text: $query)
                     .textFieldStyle(.plain)
                     .interfaceFont(.title3)
@@ -125,12 +127,13 @@ struct CommandPalette: View {
                         .accessibilityIdentifier("CommandPaletteCount")
                 }
             }
-            .padding(12)
-            if showsFilters {
-                Divider()
+            .padding(.horizontal, PaletteMetrics.markInset)
+            .padding(.top, 18)
+            .padding(.bottom, 12)
+            if mode == .search, showsFilters {
                 PaletteFilterRow(state: filterState)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { filterRowHeight = $0 }
             }
-            Divider()
             results(sections, rows: rows, chosen: chosen, target: target)
         }
         .floatingPanelSurface(width: 680)
@@ -211,15 +214,36 @@ struct CommandPalette: View {
         .accessibilityLabel("Command Palette")
     }
 
-    /// The rows, or "No Results", with the filter button, the footer and Actions floating over them.
+    /// The rows, or "No Results", with the bar at their foot. Rows scroll under the bar and fade and blur out there,
+    /// as the system's soft scroll edge effect draws them. Actions takes the bar's place: it grows up out of the bar
+    /// and shrinks back into it, so there is only ever one layer over the rows.
     private func results(_ sections: [Section], rows: [Entry], chosen: Int, target: Entry?) -> some View {
-        ZStack(alignment: .bottom) {
-            if rows.isEmpty {
-                Text("No Results")
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 110)
-            } else {
-                list(sections, chosen: chosen)
+        ZStack(alignment: .bottomTrailing) {
+            Group {
+                if rows.isEmpty {
+                    Text("No Results")
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, minHeight: 110)
+                } else {
+                    list(sections, chosen: chosen)
+                }
+            }
+            .safeAreaBar(edge: .bottom, spacing: 0) {
+                // Kept in place while Actions is out, so the rows above do not move.
+                HStack(alignment: .bottom, spacing: PaletteBar.spacing) {
+                    if mode == .search {
+                        PaletteFilterButton(count: filterState.filters.count, isOn: showsFilters) { showsFilters.toggle() }
+                    }
+                    Spacer(minLength: 0)
+                    if let row = rows.indices.contains(chosen) ? rows[chosen] : nil {
+                        PaletteFooter(
+                            openTitle: openTitle(for: row), onOpen: { run(rows, at: chosen) },
+                            onActions: { toggleActions(rows, chosen: chosen) })
+                    }
+                }
+                .opacity(target == nil ? 1 : 0)
+                .allowsHitTesting(target == nil)
+                .padding(PaletteBar.inset)
             }
             if actionsFor != nil {
                 // A click beside the panel puts it away and keeps the palette.
@@ -227,26 +251,15 @@ struct CommandPalette: View {
                     .contentShape(.rect)
                     .onTapGesture { closeActions() }
             }
-            HStack(alignment: .bottom) {
-                PaletteFilterButton(count: filterState.filters.count, isOn: showsFilters) { showsFilters.toggle() }
-                Spacer(minLength: 0)
-                if let row = rows.indices.contains(chosen) ? rows[chosen] : nil {
-                    PaletteFooter(
-                        openTitle: openTitle(for: row), onOpen: { run(rows, at: chosen) },
-                        onActions: { toggleActions(rows, chosen: chosen) })
-                }
-            }
-            .padding(10)
-            .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { floatingHeight = $0 }
             if let target {
                 PaletteActionsPanel(
                     title: target.title, actions: actions(for: target),
                     perform: { perform($0, on: target) }, submit: { performHighlighted(on: target) }, close: { closeActions() },
                     query: actionsField, highlighted: $actionsHighlighted, focus: $focus
                 )
-                .padding(.trailing, 10)
-                .padding(.bottom, floatingHeight)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                .padding(PaletteBar.inset)
+                // Grows up and to the left out of where Actions stood, and shrinks back into it.
+                .transition(.scale(scale: 0.5, anchor: .bottomTrailing).combined(with: .opacity))
             }
         }
         .frame(minHeight: actionsFor == nil ? 0 : 340)
@@ -277,12 +290,10 @@ struct CommandPalette: View {
                         }
                     }
                 }
-                .padding(.horizontal, 6)
-                .padding(.top, 2)
+                .padding(.horizontal, PaletteMetrics.listInset)
             }
-            // Room under the last row for the buttons that float over the list; a scroll to a row keeps it clear of them.
-            .contentMargins(.bottom, floatingHeight, for: .scrollContent)
-            .frame(maxHeight: 460)
+            .scrollEdgeEffectStyle(.soft, for: .bottom)
+            .frame(maxHeight: PaletteMetrics.resultsHeight - (mode == .search && showsFilters ? filterRowHeight : 0))
             .onChange(of: scrollTarget) { if let scrollTarget { proxy.scrollTo(scrollTarget) } }
         }
     }
@@ -298,8 +309,7 @@ struct CommandPalette: View {
     }
 
     private func openTitle(for row: Entry) -> String {
-        if row.item == nil { return String(localized: "Run") }
-        return mode == .search ? String(localized: "Open at Match") : String(localized: "Open")
+        row.item == nil ? String(localized: "Run") : String(localized: "Open")
     }
 
     // MARK: Running
@@ -327,7 +337,7 @@ struct CommandPalette: View {
         if actionsFor != nil {
             closeActions()
         } else if rows.indices.contains(chosen) {
-            actionsFor = rows[chosen].id
+            withAnimation(PaletteBar.grow) { actionsFor = rows[chosen].id }
             actionsQuery = ""
             actionsHighlighted = 0
             focus = .actions
@@ -340,7 +350,7 @@ struct CommandPalette: View {
     }
 
     private func closeActions() {
-        actionsFor = nil
+        withAnimation(PaletteBar.grow) { actionsFor = nil }
         // Not at once: the Escape that closed Actions is still being handled, and would reach the field and close the palette.
         Task { focus = .field }
     }
@@ -348,8 +358,7 @@ struct CommandPalette: View {
     private func actions(for row: Entry) -> [PaletteAction] {
         guard let id = row.item, let item = library.item(id) else { return PaletteAction.forCommand }
         return PaletteAction.forItem(
-            isFile: item.isFile, isFavorite: item.isFavorite, isActive: item.state == .active,
-            openTitle: mode == .search ? String(localized: "Open at Match") : String(localized: "Open"))
+            isFile: item.isFile, isFavorite: item.isFavorite, isActive: item.state == .active)
     }
 
     /// Does what the action says through the same path as the menus, once the palette is put away.
@@ -489,7 +498,7 @@ struct CommandPalette: View {
             let excerpt = results?.excerpts[item.id].flatMap { $0.plainText == item.name ? nil : $0 }
             return Entry(
                 id: "note:\(item.id)", title: item.displayTitle, detail: library.placeLabel(of: item),
-                snippet: item.preview.isEmpty ? nil : item.preview, excerpt: excerpt,
+                snippet: item.preview.isEmpty ? about(item) : item.preview, excerpt: excerpt,
                 date: DateDisplay.text(of: item.modified, place: .list, format: dateFormat, now: now),
                 icon: .type(library.catalogue.icon(for: item.type)), item: item.id, takesFocus: true
             ) {
@@ -499,6 +508,15 @@ struct CommandPalette: View {
         return PaletteSections.forSearch(rows: entries, typed: isTyped) { entry in
             PaletteMatch.matchRange(in: entry.title, query) != nil
         }
+    }
+
+    /// A search row's second line for an item with no text of its own: its type, or Inbox, and the collections it is
+    /// in, so every row in Search Notes has two lines.
+    private func about(_ item: Item) -> String {
+        let place = library.placeLabel(of: item)
+        let collections = item.collectionIDs.compactMap { library.item($0)?.displayTitle }
+        guard !collections.isEmpty else { return place }
+        return String(localized: "\(place) in \(collections.formatted(.list(type: .and)))", comment: "A search row's second line: an item's type, then the collections it is in.")
     }
 
     private var commands: [Entry] {

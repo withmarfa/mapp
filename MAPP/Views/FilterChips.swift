@@ -65,6 +65,8 @@ enum FilterChipMetrics {
 struct FilterChipsBar: View {
     let chips: [FilterChipItem]
     var leadingInset: CGFloat = 12
+    /// The palette shows no tooltips; a list's row does.
+    var showsHelp = true
     let anchors: FilterChipAnchors
     let open: (String) -> Void
     let remove: (String) -> Void
@@ -89,7 +91,7 @@ struct FilterChipsBar: View {
                 }
                 .buttonStyle(.plain)
                 .background { FilterAnchor(anchors: anchors, key: FilterChipAnchors.addKey) }
-                .help("Add a filter")
+                .help(showsHelp ? String(localized: "Add a filter") : "")
                 .accessibilityLabel("Add Filter")
                 .accessibilityIdentifier("FilterChipAdd")
             }

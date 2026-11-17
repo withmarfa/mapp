@@ -222,9 +222,9 @@ struct CommandPaletteTests {
         #expect(PaletteActionsPanel.shortcutKinds.allSatisfy { PaletteActionsPanel.shortcut(of: $0) != nil })
     }
 
-    @Test func inSearchTheFirstActionReadsOpenAtMatch() {
-        let actions = PaletteAction.forItem(isFile: false, isFavorite: false, isActive: true, openTitle: "Open at Match")
-        #expect(actions.first?.title == "Open at Match")
+    @Test func theFirstActionReadsOpen() {
+        let actions = PaletteAction.forItem(isFile: false, isFavorite: false, isActive: true)
+        #expect(actions.first?.title == String(localized: "Open"))
     }
 
     @Test func aCommandOffersOnlyRun() {

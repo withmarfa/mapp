@@ -50,6 +50,24 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 - **A flat, squared or hand-drawn segmented control.** MAPP uses the system's. See [Views and lists](views-and-lists.md).
 - **A separate filter button in the list toolbar.** Filters live in the row above the list.
 
+## Palettes
+
+- **An Actions panel floating above the palette's bar.** Actions takes the bar's place. See [Views and lists](views-and-lists.md).
+- **A filter button in the command palette.** Only Search Notes has one.
+- **A wide pill for the palette's filter button.** It is as wide as it is tall.
+- **Showing the palette's filters by making the palette taller.** The row takes its room from the list.
+- **Rows cut off hard at the palette's bar.** Rows scroll under the bar and fade out with the system's soft scroll edge effect.
+- **Filled key caps in the palette's buttons.** Key caps are outlined, with no fill.
+- **Open and Actions as two separate capsules.** They are one capsule with two segments.
+- **Open at Match as the palette's button label.** It reads Open, and Search Notes still opens at the match.
+- **An accent-colored filter button when filters are set.** It stays neutral and shows a soft fill.
+- **A filter row's + larger than its chips.** It is as tall as a chip.
+- **One-line and two-line rows in one palette list.** Every row in a list is one height.
+- **More than three palette materials, or a Tuning knob for them.** Settings offers Glass, Translucent and Solid.
+- **Actions morphing out of the bar's glass.** A Liquid Glass morph around Actions' field hung the app when Actions opened; it grows with an ordinary transition.
+- **A divider under the palette's field.**
+- **Large type marks in Search Notes rows.** Its rows use the command palette's small mark.
+
 ## Related pages
 
 - [Looks](looks.md)

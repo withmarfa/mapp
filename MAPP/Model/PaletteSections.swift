@@ -128,9 +128,9 @@ nonisolated struct PaletteAction: Identifiable, Equatable, Sendable {
 
     /// What Actions offers for an item, by the same rules as the menus: the favorite toggle and Delete only for an
     /// item that is not in the bin, Version History and Copy Link only for a note. Never Delete Immediately.
-    static func forItem(isFile: Bool, isFavorite: Bool, isActive: Bool, openTitle: String = String(localized: "Open")) -> [PaletteAction] {
+    static func forItem(isFile: Bool, isFavorite: Bool, isActive: Bool) -> [PaletteAction] {
         var actions = [
-            PaletteAction(.open, openTitle, "arrow.up.right", keys: ["↩"]),
+            PaletteAction(.open, String(localized: "Open"), "arrow.up.right", keys: ["↩"]),
             PaletteAction(.openInNewWindow, String(localized: "Open in New Window"), "macwindow", keys: ["⌘", "↩"]),
         ]
         if !isFile {

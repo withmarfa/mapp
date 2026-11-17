@@ -1,6 +1,6 @@
 # Views and lists
 
-Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built in v0.0.45. The table's margin, whole-cell hover and add to an empty cell are built, not yet released. See [Looks](looks.md).
+Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built in v0.0.45. The table's margin, whole-cell hover and add to an empty cell, and the palettes' bar, rows and material setting as described below, are built, not yet released. See [Looks](looks.md).
 
 Where it lives: `Browser`, `ItemViewMode`, `ViewLayouts` and `SidebarLayout` under `MAPP/Model/`, with `CardContents`, `ItemTableLayout`, `ItemTimelineLayout`, `ItemPlacement`, `EventSpan` and `CalendarLayout` under `MAPP/Model/Items/`; `NoteList`, `ItemRow`, `ItemGallery`, `GalleryCard`, `ItemBoard`, `ItemTable`, `ItemTableCell`, `ChipLine`, `ItemTimeline`, `ItemCalendar`, `CalendarToolbarItems`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
 
@@ -70,11 +70,14 @@ The sidebar has three groups of places, under New and Search: Library (Items, So
 
 ## Command palette
 
-Command-K and Search Notes share one 680-point panel (`CommandPalette`).
+Command-K and Search Notes share one 680-point panel (`CommandPalette`), which sits about an eighth of the way down the window, as quick add does.
 
-- A row takes one line, or two in Search Notes. The results have sections, with the one that holds the best match first, and a gray selection. The count sits at the top right of the field.
-- A round glass button at the bottom left shows the palette's filter row, which holds the view's chips for Type, Collection and Updated.
-- Open and Actions float in a small glass capsule at the bottom right, with key caps, and an Actions panel opens above them.
+- The field has room above and below it and no divider under it. Its magnifying glass sits in the rows' mark column, so the typed words start where the titles do.
+- Every row in a list is one height: one line in the command palette, two in Search Notes. Both palettes draw a row the same way: the type's small mark, the title in regular weight, and the detail or date at the right. A Search Notes row adds a second line under its title, and keeps its mark and date on the title's line: the words around the match, or else the item's own text, or for an item with none, its type (or Inbox) and the collections it is in. The results have sections, with the one that holds the best match first, and a gray selection. With nothing typed, Search Notes shows only its Recent section. The count sits at the top right of the field.
+- A bar sits at the foot of the results, and rows scroll under it, fading and blurring out with the system's soft scroll edge effect; the last row of a short list sits above it. At its right, Open and Actions are one glass capsule with two segments, as the toolbar groups its buttons: pointing at a segment fills only that segment. Open reads Open for an item (Search Notes still opens a note at the match) and Run for a command, with 14-point labels, a point larger than a large control's. Their key caps, and those in Actions, are one glyph to a cap: 16 points high with 4-point corners, a 10-point medium glyph in the label color at 42% opacity, a 1-point outline in the label color at 20%, and no fill. Menus keep the system's plain glyphs. In Search Notes only, a round glass button at its left, as tall as the capsule and no wider, shows the palette's filter row, which holds the view's chips for Type, Collection and Updated, with a + as tall as a chip. With filters set, the button shows their number and a soft fill inside its glass, in the bar's neutral color, never the accent. The row takes its room from the list, so showing filters never makes the palette taller. The command palette has no filter button.
+- Actions takes the bar's place: it grows up and to the left out of the bar, anchored at the bottom right where Actions stood, and shrinks back into the bar when it closes. It opens with a click on Actions or with Command-K, and its surface is the palette's own. There is no second panel above the bar.
+- Nothing in either palette shows a tooltip.
+- Settings > Appearance > Palettes sets what the palettes and New Item are drawn on: Glass (Liquid Glass, the default), Translucent (the system's popover material) or Solid (the window's own color). It is a Mac setting (`paletteMaterial`), never written to Marfa.
 - There is no preview pane beside the results. A row carries its own excerpt.
 
 The palette builds its own list of commands. The rule that every toolbar action is also a command is in [`MAPP/Views/AGENTS.md`](../MAPP/Views/AGENTS.md).

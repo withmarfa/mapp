@@ -26,7 +26,9 @@ enum InterfaceKey {
     static let showsPageToolbarBackground = "showsPageToolbarBackground"
     /// Whether the panels that edit a value are glass or a solid color.
     static let valuePanelStyle = "valuePanelStyle"
-    static let all = [valuePanelStyle, textSize, inspectorWidth, inspectorDetailsOpen, inspectorPropertiesOpen, inspectorRelationshipsOpen, inspectorLinksInPageOpen, inspectorLinkedFromOpen, inspectorTagsOpen, inspectorOutlineOpen, inspectorAttachmentsOpen, inspectorCollectionsOpen, inspectorAppOpen, showsScrolledTitle, toolbarLabelStyle, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
+    /// What the command palette, Search Notes and quick add stand on.
+    static let paletteMaterial = "paletteMaterial"
+    static let all = [valuePanelStyle, paletteMaterial, textSize, inspectorWidth, inspectorDetailsOpen, inspectorPropertiesOpen, inspectorRelationshipsOpen, inspectorLinksInPageOpen, inspectorLinkedFromOpen, inspectorTagsOpen, inspectorOutlineOpen, inspectorAttachmentsOpen, inspectorCollectionsOpen, inspectorAppOpen, showsScrolledTitle, toolbarLabelStyle, showsPageToolbarBackground] + ColumnWidth.allCases.map(\.key)
 }
 
 /// What a value panel is made of. Glass lets the page show through; Solid is the window's own color.
@@ -39,6 +41,18 @@ enum ValuePanelStyle: String, CaseIterable, Identifiable {
     static func stored(in defaults: UserDefaults = .standard) -> ValuePanelStyle {
         defaults.string(forKey: InterfaceKey.valuePanelStyle).flatMap(Self.init(rawValue:)) ?? standard
     }
+
+    var id: Self { self }
+}
+
+/// What the floating panels (the command palette, Search Notes and quick add) are made of. Glass is the system's
+/// Liquid Glass; Translucent is the material the system gives popovers; Solid is the window's own color.
+enum PaletteMaterial: String, CaseIterable, Identifiable {
+    case glass
+    case translucent
+    case solid
+
+    static let standard = PaletteMaterial.glass
 
     var id: Self { self }
 }
@@ -125,5 +139,18 @@ struct ValuePanelOptions: View {
             Text("Solid").tag(ValuePanelStyle.solid)
         }
         .accessibilityIdentifier("ValuePanelStyle")
+    }
+}
+
+struct PaletteMaterialOptions: View {
+    @AppStorage(InterfaceKey.paletteMaterial) private var material = PaletteMaterial.standard
+
+    var body: some View {
+        Picker("Palettes", selection: $material) {
+            Text("Glass").tag(PaletteMaterial.glass)
+            Text("Translucent").tag(PaletteMaterial.translucent)
+            Text("Solid").tag(PaletteMaterial.solid)
+        }
+        .accessibilityIdentifier("PaletteMaterial")
     }
 }
