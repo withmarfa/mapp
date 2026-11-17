@@ -32,6 +32,16 @@ struct OpeningTextTests {
         #expect(OpeningText.lines(from: "```sh\ngit log\n```") == ["git log"])
     }
 
+    @Test func aFencesLinesStayPlainText() {
+        let source = "Setup\n```sh\n# install it\n- not a bullet\n---\n| a | b |\n```\nAfter"
+        #expect(OpeningText.lines(from: source) == ["Setup", "# install it", "- not a bullet", "---", "| a | b |", "After"])
+        #expect(String(OpeningText.attributed(from: "```\n*star* # x\n```").characters) == "*star* # x")
+    }
+
+    @Test func aFenceThatTheTextCutsOffStillHoldsTheRest() {
+        #expect(OpeningText.lines(from: "```\n# comment") == ["# comment"])
+    }
+
     @Test func listItemsGetABulletAndTasksShowTheirWords() {
         let lines = OpeningText.lines(from: Self.source)
         #expect(lines.contains("\u{2022} *Affordances* say what is possible"))

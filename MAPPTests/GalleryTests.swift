@@ -63,10 +63,30 @@ struct GalleryTests {
 
     @Test func aCardsFactsFollowItsShape() {
         let (library, _, newer, _) = BrowserTests().makeFakeLibrary()
-        #expect(GalleryCardFacts(of: newer, in: library).kind == .note)
+        #expect(GalleryCardFacts(of: newer, attachments: [], in: library).kind == .note)
         var file = newer
         file.content = .file(.png, byteCount: 10)
-        #expect(GalleryCardFacts(of: file, in: library).kind == .file(.png))
+        #expect(GalleryCardFacts(of: file, attachments: [], in: library).kind == .file(.png))
+    }
+
+    private static func attachedFile() -> Item {
+        var file = Item(
+            id: .mint(), type: TypeID("core.file.image"), title: "Photo.png", titleRule: .firstLine, content: .file(.png, byteCount: 10),
+            version: ItemVersion(1), created: .now, modified: .now)
+        file.state = .active
+        return file
+    }
+
+    @Test func attachmentsAreReadOncePerNoteAndOnlyWhereAPictureShows() {
+        let library = FakeItemLibrary()
+        let note = library.add("A note\n").id
+        let other = library.add("Another\n").id
+        let photo = library.attachPicture(URL(fileURLWithPath: "/tmp/Photo.png"), to: note)
+        let items = [library.item(note), library.item(other), library.item(photo)].compactMap { $0 }
+        let found = CardAttachments.of(items, in: library, showsPicture: true)
+        #expect(found[note]?.map(\.id) == [photo])
+        #expect(found[other] == nil && found[photo] == nil, "no attachments, and a file has none")
+        #expect(CardAttachments.of(items, in: library, showsPicture: false).isEmpty, "a card with no picture reads none")
     }
 
     @Test func aCardIsRedrawnForItsOwnItemAndNotForTheSelection() {
@@ -76,8 +96,8 @@ struct GalleryTests {
             RowContent.card(
                 for: item, look: .empty, catalogue: library.catalogue, list: RowList(day: .now), shape: CardShape())
         }
-        func card(_ item: Item, width: CGFloat = 200, cards: ViewCards = ViewCards(), content said: RowContent? = nil) -> GalleryCard {
-            GalleryCard(item: item, browser: browser, width: width, cards: cards, content: said ?? content(item))
+        func card(_ item: Item, width: CGFloat = 200, cards: ViewCards = ViewCards(), content said: RowContent? = nil, attached: [Item] = []) -> GalleryCard {
+            GalleryCard(item: item, browser: browser, width: width, cards: cards, content: said ?? content(item), attachments: attached)
         }
         let before = card(newer)
         browser.show(.allNotes, in: library, order: NoteOrder())
@@ -94,5 +114,8 @@ struct GalleryTests {
         said.secondary = "A new line"
         #expect(before != card(newer, content: said), "so does what the card says")
         #expect(before == card(newer, cards: ViewCards()), "the same inputs leave it alone")
+        let file = Self.attachedFile()
+        #expect(before != card(newer, attached: [file]), "a file attached to it redraws it")
+        #expect(card(newer, attached: [file]) == card(newer, attached: [file]), "another card's link leaves it alone")
     }
 }

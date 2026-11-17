@@ -25,11 +25,12 @@ struct GalleryCardFacts {
     let sources: [CardPicture.Source]
     let icon: String?
 
-    init(of item: Item, in library: any ItemLibrary) {
+    /// `attachments` are the files attached to the item, worked out once for the place (`CardAttachments`), so this reads
+    /// no link of the library.
+    init(of item: Item, attachments: [Item], in library: any ItemLibrary) {
         let made = Cost.measure(.galleryCard) {
-            let attachments = item.isFile ? [] : library.attachments(of: item.id).compactMap { library.item($0) }
-            return (
-                GalleryKind.of(item), GalleryArtworkCache.basis(of: item, in: library),
+            (
+                GalleryKind.of(item), GalleryArtworkCache.basis(of: item, attachments: attachments, in: library),
                 CardPicture.sources(of: item, attachments: attachments), library.catalogue.icon(for: item.type))
         }
         (kind, basis, sources, icon) = made
@@ -51,15 +52,17 @@ struct GalleryCard: View, Equatable {
     /// What the view chose for its cards: the picture's preview, whether it is fitted, its shape and the size.
     let cards: ViewCards
     let content: RowContent
+    /// The files attached to the item, which a bookmark's cover is chosen from.
+    let attachments: [Item]
 
     static let radius: CGFloat = 10
 
     static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.item == rhs.item && lhs.browser === rhs.browser && lhs.width == rhs.width && lhs.cards == rhs.cards && lhs.content == rhs.content
+        lhs.item == rhs.item && lhs.browser === rhs.browser && lhs.width == rhs.width && lhs.cards == rhs.cards && lhs.content == rhs.content && lhs.attachments == rhs.attachments
     }
 
     var body: some View {
-        let facts = GalleryCardFacts(of: item, in: library)
+        let facts = GalleryCardFacts(of: item, attachments: attachments, in: library)
         let radius = cards.size == .small ? 8 : Self.radius
         VStack(alignment: .leading, spacing: 8) {
             if cards.preview == .none {
@@ -72,7 +75,7 @@ struct GalleryCard: View, Equatable {
                     .overlay(alignment: .topTrailing) { if item.isFavorite { FavoriteBadge(unit: 1).padding(6) } }
                     .overlay { GalleryRing(browser: browser, id: item.id, shape: GalleryShape(cards: cards, radius: radius)) }
             } else {
-                GalleryThumbnail(item: item, browser: browser, facts: facts, width: width, cards: cards, radius: radius)
+                GalleryThumbnail(item: item, attachments: attachments, browser: browser, facts: facts, width: width, cards: cards, radius: radius)
                 words.padding(.horizontal, 2)
             }
         }
@@ -150,6 +153,7 @@ private struct GalleryThumbnail: View {
     @CurrentLibrary private var library
     @Environment(\.displayScale) private var displayScale
     let item: Item
+    let attachments: [Item]
     let browser: Browser
     let facts: GalleryCardFacts
     let width: CGFloat
@@ -182,7 +186,7 @@ private struct GalleryThumbnail: View {
                 artwork = nil
                 resolved = GalleryArtworkCache.peek(basis, width: width) != nil
                 guard loads else { return }
-                let made = await GalleryArtworkCache.artwork(for: item, width: width, scale: displayScale, in: library)
+                let made = await GalleryArtworkCache.artwork(for: item, attachments: attachments, width: width, scale: displayScale, in: library)
                 if !Task.isCancelled {
                     artwork = made
                     resolved = true

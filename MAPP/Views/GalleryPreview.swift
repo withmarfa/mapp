@@ -13,10 +13,11 @@ enum GalleryPreview {
     /// An image file's picture, or a note's first embedded image, which the embed resolver opens, else an image file attached
     /// to it (a bookmark's saved cover), at most `maxPixels` on
     /// its longer side.
-    static func image(for item: Item, maxPixels: Int = 800, in library: any ItemLibrary) async -> Picture {
+    static func image(for item: Item, attachments: [Item], maxPixels: Int = 800, in library: any ItemLibrary) async -> Picture {
         switch item.content {
         case .file(let type, _):
             guard type.conforms(to: .image) else { return .none }
+            guard !Task.isCancelled else { return .failed }
             let url: URL
             do {
                 guard let fetched = try await fileURL(of: item, in: library) else { return .none }
@@ -39,7 +40,7 @@ enum GalleryPreview {
                     continue
                 }
             }
-            for file in CardPicture.attachedImages(of: library.attachments(of: item.id).compactMap { library.item($0) }).prefix(CardPicture.attachedLimit) {
+            for file in CardPicture.attachedImages(of: attachments).prefix(CardPicture.attachedLimit) {
                 guard !Task.isCancelled else { return .failed }
                 do {
                     guard let url = try await library.fileURL(of: file.id) else { continue }
