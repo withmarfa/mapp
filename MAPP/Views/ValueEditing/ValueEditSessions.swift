@@ -58,6 +58,9 @@ final class ValueEditPanelSession: ValueEditSession {
         layout()
         parent.addChildWindow(panel, ordered: .above)
         panel.makeKeyAndOrderFront(nil)
+        // A date panel has nothing to type until the person chooses the Time field, but AppKit gives a new panel's first text
+        // field the focus. The panel itself takes it instead, so Tab still reaches the field.
+        if case .date = model.kind { panel.makeFirstResponder(panel) }
     }
 
     /// The Location panel is a map with its own fields, so it draws itself; every other value draws the rows.
