@@ -229,9 +229,6 @@
     "%@, edited" : {
       "extractionState" : "manual"
     },
-    "%@, Read Only" : {
-      "extractionState" : "manual"
-    },
     "%@, remove" : {
 
     },
@@ -1677,6 +1674,9 @@
 
     },
     "Date Format" : {
+      "extractionState" : "manual"
+    },
+    "Date of Each Type" : {
       "extractionState" : "manual"
     },
     "Dates" : {
