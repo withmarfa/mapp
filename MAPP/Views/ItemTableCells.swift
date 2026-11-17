@@ -19,12 +19,19 @@ struct ItemTableCell: View {
     /// Which row the pointer is on, shared by the row's cells, so the name's cell can answer to it from any of them.
     let hover: ItemTableHover
     @State private var isHovering = false
+    @State private var anchor = ValueEditAnchorBox()
+
+    /// How far a hover tint reaches past the cell's content on each side, so it fills the cell to its edges. The
+    /// content is padded in by the same amount, and the cell's control is pulled back out, so the content keeps the
+    /// column's text edge.
+    private static let bleed: CGFloat = 8
 
     var body: some View {
         content
             .lineLimit(1)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 3)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            // A cell that offers an edit carries its own padding, inside its control, so the whole cell answers a click.
+            .padding(.vertical, offersEdit ? 0 : 3)
             .onHover { setHovering($0) }
             .onDisappear { setHovering(false) }
             // A panel laid over the table gets the pointer and sends no exit to the cell beneath it.
@@ -35,6 +42,23 @@ struct ItemTableCell: View {
                 isHovering = false
             }
     }
+
+    /// The cell's field as the row's own type declares it.
+    private var rowField: ItemTypeInfo.Field? { column.field(for: row, catalogue: library.catalogue) }
+
+    /// Whether the cell is a value picked from a menu that this item's type declares and that can be changed.
+    private var offersPicker: Bool {
+        switch column.style {
+        case .status, .priority, .choice: rowField != nil && row.item.isEditable
+        default: false
+        }
+    }
+
+    /// The panel an empty cell opens to take a first value, where its property can be edited for this item.
+    private var addKind: ValueEditKind? { column.addKind(for: row, catalogue: library.catalogue) }
+
+    /// Whether the cell offers to change or add a value, which its hover tint shows.
+    private var offersEdit: Bool { offersPicker || addKind != nil }
 
     private func setHovering(_ inside: Bool) {
         guard inside != isHovering else { return }
@@ -58,8 +82,50 @@ struct ItemTableCell: View {
                     .monospacedDigit()
             }
         // A mixed table's column holds the words of every type; each cell offers its own row's type's.
-        case .field(let field): value(of: column.field(for: row, catalogue: library.catalogue) ?? field)
+        case .field(let field):
+            if let kind = addKind { add(kind) } else { value(of: rowField ?? field) }
         }
+    }
+
+    /// An empty cell of a value a panel edits: on hover it reads as empty and fills with the tint, and a click opens the
+    /// panel under it, as the value's row does on the page.
+    private func add(_ kind: ValueEditKind) -> some View {
+        Button {
+            let id = row.id
+            let library = library
+            let undoManager = undoManager
+            var request = ValueEditRequest(kind: kind, library: library, item: id, undoManager: undoManager)
+            request.write = { value in
+                guard let key = kind.field?.key else { return false }
+                return library.setItemProperty(id, key: key, value: value, undoManager: undoManager)
+            }
+            guard let view = anchor.view else { return }
+            ValueEditPresenter.shared.present(request, anchor: view)
+            // The panel takes the pointer without sending the cell an exit.
+            hover.clear()
+        } label: {
+            offering(HStack(spacing: 4) {
+                if isHovering { Text("Empty").foregroundStyle(.tertiary) }
+                Spacer(minLength: 0)
+            })
+        }
+        .buttonStyle(.plain)
+        .focusEffectDisabled()
+        .padding(.horizontal, -Self.bleed)
+        .background { ValueEditAnchor(box: anchor) }
+        .accessibilityLabel(Text(kind.field?.label ?? ""))
+        .accessibilityValue(Text("Not Set"))
+        .accessibilityHint(Text("Opens a panel to add a value"))
+    }
+
+    /// A control's label as the cell offers it: the whole cell, tinted under the pointer.
+    private func offering(_ label: some View) -> some View {
+        label
+            .padding(.horizontal, Self.bleed)
+            .padding(.vertical, 3)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .background(isHovering ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear))
+            .contentShape(.rect)
     }
 
     // MARK: The name
@@ -219,23 +285,19 @@ struct ItemTableCell: View {
             .pickerStyle(.inline)
             .labelsHidden()
         } label: {
-            HStack(spacing: 4) {
+            offering(HStack(spacing: 4) {
                 if let current {
                     chip(current, field: field)
                 } else if isHovering {
                     Text("Empty").foregroundStyle(.tertiary)
                 }
                 Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 5)
-            .padding(.vertical, 2)
-            .background(isHovering ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear), in: .rect(cornerRadius: 5, style: .continuous))
-            .contentShape(.rect)
+            })
         }
         .menuStyle(.button)
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
-        .padding(.horizontal, -5)
+        .padding(.horizontal, -Self.bleed)
         .accessibilityLabel(Text(field.label))
         .accessibilityValue(Text(current.map(ItemTypeInfo.Field.label(ofOption:)) ?? String(localized: "Not Set")))
     }

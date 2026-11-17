@@ -152,6 +152,19 @@ nonisolated extension ItemTableColumn {
         return catalogue.itemTypes[row.item.type]?.fields.first { $0.key == field.key }
     }
 
+    /// The panel an empty cell of this column opens to take a first value, or nil where it offers none: the column is no
+    /// field, the row's type does not declare it, the item cannot be edited, the cell holds a value, or its value is
+    /// picked from a menu or switched (a status, priority, choice or yes or no), which the cell edits in place.
+    func addKind(for row: ItemTableRow, catalogue: Catalogue) -> ValueEditKind? {
+        guard let field = field(for: row, catalogue: catalogue), row.item.isEditable else { return nil }
+        switch style {
+        case .status, .priority, .choice, .boolean: return nil
+        default: break
+        }
+        guard !InspectorFields.hasValue(row.item.value(of: field.key)) else { return nil }
+        return ValueEditKind(field: field)
+    }
+
     /// What the cell holds for grouping and filtering: a value from the item, or nil for an empty cell.
     func category(of row: ItemTableRow) -> String? {
         switch content {
