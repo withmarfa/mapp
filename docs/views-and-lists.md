@@ -11,7 +11,7 @@ A view shows a set of items in a layout. This page explains the layouts, what a 
 An item list takes one of five layouts (`ItemViewMode`): list, gallery, table, board and timeline.
 
 - The list takes the rows described in [Looks](looks.md).
-- The gallery's card shows the item's picture, or its opening lines when it has none, then its title on up to two lines and the one line of context its type's look gives it. An item with neither a picture nor text shows its type's mark. A favorite's star sits on the picture and nothing else does. The panel chooses the preview, fit and size; the look chooses what the card says.
+- The gallery's card shows the item's picture, or its opening lines when it has none, then its title on up to two lines and the one line of context its type's look gives it. An item with neither a picture nor text shows its type's mark. A favorite's star sits on the picture and nothing else does. The panel chooses the preview, fit, shape and size; the look chooses what the card says.
 - The board shows its columns, which are the groups of its grouping field. A person can hide the groups that have no items. A card is the title, the look's context line and the bottom line (the type only where the board mixes types, the status, two facts and "+N"), without the field the board is grouped by: a board grouped by status leaves the status off every card, and one grouped by priority leaves the priority off. A compact board shows the title alone, with the type's mark where the board mixes types.
 - The table has one left edge. After the name it shows the look's status and facts as columns drawn with the same chips as a row (a status, an option, a person's initials and name, the type as a chip, a plain value with no label), then the look's date. A status and a priority stay chips in a table, not the plainer marks a board card uses. Every other property sits behind View Options and starts hidden. A table of several types shows the union of their looks, the status first. A column no row has a value in starts hidden. Columns a saved view chose win over the look, and the person can show, order and size any of them.
 - A list of several types draws each item from its own type's look in every layout.
@@ -42,7 +42,7 @@ Edit View opens in the right sidebar, and New View uses the same panel. It holds
 - Density holds a pop-up of As in Settings, Standard and Compact.
 - Sort holds a handle, the fixed property, a direction pop-up and an x in a circle, with a gray Add Sort.
 - Group holds Group by and a Hide Empty Groups switch.
-- Columns (a table) or Cards (a gallery) comes last. Cards has Preview and Size pop-ups and a Fit Picture switch; what a card says comes from its type's look, not from the view.
+- Columns (a table) or Cards (a gallery) comes last. Cards has Preview, Size and Shape pop-ups and a Fit Picture switch; Shape and Fit Picture are off where there is no picture area, and a gallery has no Density; what a card says comes from its type's look, not from the view.
 
 ## How an edit is saved
 

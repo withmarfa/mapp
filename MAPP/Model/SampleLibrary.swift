@@ -47,10 +47,13 @@ nonisolated enum SampleLibrary {
     static func open(
         _ connection: MarfaConnection, items given: [Marfa.Item]? = nil, edges: [Marfa.Edge]? = nil, now: Date = .now
     ) -> MarfaSource {
+        let gallery = given == nil && SampleGallery.isRequested
         let fake = WorkingCopy.fake(
-            items: given ?? items(now: now, tasksAndEvents: withCollections),
-            edges: edges ?? (given == nil ? memberships(now: now) : []), itemTypes: itemTypes,
+            items: given ?? (items(now: now, tasksAndEvents: withCollections) + (gallery ? SampleGallery.rows(now: now) : [])),
+            edges: edges ?? (given == nil ? memberships(now: now) + (gallery ? SampleGallery.edges(now: now) : []) : []),
+            itemTypes: itemTypes + (gallery ? SampleGallery.types : []),
             edgeTypes: edgeTypes, views: views, displays: display)
+        if gallery { SampleGallery.store(in: fake.copy) }
         let server = SampleServer(copy: fake.copy)
         let source = MarfaSource(
             copy: fake.copy, connection: connection, reading: server, refreshing: server)
