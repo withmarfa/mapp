@@ -9,7 +9,7 @@ nonisolated struct ItemTableRow: Identifiable, Hashable, Sendable {
     /// The item the row's item is filed under (`child-of`), if it is to be shown (`ItemRelations`).
     let parent: RelatedItem?
     /// The items filed under the row's item and the collections it is in, which the columns for them show. They are read
-    /// only where a column shows them.
+    /// for every row, so a column of them can be offered.
     var children: [RelatedItem] = []
     var collections: [RelatedItem] = []
     var id: ItemID { item.id }

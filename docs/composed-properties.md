@@ -42,7 +42,7 @@ A composed property is a property that MAPP builds from a type's fields and link
 
 Location is built (see above). A geographic or object field maps to a shape that the app shows but does not edit (`MarfaMapping`): the page's property block skips it, and the right sidebar prints it as plain text.
 
-Relation is built (see below). Reading time and counts are not built. A saved web page's header shows only its description (`ReadingHeader`), and the right sidebar shows parent, children and links as the page's own sections, not as properties that a look can place.
+Relation is built (see "How Relation works"). Reading time and counts are not built. A saved web page's header shows only its description (`ReadingHeader`), and the right sidebar shows parent, children and links as the page's own sections, not as properties that a look can place.
 
 ## Open point
 
