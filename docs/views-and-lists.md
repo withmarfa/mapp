@@ -33,8 +33,8 @@ A saved view splits between Marfa and the Mac. The rules for each side, and for 
 
 A type's list, and the other places that are not views, can become one with Save as View in the toolbar. The view keeps the filters, the sort and the grouping the window shows:
 
-- A Type filter is saved as the view's types where no chosen type has subtypes. Marfa lists a type with its subtypes, so a type that has any is saved as an exact-type condition in the view's filter, which lists the same items as the window.
-- A list's sections by date (Today, Yesterday and the months) are saved as a group on the date the list is sorted by, in months. The sections near today move with the day and match no fixed bucket, so a view opened later groups the older items as the list does and the recent ones by their month.
+- A Type filter is saved as the view's types, so the view lists the types the window chose: they replace the types the place listed and a type's own exact-type condition where they are not all within it. Marfa lists a type with its subtypes, so a chosen type that has any is also saved as an exact-type condition in the view's filter, which lists the same items as the window.
+- A list's sections by date (Today, Yesterday and the months) are not kept, and the Save as View sheet says so. A view groups by a field's value or a bucket of it, and Today, Yesterday and Previous 7 Days move with the day, so no grouping stands for them.
 
 ## Edit View
 

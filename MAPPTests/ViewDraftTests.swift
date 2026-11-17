@@ -164,11 +164,12 @@ struct ViewDraftTests {
 
         let byEdit = try draft(.list(NoteOrder(sort: .dateEdited, groupsByDate: true)))
         #expect(byEdit.sort == [LibraryViewSort(field: "updated_at", ascending: false)])
-        // The list's sections by date are saved as the sort's date, grouped by month.
-        #expect(byEdit.group == LibraryViewGroup(field: "updated_at", bucket: .month))
-        #expect(byEdit.unkept.isEmpty)
+        // The list's sections by date are told as not kept, and no month grouping is written for them.
+        #expect(byEdit.group == nil)
+        #expect(byEdit.unkept == [.dateSections])
         let byCreated = try draft(.list(NoteOrder(sort: .dateCreated, groupsByDate: true)))
-        #expect(byCreated.group == LibraryViewGroup(field: "created_at", bucket: .month))
+        #expect(byCreated.group == nil)
+        #expect(byCreated.unkept == [.dateSections])
         #expect(try draft(.list(NoteOrder(sort: .dateCreated, groupsByDate: false))).sort
             == [LibraryViewSort(field: "created_at", ascending: false)])
 
@@ -292,6 +293,19 @@ struct ViewDraftTests {
         #expect(!ViewDraft.differs(folded, timelineDate: nil, from: seed, seedTimelineDate: nil))
     }
 
+    @Test func removingAViewsGroupingNeverWritesAMonthGroup() {
+        let view = LibraryView(id: ItemID("v"), title: "V", version: 4, group: LibraryViewGroup(field: "type"))
+        let seed = ViewDraft.options(for: view, catalogue: Self.catalogue)
+        var ungrouped = seed
+        ungrouped.grouping = .none
+        var window = Self.window(.view(view.id), layout: .list(NoteOrder(sort: .dateEdited, groupsByDate: true)))
+        window.dated = ViewDraft.Dated(sort: [ItemTableComparator(column: .edited, order: .reverse)], hasSections: true)
+        let result = ViewDraft.change(
+            window, options: ungrouped, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
+        #expect(result.change.group == .clear)
+        #expect(result.unkept == [.dateSections])
+    }
+
     @Test func anUpdateNamesOnlyWhatTheWindowChanged() {
         let view = LibraryView(
             id: ItemID("v"), title: "V", version: 4, query: LibraryViewQuery(types: [Self.task], filter: #"tags exists"#),
@@ -386,10 +400,10 @@ struct ViewDraftTests {
         #expect(draft.query.types.isEmpty)
         #expect(draft.query.filter == #"type eq "aic.ticket""#)
         #expect(draft.unkept.isEmpty)
-        // So is a type the place does not already list.
+        // A type the place does not list replaces the place's, so the saved view is not empty.
         let beside = try #require(Self.draft(Self.window(.itemType("core.task"), filters: ["type": ["core.note"]])))
-        #expect(beside.query.types == [Self.task])
-        #expect(beside.query.filter == #"type eq "core.note""#)
+        #expect(beside.query.types == [TypeID("core.note")])
+        #expect(beside.query.filter == nil)
         #expect(beside.unkept.isEmpty)
         // With the list grouped by a column too, both are kept.
         let grouped = try #require(Self.draft(Self.window(.allNotes, grouping: Self.statusColumn, filters: ["type": ["aic.ticket"]])))
@@ -398,6 +412,66 @@ struct ViewDraftTests {
         // Is Not is a condition.
         let not = try #require(Self.draft(Self.window(.allNotes, filters: ["type": ["core.task"]], negated: ["type"])))
         #expect(not.query.filter == #"type neq "core.task""#)
+    }
+
+    @Test func aSubtypeChosenInATypesPlaceReplacesThePlacesOwnTypeTerms() throws {
+        // A place of a type with subtypes saves its own items; the window filtered to a subtype shows that subtype's.
+        let place = try #require(ViewDraft.query(for: .itemType("aic.ticket"), catalogue: Self.catalogue, views: []))
+        #expect(place.filter == #"type eq "aic.ticket""#)
+        let sub = try #require(Self.draft(Self.window(.itemType("aic.ticket"), filters: ["type": ["aic.ticket.task"]])))
+        #expect(sub.query.types == [Self.ticketTask])
+        #expect(sub.query.filter == nil)
+        #expect(sub.unkept.isEmpty)
+        // The parent alone is the place's own items already.
+        let parent = try #require(Self.draft(Self.window(.itemType("aic.ticket"), filters: ["type": ["aic.ticket"]])))
+        #expect(parent.query == place)
+        // Another type with its own subtypes is exact, and the place's terms are replaced.
+        let other = try #require(Self.draft(Self.window(.itemType("core.task"), filters: ["type": ["aic.ticket"]])))
+        #expect(other.query.types == [Self.ticket])
+        #expect(other.query.filter == #"type eq "aic.ticket""#)
+        // The place's other conditions stay.
+        let held = LibraryViewQuery(types: [Self.ticket], filter: #"type eq "aic.ticket" AND properties.status eq "done""#)
+        let choices = ItemTableOptions(filters: ["type": ["aic.ticket.task"]]).filterChoices
+        let kept = ViewDraft.adding(choices, to: held, columns: Self.columns, catalogue: Self.catalogue)
+        #expect(kept.query.types == [Self.ticketTask])
+        #expect(kept.query.filter == #"properties.status eq "done""#)
+    }
+
+    @Test func aParentTypeChosenAloneIsSavedExactWhereItsTypesAreListedWithSubtypes() throws {
+        // Marfa lists a type with its subtypes, so the parent alone cannot be said by the types: it stays a filter.
+        let listed = LibraryViewQuery(types: [Self.ticket])
+        let choices = ItemTableOptions(filters: ["type": ["aic.ticket"]]).filterChoices
+        let added = ViewDraft.adding(choices, to: listed, columns: Self.columns, catalogue: Self.catalogue)
+        #expect(added.query.types == [Self.ticket])
+        #expect(added.query.filter == #"type eq "aic.ticket""#)
+        #expect(added.unkept.isEmpty)
+        // So it is in a view that lists the type.
+        let view = LibraryView(id: ItemID("v"), title: "V", version: 2, query: listed)
+        let seed = ViewDraft.options(for: view, catalogue: Self.catalogue)
+        var options = seed
+        options.filters = ["type": ["aic.ticket"]]
+        let change = ViewDraft.change(
+            Self.window(.view(view.id), filters: ["type": ["aic.ticket"]]), options: options, seed: seed, seedTimelineDate: nil,
+            seededTypes: nil, view: view, catalogue: Self.catalogue)
+        #expect(change.change.query?.types == [Self.ticket])
+        #expect(change.change.query?.filter == #"type eq "aic.ticket""#)
+        // A subtype chosen in a view that lists the parent is the subtype's items.
+        let sub = ViewDraft.replacing(
+            listed, with: ItemTableOptions(filters: ["type": ["aic.ticket.task"]]).filterChoices, columns: Self.columns,
+            seededTypes: nil, catalogue: Self.catalogue)
+        #expect(sub.query.types == [Self.ticketTask])
+        #expect(sub.query.filter == nil)
+    }
+
+    @Test func aTypeFilterOfTwoTypesInItemsIsTheirTypes() throws {
+        let plain = try #require(Self.draft(Self.window(.allNotes, filters: ["type": ["core.task", "core.note"]])))
+        #expect(plain.query.types == [TypeID("core.note"), Self.task])
+        #expect(plain.query.filter == nil)
+        // With a type that has subtypes, the types are exact conditions joined by or.
+        let exact = try #require(Self.draft(Self.window(.allNotes, filters: ["type": ["core.task", "aic.ticket"]])))
+        #expect(exact.query.types.isEmpty)
+        #expect(exact.query.filter == #"type eq "aic.ticket" OR type eq "core.task""#)
+        #expect(exact.unkept.isEmpty)
     }
 
     @Test func aViewOfSeveralTypesOpensWithATypeFilter() {
