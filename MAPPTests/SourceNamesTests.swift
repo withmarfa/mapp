@@ -251,7 +251,7 @@ struct SourceServerMappingTests {
         #expect(MarfaServerCalls.sourceFailure(.keyRefused) == .keyRefused)
         #expect(MarfaServerCalls.sourceFailure(.refused("no")) == .refused("no"))
         #expect(MarfaServerCalls.sourceFailure(.failed("odd")) == .failed("odd"))
-        let forbidden = MarfaServerCalls.ending(MarfaError.forbidden(code: "forbidden", message: "needs keys.manage"))
+        let forbidden = MarfaServerCalls.ending(MarfaError.forbidden(code: "forbidden", message: "needs keys.manage", server: nil))
         #expect(MarfaServerCalls.sourceFailure(forbidden) == .notPermitted)
     }
 }

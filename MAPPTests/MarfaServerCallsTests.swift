@@ -1,11 +1,9 @@
 import Foundation
 import Marfa
+import MarfaAPI
 import MarfaTesting
 import Testing
 @testable import MAPP
-
-// The package names the same things; these tests mean the package's.
-private typealias PackagePatch = Marfa.InstanceConfigPatch
 
 /// How the calls to the server itself are made and how their failures are told. None reaches a server: the package's
 /// `Server` takes no transport that a test can replace, so what goes over the wire (the `PATCH`, the instance header,
@@ -20,9 +18,9 @@ private typealias PackagePatch = Marfa.InstanceConfigPatch
     @Test func theChangeNamesOnlyTheChangedSettingsAndClearRemovesOne() {
         let patch = InstanceConfigPatch(values: [.name: .text("Home"), .versionMaxVersions: .number(200)], clear: [.trashRetentionDays])
         let change = MarfaServerCalls.patch(patch)
-        #expect(change.name == .set("Home"))
-        #expect(change.versionMaxVersions == .set(200))
-        #expect(change.trashRetentionDays == .clear)
+        #expect(change.name == .value("Home"))
+        #expect(change.versionMaxVersions == .value(200))
+        #expect(change.trashRetentionDays == .null)
         #expect(change.versionRecentDays == nil)
         #expect(change.versionDailySnapshotDays == nil)
         #expect(change.versionWeeklySnapshotDays == nil)
@@ -33,13 +31,13 @@ private typealias PackagePatch = Marfa.InstanceConfigPatch
     }
 
     @Test func aChangeWithNothingChangedSendsNothing() {
-        #expect(MarfaServerCalls.patch(InstanceConfigPatch(values: [:], clear: [])) == PackagePatch())
+        #expect(MarfaServerCalls.patch(InstanceConfigPatch(values: [:], clear: [])) == Operations.UpdateConfig.Input.Body.JsonPayload())
     }
 
     @Test func theServersSettingsAreReadByTheirNames() {
-        let answer = Marfa.InstanceConfig(
-            instanceID: "i-1", name: "Home", trashRetentionDays: 30, versionRecentDays: 7, versionDailySnapshotDays: 30,
-            versionWeeklySnapshotDays: 90, versionMaxVersions: nil)
+        let answer = Components.Schemas.InstanceConfig(
+            instanceId: "i-1", versionRecentDays: 7, versionDailySnapshotDays: 30, versionWeeklySnapshotDays: 90,
+            name: "Home", trashRetentionDays: 30)
         let config = MarfaServerCalls.config(answer)
         #expect(config.instanceID == "i-1")
         #expect(config.values[.name] == .text("Home"))
@@ -84,30 +82,30 @@ private typealias PackagePatch = Marfa.InstanceConfigPatch
     }
 
     @Test func aRefusedKeyIsNotAMissingPermissionOrAnAwayServer() {
-        let refused = MarfaServerCalls.ending(MarfaError.unauthorized(code: "invalid_key", message: "no"))
+        let refused = MarfaServerCalls.ending(MarfaError.unauthorized(code: "invalid_key", message: "no", server: nil))
         #expect(refused == .keyRefused)
         #expect(MarfaServerCalls.configFailure(refused) == .keyRefused)
-        let forbidden = MarfaServerCalls.ending(MarfaError.forbidden(code: "forbidden", message: "no"))
+        let forbidden = MarfaServerCalls.ending(MarfaError.forbidden(code: "forbidden", message: "no", server: nil))
         #expect(forbidden == .notPermitted)
         #expect(MarfaServerCalls.historyFailure(forbidden) == .notPermitted)
         #expect(MarfaServerCalls.iconFailure(forbidden) == .notPermitted)
     }
 
     @Test func anotherInstanceAtTheAddressIsRefusedAndTheDraftIsLeftToTheModel() {
-        let ending = MarfaServerCalls.ending(MarfaError.instanceChanged(message: "other"))
+        let ending = MarfaServerCalls.ending(MarfaError.instanceChanged(message: "other", server: nil))
         #expect(MarfaServerCalls.configFailure(ending) == .instanceChanged)
-        #expect(MarfaServerCalls.configFailure(MarfaServerCalls.ending(MarfaError.versionConflict(message: "stale"))) == .failed("stale"))
+        #expect(MarfaServerCalls.configFailure(MarfaServerCalls.ending(MarfaError.versionConflict(message: "stale", server: nil))) == .failed("stale"))
     }
 
-    @Test func aRefusalGivesTheServersReasonWithoutItsDetails() {
-        let error = MarfaError.validation(code: "invalid_config", message: "Windows must not decrease. Details: {\"x\":1}", details: nil)
+    @Test func aRefusalGivesTheServersReason() {
+        let error = MarfaError.validation(code: "invalid_config", message: "Windows must not decrease.", details: nil, server: nil)
         let ending = MarfaServerCalls.ending(error)
         #expect(MarfaServerCalls.configFailure(ending) == .refused("Windows must not decrease."))
         #expect(MarfaServerCalls.iconFailure(ending) == .refused("Windows must not decrease."))
     }
 
     @Test func anItemTheServerHoldsNoHistoryForIsUnavailable() {
-        let ending = MarfaServerCalls.ending(MarfaError.notFound(code: "not_found", message: "gone"))
+        let ending = MarfaServerCalls.ending(MarfaError.notFound(code: "not_found", message: "gone", server: nil))
         #expect(MarfaServerCalls.historyFailure(ending) == .unavailable)
         #expect(MarfaServerCalls.iconFailure(ending) == .failed("gone"))
     }

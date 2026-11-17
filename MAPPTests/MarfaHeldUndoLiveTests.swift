@@ -56,13 +56,13 @@ extension LiveMarfaTests {
         /// A parent-of edge as the server holds it.
         private struct ServerEdge: Decodable {
             let id: String
-            let sourceID: String
-            let targetID: String
+            let fromID: String
+            let toID: String
             let version: Int64
 
             private enum CodingKeys: String, CodingKey {
                 case id, version
-                case sourceID = "source_id", targetID = "target_id"
+                case fromID = "from_id", toID = "to_id"
             }
         }
 
@@ -76,7 +76,7 @@ extension LiveMarfaTests {
             struct Page: Decodable { let data: [ServerEdge] }
             let (data, response) = try await URLSession.shared.data(for: request)
             try #require((response as? HTTPURLResponse)?.statusCode == 200)
-            return try JSONDecoder().decode(Page.self, from: data).data.first { $0.targetID == child.rawValue }
+            return try JSONDecoder().decode(Page.self, from: data).data.first { $0.toID == child.rawValue }
         }
 
         /// What a held Undo needs: a child under `parent`, moved to `other` and sent, with the copy's hydration held
@@ -134,7 +134,7 @@ extension LiveMarfaTests {
                 })
                 await source.flush()
                 try #require(await eventually { library.syncReport.waiting == 0 && LiveMarfa.isWhole(library.syncReport) })
-                try #require(await serverParentEdge(of: child)?.sourceID == parent.rawValue)
+                try #require(await serverParentEdge(of: child)?.fromID == parent.rawValue)
 
                 // The move of the edge's source: the server takes it and expires the copy, which hydrates again,
                 // and that hydration waits for the test.
@@ -149,7 +149,7 @@ extension LiveMarfaTests {
                 // wait for a drain behind the held hydration.
                 try #require(await eventually { gate.isWaiting })
                 #expect(source.syncReport.phase == .catchingUp)
-                #expect(try await serverParentEdge(of: child)?.sourceID == other.rawValue)
+                #expect(try await serverParentEdge(of: child)?.fromID == other.rawValue)
                 #expect(library.notices.waiting.isEmpty)
 
                 try await body(Scene(library: library, source: source, gate: gate, undo: undo, parent: parent, other: other, third: third, child: child))
@@ -170,10 +170,10 @@ extension LiveMarfaTests {
                 // The package refused the edge write, and the engine kept it.
                 try #require(await eventuallyAsking { await scene.source.engine.held.count == 1 })
                 #expect(scene.library.notices.waiting.isEmpty)
-                #expect(try await serverParentEdge(of: scene.child)?.sourceID == scene.other.rawValue, "the Undo was made before the copy was whole")
+                #expect(try await serverParentEdge(of: scene.child)?.fromID == scene.other.rawValue, "the Undo was made before the copy was whole")
 
                 scene.gate.release()
-                try #require(await eventuallyAsking { try await serverParentEdge(of: scene.child)?.sourceID == scene.parent.rawValue })
+                try #require(await eventuallyAsking { try await serverParentEdge(of: scene.child)?.fromID == scene.parent.rawValue })
                 try #require(await eventuallyAsking { await scene.source.engine.held.isEmpty && LiveMarfa.isWhole(scene.source.syncReport) })
                 await scene.source.flush()
                 // One move back: the same edge, one version later, and nothing else was written.
@@ -211,7 +211,7 @@ extension LiveMarfaTests {
                     _ = try await second.hydrate(types: ["core.*"], tier: .library, edgeTypes: [MarfaMapping.parentEdge])
                     let row = try #require(try await second.items.get(scene.child.rawValue))
                     _ = try await second.items.update(scene.child.rawValue, Edit(properties: ["body": .string(newer)], baseVersion: row.version))
-                    _ = try await second.edges.update(moved.id, EdgeEdit(baseVersion: moved.version, move: .source(scene.third.rawValue)))
+                    _ = try await second.edges.update(moved.id, EdgeEdit(baseVersion: moved.version, move: .from(scene.third.rawValue)))
                     do {
                         _ = try await second.queue.drain()
                     } catch MarfaError.copyExpired {
@@ -222,7 +222,7 @@ extension LiveMarfaTests {
                     throw error
                 }
                 await second.close()
-                try #require(await serverParentEdge(of: scene.child)?.sourceID == scene.third.rawValue)
+                try #require(await serverParentEdge(of: scene.child)?.fromID == scene.third.rawValue)
 
                 scene.gate.release()
                 // The copy reads what the other connection wrote, and the held Undo is given back.
@@ -234,7 +234,7 @@ extension LiveMarfaTests {
                 #expect(scene.undo.canUndo, "the Undo was not put back")
 
                 let kept = try #require(await serverParentEdge(of: scene.child))
-                #expect(kept.sourceID == scene.third.rawValue)
+                #expect(kept.fromID == scene.third.rawValue)
                 #expect(kept.version == moved.version + 1, "the Undo wrote to the edge")
                 #expect(try await scene.source.body(of: scene.child).text == newer)
                 #expect(await eventually {

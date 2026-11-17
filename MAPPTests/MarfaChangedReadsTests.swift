@@ -103,7 +103,7 @@ import Testing
 
         func edges(touching id: String) async throws -> [Marfa.Edge] {
             try refuseWhileFilling()
-            return try await read.edges(touching: id) + extraEdges.withLock { $0 }.filter { $0.sourceId == id || $0.targetId == id }
+            return try await read.edges(touching: id) + extraEdges.withLock { $0 }.filter { $0.fromId == id || $0.toId == id }
         }
 
         func edges(_ ids: [String]) async throws -> [Marfa.Edge] {
@@ -197,7 +197,7 @@ import Testing
         /// placement before.
         func place(_ id: String, at path: String, version: Int64 = 1) -> Marfa.Edge {
             let edge = Marfa.Edge(
-                id: "placement-\(id)", sourceId: id, targetId: "folder", edgeType: "in-folder",
+                id: "placement-\(id)", fromId: id, toId: "folder", edgeType: "in-folder",
                 properties: ["path": .string(path)], version: version,
                 createdAt: "2026-10-30T00:00:00Z", updatedAt: "2026-10-30T00:00:00Z")
             reads.extraEdges.withLock { edges in

@@ -53,7 +53,9 @@ extension LiveMarfaTests {
             let source = try await MarfaSource.open(connection, signIns: keys, location: location)
             try await closing(source) {
                 let log = ChangeLog(source)
-                _ = try #require(await log.wait { $0.snapshot?.items.contains { $0.id == id } == true })
+                // The copy paints what it held before the server's purge reaches it, which a fast server may do at once.
+                let state = try #require(await log.wait { $0.painted != nil })
+                #expect(state.painted?.items.contains { $0.id == id } == true)
                 let typed = "MAPPTEST purged elsewhere, then everything typed after"
                 let edit = WriteID(), behind = WriteID()
                 source.submit(.editProperties(id, ["title": .string(typed)], base: version, undoing: nil), as: edit)

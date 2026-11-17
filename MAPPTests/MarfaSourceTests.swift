@@ -12,6 +12,12 @@ nonisolated final class ChangeLog: Sendable {
         var changes: [SourceChange] = []
         var snapshot: SourceSnapshot?
 
+        /// The first snapshot the source told, which a later change can have taken an item from before a poll sees it.
+        var painted: SourceSnapshot? {
+            for case .loaded(let snapshot) in changes { return snapshot }
+            return nil
+        }
+
         func item(titled title: String) -> MAPP.Item? {
             snapshot?.items.first { $0.title == title }
         }
@@ -257,7 +263,7 @@ struct MarfaSourceOfflineTests {
         let location = MarfaStoreLocation(root: root)
         try await MarfaSource.open(connection, signIns: keys, location: location).close()
         let store = location.store(for: connection)
-        try Self.execute(store, "ALTER TABLE queue RENAME COLUMN depends_on TO depends")
+        try Self.execute(store, "PRAGMA user_version = 5; ALTER TABLE queue RENAME COLUMN depends_on TO depends")
         let before = try Self.inode(store)
 
         let failure = await #expect(throws: SourceFailure.self) {
@@ -307,13 +313,15 @@ struct MarfaSourceOfflineTests {
         try #require(FileManager.default.attributesOfItem(atPath: file.path)[.systemFileNumber] as? UInt64)
     }
 
-    /// Gives the queue the shape and write kind an earlier build used, as the package's own test does.
+    /// Gives the store the schema version and the queue the write kind an earlier build used, as the package's own
+    /// test does.
     static func makeItAnEarlierVersion(_ store: URL) throws {
         try execute(
             store,
             """
+            PRAGMA user_version = 5;
             PRAGMA writable_schema = ON;
-            UPDATE sqlite_master SET sql = replace(sql, '''replace_metadata'',', '''replace_metadata'', ''merge_metadata'',')
+            UPDATE sqlite_master SET sql = replace(sql, '''undo_rows''', '''undo_rows'', ''merge_metadata''')
               WHERE type = 'table' AND name = 'queue';
             """)
         // A new connection, since the first still holds the schema it read.
@@ -538,7 +546,7 @@ struct MarfaSourceOfflineTests {
     func anExpiredCopyIsHydratedAgain() async throws {
         let server = CountingRefresh()
         let (fake, source, _) = try await scriptedSource(refreshing: server)
-        let expired = MarfaError.copyExpired(reason: "read_view_changed", message: "the copy expired")
+        let expired = MarfaError.copyExpired(reason: "read_view_changed", message: "the copy expired", server: nil)
         fake.sendUpdate(CopyUpdate(reread: .everything, connection: .needsHydration(expired)))
         #expect(try await eventuallyAsking { server.hydrations == 1 })
         await source.close()
@@ -637,8 +645,8 @@ struct MarfaSourceOfflineTests {
         let selfLoop = WriteID()
         source.submit(.moveEdge(EdgeID(parentOf.id), end: .source, to: child), as: selfLoop)
         let answered = try #require(await log.wait { $0.answer(to: notReplaceable) != nil && $0.answer(to: selfLoop) != nil })
-        var validation = try #require(MarfaEngine.moveProblem(.validation(code: "validation_error", message: "", details: nil)))
-        var cycle = try #require(MarfaEngine.moveProblem(.validation(code: "edge_cycle", message: "", details: nil)))
+        var validation = try #require(MarfaEngine.moveProblem(.validation(code: "validation_error", message: "", details: nil, server: nil)))
+        var cycle = try #require(MarfaEngine.moveProblem(.validation(code: "edge_cycle", message: "", details: nil, server: nil)))
         // Refused before anything was queued.
         validation.notQueued = true
         cycle.notQueued = true
@@ -746,7 +754,7 @@ struct MarfaSourceOfflineTests {
 
         // Then the copy hydrates again, which this closed port refuses; the queue and the view are as they were. The
         // engine is told as the sync would tell it, since a copy with a store cannot be made to expire.
-        let expired = MarfaError.copyExpired(reason: "read_view_changed", message: "the copy expired")
+        let expired = MarfaError.copyExpired(reason: "read_view_changed", message: "the copy expired", server: nil)
         await source.tell(CopyUpdate(reread: .everything, connection: .needsHydration(expired)))
         await source.engineTook()
         let after = try await source.copy.queue.all()
@@ -803,14 +811,14 @@ struct MarfaSourceOfflineTests {
     @Test func aWriteToACopyBeingBroughtUpToDateIsRefusedPlainly() {
         for error in [
             MarfaError.hydrationIncomplete(message: "hydration did not complete; hydrate again before reading"),
-            MarfaError.copyExpired(reason: "catchup_too_old", message: "the copy expired")
+            MarfaError.copyExpired(reason: "catchup_too_old", message: "the copy expired", server: nil)
         ] {
             #expect(MarfaEngine.problem(for: error) == SyncProblem(code: error.code(), message: MarfaEngine.notCurrent))
         }
-        let other = MarfaError.validation(code: "invalid_properties", message: "body: Required field is missing", details: nil)
+        let other = MarfaError.validation(code: "invalid_properties", message: "body: Required field is missing", details: nil, server: nil)
         #expect(MarfaEngine.problem(for: other) == SyncProblem(code: "invalid_properties", message: other.message))
         // The package's own refusal names the server's code, as a drain's verdict would.
-        let reserved = MarfaError.forbidden(code: "type_not_permitted", message: "system.folder is written only through its own operation")
+        let reserved = MarfaError.forbidden(code: "type_not_permitted", message: "system.folder is written only through its own operation", server: nil)
         #expect(MarfaEngine.problem(for: reserved).code == "type_not_permitted")
     }
 }
@@ -915,11 +923,13 @@ extension LiveMarfaTests {
             await source.close()
 
             let reopened = try await open(root)
+            // Read before the server can have answered, since a fast one follows within milliseconds.
+            let atOpen = reopened.connectionState
             let again = ChangeLog(reopened)
-            let repainted = try #require(await again.wait { $0.snapshot != nil })
-            #expect(repainted.snapshot?.items.count == count)
-            #expect(repainted.snapshot?.items.first { $0.id == child }?.edgesOut.contains { $0.target == .item(parent) } == true)
-            #expect(reopened.connectionState != .online, "a copy is not online before the server has answered")
+            let repainted = try #require(await again.wait { $0.painted != nil })
+            #expect(repainted.painted?.items.count == count)
+            #expect(repainted.painted?.items.first { $0.id == child }?.edgesOut.contains { $0.target == .item(parent) } == true)
+            #expect(atOpen != .online, "a copy is not online before the server has answered")
             await reopened.close()
         }
 
@@ -1123,7 +1133,7 @@ extension LiveMarfaTests {
             _ = try await raw.items.update(a.rawValue, Edit(properties: ["body": .string("This device")], baseVersion: version.rawValue))
             let report = try await raw.queue.drain()
             let sibling = report.verdicts.compactMap { answer -> String? in
-                if case .conflicted(let sibling, _)? = answer.verdict { sibling } else { nil }
+                if case .conflicted(let sibling?, _, _)? = answer.verdict { sibling } else { nil }
             }.first
             if let sibling { made.add(ItemID(sibling)) }
             await raw.close()
@@ -1253,7 +1263,7 @@ extension LiveMarfaTests {
                 #expect(moved.isFavorite)
                 // The copy fills again after the move is answered, and a read made meanwhile is refused as incomplete.
                 #expect(await LiveMarfa.until {
-                    (try? await source.copy.edges.from(second.rawValue))?.contains { $0.targetId == child.rawValue } == true
+                    (try? await source.copy.edges.from(second.rawValue))?.contains { $0.toId == child.rawValue } == true
                 })
                 #expect(await LiveMarfa.until { (try? await source.copy.queue.all())?.isEmpty == true })
                 #expect(await waitForConnection(source) { $0 == .online })
@@ -1275,7 +1285,7 @@ extension LiveMarfaTests {
                     }
                 })
                 await source.flush()
-                let edge = try #require(try await source.copy.edges.from(a.rawValue).first { $0.targetId == b.rawValue })
+                let edge = try #require(try await source.copy.edges.from(a.rawValue).first { $0.toId == b.rawValue })
                 // `c` is below `b`, so it cannot become `b`'s parent.
                 let move = WriteID()
                 source.submit(.moveEdge(EdgeID(edge.id), end: .source, to: c), as: move)
@@ -1288,7 +1298,7 @@ extension LiveMarfaTests {
                 _ = try #require(await log.wait { state in
                     state.snapshot?.items.first { $0.id == b }?.edgesOut.contains { $0.target == .item(a) } == true
                 })
-                #expect(try await source.copy.edges.from(a.rawValue).contains { $0.targetId == b.rawValue })
+                #expect(try await source.copy.edges.from(a.rawValue).contains { $0.toId == b.rawValue })
             }
         }
 

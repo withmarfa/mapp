@@ -45,7 +45,7 @@ private actor FillServer: MarfaRefreshing {
         calls.append("catchUp")
         if expire {
             status.hydration = .stale
-            throw MarfaError.copyExpired(reason: "The event log no longer reaches this cursor", message: "expired")
+            throw MarfaError.copyExpired(reason: "The event log no longer reaches this cursor", message: "expired", server: nil)
         }
     }
     private var heldFetch: AsyncStream<Void>?

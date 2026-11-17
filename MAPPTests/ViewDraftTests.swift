@@ -230,15 +230,15 @@ struct ViewDraftTests {
         #expect(Self.filter(nil, adding: ["field.due-date": ["c"]], columns: Self.columns).unkept == [.filter(column: "Due")])
     }
 
-    @Test func aFilterIsMeasuredByTheCoreInUTF16UnitsNotCharacters() throws {
-        // Each 🎉 is one character and two UTF-16 units: 1,000 of them fit in 2,048 units and 1,100 do not.
+    @Test func aFilterIsMeasuredByTheCoreInCharactersNotUTF16Units() throws {
+        // Each 🎉 is one character and two UTF-16 units: 1,100 of them fit in 2,048 characters and 2,100 do not.
         func filter(_ count: Int) -> (filter: String?, unkept: [ViewDraft.Unkept]) {
             Self.filter(nil, adding: ["field.status": [String(repeating: "🎉", count: count)]], columns: Self.columns)
         }
-        let fits = filter(1_000)
+        let fits = filter(1_100)
         #expect(fits.unkept.isEmpty)
-        #expect(try #require(fits.filter).utf16.count <= 2_048)
-        let over = filter(1_100)
+        #expect(try #require(fits.filter).unicodeScalars.count <= 2_048)
+        let over = filter(2_100)
         #expect(over.filter == nil)
         guard case .refused(let message)? = over.unkept.first else { Issue.record("not refused: \(over.unkept)"); return }
         #expect(!message.isEmpty)

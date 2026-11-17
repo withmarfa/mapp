@@ -24,6 +24,11 @@ import Testing
         #expect(ItemTag.refusal(of: "...") == nil)
     }
 
+    @Test func aTagIsMeasuredInCharactersNotUTF16Units() {
+        #expect(ItemTag.refusal(of: String(repeating: "🎉", count: 128)) == nil)
+        #expect(ItemTag.refusal(of: String(repeating: "🎉", count: 129)) == .tooLong)
+    }
+
     // MARK: Adding and removing through the library
 
     @Test func addingATagShowsAtOnceAndKeepsTheTypedTextOnRefusal() {
