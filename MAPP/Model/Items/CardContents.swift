@@ -28,12 +28,12 @@ nonisolated extension RowContent {
     /// What a gallery card or a board card says about an item: the content of a row, with no date, and without what the
     /// card leaves out (`CardShape`). A card never says the date, and a board's lane says the field it is grouped by.
     static func card(
-        for item: Item, look: TypeLook, catalogue: Catalogue, list: RowList, shape: CardShape,
+        for item: Item, look: TypeLook, catalogue: Catalogue, list: RowList, shape: CardShape, relations: ItemRelations = .none,
         calendar: Calendar = .current, locale: Locale = .current
     ) -> RowContent {
         var content = make(
-            for: item, look: look.shaped(by: shape), catalogue: catalogue, list: list, includesDate: false, calendar: calendar,
-            locale: locale)
+            for: item, look: look.shaped(by: shape), catalogue: catalogue, list: list, relations: relations, includesDate: false,
+            calendar: calendar, locale: locale)
         let status = catalogue.itemTypes[item.type]?.statusField?.key
         if shape.groupsByStatus || (status != nil && status == shape.leaving) {
             content.chips.removeAll { if case .status = $0 { true } else { false } }
@@ -57,8 +57,14 @@ final class CardContents {
         let shape: CardShape
     }
 
+    private struct Held {
+        let item: Item
+        /// The links the card was made with: they follow other items, so a change to one is seen by reading them again.
+        let relations: ItemRelations
+    }
+
     private var basis: Basis?
-    private var held: [ItemID: Item] = [:]
+    private var held: [ItemID: Held] = [:]
     /// The content of each held item, kept beside `held` so a pass that changes nothing answers without building it again.
     private var made: [ItemID: RowContent] = [:]
     /// How many contents have been made, for tests to see that a pass that changes nothing makes none.
@@ -76,11 +82,13 @@ final class CardContents {
         }
         for item in items {
             let id = item.id
-            if held[id] == item { continue }
+            let look = looks[item.type] ?? .empty
+            let relations = library.relations(of: item, wanting: look.shaped(by: shape).relations)
+            if let known = held[id], known.item == item, known.relations == relations { continue }
             builds += 1
             made[id] = RowContent.card(
-                for: item, look: looks[item.type] ?? .empty, catalogue: library.catalogue, list: list, shape: shape)
-            held[id] = item
+                for: item, look: look, catalogue: library.catalogue, list: list, shape: shape, relations: relations)
+            held[id] = Held(item: item, relations: relations)
         }
         // Every item is held now, so more held than listed means some item is gone.
         if held.count != items.count {

@@ -20,7 +20,7 @@ A value component is one drawing for one kind of value. The same component appea
 
 Dates, numbers, web addresses and sources are plain text, not chips.
 
-In a row, linked items do not show, and tags show only in a Note's (a Note look's `tags` fact; see [Looks](looks.md)). A chip is a little smaller in a row (20 points high with 11.5-point text) than on the page (22 points high with 13-point text).
+A linked item is a fact like any other: a type's look may put its parent, its children or its collections on a row's bottom line, a board card or a table column, and a row never shows one the look does not ask for (see [Relation](composed-properties.md)). Tags show only in a Note's (a Note look's `tags` fact; see [Looks](looks.md)). A chip is a little smaller in a row (20 points high with 11.5-point text) than on the page (22 points high with 13-point text).
 
 A tint means a type, so no other chip uses a colored fill. A person has no chip round the name and is never colored. Bare chips are not used.
 
@@ -70,6 +70,7 @@ One family draws every kind of value: `PageChip` for a type, a linked item, a st
 
 - The item page's pins and property rows and the right sidebar's status, choice and tag values draw through the family at page size. The value panel's chips draw only their marks (status symbol, person circle) through it. The page's web header draws the same measures in HTML.
 - A list row, a board card and a table cell draw their type, status, options, people and tags through the family at row size, whatever the type; a person is initials only, except in a table cell, which adds the name. A row and a board card share one bottom line (`ChipLine`, from `RowContent`); a table cell draws the same chips for one column's value. A table's priority is an option chip like any other choice. A gallery card draws no chips: its picture, title and Secondary line say what its look gives it. A board card and a table cell drawing from the look are built in v0.0.45. See [Looks](looks.md).
+- A linked item in a row, a card or a table cell is the linked-item chip at row size: the item's type mark and its title on the gray of an option chip, up to two with the rest counted in "+N". An item in Recently Deleted, one the library cannot read and one the copy lacks show nothing, never an id.
 - A person is one look everywhere: initials in a pale circle, then the name on the page and in the right sidebar, and the circle alone in a row, with the name for VoiceOver; a table is not a row, so its cell writes the name. A name with one word, or an email address, gives one initial.
 - A choice the field's list does not hold draws as its word, with the color its word gives it. Several values show as the first two, then a count.
 - The right sidebar's tag chip carries a number sign and keeps its remove control.

@@ -24,6 +24,8 @@ final class RowContents {
     private struct Held {
         let item: Item
         let showsTime: Bool
+        /// The links the row was made with: they follow other items, so a change to one is seen by reading them again.
+        let relations: ItemRelations
     }
 
     private var basis: Basis?
@@ -45,12 +47,14 @@ final class RowContents {
         }
         for entry in entries {
             let id = entry.item.id
-            if let known = held[id], known.item == entry.item, known.showsTime == entry.showsTime { continue }
-            builds += 1
             let look = looks[entry.item.type] ?? .empty
+            // A linked item's title, or its coming or going, changes this row though this item is the same.
+            let relations = library.relations(of: entry.item, wanting: look.relations)
+            if let known = held[id], known.item == entry.item, known.showsTime == entry.showsTime, known.relations == relations { continue }
+            builds += 1
             made[id] = RowContent.make(
-                for: entry.item, look: look, catalogue: library.catalogue, list: list, showsTime: entry.showsTime)
-            held[id] = Held(item: entry.item, showsTime: entry.showsTime)
+                for: entry.item, look: look, catalogue: library.catalogue, list: list, relations: relations, showsTime: entry.showsTime)
+            held[id] = Held(item: entry.item, showsTime: entry.showsTime, relations: relations)
         }
         // Every entry is held now, so more held than listed means some item is gone.
         if held.count != entries.count {

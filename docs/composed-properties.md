@@ -1,15 +1,15 @@
 # Composed properties
 
-Status: Location is built in v0.0.45. Relation, Count and Reading Time are not built and are being reconsidered; see "Built today".
+Status: Location is built in v0.0.45. Relation is built, not yet released. Count and Reading Time are not built and are being reconsidered; see "Built today".
 
-Where it lives: `PropertyRow` (with its `Value`) under `MAPP/Model/Items/`, and `MarfaMapping` under `MAPP/Model/Marfa/`. Location is `ItemLocation` and `LocationFrame` under `MAPP/Model/Items/`, and `LocationPanelContent` and `LocationPanelModel` under `MAPP/Views/ValueEditing/`. Composed properties are built in a type's look from these.
+Where it lives: `PropertyRow` (with its `Value`) under `MAPP/Model/Items/`, and `MarfaMapping` under `MAPP/Model/Marfa/`. Location is `ItemLocation` and `LocationFrame` under `MAPP/Model/Items/`, and `LocationPanelContent` and `LocationPanelModel` under `MAPP/Views/ValueEditing/`. Relation is `Relation`, `RelatedItem` and `ItemRelations` under `MAPP/Model/Items/`. Composed properties are built in a type's look from these.
 
 A composed property is a property that MAPP builds from a type's fields and links. Marfa holds no such property, so building one changes nothing in Marfa and stores nothing new there.
 
 ## The properties
 
 - **Location.** A place on a map, built from the `latitude` and `longitude` fields. Marfa's `core.event`, `core.entity.place`, `core.file.image` and `core.file.video` types have them, and a type may also carry `place` or address fields. A person looks for an area with a search, clicks the map to place the pin and drags it to adjust, and MAPP writes only that point's latitude and longitude. The numbers stay hidden unless the person turns on Show Coordinates. An event's name is its `place` field, a place item's name is the item's own name and is never changed, and an image or video has no name, so it shows the map only. See "How Location works".
-- **Relation.** A link shown as a property: Parent, Children or In Collection. Marfa links items with edges, which are global, so a relation is how MAPP shows an edge as a row.
+- **Relation.** A link shown as a property: Parent, Children or In Collection. Marfa links items with edges, which are global, so a relation is how MAPP shows an edge as a row. See "How Relation works".
 - **Count.** How many items a link reaches, or how many steps are done, such as "4 subtasks" or "3 of 7 done".
 - **Reading time.** Worked out from the item's text.
 
@@ -31,11 +31,18 @@ A composed property is a property that MAPP builds from a type's fields and link
 - **An item that cannot be edited,** and every file, shows the map and its point, with no search, name field or Clear Location.
 - **Show Coordinates** is one setting on this Mac (`showsCoordinates`, off by default; see [Settings storage](settings-storage.md)).
 
+## How Relation works
+
+- **Three relations.** Parent, Children and In Collection (`Relation`), named as Marfa names the edge (`EdgeType.label` and `reverseLabel`), never reworded. Parent is the item an item is filed under (`parent-of`, read from the child end), Children are the items filed under it, and In Collection is the collections it is in (`in-collection`).
+- **Where a look places one.** A look's fact (`LookFact.relation`) puts it on a row's bottom line and a board card as the linked-item chip, and as a table column. A Secondary part (`LookPart.parent`) says the parent's title as plain text. Any type's table can show the three columns from View Options.
+- **Worked out once.** `ItemLibrary.relations(of:wanting:)` reads an item's links from the copy for only the relations its look asks for. `RowContents` and `CardContents` read them once for each item on each pass and make the content again only when the item or what it links to changed, so a renamed parent refreshes its children's rows and a row's body reads nothing.
+- **What shows.** Up to two linked items, then "+N". The linked items are in title order. An item in Recently Deleted, one with a problem, and one the copy does not hold show nothing, never an id, and an item with no links leaves no gap. It works offline from the copy.
+
 ## Built today
 
 Location is built (see above). A geographic or object field maps to a shape that the app shows but does not edit (`MarfaMapping`): the page's property block skips it, and the right sidebar prints it as plain text.
 
-Reading time, relations and counts are not built. A saved web page's header shows only its description (`ReadingHeader`), and the right sidebar shows parent, children and links as the page's own sections, not as properties that a look can place.
+Relation is built (see below). Reading time and counts are not built. A saved web page's header shows only its description (`ReadingHeader`), and the right sidebar shows parent, children and links as the page's own sections, not as properties that a look can place.
 
 ## Open point
 

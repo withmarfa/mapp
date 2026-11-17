@@ -298,7 +298,7 @@ extension ItemTableColumn {
         case .duration: (70, 92, 140)
         case .number: (60, 90, 160)
         case .boolean: (50, 70, 120)
-        case .link: (120, 200, 360)
+        case .link, .links: (120, 200, 360)
         }
     }
 }
