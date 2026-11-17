@@ -24,6 +24,32 @@ struct PaletteEntry: Identifiable {
 /// The grey of a chosen row: quiet in light and in dark, with the text keeping its own color.
 private let paletteSelection = Color.primary.opacity(0.1)
 
+/// The palette's columns, shared by the field and the rows so the typed words start where the titles do.
+enum PaletteMetrics {
+    /// The list's inset from the panel's edge.
+    static let listInset: CGFloat = 6
+    /// A row's inset inside the list.
+    static let rowInset: CGFloat = 8
+    /// The mark column's left edge, from the panel's edge.
+    static let markInset: CGFloat = listInset + rowInset
+    static let markWidth: CGFloat = 20
+    static let markGap: CGFloat = 10
+}
+
+/// The bar that floats over the foot of the results: the filter button in Search Notes, and Open and Actions.
+enum PaletteBar {
+    /// The bar's glass, by what it is, so Actions grows out of the bar's own glass and goes back into it.
+    nonisolated enum Glass: Hashable, Sendable { case filters, open, actions }
+
+    static let inset: CGFloat = 10
+    static let spacing: CGFloat = 8
+    /// The bar's height: the system's large glass button.
+    static let height: CGFloat = 32
+    /// What the last row has to clear.
+    static let clearance: CGFloat = height + inset * 2
+    static let morph = Animation.smooth(duration: 0.3)
+}
+
 struct PaletteSectionHeader: View {
     let title: String
 
@@ -31,7 +57,7 @@ struct PaletteSectionHeader: View {
         Text(title)
             .interfaceFont(.caption.weight(.medium))
             .foregroundStyle(.secondary)
-            .padding(.horizontal, 10)
+            .padding(.horizontal, PaletteMetrics.rowInset)
             .padding(.top, 10)
             .padding(.bottom, 4)
             .accessibilityAddTraits(.isHeader)
@@ -41,20 +67,19 @@ struct PaletteSectionHeader: View {
 /// A type's mark in its tone, or a command's symbol.
 private struct PaletteMark: View {
     let icon: RowIcon
-    var isLarge = false
 
     var body: some View {
         Group {
             switch icon {
             case .type(let name):
-                TypeMark(icon: name, size: isLarge ? .large : .side)
+                TypeMark(icon: name, size: .side)
             case .symbol:
                 RowIconImage(icon: icon)
                     .foregroundStyle(.secondary)
-                    .frame(width: 20, height: 20)
+                    .frame(width: PaletteMetrics.markWidth, height: PaletteMetrics.markWidth)
             }
         }
-        .frame(width: isLarge ? 32 : 20)
+        .frame(width: PaletteMetrics.markWidth)
         .accessibilityHidden(true)
     }
 }
@@ -70,9 +95,11 @@ struct PaletteRow: View {
 
     var body: some View {
         let words = isSearch ? (entry.excerpt?.attributed() ?? entry.snippet.map { AttributedString($0) }) : nil
-        HStack(spacing: 10) {
-            PaletteMark(icon: entry.icon, isLarge: words != nil)
-            VStack(alignment: .leading, spacing: 1) {
+        // A row with a second line keeps its mark and date on the title's line, as a one-line row has them.
+        HStack(alignment: words == nil ? .center : .firstTextBaseline, spacing: PaletteMetrics.markGap) {
+            PaletteMark(icon: entry.icon)
+                .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
+            VStack(alignment: .leading, spacing: 2) {
                 titleText
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -91,11 +118,10 @@ struct PaletteRow: View {
                     .fixedSize()
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, words == nil ? 5 : 4)
+        .padding(.horizontal, PaletteMetrics.rowInset)
+        .padding(.vertical, words == nil ? 5 : 6)
         .background(isHighlighted ? paletteSelection : .clear, in: .rect(cornerRadius: 8, style: .continuous))
         .contentShape(.rect)
-        .help(entry.title)
         .onContinuousHover { phase in
             if case .active = phase { onHover() }
         }
@@ -121,47 +147,51 @@ struct KeyCap: View {
 
     var body: some View {
         Text(key)
-            .font(.system(size: 10, weight: .medium))
+            .font(.system(size: 11, weight: .medium))
             .foregroundStyle(.secondary)
-            .frame(minWidth: 16, minHeight: 16)
-            .background(.quaternary, in: .rect(cornerRadius: 4, style: .continuous))
+            .frame(minWidth: 18, minHeight: 18)
+            .background(.quaternary, in: .rect(cornerRadius: 5, style: .continuous))
             .accessibilityHidden(true)
     }
 }
 
-/// Open and Actions, a small glass capsule over the bottom right of the results.
+/// Open and Actions, glass buttons of the bar's height at the bottom right of the results, each with its keys.
 struct PaletteFooter: View {
     let openTitle: String
     let onOpen: () -> Void
     let onActions: () -> Void
+    let namespace: Namespace.ID
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: PaletteBar.spacing) {
             Button(action: onOpen) {
                 HStack(spacing: 6) {
                     Text(openTitle)
                     KeyCap(key: "↩")
                 }
             }
+            .glassEffectID(PaletteBar.Glass.open, in: namespace)
             .accessibilityIdentifier("CommandPaletteOpen")
             Button(action: onActions) {
-                HStack(spacing: 4) {
+                HStack(spacing: 6) {
                     Text("Actions")
-                    KeyCap(key: "⌘")
-                    KeyCap(key: "K")
+                    HStack(spacing: 2) {
+                        KeyCap(key: "⌘")
+                        KeyCap(key: "K")
+                    }
                 }
             }
+            .glassEffectID(PaletteBar.Glass.actions, in: namespace)
             .accessibilityIdentifier("CommandPaletteActions")
         }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 7)
-        .glassEffect(.regular, in: .capsule)
+        .buttonStyle(.glass)
+        .controlSize(.large)
+        .frame(height: PaletteBar.height)
     }
 }
 
-/// The round glass button at the bottom left that shows and hides the filter row, with the number of filters set
-/// beside its symbol.
+/// The round glass button at the bar's left in Search Notes that shows and hides the filter row, with the number of
+/// filters set beside its symbol.
 struct PaletteFilterButton: View {
     let count: Int
     let isOn: Bool
@@ -181,9 +211,9 @@ struct PaletteFilterButton: View {
         .buttonStyle(.glass)
         .buttonBorderShape(count > 0 ? .capsule : .circle)
         .controlSize(.large)
+        .frame(height: PaletteBar.height)
         // As the list's View Options button shows filters: the glass stays, and the symbol and count take the accent.
         .foregroundStyle(count > 0 ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary))
-        .help(isOn ? "Hide Filters" : "Show Filters")
         .accessibilityLabel(isOn ? "Hide Filters" : "Show Filters")
         .accessibilityIdentifier("CommandPaletteFilters")
     }
@@ -207,7 +237,7 @@ struct PaletteFilterRow: View {
 
     var body: some View {
         FilterChipsBar(
-            chips: chips, anchors: anchors,
+            chips: chips, leadingInset: PaletteMetrics.markInset, showsHelp: false, anchors: anchors,
             open: { id in PaletteFilters.Field(rawValue: id).map(openValues) },
             remove: { id in if let field = PaletteFilters.Field(rawValue: id) { remove(field) } },
             add: openFields
@@ -374,8 +404,8 @@ enum PaletteFocus: Hashable {
     case field, actions
 }
 
-/// What can be done to the chosen row: a panel over the buttons with the row's title, its actions, and a field that
-/// narrows them. Escape puts the panel away and leaves the palette.
+/// What can be done to the chosen row: the bar's glass grown into a panel with the row's title, its actions, and a
+/// field that narrows them. Escape puts the panel away and leaves the palette.
 struct PaletteActionsPanel: View {
     let title: String
     let actions: [PaletteAction]
@@ -430,7 +460,6 @@ struct PaletteActionsPanel: View {
         }
         .frame(width: 300)
         .glassEffect(.regular, in: .rect(cornerRadius: 16))
-        .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
         .task {
             try? await Task.sleep(for: .milliseconds(50))
             focus.wrappedValue = .actions

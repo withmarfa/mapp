@@ -1,6 +1,6 @@
 # Views and lists
 
-Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built in v0.0.45. The table's margin, whole-cell hover and add to an empty cell are built, not yet released. See [Looks](looks.md).
+Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built in v0.0.45. The table's margin, whole-cell hover and add to an empty cell, and the palettes' bar and rows as described below, are built, not yet released. See [Looks](looks.md).
 
 Where it lives: `Browser`, `ItemViewMode`, `ViewLayouts` and `SidebarLayout` under `MAPP/Model/`, with `CardContents`, `ItemTableLayout`, `ItemTimelineLayout`, `ItemPlacement` and `EventSpan` under `MAPP/Model/Items/`; `NoteList`, `ItemRow`, `ItemGallery`, `GalleryCard`, `ItemBoard`, `ItemTable`, `ItemTableCell`, `ChipLine`, `ItemTimeline`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
 
@@ -69,11 +69,13 @@ The sidebar has three groups of places, under New and Search: Library (Items, So
 
 ## Command palette
 
-Command-K and Search Notes share one 680-point panel (`CommandPalette`).
+Command-K and Search Notes share one 680-point panel (`CommandPalette`), which sits about an eighth of the way down the window, as quick add does.
 
-- A row takes one line, or two in Search Notes. The results have sections, with the one that holds the best match first, and a gray selection. The count sits at the top right of the field.
-- A round glass button at the bottom left shows the palette's filter row, which holds the view's chips for Type, Collection and Updated.
-- Open and Actions float in a small glass capsule at the bottom right, with key caps, and an Actions panel opens above them.
+- The field has room above and below it and no divider under it. Its magnifying glass sits in the rows' mark column, so the typed words start where the titles do.
+- A row takes one line, or two in Search Notes. Both palettes draw a row the same way: the type's small mark, the title in regular weight, and the detail or date at the right. A Search Notes row adds the words around the match under its title, and keeps its mark and date on the title's line. The results have sections, with the one that holds the best match first, and a gray selection. The count sits at the top right of the field.
+- A bar floats over the foot of the results. At its right, Open and Actions are glass buttons of one height, each with its key caps. In Search Notes only, a round glass button of the same height at its left shows the palette's filter row, which holds the view's chips for Type, Collection and Updated. The command palette has no filter button.
+- Actions takes the bar's place: its glass grows up and to the left out of the bar, anchored at the bottom right where the bar was, and shrinks back into the bar when it closes. There is no second panel above the bar.
+- Nothing in either palette shows a tooltip.
 - There is no preview pane beside the results. A row carries its own excerpt.
 
 The palette builds its own list of commands. The rule that every toolbar action is also a command is in [`MAPP/Views/AGENTS.md`](../MAPP/Views/AGENTS.md).

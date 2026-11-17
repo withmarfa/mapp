@@ -48,8 +48,8 @@ struct CommandPalette: View {
     @State private var searched = SearchResults.none
     /// What `searched` lists once the filters have narrowed it: filtered when the answer or the filters change, never by the body.
     @State private var searchedItems: [Item] = []
-    /// The height of the buttons that float over the results, with their margin: what the last row must clear.
-    @State private var floatingHeight: CGFloat = 56
+    /// Where the bar's glass morphs into Actions and back.
+    @Namespace private var bar
 
     private typealias Entry = PaletteEntry
     private typealias Section = PaletteSections.Section<PaletteEntry>
@@ -97,9 +97,11 @@ struct CommandPalette: View {
         let chosen = rows.indices.contains(highlighted) ? highlighted : max(rows.count - 1, 0)
         let target = actionsFor.flatMap { id in rows.first { $0.id == id } }
         VStack(spacing: 0) {
-            HStack(spacing: 8) {
+            HStack(spacing: PaletteMetrics.markGap) {
+                // In the rows' mark column, so the typed words start where the titles do.
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
+                    .frame(width: PaletteMetrics.markWidth)
                 TextField(mode == .search ? "Search Notes" : "Search Commands and Notes", text: $query)
                     .textFieldStyle(.plain)
                     .interfaceFont(.title3)
@@ -125,12 +127,12 @@ struct CommandPalette: View {
                         .accessibilityIdentifier("CommandPaletteCount")
                 }
             }
-            .padding(12)
-            if showsFilters {
-                Divider()
+            .padding(.horizontal, PaletteMetrics.markInset)
+            .padding(.top, 18)
+            .padding(.bottom, 12)
+            if mode == .search, showsFilters {
                 PaletteFilterRow(state: filterState)
             }
-            Divider()
             results(sections, rows: rows, chosen: chosen, target: target)
         }
         .floatingPanelSurface(width: 680)
@@ -211,7 +213,8 @@ struct CommandPalette: View {
         .accessibilityLabel("Command Palette")
     }
 
-    /// The rows, or "No Results", with the filter button, the footer and Actions floating over them.
+    /// The rows, or "No Results", with the bar floating over their foot. Actions takes the bar's place: its glass grows
+    /// up out of the bar's and shrinks back into it, so there is only ever one layer over the rows.
     private func results(_ sections: [Section], rows: [Entry], chosen: Int, target: Entry?) -> some View {
         ZStack(alignment: .bottom) {
             if rows.isEmpty {
@@ -227,27 +230,28 @@ struct CommandPalette: View {
                     .contentShape(.rect)
                     .onTapGesture { closeActions() }
             }
-            HStack(alignment: .bottom) {
-                PaletteFilterButton(count: filterState.filters.count, isOn: showsFilters) { showsFilters.toggle() }
-                Spacer(minLength: 0)
-                if let row = rows.indices.contains(chosen) ? rows[chosen] : nil {
-                    PaletteFooter(
-                        openTitle: openTitle(for: row), onOpen: { run(rows, at: chosen) },
-                        onActions: { toggleActions(rows, chosen: chosen) })
+            GlassEffectContainer(spacing: PaletteBar.spacing) {
+                HStack(alignment: .bottom, spacing: PaletteBar.spacing) {
+                    if mode == .search, target == nil {
+                        PaletteFilterButton(count: filterState.filters.count, isOn: showsFilters) { showsFilters.toggle() }
+                            .glassEffectID(PaletteBar.Glass.filters, in: bar)
+                    }
+                    Spacer(minLength: 0)
+                    if let target {
+                        PaletteActionsPanel(
+                            title: target.title, actions: actions(for: target),
+                            perform: { perform($0, on: target) }, submit: { performHighlighted(on: target) }, close: { closeActions() },
+                            query: actionsField, highlighted: $actionsHighlighted, focus: $focus
+                        )
+                        .glassEffectID(PaletteBar.Glass.actions, in: bar)
+                    } else if let row = rows.indices.contains(chosen) ? rows[chosen] : nil {
+                        PaletteFooter(
+                            openTitle: openTitle(for: row), onOpen: { run(rows, at: chosen) },
+                            onActions: { toggleActions(rows, chosen: chosen) }, namespace: bar)
+                    }
                 }
             }
-            .padding(10)
-            .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { floatingHeight = $0 }
-            if let target {
-                PaletteActionsPanel(
-                    title: target.title, actions: actions(for: target),
-                    perform: { perform($0, on: target) }, submit: { performHighlighted(on: target) }, close: { closeActions() },
-                    query: actionsField, highlighted: $actionsHighlighted, focus: $focus
-                )
-                .padding(.trailing, 10)
-                .padding(.bottom, floatingHeight)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-            }
+            .padding(PaletteBar.inset)
         }
         .frame(minHeight: actionsFor == nil ? 0 : 340)
     }
@@ -277,11 +281,10 @@ struct CommandPalette: View {
                         }
                     }
                 }
-                .padding(.horizontal, 6)
-                .padding(.top, 2)
+                .padding(.horizontal, PaletteMetrics.listInset)
             }
-            // Room under the last row for the buttons that float over the list; a scroll to a row keeps it clear of them.
-            .contentMargins(.bottom, floatingHeight, for: .scrollContent)
+            // Room under the last row for the bar that floats over the list; a scroll to a row keeps it clear of it.
+            .contentMargins(.bottom, PaletteBar.clearance, for: .scrollContent)
             .frame(maxHeight: 460)
             .onChange(of: scrollTarget) { if let scrollTarget { proxy.scrollTo(scrollTarget) } }
         }
@@ -327,7 +330,7 @@ struct CommandPalette: View {
         if actionsFor != nil {
             closeActions()
         } else if rows.indices.contains(chosen) {
-            actionsFor = rows[chosen].id
+            withAnimation(PaletteBar.morph) { actionsFor = rows[chosen].id }
             actionsQuery = ""
             actionsHighlighted = 0
             focus = .actions
@@ -340,7 +343,7 @@ struct CommandPalette: View {
     }
 
     private func closeActions() {
-        actionsFor = nil
+        withAnimation(PaletteBar.morph) { actionsFor = nil }
         // Not at once: the Escape that closed Actions is still being handled, and would reach the field and close the palette.
         Task { focus = .field }
     }

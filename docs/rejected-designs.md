@@ -50,6 +50,13 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 - **A flat, squared or hand-drawn segmented control.** MAPP uses the system's. See [Views and lists](views-and-lists.md).
 - **A separate filter button in the list toolbar.** Filters live in the row above the list.
 
+## Palettes
+
+- **An Actions panel floating above the palette's bar.** Actions takes the bar's place. See [Views and lists](views-and-lists.md).
+- **A filter button in the command palette.** Only Search Notes has one.
+- **A divider under the palette's field.**
+- **Large type marks in Search Notes rows.** Its rows use the command palette's small mark.
+
 ## Related pages
 
 - [Looks](looks.md)
