@@ -158,8 +158,10 @@ struct ItemTimelineOptions: View {
         let fields = browser.timelineFieldChoices(in: library)
         let field = ItemTimelineLayout.selectedField(browser.timelineFields[browser.item], fields: fields)
         Picker("Date Field", systemImage: "calendar", selection: Binding { field ?? "" } set: {
-            browser.setTimelineField($0, in: library)
+            browser.setTimelineField($0.isEmpty ? nil : $0, in: library)
         }) {
+            Text("Date of Each Type").tag("")
+            Divider()
             ForEach(fields) { Text(verbatim: $0.label).tag($0.key) }
         }
         .pickerStyle(.menu)

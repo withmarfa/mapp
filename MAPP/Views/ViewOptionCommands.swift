@@ -114,10 +114,16 @@ struct ViewOptionCommand {
         let place = browser.item
         let fields = browser.timelineFieldChoices(in: library)
         let field = ItemTimelineLayout.selectedField(browser.timelineFields[place], fields: fields)
-        return fields.filter { $0.key != field }.map { field in
+        var commands = fields.filter { $0.key != field }.map { field in
             ViewOptionCommand(title: String(localized: "Date Field: \(field.label)"), systemImage: "calendar") {
                 browser.setTimelineField(field.key, in: library)
             }
         }
+        if field != nil {
+            commands.append(ViewOptionCommand(title: String(localized: "Date of Each Type"), systemImage: "calendar") {
+                browser.setTimelineField(nil, in: library)
+            })
+        }
+        return commands
     }
 }

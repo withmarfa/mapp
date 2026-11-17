@@ -1,11 +1,15 @@
-import MarfaIcons
 import SwiftUI
 
 struct ItemTimeline: View {
     @CurrentLibrary private var library
+    /// The window's, which the right sidebar is shown through.
+    @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     @Bindable var browser: Browser
     var pane: FocusState<Browser.Pane?>.Binding
     @State private var daysSeen = 0
+    @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
+    /// What each row says, worked out once for each item from its type's look.
+    @State private var rowContents = CardContents()
 
     var body: some View {
         let _ = daysSeen
@@ -13,10 +17,16 @@ struct ItemTimeline: View {
         let fields = browser.timelineFieldChoices(in: library)
         // Chosen in the toolbar's View Options (`ItemTimelineOptions`).
         let field = ItemTimelineLayout.selectedField(browser.timelineFields[browser.item], fields: fields)
-        let groups = ItemTimelineLayout.groups(for: items, field: field, catalogue: library.catalogue)
+        let looks = browser.looks(in: library)
+        let now = library.now()
+        let groups = ItemTimelineLayout.groups(
+            for: items, field: field, looks: looks, catalogue: library.catalogue, today: now)
+        let list = RowList(
+            mixesTypes: Set(items.map(\.type)).count > 1, date: .look, format: dateFormat, day: Calendar.current.startOfDay(for: now))
+        let contents = rowContents.contents(of: items, in: library, looks: looks, list: list, shape: CardShape())
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
 
-        timeline(groups)
+        timeline(groups, contents: contents, now: now)
         .bandsToolbar()
         .searchStatus(browser)
         .overlay {
@@ -30,9 +40,11 @@ struct ItemTimeline: View {
         }
         .filteredEmptyState(browser)
         .navigationTitle(title)
-        // The timeline only shows items; it changes none of them.
-        .navigationSubtitle(
-            Text("\(Text("^[\(items.count) item](inflect: true)")), Read Only").editedSubtitle(browser.hasViewChanges))
+        .navigationSubtitle(Text("^[\(items.count) item](inflect: true)").editedSubtitle(browser.hasViewChanges))
+        // Choosing a row shows it in the right sidebar.
+        .onChange(of: browser.selection) { _, selection in
+            if selection.count == 1, browser.showsCollection { details?.isPresented = true }
+        }
         .toolbar(removing: browser.isSearchExpanded ? .title : nil)
         .onChange(of: browser.isSearchExpanded) {
             if !browser.isSearchExpanded { browser.focusRequest = .list }
@@ -42,23 +54,75 @@ struct ItemTimeline: View {
         }
     }
 
-    private func timeline(_ groups: [ItemTimelineGroup]) -> some View {
+    /// One line of a day's list: a row, or the line that marks the present moment.
+    private enum Line: Identifiable {
+        case row(ItemTimelineRow, startsDay: Bool, endsDay: Bool)
+        case now(Date, startsDay: Bool)
+
+        var id: String {
+            switch self {
+            case .row(let row, _, _): row.id.rawValue
+            case .now: "now"
+            }
+        }
+    }
+
+    private func lines(of group: ItemTimelineGroup, now: Date) -> [Line] {
+        var lines = group.rows.enumerated().map { index, row in
+            Line.row(row, startsDay: index == 0, endsDay: index == group.rows.count - 1)
+        }
+        if let at = ItemTimelineLayout.nowLine(in: group, now: now) {
+            lines.insert(.now(now, startsDay: at == 0), at: at)
+            // The day's divider belongs to its last line.
+            if at == group.rows.count, case .row(let row, let starts, _) = lines[at - 1] {
+                lines[at - 1] = .row(row, startsDay: starts, endsDay: false)
+            }
+        }
+        return lines
+    }
+
+    private func timeline(_ groups: [ItemTimelineGroup], contents: [ItemID: RowContent], now: Date) -> some View {
         List(selection: $browser.selection) {
             ForEach(groups) { group in
-                ForEach(group.rows) { row in
-                    HStack(alignment: .top, spacing: 20) {
-                        dayRail(group.id)
-                            .opacity(row.id == group.rows.first?.id ? 1 : 0)
-                            .accessibilityHidden(row.id != group.rows.first?.id)
-                            .frame(width: 112, alignment: .leading)
-                        ItemTimelineEntry(row: row, catalogue: library.catalogue, sources: library.sources)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                ForEach(lines(of: group, now: now)) { line in
+                    switch line {
+                    case .row(let row, let startsDay, let endsDay):
+                        if let content = contents[row.id] {
+                            HStack(alignment: .top, spacing: 0) {
+                                dayRail(group.id).padding(.top, 6)
+                                    .opacity(startsDay ? 1 : 0)
+                                    .accessibilityHidden(!startsDay)
+                                    .frame(width: 148, alignment: .leading)
+                                timeColumn(row)
+                                    .frame(width: 112, alignment: .leading)
+                                ItemRow(content: content)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .tag(row.id)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityIdentifier("TimelineItem-\(row.id.rawValue)")
+                            .accessibilityAction(named: Text("Open")) { open([row.id]) }
+                            .listRowSeparator(endsDay ? .visible : .hidden, edges: .bottom)
+                        }
+                    case .now(let date, let startsDay):
+                        HStack(spacing: 0) {
+                            dayRail(group.id)
+                                .opacity(startsDay ? 1 : 0)
+                                .accessibilityHidden(true)
+                                .frame(width: 148, alignment: .leading)
+                            Text(date, format: .dateTime.hour().minute())
+                                .interfaceFont(.caption.weight(.semibold))
+                                .monospacedDigit()
+                                .foregroundStyle(.red)
+                                .frame(width: 112, alignment: .leading)
+                            Circle().fill(.red).frame(width: 6, height: 6)
+                            Rectangle().fill(.red).frame(height: 1)
+                        }
+                        .selectionDisabled()
+                        .listRowSeparator(.hidden)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(Text("Now"))
                     }
-                    .padding(.vertical, 10)
-                    .tag(row.id)
-                    .accessibilityElement(children: .combine)
-                    .accessibilityIdentifier("TimelineItem-\(row.id.rawValue)")
-                    .accessibilityAction(named: Text("Open")) { open([row.id]) }
                 }
             }
         }
@@ -83,6 +147,27 @@ struct ItemTimeline: View {
         }
     }
 
+    /// The row's date is its time, so the row itself says no second date.
+    @ViewBuilder private func timeColumn(_ row: ItemTimelineRow) -> some View {
+        Group {
+            switch row.value {
+            case .dated(let date, let dateOnly, let raw):
+                if dateOnly {
+                    Text("All day")
+                } else {
+                    Text(verbatim: DateDisplay.timeOfDay(of: date)).monospacedDigit().help(raw)
+                }
+            case .invalid(let raw):
+                Text(verbatim: raw).lineLimit(2)
+            case .missing, .notApplicable:
+                EmptyView()
+            }
+        }
+        .interfaceFont(.subheadline)
+        .foregroundStyle(.secondary)
+        .padding(.top, 6)
+    }
+
     @ViewBuilder private func dayRail(_ id: ItemTimelineGroup.ID) -> some View {
         switch id {
         case .day(let date):
@@ -91,11 +176,6 @@ struct ItemTimeline: View {
             let distance = calendar.dateComponents([.day], from: today, to: date).day
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 5) {
-                    if distance == 0 {
-                        Image(systemName: "circle.fill")
-                            .font(.system(size: 6))
-                            .accessibilityHidden(true)
-                    }
                     switch distance {
                     case 0: Text("Today")
                     case 1: Text("Tomorrow")
@@ -104,8 +184,11 @@ struct ItemTimeline: View {
                     }
                 }
                 .interfaceFont(.headline)
-                .foregroundStyle(distance == 0 ? Color.accentColor : Color.primary)
-                Text(date, format: .dateTime.day().month(.abbreviated).year())
+                .foregroundStyle(distance == 0 ? Color.red : Color.primary)
+                let named = distance.map { abs($0) <= 1 } ?? false
+                let sameYear = calendar.isDate(date, equalTo: today, toGranularity: .year)
+                let format = Date.FormatStyle().day().month(.abbreviated)
+                Text(date, format: named ? format.weekday(.wide) : sameYear ? format : format.year())
                     .interfaceFont(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -122,44 +205,5 @@ struct ItemTimeline: View {
         guard ids.count == 1 else { return }
         browser.selection = ids
         browser.openCollectionSelection()
-    }
-}
-
-private struct ItemTimelineEntry: View {
-    let row: ItemTimelineRow
-    let catalogue: Catalogue
-    let sources: SourceDirectory
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(verbatim: row.item.displayTitle)
-                .interfaceFont(.body)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Label { Text(catalogue.label(for: row.item.type)) } icon: { TypeGlyph(id: catalogue.icon(for: row.item.type)) }
-                if let source = row.item.source.map({ sources.info($0) }) {
-                    Label { Text(verbatim: source.name) } icon: { if let mark = source.mark { TypeGlyph(id: mark) } }
-                        .labelStyle(.titleAndIcon)
-                }
-            }
-            .interfaceFont(.caption)
-            .foregroundStyle(.secondary)
-            switch row.value {
-            case .dated(let date, let dateOnly, let raw):
-                if !dateOnly {
-                    Text(date, format: .dateTime.hour().minute().second())
-                        .interfaceFont(.caption)
-                        .foregroundStyle(.secondary)
-                        .help(raw)
-                }
-            case .invalid(let raw):
-                Text(verbatim: raw)
-                    .interfaceFont(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            case .missing, .notApplicable:
-                EmptyView()
-            }
-        }
     }
 }
