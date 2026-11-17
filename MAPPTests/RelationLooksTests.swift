@@ -217,15 +217,16 @@ struct RelationLooksTests {
         #expect(shown.filter { $0 == "parent" }.count == 1)
     }
 
-    @Test func aTableWithNoRelationColumnReadsNone() {
+    @Test func aTableWithNoRelationColumnReadsOnlyTheParent() {
         let project = Self.item("test.project", "Launch")
         let task = Self.item("core.task", "Write", parent: project.id, collections: [project.id])
         let library = Self.library([project, task])
         let types: Set<TypeID> = [TypeID("test.project"), TypeID("core.task")]
         let wanted = ItemTableLayout.relations(of: types, looks: [:], options: ItemTableOptions(), shown: [])
-        #expect(wanted.isEmpty)
+        #expect(wanted == [.parent], "the parent is always read, so its filter and grouping stay offered")
         let rows = ItemTableRow.rows(of: [project, task], in: library, wanting: wanted)
-        #expect(rows.allSatisfy { $0.parent == nil && $0.children.isEmpty && $0.collections.isEmpty })
+        #expect(rows.allSatisfy { $0.children.isEmpty && $0.collections.isEmpty })
+        #expect(rows.first { $0.id == task.id }?.parent != nil)
     }
 
     @Test func aTableReadsTheLinksLooksShownColumnsAndItsOptionsName() {
@@ -233,12 +234,12 @@ struct RelationLooksTests {
         let looks = [TypeID("core.task"): Self.parentFact]
         #expect(ItemTableLayout.relations(of: types, looks: looks, options: ItemTableOptions(), shown: []) == [.parent])
         #expect(ItemTableLayout.relations(of: types, looks: looks, options: ItemTableOptions(), shown: [.collections]) == [.parent, .collections])
-        // A look of a type the table does not hold asks for nothing.
-        #expect(ItemTableLayout.relations(of: [TypeID("core.note")], looks: looks, options: ItemTableOptions(), shown: []).isEmpty)
+        // A look of a type the table does not hold asks for nothing beyond the parent.
+        #expect(ItemTableLayout.relations(of: [TypeID("core.note")], looks: looks, options: ItemTableOptions(), shown: []) == [.parent])
         var grouped = ItemTableOptions()
         grouped.grouping = .column("children")
         grouped.filters["collections"] = ["x"]
-        #expect(ItemTableLayout.relations(of: types, looks: [:], options: grouped, shown: []) == [.children, .collections])
+        #expect(ItemTableLayout.relations(of: types, looks: [:], options: grouped, shown: []) == [.parent, .children, .collections])
     }
 
     @Test func theTwoLinksShownAndTheCountMatchTheSortedResult() {

@@ -396,12 +396,13 @@ nonisolated struct ItemTableGroup: Identifiable, Hashable, Sendable {
 }
 
 nonisolated enum ItemTableLayout {
-    /// The links the table reads for its rows: those the types' looks show, those of the columns the person shows, and
-    /// those a group, filter or sort names. A link none of them asks for costs nothing.
+    /// The links the table reads for its rows: the parent always, one lookup a row, so its filter and grouping are
+    /// always offered; then children and collections where the types' looks show them, the person shows their
+    /// column, or a group, filter or sort names them. Those none of them asks for cost nothing.
     static func relations(
         of types: Set<TypeID>, looks: [TypeID: TypeLook], options: ItemTableOptions, shown: Set<Relation>
     ) -> Set<Relation> {
-        var wanted = shown
+        var wanted = shown.union([.parent])
         for type in types { wanted.formUnion((looks[type] ?? .empty).relations) }
         // A column the options group, filter or sort by is read too, shown or not.
         var named = Set(options.filters.keys)
