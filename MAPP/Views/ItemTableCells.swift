@@ -21,17 +21,20 @@ struct ItemTableCell: View {
     @State private var isHovering = false
     @State private var anchor = ValueEditAnchorBox()
 
-    /// How far a hover tint reaches past the cell's content on each side, so it fills the cell to its edges. The
-    /// content is padded in by the same amount, and the cell's control is pulled back out, so the content keeps the
-    /// column's text edge.
-    private static let bleed: CGFloat = 8
+    /// How far the table's own cell reaches past the content on each side, measured from the cell itself. A hover tint
+    /// reaches out by it, so the tint fills the cell to its edges; the content is padded in by the same amount, and the
+    /// cell's control is pulled back out, so the content keeps the column's text edge.
+    @State private var bleed = CellBleed.zero
+    /// The content's least height, which with the table's own room above and below makes a row 36 points, as the board draws it.
+    private static let minimumHeight: CGFloat = 22
 
     var body: some View {
         content
             .lineLimit(1)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: Self.minimumHeight, maxHeight: .infinity, alignment: .leading)
             // A cell that offers an edit carries its own padding, inside its control, so the whole cell answers a click.
             .padding(.vertical, offersEdit ? 0 : 3)
+            .background { CellBleedProbe(bleed: $bleed) }
             .onHover { setHovering($0) }
             .onDisappear { setHovering(false) }
             // A panel laid over the table gets the pointer and sends no exit to the cell beneath it.
@@ -111,7 +114,8 @@ struct ItemTableCell: View {
         }
         .buttonStyle(.plain)
         .focusEffectDisabled()
-        .padding(.horizontal, -Self.bleed)
+        .padding(.horizontal, -bleed.horizontal)
+        .padding(.vertical, -bleed.vertical)
         .background { ValueEditAnchor(box: anchor) }
         .accessibilityLabel(Text(kind.field?.label ?? ""))
         .accessibilityValue(Text("Not Set"))
@@ -121,8 +125,8 @@ struct ItemTableCell: View {
     /// A control's label as the cell offers it: the whole cell, tinted under the pointer.
     private func offering(_ label: some View) -> some View {
         label
-            .padding(.horizontal, Self.bleed)
-            .padding(.vertical, 3)
+            .padding(.horizontal, bleed.horizontal)
+            .padding(.vertical, bleed.vertical)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             .background(isHovering ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear))
             .contentShape(.rect)
@@ -297,7 +301,8 @@ struct ItemTableCell: View {
         .menuStyle(.button)
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
-        .padding(.horizontal, -Self.bleed)
+        .padding(.horizontal, -bleed.horizontal)
+        .padding(.vertical, -bleed.vertical)
         .accessibilityLabel(Text(field.label))
         .accessibilityValue(Text(current.map(ItemTypeInfo.Field.label(ofOption:)) ?? String(localized: "Not Set")))
     }
@@ -447,6 +452,58 @@ final class ItemTableHover {
             try? await Task.sleep(for: grace)
             guard !Task.isCancelled, cells[id] == nil, row == id else { return }
             row = nil
+        }
+    }
+}
+
+/// How far a table cell reaches past its content, in points.
+struct CellBleed: Equatable {
+    var horizontal: CGFloat
+    var vertical: CGFloat
+    static let zero = CellBleed(horizontal: 0, vertical: 0)
+}
+
+/// Measures the table's cell around the view it is laid behind, so a tint can fill the cell exactly.
+private struct CellBleedProbe: NSViewRepresentable {
+    @Binding var bleed: CellBleed
+
+    func makeNSView(context: Context) -> Probe { Probe() }
+
+    func updateNSView(_ view: Probe, context: Context) {
+        view.report = { measured in
+            if measured != bleed { bleed = measured }
+        }
+    }
+
+    final class Probe: NSView {
+        var report: ((CellBleed) -> Void)?
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            DispatchQueue.main.async { [weak self] in self?.measure() }
+        }
+
+        override func setFrameSize(_ newSize: NSSize) {
+            super.setFrameSize(newSize)
+            DispatchQueue.main.async { [weak self] in self?.measure() }
+        }
+
+        private func measure() {
+            guard window != nil, bounds.width > 0 else { return }
+            var ancestor = superview
+            while let view = ancestor, !(view.superview is NSTableRowView) { ancestor = view.superview }
+            guard let cell = ancestor, let row = cell.superview as? NSTableRowView,
+                let table = row.superview as? NSTableView else { return }
+            let column = table.column(for: cell)
+            guard column >= 0 else { return }
+            let own = table.convert(bounds, from: self)
+            let reach = table.rect(ofColumn: column).intersection(row.frame)
+            let measured = CellBleed(
+                horizontal: max(0, min(own.minX - reach.minX, reach.maxX - own.maxX)).rounded(),
+                vertical: max(0, min(own.minY - reach.minY, reach.maxY - own.maxY)).rounded())
+            DispatchQueue.main.async { [weak self] in self?.report?(measured) }
         }
     }
 }
