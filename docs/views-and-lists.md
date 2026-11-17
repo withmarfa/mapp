@@ -35,6 +35,7 @@ A type's list, and the other places that are not views, can become one with Save
 
 - A type's place saves what the window lists: with Include Subtypes on, the type alone as the view's types (Marfa lists it with its subtypes); with it off, the type's own items, as the type plus an exact-type condition where it has subtypes.
 - A Type filter is saved as the view's types, so the view lists the types the window chose: they replace the types the place listed and a type's own exact-type condition. Marfa lists a type with its subtypes, so a chosen type that has any is also saved as an exact-type condition in the view's filter, which lists the same items as the window.
+- An existing view's own Type filter is different: a chosen type within the types the view lists leaves them as they are, and is saved as an exact-type condition (`type eq`), so the view keeps its types and the filter stays a chip that can be removed or undone. A view of several types opens with those types as a Type filter only while its filter has no condition on the type. A chosen type outside the view's types replaces them.
 - A list's sections by date (Today, Yesterday and the months) are not kept, and the Save as View sheet says so. A view groups by a field's value or a bucket of it, and Today, Yesterday and Previous 7 Days move with the day, so no grouping stands for them.
 
 ## Edit View

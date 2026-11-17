@@ -474,12 +474,59 @@ struct ViewDraftTests {
             seededTypes: nil, view: view, catalogue: Self.catalogue)
         #expect(change.change.query?.types == [Self.ticket])
         #expect(change.change.query?.filter == #"type eq "aic.ticket""#)
-        // A subtype chosen in a view that lists the parent is the subtype's items.
+        // A subtype chosen in a view that lists the parent keeps the view's types and narrows them exactly.
         let sub = ViewDraft.replacing(
             listed, with: ItemTableOptions(filters: ["type": ["aic.ticket.task"]]).filterChoices, columns: Self.columns,
             seededTypes: nil, catalogue: Self.catalogue)
-        #expect(sub.query.types == [Self.ticketTask])
-        #expect(sub.query.filter == nil)
+        #expect(sub.query.types == [Self.ticket])
+        #expect(sub.query.filter == #"type eq "aic.ticket.task""#)
+    }
+
+    /// The change a window makes to a saved view that lists `types` when it filters to `chosen`, and the view it makes.
+    private static func filtering(_ types: [TypeID], to chosen: Set<String>, filter: String? = nil) -> (before: LibraryView, after: LibraryView?) {
+        let view = LibraryView(id: ItemID("v"), title: "V", version: 2, query: LibraryViewQuery(types: types, filter: filter))
+        let seed = ViewDraft.options(for: view, catalogue: catalogue)
+        var options = seed
+        options.filters = ["type": chosen]
+        let change = ViewDraft.change(
+            window(.view(view.id), filters: ["type": chosen]), options: options, seed: seed, seedTimelineDate: nil,
+            seededTypes: ViewDraft.seededTypes(of: view.query, catalogue: catalogue), view: view, catalogue: catalogue)
+        guard let query = change.change.query else { return (view, nil) }
+        return (view, LibraryView(id: view.id, title: view.title, version: 3, query: query))
+    }
+
+    @Test func anExistingViewFilteredToASubtypeKeepsItsTypesAndShowsTheFilterAsAChip() throws {
+        let saved = try #require(Self.filtering([Self.ticket], to: ["aic.ticket.task"]).after)
+        #expect(saved.query.types == [Self.ticket])
+        #expect(saved.query.filter == #"type eq "aic.ticket.task""#)
+        // Reopened, the filter is a chip.
+        #expect(ViewDraft.options(for: saved, catalogue: Self.catalogue).filters == ["type": ["aic.ticket.task"]])
+        // Removing the chip writes the view as it was; so does Undo, which seeds the saved view's own options.
+        let removed = ViewDraft.replacing(
+            saved.query, with: [:], columns: Self.columns, seededTypes: nil, catalogue: Self.catalogue)
+        #expect(removed.query == LibraryViewQuery(types: [Self.ticket]))
+        #expect(ViewDraft.options(for: LibraryView(id: ItemID("v"), title: "V", query: removed.query), catalogue: Self.catalogue).filters.isEmpty)
+    }
+
+    @Test func anExistingViewOfSeveralTypesFilteredToOneKeepsAllOfThem() throws {
+        let note = TypeID("core.note")
+        let saved = try #require(Self.filtering([Self.task, note], to: ["core.task"]).after)
+        #expect(saved.query.types == [Self.task, note])
+        #expect(saved.query.filter == #"type eq "core.task""#)
+        // Reopened it shows the one chip, not the two types, and removing it restores the view's own list.
+        #expect(ViewDraft.seededTypes(of: saved.query, catalogue: Self.catalogue) == nil)
+        #expect(ViewDraft.options(for: saved, catalogue: Self.catalogue).filters == ["type": ["core.task"]])
+        let removed = ViewDraft.replacing(saved.query, with: [:], columns: Self.columns, seededTypes: nil, catalogue: Self.catalogue)
+        #expect(removed.query == LibraryViewQuery(types: [Self.task, note]))
+        // Undo is the original query, whose types show as the seeded chip again.
+        let original = LibraryView(id: ItemID("v"), title: "V", query: LibraryViewQuery(types: [Self.task, note]))
+        #expect(ViewDraft.options(for: original, catalogue: Self.catalogue).filters == ["type": ["core.task", "core.note"]])
+    }
+
+    @Test func aTypeFilterOutsideAnExistingViewsTypesReplacesThem() throws {
+        let saved = try #require(Self.filtering([Self.ticket], to: ["core.task"]).after)
+        #expect(saved.query.types == [Self.task])
+        #expect(saved.query.filter == nil)
     }
 
     @Test func aTypeFilterOfTwoTypesInItemsIsTheirTypes() throws {
@@ -513,7 +560,9 @@ struct ViewDraftTests {
                 seededTypes: ViewDraft.seededTypes(of: view.query, catalogue: Self.catalogue), view: view, catalogue: Self.catalogue)
         }
         #expect(update(seed.filters).change.query == nil)
-        #expect(update(["type": ["core.task"]]).change.query?.types == [Self.task])
+        // Filtered to one, the view keeps its types and the filter is an exact-type condition.
+        #expect(update(["type": ["core.task"]]).change.query?.types == [Self.task, TypeID("core.note")])
+        #expect(update(["type": ["core.task"]]).change.query?.filter == #"type eq "core.task""#)
         #expect(update([:]).change.query?.types == [])
     }
 
