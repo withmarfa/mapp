@@ -292,6 +292,23 @@ struct RowContentTests {
         #expect(!browser.rowList(of: [], in: library, order: NoteOrder(), now: Self.now, format: .standard).mixesTypes)
     }
 
+    @Test func aListGroupedByTypeLeavesTheTypeOffItsRows() {
+        let note = FakeItemLibrary.note("Note", modified: Self.now)
+        let task = Self.item("core.task", modified: Self.now)
+        let library = FakeItemLibrary(items: [note, task], now: Self.now)
+        let browser = Browser()
+        browser.show(.allNotes, in: library, order: NoteOrder())
+        func list() -> RowList { browser.rowList(of: [note, task], in: library, order: NoteOrder(), now: Self.now, format: .standard) }
+        #expect(list().mixesTypes)
+        browser.tableOptions[browser.item, default: .init()].grouping = .column(ItemTableColumn.type.id)
+        let grouped = list()
+        #expect(!grouped.mixesTypes)
+        let content = RowContent.make(for: task, look: TypeLook.empty, catalogue: library.catalogue, list: grouped)
+        #expect(!content.chips.contains { if case .type = $0 { true } else { false } })
+        browser.tableOptions[browser.item, default: .init()].grouping = .column("field.status")
+        #expect(list().mixesTypes, "a list grouped by another column still names each row's type")
+    }
+
     @Test func contentIsWorkedOutOncePerItemValueAndRebuiltWhenTheItemChanges() {
         let note = Self.item("core.note", title: "First", modified: Self.now)
         let library = FakeItemLibrary(items: [note], now: Self.now)

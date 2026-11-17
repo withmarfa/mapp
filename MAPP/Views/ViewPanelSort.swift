@@ -10,7 +10,7 @@ struct ViewPanelSort: View {
     let sort: [ItemTableComparator]
 
     var body: some View {
-        let unused = content.columns.filter { column in !sort.contains { $0.column.id == column.id } }
+        let unused = content.sortChoices.filter { column in !sort.contains { $0.column.id == column.id } }
         ViewPanelSection(title: "Sort") {
             InspectorBox {
                 ForEach(sort, id: \.column.id) { key in

@@ -61,8 +61,6 @@ nonisolated enum ViewDraft {
         case refused(String)
         case sort(column: String)
         case group(column: String)
-        /// The list's sections by date, which a view's grouping cannot hold.
-        case dateSections
     }
 
     /// The settings a view saves, apart from its title, and what of the window it leaves out.
@@ -127,13 +125,13 @@ nonisolated enum ViewDraft {
             let group = group(window.grouping)
             return (sort.sort, group.group, sort.unkept + group.unkept)
         case .list(let order):
-            let sort = switch order.sort {
-            case .title: LibraryViewSort(field: "title", ascending: true)
-            case .dateEdited: LibraryViewSort(field: "updated_at", ascending: false)
-            case .dateCreated: LibraryViewSort(field: "created_at", ascending: false)
+            let field = switch order.sort {
+            case .title: "title"
+            case .dateEdited: "updated_at"
+            case .dateCreated: "created_at"
             }
-            // Today, Yesterday and the rest are the list's own sections, which no bucket of a view's grouping matches.
-            return ([sort], nil, order.groupsByDate && order.sort != .title ? [.dateSections] : [])
+            let sort = LibraryViewSort(field: field, ascending: order.sort == .title)
+            return ([sort], order.groupsByDate && order.sort != .title ? LibraryViewGroup(field: field, bucket: sectionBucket) : nil, [])
         case .board(let key, let label):
             let byTitle = [LibraryViewSort(field: "title", ascending: true)]
             guard let key else { return (byTitle, nil, []) }
@@ -145,6 +143,17 @@ nonisolated enum ViewDraft {
             let field = "properties." + key
             return ([LibraryViewSort(field: field, ascending: true)], LibraryViewGroup(field: field, bucket: .day), [])
         }
+    }
+
+    /// The bucket a saved view groups a list's sections by date with. Today, Yesterday and Previous 7 Days move with the
+    /// day, so no fixed bucket matches them; a month is the one the list's own sections settle into once an item is older.
+    static let sectionBucket = LibraryViewGroup.Bucket.month
+
+    /// The grouping that stands for the list's sections by date: the date the list is sorted by, in `sectionBucket`.
+    static func sections(of dated: Dated?) -> LibraryViewGroup? {
+        guard let dated, dated.hasSections, let column = dated.sort.first?.column else { return nil }
+        let field = column == .created ? "created_at" : column == .edited ? "updated_at" : nil
+        return field.map { LibraryViewGroup(field: $0, bucket: sectionBucket) }
     }
 
     // MARK: Columns and fields
@@ -222,28 +231,25 @@ nonisolated enum ViewDraft {
     }
 
     /// The query with the window's filters added to a place's own. A Type filter that keeps types goes into the
-    /// query's types, which Marfa takes with their subtypes, so it is not kept for a type that has any, nor beside
-    /// the types the place already lists.
+    /// query's types, which Marfa takes with their subtypes. Where a chosen type has subtypes, or the place already
+    /// lists other types, it stays a filter, as the exact-type condition the window applied.
     static func adding(
         _ choices: [String: FilterChoice], to query: LibraryViewQuery, columns: [ItemTableColumn], catalogue: Catalogue
     ) -> (query: LibraryViewQuery, unkept: [Unkept]) {
         var query = query
         var choices = choices
-        var unkept: [Unkept] = []
-        if let column = columns.first(where: { $0.id == typeColumnID }), let choice = choices[typeColumnID], !choice.isNegated {
-            choices[typeColumnID] = nil
+        if columns.contains(where: { $0.id == typeColumnID }), let choice = choices[typeColumnID], !choice.isNegated {
             let chosen = choice.values.subtracting([""])
-            if !chosen.isEmpty {
-                if let types = types(keeping: chosen, beside: query.types, catalogue: catalogue) {
-                    query.types = types
-                } else {
-                    unkept.append(.filter(column: label(of: column)))
-                }
+            if chosen.isEmpty {
+                choices[typeColumnID] = nil
+            } else if let types = types(keeping: chosen, beside: query.types, catalogue: catalogue) {
+                choices[typeColumnID] = nil
+                query.types = types
             }
         }
         let result = filtered(query.filter, adding: choices, columns: columns)
         query.filter = result.filter
-        return (query, unkept + result.unkept)
+        return (query, result.unkept)
     }
 
     /// The types a Type filter keeps, as a query lists them, or nil where Marfa cannot say so: it lists a type with
@@ -467,9 +473,9 @@ nonisolated enum ViewDraft {
             }
         } else if regrouped {
             let group = group(window.grouping)
-            change.group = group.group.map { .set($0) } ?? .clear
+            // With no column to group by, the list shows its own sections by date, which the view then holds.
+            change.group = (group.group ?? sections(of: window.dated)).map { .set($0) } ?? .clear
             unkept += group.unkept
-            if window.dated?.hasSections == true { unkept.append(.dateSections) }
             if redated { unkept.append(.group(column: String(localized: "Timeline date"))) }
         }
         if options.filterChoices != seed.filterChoices {
@@ -647,16 +653,16 @@ nonisolated enum ViewDraft {
         guard window != seeded else { return (query, []) }
 
         var result = query
-        if let column = filterable[typeColumnID] {
+        if filterable[typeColumnID] != nil {
             if let choice = window[typeColumnID], !choice.isNegated {
-                window[typeColumnID] = nil
                 let chosen = choice.values.subtracting([""])
-                if !chosen.isEmpty, chosen != Set(query.types.map(\.rawValue)) {
-                    guard let types = types(keeping: chosen, beside: [], catalogue: catalogue) else {
-                        return (query, [.filter(column: label(of: column))])
-                    }
+                if chosen.isEmpty || chosen == Set(query.types.map(\.rawValue)) {
+                    window[typeColumnID] = nil
+                } else if let types = types(keeping: chosen, beside: [], catalogue: catalogue) {
+                    window[typeColumnID] = nil
                     result.types = types
                 }
+                // A type with subtypes stays in the window's filters, to be saved as an exact-type condition.
             } else if seededTypes != nil {
                 result.types = []
             }

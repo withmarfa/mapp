@@ -164,7 +164,11 @@ struct ViewDraftTests {
 
         let byEdit = try draft(.list(NoteOrder(sort: .dateEdited, groupsByDate: true)))
         #expect(byEdit.sort == [LibraryViewSort(field: "updated_at", ascending: false)])
-        #expect(byEdit.unkept == [.dateSections])
+        // The list's sections by date are saved as the sort's date, grouped by month.
+        #expect(byEdit.group == LibraryViewGroup(field: "updated_at", bucket: .month))
+        #expect(byEdit.unkept.isEmpty)
+        let byCreated = try draft(.list(NoteOrder(sort: .dateCreated, groupsByDate: true)))
+        #expect(byCreated.group == LibraryViewGroup(field: "created_at", bucket: .month))
         #expect(try draft(.list(NoteOrder(sort: .dateCreated, groupsByDate: false))).sort
             == [LibraryViewSort(field: "created_at", ascending: false)])
 
@@ -376,14 +380,21 @@ struct ViewDraftTests {
         #expect(several.query.types == [TypeID("core.note"), Self.task])
     }
 
-    @Test func aTypeWithSubtypesIsNotKeptAsAFilterBecauseMarfaListsItsSubtypesToo() throws {
+    @Test func aTypeWithSubtypesIsSavedAsAnExactTypeFilterBecauseMarfaListsItsSubtypesToo() throws {
+        // Saving from the window with the Type filter on a type that has subtypes (#389).
         let draft = try #require(Self.draft(Self.window(.allNotes, filters: ["type": ["aic.ticket"]])))
         #expect(draft.query.types.isEmpty)
-        #expect(draft.unkept == [.filter(column: "Type")])
-        // Nor beside the types the place already lists.
+        #expect(draft.query.filter == #"type eq "aic.ticket""#)
+        #expect(draft.unkept.isEmpty)
+        // So is a type the place does not already list.
         let beside = try #require(Self.draft(Self.window(.itemType("core.task"), filters: ["type": ["core.note"]])))
         #expect(beside.query.types == [Self.task])
-        #expect(beside.unkept == [.filter(column: "Type")])
+        #expect(beside.query.filter == #"type eq "core.note""#)
+        #expect(beside.unkept.isEmpty)
+        // With the list grouped by a column too, both are kept.
+        let grouped = try #require(Self.draft(Self.window(.allNotes, grouping: Self.statusColumn, filters: ["type": ["aic.ticket"]])))
+        #expect(grouped.group == LibraryViewGroup(field: "properties.status"))
+        #expect(grouped.query.filter == #"type eq "aic.ticket""#)
         // Is Not is a condition.
         let not = try #require(Self.draft(Self.window(.allNotes, filters: ["type": ["core.task"]], negated: ["type"])))
         #expect(not.query.filter == #"type neq "core.task""#)

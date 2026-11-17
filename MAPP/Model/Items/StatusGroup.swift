@@ -3,15 +3,15 @@ import Foundation
 /// Where an item stands, as every type with a status field puts it. The four groups are the same for every type, so
 /// the app can tell what is open, active or finished without knowing a type's own words.
 nonisolated enum StatusGroup: String, Hashable, Sendable, CaseIterable, Comparable {
-    case inProgress = "in_progress"
     case notStarted = "not_started"
+    case inProgress = "in_progress"
     case completed
     case canceled
 
     /// Whether the work is over, so its group starts folded away.
     var isFinished: Bool { self == .completed || self == .canceled }
 
-    /// The order groups are listed and sorted in: what is under way leads, finished work follows.
+    /// The order groups are listed and sorted in: the life of a piece of work, from not started to finished.
     static func < (lhs: StatusGroup, rhs: StatusGroup) -> Bool {
         allCases.firstIndex(of: lhs)! < allCases.firstIndex(of: rhs)!
     }

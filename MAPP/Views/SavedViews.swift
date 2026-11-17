@@ -154,7 +154,6 @@ enum SavedViews {
         case .refused(let message): String(localized: "A filter Marfa refuses: \(message)")
         case .sort(let column): String(localized: "Sorting by \(column)")
         case .group(let column): String(localized: "Grouping by \(column)")
-        case .dateSections: String(localized: "The list’s sections by date")
         }
     }
 }

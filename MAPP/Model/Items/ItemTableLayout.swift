@@ -451,6 +451,34 @@ nonisolated enum ItemTableLayout {
         return columns
     }
 
+    /// The columns a sort can name for a view that shows `types`: the fields those types declare, and the columns every
+    /// item has (title, type, parent, edited, created, tags). Title and type lead, then the status and the other
+    /// fields in the order the looks give them, then the parent and the dates.
+    static func sortChoices(from columns: [ItemTableColumn], types: Set<TypeID>, catalogue: Catalogue) -> [ItemTableColumn] {
+        let declared = Set(types.flatMap { catalogue.itemTypes[$0]?.fields.map(\.key) ?? [] })
+        func rank(_ column: ItemTableColumn) -> Int {
+            switch column.content {
+            case .title: 0
+            case .type: 1
+            case .field: column.style == .status ? 2 : 3
+            case .parent: 4
+            case .duration, .occurred: 5
+            case .edited: 6
+            case .created: 7
+            case .tags: 8
+            }
+        }
+        let available = columns.filter { column in
+            switch column.content {
+            case .field(let field): declared.contains(field.key)
+            case .duration(let start, let end): declared.contains(start) && declared.contains(end)
+            case .type: types.count > 1
+            default: true
+            }
+        }
+        return available.enumerated().sorted { (rank($0.element), $0.offset) < (rank($1.element), $1.offset) }.map(\.element)
+    }
+
     /// What a look shows of a column that is not a field's, or a field it shows: a fact or a date.
     private enum Shown: Hashable {
         case field(String)

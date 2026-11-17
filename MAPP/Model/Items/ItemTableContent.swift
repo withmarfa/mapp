@@ -12,6 +12,7 @@ final class ItemTableContent {
     let sort: [ItemTableComparator]
     let grouping: ItemTableColumn?
     private let options: ItemTableOptions
+    private let catalogue: Catalogue
 
     /// The rows the filters keep, in the order the items came in: what a layout that sorts and groups the items
     /// itself (the list, the board, the timeline) works from.
@@ -33,10 +34,16 @@ final class ItemTableContent {
         allRows = ItemTableRow.rows(of: items, in: library)
         let hidden = allRows.first.map { library.hiddenPropertyKeys(of: $0.item) } ?? []
         columns = ItemTableLayout.columns(for: allRows, catalogue: library.catalogue, hidden: hidden, looks: browser.looks(in: library))
+        catalogue = library.catalogue
         options = browser.tableOptions[browser.item] ?? ItemTableOptions()
         // Relevance is the order the rows come in, which the sort leaves alone when it is empty.
         sort = browser.ordersByRelevance ? [] : ItemTableLayout.sort(options, columns: columns, keepsGivenOrder: browser.keepsPlaceOrder)
         grouping = ItemTableLayout.grouping(options, columns: columns)
+    }
+
+    /// The columns Add Sort offers: those of the types the view shows after its filters, in a sensible order.
+    var sortChoices: [ItemTableColumn] {
+        ItemTableLayout.sortChoices(from: columns, types: Set(kept.map(\.item.type)), catalogue: catalogue)
     }
 
     /// The columns a table can be filtered and grouped by: those with a few values to pick from, where some row

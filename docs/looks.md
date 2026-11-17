@@ -44,7 +44,7 @@ A look fills a fixed set of places. A place with nothing to show is left out and
 - **Title.** The item's name, as Marfa has it. No gray key or number comes before it, because a number is a property.
 - **Date.** Top right, on every row that has one. It is the date the list is sorted by, otherwise the type's own date: due, published, taken or updated. Inside a day's group it is the time.
 - **Secondary.** One line under the title that the look chooses, such as a repository, a website, an address or a highlight's passage.
-- **Bottom line.** The type's chip, only when the list mixes types. Then the status, then up to two facts, then "+N" for the rest. These are the page's own chips at row size: 20 points high with 11.5-point text. A person is initials only, in the pale circle. Tags do not show in a row, except in a Note's: the Note preset names `tags` as its fact, shown at row size.
+- **Bottom line.** The type's chip, only when the list mixes types and is not grouped by type, whose group headers already name it. Then the status, then up to two facts, then "+N" for the rest. These are the page's own chips at row size: 20 points high with 11.5-point text. A person is initials only, in the pale circle. Tags do not show in a row, except in a Note's: the Note preset names `tags` as its fact, shown at row size.
 
 Nothing indents a row. No status circle or highlight bar sits at the leading edge.
 

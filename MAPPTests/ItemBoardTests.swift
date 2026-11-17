@@ -235,9 +235,12 @@ struct ItemBoardTests {
         let fields = ItemBoardLayout.availableFields(items: items, catalogue: Self.mixedCatalogue)
         let key = ItemBoardLayout.selectedField(nil, available: fields)?.key ?? ""
         let lanes = ItemBoardLayout.lanes(items: items, key: key, catalogue: Self.mixedCatalogue)
-        #expect(lanes.map(\.id) == [.group(.inProgress), .group(.notStarted), .group(.completed), .group(.canceled), .missing, .invalid, .notApplicable])
-        #expect(lanes.map { $0.items.map(\.id.rawValue) } == [["a"], ["c"], [], ["b"], ["d"], ["f"], ["e"]])
+        #expect(lanes.map(\.id) == [.group(.notStarted), .group(.inProgress), .group(.completed), .group(.canceled), .missing, .invalid])
+        // A type with no status (e) is in No Status with the items that have no word yet (d).
+        #expect(lanes.map { $0.items.map(\.id.rawValue) } == [["c"], ["a"], [], ["b"], ["d", "e"], ["f"]])
         #expect(lanes.first { $0.id == .missing }?.title == "No Status")
+        #expect(lanes.compactMap(\.symbol) == [.notStarted, .inProgress, .completed, .canceled])
+        #expect(lanes.first { $0.id == .missing }?.symbol == nil)
     }
 
     @Test func aGroupLaneTakesCardsOnlyWhereEveryTypeHasAWord() {
@@ -264,14 +267,27 @@ struct ItemBoardTests {
         #expect(plan.changes.map(\.key).sorted() == ["reading_status", "state"], "each item is written through its own status field")
     }
 
-    @Test func oneSharedStatusFieldKeepsItsOwnWords() {
+    @Test func aMixedListGroupsByTheFourStatusGroupsEvenWhereTheTypesShareOneStatusField() {
         let catalogue = Catalogue(itemTypes: [
             Self.type(Self.reading, fields: [Self.status("state", [("queued", .notStarted), ("read", .completed)], by: Self.reading)]),
             Self.type(Self.ticket, fields: [Self.status("state", [("todo", .notStarted), ("done", .completed)], by: Self.ticket)]),
+            Self.type(Self.text, fields: []),
         ])
-        let items = [Self.mixed("a", Self.reading), Self.mixed("b", Self.ticket)]
+        let items = [Self.mixed("a", Self.reading, key: "state", "queued"), Self.mixed("b", Self.ticket, key: "state", "done"), Self.mixed("c", Self.text)]
         let lanes = ItemBoardLayout.lanes(items: items, key: "state", catalogue: catalogue)
-        #expect(lanes.map(\.id) == [.option("queued"), .option("todo"), .option("read"), .option("done"), .missing])
+        #expect(lanes.map(\.id) == [.group(.notStarted), .group(.inProgress), .group(.completed), .group(.canceled), .missing])
+        #expect(lanes.map { $0.items.map(\.id.rawValue) } == [["a"], [], ["b"], [], ["c"]])
+    }
+
+    @Test func aBoardOfOneTypeKeepsThatTypesWordsAndMarksEachWithItsGroupsSymbol() {
+        let catalogue = Catalogue(itemTypes: [
+            Self.type(Self.ticket, fields: [Self.status("state", [("todo", .notStarted), ("doing", .inProgress), ("done", .completed), ("dropped", .canceled)], by: Self.ticket)]),
+        ])
+        let items = [Self.mixed("a", Self.ticket, key: "state", "done"), Self.mixed("b", Self.ticket)]
+        let lanes = ItemBoardLayout.lanes(items: items, key: "state", catalogue: catalogue)
+        #expect(lanes.map(\.id) == [.option("todo"), .option("doing"), .option("done"), .option("dropped"), .missing])
+        #expect(lanes.compactMap(\.symbol) == [.notStarted, .inProgress, .completed, .canceled])
+        #expect(!ItemBoardLayout.groupsByStatus(items: items, key: "state", catalogue: catalogue))
     }
 
     @Test func aChoiceFieldStillGroupsByItsOwnWordsOnAMixedBoard() {
