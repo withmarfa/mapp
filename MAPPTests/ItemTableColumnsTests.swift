@@ -159,4 +159,27 @@ struct ItemTableColumnsTests {
         #expect(back.width == 160)
         #expect(first.tableColumns.first?.width == titleColumn.width)
     }
+
+    @MainActor
+    @Test(arguments: [false, true]) func aWideWindowsTableHoldsEveryShownColumn(inSavedView: Bool) async throws {
+        let (library, _) = try await BigLibrary.loaded()
+        let browser = Browser()
+        browser.sidebarItem = inSavedView ? .view(ItemID("view-1")) : .allNotes
+        browser.viewMode = .table
+        let suite = "MAPP.ItemTableColumnsTests.wide.\(inSavedView ? "view" : "all")"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 2600, height: 800), styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(rootView: Host(browser: browser).environment(\.library, library).defaultAppStorage(defaults))
+        window.makeKeyAndOrderFront(nil)
+        defer { window.performClose(nil); window.contentView = nil }
+        let expected = ItemTableColumnLayouts.shown(browser.tableContent(in: library).columns, in: .init()).map(\.id)
+        try #require(await eventually { window.contentView.flatMap { Self.tableView(in: $0) }.map { !$0.tableColumns.isEmpty } ?? false })
+        // Nothing to wait for: this gives the table time to add or hide columns after its first layout, if it is going to.
+        try await Task.sleep(for: .milliseconds(500))
+        let table = try #require(window.contentView.flatMap { Self.tableView(in: $0) })
+        #expect(table.tableColumns.filter { !$0.isHidden }.count == expected.count)
+    }
 }

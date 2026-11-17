@@ -152,6 +152,39 @@ nonisolated extension ItemTableColumn {
         return catalogue.itemTypes[row.item.type]?.fields.first { $0.key == field.key }
     }
 
+    /// The panel an empty cell of this column opens to take a first value, or nil where it offers none: the column is no
+    /// field, the row's type does not declare it, the item cannot be edited, the cell holds a value, or its value is
+    /// picked from a menu or switched (a status, priority, choice or yes or no), which the cell edits in place.
+    func addKind(for row: ItemTableRow, catalogue: Catalogue) -> ValueEditKind? {
+        guard let field = field(for: row, catalogue: catalogue), row.item.isEditable, !picksFrom(field),
+              let kind = ValueEditKind(field: field) else { return nil }
+        guard !InspectorFields.hasValue(row.item.value(of: field.key)) else { return nil }
+        return kind
+    }
+
+    /// Whether the row's own field is picked from a menu or switched in place, whatever the merged column's style is.
+    func picksFrom(_ field: ItemTypeInfo.Field) -> Bool {
+        switch style(for: field) {
+        case .status, .priority, .choice, .boolean: true
+        default: false
+        }
+    }
+
+    /// The column's style as this row's field has it: a merged column takes the style of one type's field, and another
+    /// type's field of the same key may be a different kind.
+    func style(for field: ItemTypeInfo.Field) -> Style {
+        switch field.kind {
+        case .boolean: return .boolean
+        case .status where field.isPicked: return .status
+        case .choice where field.isPicked: return style == .priority ? .priority : .choice
+        default:
+            switch style {
+            case .status, .priority, .choice, .boolean: return .text
+            default: return style
+            }
+        }
+    }
+
     /// What the cell holds for grouping and filtering: a value from the item, or nil for an empty cell.
     func category(of row: ItemTableRow) -> String? {
         switch content {

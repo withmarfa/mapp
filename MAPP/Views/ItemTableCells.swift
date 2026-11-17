@@ -19,12 +19,31 @@ struct ItemTableCell: View {
     /// Which row the pointer is on, shared by the row's cells, so the name's cell can answer to it from any of them.
     let hover: ItemTableHover
     @State private var isHovering = false
+    @State private var anchor = ValueEditAnchorBox()
+
+    /// How far the table's own cell reaches past the content on each side, measured from the cell itself. A hover tint
+    /// reaches out by it, so the tint fills the cell to its edges; the content is padded in by the same amount, and the
+    /// cell's control is pulled back out, so the content keeps the column's text edge.
+    @State private var bleed = CellBleed.zero
+    /// The content's least height. With the 3 points of room the cell keeps above and below it and the table's own room
+    /// beyond that, it makes a row 36 points, as the board draws it.
+    private static let minimumHeight: CGFloat = 22
 
     var body: some View {
         content
             .lineLimit(1)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: Self.minimumHeight, maxHeight: .infinity, alignment: .leading)
+            // The same room for every cell, whether or not it offers an edit, so the probe measures the same frame throughout.
             .padding(.vertical, 3)
+            .background { if offersEdit { CellBleedProbe(bleed: $bleed) } }
+            // One anchor for a field's cell however it reads, so a panel opened from it outlives the first value written.
+            .background {
+                if isField {
+                    ValueEditAnchor(box: anchor)
+                        .padding(.horizontal, -bleed.horizontal)
+                        .padding(.vertical, -bleed.vertical)
+                }
+            }
             .onHover { setHovering($0) }
             .onDisappear { setHovering(false) }
             // A panel laid over the table gets the pointer and sends no exit to the cell beneath it.
@@ -35,6 +54,25 @@ struct ItemTableCell: View {
                 isHovering = false
             }
     }
+
+    /// The cell's field as the row's own type declares it.
+    private var rowField: ItemTypeInfo.Field? { column.field(for: row, catalogue: library.catalogue) }
+
+    private var isField: Bool {
+        if case .field = column.content { true } else { false }
+    }
+
+    /// Whether the cell is a value picked from a menu that this row's own field declares and that can be changed.
+    private var offersPicker: Bool {
+        guard let rowField, row.item.isEditable else { return false }
+        return column.picksFrom(rowField)
+    }
+
+    /// The panel an empty cell opens to take a first value, where its property can be edited for this item.
+    private var addKind: ValueEditKind? { column.addKind(for: row, catalogue: library.catalogue) }
+
+    /// Whether the cell offers to change or add a value, which its hover tint shows.
+    private var offersEdit: Bool { offersPicker || addKind != nil }
 
     private func setHovering(_ inside: Bool) {
         guard inside != isHovering else { return }
@@ -58,18 +96,56 @@ struct ItemTableCell: View {
                     .monospacedDigit()
             }
         // A mixed table's column holds the words of every type; each cell offers its own row's type's.
-        case .field(let field): value(of: column.field(for: row, catalogue: library.catalogue) ?? field)
+        case .field(let field):
+            if let kind = addKind { add(kind) } else { value(of: rowField ?? field) }
         }
+    }
+
+    /// An empty cell of a value a panel edits: on hover it reads as empty and fills with the tint, and a click opens the
+    /// panel under it, as the value's row does on the page.
+    private func add(_ kind: ValueEditKind) -> some View {
+        Button {
+            let id = row.id
+            let library = library
+            let undoManager = undoManager
+            var request = ValueEditRequest(kind: kind, library: library, item: id, undoManager: undoManager)
+            request.write = { value in
+                guard let key = kind.field?.key else { return false }
+                return library.setItemProperty(id, key: key, value: value, undoManager: undoManager)
+            }
+            guard let view = anchor.view else { return }
+            ValueEditPresenter.shared.present(request, anchor: view)
+            // The panel takes the pointer without sending the cell an exit.
+            hover.clear()
+        } label: {
+            offering(HStack(spacing: 4) {
+                if isHovering { Text("Empty").foregroundStyle(.tertiary) }
+                Spacer(minLength: 0)
+            })
+        }
+        .buttonStyle(.plain)
+        .focusEffectDisabled()
+        .padding(.horizontal, -bleed.horizontal)
+        .padding(.vertical, -bleed.vertical)
+        .accessibilityLabel(Text(kind.field?.label ?? ""))
+        .accessibilityValue(Text("Not Set"))
+        .accessibilityHint(Text("Opens a panel to add a value"))
+    }
+
+    /// A control's label as the cell offers it: the whole cell, tinted under the pointer.
+    private func offering(_ label: some View) -> some View {
+        label
+            .padding(.horizontal, bleed.horizontal)
+            .padding(.vertical, bleed.vertical)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .background(isHovering ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear))
+            .contentShape(.rect)
     }
 
     // MARK: The name
 
     private var title: some View {
         HStack(spacing: 8) {
-            TypeGlyph(id: row.typeIcon)
-                .foregroundStyle(.secondary)
-                .frame(width: 16)
-                .accessibilityHidden(true)
             Text(row.item.displayTitle)
                 .fontWeight(.medium)
                 .foregroundStyle(row.item.isUntitled ? .secondary : .primary)
@@ -116,7 +192,7 @@ struct ItemTableCell: View {
         let current = ItemTableValue.string(row, key: field.key)
         let declares = library.catalogue.itemTypes[row.item.type]?.declares(field.key) ?? false
         let editable = declares && row.item.isEditable
-        switch column.style {
+        switch column.style(for: field) {
         case .status, .priority, .choice:
             picked(field, current: current, editable: editable)
         case .boolean:
@@ -219,23 +295,20 @@ struct ItemTableCell: View {
             .pickerStyle(.inline)
             .labelsHidden()
         } label: {
-            HStack(spacing: 4) {
+            offering(HStack(spacing: 4) {
                 if let current {
                     chip(current, field: field)
                 } else if isHovering {
                     Text("Empty").foregroundStyle(.tertiary)
                 }
                 Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 5)
-            .padding(.vertical, 2)
-            .background(isHovering ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear), in: .rect(cornerRadius: 5, style: .continuous))
-            .contentShape(.rect)
+            })
         }
         .menuStyle(.button)
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
-        .padding(.horizontal, -5)
+        .padding(.horizontal, -bleed.horizontal)
+        .padding(.vertical, -bleed.vertical)
         .accessibilityLabel(Text(field.label))
         .accessibilityValue(Text(current.map(ItemTypeInfo.Field.label(ofOption:)) ?? String(localized: "Not Set")))
     }
@@ -385,6 +458,58 @@ final class ItemTableHover {
             try? await Task.sleep(for: grace)
             guard !Task.isCancelled, cells[id] == nil, row == id else { return }
             row = nil
+        }
+    }
+}
+
+/// How far a table cell reaches past its content, in points.
+struct CellBleed: Equatable {
+    var horizontal: CGFloat
+    var vertical: CGFloat
+    static let zero = CellBleed(horizontal: 0, vertical: 0)
+}
+
+/// Measures the table's cell around the view it is laid behind, so a tint can fill the cell exactly.
+private struct CellBleedProbe: NSViewRepresentable {
+    @Binding var bleed: CellBleed
+
+    func makeNSView(context: Context) -> Probe { Probe() }
+
+    func updateNSView(_ view: Probe, context: Context) {
+        view.report = { measured in
+            if measured != bleed { bleed = measured }
+        }
+    }
+
+    final class Probe: NSView {
+        var report: ((CellBleed) -> Void)?
+
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            DispatchQueue.main.async { [weak self] in self?.measure() }
+        }
+
+        override func setFrameSize(_ newSize: NSSize) {
+            super.setFrameSize(newSize)
+            DispatchQueue.main.async { [weak self] in self?.measure() }
+        }
+
+        private func measure() {
+            guard window != nil, bounds.width > 0 else { return }
+            var ancestor = superview
+            while let view = ancestor, !(view.superview is NSTableRowView) { ancestor = view.superview }
+            guard let cell = ancestor, let row = cell.superview as? NSTableRowView,
+                let table = row.superview as? NSTableView else { return }
+            let column = table.column(for: cell)
+            guard column >= 0 else { return }
+            let own = table.convert(bounds, from: self)
+            let reach = table.rect(ofColumn: column).intersection(row.frame)
+            let measured = CellBleed(
+                horizontal: max(0, min(own.minX - reach.minX, reach.maxX - own.maxX)).rounded(),
+                vertical: max(0, min(own.minY - reach.minY, reach.maxY - own.maxY)).rounded())
+            DispatchQueue.main.async { [weak self] in self?.report?(measured) }
         }
     }
 }

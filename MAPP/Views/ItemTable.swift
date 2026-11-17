@@ -21,9 +21,14 @@ struct ItemTable: View {
     @State private var hover = ItemTableHover()
     @State private var placeTrace = TablePlaceTrace()
 
-    /// Where the table's first column starts: the inset style's own margin, measured from the table's edge. The filter
-    /// chips, the group names and Load More line up here, so the table reads as one left edge.
-    static let leadingEdge: CGFloat = 16
+    /// The inset style's own margin before the first column.
+    static let inset: CGFloat = 16
+    /// The room the table leaves at each side of the pane, so a group's chevron, which hangs in the margin, sits inside
+    /// the window and a selected row's highlight stops short of its edge.
+    static let margin: CGFloat = 8
+    /// Where the table's first column starts, measured from the pane's edge. The filter chips, the group names and
+    /// Load More line up here, so the table reads as one left edge.
+    static let leadingEdge: CGFloat = inset + margin
 
     var body: some View {
         let _ = daysSeen
@@ -34,6 +39,7 @@ struct ItemTable: View {
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
 
         table(columns: content.columns, pages: pages, grouping: content.grouping, collapsed: content.collapsed)
+            .padding(.horizontal, Self.margin)
             .searchStatus(browser)
             .overlay {
                 if allRows.isEmpty {
@@ -304,7 +310,8 @@ private struct ItemTableGroupHeader: View {
     let isCollapsed: Bool
     let toggle: () -> Void
 
-    private static let gap: CGFloat = 4
+    private static let gap: CGFloat = 2
+    private static let chevronWidth: CGFloat = 10
 
     var body: some View {
         Button(action: toggle) {
@@ -313,7 +320,7 @@ private struct ItemTableGroupHeader: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.tertiary)
                     .rotationEffect(.degrees(isCollapsed ? 0 : 90))
-                    .frame(width: ItemTable.leadingEdge - Self.gap)
+                    .frame(width: Self.chevronWidth)
                 ItemTableCategory(column: column, value: group.value, title: group.title, isGroup: true)
                     .fontWeight(.semibold)
                 Text(group.rows.count, format: .number)
@@ -321,8 +328,8 @@ private struct ItemTableGroupHeader: View {
                     .monospacedDigit()
                 Spacer(minLength: 0)
             }
-            // The cell starts at the edge, so the chevron's width and gap bring it back to the table's own.
-            .padding(.leading, -ItemTable.leadingEdge)
+            // The cell starts at the inset style's margin, so the chevron's width and gap bring the name back to it.
+            .padding(.leading, -(Self.chevronWidth + Self.gap))
             .contentShape(.rect)
         }
         .buttonStyle(.plain)

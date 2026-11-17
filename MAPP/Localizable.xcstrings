@@ -2920,6 +2920,9 @@
     "Opens a list of words to add to and remove from" : {
       "extractionState" : "manual"
     },
+    "Opens a panel to add a value" : {
+
+    },
     "Opens in the browser" : {
 
     },
