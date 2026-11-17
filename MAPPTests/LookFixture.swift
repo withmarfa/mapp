@@ -114,10 +114,10 @@ extension LookFixture {
     /// child under `child-of`, and a member joins a collection, the type that plays the `container` role.
     static let relationEdges: [EdgeTypeInfo] = [
         EdgeTypeInfo(
-            id: "parent-of", label: "Children", reverseLabel: "Parent", reverseName: "child-of", cardinality: .one, writtenAt: .target,
-            sourceTypes: [], targetTypes: []),
+            id: "parent-of", label: "Children", reverseLabel: "Parent", reverseName: "child-of", cardinality: .one, writtenFrom: .to,
+            fromTypes: [], toTypes: []),
         EdgeTypeInfo(
             id: "in-collection", label: "In Collection", reverseLabel: "Contents", reverseName: nil, cardinality: .many,
-            writtenAt: .source, sourceTypes: [], targetTypes: [], targetRoles: ["container"], flat: true),
+            writtenFrom: .from, fromTypes: [], toTypes: [], toRoles: ["container"], flat: true),
     ]
 }

@@ -13,8 +13,8 @@ nonisolated struct LookSurface: Sendable {
         isFile = catalogue.isFileType(type)
         var relations: Set<Relation> = []
         if let parentEdge = catalogue.edgeTypes[MarfaMapping.parentEdge] {
-            if catalogue.admits(type, types: parentEdge.targetTypes, roles: parentEdge.targetRoles) { relations.insert(.parent) }
-            if catalogue.admits(type, source: parentEdge) { relations.insert(.children) }
+            if catalogue.admits(type, types: parentEdge.toTypes, roles: parentEdge.toRoles) { relations.insert(.parent) }
+            if catalogue.admits(type, from: parentEdge) { relations.insert(.children) }
         }
         if catalogue.canJoinCollection(type) { relations.insert(.collections) }
         self.relations = relations

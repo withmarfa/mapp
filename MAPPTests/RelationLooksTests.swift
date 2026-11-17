@@ -25,12 +25,12 @@ struct RelationLooksTests {
             version: ItemVersion(1), created: now, modified: now)
         item.problem = problem
         if let parent {
-            item.edgesOut.append(Edge(id: EdgeID(rawValue: "p-\(id.rawValue)"), type: "child-of", source: id, target: .item(parent), origin: .property("parent")))
+            item.edgesOut.append(Edge(id: EdgeID(rawValue: "p-\(id.rawValue)"), type: "child-of", from: id, to: .item(parent), origin: .property("parent")))
         }
         for collection in collections {
             item.edgesOut.append(Edge(
-                id: EdgeID(rawValue: "c-\(id.rawValue)-\(collection.rawValue)"), type: MarfaMapping.collectionEdge, source: id,
-                target: .item(collection), origin: .property("parent")))
+                id: EdgeID(rawValue: "c-\(id.rawValue)-\(collection.rawValue)"), type: MarfaMapping.collectionEdge, from: id,
+                to: .item(collection), origin: .property("parent")))
         }
         return item
     }

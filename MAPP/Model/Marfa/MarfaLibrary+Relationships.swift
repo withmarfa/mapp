@@ -137,7 +137,7 @@ extension MarfaLibrary {
 
     func childIDs(of id: ItemID) -> [ItemID] {
         _ = linksRevision
-        return index.links(from: id, type: MarfaMapping.parentEdge).map(\.target)
+        return index.links(from: id, type: MarfaMapping.parentEdge).map(\.to)
     }
 
     func relationships(for id: ItemID) -> [ItemRelationship] {

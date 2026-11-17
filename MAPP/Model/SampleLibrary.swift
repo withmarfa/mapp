@@ -365,7 +365,7 @@ nonisolated enum SampleLibrary {
     static func taskLinks(now: Date) -> [Marfa.Edge] {
         func edge(_ source: String, _ target: String, _ type: String) -> Marfa.Edge {
             Marfa.Edge(
-                id: "\(type)-\(source)-\(target)", sourceId: source, targetId: target, edgeType: type, properties: [:], version: 1,
+                id: "\(type)-\(source)-\(target)", fromId: source, toId: target, edgeType: type, properties: [:], version: 1,
                 createdAt: stamp(now), updatedAt: stamp(now))
         }
         let parents = [1: "project-1", 2: "project-2", 3: "project-1", 4: "project-1", 6: "project-1", 7: "project-2"]
