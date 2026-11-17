@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The panel's section for a gallery, in place of Columns: what fills each card's picture area, and how large a card
-/// is. What a card says under its picture is its type's look (`TypeLook`), not a choice of the view. A saved view's
+/// is, and its shape. What a card says under its picture is its type's look (`TypeLook`), not a choice of the view. A saved view's
 /// choices are kept on this Mac as they are made, and a place's last as long as the window (`Browser.changeCards`).
 struct ViewPanelCards: View {
     let browser: Browser
@@ -32,6 +32,18 @@ struct ViewPanelCards: View {
                     .fixedSize()
                     .accessibilityIdentifier("ViewPanelCardSize")
                 }
+                HStack {
+                    Text("Shape")
+                    Spacer(minLength: 0)
+                    Picker("Shape", selection: Binding { cards.shape } set: { value in browser.changeCards { $0.shape = value } }) {
+                        ForEach(ViewCards.Shape.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .fixedSize()
+                    .disabled(cards.preview == .none)
+                    .accessibilityIdentifier("ViewPanelCardShape")
+                }
                 Toggle("Fit Picture", isOn: Binding { cards.fitsPicture } set: { value in browser.changeCards { $0.fitsPicture = value } })
                     .disabled(!cards.preview.showsPicture)
                     .help(cards.preview.showsPicture ? "" : String(localized: "Only a card with a picture can fit it."))
@@ -58,6 +70,16 @@ extension ViewCards.Size {
         case .small: String(localized: "Small")
         case .medium: String(localized: "Medium")
         case .large: String(localized: "Large")
+        }
+    }
+}
+
+extension ViewCards.Shape {
+    var title: String {
+        switch self {
+        case .standard: String(localized: "Standard")
+        case .square: String(localized: "Square")
+        case .cover: String(localized: "Cover")
         }
     }
 }

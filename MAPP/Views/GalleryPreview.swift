@@ -10,7 +10,8 @@ enum GalleryPreview {
         case failed
     }
 
-    /// An image file's picture, or a note's first embedded image, which the embed resolver opens, at most `maxPixels` on
+    /// An image file's picture, or a note's first embedded image, which the embed resolver opens, else an image file attached
+    /// to it (a bookmark's saved cover), at most `maxPixels` on
     /// its longer side.
     static func image(for item: Item, maxPixels: Int = 800, in library: any ItemLibrary) async -> Picture {
         switch item.content {
@@ -38,30 +39,37 @@ enum GalleryPreview {
                     continue
                 }
             }
+            for file in CardPicture.attachedImages(of: library.attachments(of: item.id).compactMap { library.item($0) }).prefix(CardPicture.attachedLimit) {
+                guard !Task.isCancelled else { return .failed }
+                do {
+                    guard let url = try await library.fileURL(of: file.id) else { continue }
+                    if let image = await thumbnail(at: url, maxPixels: maxPixels) { return .image(image) }
+                } catch {
+                    failed = true
+                }
+            }
             return failed ? .failed : .none
         }
     }
 
-    /// The file, fetched when it is small enough that a grid of cards can afford it. A larger file shows its type's
-    /// icon until the person opens it.
+    /// The file, fetched when it is small enough that a grid of cards can afford it (`CardPicture.fetchLimit`). A larger
+    /// file shows its type's icon until the person opens it.
     static func fileURL(of item: Item, in library: any ItemLibrary) async throws -> URL? {
-        guard case .file(_, let byteCount) = item.content, byteCount <= fetchLimit else { return nil }
+        guard case .file(let type, let byteCount) = item.content, byteCount <= CardPicture.fetchLimit(CardPicture.kind(of: type)) else { return nil }
         return try await library.fileURL(of: item.id)
     }
 
     private static func isSmallImage(_ item: Item) -> Bool {
         guard case .file(let type, let byteCount) = item.content else { return false }
-        return type.conforms(to: .image) && byteCount <= fetchLimit
+        return type.conforms(to: .image) && byteCount <= CardPicture.fetchLimit(.image)
     }
 
     /// How many of a note's embeds its picture is chosen from.
     nonisolated static let embedLimit = 8
 
-    nonisolated private static let fetchLimit: Int64 = 8 << 20
-
     /// Read from the descriptor the resolver checked, never reopened by path.
     @concurrent private static func thumbnail(of file: OpenFile, maxPixels: Int) async -> CGImage? {
-        guard file.length <= fetchLimit, let data = await file.read(at: 0, count: Int(file.length)),
+        guard file.length <= CardPicture.fetchLimit(.image), let data = await file.read(at: 0, count: Int(file.length)),
               !Task.isCancelled, let source = CGImageSourceCreateWithData(data as CFData, nil)
         else { return nil }
         return thumbnail(source, maxPixels: maxPixels)

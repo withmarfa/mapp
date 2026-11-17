@@ -20,12 +20,23 @@ enum GalleryArtworkCache {
         let item: ItemID
         let version: ItemVersion
         let embeds: [EmbedState]
+        /// The image files attached to it, which a bookmark's cover is: each one's version and whether it is in the bin.
+        let attached: [Attached]
+    }
+
+    nonisolated struct Attached: Hashable, Sendable {
+        let file: ItemID
+        let version: ItemVersion
+        let trashed: Bool
     }
 
     /// Reads the embeds' files from the library, so a view calling it follows them as it follows its item.
     static func basis(of item: Item, in library: any ItemLibrary) -> Basis {
         let embeds = item.boundEmbeds.prefix(GalleryPreview.embedLimit).map { library.embedState(of: $0) }
-        return Basis(item: item.id, version: item.version, embeds: embeds)
+        let attached = item.isFile ? [] : library.attachments(of: item.id).compactMap { library.item($0) }
+            .filter(\.isFile).map { Attached(file: $0.id, version: $0.version, trashed: $0.state == .trashed) }
+            .sorted { $0.file.rawValue < $1.file.rawValue }
+        return Basis(item: item.id, version: item.version, embeds: embeds, attached: attached)
     }
 
     nonisolated private final class Key: NSObject {
@@ -101,7 +112,9 @@ enum GalleryArtworkCache {
             let url: URL?
             do { url = try await GalleryPreview.fileURL(of: item, in: library) } catch { return nil }
             guard let url, !Task.isCancelled else { return .some(nil) }
-            return .some(await quickLook(at: url, width: width, scale: scale).map { GalleryArtwork(image: $0, isDocument: true) })
+            let isVideo = CardPicture.kind(of: type) == .video
+            let image = await quickLook(at: url, width: width, height: isVideo ? width * 0.75 : width * 1.5, scale: scale)
+            return .some(image.map { GalleryArtwork(image: $0, isDocument: !isVideo) })
         }
         // Twice the side, as a tall picture fills a square by its width; a list row's is far smaller than a card's.
         switch await GalleryPreview.image(for: item, maxPixels: min(800, Int(width * scale * 2)), in: library) {
@@ -111,10 +124,11 @@ enum GalleryArtworkCache {
         }
     }
 
-    /// A tall request, since a page fits inside it by its height; the card then fills its frame from the page's top.
-    @concurrent private static func quickLook(at url: URL, width: CGFloat, scale: CGFloat) async -> CGImage? {
+    /// A document's request is tall, since a page fits inside it by its height; the card then fills its frame from the
+    /// page's top. A video's is wide, as its frame is.
+    @concurrent private static func quickLook(at url: URL, width: CGFloat, height: CGFloat, scale: CGFloat) async -> CGImage? {
         let request = QLThumbnailGenerator.Request(
-            fileAt: url, size: CGSize(width: width, height: width * 1.5), scale: scale, representationTypes: .thumbnail)
+            fileAt: url, size: CGSize(width: width, height: height), scale: scale, representationTypes: .thumbnail)
         return try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request).cgImage
     }
 }

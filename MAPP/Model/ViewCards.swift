@@ -30,15 +30,35 @@ nonisolated struct ViewCards: Codable, Hashable, Sendable {
         }
     }
 
+    /// The shape of the picture area, which sets how tall a card is for its width.
+    enum Shape: String, Codable, CaseIterable, Sendable {
+        /// Four wide to three high, as a photograph or a page.
+        case standard
+        case square
+        /// Two wide to three high, as a book's cover.
+        case cover
+
+        /// Width over height.
+        var aspect: Double {
+            switch self {
+            case .standard: 4.0 / 3.0
+            case .square: 1
+            case .cover: 2.0 / 3.0
+            }
+        }
+    }
+
     var preview = Preview.pictureOrText
     /// Whether a picture is shown whole, rather than filling the picture area and cut at its edges.
     var fitsPicture = false
     var size = Size.medium
+    var shape = Shape.standard
 
-    init(preview: Preview = .pictureOrText, fitsPicture: Bool = false, size: Size = .medium) {
+    init(preview: Preview = .pictureOrText, fitsPicture: Bool = false, size: Size = .medium, shape: Shape = .standard) {
         self.preview = preview
         self.fitsPicture = fitsPicture
         self.size = size
+        self.shape = shape
     }
 
     /// A choice this version does not know, or one a later version adds, never voids the rest. The subtext and the
@@ -48,5 +68,6 @@ nonisolated struct ViewCards: Codable, Hashable, Sendable {
         preview = (try? container.decodeIfPresent(Preview.self, forKey: .preview)) ?? .pictureOrText
         fitsPicture = (try? container.decodeIfPresent(Bool.self, forKey: .fitsPicture)) ?? false
         size = (try? container.decodeIfPresent(Size.self, forKey: .size)) ?? .medium
+        shape = (try? container.decodeIfPresent(Shape.self, forKey: .shape)) ?? .standard
     }
 }

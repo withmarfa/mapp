@@ -19,7 +19,7 @@ struct ItemGallery: View {
     /// What each card says, worked out once for each item from its type's look.
     @State private var cardContents = CardContents()
 
-    private static let spacing: CGFloat = 20
+    private static let spacing: CGFloat = 16
     private static let inset: CGFloat = 24
 
     /// What the view chose for its cards and the grid it makes: a larger card means fewer columns across the same width.
@@ -79,7 +79,7 @@ struct ItemGallery: View {
     private func collection(_ sections: [NoteSection], ids: [ItemID], plan: Plan) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 28) {
+                LazyVStack(alignment: .leading, spacing: 24) {
                     ForEach(sections) { section in
                         sectionGrid(section, ids: ids, plan: plan)
                     }
@@ -118,11 +118,10 @@ struct ItemGallery: View {
     }
 
     private func sectionGrid(_ section: NoteSection, ids: [ItemID], plan: Plan) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             if let group = section.group {
                 Text(group.title())
-                    .interfaceFont(.headline)
-                    .foregroundStyle(.secondary)
+                    .interfaceFont(.callout.weight(.semibold))
                     .accessibilityAddTraits(.isHeader)
             }
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: Self.spacing), count: plan.columns), spacing: Self.spacing + 4) {

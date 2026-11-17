@@ -17,17 +17,22 @@ enum GalleryKind: Equatable {
 }
 
 /// What a card derives from its item, the catalogue and the files its text embeds: its shape, what decides its
-/// picture and its type's icon. It is read when the card's own inputs change, never for another card's selection.
+/// picture, where the picture may come from and its type's icon. It is read when the card's own inputs change, never
+/// for another card's selection.
 struct GalleryCardFacts {
     let kind: GalleryKind
     let basis: GalleryArtworkCache.Basis
+    let sources: [CardPicture.Source]
     let icon: String?
 
     init(of item: Item, in library: any ItemLibrary) {
         let made = Cost.measure(.galleryCard) {
-            (GalleryKind.of(item), GalleryArtworkCache.basis(of: item, in: library), library.catalogue.icon(for: item.type))
+            let attachments = item.isFile ? [] : library.attachments(of: item.id).compactMap { library.item($0) }
+            return (
+                GalleryKind.of(item), GalleryArtworkCache.basis(of: item, in: library),
+                CardPicture.sources(of: item, attachments: attachments), library.catalogue.icon(for: item.type))
         }
-        (kind, basis, icon) = made
+        (kind, basis, sources, icon) = made
     }
 }
 
@@ -43,7 +48,7 @@ struct GalleryCard: View, Equatable {
     let browser: Browser
     /// The picture's width in points, which sets the scale of the opening lines drawn on it.
     let width: CGFloat
-    /// What the view chose for its cards: the picture's preview, whether it is fitted, and the size.
+    /// What the view chose for its cards: the picture's preview, whether it is fitted, its shape and the size.
     let cards: ViewCards
     let content: RowContent
 
@@ -55,37 +60,60 @@ struct GalleryCard: View, Equatable {
 
     var body: some View {
         let facts = GalleryCardFacts(of: item, in: library)
-        VStack(alignment: .leading, spacing: 10) {
+        let radius = cards.size == .small ? 8 : Self.radius
+        VStack(alignment: .leading, spacing: 8) {
             if cards.preview == .none {
                 words
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
-                    .background(Color(nsColor: .textBackgroundColor), in: .rect(cornerRadius: Self.radius, style: .continuous))
-                    .overlay { RoundedRectangle(cornerRadius: Self.radius, style: .continuous).strokeBorder(.separator, lineWidth: 1) }
+                    .background(Color(nsColor: .textBackgroundColor), in: .rect(cornerRadius: radius, style: .continuous))
+                    .overlay { RoundedRectangle(cornerRadius: radius, style: .continuous).strokeBorder(.separator, lineWidth: 0.5) }
                     .overlay(alignment: .topTrailing) { if item.isFavorite { FavoriteBadge(unit: 1).padding(6) } }
-                    .shadow(color: .black.opacity(0.07), radius: 6, y: 2)
-                    .overlay { GalleryRing(browser: browser, id: item.id, radius: Self.radius + 3) }
+                    .overlay { GalleryRing(browser: browser, id: item.id, shape: GalleryShape(cards: cards, radius: radius)) }
             } else {
-                GalleryThumbnail(item: item, browser: browser, facts: facts, width: width, cards: cards)
-                words.padding(.horizontal, 4)
+                GalleryThumbnail(item: item, browser: browser, facts: facts, width: width, cards: cards, radius: radius)
+                words.padding(.horizontal, 2)
             }
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
-    /// The title, then the line its type's look gives it. Both keep their room, so the cards of a row are one height.
+    /// The title, then the line its type's look gives it. The title keeps the room of two lines and the Secondary line
+    /// that of one, so the cards of a row are one height whatever their titles are.
     private var words: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        let large = cards.size == .large
+        return VStack(alignment: .leading, spacing: 2) {
             Text(content.title)
-                .interfaceFont(.subheadline.weight(.semibold))
+                .interfaceFont(large ? .body.weight(.medium) : .callout.weight(.medium))
                 .lineLimit(2, reservesSpace: true)
                 .multilineTextAlignment(.leading)
             Text(verbatim: content.secondary ?? " ")
-                .interfaceFont(.caption)
+                .interfaceFont(large ? .callout : .subheadline)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
         }
         .foregroundStyle(.primary)
+    }
+}
+
+/// The outline of a card's picture area: rounded all round, or, for a book's cover, squarer at the spine.
+private nonisolated struct GalleryShape: InsettableShape {
+    let cards: ViewCards
+    let radius: CGFloat
+    var insetAmount: CGFloat = 0
+
+    func path(in rect: CGRect) -> Path {
+        let rect = rect.insetBy(dx: insetAmount, dy: insetAmount)
+        if cards.shape == .cover {
+            return UnevenRoundedRectangle(topLeadingRadius: 3, bottomLeadingRadius: 3, bottomTrailingRadius: 6, topTrailingRadius: 6, style: .continuous).path(in: rect)
+        }
+        return RoundedRectangle(cornerRadius: radius, style: .continuous).path(in: rect)
+    }
+
+    func inset(by amount: CGFloat) -> GalleryShape {
+        var shape = self
+        shape.insetAmount += amount
+        return shape
     }
 }
 
@@ -103,9 +131,10 @@ private struct FavoriteBadge: View {
     }
 }
 
-/// The picture on top of a card, 4 to 3 with a hairline edge and a soft shadow. What fills it is the view's choice of
-/// preview: the item's picture or else its opening lines, either alone, and a picture cut to fill or shown whole. An
-/// item with neither shows its type's mark, quietly, so no card is an empty frame.
+/// The picture on top of a card, in the view's shape with a hairline edge. What fills it is `CardFace`: the item's
+/// picture or else its opening lines, either alone, and a picture cut to fill or shown whole. A picture is made off the
+/// main thread and cached, and a quiet frame stands in until it is ready. An item with neither a picture nor text shows
+/// its type's mark, so no card is an empty frame.
 private struct GalleryThumbnail: View {
     @CurrentLibrary private var library
     @Environment(\.displayScale) private var displayScale
@@ -114,9 +143,10 @@ private struct GalleryThumbnail: View {
     let facts: GalleryCardFacts
     let width: CGFloat
     let cards: ViewCards
+    let radius: CGFloat
     @State private var artwork: GalleryArtwork?
-
-    private static let radius = GalleryCard.radius
+    /// Whether making the picture has ended, with or without one, so a card does not show its fallback while it waits.
+    @State private var resolved = false
 
     private struct Loading: Hashable {
         let basis: GalleryArtworkCache.Basis
@@ -124,56 +154,63 @@ private struct GalleryThumbnail: View {
     }
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: Self.radius, style: .continuous)
+        let shape = GalleryShape(cards: cards, radius: radius)
         let basis = facts.basis
-        let loads = cards.preview.showsPicture
+        let face = CardFace.of(preview: cards.preview, sources: facts.sources, isFile: item.isFile, text: item.preview)
+        let loads = face == .picture
         let shown = loads ? (artwork ?? GalleryArtworkCache.peek(basis, width: width)) : nil
         let unit = min(1.6, max(0.85, width / 220))
         Color(nsColor: .textBackgroundColor)
-            .aspectRatio(4 / 3, contentMode: .fit)
-            .overlay { content(shown, unit: unit) }
+            .aspectRatio(cards.shape.aspect, contentMode: .fit)
+            .overlay { content(shown, face: face, waiting: loads && !resolved, unit: unit) }
             .overlay(alignment: .topTrailing) { if item.isFavorite { FavoriteBadge(unit: unit).padding(8 * unit) } }
             .clipShape(shape)
-            .overlay { shape.strokeBorder(.separator, lineWidth: 1) }
-            .shadow(color: .black.opacity(0.07), radius: 6, y: 2)
-            .overlay { GalleryRing(browser: browser, id: item.id, radius: Self.radius + 3) }
+            .overlay { shape.strokeBorder(.separator, lineWidth: 0.5) }
+            .overlay { GalleryRing(browser: browser, id: item.id, shape: GalleryShape(cards: cards, radius: radius)) }
             .task(id: Loading(basis: basis, loads: loads)) {
                 artwork = nil
+                resolved = GalleryArtworkCache.peek(basis, width: width) != nil
                 guard loads else { return }
                 let made = await GalleryArtworkCache.artwork(for: item, width: width, scale: displayScale, in: library)
-                if !Task.isCancelled { artwork = made }
+                if !Task.isCancelled {
+                    artwork = made
+                    resolved = true
+                }
             }
     }
 
-    @ViewBuilder private func content(_ shown: GalleryArtwork?, unit: CGFloat) -> some View {
+    @ViewBuilder private func content(_ shown: GalleryArtwork?, face: CardFace, waiting: Bool, unit: CGFloat) -> some View {
         if let shown {
             Color.clear.overlay(alignment: shown.isDocument && !cards.fitsPicture ? .top : .center) {
                 let image = Image(decorative: shown.image, scale: displayScale).resizable()
                 if cards.fitsPicture { image.scaledToFit() } else { image.scaledToFill() }
             }
             .clipped()
-        } else if cards.preview != .text, case .file(let type) = facts.kind {
-            FileGlyph(type: type)
-        } else if !item.preview.isEmpty, cards.preview != .picture {
-            OpeningLines(text: item.preview, unit: unit)
+        } else if waiting {
+            Color.primary.opacity(0.03)
         } else {
-            QuietMark(icon: facts.icon)
+            switch CardFace.fallback(preview: cards.preview, isFile: item.isFile, text: item.preview) {
+            case .fileIcon:
+                if case .file(let type) = facts.kind { FileGlyph(type: type) }
+            case .text: OpeningLines(text: item.preview, unit: unit)
+            case .picture, .placeholder: QuietMark(icon: facts.icon)
+            }
         }
     }
 }
 
-/// The ring around a selected card's picture. It reads the selection itself, so a selection that moves redraws the
-/// rings and no card.
+/// The ring around a selected card's picture, in the accent color with a gap of the window's color, as a Finder icon's
+/// is. It reads the selection itself, so a selection that moves redraws the rings and no card.
 private struct GalleryRing: View {
     let browser: Browser
     let id: ItemID
-    let radius: CGFloat
+    let shape: GalleryShape
 
     var body: some View {
         if browser.selection.contains(id) {
-            RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.18), lineWidth: 3)
-                .padding(-3)
+            shape
+                .strokeBorder(Color.accentColor, lineWidth: 2)
+                .padding(-4)
         }
     }
 }
