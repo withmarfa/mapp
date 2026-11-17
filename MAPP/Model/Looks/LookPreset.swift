@@ -5,10 +5,19 @@ import Foundation
 nonisolated struct LookSurface: Sendable {
     let info: ItemTypeInfo?
     let isFile: Bool
+    /// Which links an item of the type can hold, by what Marfa's edge types admit of it.
+    let relations: Set<Relation>
 
     init(_ type: TypeID, in catalogue: Catalogue) {
         info = catalogue.itemTypes[type]
         isFile = catalogue.isFileType(type)
+        var relations: Set<Relation> = []
+        if let parentEdge = catalogue.edgeTypes[MarfaMapping.parentEdge] {
+            if catalogue.admits(type, types: parentEdge.toTypes, roles: parentEdge.toRoles) { relations.insert(.parent) }
+            if catalogue.admits(type, from: parentEdge) { relations.insert(.children) }
+        }
+        if catalogue.canJoinCollection(type) { relations.insert(.collections) }
+        self.relations = relations
     }
 
     func field(_ key: String) -> ItemTypeInfo.Field? { info?.fields.first { $0.key == key } }
@@ -27,6 +36,7 @@ nonisolated struct LookSurface: Sendable {
         case .opening: true
         case .site: field(MarfaMapping.urlField) != nil
         case .file: isFile
+        case .parent: relations.contains(.parent)
         }
     }
 
@@ -34,6 +44,7 @@ nonisolated struct LookSurface: Sendable {
         switch fact {
         case .field(let key): field(key) != nil
         case .tags: true
+        case .relation(let relation): relations.contains(relation)
         }
     }
 
@@ -117,7 +128,7 @@ nonisolated enum LookPreset: String, CaseIterable, Codable, Identifiable, Hashab
         case .task:
             return Template(
                 dateFields: [MarfaMapping.dueField], fallback: .edited,
-                slots: [[field(MarfaMapping.projectField), field(MarfaMapping.repositoryField)]],
+                slots: [[field(MarfaMapping.projectField), field(MarfaMapping.repositoryField), .parent]],
                 facts: [[fact(MarfaMapping.priorityField)], [fact(MarfaMapping.assigneesField)]])
         case .event:
             return Template(

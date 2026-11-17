@@ -212,6 +212,7 @@ final class FakeItemLibrary: ItemLibrary {
         }
     }
     func relationships(for id: ItemID) -> [ItemRelationship] { relationshipsByItem[id] ?? [] }
+    func childIDs(of id: ItemID) -> [ItemID] { items.filter { $0.parentID == id }.map(\.id) }
     func relationshipCandidates(for id: ItemID, field: String) -> [Item] { [] }
     /// The refusal for each (item, other) a test sets; any other link is taken.
     var refusals: [ItemID: [ItemID: String]] = [:]

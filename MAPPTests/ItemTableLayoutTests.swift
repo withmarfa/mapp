@@ -42,7 +42,7 @@ struct ItemTableLayoutTests {
         let item = Item(
             id: ItemID(title), type: TypeID(type), title: title, titleRule: .property("title"), properties: properties,
             version: ItemVersion(1), created: modified, modified: modified)
-        func link(_ title: String?) -> ItemTableRow.Link? { title.map { .init(id: ItemID($0), title: $0, icon: "folder") } }
+        func link(_ title: String?) -> RelatedItem? { title.map { .init(id: ItemID($0), title: $0, icon: "folder") } }
         return ItemTableRow(item: item, typeLabel: type, typeIcon: nil, parent: link(parent))
     }
 
@@ -85,7 +85,7 @@ struct ItemTableLayoutTests {
         let rows = [Self.row("A", status: "pending", priority: "low", parent: "P")]
         let ids = Self.columns(rows).map(\.id)
         #expect(ids == [
-            "title", "field.status", "field.priority", "edited", "parent", "field.description", "field.notes", "created", "occurred", "tags",
+            "title", "field.status", "field.priority", "edited", "parent", "children", "collections", "field.description", "field.notes", "created", "occurred", "tags",
         ])
     }
 

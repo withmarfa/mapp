@@ -10,7 +10,7 @@ struct PageChip: View {
         /// The type's name, tinted in its tone, with its icon in color.
         case type(icon: String?)
         /// An item a row links to: its mark in color and its title on a grey fill, since a tint means a type. The title
-        /// is underlined under the pointer.
+        /// is underlined under the pointer where `underlinesOnHover` says it opens.
         case link(icon: String?)
         /// A status: its symbol in a chip with a fine edge, and a chevron where it opens a menu.
         case status(StatusSymbol, chevron: Bool)
@@ -34,6 +34,9 @@ struct PageChip: View {
     let kind: Kind
     var size: ChipSize = .page
     var removal: Removal?
+    /// Whether a link chip answers the pointer by underlining its title, which says a click opens the item. A row's chip
+    /// does not: a click there selects the row.
+    var underlinesOnHover = true
 
     @Environment(\.colorScheme) private var scheme
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
@@ -44,7 +47,7 @@ struct PageChip: View {
     }
 
     private var isLink: Bool {
-        if case .link = kind { true } else { false }
+        if case .link = kind { underlinesOnHover } else { false }
     }
 
     var body: some View {

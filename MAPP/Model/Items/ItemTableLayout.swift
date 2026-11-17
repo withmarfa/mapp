@@ -3,31 +3,37 @@ import Marfa
 
 /// One row of the table: an item, with what its cells show that the item alone does not say.
 nonisolated struct ItemTableRow: Identifiable, Hashable, Sendable {
-    struct Link: Hashable, Sendable {
-        let id: ItemID
-        let title: String
-        let icon: String?
-    }
-
     let item: Item
     let typeLabel: String
     let typeIcon: String?
-    /// The item the row's item is filed under (`child-of`).
-    let parent: Link?
+    /// The item the row's item is filed under (`child-of`), if it is to be shown (`ItemRelations`).
+    let parent: RelatedItem?
+    /// The items filed under the row's item and the collections it is in, which the columns for them show. A row holds
+    /// only the links the table asked for (`rows(of:in:wanting:)`); the others are empty.
+    var children: [RelatedItem] = []
+    var collections: [RelatedItem] = []
     var id: ItemID { item.id }
+
+    func items(of relation: Relation) -> [RelatedItem] {
+        switch relation {
+        case .parent: parent.map { [$0] } ?? []
+        case .children: children
+        case .collections: collections
+        }
+    }
 }
 
 extension ItemTableRow {
     @MainActor
-    static func rows(of items: [Item], in library: any ItemLibrary) -> [ItemTableRow] {
+    static func rows(of items: [Item], in library: any ItemLibrary, wanting wanted: Set<Relation> = []) -> [ItemTableRow] {
         let catalogue = library.catalogue
         return items.map { item in
-            let parent = item.parentID.flatMap { library.item($0) }
+            let relations = library.relations(of: item, wanting: wanted)
             return ItemTableRow(
                 item: item,
                 typeLabel: catalogue.label(for: item.type),
                 typeIcon: catalogue.icon(for: item.type),
-                parent: parent.map { Link(id: $0.id, title: $0.displayTitle, icon: catalogue.icon(for: $0.type)) })
+                parent: relations.parent, children: relations.children, collections: relations.collections)
         }
     }
 }
@@ -35,7 +41,7 @@ extension ItemTableRow {
 /// A column of the table: which part of an item it shows, and how.
 nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
     enum Content: Hashable, Sendable {
-        case title, type, parent, created, edited
+        case title, type, parent, children, collections, created, edited
         /// When the item happened (Marfa's `occurred_at`), which a record's look shows as its date.
         case occurred
         /// The item's tags, which a note's look shows as its fact.
@@ -47,6 +53,8 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
 
     enum Style: Hashable, Sendable {
         case title, status, priority, choice, date, number, boolean, link, text, duration
+        /// Several linked items, shown as their chips. Not a value to group or filter by.
+        case links
 
         /// How much a style says about its column, where types give one key different styles: a status, then a
         /// priority, then the rest.
@@ -70,17 +78,31 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
         if case .field(let field) = content { field } else { nil }
     }
 
+    /// The link this column shows, if it is the column of one.
+    var relation: Relation? {
+        switch content {
+        case .parent: .parent
+        case .children: .children
+        case .collections: .collections
+        default: nil
+        }
+    }
+
     /// Whether the cells hold a few values a person picks from, which the table can group and filter by.
     var isCategorical: Bool {
         switch style {
         case .status, .priority, .choice, .boolean, .link: true
-        case .title, .date, .number, .text, .duration: content == .type
+        case .title, .date, .number, .text, .duration, .links: content == .type
         }
     }
 
     static let title = ItemTableColumn(id: "title", label: String(localized: "Name"), content: .title, style: .title)
     static let type = ItemTableColumn(id: "type", label: String(localized: "Type"), content: .type, style: .text)
     static let parent = ItemTableColumn(id: "parent", label: "", content: .parent, style: .link)
+    static let children = ItemTableColumn(
+        id: "children", label: "", content: .children, style: .links, isShownByDefault: false)
+    static let collections = ItemTableColumn(
+        id: "collections", label: "", content: .collections, style: .links, isShownByDefault: false)
     static let edited = ItemTableColumn(id: "edited", label: String(localized: "Edited"), content: .edited, style: .date)
     static let created = ItemTableColumn(
         id: "created", label: String(localized: "Created"), content: .created, style: .date, isShownByDefault: false)
@@ -88,6 +110,17 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
         id: "occurred", label: String(localized: "Happened"), content: .occurred, style: .date, isShownByDefault: false)
     static let tags = ItemTableColumn(
         id: "tags", label: String(localized: "Tags"), content: .tags, style: .text, isShownByDefault: false)
+
+    /// The column of a link, headed with Marfa's name for it (`Relation.label`).
+    static func relation(_ relation: Relation, in catalogue: Catalogue) -> ItemTableColumn {
+        var column: ItemTableColumn = switch relation {
+        case .parent: .parent
+        case .children: .children
+        case .collections: .collections
+        }
+        column.label = relation.label(in: catalogue)
+        return column
+    }
 }
 
 // MARK: Values
@@ -191,7 +224,7 @@ nonisolated extension ItemTableColumn {
         case .type: return row.item.type.rawValue
         case .parent: return row.parent?.id.rawValue
         case .field(let field): return ItemTableValue.string(row, key: field.key)
-        case .title, .created, .edited, .occurred, .tags, .duration: return nil
+        case .title, .children, .collections, .created, .edited, .occurred, .tags, .duration: return nil
         }
     }
 
@@ -203,7 +236,7 @@ nonisolated extension ItemTableColumn {
         case .field:
             if style == .boolean { return value == "true" ? String(localized: "Yes") : String(localized: "No") }
             return ItemTypeInfo.Field.label(ofOption: value)
-        case .title, .created, .edited, .occurred, .tags, .duration: return value
+        case .title, .children, .collections, .created, .edited, .occurred, .tags, .duration: return value
         }
     }
 
@@ -212,6 +245,8 @@ nonisolated extension ItemTableColumn {
         case .title: return .text(row.item.displayTitle)
         case .type: return .text(row.typeLabel)
         case .parent: return row.parent.map { .text($0.title) }
+        case .children: return row.children.first.map { .text($0.title) }
+        case .collections: return row.collections.first.map { .text($0.title) }
         case .created: return .date(row.item.created)
         case .edited: return .date(row.item.modified)
         case .occurred: return .date(row.item.occurred ?? row.item.created)
@@ -361,6 +396,22 @@ nonisolated struct ItemTableGroup: Identifiable, Hashable, Sendable {
 }
 
 nonisolated enum ItemTableLayout {
+    /// The links the table reads for its rows: the parent always, one lookup a row, so its filter and grouping are
+    /// always offered; then children and collections where the types' looks show them, the person shows their
+    /// column, or a group, filter or sort names them. Those none of them asks for cost nothing.
+    static func relations(
+        of types: Set<TypeID>, looks: [TypeID: TypeLook], options: ItemTableOptions, shown: Set<Relation>
+    ) -> Set<Relation> {
+        var wanted = shown.union([.parent])
+        for type in types { wanted.formUnion((looks[type] ?? .empty).relations) }
+        // A column the options group, filter or sort by is read too, shown or not.
+        var named = Set(options.filters.keys)
+        if case .column(let id) = options.grouping { named.insert(id) }
+        for comparator in options.sort ?? [] { named.insert(comparator.column.id) }
+        for id in named { if let relation = Relation(rawValue: id) { wanted.insert(relation) } }
+        return wanted
+    }
+
     /// The table's columns for these rows: the name, then the type where the rows mix types, then what the types' looks
     /// show (`TypeLook`): the status of each type that has one, then the facts in the order the looks give them, then
     /// their dates. The columns of several types are the union of their looks. Every other column starts hidden and the
@@ -426,6 +477,9 @@ nonisolated enum ItemTableLayout {
             case .tags:
                 guard rows.contains(where: { !$0.item.tags.subtracting([ItemTag.favorite]).isEmpty }) else { continue }
                 add(.tags, shown: true)
+            case .relation(let relation):
+                guard rows.contains(where: { !$0.items(of: relation).isEmpty }) else { continue }
+                add(.relation(relation, in: catalogue), shown: true)
             case .created: add(.created, shown: true)
             case .edited: add(.edited, shown: true)
             case .occurred: add(.occurred, shown: true)
@@ -433,10 +487,9 @@ nonisolated enum ItemTableLayout {
         }
 
         // What the looks do not show waits behind View Options. Where each item is filed is one of those.
-        var parent = ItemTableColumn.parent
-        // The column is headed with Marfa's name for the child end of the parent link.
-        if let name = catalogue.edgeTypes[MarfaMapping.parentEdge]?.reverseLabel { parent.label = name }
-        add(parent, shown: false)
+        for relation in Relation.allCases where !used.contains(ItemTableColumn.relation(relation, in: catalogue).id) {
+            add(.relation(relation, in: catalogue), shown: false)
+        }
         for key in order where !used.contains("field." + key) {
             if let column = fieldColumn(key) { add(column, shown: false) }
             if key == MarfaMapping.startField, fields[MarfaMapping.endField] != nil {
@@ -462,6 +515,7 @@ nonisolated enum ItemTableLayout {
             case .type: 1
             case .field: column.style == .status ? 2 : 3
             case .parent: 4
+            case .children, .collections: 4
             case .duration, .occurred: 5
             case .edited: 6
             case .created: 7
@@ -483,6 +537,7 @@ nonisolated enum ItemTableLayout {
     private enum Shown: Hashable {
         case field(String)
         case tags, created, edited, occurred
+        case relation(Relation)
     }
 
     /// The facts of the types' looks in order, type by type, then their dates, each once.
@@ -495,6 +550,7 @@ nonisolated enum ItemTableLayout {
                 let entry: Shown = switch fact {
                 case .field(let key): .field(key)
                 case .tags: .tags
+                case .relation(let relation): .relation(relation)
                 }
                 if !facts.contains(entry) { facts.append(entry) }
             }

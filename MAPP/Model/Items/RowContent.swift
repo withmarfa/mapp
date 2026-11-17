@@ -58,6 +58,8 @@ nonisolated struct RowContent: Hashable, Sendable {
         case option(label: String, tone: TypeTone)
         case person(initials: String?, name: String)
         case tag(String)
+        /// An item this one links to, as its type's mark and its title (`Relation`).
+        case linked(icon: String?, title: String)
         /// A plain fact in secondary text, led by its field's label ("Location 1712") unless it is a flag, which is the
         /// label alone ("Archived").
         case text(String)
@@ -80,12 +82,14 @@ nonisolated struct RowContent: Hashable, Sendable {
     static let shownFacts = 2
     /// The most tags a row shows; the rest are counted.
     static let shownTags = 3
+    /// The most linked items a relation shows; the rest are counted.
+    static let shownLinks = 2
 
     /// The words a row reads aloud: its title, date and line, and the words of its chips.
     var spoken: String {
         let chipWords = chips.map { chip -> String in
             switch chip {
-            case .type(_, let label), .status(_, let label), .option(let label, _), .tag(let label), .text(let label): label
+            case .type(_, let label), .status(_, let label), .option(let label, _), .tag(let label), .text(let label), .linked(_, let label): label
             case .person(_, let name): name
             }
         }
@@ -95,11 +99,15 @@ nonisolated struct RowContent: Hashable, Sendable {
     // MARK: Making
 
     /// `includesDate` is false for a content that never says its date, so the date is not worked out to be dropped.
+    /// `relations` are the item's links as the library holds them now, which the caller works out once for the item
+    /// (`ItemLibrary.relations(of:wanting:)`) for the links the look asks for (`TypeLook.relations`).
     static func make(
-        for item: Item, look: TypeLook, catalogue: Catalogue, list: RowList, showsTime: Bool = false, includesDate: Bool = true,
-        calendar: Calendar = .current, locale: Locale = .current
+        for item: Item, look: TypeLook, catalogue: Catalogue, list: RowList, relations: ItemRelations = .none, showsTime: Bool = false,
+        includesDate: Bool = true, calendar: Calendar = .current, locale: Locale = .current
     ) -> RowContent {
-        let maker = Maker(item: item, info: catalogue.itemTypes[item.type], catalogue: catalogue, list: list, calendar: calendar, locale: locale)
+        let maker = Maker(
+            item: item, info: catalogue.itemTypes[item.type], catalogue: catalogue, list: list, relations: relations, calendar: calendar,
+            locale: locale)
         var content = RowContent(
             title: item.displayTitle, date: includesDate ? maker.date(of: look, showsTime: showsTime) : nil, secondary: maker.secondary(of: look),
             typeIcon: catalogue.icon(for: item.type), typeLabel: catalogue.label(for: item.type), mixesTypes: list.mixesTypes)
@@ -113,6 +121,7 @@ nonisolated struct RowContent: Hashable, Sendable {
         let info: ItemTypeInfo?
         let catalogue: Catalogue
         let list: RowList
+        let relations: ItemRelations
         let calendar: Calendar
         let locale: Locale
 
@@ -181,6 +190,8 @@ nonisolated struct RowContent: Hashable, Sendable {
                     .flatMap { $0.host() }.map(Self.withoutWWW)
             case .file:
                 return item.isFile ? Self.line(item.preview) : nil
+            case .parent:
+                return relations.parent?.title
             }
         }
 
@@ -249,6 +260,9 @@ nonisolated struct RowContent: Hashable, Sendable {
         /// The chips of one fact and how many of its values they leave out. A fact the item has no value for has none.
         private func chips(of fact: LookFact, skipping status: String?) -> (chips: [Chip], left: Int) {
             switch fact {
+            case .relation(let relation):
+                let linked = relations.items(of: relation)
+                return (linked.prefix(RowContent.shownLinks).map { Chip.linked(icon: $0.icon, title: $0.title) }, max(0, relations.count(of: relation) - RowContent.shownLinks))
             case .tags:
                 let tags = item.tags.subtracting([ItemTag.favorite]).sorted()
                 return (tags.prefix(RowContent.shownTags).map(Chip.tag), max(0, tags.count - RowContent.shownTags))

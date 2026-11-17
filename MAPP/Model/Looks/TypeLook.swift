@@ -27,14 +27,18 @@ nonisolated enum LookPart: Hashable, Sendable {
     case site
     /// A file's kind and size, worked out from the file.
     case file
+    /// The title of the item this one is filed under, so a task of a type with no project or repository field still says
+    /// where it belongs.
+    case parent
 }
 
-/// One thing on the bottom line, after the status. Later kinds MAPP builds (a count, a reading time, a relation) are new
-/// cases here.
+/// One thing on the bottom line, after the status. Later kinds MAPP builds (a count, a reading time) are new cases here.
 nonisolated enum LookFact: Hashable, Sendable {
     /// A field of the type: an option, a list of people, a number or a date.
     case field(String)
     case tags
+    /// A link shown as a property: the parent, the children or the collections, each as the linked item's chip.
+    case relation(Relation)
 }
 
 /// How one type looks wherever its items are listed or shown as cards or rows of a table: the date, the line under the
@@ -78,6 +82,15 @@ nonisolated struct TypeLookChoice: Hashable, Sendable {
     }
 
     var isEmpty: Bool { date == nil && secondary == nil && facts == nil }
+}
+
+nonisolated extension TypeLook {
+    /// The links the look asks for, which a view reads from the library only for the types that show them.
+    var relations: Set<Relation> {
+        var relations = Set(facts.compactMap { fact -> Relation? in if case .relation(let relation) = fact { relation } else { nil } })
+        if secondary.contains(.parent) { relations.insert(.parent) }
+        return relations
+    }
 }
 
 // MARK: Stored words
@@ -142,6 +155,7 @@ nonisolated extension LookPart: LookWord {
         case .opening: "opening"
         case .site: "site"
         case .file: "file"
+        case .parent: "parent"
         }
     }
 
@@ -150,6 +164,7 @@ nonisolated extension LookPart: LookWord {
         case "opening": self = .opening
         case "site": self = .site
         case "file": self = .file
+        case "parent": self = .parent
         default:
             if let key = Self.fieldKey(in: word) {
                 self = .field(key)
@@ -167,12 +182,15 @@ nonisolated extension LookFact: LookWord {
         switch self {
         case .field(let key): "field:" + key
         case .tags: "tags"
+        case .relation(let relation): relation.word
         }
     }
 
     init?(word: String) {
         if word == "tags" {
             self = .tags
+        } else if let relation = Relation(rawValue: word) {
+            self = .relation(relation)
         } else if let key = Self.fieldKey(in: word) {
             self = .field(key)
         } else {

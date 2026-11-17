@@ -50,7 +50,9 @@ nonisolated enum SampleLibrary {
         let gallery = given == nil && SampleGallery.isRequested
         let fake = WorkingCopy.fake(
             items: given ?? (items(now: now, tasksAndEvents: withCollections) + (gallery ? SampleGallery.rows(now: now) : [])),
-            edges: edges ?? (given == nil ? memberships(now: now) + (gallery ? SampleGallery.edges(now: now) : []) : []),
+            edges: edges ?? (given == nil
+                ? memberships(now: now) + (withCollections ? taskLinks(now: now) : []) + (gallery ? SampleGallery.edges(now: now) : [])
+                : []),
             itemTypes: itemTypes + (gallery ? SampleGallery.types : []),
             edgeTypes: edgeTypes, views: views, displays: display)
         if gallery { SampleGallery.writeFiles() }
@@ -322,6 +324,10 @@ nonisolated enum SampleLibrary {
             let created = date(daysAgo: 7, hour: 9)
             rows.append(row("event-\(sessions.count + offset + 1)", type: "core.event", properties: properties, created: created, edited: created))
         }
+        for (index, title) in projectTitles.enumerated() {
+            let created = date(daysAgo: 14 + index, hour: 9)
+            rows.append(row("project-\(index + 1)", type: "sample.project", properties: ["title": .string(title)], created: created, edited: created))
+        }
         let met = date(daysAgo: 20, hour: 9)
         rows.append(row("person-1", type: "core.entity.person", properties: [
             "title": "Ruth Okonjo", "job_title": "Editor",
@@ -352,6 +358,19 @@ nonisolated enum SampleLibrary {
                     createdAt: stamp(now), updatedAt: stamp(now))
             }
         }
+    }
+
+    /// The sample's tasks under their projects, and the first task in two collections, so a look can show a parent, children
+    /// and several collections.
+    static func taskLinks(now: Date) -> [Marfa.Edge] {
+        func edge(_ source: String, _ target: String, _ type: String) -> Marfa.Edge {
+            Marfa.Edge(
+                id: "\(type)-\(source)-\(target)", fromId: source, toId: target, edgeType: type, properties: [:], version: 1,
+                createdAt: stamp(now), updatedAt: stamp(now))
+        }
+        let parents = [1: "project-1", 2: "project-2", 3: "project-1", 4: "project-1", 6: "project-1", 7: "project-2"]
+        return parents.sorted { $0.key < $1.key }.map { edge($0.value, "task-\($0.key)", "parent-of") }
+            + [edge("task-1", "collection-home", "in-collection"), edge("task-1", "collection-reading", "in-collection")]
     }
 
     /// A note's heading is its title, and the text below it its body. A note with no heading has no title.
@@ -422,6 +441,8 @@ nonisolated private let tasks: [(title: String, status: String, priority: String
     ("Try a weekly planning view", "canceled", "low", "Keep undated items visible so nothing disappears."),
     ("Decide where this belongs", "", "low", "An item without a status still needs a place on the board."),
 ]
+
+nonisolated private let projectTitles = ["Reading experience", "First collections"]
 
 /// The first tasks' due dates, in days from today and an hour, so a timeline mixes tasks with the sessions.
 nonisolated private let taskDues: [(day: Int, hour: Int)] = [(0, 16), (0, 13), (1, 10), (-1, 15)]

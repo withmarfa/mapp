@@ -90,7 +90,7 @@ enum LookFixture {
     }
 
     /// The catalogue of `specs`, each type's fields with its ancestors' before its own.
-    static func catalogue(_ specs: [Spec] = specs) -> Catalogue {
+    static func catalogue(_ specs: [Spec] = specs, edgeTypes: [EdgeTypeInfo] = []) -> Catalogue {
         let byID = Dictionary(uniqueKeysWithValues: specs.map { ($0.id, $0) })
         func fields(of spec: Spec, depth: Int = 0) -> [ItemTypeInfo.Field] {
             let inherited = depth < 12 ? spec.parent.flatMap { byID[$0] }.map { fields(of: $0, depth: depth + 1) } ?? [] : []
@@ -101,10 +101,23 @@ enum LookFixture {
             ItemTypeInfo(
                 id: TypeID(spec.id), label: spec.id, fields: fields(of: spec), titleField: nil, bodyField: spec.bodyField,
                 parent: spec.parent.map { TypeID($0) })
-        })
+        }, edgeTypes: edgeTypes)
     }
 
     static func make(_ id: String, parent: String? = nil, _ fields: [ItemTypeInfo.Field] = []) -> Spec {
         Spec(id: id, parent: parent, fields: fields)
     }
+}
+
+extension LookFixture {
+    /// Marfa's `parent-of` and `in-collection` as the contract gives them: a parent holds many children, written at the
+    /// child under `child-of`, and a member joins a collection, the type that plays the `container` role.
+    static let relationEdges: [EdgeTypeInfo] = [
+        EdgeTypeInfo(
+            id: "parent-of", label: "Children", reverseLabel: "Parent", reverseName: "child-of", cardinality: .one, writtenFrom: .to,
+            fromTypes: [], toTypes: []),
+        EdgeTypeInfo(
+            id: "in-collection", label: "In Collection", reverseLabel: "Contents", reverseName: nil, cardinality: .many,
+            writtenFrom: .from, fromTypes: [], toTypes: [], toRoles: ["container"], flat: true),
+    ]
 }

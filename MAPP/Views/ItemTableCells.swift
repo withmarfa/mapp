@@ -84,7 +84,9 @@ struct ItemTableCell: View {
         switch column.content {
         case .title: title
         case .type: PageChip(text: row.typeLabel, kind: .type(icon: row.typeIcon), size: .row)
-        case .parent: link(row.parent)
+        case .parent: links(row.parent.map { [$0] } ?? [])
+        case .children: links(row.children)
+        case .collections: links(row.collections)
         case .created: date(row.item.created, isDue: false)
         case .edited: date(row.item.modified, isDue: false)
         case .occurred: date(row.item.occurred ?? row.item.created, isDue: false)
@@ -317,17 +319,23 @@ struct ItemTableCell: View {
         library.setItemProperty(row.id, key: field.key, value: value, undoManager: undoManager)
     }
 
-    /// Where the item is filed, as a link that shows that item.
-    @ViewBuilder private func link(_ link: ItemTableRow.Link?) -> some View {
-        if let link {
-            Button {
-                if let item = library.item(link.id) { browser.reveal(item, in: library, order: order) }
-            } label: {
-                Label { Text(link.title).underline(isHovering) } icon: { TypeGlyph(id: link.icon) }
-                    .labelStyle(ItemTableLabelStyle())
+    /// Linked items as the page's linked-item chips, the first two and then the rest counted. A chip shows its item.
+    @ViewBuilder private func links(_ items: [RelatedItem]) -> some View {
+        if !items.isEmpty {
+            HStack(spacing: 4) {
+                ForEach(items.prefix(RowContent.shownLinks)) { link in
+                    Button {
+                        if let item = library.item(link.id) { browser.reveal(item, in: library, order: order) }
+                    } label: {
+                        PageChip(text: link.title, kind: .link(icon: link.icon), size: .row)
+                    }
+                    .buttonStyle(.plain)
+                    .help(Text("Show \(link.title)"))
+                }
+                if items.count > RowContent.shownLinks {
+                    Text(verbatim: "+\(items.count - RowContent.shownLinks)").foregroundStyle(.secondary)
+                }
             }
-            .buttonStyle(.plain)
-            .help(Text("Show \(link.title)"))
         }
     }
 

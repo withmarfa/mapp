@@ -33,7 +33,7 @@ struct ItemTable: View {
     var body: some View {
         let _ = daysSeen
         let _ = placeTrace.bodyRan(for: browser.item)
-        let content = browser.tableContent(in: library)
+        let content = tableContent()
         let (allRows, rows) = (content.allRows, content.rows)
         let pages = Pages(content: content, paging: browser.tablePaging, size: browser.tablePageSize)
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
@@ -66,6 +66,14 @@ struct ItemTable: View {
             .task {
                 for await _ in NotificationCenter.default.notifications(named: .NSCalendarDayChanged) { daysSeen += 1 }
             }
+    }
+
+    /// The table's content, with its rows holding the links of the columns the person shows. A link column that was hidden
+    /// before needs its rows made again, once.
+    private func tableContent() -> ItemTableContent {
+        let content = browser.tableContent(in: library)
+        guard browser.showRelations(of: browser.shownColumns(content.columns, stored: storedColumns)) else { return content }
+        return browser.tableContent(in: library)
     }
 
     private func table(
@@ -298,7 +306,7 @@ extension ItemTableColumn {
         case .duration: (70, 92, 140)
         case .number: (60, 90, 160)
         case .boolean: (50, 70, 120)
-        case .link: (120, 200, 360)
+        case .link, .links: (120, 200, 360)
         }
     }
 }
