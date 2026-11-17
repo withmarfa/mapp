@@ -194,7 +194,7 @@ struct RelationLooksTests {
         let project = Self.item("test.project", "Launch")
         let task = Self.item("core.task", "Write", parent: project.id)
         let library = Self.library([project, task])
-        let rows = ItemTableRow.rows(of: [project, task], in: library)
+        let rows = ItemTableRow.rows(of: [project, task], in: library, wanting: Set(Relation.allCases))
         #expect(rows[0].children.map(\.title) == ["Write"])
         #expect(rows[1].parent?.title == "Launch")
 
@@ -215,5 +215,54 @@ struct RelationLooksTests {
         #expect(shown.contains("children") && shown.contains("parent"))
         #expect(!shown.contains("collections"), "a column no row fills starts hidden")
         #expect(shown.filter { $0 == "parent" }.count == 1)
+    }
+
+    @Test func aTableWithNoRelationColumnReadsNone() {
+        let project = Self.item("test.project", "Launch")
+        let task = Self.item("core.task", "Write", parent: project.id, collections: [project.id])
+        let library = Self.library([project, task])
+        let types: Set<TypeID> = [TypeID("test.project"), TypeID("core.task")]
+        let wanted = ItemTableLayout.relations(of: types, looks: [:], options: ItemTableOptions(), shown: [])
+        #expect(wanted.isEmpty)
+        let rows = ItemTableRow.rows(of: [project, task], in: library, wanting: wanted)
+        #expect(rows.allSatisfy { $0.parent == nil && $0.children.isEmpty && $0.collections.isEmpty })
+    }
+
+    @Test func aTableReadsTheLinksLooksShownColumnsAndItsOptionsName() {
+        let types: Set<TypeID> = [TypeID("core.task")]
+        let looks = [TypeID("core.task"): Self.parentFact]
+        #expect(ItemTableLayout.relations(of: types, looks: looks, options: ItemTableOptions(), shown: []) == [.parent])
+        #expect(ItemTableLayout.relations(of: types, looks: looks, options: ItemTableOptions(), shown: [.collections]) == [.parent, .collections])
+        // A look of a type the table does not hold asks for nothing.
+        #expect(ItemTableLayout.relations(of: [TypeID("core.note")], looks: looks, options: ItemTableOptions(), shown: []).isEmpty)
+        var grouped = ItemTableOptions()
+        grouped.grouping = .column("children")
+        grouped.filters["collections"] = ["x"]
+        #expect(ItemTableLayout.relations(of: types, looks: [:], options: grouped, shown: []) == [.children, .collections])
+    }
+
+    @Test func theTwoLinksShownAndTheCountMatchTheSortedResult() {
+        let project = Self.item("test.project", "Launch")
+        let titles = ["delta", "Charlie", "alpha 10", "alpha 2", "Bravo", "alpha 2", "echo"]
+        let kids = titles.map { Self.item("core.task", $0, parent: project.id) }
+        let collections = titles.map { Self.item("test.collection", $0) }
+        let note = Self.item("core.note", "N", collections: collections.map(\.id))
+        let library = Self.library([project, note] + kids + collections)
+        let all: Set<Relation> = [.children, .collections]
+
+        let full = library.relations(of: project, wanting: all)
+        let limited = library.relations(of: project, wanting: all, limit: RowContent.shownLinks)
+        #expect(limited.children == Array(full.children.prefix(RowContent.shownLinks)))
+        #expect(limited.count(of: .children) == full.children.count)
+        let fullNote = library.relations(of: note, wanting: all)
+        let limitedNote = library.relations(of: note, wanting: all, limit: RowContent.shownLinks)
+        #expect(limitedNote.collections == Array(fullNote.collections.prefix(RowContent.shownLinks)))
+        #expect(limitedNote.count(of: .collections) == titles.count)
+
+        let look = TypeLook(date: .off, secondary: [], facts: [.relation(.children)])
+        let content = RowContent.make(
+            for: project, look: look, catalogue: Self.catalogue, list: Self.list, relations: limited)
+        let sorted = RowContent.make(for: project, look: look, catalogue: Self.catalogue, list: Self.list, relations: full)
+        #expect(content.chips == sorted.chips && content.more == sorted.more && content.more == titles.count - 2)
     }
 }

@@ -13,7 +13,7 @@ A value component is one drawing for one kind of value. The same component appea
 | Status | A symbol for its group, in a chip with a fine gray edge, and a faint fill in dark. |
 | Priority and other options | A dot in the option's color, then the word. A list of options, such as a repository's labels, takes the dot too. |
 | Type | The type's name tinted in its color, with its icon in color. |
-| Linked item | The linked item's type mark and title on the gray of an option chip. The title is underlined under the pointer. |
+| Linked item | The linked item's type mark and title on the gray of an option chip. The title is underlined under the pointer where a click opens the item (a table cell, a pin), not in a row or a card. |
 | Tag | Gray, after a number sign. |
 | Person | Initials in a pale circle with a fine edge. The page and the right sidebar add the name; a row shows initials only, and a table cell shows the name too. |
 | Filter | Its field in gray, then is or is not, the values and an x. |

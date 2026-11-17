@@ -8,8 +8,8 @@ nonisolated struct ItemTableRow: Identifiable, Hashable, Sendable {
     let typeIcon: String?
     /// The item the row's item is filed under (`child-of`), if it is to be shown (`ItemRelations`).
     let parent: RelatedItem?
-    /// The items filed under the row's item and the collections it is in, which the columns for them show. They are read
-    /// for every row, so a column of them can be offered.
+    /// The items filed under the row's item and the collections it is in, which the columns for them show. A row holds
+    /// only the links the table asked for (`rows(of:in:wanting:)`); the others are empty.
     var children: [RelatedItem] = []
     var collections: [RelatedItem] = []
     var id: ItemID { item.id }
@@ -25,10 +25,10 @@ nonisolated struct ItemTableRow: Identifiable, Hashable, Sendable {
 
 extension ItemTableRow {
     @MainActor
-    static func rows(of items: [Item], in library: any ItemLibrary) -> [ItemTableRow] {
+    static func rows(of items: [Item], in library: any ItemLibrary, wanting wanted: Set<Relation> = []) -> [ItemTableRow] {
         let catalogue = library.catalogue
         return items.map { item in
-            let relations = library.relations(of: item, wanting: Set(Relation.allCases))
+            let relations = library.relations(of: item, wanting: wanted)
             return ItemTableRow(
                 item: item,
                 typeLabel: catalogue.label(for: item.type),
@@ -76,6 +76,16 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
 
     var field: ItemTypeInfo.Field? {
         if case .field(let field) = content { field } else { nil }
+    }
+
+    /// The link this column shows, if it is the column of one.
+    var relation: Relation? {
+        switch content {
+        case .parent: .parent
+        case .children: .children
+        case .collections: .collections
+        default: nil
+        }
     }
 
     /// Whether the cells hold a few values a person picks from, which the table can group and filter by.
@@ -386,6 +396,21 @@ nonisolated struct ItemTableGroup: Identifiable, Hashable, Sendable {
 }
 
 nonisolated enum ItemTableLayout {
+    /// The links the table reads for its rows: those the types' looks show, those of the columns the person shows, and
+    /// those a group, filter or sort names. A link none of them asks for costs nothing.
+    static func relations(
+        of types: Set<TypeID>, looks: [TypeID: TypeLook], options: ItemTableOptions, shown: Set<Relation>
+    ) -> Set<Relation> {
+        var wanted = shown
+        for type in types { wanted.formUnion((looks[type] ?? .empty).relations) }
+        // A column the options group, filter or sort by is read too, shown or not.
+        var named = Set(options.filters.keys)
+        if case .column(let id) = options.grouping { named.insert(id) }
+        for comparator in options.sort ?? [] { named.insert(comparator.column.id) }
+        for id in named { if let relation = Relation(rawValue: id) { wanted.insert(relation) } }
+        return wanted
+    }
+
     /// The table's columns for these rows: the name, then the type where the rows mix types, then what the types' looks
     /// show (`TypeLook`): the status of each type that has one, then the facts in the order the looks give them, then
     /// their dates. The columns of several types are the union of their looks. Every other column starts hidden and the

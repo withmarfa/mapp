@@ -31,11 +31,15 @@ final class ItemTableContent {
     init(browser: Browser, library: any ItemLibrary, items: [Item]) {
         let start = ContinuousClock.now
         defer { Cost.record(.tableContent, since: start) }
-        allRows = ItemTableRow.rows(of: items, in: library)
+        let looks = browser.looks(in: library)
+        let options = browser.tableOptions[browser.item] ?? ItemTableOptions()
+        let wanted = ItemTableLayout.relations(
+            of: Set(items.map(\.type)), looks: looks, options: options, shown: browser.shownRelations)
+        allRows = ItemTableRow.rows(of: items, in: library, wanting: wanted)
         let hidden = allRows.first.map { library.hiddenPropertyKeys(of: $0.item) } ?? []
-        columns = ItemTableLayout.columns(for: allRows, catalogue: library.catalogue, hidden: hidden, looks: browser.looks(in: library))
+        columns = ItemTableLayout.columns(for: allRows, catalogue: library.catalogue, hidden: hidden, looks: looks)
         catalogue = library.catalogue
-        options = browser.tableOptions[browser.item] ?? ItemTableOptions()
+        self.options = options
         // Relevance is the order the rows come in, which the sort leaves alone when it is empty.
         sort = browser.ordersByRelevance ? [] : ItemTableLayout.sort(options, columns: columns, keepsGivenOrder: browser.keepsPlaceOrder)
         grouping = ItemTableLayout.grouping(options, columns: columns)

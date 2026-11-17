@@ -28,7 +28,7 @@ struct ChipLine: View {
                 case .tag(let tag):
                     PageChip(text: tag, kind: .tag, size: .row)
                 case .linked(let icon, let title):
-                    PageChip(text: title, kind: .link(icon: icon), size: .row)
+                    PageChip(text: title, kind: .link(icon: icon), size: .row, underlinesOnHover: false)
                 case .text(let text):
                     Text(verbatim: text).font(.system(size: size)).foregroundStyle(.secondary).lineLimit(1)
                 }

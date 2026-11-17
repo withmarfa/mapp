@@ -497,7 +497,7 @@ final class Browser {
     func tableContent(in library: any ItemLibrary) -> ItemTableContent {
         let keyed = (tableOptions[item] ?? ItemTableOptions()).settled
         let derived = derivedKey(in: library)
-        let key = TableKey(derived: derived.key, options: keyed, choices: lookChoices)
+        let key = TableKey(derived: derived.key, options: keyed, choices: lookChoices, shownRelations: shownRelations)
         if let held = tableMemo, held.key == key { return held.content }
         let content = ItemTableContent(browser: self, library: library, items: derived.items ?? items(in: library))
         tableMemo = (key, content)
@@ -551,6 +551,20 @@ final class Browser {
         let derived: DerivedKey
         let options: ItemTableOptions
         let choices: [TypeID: TypeLookChoice]
+        let shownRelations: Set<Relation>
+    }
+
+    /// The links the table's shown columns hold, which its rows read besides those the looks and the options name.
+    /// The table sets it (`showRelations(of:)`); it never changes what an observer reads, only what a row holds.
+    @ObservationIgnored private(set) var shownRelations: Set<Relation> = []
+
+    /// Notes which links the table shows, so its rows hold them. Returns whether that changed what the rows read, in
+    /// which case the table asks for its content again.
+    func showRelations(of columns: [ItemTableColumn]) -> Bool {
+        let shown = Set(columns.compactMap(\.relation))
+        guard shown != shownRelations else { return false }
+        shownRelations = shown
+        return true
     }
 
     private var showsOnlyFavorites: Bool {

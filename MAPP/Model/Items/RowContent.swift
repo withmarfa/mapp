@@ -262,7 +262,7 @@ nonisolated struct RowContent: Hashable, Sendable {
             switch fact {
             case .relation(let relation):
                 let linked = relations.items(of: relation)
-                return (linked.prefix(RowContent.shownLinks).map { Chip.linked(icon: $0.icon, title: $0.title) }, max(0, linked.count - RowContent.shownLinks))
+                return (linked.prefix(RowContent.shownLinks).map { Chip.linked(icon: $0.icon, title: $0.title) }, max(0, relations.count(of: relation) - RowContent.shownLinks))
             case .tags:
                 let tags = item.tags.subtracting([ItemTag.favorite]).sorted()
                 return (tags.prefix(RowContent.shownTags).map(Chip.tag), max(0, tags.count - RowContent.shownTags))
