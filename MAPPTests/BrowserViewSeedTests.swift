@@ -102,7 +102,7 @@ struct BrowserViewSeedTests {
         #expect(browser.hasViewChanges)
     }
 
-    @Test func pickingTheDateFieldTheTimelineAlreadyShowsIsNoChange() throws {
+    @Test func pickingADateFieldIsAChangeAndEachTypesDateTakesItBack() throws {
         let event = TypeID("test.event")
         let eventType = ItemTypeInfo(
             id: event, label: "Event", fields: [
@@ -120,16 +120,13 @@ struct BrowserViewSeedTests {
         library.viewMembers[Self.view().id] = [item.id]
         browser.viewMode = .timeline
         Self.take(.timeline, in: browser)
-        let fallback = try #require(browser.timelineFieldChoices(in: library).first?.key)
-        // Picking the date it already shows keeps the view as it was, and so no group to write.
-        browser.setTimelineField(fallback, in: library)
+        // Each type's own date is no choice, so choosing it again keeps the view as it was.
+        browser.setTimelineField(nil, in: library)
         #expect(!browser.hasViewChanges)
-        // Another date is a change, and picking the first again takes it back.
-        let other = try #require(browser.timelineFieldChoices(in: library).last?.key)
-        #expect(other != fallback)
-        browser.setTimelineField(other, in: library)
+        let field = try #require(browser.timelineFieldChoices(in: library).first?.key)
+        browser.setTimelineField(field, in: library)
         #expect(browser.hasViewChanges)
-        browser.setTimelineField(fallback, in: library)
+        browser.setTimelineField(nil, in: library)
         #expect(!browser.hasViewChanges)
     }
 

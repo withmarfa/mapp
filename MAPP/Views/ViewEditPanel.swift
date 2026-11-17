@@ -170,7 +170,9 @@ private struct ViewPanelGroup: View {
         case .timeline:
             let fields = browser.timelineFieldChoices(in: library)
             let selected = ItemTimelineLayout.selectedField(browser.timelineFields[place], fields: fields)
-            Picker("Group by", selection: Binding { selected ?? "" } set: { browser.timelineFields[place] = $0 }) {
+            Picker("Group by", selection: Binding { selected ?? "" } set: { browser.timelineFields[place] = $0.isEmpty ? nil : $0 }) {
+                Text("Date of Each Type").tag("")
+                Divider()
                 ForEach(fields, id: \.key) { Text($0.label).tag($0.key) }
             }
             .labelsHidden()

@@ -229,9 +229,6 @@
     "%@, edited" : {
       "extractionState" : "manual"
     },
-    "%@, Read Only" : {
-      "extractionState" : "manual"
-    },
     "%@, remove" : {
 
     },
@@ -1679,6 +1676,9 @@
     "Date Format" : {
       "extractionState" : "manual"
     },
+    "Date of Each Type" : {
+      "extractionState" : "manual"
+    },
     "Dates" : {
       "extractionState" : "manual"
     },
@@ -1825,6 +1825,9 @@
       "extractionState" : "manual"
     },
     "Each server has its own copy on this Mac." : {
+      "extractionState" : "manual"
+    },
+    "Earlier" : {
       "extractionState" : "manual"
     },
     "Earlier versions of “%@”." : {

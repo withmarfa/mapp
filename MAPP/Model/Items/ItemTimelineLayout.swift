@@ -11,12 +11,16 @@ nonisolated struct ItemTimelineRow: Identifiable, Hashable, Sendable {
 
     let item: Item
     let value: Value
+    /// Whether the item is an event, which alone is said to be "all day" where it holds no time.
+    var isEvent = false
     var id: ItemID { item.id }
 }
 
 nonisolated struct ItemTimelineGroup: Identifiable, Hashable, Sendable {
     enum ID: Hashable, Sendable {
         case day(Date), missing, invalid, notApplicable
+        /// The header where the days ahead end and the days before today begin. It holds no rows.
+        case earlier
     }
 
     let id: ID
@@ -48,49 +52,81 @@ nonisolated enum ItemTimelineLayout {
         }
     }
 
+    /// The field the person pointed the timeline at, or nil where each item sits on the date its type's look names
+    /// (`ItemPlacement`).
     static func selectedField(_ selected: String?, fields: [ItemTypeInfo.Field]) -> String? {
-        if let selected, fields.contains(where: { $0.key == selected }) { return selected }
-        return fields.first?.key
+        guard let selected, fields.contains(where: { $0.key == selected }) else { return nil }
+        return selected
     }
 
+    /// The days of the items, from `today` on first and then, after an `Earlier` header, the days before it, the latest
+    /// first, so the timeline opens on today's agenda; an item with no date, or an invalid one, follows. Inside a day a
+    /// whole-day item leads, then the rest by time.
     static func groups(
-        for items: [Item], field: String?, catalogue: Catalogue, calendar: Calendar = .current
+        for items: [Item], field: String?, looks: [TypeID: TypeLook], catalogue: Catalogue, today: Date? = nil,
+        calendar: Calendar = .current
     ) -> [ItemTimelineGroup] {
         var groups: [ItemTimelineGroup.ID: [ItemTimelineRow]] = [:]
         for item in items {
-            let value = value(of: item, field: field, catalogue: catalogue, calendar: calendar)
+            let outcome = ItemPlacement.of(item, look: looks[item.type] ?? .empty, field: field, catalogue: catalogue, calendar: calendar)
+            let value = value(from: outcome)
+            var isEvent = false
+            if case .placed(let placement) = outcome { isEvent = placement.isEvent }
             let id: ItemTimelineGroup.ID = switch value {
             case .dated(let date, _, _): .day(calendar.startOfDay(for: date))
             case .missing: .missing
             case .invalid: .invalid
             case .notApplicable: .notApplicable
             }
-            groups[id, default: []].append(ItemTimelineRow(item: item, value: value))
+            groups[id, default: []].append(ItemTimelineRow(item: item, value: value, isEvent: isEvent))
         }
+        let start = calendar.startOfDay(for: today ?? .now)
         let days = groups.keys.compactMap { id -> Date? in
             if case .day(let date) = id { return date }
             return nil
-        }.sorted().map(ItemTimelineGroup.ID.day)
-        return (days + [.missing, .invalid, .notApplicable]).compactMap { id in
-            groups[id].map { ItemTimelineGroup(id: id, rows: $0.sorted(by: precedes)) }
+        }
+        let ahead = days.filter { $0 >= start }.sorted()
+        let behind = days.filter { $0 < start }.sorted(by: >)
+        // Where days ahead are followed by days before, a header marks the turn.
+        let turn: [ItemTimelineGroup.ID] = ahead.isEmpty || behind.isEmpty ? [] : [.earlier]
+        let order = ahead.map(ItemTimelineGroup.ID.day) + turn + behind.map(ItemTimelineGroup.ID.day)
+        return (order + [.missing, .invalid, .notApplicable]).compactMap { id in
+            if id == .earlier { return ItemTimelineGroup(id: id, rows: []) }
+            return groups[id].map { ItemTimelineGroup(id: id, rows: $0.sorted(by: precedes)) }
         }
     }
 
     static func value(
-        of item: Item, field: String?, catalogue: Catalogue, calendar: Calendar = .current
+        of item: Item, look: TypeLook, field: String?, catalogue: Catalogue, calendar: Calendar = .current
     ) -> ItemTimelineRow.Value {
-        guard let field, catalogue.itemTypes[item.type]?.fields.contains(where: { $0.key == field && $0.kind.isDate }) == true
-        else { return .notApplicable }
-        guard let value = item.value(of: field), value != .null, value != .string("") else { return .missing }
-        guard let text = value.string, let parsed = ItemDate.parse(text, calendar: calendar) else {
-            return .invalid(ItemValueText.string(value))
+        value(from: ItemPlacement.of(item, look: look, field: field, catalogue: catalogue, calendar: calendar))
+    }
+
+    private static func value(from outcome: ItemPlacement.Outcome) -> ItemTimelineRow.Value {
+        switch outcome {
+        case .placed(let placement): .dated(placement.start, dateOnly: !placement.hasTime, raw: placement.raw)
+        case .missing: .missing
+        case .invalid(let raw): .invalid(raw)
+        case .notApplicable: .notApplicable
         }
-        return .dated(parsed.date, dateOnly: !parsed.hasTime, raw: text)
+    }
+
+    /// Where today's line of the present moment sits among a day's rows: before the first timed row that is still to
+    /// come, or after the last. Nil for a day that is not today, or one with no timed row.
+    static func nowLine(in group: ItemTimelineGroup, now: Date, calendar: Calendar = .current) -> Int? {
+        guard case .day(let day) = group.id, day == calendar.startOfDay(for: now) else { return nil }
+        guard group.rows.contains(where: { if case .dated(_, false, _) = $0.value { true } else { false } }) else { return nil }
+        let coming = group.rows.firstIndex { row in
+            if case .dated(let date, false, _) = row.value { return date > now }
+            return false
+        }
+        return coming ?? group.rows.count
     }
 
     private static func precedes(_ lhs: ItemTimelineRow, _ rhs: ItemTimelineRow) -> Bool {
-        if case .dated(let left, _, _) = lhs.value, case .dated(let right, _, _) = rhs.value, left != right {
-            return left < right
+        if case .dated(let left, let leftDay, _) = lhs.value, case .dated(let right, let rightDay, _) = rhs.value {
+            if leftDay != rightDay { return leftDay }
+            if left != right { return left < right }
         }
         let title = lhs.item.displayTitle.localizedStandardCompare(rhs.item.displayTitle)
         return title == .orderedSame ? lhs.id.rawValue < rhs.id.rawValue : title == .orderedAscending

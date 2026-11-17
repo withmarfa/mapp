@@ -37,6 +37,11 @@ nonisolated struct RowList: Hashable, Sendable {
     var mixesTypes = false
     var date = RowDateSource.look
     var format = DateFormat.standard
+    /// Whether the list gives the date a column of its own, so a row's Secondary line leaves out a time it would repeat.
+    var datesApart = false
+    /// The date field the list places each item by where the person chose one, nil where each item sits on its type's
+    /// look's date. Only a time of that field is left out of the Secondary line.
+    var placedField: String?
     /// The start of today, which is all a row's dates need of the moment.
     var day: Date
 }
@@ -124,19 +129,21 @@ nonisolated struct RowContent: Hashable, Sendable {
 
         private func moment(of look: TypeLook) -> Moment? {
             switch list.date {
-            case .created: return (item.created, true)
-            case .edited: return (item.trashed ?? item.modified, true)
+            case .created: return stamp(.created)
+            case .edited: return stamp(.edited)
             case .field(let key): return fieldMoment(key)
             case .look:
                 switch look.date {
                 case .off: return nil
-                case .created: return (item.created, true)
-                case .edited: return (item.trashed ?? item.modified, true)
-                case .occurred: return (item.occurred ?? item.created, true)
                 // An item with no value in the field shows when it was last changed.
-                case .field(let key): return fieldMoment(key) ?? (item.trashed ?? item.modified, true)
+                case .field(let key): return fieldMoment(key) ?? stamp(.edited)
+                case .created, .edited, .occurred: return stamp(look.date)
                 }
             }
+        }
+
+        private func stamp(_ date: LookDate) -> Moment? {
+            ItemMoment.stamp(date, of: item).map { ($0, true) }
         }
 
         private func fieldMoment(_ key: String) -> Moment? {
@@ -154,17 +161,17 @@ nonisolated struct RowContent: Hashable, Sendable {
         // MARK: Secondary
 
         func secondary(of look: TypeLook) -> String? {
-            let parts = look.secondary.compactMap(part)
+            let parts = look.secondary.compactMap { part($0, look: look) }
             return parts.isEmpty ? nil : parts.joined(separator: ", ")
         }
 
-        private func part(_ part: LookPart) -> String? {
+        private func part(_ part: LookPart, look: TypeLook) -> String? {
             switch part {
             case .field(let key):
                 guard let field = field(key) else { return nil }
                 return isBody(field) ? Self.line(item.preview) : fieldText(field)
             case .time(let key):
-                guard case .date(includesTime: true)? = field(key)?.kind, let moment = fieldMoment(key), moment.hasTime else { return nil }
+                guard !isPlacedBy(key, look: look), case .date(includesTime: true)? = field(key)?.kind, let moment = fieldMoment(key), moment.hasTime else { return nil }
                 return DateDisplay.timeOfDay(of: moment.date, calendar: calendar, locale: locale)
             case .opening:
                 return Self.line(item.preview)
@@ -175,6 +182,14 @@ nonisolated struct RowContent: Hashable, Sendable {
             case .file:
                 return item.isFile ? Self.line(item.preview) : nil
             }
+        }
+
+        /// Whether the list's date column already says this field's time.
+        private func isPlacedBy(_ key: String, look: TypeLook) -> Bool {
+            guard list.datesApart else { return false }
+            if let placed = list.placedField { return key == placed }
+            if case .field(let own) = look.date { return key == own }
+            return false
         }
 
         private static func withoutWWW(_ host: String) -> String {

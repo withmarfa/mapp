@@ -279,6 +279,11 @@ nonisolated enum SampleLibrary {
                 "title": .string(task.title), "body": .string(task.body), "priority": .string(task.priority),
             ]
             if !task.status.isEmpty { properties["status"] = .string(task.status) }
+            if index < taskDues.count {
+                let due = taskDues[index]
+                let day = calendar.date(byAdding: .day, value: due.day, to: now) ?? now
+                properties["due_at"] = .string(stamp(calendar.date(bySettingHour: due.hour, minute: 0, second: 0, of: day) ?? day))
+            }
             if index == 0 { properties["assignees"] = [["name": "Ruth Okonjo", "email": "ruth@example.com"], ["email": "sam@example.com"]] }
             let created = date(daysAgo: index + 1, hour: 10)
             rows.append(row("task-\(index + 1)", type: "core.task", properties: properties, created: created, edited: created))
@@ -399,6 +404,9 @@ nonisolated private let tasks: [(title: String, status: String, priority: String
     ("Try a weekly planning view", "canceled", "low", "Keep undated items visible so nothing disappears."),
     ("Decide where this belongs", "", "low", "An item without a status still needs a place on the board."),
 ]
+
+/// The first tasks' due dates, in days from today and an hour, so a timeline mixes tasks with the sessions.
+nonisolated private let taskDues: [(day: Int, hour: Int)] = [(0, 16), (0, 13), (1, 10), (-1, 15)]
 
 nonisolated private let sessions: [(title: String, day: Int?, hour: Int, body: String)] = [
     ("Morning review", 0, 9, "A sample planning session. Open this page from the timeline and return without losing your place."),

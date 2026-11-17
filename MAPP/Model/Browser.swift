@@ -110,13 +110,10 @@ final class Browser {
         return fields
     }
 
-    /// Sets the date field the timeline shows. The field the timeline starts on stays unset unless the place is a
-    /// view that opened on another, so choosing it again is no change from the view and writes no day grouping.
-    func setTimelineField(_ key: String, in library: any ItemLibrary) {
-        let fallback = ItemTimelineLayout.selectedField(nil, fields: timelineFieldChoices(in: library))
-        var seeded: String?
-        if case .view(let id) = item { seeded = viewSeeds[id]?.timelineDate }
-        timelineFields[item] = key == fallback && seeded == nil ? nil : key
+    /// Sets the date field the timeline places every item by, or, with nil, lets each item sit on the date its type's
+    /// look names. Nil is no choice, so a place that is not a view keeps nothing and a view writes no day grouping.
+    func setTimelineField(_ key: String?, in library: any ItemLibrary) {
+        timelineFields[item] = key
     }
 
     private func fieldsKey(in library: any ItemLibrary) -> (key: FieldsKey, items: [Item]?) {

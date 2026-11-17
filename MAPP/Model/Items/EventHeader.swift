@@ -27,33 +27,11 @@ nonisolated struct EventHeader: Hashable, Sendable {
     /// Nil where the event has no start the pin can place: none, one that is not a date, or one known only to the
     /// month or the year, which no calendar day stands for. The fields then stay in the property block.
     init?(item: Item, now: Date, calendar: Calendar = .current, locale: Locale = .current) {
-        func text(_ key: String) -> String? {
-            item.value(of: key)?.string.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.flatMap { $0.isEmpty ? nil : $0 }
-        }
-        guard let startText = text("starts_at") else { return nil }
-        let precision = text("precision")
-        guard precision != "year", precision != "month" else { return nil }
-        var allDay = false
-        if case .bool(let flag)? = item.value(of: "all_day") { allDay = flag }
-
-        // A whole day belongs to the zone it is lived in, and with none named, to UTC. An hour with no zone is an
-        // instant, which reads in the reader's own.
-        let named = text("timezone").flatMap { TimeZone(identifier: $0) }
-        let eventZone = named ?? (allDay ? TimeZone(identifier: "UTC")! : calendar.timeZone)
-        var inZone = Calendar(identifier: .gregorian)
-        inZone.timeZone = eventZone
-        inZone.locale = locale
-        guard let start = ItemDate.parse(startText, calendar: inZone) else { return nil }
-        let wholeDays = allDay || precision == "day" || !start.hasTime
-
-        let endZone = text("end_timezone").flatMap { TimeZone(identifier: $0) } ?? eventZone
-        var inEndZone = inZone
-        inEndZone.timeZone = endZone
-        var end = text("ends_at").flatMap { ItemDate.parse($0, calendar: inEndZone) }?.date
-        if end == nil, case .number(let seconds)? = item.value(of: "duration") {
-            end = start.date.addingTimeInterval(seconds.nearestDouble)
-        }
-        if let finish = end, finish <= start.date { end = nil }
+        guard let event = EventSpan(item: item, calendar: calendar, locale: locale) else { return nil }
+        guard event.precision != "year", event.precision != "month" else { return nil }
+        let (inZone, inEndZone) = (event.inZone, event.inEndZone)
+        let (eventZone, endZone) = (event.zone, event.endZone)
+        let end = event.end
 
         func style(_ calendar: Calendar) -> Date.FormatStyle {
             Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone)
@@ -65,14 +43,8 @@ nonisolated struct EventHeader: Hashable, Sendable {
             return date.formatted(sameYear ? day : day.year())
         }
 
-        if wholeDays {
-            let first = inZone.startOfDay(for: start.date)
-            var last = first
-            if let finish = end {
-                // A whole-day event ends at the midnight that closes its last day.
-                let closes = inEndZone.startOfDay(for: finish) == finish
-                last = max(first, inEndZone.startOfDay(for: closes ? finish.addingTimeInterval(-1) : finish))
-            }
+        if event.wholeDays {
+            let (first, last) = (event.firstDay, event.lastDay)
             if last == first {
                 time = dayText(first, in: inZone)
                 span = String(localized: "All day")
@@ -88,20 +60,20 @@ nonisolated struct EventHeader: Hashable, Sendable {
                 "\(dayText(date, in: calendar)), \(clock(date, in: calendar))"
             }
             if let finish = end {
-                if endZone == eventZone && inZone.isDate(start.date, inSameDayAs: finish) {
-                    time = String(localized: "\(moment(start.date, in: inZone)) to \(clock(finish, in: inZone))")
+                if endZone == eventZone && inZone.isDate(event.start, inSameDayAs: finish) {
+                    time = String(localized: "\(moment(event.start, in: inZone)) to \(clock(finish, in: inZone))")
                 } else {
                     // Another day, or another zone at the far end, says which.
                     var endText = moment(finish, in: inEndZone)
                     if endZone != eventZone { endText += " (\(Self.abbreviation(endZone, at: finish)))" }
-                    time = String(localized: "\(moment(start.date, in: inZone)) to \(endText)")
+                    time = String(localized: "\(moment(event.start, in: inZone)) to \(endText)")
                 }
             } else {
-                time = moment(start.date, in: inZone)
+                time = moment(event.start, in: inZone)
             }
             span = nil
-            zone = Self.zoneLabel(eventZone, at: start.date)
-            relative = Self.relative(from: now, start: start.date, last: nil, finish: end, zone: inZone, locale: locale)
+            zone = Self.zoneLabel(eventZone, at: event.start)
+            relative = Self.relative(from: now, start: event.start, last: nil, finish: end, zone: inZone, locale: locale)
         }
     }
 
