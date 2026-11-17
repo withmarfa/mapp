@@ -9,6 +9,7 @@ struct ItemCalendar: View {
     @Bindable var browser: Browser
     var pane: FocusState<Browser.Pane?>.Binding
     @State private var daysSeen = 0
+    @State private var keyboard = CalendarKeyboard()
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
 
     var body: some View {
@@ -19,17 +20,18 @@ struct ItemCalendar: View {
         let anchor = browser.calendarDay ?? now
         let placed = CalendarLayout.entries(for: items, looks: browser.looks(in: library), catalogue: library.catalogue, calendar: calendar)
         let scale = browser.calendarScale
+        let visible = CalendarLayout.interval(of: scale, containing: anchor, calendar: calendar)
 
         Group {
             switch scale {
             case .week:
                 let week = CalendarWeek.make(entries: placed.entries, around: anchor, calendar: calendar, now: now)
-                CalendarWeekView(week: week, browser: browser, calendar: calendar, now: now, open: open)
+                CalendarWeekView(week: week, browser: browser, keyboard: keyboard, calendar: calendar, now: now, choose: choose, open: open)
                     .navigationTitle(Self.title(of: week.interval, calendar: calendar))
                     .navigationSubtitle(Text("Week \(calendar.component(.weekOfYear, from: week.interval.start))").editedSubtitle(browser.hasViewChanges))
             case .month:
                 let month = CalendarMonth.make(entries: placed.entries, around: anchor, calendar: calendar, now: now)
-                CalendarMonthView(month: month, browser: browser, calendar: calendar, open: open)
+                CalendarMonthView(month: month, browser: browser, calendar: calendar, choose: choose, open: open)
                     .navigationTitle(Self.title(of: month.interval, calendar: calendar))
                     .navigationSubtitle(Text("^[\(month.itemCount) item](inflect: true)").editedSubtitle(browser.hasViewChanges))
             }
@@ -42,7 +44,26 @@ struct ItemCalendar: View {
             browser.openCollectionSelection()
             return .handled
         }
-        .onKeyPress(.escape) { browser.selection = []; return .handled }
+        .onKeyPress(keys: [.upArrow, .downArrow, .leftArrow, .rightArrow], phases: .down) { press in
+            guard !press.modifiers.contains(.command) else { return .ignored }
+            let direction: CalendarNavigation.Direction =
+                press.key == .upArrow ? .up : press.key == .downArrow ? .down : press.key == .leftArrow ? .left : .right
+            let current = browser.selection.count == 1 ? browser.selection.first : nil
+            let from = current.flatMap {
+                CalendarNavigation.spot(of: $0, near: keyboard.day, in: placed.entries, visible: visible, calendar: calendar)
+            }
+            guard let next = CalendarNavigation.move(from: from, direction, in: placed.entries, visible: visible, calendar: calendar)
+            else { return .ignored }
+            if !visible.contains(next.day) { browser.calendarDay = next.day }
+            choose(next.id, next.day)
+            keyboard.reveal = next
+            return .handled
+        }
+        .onKeyPress(.escape) {
+            browser.selection = []
+            keyboard.day = nil
+            return .handled
+        }
         .searchStatus(browser)
         .overlay {
             if items.isEmpty {
@@ -65,6 +86,12 @@ struct ItemCalendar: View {
         }
     }
 
+    /// Chooses an event on one of its days, which is where the arrow keys go on from.
+    private func choose(_ id: ItemID, _ day: Date) {
+        keyboard.day = day
+        browser.selection = [id]
+    }
+
     private func open(_ id: ItemID) {
         browser.selection = [id]
         browser.openCollectionSelection()
@@ -82,30 +109,67 @@ struct ItemCalendar: View {
 
 // MARK: Parts shared by the week and the month
 
+/// What the keys and the scroll share, kept out of what any view reads so that moving the choice runs no body: the day
+/// the chosen event was chosen on and the part of the week on screen are plain, and only the small watcher that scrolls
+/// reads `reveal`.
+@Observable
+private final class CalendarKeyboard {
+    @ObservationIgnored var day: Date?
+    @ObservationIgnored var viewport = CGRect.zero
+    /// The event a key has just moved to, for the week to bring into view.
+    var reveal: CalendarNavigation.Spot?
+}
+
+private extension CalendarEntry {
+    /// What a block says to VoiceOver beyond its title: where the event really starts and ends, whatever part of it the
+    /// day shows.
+    func spoken(calendar: Calendar) -> String {
+        let style = Date.IntervalFormatStyle(
+            date: .abbreviated, time: isAllDay ? .omitted : .shortened, locale: calendar.locale ?? .current, calendar: calendar,
+            timeZone: calendar.timeZone)
+        let last = isAllDay ? max(end.addingTimeInterval(-1), start) : end
+        return (start..<last).formatted(style)
+    }
+}
+
 /// One item as a control: it answers a click and a double click, and reads the selection itself, so a selection that
 /// moves runs these small bodies and not the calendar's.
 private struct CalendarCell<Label: View>: View {
     let browser: Browser
-    let id: ItemID
-    let help: String
+    let entry: CalendarEntry
+    /// The day this one is drawn on, since an event over midnight is drawn on each.
+    let day: Date
+    let calendar: Calendar
+    let choose: (ItemID, Date) -> Void
     let open: (ItemID) -> Void
     @ViewBuilder let label: (_ isSelected: Bool) -> Label
 
     var body: some View {
+        let id = entry.id
         let isSelected = browser.selection.contains(id)
         Button {
-            browser.selection = [id]
+            choose(id, day)
         } label: {
             label(isSelected)
         }
         .buttonStyle(.plain)
         .focusable(false)
         .simultaneousGesture(TapGesture(count: 2).onEnded { open(id) })
-        .help(help)
+        .help(entry.title)
         .contextMenu { Button("Open") { open(id) } }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: entry.title))
+        .accessibilityValue(Text(verbatim: entry.spoken(calendar: calendar)))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityAction(named: Text("Open")) { open(id) }
-        .accessibilityIdentifier("CalendarItem-\(id.rawValue)")
+        .accessibilityIdentifier("CalendarItem-\(id.rawValue)-\(Self.dayKey(day, calendar))")
+    }
+}
+
+private extension CalendarCell {
+    static func dayKey(_ day: Date, _ calendar: Calendar) -> String {
+        let parts = calendar.dateComponents([.year, .month, .day], from: day)
+        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }
 }
 
@@ -138,11 +202,13 @@ private extension Calendar {
 private struct CalendarWeekView: View {
     let week: CalendarWeek
     let browser: Browser
+    let keyboard: CalendarKeyboard
     let calendar: Calendar
     let now: Date
+    let choose: (ItemID, Date) -> Void
     let open: (ItemID) -> Void
 
-    private static let hourHeight: CGFloat = 59
+    fileprivate static let hourHeight: CGFloat = 59
     private static let margin: CGFloat = 56
     /// The hour the day opens scrolled to, a little above the working day's first hour.
     private static let workday = 8
@@ -154,6 +220,8 @@ private struct CalendarWeekView: View {
             allDay
             ScrollView { grid }
                 .scrollPosition($position)
+                .onScrollGeometryChange(for: CGRect.self) { $0.visibleRect } action: { _, visible in keyboard.viewport = visible }
+                .background(CalendarReveal(keyboard: keyboard, week: week, position: $position))
                 .scrollBounceBehavior(.basedOnSize)
                 .task {
                     // The grid has no size on the first pass, so scroll once it has been laid out.
@@ -190,7 +258,7 @@ private struct CalendarWeekView: View {
 
     private var allDay: some View {
         HStack(spacing: 0) {
-            Text("All Day")
+            Text("All day")
                 .interfaceFont(.system(size: 10.5))
                 .foregroundStyle(.secondary)
                 .padding(.trailing, 8)
@@ -199,7 +267,7 @@ private struct CalendarWeekView: View {
             ForEach(week.days) { day in
                 VStack(spacing: 2) {
                     ForEach(day.allDay) { entry in
-                        CalendarCell(browser: browser, id: entry.id, help: entry.title, open: open) { isSelected in
+                        CalendarCell(browser: browser, entry: entry, day: day.date, calendar: calendar, choose: choose, open: open) { isSelected in
                             Text(verbatim: entry.title)
                                 .interfaceFont(.system(size: 11.5, weight: .medium))
                                 .lineLimit(1)
@@ -221,7 +289,7 @@ private struct CalendarWeekView: View {
         .frame(minHeight: 28)
         .fixedSize(horizontal: false, vertical: true)
         .overlay(alignment: .bottom) { Rectangle().fill(.separator).frame(height: 0.5) }
-        .accessibilityLabel("All Day")
+        .accessibilityLabel("All day")
     }
 
     private var grid: some View {
@@ -258,7 +326,7 @@ private struct CalendarWeekView: View {
                     let top = CGFloat(block.startMinute) / 60 * Self.hourHeight
                     let tall = max(CGFloat(block.endMinute - block.startMinute) / 60 * Self.hourHeight, 20)
                     let blockWidth = max(slot - 2, 8)
-                    CalendarCell(browser: browser, id: block.entry.id, help: block.entry.title, open: open) { isSelected in
+                    CalendarCell(browser: browser, entry: block.entry, day: day.date, calendar: calendar, choose: choose, open: open) { isSelected in
                         CalendarBlockLabel(
                             entry: block.entry, isSelected: isSelected, calendar: calendar, showsTime: tall >= 34, width: blockWidth,
                             height: tall - 1)
@@ -277,6 +345,30 @@ private struct CalendarWeekView: View {
         .background(day.isWeekend ? Color.primary.opacity(0.03) : .clear)
         .overlay(alignment: .leading) { Rectangle().fill(.separator).frame(width: 0.5) }
         .clipped()
+    }
+}
+
+/// Scrolls the week to the event a key has moved to, when it is not in view. It alone reads `reveal`.
+private struct CalendarReveal: View {
+    let keyboard: CalendarKeyboard
+    let week: CalendarWeek
+    @Binding var position: ScrollPosition
+
+    var body: some View {
+        Color.clear.onChange(of: keyboard.reveal) { _, spot in
+            guard let spot,
+                let block = week.days.first(where: { $0.date == spot.day })?.blocks.first(where: { $0.entry.id == spot.id })
+            else { return }
+            let hour = CalendarWeekView.hourHeight
+            let top = CGFloat(block.startMinute) / 60 * hour
+            let bottom = top + max(CGFloat(block.endMinute - block.startMinute) / 60 * hour, 20)
+            let shown = keyboard.viewport
+            if top < shown.minY + 8 {
+                position.scrollTo(y: max(top - 12, 0))
+            } else if bottom > shown.maxY - 8 {
+                position.scrollTo(y: bottom + 12 - shown.height)
+            }
+        }
     }
 }
 
@@ -311,8 +403,6 @@ private struct CalendarBlockLabel: View {
                         .foregroundStyle(isSelected ? Color.white : .primary)
                 }
             }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel(Text(verbatim: entry.title))
             if showsTime {
                 Text(verbatim: DateDisplay.timeOfDay(of: entry.start, calendar: calendar))
                     .interfaceFont(.system(size: 10.5))
@@ -341,6 +431,7 @@ private struct CalendarMonthView: View {
     let month: CalendarMonth
     let browser: Browser
     let calendar: Calendar
+    let choose: (ItemID, Date) -> Void
     let open: (ItemID) -> Void
 
     var body: some View {
@@ -385,7 +476,7 @@ private struct CalendarMonthView: View {
                 .padding(.horizontal, 4)
                 .background { if day.isToday { Capsule().fill(Color.calendarToday) } }
             ForEach(fitting.shown) { entry in
-                CalendarCell(browser: browser, id: entry.id, help: entry.title, open: open) { isSelected in
+                CalendarCell(browser: browser, entry: entry, day: day.date, calendar: calendar, choose: choose, open: open) { isSelected in
                     Text(verbatim: entry.title)
                         .interfaceFont(.system(size: 11))
                         .lineLimit(1)
@@ -397,7 +488,7 @@ private struct CalendarMonthView: View {
                 }
             }
             if fitting.more > 0 {
-                Text("+\(fitting.more)")
+                Text(verbatim: "+\(fitting.more.formatted())")
                     .interfaceFont(.system(size: 10.5))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 5)

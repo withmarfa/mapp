@@ -282,4 +282,80 @@ struct CalendarLayoutTests {
         #expect(lines("Weekly planning meeting notes", 1, 100) == ["Weekly planning meeting notes"])
         #expect(lines("Retrospective", 2, 30) == ["Retrospective"])
     }
+
+    // MARK: Keyboard
+
+    private static func move(
+        _ items: [Item], from: (String, String)?, _ direction: CalendarNavigation.Direction, shown day: String = "2026-11-04"
+    ) -> (id: String, day: String)? {
+        let calendar = calendar()
+        let all = entries(items, calendar).entries
+        let visible = CalendarLayout.interval(of: .week, containing: date(day, calendar), calendar: calendar)
+        let spot = from.map { CalendarNavigation.Spot(id: ItemID($0.0), day: date($0.1, calendar)) }
+        guard let next = CalendarNavigation.move(from: spot, direction, in: all, visible: visible, calendar: calendar) else { return nil }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+        return (next.id.rawValue, formatter.string(from: next.day))
+    }
+
+    private static let spread = [
+        timed("late", "2026-11-03T15:00:00", "2026-11-03T16:00:00"),
+        timed("early", "2026-11-03T09:00:00", "2026-11-03T10:00:00"),
+        item("holiday", ["starts_at": .string("2026-11-03"), "all_day": .bool(true)]),
+        timed("midweek", "2026-11-04T11:00:00", "2026-11-04T12:00:00"),
+        timed("sunday", "2026-11-08T10:00:00", "2026-11-08T11:00:00"),
+        timed("nextWeek", "2026-11-10T08:00:00", "2026-11-10T09:00:00"),
+        timed("lastMonth", "2026-10-28T08:00:00", "2026-10-28T09:00:00"),
+    ]
+
+    @Test func downAndUpMoveThroughADaysEventsInOrderAndStopAtTheEnds() {
+        let down = Self.move(Self.spread, from: ("holiday", "2026-11-03"), .down)
+        #expect(down?.id == "early")
+        #expect(Self.move(Self.spread, from: ("early", "2026-11-03"), .down)?.id == "late")
+        #expect(Self.move(Self.spread, from: ("late", "2026-11-03"), .down) == nil)
+        #expect(Self.move(Self.spread, from: ("early", "2026-11-03"), .up)?.id == "holiday")
+        #expect(Self.move(Self.spread, from: ("holiday", "2026-11-03"), .up) == nil)
+    }
+
+    @Test func leftAndRightGoToTheNextDayWithEventsAtTheSamePlaceInItsOrder() {
+        let right = Self.move(Self.spread, from: ("late", "2026-11-03"), .right)
+        #expect(right?.id == "midweek" && right?.day == "2026-11-04", "the day has one event, so the last is taken")
+        let left = Self.move(Self.spread, from: ("midweek", "2026-11-04"), .left)
+        #expect(left?.id == "holiday" && left?.day == "2026-11-03", "the same place, the first")
+        let second = Self.move(Self.spread, from: ("early", "2026-11-03"), .right)
+        #expect(second?.id == "midweek", "the second of three, where the next day has one")
+    }
+
+    @Test func leftAndRightCrossTheWeekAndTheMonthAndStopWhereTheEventsEnd() {
+        let week = Self.move(Self.spread, from: ("sunday", "2026-11-08"), .right)
+        #expect(week?.id == "nextWeek" && week?.day == "2026-11-10", "past the edge of the week shown")
+        let back = Self.move(Self.spread, from: ("early", "2026-11-03"), .left)
+        #expect(back?.id == "lastMonth" && back?.day == "2026-10-28", "into the month before")
+        #expect(Self.move(Self.spread, from: ("lastMonth", "2026-10-28"), .left) == nil)
+        #expect(Self.move(Self.spread, from: ("nextWeek", "2026-11-10"), .right) == nil)
+    }
+
+    @Test func anEventOverMidnightIsChosenOnTheDayItWasChosenOn() {
+        let items = [Self.timed("night", "2026-11-03T22:00:00", "2026-11-04T02:00:00"), Self.timed("morning", "2026-11-04T09:00:00")]
+        let right = Self.move(items, from: ("night", "2026-11-03"), .right)
+        #expect(right?.id == "night" && right?.day == "2026-11-04", "its block on the next day")
+        #expect(Self.move(items, from: ("night", "2026-11-04"), .down)?.id == "morning")
+        let calendar = Self.calendar()
+        let all = Self.entries(items, calendar).entries
+        let visible = CalendarLayout.interval(of: .week, containing: Self.date("2026-11-04", calendar), calendar: calendar)
+        let spot = CalendarNavigation.spot(of: ItemID("night"), near: Self.date("2026-11-04", calendar), in: all, visible: visible, calendar: calendar)
+        #expect(spot?.day == Self.date("2026-11-04", calendar))
+        let first = CalendarNavigation.spot(of: ItemID("night"), near: nil, in: all, visible: visible, calendar: calendar)
+        #expect(first?.day == Self.date("2026-11-03", calendar), "with no day, the first it has on screen")
+    }
+
+    @Test func withNothingChosenAnArrowTakesAnEdgeOfTheWeekShown() {
+        #expect(Self.move(Self.spread, from: nil, .down)?.id == "holiday")
+        #expect(Self.move(Self.spread, from: nil, .right)?.id == "holiday")
+        #expect(Self.move(Self.spread, from: nil, .up)?.id == "sunday")
+        #expect(Self.move([], from: nil, .down) == nil)
+    }
 }

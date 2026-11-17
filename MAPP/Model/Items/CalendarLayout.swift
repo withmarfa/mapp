@@ -281,3 +281,69 @@ nonisolated struct CalendarMonth: Equatable, Sendable {
         return CalendarMonth(interval: month, weeks: weeks, itemCount: inMonth.count)
     }
 }
+
+// MARK: Keyboard
+
+/// Moving the chosen event with the arrow keys, over every event and not only those on screen, so the choice can cross
+/// to the week or the month beside the one shown. An event over midnight is on each day it covers, so a choice is an
+/// event on a day (`Spot`).
+nonisolated enum CalendarNavigation {
+    enum Direction: Sendable { case up, down, left, right }
+
+    struct Spot: Equatable, Sendable {
+        let id: ItemID
+        let day: Date
+    }
+
+    /// The events with time on `day`: whole-day ones first, then by start.
+    static func entries(on day: Date, in entries: [CalendarEntry], calendar: Calendar) -> [CalendarEntry] {
+        entries.filter { CalendarLayout.covers($0, day: day, calendar: calendar) }.sorted(by: CalendarLayout.precedes)
+    }
+
+    /// The day of the chosen event to move from: `day` where the event is on it, else its first day in `visible`, else
+    /// its own first day. Nil where the event is not on the calendar.
+    static func spot(of id: ItemID, near day: Date?, in entries: [CalendarEntry], visible: DateInterval, calendar: Calendar) -> Spot? {
+        guard let entry = entries.first(where: { $0.id == id }) else { return nil }
+        if let day, CalendarLayout.covers(entry, day: day, calendar: calendar) { return Spot(id: id, day: day) }
+        let first = CalendarLayout.days(in: visible, calendar: calendar).first { CalendarLayout.covers(entry, day: $0, calendar: calendar) }
+        return Spot(id: id, day: first ?? calendar.startOfDay(for: entry.start))
+    }
+
+    /// Where an arrow key takes the choice. Up and down stay within the day's events, in order; left and right go to
+    /// the nearest day beside it that has any, at the same place in its order or its last, however far away and in
+    /// whichever week or month. Nil where there is nowhere to go. From no choice, the first event shown, or the last
+    /// for up and left.
+    static func move(
+        from spot: Spot?, _ direction: Direction, in entries: [CalendarEntry], visible: DateInterval, calendar: Calendar
+    ) -> Spot? {
+        guard let spot else { return edge(direction, in: entries, visible: visible, calendar: calendar) }
+        let here = Self.entries(on: spot.day, in: entries, calendar: calendar)
+        let index = here.firstIndex { $0.id == spot.id } ?? 0
+        switch direction {
+        case .up, .down:
+            let next = index + (direction == .down ? 1 : -1)
+            return here.indices.contains(next) ? Spot(id: here[next].id, day: spot.day) : nil
+        case .left, .right:
+            guard let earliest = entries.map(\.start).min(), let latest = entries.map(\.end).max() else { return nil }
+            let step = direction == .right ? 1 : -1
+            var day = spot.day
+            while let next = calendar.date(byAdding: .day, value: step, to: day), next != day {
+                day = next
+                if day >= latest || day < calendar.startOfDay(for: earliest) { return nil }
+                let there = Self.entries(on: day, in: entries, calendar: calendar)
+                if !there.isEmpty { return Spot(id: there[min(index, there.count - 1)].id, day: day) }
+            }
+            return nil
+        }
+    }
+
+    private static func edge(_ direction: Direction, in entries: [CalendarEntry], visible: DateInterval, calendar: Calendar) -> Spot? {
+        let days = CalendarLayout.days(in: visible, calendar: calendar)
+        let backwards = direction == .up || direction == .left
+        for day in backwards ? days.reversed() : days {
+            let here = Self.entries(on: day, in: entries, calendar: calendar)
+            if let entry = backwards ? here.last : here.first { return Spot(id: entry.id, day: day) }
+        }
+        return nil
+    }
+}
