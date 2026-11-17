@@ -66,7 +66,7 @@ nonisolated enum SignInOutcome: Hashable, Sendable {
             case .expired: self = .expired
             case .unavailable(let message): self = .unreachable(message)
             case .heldElsewhere: self = .inUse
-            case .stateMismatch, .notSignedIn, .notAServer, .otherServer, .noRedirect, .refused, .unreadable:
+            case .stateMismatch, .issuerMismatch, .notSignedIn, .notAServer, .otherServer, .noRedirect, .refused, .unreadable:
                 self = .refused(error.description)
             }
         } else if error is any KeychainRefusal {

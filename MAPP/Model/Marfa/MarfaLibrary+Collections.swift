@@ -27,7 +27,7 @@ extension MarfaLibrary {
     private func positions(in collection: ItemID) -> [ItemID: Double] {
         index.links(to: collection, type: MarfaMapping.collectionEdge).reduce(into: [:]) { positions, link in
             guard let position = link.position else { return }
-            positions[link.source] = min(positions[link.source] ?? position, position)
+            positions[link.from] = min(positions[link.from] ?? position, position)
         }
     }
 
@@ -48,7 +48,7 @@ extension MarfaLibrary {
         let last = positions(in: collection).values.max()
         let drafts = joining.enumerated().map { offset, member in
             EdgeDraft(
-                type: MarfaMapping.collectionEdge, source: member.id, target: collection,
+                type: MarfaMapping.collectionEdge, from: member.id, to: collection,
                 position: last.map { $0 + Double(offset + 1) })
         }
         relink(
@@ -65,16 +65,16 @@ extension MarfaLibrary {
         var skips = BatchSkips()
         var drafts: [EdgeDraft] = []
         for id in ids {
-            guard let link = index.link(type: MarfaMapping.collectionEdge, source: id, target: collection) else { continue }
+            guard let link = index.link(type: MarfaMapping.collectionEdge, from: id, to: collection) else { continue }
             if let reason = item(id)?.writeObstacle {
                 skips.skip(reason)
             } else {
-                drafts.append(EdgeDraft(type: link.type, source: link.source, target: link.target, position: link.position))
+                drafts.append(EdgeDraft(type: link.type, from: link.from, to: link.to, position: link.position))
             }
         }
         tellSkipped(skips, didChange: !drafts.isEmpty, failing: title)
         guard !drafts.isEmpty else { return false }
-        drafts.sort { $0.source.rawValue < $1.source.rawValue }
+        drafts.sort { $0.from.rawValue < $1.from.rawValue }
         relink(RelationshipChange(removing: drafts), name: String(localized: "Remove from Collection"), failing: title, undoManager: undoManager)
         return true
     }

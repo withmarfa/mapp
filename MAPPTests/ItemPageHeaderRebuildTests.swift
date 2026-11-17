@@ -88,7 +88,7 @@ import Testing
         let page = try await Page.opening(F.p2)
         #expect(page.editor.header?.linked.isEmpty == true)
         var linking = try #require(page.library.item(F.n2))
-        linking.edgesOut = [Edge(id: EdgeID("a2"), type: "about", source: F.n2, target: .item(F.p2), origin: .property("about"))]
+        linking.edgesOut = [Edge(id: EdgeID("a2"), type: "about", from: F.n2, to: .item(F.p2), origin: .property("about"))]
         try await page.send(linking)
         #expect(await eventually { page.editor.header?.linked.map(\.title) == ["Feed note"] })
     }
@@ -96,7 +96,7 @@ import Testing
     @Test func aLinkAnotherItemMovesAwayFromHereIsGone() async throws {
         let page = try await Page.opening(F.p1)
         var linking = try #require(page.library.item(F.n1))
-        linking.edgesOut = [Edge(id: EdgeID("a1"), type: "about", source: F.n1, target: .item(F.p2), origin: .property("about"))]
+        linking.edgesOut = [Edge(id: EdgeID("a1"), type: "about", from: F.n1, to: .item(F.p2), origin: .property("about"))]
         try await page.send(linking)
         #expect(await eventually { page.editor.header?.linked.map(\.title).contains("Plain note") == false })
     }

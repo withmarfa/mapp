@@ -181,36 +181,36 @@ nonisolated extension ItemTypeInfo.Field {
 }
 
 nonisolated struct EdgeTypeInfo: Identifiable, Hashable, Sendable {
-    enum End: Hashable, Sendable { case source, target }
+    enum End: Hashable, Sendable { case from, to }
 
     enum Cardinality: Hashable, Sendable { case one, many }
 
-    /// What deleting an item does through an edge: `cascade` deletes the target when the source is deleted, `block`
+    /// What deleting an item does through an edge: `cascade` deletes the to end when the from end is deleted, `block`
     /// refuses a delete of either end, and `orphan` keeps the other end.
     enum CascadeOnDelete: Hashable, Sendable { case cascade, orphan, block }
 
     let id: String
-    /// Marfa's name for the source end of a link, as it comes: the parent end of `parent-of` is `Children`.
+    /// Marfa's name for the from end of a link, as it comes: the parent end of `parent-of` is `Children`.
     let label: String
-    /// Marfa's name for the target end, as it comes: the child end of `parent-of` is `Parent`.
+    /// Marfa's name for the to end, as it comes: the child end of `parent-of` is `Parent`.
     let reverseLabel: String
-    /// The name it is written under at its target, such as `child-of` for `parent-of`.
+    /// The name it is written under at its to end, such as `child-of` for `parent-of`.
     let reverseName: String?
     /// How many of this edge the end it is written at may hold, which decides whether its field takes a list.
     let cardinality: Cardinality
-    let writtenAt: End
+    let writtenFrom: End
     /// The types each end may be, with their subtypes, and the roles a type may play to be one. An end naming
     /// neither allows any type.
-    let sourceTypes: Set<TypeID>
-    let targetTypes: Set<TypeID>
-    var sourceRoles: Set<String> = []
-    var targetRoles: Set<String> = []
+    let fromTypes: Set<TypeID>
+    let toTypes: Set<TypeID>
+    var fromRoles: Set<String> = []
+    var toRoles: Set<String> = []
     var description: String?
     /// How many of this edge the end it is not written at may hold.
     var reverseCardinality: Cardinality = .many
     var cascadeOnDelete: CascadeOnDelete = .orphan
     var properties: [ItemTypeInfo.Field] = []
-    /// Whether the core refuses, as the source of this edge type, a type its target constraints admit, such as a
+    /// Whether the core refuses, as the from end of this edge type, a type its to constraints admit, such as a
     /// collection inside a collection.
     var flat = false
 
@@ -219,11 +219,11 @@ nonisolated struct EdgeTypeInfo: Identifiable, Hashable, Sendable {
     var isTwoWay: Bool { label == reverseLabel }
 
     /// The name of the end an item holds, as Marfa gives it.
-    func label(atTarget: Bool) -> String { atTarget ? reverseLabel : label }
+    func label(atTo: Bool) -> String { atTo ? reverseLabel : label }
 
-    /// How many edges of this type one item holds as its source, or as its target.
-    func cardinality(atTarget: Bool) -> Cardinality {
-        (writtenAt == .target) == atTarget ? cardinality : reverseCardinality
+    /// How many edges of this type one item holds at its from end, or at its to end.
+    func cardinality(atTo: Bool) -> Cardinality {
+        (writtenFrom == .to) == atTo ? cardinality : reverseCardinality
     }
 }
 
@@ -365,18 +365,18 @@ nonisolated struct Catalogue: Hashable, Sendable {
         itemTypes.values.filter { $0.roles.contains(MarfaMapping.containerRole) }.map(\.id)
     }
 
-    /// Whether an item of `type` can be filed in a collection: the catalogue has `in-collection`, its source end
-    /// admits the type, and the edge type being flat, the type is not one its target end admits.
+    /// Whether an item of `type` can be filed in a collection: the catalogue has `in-collection`, its from end
+    /// admits the type, and the edge type being flat, the type is not one its to end admits.
     func canJoinCollection(_ type: TypeID) -> Bool {
-        guard let info = edgeTypes[MarfaMapping.collectionEdge], admits(type, source: info) else { return false }
+        guard let info = edgeTypes[MarfaMapping.collectionEdge], admits(type, from: info) else { return false }
         return true
     }
 
-    /// Whether `type` may be the source of an edge of type `info`: its source end admits the type, and where the type is
-    /// flat, its target end does not.
-    func admits(_ type: TypeID, source info: EdgeTypeInfo) -> Bool {
-        guard admits(type, types: info.sourceTypes, roles: info.sourceRoles) else { return false }
-        return !info.flat || !admits(type, types: info.targetTypes, roles: info.targetRoles)
+    /// Whether `type` may be the from end of an edge of type `info`: its from end admits the type, and where the type is
+    /// flat, its to end does not.
+    func admits(_ type: TypeID, from info: EdgeTypeInfo) -> Bool {
+        guard admits(type, types: info.fromTypes, roles: info.fromRoles) else { return false }
+        return !info.flat || !admits(type, types: info.toTypes, roles: info.toRoles)
     }
 
     /// The edge type an item writes under `name`, and whether `name` is its reverse.

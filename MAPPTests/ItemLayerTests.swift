@@ -17,8 +17,8 @@ struct ItemLayerTests {
         ],
         edgeTypes: [
             EdgeTypeInfo(
-                id: "parent-of", label: "Children", reverseLabel: "Parent", reverseName: "child-of", cardinality: .one, writtenAt: .target,
-                sourceTypes: [], targetTypes: [])
+                id: "parent-of", label: "Children", reverseLabel: "Parent", reverseName: "child-of", cardinality: .one, writtenFrom: .to,
+                fromTypes: [], toTypes: [])
         ])
 
     private static func type(_ id: TypeID, parent: TypeID? = nil, fields: [String]) -> ItemTypeInfo {

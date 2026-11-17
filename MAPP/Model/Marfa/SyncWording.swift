@@ -139,14 +139,42 @@ nonisolated enum Words {
         String(localized: "\(count) changes on this Mac haven’t reached the server.")
     }
 
+    /// Why the copy on this Mac kept a change from the server without sending it. The person can only discard it,
+    /// so the way forward is to make the change again.
+    static func unsent(_ unsent: SyncProblem.Unsent) -> String {
+        switch unsent {
+        case .tooLarge(let size, let limit):
+            let (sizeText, limitText) = sizes(size, limit)
+            return String(localized: "This change is \(sizeText), more than the \(limitText) the server takes at once, so it wasn’t sent. Make it again in smaller parts.")
+        case .afterRefusal:
+            return String(localized: "It went with an earlier change that wasn’t sent, so it wasn’t sent either. Make it again.")
+        case .notSent:
+            return String(localized: "MAPP couldn’t send this change.")
+        }
+    }
+
+    /// Two sizes as Finder shows them, with the exact bytes added where they would otherwise read the same.
+    static func sizes(_ size: UInt64, _ limit: UInt64) -> (String, String) {
+        let shown = [size, limit].map { Int64(clamping: $0).formatted(.byteCount(style: .file)) }
+        guard shown[0] == shown[1] else { return (shown[0], shown[1]) }
+        let exact = ByteCountFormatStyle(style: .file, includesActualByteCount: true)
+        return (Int64(clamping: size).formatted(exact), Int64(clamping: limit).formatted(exact))
+    }
+
+    /// The copy's own reason for not sending a change, as a sentence.
+    static func unsentReason(_ reason: String) -> String {
+        let sentence = reason.prefix(1).uppercased() + reason.dropFirst()
+        return sentence.hasSuffix(".") ? sentence : sentence + "."
+    }
+
     static func moreNotShown(_ count: Int) -> String {
         String(localized: "And \(count) more changes whose text can’t be shown.")
     }
 
     /// What to tell a person whose copy a different version of the app made, and so cannot be opened. Only that
     /// version can send the changes in it that the server has not taken, so the way forward is through it. A count
-    /// that can't be read stays unread after that version sends everything, and the package never removes a copy it
-    /// can't count, so the way out then is to remove the copy's folder.
+    /// that can't be read stays unread after that version sends everything, and the package never removes a copy whose
+    /// changes it can't read, so the way out then is to remove the copy's folder.
     static func otherVersion(unsent: UInt64?) -> String {
         let lead = String(localized: "This version of MAPP can’t read the copy of your library on this Mac, because a different version made it.")
         switch unsent {
@@ -163,8 +191,8 @@ nonisolated enum Words {
         }
     }
 
-    /// The package removes a copy only when it can count the changes in it, so a copy it can't count is left for the
-    /// person, who is shown where it is.
+    /// The package removes a copy only against the list of the changes in it, so a copy whose changes can't be listed
+    /// is left for the person, who is shown where it is.
     static func cannotDiscard(folder: String) -> String {
         String(localized: "MAPP can’t read the copy of your library on this Mac, so it can’t tell what the copy holds and won’t discard it. If you remove it yourself, quit MAPP first, then move the folder “\(folder)” to the Trash. Anything in it that hasn’t reached the server is lost.")
     }
@@ -262,12 +290,15 @@ nonisolated struct ProblemWording: Hashable, Sendable {
                 explanation = String(localized: "MAPP doesn’t have permission for “\(grant.name)”. Ask whoever runs the server to allow it, then make the change again.")
             } else if reason?.isTrashed == true {
                 explanation = String(localized: "The item is in Recently Deleted on the server, so it can’t be changed. Restore it, then make the change again.")
+            } else if let unsent = reason?.unsent {
+                explanation = Words.unsent(unsent)
             } else if let message = reason?.message, !message.isEmpty {
                 explanation = String(localized: "The server refused it: \(message)")
             } else {
                 explanation = String(localized: "The server refused it.")
             }
             details = (reason?.fields ?? [:]).sorted { $0.key < $1.key }.map { "\(entry.fieldLabels[$0.key] ?? $0.key): \($0.value)" }
+            if case .notSent(let why)? = reason?.unsent { details.append(Words.unsentReason(why)) }
             if canCopyText { explanation += " " + String(localized: "To keep what you wrote, copy it before you discard this change.") }
         case .blocked(let reason):
             headline = Self.stoppedHeadline(name: name)
@@ -277,6 +308,7 @@ nonisolated struct ProblemWording: Hashable, Sendable {
             case .ancestorUnavailable: String(localized: "It depends on an item that isn’t available any more. Undoing it puts the item back as the server has it.")
             case .conflictUnresolved: String(localized: "It can’t be applied until a conflict on the item is settled. Undoing it puts the item back as the server has it.")
             case .instanceChanged: String(localized: "This change was made for a library the server no longer holds as it was. Try again to send it to the library as it is now, or undo it to put the item back as the server has it.")
+            case .recordUnread: String(localized: "This change came from a copy that MAPP could only partly read, so it was held. Try again to send it, or undo it to put the item back as the server has it.")
             case .failingAlone: String(localized: "This change couldn’t be sent on its own, although the server took other changes. Try again to send it, or undo it to put the item back as the server has it.")
             }
         case .dead:

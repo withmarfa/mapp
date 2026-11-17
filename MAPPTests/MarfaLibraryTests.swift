@@ -51,27 +51,27 @@ nonisolated enum LibraryFixture {
         ],
         edgeTypes: [
             EdgeTypeInfo(
-                id: "parent-of", label: "Children", reverseLabel: "Parent", reverseName: "child-of", cardinality: .one, writtenAt: .target,
-                sourceTypes: [], targetTypes: []),
+                id: "parent-of", label: "Children", reverseLabel: "Parent", reverseName: "child-of", cardinality: .one, writtenFrom: .to,
+                fromTypes: [], toTypes: []),
             EdgeTypeInfo(
-                id: "about", label: "About", reverseLabel: "Subject of", reverseName: nil, cardinality: .many, writtenAt: .source,
-                sourceTypes: [], targetTypes: []),
+                id: "about", label: "About", reverseLabel: "Subject of", reverseName: nil, cardinality: .many, writtenFrom: .from,
+                fromTypes: [], toTypes: []),
             EdgeTypeInfo(
-                id: "supersedes", label: "Supersedes", reverseLabel: "Superseded by", reverseName: nil, cardinality: .one, writtenAt: .source,
-                sourceTypes: [ticket], targetTypes: [ticket], reverseCardinality: .one),
+                id: "supersedes", label: "Supersedes", reverseLabel: "Superseded by", reverseName: nil, cardinality: .one, writtenFrom: .from,
+                fromTypes: [ticket], toTypes: [ticket], reverseCardinality: .one),
             EdgeTypeInfo(
-                id: "in-collection", label: "In collection", reverseLabel: "Contents", reverseName: nil, cardinality: .many, writtenAt: .source,
-                sourceTypes: [], targetTypes: [], targetRoles: ["container"], flat: true),
+                id: "in-collection", label: "In collection", reverseLabel: "Contents", reverseName: nil, cardinality: .many, writtenFrom: .from,
+                fromTypes: [], toTypes: [], toRoles: ["container"], flat: true),
             EdgeTypeInfo(
-                id: "references", label: "References", reverseLabel: "Referenced by", reverseName: nil, cardinality: .many, writtenAt: .source,
-                sourceTypes: [], targetTypes: []),
+                id: "references", label: "References", reverseLabel: "Referenced by", reverseName: nil, cardinality: .many, writtenFrom: .from,
+                fromTypes: [], toTypes: []),
             EdgeTypeInfo(
-                id: "in-folder", label: "In folder", reverseLabel: "Folder of", reverseName: nil, cardinality: .many, writtenAt: .source,
-                sourceTypes: [], targetTypes: [TypeID("system.folder")]),
+                id: "in-folder", label: "In folder", reverseLabel: "Folder of", reverseName: nil, cardinality: .many, writtenFrom: .from,
+                fromTypes: [], toTypes: [TypeID("system.folder")]),
         ])
 
     static func child(_ edge: String, _ child: ItemID, of parent: ItemID) -> Edge {
-        Edge(id: EdgeID(edge), type: "child-of", source: child, target: .item(parent), origin: .property("child-of"))
+        Edge(id: EdgeID(edge), type: "child-of", from: child, to: .item(parent), origin: .property("child-of"))
     }
 
     static func item(
@@ -92,8 +92,8 @@ nonisolated enum LibraryFixture {
             item(e1, task, "Epic task", age: 2, edges: [child("c1", e1, of: p1)]),
             item(t1, bug, "Bug one", age: 3, tags: [ItemTag.favorite], edges: [child("c2", t1, of: e1)]),
             item(n1, note, "Plain note", age: 4, tags: [ItemTag.favorite], edges: [
-                Edge(id: EdgeID("a1"), type: "about", source: n1, target: .item(p1), origin: .property("about")),
-                Edge(id: EdgeID("r1"), type: "references", source: n1, target: .item(t1), origin: .body),
+                Edge(id: EdgeID("a1"), type: "about", from: n1, to: .item(p1), origin: .property("about")),
+                Edge(id: EdgeID("r1"), type: "references", from: n1, to: .item(t1), origin: .body),
             ]),
             item(n2, note, "Feed note", age: 5, tier: .feed),
             item(n3, note, "Old note", age: 6, state: .trashed, tags: [ItemTag.favorite]),
@@ -598,27 +598,27 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         undo.beginUndoGrouping()
         #expect(await library.changeItemRelationship(F.t1, field: "child-of", adding: [F.p1], removing: [F.e1], undoManager: undo))
         // The core is asked first, so the write follows; it joins the open group.
-        #expect(await eventually { source.writes == [.moveEdge(EdgeID("c2"), end: .source, to: F.p1)] }, "sent \(source.writes)")
+        #expect(await eventually { source.writes == [.moveEdge(EdgeID("c2"), end: .from, to: F.p1)] }, "sent \(source.writes)")
         source.send(.taken(try #require(source.submitted.last?.id)))
         undo.endUndoGrouping()
         #expect(library.notices.waiting.last == nil)
         // The undo moves it back, to the parent it had.
         source.clearWrites()
         undo.undo()
-        #expect(source.writes == [.moveEdge(EdgeID("c2"), end: .source, to: F.e1)])
+        #expect(source.writes == [.moveEdge(EdgeID("c2"), end: .from, to: F.e1)])
         undo.redo()
-        #expect(source.writes.last == .moveEdge(EdgeID("c2"), end: .source, to: F.p1))
+        #expect(source.writes.last == .moveEdge(EdgeID("c2"), end: .from, to: F.p1))
 
         // A child chosen under a project from the project's side is taken from the parent it has, in one move.
         source.clearWrites()
         undo.beginUndoGrouping()
         #expect(await library.changeItemRelationship(F.p2, field: "inverse:parent-of", adding: [F.e1], removing: [], undoManager: undo))
-        #expect(await eventually { source.writes == [.moveEdge(EdgeID("c1"), end: .source, to: F.p2)] }, "sent \(source.writes)")
+        #expect(await eventually { source.writes == [.moveEdge(EdgeID("c1"), end: .from, to: F.p2)] }, "sent \(source.writes)")
         source.send(.taken(try #require(source.submitted.last?.id)))
         undo.endUndoGrouping()
         source.clearWrites()
         undo.undo()
-        #expect(source.writes == [.moveEdge(EdgeID("c1"), end: .source, to: F.p1)])
+        #expect(source.writes == [.moveEdge(EdgeID("c1"), end: .from, to: F.p1)])
         #expect(library.notices.waiting.last == nil)
         source.clearWrites()
 
@@ -633,7 +633,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.clearWrites()
         undo.beginUndoGrouping()
         #expect(await library.changeItemRelationship(F.t1, field: "child-of", adding: [F.p1], removing: [], undoManager: undo))
-        let toProject = EdgeDraft(type: "parent-of", source: F.p1, target: F.t1)
+        let toProject = EdgeDraft(type: "parent-of", from: F.p1, to: F.t1)
         #expect(await eventually { source.writes == [.link(toProject)] }, "sent \(source.writes)")
         source.send(.taken(try #require(source.submitted.last?.id)))
         undo.endUndoGrouping()
@@ -645,12 +645,12 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         undo.undo()
         #expect(source.writes == [.unlink(EdgeID("c7"))])
         undo.undo()
-        #expect(source.writes.last == .link(EdgeDraft(type: "parent-of", source: F.e1, target: F.t1)))
+        #expect(source.writes.last == .link(EdgeDraft(type: "parent-of", from: F.e1, to: F.t1)))
 
         // A field that holds many adds and removes in one change.
         source.clearWrites()
         #expect(await library.changeItemRelationship(F.n1, field: "about", adding: [F.p2], removing: [F.p1], undoManager: nil))
-        #expect(await eventually { source.writes == [.link(EdgeDraft(type: "about", source: F.n1, target: F.p2))] })
+        #expect(await eventually { source.writes == [.link(EdgeDraft(type: "about", from: F.n1, to: F.p2))] })
         // The old link goes once the source has taken the new one.
         source.send(.answered(try #require(source.submitted.last?.id), .accepted))
         #expect(await eventually { source.writes.last == .unlink(EdgeID("a1")) })
@@ -658,7 +658,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
     @Test func aLinkAThirdItemHoldsIsNeverTakenFromIt() async throws {
         let bug2 = F.item(ItemID("t2"), F.bug, "Bug two", age: 0, edges: [
-            Edge(id: EdgeID("s1"), type: "supersedes", source: ItemID("t2"), target: .item(F.t1), origin: .property("supersedes")),
+            Edge(id: EdgeID("s1"), type: "supersedes", from: ItemID("t2"), to: .item(F.t1), origin: .property("supersedes")),
         ])
         let (library, source) = try await loaded(F.items + [bug2])
         #expect(library.relationships(for: F.t1).first { $0.field == "inverse:supersedes" }?.allowsMultiple == false)
@@ -674,7 +674,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         // target moves.
         library.notices.answerAll()
         #expect(await library.changeItemRelationship(F.e1, field: "inverse:supersedes", adding: [bug2.id], removing: [], undoManager: nil))
-        #expect(await eventually { source.writes == [.moveEdge(EdgeID("s1"), end: .target, to: F.e1)] }, "sent \(source.writes)")
+        #expect(await eventually { source.writes == [.moveEdge(EdgeID("s1"), end: .to, to: F.e1)] }, "sent \(source.writes)")
         #expect(library.notices.waiting.last == nil)
     }
 
@@ -683,7 +683,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     @Test func aReplacementOfAnItemsOwnLinkIsAskedAsAMove() async throws {
         func bug(_ id: String, supersedes target: ItemID? = nil, edge: String = "") -> MAPP.Item {
             F.item(ItemID(id), F.bug, "Bug \(id)", age: 0, edges: target.map {
-                [Edge(id: EdgeID(edge), type: "supersedes", source: ItemID(id), target: .item($0), origin: .property("supersedes"))]
+                [Edge(id: EdgeID(edge), type: "supersedes", from: ItemID(id), to: .item($0), origin: .property("supersedes"))]
             } ?? [])
         }
         let (library, source) = try await loaded(F.items + [bug("a"), bug("b"), bug("c", supersedes: ItemID("a"), edge: "s1"),
@@ -696,8 +696,8 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         // Replacing its own link for an item that holds none is one move of the end that goes.
         library.notices.answerAll()
         #expect(await library.changeItemRelationship(ItemID("c"), field: "supersedes", adding: [F.t1], removing: [ItemID("a")], undoManager: nil))
-        #expect(await eventually { source.writes == [.moveEdge(EdgeID("s1"), end: .target, to: F.t1)] }, "sent \(source.writes)")
-        #expect(source.asked.withLock { $0 } == [.moved(EdgeID("s1"), .target, F.t1)])
+        #expect(await eventually { source.writes == [.moveEdge(EdgeID("s1"), end: .to, to: F.t1)] }, "sent \(source.writes)")
+        #expect(source.asked.withLock { $0 } == [.moved(EdgeID("s1"), .to, F.t1)])
     }
 
     /// The core is asked of a replacement as a move and of every other link as a new one, whichever the picker asks.
@@ -706,7 +706,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(await library.relationshipVerdict(for: F.t1, field: "child-of", to: F.p2) == .taken)
         #expect(await library.relationshipVerdict(for: F.n1, field: "about", to: F.p2) == .taken)
         #expect(source.asked.withLock { $0 }
-            == [.moved(EdgeID("c2"), .source, F.p2), .added(EdgeDraft(type: "about", source: F.n1, target: F.p2))])
+            == [.moved(EdgeID("c2"), .from, F.p2), .added(EdgeDraft(type: "about", from: F.n1, to: F.p2))])
         // The core refuses the move: the row is refused with its words, and a change is told the same and sends nothing.
         source.moveRefusals.withLock { $0[EdgeID("c2")] = "That would close a cycle." }
         #expect(await library.relationshipVerdict(for: F.t1, field: "child-of", to: F.p2) == .refused("That would close a cycle."))
@@ -733,7 +733,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     /// The note's `about` links as the copy shows them after the source has taken the writes so far.
     private static func note(about targets: [ItemID]) -> MAPP.Item {
         F.item(F.n1, F.note, "Plain note", age: 4, tags: [ItemTag.favorite], edges: targets.enumerated().map { position, target in
-            Edge(id: EdgeID("a\(position + 1)"), type: "about", source: F.n1, target: .item(target), origin: .property("about"))
+            Edge(id: EdgeID("a\(position + 1)"), type: "about", from: F.n1, to: .item(target), origin: .property("about"))
         })
     }
 
@@ -747,7 +747,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         try #require(await eventually { library.relationshipChangesInFlight == 2 })
         #expect(source.writes.isEmpty, "nothing is written before the core has answered")
         source.holdingChecks.withLock { $0 = false }
-        try #require(await eventually { source.writes == [.link(EdgeDraft(type: "about", source: F.n1, target: F.p2))] })
+        try #require(await eventually { source.writes == [.link(EdgeDraft(type: "about", from: F.n1, to: F.p2))] })
         // The copy shows the first change and has taken it; only then is the second worked out.
         let link = try #require(source.submitted.last?.id)
         source.send(.upserted([Self.note(about: [F.p1, F.p2])]))
@@ -755,15 +755,15 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(await first.value)
         #expect(await second.value)
         #expect(source.writes == [
-            .link(EdgeDraft(type: "about", source: F.n1, target: F.p2)),
-            .link(EdgeDraft(type: "about", source: F.n1, target: F.e1)),
+            .link(EdgeDraft(type: "about", from: F.n1, to: F.p2)),
+            .link(EdgeDraft(type: "about", from: F.n1, to: F.e1)),
         ], "sent \(source.writes)")
     }
 
     /// The note about the three, each link keeping the id it was made with.
     private static func note(about links: [(id: String, target: ItemID)]) -> MAPP.Item {
         F.item(F.n1, F.note, "Plain note", age: 4, tags: [ItemTag.favorite], edges: links.map {
-            Edge(id: EdgeID($0.id), type: "about", source: F.n1, target: .item($0.target), origin: .property("about"))
+            Edge(id: EdgeID($0.id), type: "about", from: F.n1, to: .item($0.target), origin: .property("about"))
         })
     }
 
@@ -793,8 +793,8 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.send(.taken(added))
         #expect(await library.changeItemRelationship(F.n1, field: "about", adding: [F.e1], removing: [], undoManager: nil))
         #expect(source.writes == [
-            .link(EdgeDraft(type: "about", source: F.n1, target: F.p2)),
-            .link(EdgeDraft(type: "about", source: F.n1, target: F.e1)),
+            .link(EdgeDraft(type: "about", from: F.n1, to: F.p2)),
+            .link(EdgeDraft(type: "about", from: F.n1, to: F.e1)),
         ], "sent \(source.writes)")
     }
 
@@ -837,7 +837,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
     @Test func aRefusalByTheCoreIsAnsweredToTheCallerAndNothingIsWritten() async throws {
         let (library, source) = try await loaded()
-        source.refusals.withLock { $0[EdgeDraft(type: "about", source: F.n1, target: F.p2)] = "That would close a cycle." }
+        source.refusals.withLock { $0[EdgeDraft(type: "about", from: F.n1, to: F.p2)] = "That would close a cycle." }
         #expect(await library.changeItemRelationship(F.n1, field: "about", adding: [F.p2], removing: [], undoManager: nil) == false)
         #expect(library.notices.waiting.last?.message == "That would close a cycle.")
         #expect(source.writes.isEmpty)
@@ -854,19 +854,19 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let second = Task { await library.changeItemRelationship(F.t1, field: "child-of", adding: [F.p2], removing: [F.p1], undoManager: undo) }
         try #require(await eventually { library.relationshipChangesInFlight == 2 })
         source.holdingChecks.withLock { $0 = false }
-        try #require(await eventually { source.writes == [.moveEdge(EdgeID("c2"), end: .source, to: F.p1)] })
+        try #require(await eventually { source.writes == [.moveEdge(EdgeID("c2"), end: .from, to: F.p1)] })
         let move = try #require(source.submitted.last?.id)
         source.send(.upserted([F.item(F.t1, F.bug, "Bug one", age: 3, tags: [ItemTag.favorite], edges: [F.child("c2", F.t1, of: F.p1)])]))
         source.send(.taken(move))
         #expect(await first.value)
         #expect(await second.value)
         undo.endUndoGrouping()
-        #expect(source.writes.last == .moveEdge(EdgeID("c2"), end: .source, to: F.p2), "sent \(source.writes)")
+        #expect(source.writes.last == .moveEdge(EdgeID("c2"), end: .from, to: F.p2), "sent \(source.writes)")
         source.clearWrites()
         undo.undo()
         // The second move is undone to the project the first put it under, then the first to the task it started under.
         #expect(source.writes == [
-            .moveEdge(EdgeID("c2"), end: .source, to: F.p1), .moveEdge(EdgeID("c2"), end: .source, to: F.e1),
+            .moveEdge(EdgeID("c2"), end: .from, to: F.p1), .moveEdge(EdgeID("c2"), end: .from, to: F.e1),
         ], "sent \(source.writes)")
     }
 
@@ -885,7 +885,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(!finished.isSet, "the flush returned with the change not yet written")
         source.holdingChecks.withLock { $0 = false }
         await finishing.value
-        #expect(source.writes == [.link(EdgeDraft(type: "about", source: F.n1, target: F.p2))], "sent \(source.writes)")
+        #expect(source.writes == [.link(EdgeDraft(type: "about", from: F.n1, to: F.p2))], "sent \(source.writes)")
         #expect(await change.value)
         #expect(library.notices.waiting.isEmpty)
     }
@@ -1110,8 +1110,8 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     private static var catalogue: Catalogue {
         var catalogue = F.catalogue
         catalogue.edgeTypes["attached-to"] = EdgeTypeInfo(
-            id: "attached-to", label: "Attached to", reverseLabel: "Attachments", reverseName: nil, cardinality: .many, writtenAt: .source,
-            sourceTypes: [MarfaMapping.fileType], targetTypes: [])
+            id: "attached-to", label: "Attached to", reverseLabel: "Attachments", reverseName: nil, cardinality: .many, writtenFrom: .from,
+            fromTypes: [MarfaMapping.fileType], toTypes: [])
         return catalogue
     }
 
@@ -1124,14 +1124,14 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         }
         replace(F.n1) { note in
             note.edgesOut += [
-                Edge(id: EdgeID("n1#references#1"), type: "references", source: F.n1, target: .pending(spelling: "Later"), origin: .body),
-                Edge(id: EdgeID("n1#references#2"), type: "references", source: F.n1, target: .unresolved(spelling: "Nowhere", ambiguous: false), origin: .body),
-                Edge(id: EdgeID("n1#references#3"), type: "references", source: F.n1, target: .unresolved(spelling: "Twin", ambiguous: true), origin: .body),
-                Edge(id: EdgeID("n1#references#4"), type: "references", source: F.n1, target: .refused(spelling: "Banned", reason: "forbidden"), origin: .body),
+                Edge(id: EdgeID("n1#references#1"), type: "references", from: F.n1, to: .pending(spelling: "Later"), origin: .body),
+                Edge(id: EdgeID("n1#references#2"), type: "references", from: F.n1, to: .unresolved(spelling: "Nowhere", ambiguous: false), origin: .body),
+                Edge(id: EdgeID("n1#references#3"), type: "references", from: F.n1, to: .unresolved(spelling: "Twin", ambiguous: true), origin: .body),
+                Edge(id: EdgeID("n1#references#4"), type: "references", from: F.n1, to: .refused(spelling: "Banned", reason: "forbidden"), origin: .body),
             ]
         }
         replace(F.f1) { file in
-            file.edgesOut = [Edge(id: EdgeID("at1"), type: "attached-to", source: F.f1, target: .item(F.n1), origin: .property("attached-to"))]
+            file.edgesOut = [Edge(id: EdgeID("at1"), type: "attached-to", from: F.f1, to: .item(F.n1), origin: .property("attached-to"))]
         }
         source.send(.loaded(SourceSnapshot(items: items, catalogue: catalogue)))
         try #require(await eventually { library.isLoaded })
@@ -1345,6 +1345,25 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.notices.waiting.count == 1, "the person is told once")
     }
 
+    /// Typed text is kept when the copy already knows another device purged the item, so the package refuses the write
+    /// itself: nothing is queued, and a body or a title is given back with the server's words.
+    @Test(arguments: ["body", "title"])
+    func textForAnItemThePackageKnowsWasPurgedIsGivenBack(_ kind: String) async throws {
+        let (library, source) = try await loaded()
+        if kind == "body" {
+            library.updateBody(of: LibraryFixture.n1, to: "Typed as it was purged")
+        } else {
+            #expect(library.setItemProperty(LibraryFixture.n1, key: "title", value: .string("Typed as it was purged"), undoManager: nil))
+        }
+        let write = try #require(source.submitted.last?.id)
+        let problem = SyncProblem(code: "item_not_found", message: "This item is gone.", notQueued: true)
+        source.send(.answered(write, .refused(problem)))
+        #expect(await eventually { !library.notices.waiting.isEmpty })
+        #expect(library.notices.waiting.map(\.text) == ["Typed as it was purged"])
+        #expect(library.notices.waiting.last?.message == "This item is gone. Your text is on the clipboard, so you can paste it back.")
+        #expect(library.notices.waiting.count == 1, "the person is told once")
+    }
+
     /// A list of entries refused before it was queued is in no queue either, so the text in its entries is given back.
     @Test func aListRefusedBeforeItWasQueuedGivesItsTextBack() async throws {
         let shape = ListShape(members: [.init(key: "value", label: "Value", kind: .text(nil)), .init(key: "label", label: "Label", kind: .text(nil))])
@@ -1451,10 +1470,10 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         var catalogue = F.catalogue
         catalogue.edgeTypes["related"] = EdgeTypeInfo(
             id: "related", label: "Related to", reverseLabel: "Related to", reverseName: nil, cardinality: .many,
-            writtenAt: .source, sourceTypes: [], targetTypes: [])
+            writtenFrom: .from, fromTypes: [], toTypes: [])
         var items = F.items
         func link(_ id: String, from source: ItemID, to target: ItemID) -> Edge {
-            Edge(id: EdgeID(id), type: "related", source: source, target: .item(target), origin: .property("related"))
+            Edge(id: EdgeID(id), type: "related", from: source, to: .item(target), origin: .property("related"))
         }
         items[items.firstIndex { $0.id == F.n1 }!].edgesOut += [link("rel1", from: F.n1, to: F.p1)]
         items[items.firstIndex { $0.id == F.n2 }!].edgesOut += [link("rel2", from: F.n2, to: F.n1)]
@@ -1496,17 +1515,17 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         var catalogue = F.catalogue
         catalogue.edgeTypes["partner"] = EdgeTypeInfo(
             id: "partner", label: "Partner", reverseLabel: "Partner", reverseName: nil, cardinality: .one,
-            writtenAt: .source, sourceTypes: [], targetTypes: [], reverseCardinality: .one)
+            writtenFrom: .from, fromTypes: [], toTypes: [], reverseCardinality: .one)
         var items = F.items
         items[items.firstIndex { $0.id == F.n2 }!].edgesOut += [
-            Edge(id: EdgeID("pt1"), type: "partner", source: F.n2, target: .item(F.n1), origin: .property("partner"))
+            Edge(id: EdgeID("pt1"), type: "partner", from: F.n2, to: .item(F.n1), origin: .property("partner"))
         ]
         let source = FakeItemSource()
         let library = MarfaLibrary(source: source, notices: Notices())
         source.send(.loaded(SourceSnapshot(items: items, catalogue: catalogue)))
         try #require(await eventually { library.isLoaded })
         #expect(await library.changeItemRelationship(F.n1, field: "partner", adding: [F.p1], removing: [F.n2], undoManager: nil))
-        #expect(await eventually { source.writes == [.moveEdge(EdgeID("pt1"), end: .source, to: F.p1)] }, "sent \(source.writes)")
+        #expect(await eventually { source.writes == [.moveEdge(EdgeID("pt1"), end: .from, to: F.p1)] }, "sent \(source.writes)")
         #expect(library.notices.waiting.last == nil)
     }
 }

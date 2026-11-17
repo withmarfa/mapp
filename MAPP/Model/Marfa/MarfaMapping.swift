@@ -21,7 +21,7 @@ nonisolated enum MarfaMapping {
     static let placementEdge = "in-folder"
     /// Marfa files an item in a collection with this edge, from the member to the collection.
     static let collectionEdge = "in-collection"
-    /// The role a type plays to be a collection, which `in-collection` names at its target.
+    /// The role a type plays to be a collection, which `in-collection` names at its to item.
     static let containerRole = "container"
     /// The type a task is, or descends from: only such a type's `priority` and `due_at` are read as a priority and a
     /// due date.
@@ -262,18 +262,18 @@ nonisolated enum MarfaMapping {
     }
 
     static func edgeType(_ type: Marfa.EdgeType) -> EdgeTypeInfo {
-        // Cardinality is given from source to target; the end that writes the edge holds as many as the other
+        // Cardinality is given from the `from` end to the `to` end; the end that writes the edge holds as many as the other
         // side of it allows.
         let ends = type.cardinality.split(separator: "-to-").map(String.init)
-        let held = type.writtenAt == .target ? ends.first : ends.last
-        let other = type.writtenAt == .target ? ends.last : ends.first
+        let held = type.writtenFrom == .to ? ends.first : ends.last
+        let other = type.writtenFrom == .to ? ends.last : ends.first
         return EdgeTypeInfo(
             id: type.id, label: type.label, reverseLabel: type.reverseLabel, reverseName: type.reverseName,
-            cardinality: held == "one" ? .one : .many, writtenAt: type.writtenAt == .target ? .target : .source,
-            sourceTypes: constraints(type.sourceTypeConstraints).types,
-            targetTypes: constraints(type.targetTypeConstraints).types,
-            sourceRoles: constraints(type.sourceTypeConstraints).roles,
-            targetRoles: constraints(type.targetTypeConstraints).roles,
+            cardinality: held == "one" ? .one : .many, writtenFrom: type.writtenFrom == .to ? .to : .from,
+            fromTypes: constraints(type.fromTypeConstraints).types,
+            toTypes: constraints(type.toTypeConstraints).types,
+            fromRoles: constraints(type.fromTypeConstraints).roles,
+            toRoles: constraints(type.toTypeConstraints).roles,
             description: type.description, reverseCardinality: other == "one" ? .one : .many,
             cascadeOnDelete: cascade(type.cascadeOnDelete), properties: type.properties.map { field($0) }, flat: type.flat)
     }
@@ -418,13 +418,13 @@ nonisolated enum MarfaMapping {
     ) -> [Edge] {
         edges.compactMap { edge in
             let info = catalogue.edgeTypes[edge.edgeType]
-            let atTarget = info?.writtenAt == .target
-            guard (atTarget ? edge.targetId : edge.sourceId) == id else { return nil }
-            let other = atTarget ? edge.sourceId : edge.targetId
+            let atTo = info?.writtenFrom == .to
+            guard (atTo ? edge.toId : edge.fromId) == id else { return nil }
+            let other = atTo ? edge.fromId : edge.toId
             guard isHeld(other) else { return nil }
-            let name = atTarget ? info?.reverseName ?? edge.edgeType : edge.edgeType
+            let name = atTo ? info?.reverseName ?? edge.edgeType : edge.edgeType
             return Edge(
-                id: EdgeID(edge.id), type: name, source: ItemID(id), target: .item(ItemID(other)),
+                id: EdgeID(edge.id), type: name, from: ItemID(id), to: .item(ItemID(other)),
                 origin: edge.edgeType == bodyLinkEdge ? .body : .property(name),
                 position: edge.properties[positionProperty]?.number)
         }
@@ -438,16 +438,16 @@ nonisolated enum MarfaMapping {
         var found: [Edge] = []
         for (kind, names) in [(bodyLinkEdge, bodyLinks.links), (attachmentEdge, bodyLinks.embeds)] {
             for (position, name) in names.enumerated() {
-                let target: EdgeTarget
+                let to: EdgeTo
                 switch name.target {
                 case .item: continue
-                case .pending: target = .pending(spelling: name.name)
-                case .missing: target = .unresolved(spelling: name.name, ambiguous: false)
-                case .ambiguous: target = .unresolved(spelling: name.name, ambiguous: true)
-                case .refused(let reason): target = .refused(spelling: name.name, reason: reason)
+                case .pending: to = .pending(spelling: name.name)
+                case .missing: to = .unresolved(spelling: name.name, ambiguous: false)
+                case .ambiguous: to = .unresolved(spelling: name.name, ambiguous: true)
+                case .refused(let reason): to = .refused(spelling: name.name, reason: reason)
                 }
                 found.append(Edge(
-                    id: EdgeID("\(id)#\(kind)#\(position)"), type: kind, source: ItemID(id), target: target,
+                    id: EdgeID("\(id)#\(kind)#\(position)"), type: kind, from: ItemID(id), to: to,
                     origin: .body))
             }
         }
@@ -555,22 +555,45 @@ nonisolated enum MarfaMapping {
 
     // MARK: Verdicts and sync
 
-    static func outcome(_ verdict: Marfa.Verdict) -> WriteOutcome {
+    /// `afterRefusal`: a write the refused one waited on was refused or died, which only the queue can tell
+    /// (`MarfaProblems.waitsOnStopped`).
+    static func outcome(_ verdict: Marfa.Verdict, afterRefusal: Bool = false) -> WriteOutcome {
         switch verdict {
         case .accepted: .accepted
         case .merged(let fields): .merged(fields: fields)
-        case .conflicted(let sibling, let fields): .conflicted(sibling: ItemID(sibling), fields: fields)
-        case .refused(let refusal): .refused(problem(refusal))
-        case .blocked(let reason, let refusal): .blocked(blockedReason(reason), refusal.map(problem))
+        case .conflicted(let sibling?, let fields, _): .conflicted(sibling: ItemID(sibling), fields: fields)
+        // An item conflict always names the copy it wrote; one that names none is a table row's, which MAPP never writes.
+        case .conflicted(nil, let fields, _): .merged(fields: fields)
+        case .refused(let refusal): .refused(problem(refusal, afterRefusal: afterRefusal))
+        case .blocked(let reason, let refusal): .blocked(blockedReason(reason), refusal.map { problem($0) })
         case .dead: .dead
         }
     }
 
-    static func problem(_ refusal: Marfa.Refusal) -> SyncProblem {
-        SyncProblem(
-            code: refusal.code ?? refusal.reason, message: refusal.message,
+    /// A refusal with no code is either the server's answer with none, stored as a one-word reason, or the copy's
+    /// own, never sent, with an English sentence as its reason. The copy's is told in the app's words: too large, or
+    /// after a write it waited on (`afterRefusal`, which the caller reads from the queue), or otherwise as not sent.
+    static func problem(_ refusal: Marfa.Refusal, afterRefusal: Bool = false) -> SyncProblem {
+        let sentence = refusal.reason.contains(where: \.isWhitespace)
+        let unsent: SyncProblem.Unsent? =
+            if let limit = refusal.requestLimit { .tooLarge(size: limit.size, limit: limit.limit) }
+            else if refusal.code != nil { nil }
+            else if afterRefusal { .afterRefusal }
+            else if sentence { .notSent(reason: refusal.reason) }
+            else { nil }
+        return SyncProblem(
+            code: refusal.code ?? unsent.map(unsentCode) ?? refusal.reason,
+            message: unsent.map(Words.unsent) ?? refusal.message, unsent: unsent,
             fields: Dictionary(refusal.fields.map { ($0.field, $0.message) }, uniquingKeysWith: { first, _ in first }),
             isTrashed: refusal.trashed, grant: refusal.grant.map(grant))
+    }
+
+    private static func unsentCode(_ unsent: SyncProblem.Unsent) -> String {
+        switch unsent {
+        case .tooLarge: "over_request_limit"
+        case .afterRefusal: "refused_with_dependency"
+        case .notSent: "refused_unsent"
+        }
     }
 
     private static func grant(_ grant: MissingGrant) -> SyncProblem.Grant {
@@ -591,6 +614,7 @@ nonisolated enum MarfaMapping {
         case .conflictUnresolved: .conflictUnresolved
         case .failingAlone: .failingAlone
         case .instanceChanged: .instanceChanged
+        case .recordUnread: .recordUnread
         }
     }
 

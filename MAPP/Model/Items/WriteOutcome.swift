@@ -13,10 +13,22 @@ nonisolated struct SyncProblem: Hashable, Sendable {
         var level: Level
     }
 
+    /// Why the copy refused a write without sending it.
+    enum Unsent: Hashable, Sendable {
+        /// Larger than the server takes in one request, both in bytes.
+        case tooLarge(size: UInt64, limit: UInt64)
+        /// A write it waited on was refused or died.
+        case afterRefusal
+        /// For a reason of its own, such as a delete with no confirmed version, in the copy's English sentence.
+        case notSent(reason: String)
+    }
+
     /// The server's code verbatim, the contract's name for a blocked reason, or a source's own code for a write
     /// it could not make.
     var code: String
+    /// What the person is told of it, in the server's words or, for a write the copy refused unsent, the app's.
     var message: String?
+    var unsent: Unsent?
     /// Each property refused, with the reason given.
     var fields: [String: String] = [:]
     /// The item is in the bin and can be restored.
@@ -34,6 +46,7 @@ nonisolated enum BlockedReason: String, Hashable, Sendable, CaseIterable {
     case conflictUnresolved = "conflict_unresolved"
     case failingAlone = "failing_alone"
     case instanceChanged = "instance_changed"
+    case recordUnread = "record_unread"
 }
 
 /// One of the contract's six verdicts on a write.
@@ -58,7 +71,7 @@ nonisolated enum WriteOutcome: Hashable, Sendable {
         case .refused(let problem): .refused(problem)
         case .blocked(let reason, let problem):
             .blocked(SyncProblem(
-                code: reason.rawValue, message: problem?.message, fields: problem?.fields ?? [:],
+                code: reason.rawValue, message: problem?.message, unsent: problem?.unsent, fields: problem?.fields ?? [:],
                 isTrashed: problem?.isTrashed ?? false, grant: problem?.grant))
         // A dead write waits for a release as a blocked one does, so the person is offered the same retry.
         case .dead: .blocked(SyncProblem(code: "dead"))

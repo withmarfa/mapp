@@ -76,7 +76,7 @@ import Testing
     @Test func aReplacementIsOneMoveRatherThanTwoWrites() async throws {
         let (library, source) = try await loaded()
         #expect(await library.changeItemRelationship(F.e1, field: "child-of", adding: [F.p2], removing: [F.p1], undoManager: nil))
-        #expect(await eventually { source.writes == [.moveEdge(EdgeID("c1"), end: .source, to: F.p2)] }, "replacement sent as \(source.writes)")
+        #expect(await eventually { source.writes == [.moveEdge(EdgeID("c1"), end: .from, to: F.p2)] }, "replacement sent as \(source.writes)")
         #expect(library.notices.waiting.last == nil)
     }
 
@@ -85,7 +85,7 @@ import Testing
     @Test func aRefusedLinkInAReplacementKeepsTheOldLink() async throws {
         let (library, source) = try await loaded()
         #expect(await library.changeItemRelationship(F.n1, field: "about", adding: [F.p2], removing: [F.p1], undoManager: nil))
-        #expect(await eventually { source.writes == [.link(EdgeDraft(type: "about", source: F.n1, target: F.p2))] })
+        #expect(await eventually { source.writes == [.link(EdgeDraft(type: "about", from: F.n1, to: F.p2))] })
         let link = try #require(source.submitted.last?.id)
         source.send(.answered(link, .refused(SyncProblem(code: "type_not_permitted", message: "Not permitted."))))
         #expect(await eventually { library.notices.waiting.last != nil })
@@ -215,8 +215,8 @@ nonisolated final class FailingSearchSource: MAPP.ItemSource {
     func queueSubmitted() async {}
     func close() async {}
     func refresh() {}
-    func unsentWrites() async -> UnsentWrites? { nil }
-    func close(agreeing agreed: UnsentWrites?) async -> CloseOutcome { .closed }
+    func unsentWrites() async -> UnsentChanges? { nil }
+    func close(agreeing agreed: UnsentChanges?) async -> CloseOutcome { .closed }
 }
 
 extension LiveMarfaTests {

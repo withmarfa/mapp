@@ -5,13 +5,14 @@ import UniformTypeIdentifiers
 
 /// The writes a copy holds that the server has not taken, by their queue ids, so what the person agrees to lose
 /// covers those and no write that arrives after.
-nonisolated struct UnsentWrites: Sendable {
+nonisolated struct UnsentChanges: Sendable {
     /// What the person wrote in one of the writes, to show before they agree to lose it.
     nonisolated struct Text: Hashable, Sendable, Identifiable {
         let id: String
         var change: SyncProblemEntry.Change
         var content: SyncContent
-        var date: Date
+        /// Nil for a store read without opening it, whose writes say no date and are listed in queue order.
+        var date: Date?
     }
 
     var ids: Set<String>
@@ -21,15 +22,15 @@ nonisolated struct UnsentWrites: Sendable {
     var count: Int { ids.count }
 }
 
-nonisolated extension UnsentWrites: Hashable {
-    static func == (lhs: UnsentWrites, rhs: UnsentWrites) -> Bool { lhs.ids == rhs.ids }
+nonisolated extension UnsentChanges: Hashable {
+    static func == (lhs: UnsentChanges, rhs: UnsentChanges) -> Bool { lhs.ids == rhs.ids }
     func hash(into hasher: inout Hasher) { hasher.combine(ids) }
 }
 
 nonisolated enum CloseOutcome: Hashable, Sendable {
     case closed
     /// Kept open for writes not agreed to; nil where the queue could not be read.
-    case waiting(UnsentWrites?)
+    case waiting(UnsentChanges?)
 }
 
 /// How the library's server stands, for the app to show beside the library: the one record of it. An open copy
@@ -106,12 +107,8 @@ nonisolated final class MarfaSource: ItemSource {
         let copy: WorkingCopy
         do {
             copy = try await openCopy(connection, server: server, location: location)
-        } catch MarfaError.wrongSchema(_, _, let unsent, let message) {
-            throw SourceFailure(kind: .otherVersion(unsent: unsent), message: message)
-        } catch MarfaError.readingHandle {
-            throw SourceFailure(kind: .inUse, message: Words.inUse)
         } catch let error as MarfaError {
-            throw SourceFailure(kind: .failed, message: error.message)
+            throw failure(opening: error)
         }
         // A second opener of a store only reads it, and every write it made would be refused.
         guard copy.handle == .writer else {
@@ -121,6 +118,16 @@ nonisolated final class MarfaSource: ItemSource {
         let source = MarfaSource(copy: copy, connection: connection)
         source.events.yield(.paint)
         return source
+    }
+
+    /// Another program holding the store, as its writer or mid-write, is the same to the person: another copy of
+    /// MAPP has the library open.
+    nonisolated static func failure(opening error: MarfaError) -> SourceFailure {
+        switch error {
+        case .wrongSchema(_, _, let unsent, let message): SourceFailure(kind: .otherVersion(unsent: unsent), message: message)
+        case .readingHandle, .storeBusy: SourceFailure(kind: .inUse, message: Words.inUse)
+        default: SourceFailure(kind: .failed, message: error.message)
+        }
     }
 
     /// The package refuses a copy a different version of the app made, removing nothing, with the count of changes
@@ -178,7 +185,8 @@ nonisolated final class MarfaSource: ItemSource {
             // It reads the server, so it runs beside the engine rather than holding up the writes behind it; the
             // copy announces the withdrawal, which the engine reads again.
             do {
-                return try await MarfaEngine.asking { try await copy.queue.withdraw(id) }
+                // An empty answer means nothing was taken, as when the write was no longer withdrawable.
+                return try await !MarfaEngine.asking { try await copy.queue.withdraw(id) }.isEmpty
             } catch let error as MarfaError {
                 throw SourceFailure(kind: .failed, message: error.message)
             }
@@ -224,11 +232,11 @@ nonisolated final class MarfaSource: ItemSource {
     /// `Edges.check` throws `validation` or `notFound` for an edge the core refuses. Any other error (the key changing,
     /// the copy closed or not yet whole, a canceled call) says nothing about the edge.
     func edgeVerdict(_ draft: EdgeDraft) async -> EdgeVerdict {
-        await verdict { try await copy.edges.check(from: draft.source.rawValue, to: draft.target.rawValue, type: draft.type) }
+        await verdict { try await copy.edges.check(from: draft.from.rawValue, to: draft.to.rawValue, type: draft.type) }
     }
 
     func edgeVerdict(moving edge: EdgeID, end: EdgeTypeInfo.End, to: ItemID) async -> EdgeVerdict {
-        let move: EdgeEdit.Move = end == .source ? .source(to.rawValue) : .target(to.rawValue)
+        let move: EdgeEdit.Move = end == .from ? .from(to.rawValue) : .to(to.rawValue)
         return await verdict { try await copy.edges.check(edge.rawValue, moving: move) }
     }
 
@@ -249,11 +257,11 @@ nonisolated final class MarfaSource: ItemSource {
     /// The core's refusal in the person's words where MAPP can say more than the core does: an end that already holds the
     /// one link of its type is named, as is a link made twice. Any other refusal is the core's own.
     private func refusal(_ error: MarfaError) async -> String {
-        guard case .validation("edge_constraint_violation", _, let details) = error else { return error.message }
+        guard case .validation("edge_constraint_violation", _, let details, _) = error else { return error.message }
         switch details?.object?["constraint"]?.string {
         case "cardinality":
             let object = details?.object
-            let full = (object?["target_id"] ?? object?["source_id"])?.string
+            let full = (object?["to_id"] ?? object?["from_id"])?.string
             var title: String?
             if let full { title = try? await row(ItemID(full)).title }
             let name = title.flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "Untitled")
@@ -447,7 +455,7 @@ nonisolated final class MarfaSource: ItemSource {
 
     /// The writes not sent once every write submitted before this call is in the queue; nil where the queue
     /// cannot be read.
-    func unsentWrites() async -> UnsentWrites? {
+    func unsentWrites() async -> UnsentChanges? {
         await withCheckedContinuation { continuation in
             if case .terminated = events.yield(.unsent(continuation)) { continuation.resume(returning: nil) }
         }
@@ -456,7 +464,7 @@ nonisolated final class MarfaSource: ItemSource {
     /// Closes, as `close()` does, only if every write not sent, once every write submitted before this call is
     /// in the queue, is one of `agreed`, deciding and closing in one step; nil agrees to whatever the copy
     /// holds. Otherwise it stays open and answers what is not sent.
-    func close(agreeing agreed: UnsentWrites?) async -> CloseOutcome {
+    func close(agreeing agreed: UnsentChanges?) async -> CloseOutcome {
         let outcome = await withCheckedContinuation { continuation in
             if case .terminated = events.yield(.closeAgreeing(agreed, continuation)) {
                 continuation.resume(returning: .closed)

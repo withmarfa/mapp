@@ -8,31 +8,31 @@ import Foundation
 extension MarfaLibrary {
     static let inversePrefix = "inverse:"
 
-    /// A relationship field as one item sees it: the edge type, and whether the item is the edge's target.
+    /// A relationship field as one item sees it: the edge type, and whether the item is the edge's `to` end.
     nonisolated struct FieldEnd {
         let info: EdgeTypeInfo
-        let atTarget: Bool
+        let atTo: Bool
         let isInverse: Bool
     }
 
     func fieldEnd(_ field: String) -> FieldEnd? {
         if field.hasPrefix(Self.inversePrefix) {
             guard let info = catalogue.edgeTypes[String(field.dropFirst(Self.inversePrefix.count))] else { return nil }
-            return FieldEnd(info: info, atTarget: info.writtenAt == .source, isInverse: true)
+            return FieldEnd(info: info, atTo: info.writtenFrom == .from, isInverse: true)
         }
         guard let (info, isReverse) = catalogue.edgeType(named: field) else { return nil }
-        return FieldEnd(info: info, atTarget: isReverse || info.writtenAt == .target, isInverse: false)
+        return FieldEnd(info: info, atTo: isReverse || info.writtenFrom == .to, isInverse: false)
     }
 
     /// The edge `id` would hold, or be pointed at by, with `other` at the far end.
     private func draft(_ id: ItemID, _ other: ItemID, _ end: FieldEnd) -> EdgeDraft {
-        end.atTarget
-            ? EdgeDraft(type: end.info.id, source: other, target: id)
-            : EdgeDraft(type: end.info.id, source: id, target: other)
+        end.atTo
+            ? EdgeDraft(type: end.info.id, from: other, to: id)
+            : EdgeDraft(type: end.info.id, from: id, to: other)
     }
 
     private func others(of id: ItemID, _ end: FieldEnd) -> [ItemID] {
-        held(by: id, end).map { end.atTarget ? $0.source : $0.target }
+        held(by: id, end).map { end.atTo ? $0.from : $0.to }
     }
 
     /// What one end of an edge type allows: the types named, with their subtypes, and the types that play a
@@ -45,20 +45,20 @@ extension MarfaLibrary {
         var isServers: Bool { roles.isEmpty && !types.isEmpty && types.allSatisfy { $0.rawValue.hasPrefix("system.") } }
     }
 
-    private func constraint(of info: EdgeTypeInfo, atTarget: Bool) -> EndConstraint {
-        atTarget
-            ? EndConstraint(types: info.targetTypes, roles: info.targetRoles)
-            : EndConstraint(types: info.sourceTypes, roles: info.sourceRoles)
+    private func constraint(of info: EdgeTypeInfo, atTo: Bool) -> EndConstraint {
+        atTo
+            ? EndConstraint(types: info.toTypes, roles: info.toRoles)
+            : EndConstraint(types: info.fromTypes, roles: info.fromRoles)
     }
 
     private func admits(_ type: TypeID, _ end: EndConstraint) -> Bool {
         catalogue.admits(type, types: end.types, roles: end.roles)
     }
 
-    /// Whether an item of `type` may hold the end `atTarget` names of the edge type `info`. The core refuses a flat
-    /// edge type's source a type its target end admits, so the field is not offered there.
-    private func admits(_ type: TypeID, _ info: EdgeTypeInfo, atTarget: Bool) -> Bool {
-        atTarget ? admits(type, constraint(of: info, atTarget: true)) : catalogue.admits(type, source: info)
+    /// Whether an item of `type` may hold the end `atTo` names of the edge type `info`. The core refuses a flat
+    /// edge type's `from` end a type its `to` end admits, so the field is not offered there.
+    private func admits(_ type: TypeID, _ info: EdgeTypeInfo, atTo: Bool) -> Bool {
+        atTo ? admits(type, constraint(of: info, atTo: true)) : catalogue.admits(type, from: info)
     }
 
     /// What the core says of linking `id` through `field` to `other`, as the change would be made: a field that holds one
@@ -69,7 +69,7 @@ extension MarfaLibrary {
         let current = linked(to: id, end)
         guard !current.contains(other) else { return .taken }
         // A picker of a field that holds one link replaces it with the item chosen.
-        let replaced = end.info.cardinality(atTarget: end.atTarget) == .one ? current : []
+        let replaced = end.info.cardinality(atTo: end.atTo) == .one ? current : []
         switch plan(id, field: field, adding: [other], removing: replaced) {
         case .unavailable: return await source.edgeVerdict(draft(id, other, end))
         case .refused(let reason): return .refused(reason)
@@ -90,9 +90,9 @@ extension MarfaLibrary {
     }
 
     /// The edge is checked to the id the item will be given, which the copy does not hold yet: the core then judges
-    /// the parent (held, not in the bin, a type that may be one, not flat) and skips the target's type.
+    /// the parent (held, not in the bin, a type that may be one, not flat) and skips the to item's type.
     func newChildVerdict(under parent: ItemID) async -> EdgeVerdict {
-        await source.edgeVerdict(EdgeDraft(type: MarfaMapping.parentEdge, source: parent, target: ItemID.mint(at: now())))
+        await source.edgeVerdict(EdgeDraft(type: MarfaMapping.parentEdge, from: parent, to: ItemID.mint(at: now())))
     }
 
     // MARK: Reading
@@ -102,18 +102,18 @@ extension MarfaLibrary {
     private func ownFields(of type: TypeID) -> [(name: String, end: FieldEnd)] {
         catalogue.edgeTypes.values.compactMap { info -> (String, FieldEnd)? in
             guard info.id != MarfaMapping.bodyLinkEdge else { return nil }
-            let atTarget = info.writtenAt == .target
-            let far = constraint(of: info, atTarget: !atTarget)
-            guard admits(type, info, atTarget: atTarget), !far.isServers else { return nil }
-            let name = atTarget ? info.reverseName ?? info.id : info.id
-            return (name, FieldEnd(info: info, atTarget: atTarget, isInverse: false))
+            let atTo = info.writtenFrom == .to
+            let far = constraint(of: info, atTo: !atTo)
+            guard admits(type, info, atTo: atTo), !far.isServers else { return nil }
+            let name = atTo ? info.reverseName ?? info.id : info.id
+            return (name, FieldEnd(info: info, atTo: atTo, isInverse: false))
         }
     }
 
-    /// The name Marfa gives the end of the link this field is: the edge type's `label` on its source end and its
-    /// `reverseLabel` on its target end.
+    /// The name Marfa gives the end of the link this field is: the edge type's `label` on its `from` end and its
+    /// `reverseLabel` on its `to` end.
     private func label(_ end: FieldEnd) -> String {
-        end.info.label(atTarget: end.atTarget)
+        end.info.label(atTo: end.atTo)
     }
 
     /// A link keeps its item's ID whether or not the copy holds the item, so it can still be removed: one it does not
@@ -185,16 +185,16 @@ extension MarfaLibrary {
     /// would close a cycle, is asked of each (`relationshipVerdict`).
     func relationshipCandidates(for id: ItemID, field: String) -> [Item] {
         guard let item = item(id), let end = fieldEnd(field) else { return [] }
-        guard admits(item.type, end.info, atTarget: end.atTarget) else { return [] }
+        guard admits(item.type, end.info, atTo: end.atTo) else { return [] }
         return heldItems(index.ids(in: .active))
-            .filter { $0.id != id && admits($0.type, end.info, atTarget: !end.atTarget) }
+            .filter { $0.id != id && admits($0.type, end.info, atTo: !end.atTo) }
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
     func bodyMentions(for id: ItemID) -> [ItemRelationshipTarget] {
         guard let item = item(id) else { return [] }
         return item.edgesOut.filter { $0.origin == .body }.map { edge in
-            switch edge.target {
+            switch edge.to {
             case .item(let other): target(other)
             case .unresolved(let spelling, let ambiguous):
                 ItemRelationshipTarget(title: spelling, itemID: nil, resolution: ambiguous ? .ambiguous([]) : .missing)
@@ -208,9 +208,9 @@ extension MarfaLibrary {
 
     func creationParentCandidates(typeID: String) -> [Item] {
         guard let info = catalogue.edgeTypes[MarfaMapping.parentEdge],
-            admits(TypeID(typeID), constraint(of: info, atTarget: true))
+            admits(TypeID(typeID), constraint(of: info, atTo: true))
         else { return [] }
-        let parents = constraint(of: info, atTarget: false)
+        let parents = constraint(of: info, atTo: false)
         return heldItems(index.ids(in: .active))
             .filter { admits($0.type, parents) }
             .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
@@ -218,9 +218,9 @@ extension MarfaLibrary {
 
     func canHaveParent(typeID: String) -> Bool {
         guard let info = catalogue.edgeTypes[MarfaMapping.parentEdge],
-            admits(TypeID(typeID), constraint(of: info, atTarget: true))
+            admits(TypeID(typeID), constraint(of: info, atTo: true))
         else { return false }
-        let parents = constraint(of: info, atTarget: false)
+        let parents = constraint(of: info, atTo: false)
         return index.ids(in: .active).contains { id in heldItems(CollectionOfOne(id)).first.map { admits($0.type, parents) } ?? false }
     }
 
@@ -268,14 +268,14 @@ extension MarfaLibrary {
 
     /// The edges of the field's type that `id` holds at the end `end` names.
     private func held(by id: ItemID, _ end: FieldEnd) -> [MarfaItemIndex.Link] {
-        index.links(touching: id).filter { $0.type == end.info.id && (end.atTarget ? $0.target == id : $0.source == id) }
+        index.links(touching: id).filter { $0.type == end.info.id && (end.atTo ? $0.to == id : $0.from == id) }
     }
 
     /// Changes the field of `id` by what the person changed: `adding` items to link and `removing` items to unlink,
     /// relative to what they saw, never the whole list they saw, which a change made since would be undone by.
     /// A link is removed freely; the core judges every link added, and how many an end may hold.
-    /// An end that holds one link of its type has it replaced by moving the edge's other end (`edges/move-target`,
-    /// `edges/move-source`), so a new parent is one write and the child never holds none or two (`edges/move-no-gap`):
+    /// An end that holds one link of its type has it replaced by moving the edge's other end (`edges/move-to`,
+    /// `edges/move-from`), so a new parent is one write and the child never holds none or two (`edges/move-no-gap`):
     /// a replacement is a move, and so is taking an item whose own link points elsewhere, as a child chosen under a
     /// project. A link a third item holds as its own is never taken from it.
     ///
@@ -354,7 +354,7 @@ extension MarfaLibrary {
     private func linked(to id: ItemID, _ end: FieldEnd) -> [ItemID] {
         let own = others(of: id, end)
         guard !end.isInverse, end.info.isTwoWay else { return own }
-        let farEnd = FieldEnd(info: end.info, atTarget: !end.atTarget, isInverse: !end.isInverse)
+        let farEnd = FieldEnd(info: end.info, atTo: !end.atTo, isInverse: !end.isInverse)
         return own + others(of: id, farEnd).filter { !own.contains($0) }
     }
 
@@ -367,8 +367,8 @@ extension MarfaLibrary {
         guard end.info.id != MarfaMapping.bodyLinkEdge else {
             return .refused(String(localized: "A link is changed in the text that holds it."))
         }
-        let holds = end.info.cardinality(atTarget: end.atTarget)
-        let farEnd = FieldEnd(info: end.info, atTarget: !end.atTarget, isInverse: !end.isInverse)
+        let holds = end.info.cardinality(atTo: end.atTo)
+        let farEnd = FieldEnd(info: end.info, atTo: !end.atTo, isInverse: !end.isInverse)
         // A two-way relation is one list of the links this item holds and the ones pointing at it.
         let own = others(of: id, end)
         let incoming = !end.isInverse && end.info.isTwoWay ? others(of: id, farEnd) : []
@@ -379,21 +379,21 @@ extension MarfaLibrary {
         for other in wanted where !targetIDs.contains(other) && !unwanted.contains(other) { targetIDs.append(other) }
         let adding = targetIDs.filter { !current.contains($0) }
         let removing = current.filter { !targetIDs.contains($0) }
-        let farHolds = end.info.cardinality(atTarget: !end.atTarget)
+        let farHolds = end.info.cardinality(atTo: !end.atTo)
         // Replacing this item's own link moves the far end; taking another item's link moves this item's end.
-        let farIsTarget = !end.atTarget
+        let farIsTo = !end.atTo
         let replacingOwn = holds == .one && !removing.isEmpty && !adding.isEmpty
         var unlinking = removing
         var change = RelationshipChange()
         // Every link the change makes, whether added or made by moving an end: what the core is asked about.
         var made: [MadeLink] = []
         for other in adding {
-            let taken = farHolds == .one ? held(by: other, farEnd).filter { (farIsTarget ? $0.source : $0.target) != id } : []
+            let taken = farHolds == .one ? held(by: other, farEnd).filter { (farIsTo ? $0.from : $0.to) != id } : []
             if let theirs = taken.first, !end.isInverse {
                 // The item chosen holds its one link elsewhere, and it is the third item's own: the move would take it from
                 // an item the person is not looking at, so they are told which item holds it. Where that link is the
                 // chosen item's own, as a child's parent is, the move changes it to this one.
-                let old = farIsTarget ? theirs.source : theirs.target
+                let old = farIsTo ? theirs.from : theirs.to
                 let chosen = self.item(other)?.title ?? ""
                 let holder = self.item(old)?.title ?? ""
                 return .refused(String(localized: "“\(holder)” already holds this link to “\(chosen)”. Remove it there first."))
@@ -401,11 +401,11 @@ extension MarfaLibrary {
             // The end that stays holds one link, and its other end changes. A two-way link may point here instead, and
             // then the end that moves is the one on the far side of that edge.
             let replaced = replacingOwn ? unlinking.compactMap { old -> (ItemID, RelationshipChange.Move)? in
-                if let edge = held(by: id, end).first(where: { (farIsTarget ? $0.target : $0.source) == old }) {
-                    return (old, .init(edge: edge.id, end: farIsTarget ? .target : .source, to: other, from: old))
+                if let edge = held(by: id, end).first(where: { (farIsTo ? $0.to : $0.from) == old }) {
+                    return (old, .init(edge: edge.id, end: farIsTo ? .to : .from, to: other, from: old))
                 }
-                if let edge = held(by: id, farEnd).first(where: { (farIsTarget ? $0.source : $0.target) == old }) {
-                    return (old, .init(edge: edge.id, end: farIsTarget ? .source : .target, to: other, from: old))
+                if let edge = held(by: id, farEnd).first(where: { (farIsTo ? $0.from : $0.to) == old }) {
+                    return (old, .init(edge: edge.id, end: farIsTo ? .from : .to, to: other, from: old))
                 }
                 return nil
             }.first : nil
@@ -414,8 +414,8 @@ extension MarfaLibrary {
                 change.moving.append(move)
                 made.append(.moved(move))
             } else if let theirs = taken.first {
-                let old = farIsTarget ? theirs.source : theirs.target
-                let move = RelationshipChange.Move(edge: theirs.id, end: farIsTarget ? .source : .target, to: id, from: old)
+                let old = farIsTo ? theirs.from : theirs.to
+                let move = RelationshipChange.Move(edge: theirs.id, end: farIsTo ? .from : .to, to: id, from: old)
                 change.moving.append(move)
                 made.append(.moved(move))
             } else {
@@ -463,7 +463,7 @@ extension MarfaLibrary {
     @discardableResult
     func unlink(_ drafts: [EdgeDraft], failing title: String = String(localized: "Can’t Change This Relationship")) -> [WriteID] {
         drafts.compactMap { draft in
-            index.link(type: draft.type, source: draft.source, target: draft.target).map { submit(.unlink($0.id), failing: title) }
+            index.link(type: draft.type, from: draft.from, to: draft.to).map { submit(.unlink($0.id), failing: title) }
         }
     }
 }

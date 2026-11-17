@@ -73,11 +73,11 @@ struct MarfaEdgeCheckTests {
         await scene.source.close()
     }
 
-    /// `source` linked to `target` by an edge of `type`, once the library shows it.
-    private static func link(_ type: String, from source: String, to target: String, in scene: Scene) async throws {
-        _ = try await scene.fake.copy.edges.create(from: scene.id(source).rawValue, to: scene.id(target).rawValue, type: type)
+    /// `from` linked to `to` by an edge of `type`, once the library shows it.
+    private static func link(_ type: String, from: String, to: String, in scene: Scene) async throws {
+        _ = try await scene.fake.copy.edges.create(from: scene.id(from).rawValue, to: scene.id(to).rawValue, type: type)
         try #require(await eventually {
-            scene.library.relationships(for: scene.id(target)).contains { $0.targets.contains { $0.itemID == scene.id(source) } }
+            scene.library.relationships(for: scene.id(to)).contains { $0.targets.contains { $0.itemID == scene.id(from) } }
         })
     }
 

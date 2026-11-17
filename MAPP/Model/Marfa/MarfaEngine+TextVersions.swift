@@ -108,7 +108,7 @@ extension MarfaEngine {
     private func heldVersion(_ id: ItemID) async throws -> Int64 {
         if let row = try await copy.items.get(id.rawValue) { return row.version }
         guard let row = rows[id.rawValue] else {
-            throw MarfaError.notFound(code: "item_not_found", message: String(localized: "This item isn’t in the library."))
+            throw MarfaError.notFound(code: "item_not_found", message: String(localized: "This item isn’t in the library."), server: nil)
         }
         return row.version
     }

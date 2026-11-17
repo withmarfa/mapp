@@ -324,7 +324,8 @@ import Testing
         source.report.set(SyncReport(waiting: 2, queueRead: true))
         #expect(await eventually { model.host.waitingChanges == 2 })
         await model.disconnect()
-        #expect(model.departure?.unsent == .fake(2))
+        #expect(model.departure?.unsent == UnsentChanges(ids: Set(try await source.storeWrites)))
+        #expect(model.departure?.unsent?.count == 2)
 
         await model.answer(.discardCopy)
         #expect(model.departure == nil)

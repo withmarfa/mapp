@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		331000123066ED47005D07A2 /* MarfaAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 331000133066ED47005D07A2 /* MarfaAPI */; };
 		331000043066ED47005D07A2 /* Marfa in Frameworks */ = {isa = PBXBuildFile; productRef = 331000053066ED47005D07A2 /* Marfa */; };
 		331000073066ED47005D07A2 /* MarfaTesting in Frameworks */ = {isa = PBXBuildFile; productRef = 331000083066ED47005D07A2 /* MarfaTesting */; };
 		3310000D3066ED47005D07A2 /* MarfaTelemetry in Frameworks */ = {isa = PBXBuildFile; productRef = 3310000E3066ED47005D07A2 /* MarfaTelemetry */; };
@@ -81,6 +82,7 @@
 		3303FCF63066ED46005D07A2 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				331000123066ED47005D07A2 /* MarfaAPI in Frameworks */,
 				331000043066ED47005D07A2 /* Marfa in Frameworks */,
 				331000113066ED47005D07A2 /* MarfaBrandIcons in Frameworks */,
 				3310000B3066ED47005D07A2 /* MarfaIcons in Frameworks */,
@@ -148,6 +150,7 @@
 			);
 			name = MAPP;
 			packageProductDependencies = (
+				331000133066ED47005D07A2 /* MarfaAPI */,
 				331000053066ED47005D07A2 /* Marfa */,
 				331000103066ED47005D07A2 /* MarfaBrandIcons */,
 				3310000C3066ED47005D07A2 /* MarfaIcons */,
@@ -721,12 +724,17 @@
 			repositoryURL = "https://github.com/withmarfa/marfa-swift";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 0.0.64;
+				minimumVersion = 0.0.65;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		331000133066ED47005D07A2 /* MarfaAPI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 331000063066ED47005D07A2 /* XCRemoteSwiftPackageReference "marfa-swift" */;
+			productName = MarfaAPI;
+		};
 		331000053066ED47005D07A2 /* Marfa */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 331000063066ED47005D07A2 /* XCRemoteSwiftPackageReference "marfa-swift" */;

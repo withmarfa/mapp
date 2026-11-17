@@ -72,7 +72,9 @@ extension LiveMarfaTests {
                     default: #expect(items.allSatisfy { $0.state == .active }, "\(place)")
                     }
                 }
-                #expect(library.items(in: .allNotes).allSatisfy { !$0.title.isEmpty })
+                // A library may hold untitled notes, so what is read back is the titles of the notes made here.
+                #expect(library.item(project)?.title == "MAPPTEST project \(token)")
+                #expect(children.map { library.item($0)?.title } == ["MAPPTEST first child \(token)", "MAPPTEST second child \(token)"])
                 // One copy holds both tiers: the Inbox is the feed, and All Items has the feed's items among the rest.
                 let inbox = library.items(in: .inbox)
                 #expect(inbox.contains { $0.id == captured })

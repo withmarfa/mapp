@@ -124,8 +124,8 @@ extension MarfaEngine {
     private func attachmentTitle(for file: URL, on host: Marfa.Item) -> String {
         let taken = Set(
             edges.edges(touching: host.id)
-                .filter { $0.edgeType == MarfaMapping.attachmentEdge && $0.targetId == host.id }
-                .compactMap { rows[$0.sourceId]?.title?.lowercased() })
+                .filter { $0.edgeType == MarfaMapping.attachmentEdge && $0.toId == host.id }
+                .compactMap { rows[$0.fromId]?.title?.lowercased() })
             .union(attachingTitles[host.id] ?? [])
         let name = file.lastPathComponent
         let stem = file.deletingPathExtension().lastPathComponent

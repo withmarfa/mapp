@@ -283,9 +283,9 @@ nonisolated final class FakeItemSource: ItemSource {
 
     let refreshes = Mutex(0)
     func refresh() { refreshes.withLock { $0 += 1 } }
-    func unsentWrites() async -> UnsentWrites? { nil }
+    func unsentWrites() async -> UnsentChanges? { nil }
 
-    func close(agreeing agreed: UnsentWrites?) async -> CloseOutcome {
+    func close(agreeing agreed: UnsentChanges?) async -> CloseOutcome {
         await close()
         return .closed
     }

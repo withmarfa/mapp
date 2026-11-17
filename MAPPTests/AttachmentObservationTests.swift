@@ -20,7 +20,7 @@ import UniformTypeIdentifiers
             id: Self.media, label: "Media", fields: [], titleField: nil, bodyField: nil, parent: nil)
         catalogue.edgeTypes[MarfaMapping.attachmentEdge] = EdgeTypeInfo(
             id: MarfaMapping.attachmentEdge, label: "Attached to", reverseLabel: "Attachments", reverseName: nil, cardinality: .many,
-            writtenAt: .source, sourceTypes: [MarfaMapping.fileType], targetTypes: [])
+            writtenFrom: .from, fromTypes: [MarfaMapping.fileType], toTypes: [])
         source.send(.loaded(SourceSnapshot(items: F.items + [F.item(Self.article, Self.media, "An article", age: 0)], catalogue: catalogue)))
         try #require(await eventually { library.isLoaded })
         return (library, source)
@@ -35,7 +35,7 @@ import UniformTypeIdentifiers
     private func document(_ id: ItemID, attachedTo host: ItemID, state: ItemState = .active) -> MAPP.Item {
         F.item(
             id, MarfaMapping.fileType, "article.html", age: 0, state: state,
-            edges: [Edge(id: EdgeID("at-\(id.rawValue)"), type: MarfaMapping.attachmentEdge, source: id, target: .item(host), origin: .property(MarfaMapping.attachmentEdge))],
+            edges: [Edge(id: EdgeID("at-\(id.rawValue)"), type: MarfaMapping.attachmentEdge, from: id, to: .item(host), origin: .property(MarfaMapping.attachmentEdge))],
             titleRule: .firstLine,
             content: .file(.html, byteCount: 10))
     }

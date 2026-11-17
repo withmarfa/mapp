@@ -55,10 +55,10 @@ struct MarfaSyncFailureTests {
 
     @Test(arguments: [
         MarfaError.canceled(message: "the call was canceled"),
-        MarfaError.server(status: 503, code: "unavailable", message: "The server is busy."),
+        MarfaError.server(status: 503, code: "unavailable", message: "The server is busy.", details: nil, server: nil),
         MarfaError.network(message: "offline"),
         MarfaError.keyChanging(message: "The key is changing."),
-        MarfaError.copyExpired(reason: "read_view_changed", message: "The copy expired."),
+        MarfaError.copyExpired(reason: "read_view_changed", message: "The copy expired.", server: nil),
     ])
     func aFailureThePackageHandlesIsNeitherShownNorReported(_ error: MarfaError) async throws {
         let (_, source, server, log) = try await open(failing: [error])
@@ -108,7 +108,7 @@ struct MarfaSyncFailureTests {
     /// with nothing hydrating, so Refresh is offered.
     @Test func aFailedFirstFillIsShownWithItsErrorAndOffersRefresh() async throws {
         let (fake, source, _, log) = try await open(failing: [])
-        let refused = MarfaError.server(status: 400, code: "bad_request", message: "The server refused the fill.")
+        let refused = MarfaError.server(status: 400, code: "bad_request", message: "The server refused the fill.", details: nil, server: nil)
         fake.sendUpdate(update(.needsHydration(nil)))
         fake.sendUpdate(update(.needsHydration(refused)))
         _ = try #require(await log.wait { unavailable($0) == 1 })
@@ -133,7 +133,7 @@ struct MarfaSyncFailureTests {
     /// A key the server ended is the package's `.keyRefused`: shown as that, told once, and waiting for another key.
     @Test func aKeyTheServerEndedIsShownRefusedAndToldOnce() async throws {
         let (fake, source, _, log) = try await open(failing: [])
-        let ended = MarfaError.copyExpired(reason: "credential_ended", message: "the key ended")
+        let ended = MarfaError.copyExpired(reason: "credential_ended", message: "the key ended", server: nil)
         for _ in 0..<3 { fake.sendUpdate(update(.keyRefused(ended))) }
         #expect(await waitForConnection(source) { $0 == .keyRefused })
         try #require(await eventually { log.current.changes.contains { if case .unavailable = $0 { true } else { false } } })

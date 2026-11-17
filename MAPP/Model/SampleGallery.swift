@@ -98,7 +98,7 @@ nonisolated enum SampleGallery {
         files.compactMap { file in
             file.attachedTo.map {
                 Marfa.Edge(
-                    id: "attached-\(file.id)", sourceId: file.id, targetId: $0, edgeType: "attached-to", properties: [:], version: 1,
+                    id: "attached-\(file.id)", fromId: file.id, toId: $0, edgeType: "attached-to", properties: [:], version: 1,
                     createdAt: SampleLibrary.stamp(now), updatedAt: SampleLibrary.stamp(now))
             }
         }

@@ -375,7 +375,7 @@ import Testing
             let unresolved = answer.links.filter { !$0.target.isItem }.count
             let embeds = answer.embeds.map { BoundEmbed(text: $0.text, resolution: MarfaMapping.resolution(of: $0.target)) }
             let shown = item.edgesOut.filter { edge in
-                if case .item = edge.target { false } else { edge.origin == .body && edge.type == MarfaMapping.bodyLinkEdge }
+                if case .item = edge.to { false } else { edge.origin == .body && edge.type == MarfaMapping.bodyLinkEdge }
             }.count
             #expect(shown == unresolved, "\(id) shows \(shown) unresolved links, the copy answered \(unresolved)")
             #expect(item.boundEmbeds == embeds, "\(id) shows embeds \(item.boundEmbeds), the copy answered \(embeds)")
@@ -473,7 +473,7 @@ import Testing
         try await scene.holdEngine(reading: "other")
         for parent in ["second", "first", "second"] {
             let edge = try #require(try await scene.copy.edges.to("child").first { $0.id == edgeID })
-            _ = try await scene.copy.edges.update(edgeID, EdgeEdit(baseVersion: edge.version, move: .source(parent)))
+            _ = try await scene.copy.edges.update(edgeID, EdgeEdit(baseVersion: edge.version, move: .from(parent)))
             try await scene.drainAccepting()
         }
         // The package coalesces the three moves into one update.
@@ -638,7 +638,7 @@ import Testing
         let before = unavailable()
 
         let failing = Mutex(true)
-        hooks.naming.set { _ in failing.withLock { $0 } ? MarfaError.server(status: 500, code: "internal", message: "No names.") : nil }
+        hooks.naming.set { _ in failing.withLock { $0 } ? MarfaError.server(status: 500, code: "internal", message: "No names.", details: nil, server: nil) : nil }
         let made = ItemID.mint().rawValue
         _ = try await scene.copy.items.create(Draft(type: "core.note", properties: ["title": .string("Made")], id: made))
         try await scene.drainAccepting()
@@ -812,7 +812,7 @@ import Testing
         scene.source.engine.hooks.attaching.set { item, title in
             await reading.wait()
             func write(_ id: String, _ kind: WriteKind, item: String? = nil, target: String? = nil) -> Marfa.QueuedWrite {
-                Marfa.QueuedWrite(id: id, kind: kind, itemId: item, targetId: target, idempotencyKey: id, queuedAt: stamp)
+                Marfa.QueuedWrite(id: id, kind: kind, itemId: item, toId: target, idempotencyKey: id, queuedAt: stamp)
             }
             let file = "file-\(UUID().uuidString)"
             return Marfa.Attached(

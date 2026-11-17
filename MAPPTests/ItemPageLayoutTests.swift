@@ -18,7 +18,7 @@ import UniformTypeIdentifiers
             content: type.map { .file($0, byteCount: 10) } ?? .file(.data, byteCount: 10), state: state,
             version: ItemVersion(1), created: created, modified: created,
             edgesOut: host.map {
-                [Edge(id: EdgeID("attached-\(id.rawValue)"), type: MarfaMapping.attachmentEdge, source: id, target: .item($0), origin: .body)]
+                [Edge(id: EdgeID("attached-\(id.rawValue)"), type: MarfaMapping.attachmentEdge, from: id, to: .item($0), origin: .body)]
             } ?? [])
         library.items.append(item)
         return item

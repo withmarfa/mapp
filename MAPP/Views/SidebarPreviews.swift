@@ -30,7 +30,7 @@ import SwiftUI
     }
     let edges = (1...100).map { index in
         Marfa.Edge(
-            id: "edge-\(index)", sourceId: "child-\(index)", targetId: "collection-\(index)", edgeType: "in-collection",
+            id: "edge-\(index)", fromId: "child-\(index)", toId: "collection-\(index)", edgeType: "in-collection",
             properties: [:], version: 1, createdAt: SampleLibrary.stamp(date), updatedAt: SampleLibrary.stamp(date))
     }
     let library = MarfaLibrary(source: SampleLibrary.open(SampleLibrary.connection, items: rows, edges: edges, now: date), notices: Notices())

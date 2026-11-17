@@ -39,10 +39,10 @@ struct MarfaMappingTests {
             ItemType(id: "system.folder", label: "Folder", fields: [field("title", by: "system.folder")])
         ],
         edgeTypes: [
-            EdgeType(id: "parent-of", label: "Parent of", cardinality: "one-to-many", reverseName: "child-of", writtenAt: .target),
+            EdgeType(id: "parent-of", label: "Parent of", cardinality: "one-to-many", reverseName: "child-of", writtenFrom: .to),
             EdgeType(id: "references", label: "References", cardinality: "many-to-many"),
             EdgeType(id: "supersedes", label: "Supersedes", cardinality: "one-to-one"),
-            EdgeType(id: "in-folder", label: "In folder", cardinality: "many-to-many", targetTypeConstraints: ["system.folder"])
+            EdgeType(id: "in-folder", label: "In folder", cardinality: "many-to-many", toTypeConstraints: ["system.folder"])
         ])
 
     private static func row(
@@ -57,7 +57,7 @@ struct MarfaMappingTests {
 
     private static func edge(_ id: String, _ type: String, from source: String, to target: String) -> Marfa.Edge {
         Marfa.Edge(
-            id: id, sourceId: source, targetId: target, edgeType: type, properties: [:], version: 1,
+            id: id, fromId: source, toId: target, edgeType: type, properties: [:], version: 1,
             createdAt: "2026-10-06T00:00:00Z", updatedAt: "2026-10-06T00:00:00Z")
     }
 
@@ -150,31 +150,31 @@ struct MarfaMappingTests {
     @Test func anEdgeIsHeldAsManyTimesAsTheOtherEndAllows() throws {
         let parent = try #require(Self.catalogue.edgeTypes["parent-of"])
         #expect(parent.reverseName == "child-of")
-        #expect(parent.writtenAt == .target)
+        #expect(parent.writtenFrom == .to)
         #expect(parent.cardinality == .one)
-        #expect(parent.sourceTypes.isEmpty && parent.targetTypes.isEmpty)
+        #expect(parent.fromTypes.isEmpty && parent.toTypes.isEmpty)
         #expect(Self.catalogue.edgeTypes["references"]?.cardinality == .many)
         #expect(Self.catalogue.edgeTypes["supersedes"]?.cardinality == .one)
-        #expect(Self.catalogue.edgeTypes["in-folder"]?.targetTypes == [TypeID("system.folder")])
+        #expect(Self.catalogue.edgeTypes["in-folder"]?.toTypes == [TypeID("system.folder")])
         #expect(Self.catalogue.edgeType(named: "child-of")?.isReverse == true)
     }
 
-    /// A move replaces an end only where the end that stays holds one edge of the type (`edges/move-target`,
-    /// `edges/move-source`): the target for `parent-of` (each child has one parent), the source for a type where
-    /// each source holds one.
+    /// A move replaces an end only where the end that stays holds one edge of the type (`edges/move-to`,
+    /// `edges/move-from`): the to item for `parent-of` (each child has one parent), the from item for a type where
+    /// each from item holds one.
     @Test func eachEndSaysHowManyEdgesOfATypeItHolds() throws {
         let parent = try #require(Self.catalogue.edgeTypes["parent-of"])
-        #expect(parent.cardinality(atTarget: true) == .one)
-        #expect(parent.cardinality(atTarget: false) == .many)
+        #expect(parent.cardinality(atTo: true) == .one)
+        #expect(parent.cardinality(atTo: false) == .many)
         let supersedes = try #require(Self.catalogue.edgeTypes["supersedes"])
-        #expect(supersedes.cardinality(atTarget: true) == .one)
-        #expect(supersedes.cardinality(atTarget: false) == .one)
+        #expect(supersedes.cardinality(atTo: true) == .one)
+        #expect(supersedes.cardinality(atTo: false) == .one)
         let references = try #require(Self.catalogue.edgeTypes["references"])
-        #expect(references.cardinality(atTarget: true) == .many)
-        #expect(references.cardinality(atTarget: false) == .many)
+        #expect(references.cardinality(atTo: true) == .many)
+        #expect(references.cardinality(atTo: false) == .many)
         let thread = MarfaMapping.edgeType(EdgeType(id: "in-thread", label: "In thread", cardinality: "many-to-one"))
-        #expect(thread.cardinality(atTarget: false) == .one)
-        #expect(thread.cardinality(atTarget: true) == .many)
+        #expect(thread.cardinality(atTo: false) == .one)
+        #expect(thread.cardinality(atTo: true) == .many)
     }
 
     @Test func typesCarryTheRestOfTheirDefinition() throws {
@@ -188,7 +188,7 @@ struct MarfaMappingTests {
             edgeTypes: [
                 EdgeType(
                     id: "knows", label: "Knows", description: "Two people know each other.", cardinality: "one-to-many",
-                    reverseName: "known-by", writtenAt: .target, cascadeOnDelete: "block",
+                    reverseName: "known-by", writtenFrom: .to, cascadeOnDelete: "block",
                     properties: [TypeField(name: "since", type: "date", declaredBy: "knows")]),
                 EdgeType(id: "owns", label: "Owns", cardinality: "many-to-one", cascadeOnDelete: "cascade"),
                 EdgeType(id: "next", label: "Next", cardinality: "one-to-one", cascadeOnDelete: "unknown")
@@ -250,17 +250,17 @@ struct MarfaMappingTests {
         let catalogue = MarfaMapping.catalogue(
             itemTypes: [],
             edgeTypes: [
-                EdgeType(id: "in-collection", label: "In collection", cardinality: "many-to-many", targetTypeConstraints: ["role:container"]),
-                EdgeType(id: "mixed", label: "Mixed", cardinality: "many-to-many", sourceTypeConstraints: ["core.note", "role:container"]),
-                EdgeType(id: "open", label: "Open", cardinality: "many-to-many", sourceTypeConstraints: ["*"], targetTypeConstraints: ["*", "role:x"])
+                EdgeType(id: "in-collection", label: "In collection", cardinality: "many-to-many", toTypeConstraints: ["role:container"]),
+                EdgeType(id: "mixed", label: "Mixed", cardinality: "many-to-many", fromTypeConstraints: ["core.note", "role:container"]),
+                EdgeType(id: "open", label: "Open", cardinality: "many-to-many", fromTypeConstraints: ["*"], toTypeConstraints: ["*", "role:x"])
             ])
         let inCollection = try #require(catalogue.edgeTypes["in-collection"])
-        #expect(inCollection.targetTypes.isEmpty && inCollection.targetRoles == ["container"])
-        #expect(inCollection.sourceTypes.isEmpty && inCollection.sourceRoles.isEmpty)
+        #expect(inCollection.toTypes.isEmpty && inCollection.toRoles == ["container"])
+        #expect(inCollection.fromTypes.isEmpty && inCollection.fromRoles.isEmpty)
         let mixed = try #require(catalogue.edgeTypes["mixed"])
-        #expect(mixed.sourceTypes == [TypeID("core.note")] && mixed.sourceRoles == ["container"])
+        #expect(mixed.fromTypes == [TypeID("core.note")] && mixed.fromRoles == ["container"])
         let open = try #require(catalogue.edgeTypes["open"])
-        #expect(open.sourceTypes.isEmpty && open.sourceRoles.isEmpty && open.targetTypes.isEmpty && open.targetRoles.isEmpty)
+        #expect(open.fromTypes.isEmpty && open.fromRoles.isEmpty && open.toTypes.isEmpty && open.toRoles.isEmpty)
     }
 
     // MARK: Items
@@ -356,7 +356,7 @@ struct MarfaMappingTests {
             Self.row("n"), edges: [Self.edge("e", "references", from: "n", to: "plan")], catalogue: Self.catalogue,
             bodyLinks: links, isHeld: { $0 == "plan" })
         // Those that name an item are the copy's own edges; the rest are the package's word that none is there.
-        #expect(item.edgesOut.map(\.target) == [
+        #expect(item.edgesOut.map(\.to) == [
             .item(ItemID("plan")), .unresolved(spelling: "Plan", ambiguous: false), .pending(spelling: "Later"), .unresolved(spelling: "Nowhere", ambiguous: false),
             .unresolved(spelling: "Twin", ambiguous: true), .refused(spelling: "Banned", reason: "forbidden"),
             .unresolved(spelling: "dog.png", ambiguous: false)
@@ -382,9 +382,9 @@ struct MarfaMappingTests {
         let held: Set<String> = ["project", "ticket", "decision"]
         let ticket = Self.item(Self.row("ticket"), edges: edges, held: held)
         #expect(ticket.edgesOut == [
-            MAPP.Edge(id: EdgeID("e1"), type: "child-of", source: ItemID("ticket"), target: .item(ItemID("project")),
+            MAPP.Edge(id: EdgeID("e1"), type: "child-of", from: ItemID("ticket"), to: .item(ItemID("project")),
                  origin: .property("child-of")),
-            MAPP.Edge(id: EdgeID("e2"), type: "references", source: ItemID("ticket"), target: .item(ItemID("decision")),
+            MAPP.Edge(id: EdgeID("e2"), type: "references", from: ItemID("ticket"), to: .item(ItemID("decision")),
                  origin: .body)
         ])
         let project = Self.item(Self.row("project", type: "aic.project"), edges: edges, held: held)
@@ -439,14 +439,71 @@ struct MarfaMappingTests {
             code: "validation_error", message: "Bad status", fields: ["status": "not one of open, done"],
             isTrashed: true)))
         let unsent = Refusal(reason: "the create_item it waits for was refused")
-        #expect(MarfaMapping.outcome(.refused(unsent)) == .refused(SyncProblem(
-            code: "the create_item it waits for was refused", message: nil)))
+        #expect(MarfaMapping.outcome(.refused(unsent), afterRefusal: true) == .refused(SyncProblem(
+            code: "refused_with_dependency", message: Words.unsent(.afterRefusal), unsent: .afterRefusal)))
         #expect(MarfaMapping.outcome(.conflicted(siblingId: "s", fields: ["body"])) ==
             .conflicted(sibling: ItemID("s"), fields: ["body"]))
         #expect(MarfaMapping.outcome(.blocked(reason: .keySpent)) == .blocked(.keySpent, nil))
         #expect(MarfaMapping.outcome(.blocked(reason: .failingAlone)) == .blocked(.failingAlone, nil))
         #expect(MarfaMapping.outcome(.blocked(reason: .instanceChanged)) == .blocked(.instanceChanged, nil))
+        #expect(MarfaMapping.outcome(.blocked(reason: .recordUnread)) == .blocked(.recordUnread, nil))
         #expect(MarfaMapping.outcome(.dead) == .dead)
+    }
+
+    /// The copy also refuses writes unsent for reasons of their own, such as a delete with no confirmed version,
+    /// with no code. Without a refused write it waited on, it is told only that it wasn't sent, never that an
+    /// earlier change took it down.
+    @Test func aRefusalWithNoCodeIsNotToldAsAfterAnother() {
+        let reason = "the delete has no confirmed server version to remove; read the item before deleting it"
+        let problem = MarfaMapping.problem(Refusal(reason: reason))
+        #expect(problem.unsent == .notSent(reason: reason))
+        #expect(problem.code == "refused_unsent")
+        #expect(problem.message == Words.unsent(.notSent(reason: reason)))
+        #expect(problem.message?.contains("earlier change") == false)
+        // A code wins over the queue's say: the server refused it for itself.
+        let server = MarfaMapping.problem(Refusal(reason: "validation_error", code: "validation_error"), afterRefusal: true)
+        #expect(server.unsent == nil)
+    }
+
+    /// The server's answer with no `error.code` is stored with a one-word reason, and was sent: the server refused it.
+    @Test func aServerAnswerWithNoCodeIsTheServersRefusal() {
+        let problem = MarfaMapping.problem(Refusal(reason: "unknown", message: "Not allowed here."))
+        #expect(problem.unsent == nil)
+        #expect(problem.code == "unknown")
+        #expect(problem.message == "Not allowed here.")
+    }
+
+    /// The copy refuses a write larger than the server takes before sending it, with no code and its reason in
+    /// English. The person is told the sizes in the app's words, wherever the refusal is shown.
+    @Test func aWriteTooLargeToSendIsToldWithItsSizes() throws {
+        let refusal = Refusal(
+            reason: "This write is 3,145,729 bytes as a request, and this server takes 3,145,728. Make it smaller to send it.",
+            requestLimit: RequestLimit(size: 3_145_729, limit: 3_145_728))
+        guard case .refused(let problem) = MarfaMapping.outcome(.refused(refusal)) else {
+            Issue.record("expected a refusal")
+            return
+        }
+        #expect(problem.unsent == .tooLarge(size: 3_145_729, limit: 3_145_728))
+        #expect(problem.code == "over_request_limit")
+        let message = try #require(problem.message)
+        let (size, limit) = Words.sizes(3_145_729, 3_145_728)
+        #expect(size != limit, "sizes that would read the same carry their bytes")
+        #expect(message.contains(size) && message.contains(limit))
+        #expect(!message.localizedCaseInsensitiveContains("write"), "the queue's word is not the person's")
+
+        let entry = SyncProblemEntry(
+            id: .write("w"), itemID: ItemID("item"), kind: .refused, change: .edit, reason: problem,
+            content: SyncContent(title: "Plan", body: "A very long note"), actions: MarfaProblems.actions(for: .refused))
+        let wording = ProblemWording(entry) { _ in nil }
+        #expect(wording.explanation.hasPrefix(message), "Settings says why, not only that it was refused")
+        #expect(!wording.explanation.contains("The server refused it"), "the copy refused it, not the server")
+    }
+
+    /// Only a table row's conflict names no copy, and MAPP writes no rows, so such an answer leaves the item as
+    /// merged rather than pointing at a copy that does not exist.
+    @Test func aConflictNamingNoCopyIsReadAsMerged() {
+        #expect(MarfaMapping.outcome(.conflicted(siblingId: nil, fields: ["title"])) == .merged(fields: ["title"]))
+        #expect(MarfaMapping.outcome(.conflicted(siblingId: nil, fields: [])).syncState == .settled)
     }
 
     private static func write(_ id: String, on item: String, _ verdict: Verdict? = nil) -> QueuedWrite {

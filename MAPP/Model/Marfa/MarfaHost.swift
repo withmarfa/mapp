@@ -10,9 +10,9 @@ import Observation
     typealias Opener = @Sendable (MarfaConnection, any SignIns, MarfaStoreLocation) async throws -> any ItemSource
     /// Reads the name the server at an address gives itself. It sends no sign-in.
     typealias Describer = @Sendable (MarfaConnection) async throws -> String
-    /// Removes the copy at a store, agreed to hold this many unsent changes. Tests stand in for the package's
-    /// answers that a real copy can't be made to give.
-    typealias Remover = @Sendable (URL, UInt64) async throws -> Void
+    /// Removes the copy at a store, provided every change it holds that the server has not taken is one of the ids
+    /// the person agreed to lose. Tests stand in for the package's answers that a real copy can't be made to give.
+    typealias Remover = @Sendable (URL, Agreed) async throws -> Void
     /// Makes the reader of item histories for a connection, or nil where there is no server to ask, as in the sample.
     typealias Historian = @Sendable (MarfaConnection, any SignIns) -> (any ItemHistorySource)?
     /// Makes the keeper of the owner's type icons for a connection, or nil where there is no server to ask, as in the
@@ -28,9 +28,9 @@ import Observation
         /// Left on disk, so connecting the same address again goes on from it and sends what waits.
         case keepCopy
         /// Removed with the writes the person was shown in `changesWaiting`, which they agreed to lose. A write
-        /// not among them, such as a late save, keeps the copy and the person is asked again. Nil is only for a
-        /// copy another version made, and agrees to the count it reported; with none, the choice is refused.
-        case discardCopy(UnsentWrites?)
+        /// not among them, such as a late save, keeps the copy and the person is asked again. Nil, where they
+        /// were shown none, is refused.
+        case discardCopy(UnsentChanges?)
     }
 
     nonisolated enum Problem: Error, Hashable, Sendable {
@@ -40,7 +40,7 @@ import Observation
         /// Writes still wait in the copy being left, so the person chooses what becomes of them, and a choice
         /// to discard names these; asked again when others arrive after it. Nil where the copy could not be
         /// read and may hold some.
-        case changesWaiting(UnsentWrites?)
+        case changesWaiting(UnsentChanges?)
         /// The copy could not be opened or read.
         case unavailable(message: String)
         /// The copy was made by a different version of the app; see `MarfaConnectionState.otherVersion`.
@@ -69,20 +69,43 @@ import Observation
 
     /// Why the package left a copy the person chose to discard. The copy keeps every change in it.
     nonisolated enum CopyKept: Hashable, Sendable {
-        /// It holds `now` changes the server has not taken, not the number the person was shown and agreed to
+        /// It holds `now` changes the server has not taken, not only the ones the person was shown and agreed to
         /// lose. Connecting to the address again opens it and sends them.
         case changed(now: UInt64)
-        /// Its changes can't be counted, and the package never removes a copy it can't count. `folder` is where it
-        /// is, for the person to remove.
+        /// Its changes can't be read, and the package never removes a copy whose changes it can't read. `folder` is
+        /// where it is, for the person to remove.
         case unreadable(folder: String)
         /// It is a folder's store, which is not MAPP's to remove.
         case notMapps(folder: String)
     }
 
+    /// What the person agreed to lose with a copy they discard: the writes they were shown, by queue id. A count
+    /// confirms nothing, since another write can take the place of one that was sent.
+    nonisolated struct Agreed: Hashable, Sendable {
+        var ids: Set<String>
+
+        init(ids: Set<String>) {
+            self.ids = ids
+        }
+
+        /// A mark that is not a list of ids agrees to lose nothing, so a copy holding any change is kept.
+        init(stored: Any) {
+            ids = Set(stored as? [String] ?? [])
+        }
+
+        /// Whether a copy holding `held` loses nothing beyond what was agreed: a write sent meanwhile is no loss.
+        func covers(_ held: [String]) -> Bool {
+            Set(held).isSubset(of: ids)
+        }
+
+        /// As it is kept in the defaults, so a removal that stops part way is finished at the next launch.
+        var stored: [String] { ids.sorted() }
+    }
+
     private static let addressKey = "MarfaAddress"
     /// The address of the sign-in kept for a question, so a launch ends one the app quit with.
     private static let pendingSignInKey = "MarfaPendingSignIn"
-    /// The address of each copy the person discarded but which could not be removed, with the number of changes
+    /// The address of each copy the person discarded but which could not be removed, with the ids of the changes
     /// they agreed to lose with it.
     static let discardedKey = "MarfaDiscardedCopies"
     /// The last name each server gave itself, by address, so a launch and an offline window show it.
@@ -139,7 +162,7 @@ import Observation
         defaults: UserDefaults, signIns: any SignIns, location: MarfaStoreLocation,
         opener: @escaping Opener = { try await MarfaSource.open($0, signIns: $1, location: $2) },
         describer: @escaping Describer = { try await $0.server(key: "").instanceDescription().name },
-        remover: @escaping Remover = { try await WorkingCopy.remove(store: $0, unsent: $1) },
+        remover: @escaping Remover = { try await MarfaHost.removeStore($0, agreedToLose: $1) },
         historian: @escaping Historian = { MarfaServerCalls(connection: $0, signIns: $1) },
         configurer: @escaping Configurer = { MarfaServerCalls(connection: $0, signIns: $1) },
         iconKeeper: @escaping IconKeeper = { MarfaServerCalls(connection: $0, signIns: $1) },
@@ -276,7 +299,8 @@ import Observation
         if let source {
             try await close(source, for: choice)
         } else if choice == nil, hasCopy(connection) {
-            throw .changesWaiting(nil)
+            let unsent = await Self.unsentChanges(in: location.store(for: connection))
+            if unsent?.ids.isEmpty != true { throw .changesWaiting(unsent) }
         }
         detach()
         forgetName(of: connection)
@@ -323,7 +347,7 @@ import Observation
         // Taken at once, so a step that stops before the approval is used or dropped does not leave it live.
         let kept = pendingSignIn
         pendingSignIn = nil
-        let agreed: UInt64?
+        let agreed: Agreed?
         let current = source
         let fresh: Bool
         do throws(Problem) {
@@ -333,7 +357,8 @@ import Observation
                 let unsent = await current.unsentWrites()
                 if unsent?.ids.isEmpty != true { throw Problem.changesWaiting(unsent) }
             } else if current == nil, choice == nil, hasCopy(old) {
-                throw Problem.changesWaiting(nil)
+                let unsent = await Self.unsentChanges(in: location.store(for: old))
+                if unsent?.ids.isEmpty != true { throw Problem.changesWaiting(unsent) }
             }
             fresh = !hasCopy(connection)
         } catch {
@@ -374,7 +399,7 @@ import Observation
                 // The move is abandoned, so the copy and the sign-in made for it go too.
                 await opened.close()
                 await endSignIn(of: connection)
-                if fresh { _ = await removeCopy(connection, agreed: 0) }
+                if fresh { _ = await removeCopy(connection, agreed: Agreed(ids: [])) }
                 throw error
             }
         }
@@ -387,12 +412,12 @@ import Observation
     }
 
     /// Whether what the person agreed to lose takes in every write the copy holds: nothing, without a choice.
-    private static func covers(_ choice: DisconnectChoice?, _ unsent: UnsentWrites?) -> Bool {
+    private static func covers(_ choice: DisconnectChoice?, _ unsent: UnsentChanges?) -> Bool {
         switch (choice, unsent) {
         case (nil, let unsent?): unsent.ids.isEmpty
         case (nil, nil): false
-        case (.discardCopy(let agreed), let unsent?): agreed.map { unsent.ids.isSubset(of: $0.ids) } ?? true
-        case (.discardCopy(let agreed), nil): agreed == nil
+        case (.discardCopy(let agreed?), let unsent?): unsent.ids.isSubset(of: agreed.ids)
+        case (.discardCopy, _): false
         case (.keepCopy, _): true
         }
     }
@@ -469,13 +494,13 @@ import Observation
     /// only if every write not sent is one the person agreed to lose: none, without a choice.
     private func close(_ source: any ItemSource, for choice: DisconnectChoice?) async throws(Problem) {
         guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current note before changing libraries.")) }
-        let agreed: UnsentWrites?
+        let agreed: UnsentChanges
         switch choice {
         case .keepCopy:
             await source.close()
             return
-        case .discardCopy(let shown): agreed = shown
-        case nil: agreed = UnsentWrites(ids: [])
+        case .discardCopy(let shown): agreed = shown ?? UnsentChanges(ids: [])
+        case nil: agreed = UnsentChanges(ids: [])
         }
         if case .waiting(let unsent) = await source.close(agreeing: agreed) { throw .changesWaiting(unsent) }
     }

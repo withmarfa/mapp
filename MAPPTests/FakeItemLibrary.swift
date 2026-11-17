@@ -114,11 +114,11 @@ final class FakeItemLibrary: ItemLibrary {
         ]
         // A child names its parent, so `parent-of` is written at its target, under its reverse name.
         let parent = EdgeTypeInfo(
-            id: "parent-of", label: "Children", reverseLabel: "Parent", reverseName: "child-of", cardinality: .one, writtenAt: .target,
-            sourceTypes: [], targetTypes: [])
+            id: "parent-of", label: "Children", reverseLabel: "Parent", reverseName: "child-of", cardinality: .one, writtenFrom: .to,
+            fromTypes: [], toTypes: [])
         let collection = EdgeTypeInfo(
             id: "in-collection", label: "In collection", reverseLabel: "Contents", reverseName: nil, cardinality: .many,
-            writtenAt: .source, sourceTypes: [], targetTypes: [], targetRoles: ["container"], flat: true)
+            writtenFrom: .from, fromTypes: [], toTypes: [], toRoles: ["container"], flat: true)
         return Catalogue(itemTypes: types, edgeTypes: [parent, collection])
     }()
 
@@ -282,7 +282,7 @@ final class FakeItemLibrary: ItemLibrary {
 
     func attachments(of id: ItemID) -> [ItemID] {
         items.filter { file in
-            file.edgesOut.contains { $0.type == MarfaMapping.attachmentEdge && $0.target == .item(id) }
+            file.edgesOut.contains { $0.type == MarfaMapping.attachmentEdge && $0.to == .item(id) }
         }.map(\.id)
     }
 
@@ -300,7 +300,7 @@ final class FakeItemLibrary: ItemLibrary {
             properties: address.map { [Property(key: SavedPictures.sourceField, value: .string($0))] } ?? [],
             content: .file(UTType(filenameExtension: file.pathExtension) ?? .data, byteCount: Int64(size)), state: state,
             version: ItemVersion(1), created: moment, modified: moment,
-            edgesOut: [Edge(id: EdgeID("attached-\(id.rawValue)"), type: MarfaMapping.attachmentEdge, source: id, target: .item(host), origin: .body)]))
+            edgesOut: [Edge(id: EdgeID("attached-\(id.rawValue)"), type: MarfaMapping.attachmentEdge, from: id, to: .item(host), origin: .body)]))
         files[id] = file
         return id
     }
@@ -327,7 +327,7 @@ final class FakeItemLibrary: ItemLibrary {
             return nil
         }
         let id = ItemID.mint()
-        let parent = parentID.map { Edge(id: EdgeID("child-of-\(id.rawValue)"), type: "child-of", source: id, target: .item($0), origin: .property("child-of")) }
+        let parent = parentID.map { Edge(id: EdgeID("child-of-\(id.rawValue)"), type: "child-of", from: id, to: .item($0), origin: .property("child-of")) }
         let item = Item(
             id: id, type: TypeID(typeID), title: title, titleRule: .property("title"),
             properties: properties.sorted { $0.key < $1.key }.map { Property(key: $0.key, value: $0.value) },
@@ -642,7 +642,7 @@ final class FakeItemLibrary: ItemLibrary {
         addedFiles.append((name, data, title, parentID))
         addedPlaces.append(place)
         let id = ItemID.mint()
-        let parent = parentID.map { Edge(id: EdgeID("child-of-\(id.rawValue)"), type: "child-of", source: id, target: .item($0), origin: .property("child-of")) }
+        let parent = parentID.map { Edge(id: EdgeID("child-of-\(id.rawValue)"), type: "child-of", from: id, to: .item($0), origin: .property("child-of")) }
         items.append(Item(
             id: id, type: .file, title: title ?? name, titleRule: .property("title"), content: .file(.data, byteCount: Int64(data.count)),
             version: ItemVersion(1), created: now(), modified: now(), edgesOut: parent.map { [$0] } ?? []))
@@ -668,7 +668,7 @@ final class FakeItemLibrary: ItemLibrary {
             let id = items[index].id
             items[index].edgesOut.append(Edge(
                 id: EdgeID("in-collection-\(id.rawValue)-\(collection.rawValue)"), type: MarfaMapping.collectionEdge,
-                source: id, target: .item(collection), origin: .property(MarfaMapping.collectionEdge)))
+                from: id, to: .item(collection), origin: .property(MarfaMapping.collectionEdge)))
         }
         return !joining.isEmpty || plan.skips.isEmpty
     }
@@ -682,7 +682,7 @@ final class FakeItemLibrary: ItemLibrary {
                 skips.skip(reason)
                 continue
             }
-            items[index].edgesOut.removeAll { $0.type == MarfaMapping.collectionEdge && $0.target == .item(collection) }
+            items[index].edgesOut.removeAll { $0.type == MarfaMapping.collectionEdge && $0.to == .item(collection) }
             removed = true
         }
         tellSkipped(skips, didChange: removed, failing: "Can’t Remove from Collection")

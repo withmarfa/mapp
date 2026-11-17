@@ -143,10 +143,10 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     func refresh()
     /// The writes not sent once every write submitted before the call is in the queue; nil where the queue
     /// cannot be read.
-    func unsentWrites() async -> UnsentWrites?
+    func unsentWrites() async -> UnsentChanges?
     /// Closes only if every write not sent, read in the same step, is one of `agreed` (nil agrees to whatever
     /// the copy holds); otherwise stays open and answers what is not sent.
-    func close(agreeing agreed: UnsentWrites?) async -> CloseOutcome
+    func close(agreeing agreed: UnsentChanges?) async -> CloseOutcome
 }
 
 nonisolated extension ItemSource {

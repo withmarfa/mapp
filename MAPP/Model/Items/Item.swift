@@ -48,7 +48,7 @@ nonisolated struct Property: Identifiable, Hashable, Sendable {
 // Not `Tag`, which would shadow Testing.Tag.
 nonisolated enum ItemTag {
     static let favorite = "favorite"
-    /// What Marfa allows a tag, in UTF-16 code units, and how many an item holds (`items/tag-text`, `items/tags-count`).
+    /// What Marfa allows a tag, in Unicode characters, and how many an item holds (`items/tag-text`, `items/tags-count`).
     static let maxLength = 128
     static let maxPerItem = 100
 
@@ -82,7 +82,7 @@ nonisolated enum ItemTag {
     /// The refusal the rules of a tag's text give, before any item is looked at.
     static func refusal(of tag: String) -> Refusal? {
         if tag.isEmpty { return .empty }
-        if tag.utf16.count > maxLength { return .tooLong }
+        if tag.unicodeScalars.count > maxLength { return .tooLong }
         if tag == "." || tag == ".." { return .dotSegment }
         return nil
     }
@@ -163,7 +163,7 @@ nonisolated struct ItemBody: Hashable, Sendable {
     let version: ItemVersion
 }
 
-nonisolated enum EdgeTarget: Hashable, Sendable {
+nonisolated enum EdgeTo: Hashable, Sendable {
     case item(ItemID)
     /// A reference no item answers to, or more than one does, kept as spelled so it can be shown and fixed.
     case unresolved(spelling: String, ambiguous: Bool)
@@ -180,30 +180,30 @@ nonisolated enum EdgeOrigin: Hashable, Sendable {
 
 /// An edge as the item that writes it holds it, following Marfa's folder rule: it sits in the `edgesOut` of the
 /// item at the end its type is written at, named as that end writes it. A child's `child-of` is in the child's
-/// `edgesOut` with the parent as its target; `Catalogue.edgeType(named:)` gives the canonical direction.
+/// `edgesOut` with the parent as its `to` end; `Catalogue.edgeType(named:)` gives the canonical direction.
 nonisolated struct Edge: Identifiable, Hashable, Sendable {
     let id: EdgeID
     let type: String
-    let source: ItemID
-    let target: EdgeTarget
+    let from: ItemID
+    let to: EdgeTo
     let origin: EdgeOrigin
     /// The edge's `position` property, where it has one, as an `in-collection` edge orders a collection's members.
     var position: Double? = nil
 }
 
 nonisolated extension Item {
-    /// The item this one is filed under: the target of its `child-of` edge.
+    /// The item this one is filed under: the `to` end of its `child-of` edge.
     var parentID: ItemID? {
         edgesOut.lazy.compactMap { edge -> ItemID? in
-            guard edge.type == "child-of", case .item(let id) = edge.target else { return nil }
+            guard edge.type == "child-of", case .item(let id) = edge.to else { return nil }
             return id
         }.first
     }
 
-    /// The collections this item is in: the targets of its `in-collection` edges, in the order it holds them.
+    /// The collections this item is in: the to items of its `in-collection` edges, in the order it holds them.
     var collectionIDs: [ItemID] {
         edgesOut.compactMap { edge -> ItemID? in
-            guard edge.type == MarfaMapping.collectionEdge, case .item(let id) = edge.target else { return nil }
+            guard edge.type == MarfaMapping.collectionEdge, case .item(let id) = edge.to else { return nil }
             return id
         }
     }

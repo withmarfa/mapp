@@ -126,7 +126,7 @@ import Testing
         }
         .map { member in
             var member = member
-            member.edgesOut = [Edge(id: EdgeID("\(member.id.rawValue)#in"), type: "in-collection", source: member.id, target: .item(album.id), origin: .property("in-collection"))]
+            member.edgesOut = [Edge(id: EdgeID("\(member.id.rawValue)#in"), type: "in-collection", from: member.id, to: .item(album.id), origin: .property("in-collection"))]
             return member
         }
         let source = FakeItemSource()

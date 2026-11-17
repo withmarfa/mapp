@@ -67,7 +67,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         let id = UUID()
         var kind: Kind
         /// What the copy holds that the server has not taken, as last read; nil where it could not be read.
-        var unsent: UnsentWrites?
+        var unsent: UnsentChanges?
         /// More changes arrived after the person was shown the others, so they are asked again.
         var isAskedAgain = false
     }
@@ -394,14 +394,14 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         }
     }
 
-    private func ask(_ kind: Departure.Kind, _ unsent: UnsentWrites?, askedAgain: Bool) {
+    private func ask(_ kind: Departure.Kind, _ unsent: UnsentChanges?, askedAgain: Bool) {
         departure = Departure(kind: kind, unsent: unsent, isAskedAgain: askedAgain)
     }
 
     private func run(
         _ step: Step,
         _ work: () async throws(MarfaHost.Problem) -> Void,
-        onWaiting: ((UnsentWrites?) -> Void)? = nil
+        onWaiting: ((UnsentChanges?) -> Void)? = nil
     ) async {
         guard !isWorking else { return }
         isWorking = true

@@ -3,12 +3,12 @@ import Foundation
 /// Which items each place holds, and every edge in its canonical direction, kept up to date one item at a time so
 /// a read costs what it returns rather than a pass over the library.
 nonisolated struct MarfaItemIndex {
-    /// An edge from its source to its target as its type names them, whichever end holds it.
+    /// An edge from its `from` end to its `to` end as its type names them, whichever end holds it.
     struct Link: Hashable, Sendable {
         let id: EdgeID
         let type: String
-        let source: ItemID
-        let target: ItemID
+        let from: ItemID
+        let to: ItemID
         let holder: ItemID
         var position: Double? = nil
     }
@@ -39,7 +39,7 @@ nonisolated struct MarfaItemIndex {
     }
 
     private func isAttachedToHeldItem(_ id: ItemID) -> Bool {
-        attachments[id]?.contains { edge in links[edge].map { held[$0.target] != nil } ?? false } ?? false
+        attachments[id]?.contains { edge in links[edge].map { held[$0.to] != nil } ?? false } ?? false
     }
 
     mutating func insert(_ item: Item, catalogue: Catalogue) {
@@ -54,9 +54,9 @@ nonisolated struct MarfaItemIndex {
         for edge in item.edgesOut {
             guard let link = Self.link(edge, catalogue: catalogue) else { continue }
             links[link.id] = link
-            linksFrom[link.source, default: []].insert(link.id)
-            linksTo[link.target, default: []].insert(link.id)
-            if link.type == MarfaMapping.attachmentEdge { attachments[link.source, default: []].insert(link.id) }
+            linksFrom[link.from, default: []].insert(link.id)
+            linksTo[link.to, default: []].insert(link.id)
+            if link.type == MarfaMapping.attachmentEdge { attachments[link.from, default: []].insert(link.id) }
             holding.append(link.id)
         }
         held[item.id] = holding
@@ -74,26 +74,26 @@ nonisolated struct MarfaItemIndex {
         feed.remove(item.id)
         for id in held.removeValue(forKey: item.id) ?? [] {
             guard let link = links.removeValue(forKey: id) else { continue }
-            linksFrom[link.source]?.remove(id)
-            linksTo[link.target]?.remove(id)
+            linksFrom[link.from]?.remove(id)
+            linksTo[link.to]?.remove(id)
             if link.type == MarfaMapping.attachmentEdge {
-                attachments[link.source]?.remove(id)
-                if attachments[link.source]?.isEmpty == true { attachments[link.source] = nil }
+                attachments[link.from]?.remove(id)
+                if attachments[link.from]?.isEmpty == true { attachments[link.from] = nil }
             }
         }
     }
 
     /// An edge sits with the item at the end its type is written at, under the reverse name there where the type
-    /// has one; a type the catalogue does not know is taken as written at its source.
+    /// has one; a type the catalogue does not know is taken as written at its from item.
     static func link(_ edge: Edge, catalogue: Catalogue) -> Link? {
-        guard case .item(let other) = edge.target else { return nil }
+        guard case .item(let other) = edge.to else { return nil }
         guard let (info, isReverse) = catalogue.edgeType(named: edge.type) else {
-            return Link(id: edge.id, type: edge.type, source: edge.source, target: other, holder: edge.source, position: edge.position)
+            return Link(id: edge.id, type: edge.type, from: edge.from, to: other, holder: edge.from, position: edge.position)
         }
-        let atTarget = isReverse || info.writtenAt == .target
+        let atTo = isReverse || info.writtenFrom == .to
         return Link(
-            id: edge.id, type: info.id, source: atTarget ? other : edge.source, target: atTarget ? edge.source : other,
-            holder: edge.source, position: edge.position)
+            id: edge.id, type: info.id, from: atTo ? other : edge.from, to: atTo ? edge.from : other,
+            holder: edge.from, position: edge.position)
     }
 
     func links(from id: ItemID, type: String) -> [Link] {
@@ -109,7 +109,7 @@ nonisolated struct MarfaItemIndex {
         (linksFrom[id] ?? []).union(linksTo[id] ?? []).compactMap { links[$0] }
     }
 
-    func link(type: String, source: ItemID, target: ItemID) -> Link? {
-        links(from: source, type: type).first { $0.target == target }
+    func link(type: String, from: ItemID, to: ItemID) -> Link? {
+        links(from: from, type: type).first { $0.to == to }
     }
 }

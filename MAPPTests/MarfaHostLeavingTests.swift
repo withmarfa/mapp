@@ -103,12 +103,12 @@ import Testing
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
         let suite = bench.suite
-        let seen = Mutex<[String: Int]?>(nil)
+        let seen = Mutex<[String: [String]]?>(nil)
         bench.signIns.onSignOut.withLock {
-            $0 = { seen.withLock { $0 = UserDefaults(suiteName: suite)?.dictionary(forKey: "MarfaDiscardedCopies") as? [String: Int] ?? [:] } }
+            $0 = { seen.withLock { $0 = UserDefaults(suiteName: suite)?.dictionary(forKey: "MarfaDiscardedCopies") as? [String: [String]] ?? [:] } }
         }
         try await host.disconnect()
-        #expect(seen.withLock { $0 } == ["http://first.test:8210": 0], "marked with the number of changes agreed to be lost")
+        #expect(seen.withLock { $0 } == ["http://first.test:8210": []], "marked with the ids of the changes agreed to be lost")
         #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies")?.isEmpty ?? true)
         #expect(!bench.hasCopy(first))
     }

@@ -28,7 +28,7 @@ struct FileDropTests {
         browser.show(.collection(collection.id), in: library, order: NoteOrder())
         let ids = await browser.importFiles([disk.url("a.txt")], in: library, order: NoteOrder(), undoManager: nil)
         let added = try #require(ids.first)
-        #expect(library.item(added)?.edgesOut.contains { $0.target == .item(collection.id) } == true)
+        #expect(library.item(added)?.edgesOut.contains { $0.to == .item(collection.id) } == true)
     }
 
     @Test func filesDroppedOnACollectionJoinItWhereverTheWindowIs() async throws {
@@ -38,7 +38,7 @@ struct FileDropTests {
         browser.adopt(library)
         let ids = await browser.importFiles([disk.url("a.txt")], into: collection.id, in: library, order: NoteOrder(), undoManager: nil)
         let added = try #require(ids.first)
-        #expect(library.item(added)?.edgesOut.contains { $0.target == .item(collection.id) } == true)
+        #expect(library.item(added)?.edgesOut.contains { $0.to == .item(collection.id) } == true)
         #expect(browser.selection == [added])
     }
 
@@ -70,7 +70,7 @@ struct FileDropTests {
         library.sendingFile = { browser.show(.allNotes, in: library, order: NoteOrder()) }
         let ids = await browser.importFiles([disk.url("a.txt"), disk.url("b.txt")], in: library, order: NoteOrder(), undoManager: nil)
         #expect(ids.count == 2)
-        for id in ids { #expect(library.item(id)?.edgesOut.contains { $0.target == .item(collection.id) } == true) }
+        for id in ids { #expect(library.item(id)?.edgesOut.contains { $0.to == .item(collection.id) } == true) }
         #expect(browser.item == .allNotes)
     }
 

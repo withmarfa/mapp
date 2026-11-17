@@ -157,6 +157,56 @@ struct ProblemWordingTests {
         #expect(wording(refused).details == ["due_at: not a date", "Status: not one of open, closed"])
     }
 
+    @Test func aChangeTooLargeToSendSaysItsSizesAndHowToKeepTheText() {
+        let reason = SyncProblem(
+            code: "over_request_limit", message: Words.unsent(.tooLarge(size: 12_000_000, limit: 10_000_000)),
+            unsent: .tooLarge(size: 12_000_000, limit: 10_000_000))
+        let wording = wording(entry(.refused, reason: reason))
+        let size = Int64(12_000_000).formatted(.byteCount(style: .file))
+        let limit = Int64(10_000_000).formatted(.byteCount(style: .file))
+        #expect(wording.explanation.hasPrefix("This change is \(size), more than the \(limit) the server takes at once"))
+        #expect(wording.explanation.contains("copy it before you discard"))
+        #expect(wording.actions.map(\.action) == [.discard])
+    }
+
+    /// Sizes that round to the same words would say the change is no larger than the limit, so they carry their bytes.
+    @Test func sizesThatReadTheSameCarryTheirBytes() {
+        let (size, limit) = Words.sizes(2_000_001, 2_000_000)
+        #expect(size != limit)
+        #expect(size.contains(Int64(2_000_001).formatted(.byteCount(style: .file))))
+    }
+
+    /// A change the copy refused for a reason of its own says only that it wasn't sent, with the copy's reason
+    /// beside it, never that an earlier change or the server refused it.
+    @Test func aChangeNotSentForItsOwnReasonSaysSo() {
+        let why = "the delete has no confirmed server version to remove; read the item before deleting it"
+        let reason = SyncProblem(code: "refused_unsent", message: Words.unsent(.notSent(reason: why)), unsent: .notSent(reason: why))
+        let wording = wording(entry(.refused, reason: reason))
+        #expect(wording.explanation.hasPrefix("MAPP couldn’t send this change."))
+        #expect(!wording.explanation.contains("earlier change"))
+        #expect(!wording.explanation.contains("The server refused it"))
+        #expect(wording.explanation.contains("copy it before you discard"))
+        #expect(wording.details == ["The delete has no confirmed server version to remove; read the item before deleting it."])
+        #expect(wording.actions.map(\.action) == [.discard])
+    }
+
+    /// A change refused only because one it went with was refused says so, rather than that the server refused it.
+    @Test func aChangeRefusedWithAnEarlierOneSaysSo() {
+        let reason = SyncProblem(code: "refused_with_dependency", message: Words.unsent(.afterRefusal), unsent: .afterRefusal)
+        let wording = wording(entry(.refused, reason: reason))
+        #expect(wording.explanation.hasPrefix("It went with an earlier change that wasn’t sent, so it wasn’t sent either."))
+        #expect(!wording.explanation.contains("The server refused it"))
+    }
+
+    @Test func aChangeFromACopyReadInPartIsHeldUntilThePersonSays() {
+        let wording = wording(entry(.blocked(.recordUnread)))
+        #expect(wording.headline == "A change to “Plan the launch” is on hold")
+        #expect(wording.explanation.hasPrefix("This change came from a copy that MAPP could only partly read"))
+        #expect(wording.actions.map(\.action) == [.tryAgain, .withdraw])
+        #expect(wording.actions.map(\.title) == ["Try Again", "Undo Change"])
+        #expect(wording.confirmation(for: .withdraw)?.copiesText == true)
+    }
+
     @Test func aRefusalWithNoReasonStillSaysSomething() {
         let wording = wording(entry(.refused, title: nil, body: nil))
         #expect(wording.explanation == "The server refused it.")
@@ -217,7 +267,8 @@ struct ProblemWordingTests {
     @Test func everyActionOfferedIsOneTheContractAllows() {
         let kinds: [SyncProblemEntry.Kind] = [
             .refused, .blocked(.credentialRefused), .blocked(.keySpent), .blocked(.ancestorUnavailable),
-            .blocked(.conflictUnresolved), .blocked(.failingAlone), .blocked(.instanceChanged), .dead, .conflicted(sibling: ItemID("c"), original: nil)
+            .blocked(.conflictUnresolved), .blocked(.failingAlone), .blocked(.instanceChanged), .blocked(.recordUnread), .dead,
+            .conflicted(sibling: ItemID("c"), original: nil)
         ]
         for kind in kinds {
             #expect(wording(entry(kind)).actions.map(\.action) == MarfaProblems.actions(for: kind))
@@ -227,10 +278,17 @@ struct ProblemWordingTests {
     @Test func noWordIsJargon() {
         let kinds: [SyncProblemEntry.Kind] = [
             .refused, .blocked(.credentialRefused), .blocked(.keySpent), .blocked(.ancestorUnavailable),
-            .blocked(.conflictUnresolved), .blocked(.failingAlone), .dead, .conflicted(sibling: ItemID("c"), original: nil)
+            .blocked(.conflictUnresolved), .blocked(.failingAlone), .blocked(.instanceChanged), .blocked(.recordUnread), .dead,
+            .conflicted(sibling: ItemID("c"), original: nil)
         ]
-        for kind in kinds {
-            let wording = wording(entry(kind))
+        let unsent: [SyncProblem.Unsent] = [
+            .tooLarge(size: 2_000_001, limit: 2_000_000), .afterRefusal, .notSent(reason: "the bytes are gone")
+        ]
+        let entries = kinds.map { entry($0) } + unsent.map {
+            entry(.refused, reason: SyncProblem(code: "unsent", message: Words.unsent($0), unsent: $0))
+        }
+        for entry in entries {
+            let wording = wording(entry)
             let text = ([wording.headline, wording.explanation] + wording.actions.map(\.title)).joined(separator: " ")
             for word in ["sync", "write", "queue", "idempotency", "verdict", "ancestor", "credential"] {
                 #expect(!text.localizedCaseInsensitiveContains(word), "“\(text)” says “\(word)”")

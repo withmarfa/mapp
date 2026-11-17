@@ -165,6 +165,73 @@ struct MarfaProblemsTests {
         #expect(report.problems[1].dependents == ["behind"])
         #expect(report.problems[2].dependents.isEmpty)
         #expect(report.problems[2].actions == [.discard])
+        #expect(report.problems[0].reason?.unsent == nil)
+        // The write it waited on is not in the queue, so nothing shows it went with another: it is told only as not sent.
+        #expect(report.problems[2].reason?.unsent == .notSent(reason: "the create_item it waits for was refused"))
+        #expect(report.problems[2].reason?.code.contains(" ") == false)
+    }
+
+    /// The copy refuses a delete with no confirmed version unsent and with no code. It waited on nothing refused,
+    /// so it is its own row, worded as not sent, never as after an earlier change, even beside unrelated refusals.
+    @Test func aRefusalWithNoCodeAndNoRefusedDependencyStandsAlone() throws {
+        let server = Refusal(reason: "type_not_permitted", code: "type_not_permitted")
+        let reason = "the delete has no confirmed server version to remove; read the item before deleting it"
+        let report = Self.report([
+            Self.write("create", .refused(server), kind: .createItem, body: Self.task, at: "2026-10-06T08:00:00Z"),
+            Self.write("done", .accepted, kind: .updateItem, on: "other", at: "2026-10-06T08:30:00Z"),
+            Self.write("delete", .refused(Refusal(reason: reason)), kind: .deleteItem, on: "other", dependsOn: ["done"])
+        ])
+        #expect(report.problems.map(\.id) == [.write("create"), .write("delete")])
+        #expect(report.problems[0].dependents.isEmpty)
+        let delete = try #require(report.problems.last)
+        #expect(delete.reason?.unsent == .notSent(reason: reason))
+        #expect(delete.reason?.message == Words.unsent(.notSent(reason: reason)))
+        #expect(delete.actions == [.discard])
+        let wording = ProblemWording(delete) { _ in nil }
+        #expect(!wording.explanation.contains("earlier change"))
+    }
+
+    /// A write refused unsent with no code after a write it waited on was refused is that one's dependent.
+    @Test func aRefusalAfterARefusedDependencyIsFoldedUnderIt() throws {
+        let server = Refusal(reason: "type_not_permitted", code: "type_not_permitted")
+        let unsent = Refusal(reason: "the create_item it waits for was refused")
+        let report = Self.report([
+            Self.write("create", .refused(server), kind: .createItem, body: Self.task, at: "2026-10-06T08:00:00Z"),
+            Self.write("edit", .refused(unsent), body: ["properties": ["body": "More"]], dependsOn: ["create"])
+        ])
+        let entry = try #require(report.problems.first)
+        #expect(report.problems.count == 1)
+        #expect(entry.id == .write("create"))
+        #expect(entry.dependents == ["edit"])
+        #expect(MarfaProblems.waitsOnStopped(Self.write("edit", .refused(unsent), dependsOn: ["create"])) { id in
+            id == "create" ? Self.write("create", .refused(server)) : nil
+        })
+        // Read alone, as the queue shows it, it is worded after the refusal it went with.
+        let alone = MarfaProblems.entry(
+            for: Self.write("edit", .refused(unsent), dependsOn: ["create"]), type: nil, catalogue: Self.catalogue,
+            afterRefusal: true)
+        #expect(alone?.reason?.unsent == .afterRefusal)
+        #expect(alone?.reason?.message == Words.unsent(.afterRefusal))
+    }
+
+    /// A write the copy would not send for its own size also carries no code, but is refused for itself, so it is
+    /// shown on its own with its sizes even when it went with a refused write.
+    @Test func aWriteTooLargeToSendIsShownOnItsOwnWithItsSizes() throws {
+        let server = Refusal(reason: "type_not_permitted", code: "type_not_permitted")
+        let tooLarge = Refusal(
+            reason: "This write is 2,000,001 bytes as a request, and this server takes 2,000,000. Make it smaller to send it.",
+            requestLimit: RequestLimit(size: 2_000_001, limit: 2_000_000))
+        let report = Self.report([
+            Self.write("create", .refused(server), kind: .createItem, body: Self.task, at: "2026-10-06T08:00:00Z"),
+            Self.write("big", .refused(tooLarge), body: ["properties": ["body": "A very long note"]], dependsOn: ["create"])
+        ])
+        #expect(report.problems.map(\.id) == [.write("create"), .write("big")])
+        #expect(report.problems[0].dependents.isEmpty)
+        let big = report.problems[1]
+        #expect(big.reason?.unsent == .tooLarge(size: 2_000_001, limit: 2_000_000))
+        #expect(big.reason?.code == "over_request_limit")
+        #expect(big.copyText.contains("A very long note"))
+        #expect(big.actions == [.discard])
     }
 
     /// Each later write's values win, field by field, as the queue would have sent them.
@@ -275,8 +342,25 @@ struct UnsentTextsTests {
         #expect(MarfaProblems.unsentTexts([empty], catalogue: Self.catalogue).isEmpty)
     }
 
+    /// A store this version can't open is listed from its own words: every write by id, and the text of each create or
+    /// edit that carried any, in queue order, whatever kind or body this build can't read.
+    @Test func aStoreReadWithoutOpeningItListsEveryWriteAndTheTextItCan() {
+        let writes = [
+            UnsentWrite(id: "made", kind: "create_item", body: #"{"type":"core.note","properties":{"body":"Book the hotel"}}"#),
+            UnsentWrite(id: "edited", kind: "update_item", itemId: "item", body: #"{"properties":{"body":"Second thought"}}"#),
+            UnsentWrite(id: "old-kind", kind: "merge_metadata", body: #"{"properties":{"body":"Unknown"}}"#),
+            UnsentWrite(id: "garbled", kind: "update_item", body: "not json"),
+            UnsentWrite(id: "tagged", kind: "add_tag", body: #"{"tags":["x"]}"#)
+        ]
+        let unsent = MarfaProblems.unsentChanges(writes)
+        #expect(unsent.ids == ["made", "edited", "old-kind", "garbled", "tagged"])
+        #expect(unsent.texts.map(\.id) == ["made", "edited"])
+        #expect(unsent.texts.map(\.change) == [.create, .edit])
+        #expect(unsent.texts.map(\.content.plainText) == ["Book the hotel", "Second thought"])
+    }
+
     @Test func whatIsShownDoesNotChangeWhatTheyAgreedTo() {
-        #expect(UnsentWrites(ids: ["a"], texts: []) == UnsentWrites(ids: ["a"]))
-        #expect(UnsentWrites(ids: ["a"]) != UnsentWrites(ids: ["a", "b"]))
+        #expect(UnsentChanges(ids: ["a"], texts: []) == UnsentChanges(ids: ["a"]))
+        #expect(UnsentChanges(ids: ["a"]) != UnsentChanges(ids: ["a", "b"]))
     }
 }

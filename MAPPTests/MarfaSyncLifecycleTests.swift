@@ -134,7 +134,7 @@ struct MarfaSyncLifecycleTests {
     @Test func aCopyThatNeedsHydrationAgainAfterFollowingHydratesAgain() async throws {
         let refresh = ScriptedRefresh(status: ScriptedRefresh.complete())
         let (fake, source, _) = try await scriptedSource(refreshing: refresh)
-        let expired = MarfaError.copyExpired(reason: "read_view_changed", message: "the copy expired")
+        let expired = MarfaError.copyExpired(reason: "read_view_changed", message: "the copy expired", server: nil)
 
         fake.sendUpdate(update(.needsHydration(expired)))
         try #require(await eventually { refresh.hydrations == 1 })
@@ -149,7 +149,7 @@ struct MarfaSyncLifecycleTests {
     @Test func aHydrationIsCatchingUpBeforeThePackageReportsItsProgress() async throws {
         let refresh = ScriptedRefresh(status: ScriptedRefresh.complete(), holding: true)
         let (fake, source, _) = try await scriptedSource(refreshing: refresh)
-        let expired = MarfaError.copyExpired(reason: "reach_changed", message: "the copy expired")
+        let expired = MarfaError.copyExpired(reason: "reach_changed", message: "the copy expired", server: nil)
 
         fake.sendUpdate(update(.needsHydration(expired)))
         try #require(await eventually { refresh.hydrations == 1 })
@@ -212,7 +212,7 @@ struct MarfaSyncLifecycleTests {
     @Test func aFirstFillThatFailedOnAFaultIsNotFilledAgainByItself() async throws {
         let refresh = ScriptedRefresh(status: ScriptedRefresh.complete())
         let (fake, source, _) = try await scriptedSource(refreshing: refresh)
-        let refused = MarfaError.server(status: 400, code: "bad_request", message: "The server refused the fill.")
+        let refused = MarfaError.server(status: 400, code: "bad_request", message: "The server refused the fill.", details: nil, server: nil)
 
         fake.sendUpdate(update(.needsHydration(nil)))
         try #require(await eventually { refresh.hydrations == 1 })
@@ -322,7 +322,7 @@ struct MarfaSyncLifecycleTests {
     }
 
     @Test(arguments: [
-        MarfaError.unknownType(message: "No such type."),
+        MarfaError.unknownType(message: "No such type.", server: nil),
         MarfaError.invalid(message: "The request is invalid."),
     ])
     func aRefreshRefusedForTheAppsOwnRequestIsShownUnavailableAndToldOnce(_ error: MarfaError) async throws {
@@ -342,10 +342,10 @@ struct MarfaSyncLifecycleTests {
 
     @Test(arguments: [
         MarfaError.network(message: "offline"),
-        MarfaError.server(status: 503, code: "unavailable", message: "The server is busy."),
+        MarfaError.server(status: 503, code: "unavailable", message: "The server is busy.", details: nil, server: nil),
         MarfaError.canceled(message: "the call was canceled"),
         MarfaError.keyChanging(message: "The key is changing."),
-        MarfaError.copyExpired(reason: "read_view_changed", message: "The copy expired."),
+        MarfaError.copyExpired(reason: "read_view_changed", message: "The copy expired.", server: nil),
     ])
     func aDrainThePackageRetriesOrAnswersIsNotTold(_ error: MarfaError) async throws {
         let (_, source, log) = try await scriptedSource(refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()))

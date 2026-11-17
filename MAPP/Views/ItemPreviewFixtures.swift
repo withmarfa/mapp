@@ -59,7 +59,7 @@ enum ItemPreviewFixtures {
     private static var edges: [Marfa.Edge] {
         [ticketID, noteID].map { child in
             Marfa.Edge(
-                id: "edge-\(child.rawValue)", sourceId: projectID.rawValue, targetId: child.rawValue, edgeType: "parent-of",
+                id: "edge-\(child.rawValue)", fromId: projectID.rawValue, toId: child.rawValue, edgeType: "parent-of",
                 properties: [:], version: 1, createdAt: SampleLibrary.stamp(date), updatedAt: SampleLibrary.stamp(date))
         }
     }

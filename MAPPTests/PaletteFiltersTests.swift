@@ -22,7 +22,7 @@ struct PaletteFiltersTests {
         var item = FakeItemLibrary.note(title, modified: modified)
         item.type = TypeID(type)
         item.edgesOut = collections.map {
-            Edge(id: EdgeID(rawValue: UUID().uuidString), type: MarfaMapping.collectionEdge, source: item.id, target: .item($0), origin: .property("collections"))
+            Edge(id: EdgeID(rawValue: UUID().uuidString), type: MarfaMapping.collectionEdge, from: item.id, to: .item($0), origin: .property("collections"))
         }
         return item
     }
