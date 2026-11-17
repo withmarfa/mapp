@@ -1,6 +1,6 @@
 # MAPP
 
-MAPP is a native macOS markdown notes app with a sidebar, a list and a page, like Notes and Mail. It reads and writes a library only through a Marfa server, by the `marfa-swift` package's working copy, and names no item type of its own. The note editor is a web page built on Inkkit in a `WKWebView`. Concepts and agreed designs are in `docs/`; a directory's rules are in the `AGENTS.md` beside its code.
+MAPP is a macOS app for a Marfa server's items, with a sidebar, a list and a page, like Notes and Mail. It works only through the `marfa-swift` package's working copy, names no item type of its own, and holds no power another app lacks. The note editor is a web page built on Inkkit in a `WKWebView`. Concepts and agreed designs are in `docs/`; a directory's rules are in the `AGENTS.md` beside its code.
 
 ## Read before you change
 

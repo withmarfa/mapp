@@ -1,6 +1,6 @@
 # MAPP
 
-MAPP is a native macOS notes app for a Marfa server. Its editor is built on [Inkkit](https://github.com/aicayzer/inkkit).
+MAPP is a native macOS app for the items in a Marfa server. Its editor is built on [Inkkit](https://github.com/aicayzer/inkkit).
 
 ## Requirements
 
