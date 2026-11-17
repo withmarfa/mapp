@@ -48,6 +48,8 @@ nonisolated enum ViewDraft {
         case board(key: String?, label: String)
         /// Days by a date field, or none where the timeline has no field.
         case timeline(key: String?, label: String)
+        /// Items placed by their own dates, in no order and no groups of a view's.
+        case calendar
     }
 
     /// A choice of the window's that the view will not keep.
@@ -145,6 +147,8 @@ nonisolated enum ViewDraft {
             guard let key else { return (byTitle, nil, []) }
             guard isPropertyName(key) else { return (byTitle, nil, [.group(column: label)]) }
             return (byTitle, LibraryViewGroup(field: "properties." + key), [])
+        case .calendar:
+            return ([], nil, [])
         case .timeline(let key, let label):
             guard let key else { return ([], nil, []) }
             guard isPropertyName(key) else { return ([], nil, [.group(column: label)]) }

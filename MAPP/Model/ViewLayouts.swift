@@ -103,10 +103,13 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
     /// divider records at once and Save does not wait for. Opaque: SwiftUI exposes no way to read or write a
     /// width alone.
     var widths: Data?
+    /// Whether the calendar shows a week or a month. Nil is a week.
+    var calendarScale: CalendarScale?
 
     init(
         layout: ItemViewMode? = nil, columns: ViewColumns = ViewColumns(), hidesEmptyGroups: Bool = false,
-        cards: ViewCards = ViewCards(), density: Density? = nil, widths: Data? = nil
+        cards: ViewCards = ViewCards(), density: Density? = nil, widths: Data? = nil,
+        calendarScale: CalendarScale? = nil
     ) {
         self.layout = layout
         self.columns = columns
@@ -114,6 +117,7 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
         self.cards = cards
         self.density = density
         self.widths = widths
+        self.calendarScale = calendarScale
     }
 
     /// A field this version does not know, or one a later version adds, never voids the rest.
@@ -125,12 +129,13 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
         cards = (try? container.decodeIfPresent(ViewCards.self, forKey: .cards)) ?? ViewCards()
         density = try? container.decodeIfPresent(Density.self, forKey: .density)
         widths = try? container.decodeIfPresent(Data.self, forKey: .widths)
+        calendarScale = try? container.decodeIfPresent(CalendarScale.self, forKey: .calendarScale)
     }
 
     /// Whether the choices a Save keeps are the same, leaving the widths out, which are kept as they are dragged.
     func sameChoices(as other: ViewMacSettings) -> Bool {
         layout == other.layout && columns == other.columns && hidesEmptyGroups == other.hidesEmptyGroups
-            && cards == other.cards && density == other.density
+            && cards == other.cards && density == other.density && calendarScale == other.calendarScale
     }
 
     /// Takes the choices of another and keeps its own widths.
@@ -140,6 +145,7 @@ nonisolated struct ViewMacSettings: Codable, Hashable, Sendable {
         hidesEmptyGroups = other.hidesEmptyGroups
         cards = other.cards
         density = other.density
+        calendarScale = other.calendarScale
     }
 }
 

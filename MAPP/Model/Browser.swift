@@ -670,6 +670,8 @@ final class Browser {
         writingViews = []
         pendingViewWrites = []
         placeCards = [:]
+        placeCalendarScales = [:]
+        calendarDay = nil
         compactBoards = [:]
         timelineFields = [:]
         selection = []
@@ -792,6 +794,10 @@ final class Browser {
     /// What the gallery draws on each card in a place that is not a saved view, kept for this window only, as the
     /// window keeps that place's other choices (`Browser+SavedViews`).
     var placeCards: [SidebarItem: ViewCards] = [:]
+    /// The scale of each place's calendar that is not a saved view, for the life of the window (`calendarScale`).
+    var placeCalendarScales: [SidebarItem: CalendarScale] = [:]
+    /// A day in the week or month the calendar shows, or nil for the one that holds today. Kept for the window.
+    var calendarDay: Date?
 
     /// Counts the changes to the densities this Mac keeps for places, which a list reads to know its own changed
     /// (`Browser+SavedViews`).

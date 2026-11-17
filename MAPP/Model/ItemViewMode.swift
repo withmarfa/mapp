@@ -2,7 +2,7 @@ import Foundation
 
 /// The list keeps the page beside it; collection layouts span the window and open an item in their place.
 nonisolated enum ItemViewMode: String, Codable, CaseIterable {
-    case list, gallery, table, board, timeline
+    case list, gallery, table, board, timeline, calendar
 
     /// A stored layout this version does not have, such as one a window or a view kept under an earlier name, reads
     /// as the list, so the window opens instead of losing the rest of what it kept.
@@ -17,16 +17,17 @@ nonisolated enum ItemViewMode: String, Codable, CaseIterable {
         case .gallery: "square.grid.2x2"
         case .table: "tablecells"
         case .board: "rectangle.split.3x1"
-        case .timeline: "calendar"
+        case .timeline: "calendar.day.timeline.left"
+        case .calendar: "calendar"
         }
     }
 
-    /// The layouts that can show items of these types. Board needs a choice field and Timeline a date field to group
-    /// by; a place without one never offers that layout, instead of offering an empty one.
+    /// The layouts that can show items of these types. Board needs a choice field, and Timeline and Calendar a date field to place
+    /// items by; a place without one never offers that layout, instead of offering an empty one.
     static func available(forTypes types: Set<TypeID>, catalogue: Catalogue) -> [ItemViewMode] {
         var modes: [ItemViewMode] = [.list, .gallery, .table]
         if types.contains(where: { !ItemBoardLayout.eligibleFields(of: $0, catalogue: catalogue).isEmpty }) { modes.append(.board) }
-        if !ItemTimelineLayout.fields(forTypes: types, catalogue: catalogue).isEmpty { modes.append(.timeline) }
+        if !ItemTimelineLayout.fields(forTypes: types, catalogue: catalogue).isEmpty { modes += [.timeline, .calendar] }
         return modes
     }
 
@@ -41,6 +42,7 @@ nonisolated enum ItemViewMode: String, Codable, CaseIterable {
         case .table: "Back to Table"
         case .board: "Back to Board"
         case .timeline: "Back to Timeline"
+        case .calendar: "Back to Calendar"
         }
     }
 }
