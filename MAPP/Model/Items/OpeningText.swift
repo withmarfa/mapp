@@ -9,11 +9,19 @@ nonisolated enum OpeningText {
     private nonisolated(unsafe) static let bullet = /^(\s*)[-*+]\s+(.*)$/
     private nonisolated(unsafe) static let heading = /^\s{0,3}#{1,6}\s+(.*?)(\s+#+)?\s*$/
     private nonisolated(unsafe) static let quote = /^\s{0,3}>\s?(.*)$/
+    /// A link or picture a preview cut off before its address ended: `[words](https` or `![words](`.
+    private nonisolated(unsafe) static let cutAddress = /!?\[([^\]\n]*)\]\([^)\n]*$/
+    /// A link or picture a preview cut off inside its words: `[the revised ed`.
+    private nonisolated(unsafe) static let cutWords = /!?\[([^\]\n]*)$/
 
     /// The lines as plain reading text, one string a line, with the emphasis marks still in it.
     static func lines(from markdown: String) -> [String] {
         var out: [String] = []
-        for raw in markdown.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
+        // A preview is cut where its length ends, so only its end can hold a link whose address is unfinished: it
+        // shows the link's words, as the whole link would.
+        let whole = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacing(cutAddress) { String($0.1) }.replacing(cutWords) { String($0.1) }
+        for raw in whole.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
             let line = raw.trimmingCharacters(in: CharacterSet(charactersIn: "\r"))
             if line.wholeMatch(of: rule) != nil || line.trimmingCharacters(in: .whitespaces).hasPrefix("```") { continue }
             if line.contains("|"), line.wholeMatch(of: tableSeparator) != nil { continue }
@@ -49,6 +57,8 @@ nonisolated enum OpeningText {
             let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
             result += (try? AttributedString(markdown: line, options: options)) ?? AttributedString(line)
         }
+        // A link's words stay, but a card is for selecting and opening, so they are not a link to click.
+        result.link = nil
         return result
     }
 }

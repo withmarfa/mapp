@@ -64,6 +64,7 @@ struct GalleryCard: View, Equatable {
         VStack(alignment: .leading, spacing: 8) {
             if cards.preview == .none {
                 words
+                    .padding(.trailing, item.isFavorite ? 22 : 0)
                     .padding(10)
                     .frame(maxWidth: .infinity, alignment: .topLeading)
                     .background(Color(nsColor: .textBackgroundColor), in: .rect(cornerRadius: radius, style: .continuous))
@@ -202,7 +203,7 @@ private struct GalleryThumbnail: View {
             switch CardFace.fallback(preview: cards.preview, isFile: item.isFile, text: item.preview) {
             case .fileIcon:
                 if case .file(let type) = facts.kind { FileGlyph(type: type) }
-            case .text: OpeningLines(text: item.preview, unit: cards.size == .large ? 12.0 / 11 : 1)
+            case .text: OpeningLines(text: item.preview, unit: cards.size == .large ? 12.0 / 11 : 1, clearsStar: item.isFavorite)
             case .picture, .placeholder: QuietMark(icon: facts.icon)
             }
         }
@@ -229,12 +230,15 @@ private struct GalleryRing: View {
 private struct OpeningLines: View {
     let text: String
     let unit: CGFloat
+    /// Whether the favorite's star sits on the corner, so the first line stops short of it.
+    let clearsStar: Bool
 
     var body: some View {
         Text(OpeningText.attributed(from: text))
             .font(.system(size: 11 * unit))
             .foregroundStyle(.secondary)
             .lineSpacing(2 * unit)
+            .padding(.trailing, clearsStar ? 20 * unit : 0)
             .padding(12 * unit)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .mask {

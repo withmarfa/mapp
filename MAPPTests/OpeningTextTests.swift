@@ -53,4 +53,17 @@ struct OpeningTextTests {
     @Test func plainTextAndAnUnclosedMarkAreKept() {
         #expect(OpeningText.lines(from: "Notes as I read.\n*half") == ["Notes as I read.", "*half"])
     }
+
+    @Test func aLinkCutBeforeItsAddressEndsShowsItsWords() {
+        #expect(OpeningText.lines(from: "See [the revised edition](https") == ["See the revised edition"])
+        #expect(OpeningText.lines(from: "One\n\nSee ![a chart](") == ["One", "", "See a chart"])
+        #expect(OpeningText.lines(from: "See [the revised ed") == ["See the revised ed"])
+        #expect(OpeningText.lines(from: "[a](b) and [the second](htt\n") == ["[a](b) and the second"])
+    }
+
+    @Test func aWholeLinkShowsItsWordsAndIsNotALink() {
+        let text = OpeningText.attributed(from: "Read [the edition](https://example.com/a) now")
+        #expect(text.text == "Read the edition now")
+        #expect(!text.runs.contains { $0.link != nil })
+    }
 }
