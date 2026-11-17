@@ -37,16 +37,16 @@ extension MarfaEngine {
                 var ends: Set<String> = []
                 switch write {
                 case .unlink(let edgeID):
-                    if let edge = edges[edgeID.rawValue] { ends = [edge.sourceId, edge.targetId] }
+                    if let edge = edges[edgeID.rawValue] { ends = [edge.fromId, edge.toId] }
                 case .moveEdge(let edgeID, _, let to):
                     ends = [to.rawValue]
-                    if let edge = edges[edgeID.rawValue] { ends.formUnion([edge.sourceId, edge.targetId]) }
+                    if let edge = edges[edgeID.rawValue] { ends.formUnion([edge.fromId, edge.toId]) }
                 default: break
                 }
                 let queued = try await Self.asking { try await queue(write) }
                 record(id, queued)
                 if case .moveEdge = write { for written in queued { movedEnds[written.id] = ends } }
-                touched = ends.union(queued.flatMap { [$0.itemId, $0.targetId].compactMap(\.self) })
+                touched = ends.union(queued.flatMap { [$0.itemId, $0.toId].compactMap(\.self) })
             }
             await reread(touched)
             hub.publish(.taken(id))
@@ -88,8 +88,8 @@ extension MarfaEngine {
     /// before queueing it; `code()` names only the kind of error, such as `forbidden` for `type_not_permitted`.
     nonisolated static func refusalCode(of error: MarfaError) -> String {
         switch error {
-        case .notFound(let code, _), .unauthorized(let code, _), .forbidden(let code, _), .validation(let code, _, _),
-            .rateLimited(let code, _, _), .server(_, let code, _):
+        case .notFound(let code, _, _), .unauthorized(let code, _, _), .forbidden(let code, _, _),
+            .validation(let code, _, _, _), .rateLimited(let code, _, _, _), .server(_, let code, _, _, _):
             code
         default:
             error.code()
@@ -99,7 +99,7 @@ extension MarfaEngine {
     /// What the package refuses a move for before it queues anything, in the person's words: a self-loop, or a
     /// type whose end that stays can hold more than one edge. Anything else is the package's own.
     nonisolated static func moveProblem(_ error: MarfaError) -> SyncProblem? {
-        guard case .validation(let code, _, _) = error else { return nil }
+        guard case .validation(let code, _, _, _) = error else { return nil }
         switch code {
         case "edge_cycle":
             return SyncProblem(code: code, message: String(localized: "An item can’t be linked to itself."))
@@ -175,9 +175,9 @@ extension MarfaEngine {
             return [try await copy.edges.delete(edgeID.rawValue)]
         case .moveEdge(let edgeID, let end, let to):
             guard let edge = edges[edgeID.rawValue] else {
-                throw MarfaError.notFound(code: "edge_not_found", message: String(localized: "This link isn’t in the library."))
+                throw MarfaError.notFound(code: "edge_not_found", message: String(localized: "This link isn’t in the library."), server: nil)
             }
-            let move: EdgeEdit.Move = end == .source ? .source(to.rawValue) : .target(to.rawValue)
+            let move: EdgeEdit.Move = end == .source ? .from(to.rawValue) : .to(to.rawValue)
             do {
                 // The copy's own version of the edge, since the move is refused on any other; an edge it shows
                 // moved by a move still waiting is read from its new ends.
@@ -238,15 +238,15 @@ extension MarfaEngine {
     }
 
     private func heldEdge(_ edge: Marfa.Edge) async throws -> Marfa.Edge {
-        if let held = try await copy.edges.from(edge.sourceId).first(where: { $0.id == edge.id }) { return held }
-        if let held = try await copy.edges.to(edge.targetId).first(where: { $0.id == edge.id }) { return held }
+        if let held = try await copy.edges.from(edge.fromId).first(where: { $0.id == edge.id }) { return held }
+        if let held = try await copy.edges.to(edge.toId).first(where: { $0.id == edge.id }) { return held }
         if let held = try await copy.edges.ofType(edge.edgeType).first(where: { $0.id == edge.id }) { return held }
-        throw MarfaError.notFound(code: "edge_not_found", message: String(localized: "This link isn’t in the library."))
+        throw MarfaError.notFound(code: "edge_not_found", message: String(localized: "This link isn’t in the library."), server: nil)
     }
 
     private func itemType(of id: ItemID) throws -> TypeID {
         guard let row = rows[id.rawValue] else {
-            throw MarfaError.notFound(code: "item_not_found", message: String(localized: "This item isn’t in the library."))
+            throw MarfaError.notFound(code: "item_not_found", message: String(localized: "This item isn’t in the library."), server: nil)
         }
         return TypeID(row.type)
     }

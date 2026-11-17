@@ -188,12 +188,12 @@ extension MarfaEngine {
         }
         var changedEdges: [(before: Marfa.Edge?, after: Marfa.Edge?)] = []
         for edge in edges where previousEdges[edge.id] != edge {
-            touched.formUnion([edge.sourceId, edge.targetId])
-            if let old = previousEdges[edge.id] { touched.formUnion([old.sourceId, old.targetId]) }
+            touched.formUnion([edge.fromId, edge.toId])
+            if let old = previousEdges[edge.id] { touched.formUnion([old.fromId, old.toId]) }
             changedEdges.append((previousEdges[edge.id], edge))
         }
         for edge in previousEdges.all where self.edges[edge.id] == nil {
-            touched.formUnion([edge.sourceId, edge.targetId])
+            touched.formUnion([edge.fromId, edge.toId])
             changedEdges.append((edge, nil))
         }
         for (before, after) in changedEdges {
@@ -204,7 +204,7 @@ extension MarfaEngine {
         }
         for id in gone.union(rows.keys.filter { previousRows[$0] == nil }) {
             for edge in previousEdges.edges(touching: id) + self.edges.edges(touching: id) {
-                touched.formUnion([edge.sourceId, edge.targetId])
+                touched.formUnion([edge.fromId, edge.toId])
             }
         }
         let relinked = everything ? [] : linkers(

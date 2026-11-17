@@ -190,13 +190,14 @@ nonisolated enum MarfaProblems {
     /// write the server answers the same way however often it is sent is withdrawn rather than sent again.
     /// A write set aside `failing_alone` met failures that were no answer to it, so it may still be sent again, and
     /// the person may instead withdraw it. A write blocked `instanceChanged` was made for an instance that no longer
-    /// answers at the address, and the package takes it back by `withdraw` as well.
+    /// answers at the address, and the package takes it back by `withdraw` as well. A write blocked `recordUnread` came from a
+    /// damaged store that could not say how it is sent, so it too is sent only when the person says so.
     static func actions(for kind: SyncProblemEntry.Kind) -> [SyncAction] {
         switch kind {
         case .refused: [.discard]
         case .blocked(.credentialRefused): []
         case .blocked(.keySpent), .dead: [.tryAgain]
-        case .blocked(.failingAlone), .blocked(.instanceChanged): [.tryAgain, .withdraw]
+        case .blocked(.failingAlone), .blocked(.instanceChanged), .blocked(.recordUnread): [.tryAgain, .withdraw]
         case .blocked(.ancestorUnavailable), .blocked(.conflictUnresolved): [.withdraw]
         case .conflicted: [.keep, .discard]
         }
@@ -213,7 +214,7 @@ nonisolated enum MarfaProblems {
         case .removeTag: .untag
         case .createEdge, .updateEdge: .link
         case .deleteEdge: .unlink
-        case .replaceMetadata, .writeExtension, .deleteExtension, .uploadBlob: .other
+        case .replaceTags, .writeExtension, .deleteExtension, .uploadBlob, .writeRows, .undoRows: .other
         }
     }
 

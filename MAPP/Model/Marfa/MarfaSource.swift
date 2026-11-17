@@ -178,7 +178,8 @@ nonisolated final class MarfaSource: ItemSource {
             // It reads the server, so it runs beside the engine rather than holding up the writes behind it; the
             // copy announces the withdrawal, which the engine reads again.
             do {
-                return try await MarfaEngine.asking { try await copy.queue.withdraw(id) }
+                // An empty answer means nothing was taken, as when the write was no longer withdrawable.
+                return try await !MarfaEngine.asking { try await copy.queue.withdraw(id) }.isEmpty
             } catch let error as MarfaError {
                 throw SourceFailure(kind: .failed, message: error.message)
             }
@@ -228,7 +229,7 @@ nonisolated final class MarfaSource: ItemSource {
     }
 
     func edgeVerdict(moving edge: EdgeID, end: EdgeTypeInfo.End, to: ItemID) async -> EdgeVerdict {
-        let move: EdgeEdit.Move = end == .source ? .source(to.rawValue) : .target(to.rawValue)
+        let move: EdgeEdit.Move = end == .source ? .from(to.rawValue) : .to(to.rawValue)
         return await verdict { try await copy.edges.check(edge.rawValue, moving: move) }
     }
 
@@ -249,11 +250,11 @@ nonisolated final class MarfaSource: ItemSource {
     /// The core's refusal in the person's words where MAPP can say more than the core does: an end that already holds the
     /// one link of its type is named, as is a link made twice. Any other refusal is the core's own.
     private func refusal(_ error: MarfaError) async -> String {
-        guard case .validation("edge_constraint_violation", _, let details) = error else { return error.message }
+        guard case .validation("edge_constraint_violation", _, let details, _) = error else { return error.message }
         switch details?.object?["constraint"]?.string {
         case "cardinality":
             let object = details?.object
-            let full = (object?["target_id"] ?? object?["source_id"])?.string
+            let full = (object?["to_id"] ?? object?["from_id"])?.string
             var title: String?
             if let full { title = try? await row(ItemID(full)).title }
             let name = title.flatMap { $0.isEmpty ? nil : $0 } ?? String(localized: "Untitled")

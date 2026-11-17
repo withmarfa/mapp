@@ -1,10 +1,12 @@
 import Foundation
 import Marfa
+import MarfaAPI
 
 /// The calls that ask the Marfa server itself instead of the working copy: an item's snapshots (Version History),
 /// the server's own settings (This Marfa), the owner's icon for a type and the names, marks and counts of sources.
-/// They need a connection, so they fail while the server cannot be reached. Every call goes through the package's `Server`, with the address and the sign-in read
-/// from the Keychain on each call, so a sign-in the person has since made again is the one used. `Server` calls go over
+/// They need a connection, so they fail while the server cannot be reached. Every call goes through the package's `Server`
+/// (This Marfa's through the generated `Client` made from it), with the address and the sign-in read
+/// from the Keychain on each call, so a sign-in the person has since made again is the one used. Both go over
 /// `URLSession`, so App Transport Security applies to a plain http address, unlike the copy, which goes through the
 /// package's core.
 nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, TypeIconSource, SourceNameSource {
@@ -42,15 +44,10 @@ nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, Ty
         switch error {
         case .forbidden: return .notPermitted
         case .notFound: return .notFound(error.message)
-        case .validation(_, let message, _): return .refused(reason(message))
+        case .validation(_, let message, _, _): return .refused(message)
         case .instanceChanged: return .instanceChanged(error.message)
         default: return .failed(error.message)
         }
-    }
-
-    /// The server's sentence without the raw details the client appends to it.
-    static func reason(_ message: String) -> String {
-        message.components(separatedBy: " Details:").first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? message
     }
 
     // MARK: Version History (`GET /items/{id}/versions`)
@@ -104,7 +101,7 @@ nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, Ty
 
     @concurrent func read() async throws(InstanceConfigFailure) -> InstanceConfig {
         do {
-            return Self.config(try await server().config(timeout: timeout))
+            return Self.config(try await Client(server(), timeout: timeout).getConfig().ok.body.json)
         } catch let ending as Ending {
             throw Self.configFailure(ending)
         } catch {
@@ -114,7 +111,10 @@ nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, Ty
 
     @concurrent func update(_ patch: InstanceConfigPatch, expecting instanceID: String?) async throws(InstanceConfigFailure) -> InstanceConfig {
         do {
-            return Self.config(try await server().updateConfig(Self.patch(patch), expecting: instanceID, timeout: timeout))
+            let body = Self.patch(patch)
+            let headers = Operations.UpdateConfig.Input.Headers(xMarfaInstanceId: instanceID)
+            return Self.config(
+                try await Client(server(), timeout: timeout).updateConfig(headers: headers, body: .json(body)).ok.body.json)
         } catch let ending as Ending {
             throw Self.configFailure(ending)
         } catch {
@@ -133,9 +133,9 @@ nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, Ty
         }
     }
 
-    static func config(_ answer: Marfa.InstanceConfig) -> InstanceConfig {
+    static func config(_ answer: Components.Schemas.InstanceConfig) -> InstanceConfig {
         var config = InstanceConfig()
-        config.instanceID = answer.instanceID
+        config.instanceID = answer.instanceId
         config.values[.name] = answer.name.map { .text($0) }
         config.values[.trashRetentionDays] = answer.trashRetentionDays.map { .number($0) }
         config.values[.versionRecentDays] = answer.versionRecentDays.map { .number($0) }
@@ -146,17 +146,17 @@ nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, Ty
     }
 
     /// A change that names only the settings in `patch`: a field left out stays as it is, and a cleared one is removed.
-    static func patch(_ patch: InstanceConfigPatch) -> Marfa.InstanceConfigPatch {
-        func number(_ setting: InstanceSetting) -> SettingChange<Int>? {
-            if patch.clear.contains(setting) { return .clear }
-            if case .number(let number)? = patch.values[setting] { return .set(number) }
+    static func patch(_ patch: InstanceConfigPatch) -> Operations.UpdateConfig.Input.Body.JsonPayload {
+        func number(_ setting: InstanceSetting) -> MarfaNullable<Int>? {
+            if patch.clear.contains(setting) { return .null }
+            if case .number(let number)? = patch.values[setting] { return .value(number) }
             return nil
         }
-        var change = Marfa.InstanceConfigPatch()
+        var change = Operations.UpdateConfig.Input.Body.JsonPayload()
         if patch.clear.contains(.name) {
-            change.name = .clear
+            change.name = .null
         } else if case .text(let text)? = patch.values[.name] {
-            change.name = .set(text)
+            change.name = .value(text)
         }
         change.trashRetentionDays = number(.trashRetentionDays)
         change.versionRecentDays = number(.versionRecentDays)

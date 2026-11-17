@@ -20,14 +20,14 @@ nonisolated struct MarfaEdgeTable: Sendable {
     mutating func insert(_ edge: Marfa.Edge) {
         _ = remove(edge.id)
         byID[edge.id] = edge
-        byItem[edge.sourceId, default: []].insert(edge.id)
-        byItem[edge.targetId, default: []].insert(edge.id)
+        byItem[edge.fromId, default: []].insert(edge.id)
+        byItem[edge.toId, default: []].insert(edge.id)
     }
 
     @discardableResult
     mutating func remove(_ id: String) -> Marfa.Edge? {
         guard let edge = byID.removeValue(forKey: id) else { return nil }
-        for end in [edge.sourceId, edge.targetId] {
+        for end in [edge.fromId, edge.toId] {
             byItem[end]?.remove(id)
             if byItem[end]?.isEmpty == true { byItem[end] = nil }
         }

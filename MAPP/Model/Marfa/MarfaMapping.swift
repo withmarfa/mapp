@@ -265,15 +265,15 @@ nonisolated enum MarfaMapping {
         // Cardinality is given from source to target; the end that writes the edge holds as many as the other
         // side of it allows.
         let ends = type.cardinality.split(separator: "-to-").map(String.init)
-        let held = type.writtenAt == .target ? ends.first : ends.last
-        let other = type.writtenAt == .target ? ends.last : ends.first
+        let held = type.writtenFrom == .to ? ends.first : ends.last
+        let other = type.writtenFrom == .to ? ends.last : ends.first
         return EdgeTypeInfo(
             id: type.id, label: type.label, reverseLabel: type.reverseLabel, reverseName: type.reverseName,
-            cardinality: held == "one" ? .one : .many, writtenAt: type.writtenAt == .target ? .target : .source,
-            sourceTypes: constraints(type.sourceTypeConstraints).types,
-            targetTypes: constraints(type.targetTypeConstraints).types,
-            sourceRoles: constraints(type.sourceTypeConstraints).roles,
-            targetRoles: constraints(type.targetTypeConstraints).roles,
+            cardinality: held == "one" ? .one : .many, writtenAt: type.writtenFrom == .to ? .target : .source,
+            sourceTypes: constraints(type.fromTypeConstraints).types,
+            targetTypes: constraints(type.toTypeConstraints).types,
+            sourceRoles: constraints(type.fromTypeConstraints).roles,
+            targetRoles: constraints(type.toTypeConstraints).roles,
             description: type.description, reverseCardinality: other == "one" ? .one : .many,
             cascadeOnDelete: cascade(type.cascadeOnDelete), properties: type.properties.map { field($0) }, flat: type.flat)
     }
@@ -419,8 +419,8 @@ nonisolated enum MarfaMapping {
         edges.compactMap { edge in
             let info = catalogue.edgeTypes[edge.edgeType]
             let atTarget = info?.writtenAt == .target
-            guard (atTarget ? edge.targetId : edge.sourceId) == id else { return nil }
-            let other = atTarget ? edge.sourceId : edge.targetId
+            guard (atTarget ? edge.toId : edge.fromId) == id else { return nil }
+            let other = atTarget ? edge.fromId : edge.toId
             guard isHeld(other) else { return nil }
             let name = atTarget ? info?.reverseName ?? edge.edgeType : edge.edgeType
             return Edge(
@@ -559,7 +559,8 @@ nonisolated enum MarfaMapping {
         switch verdict {
         case .accepted: .accepted
         case .merged(let fields): .merged(fields: fields)
-        case .conflicted(let sibling, let fields): .conflicted(sibling: ItemID(sibling), fields: fields)
+        case .conflicted(let sibling?, let fields, _): .conflicted(sibling: ItemID(sibling), fields: fields)
+        case .conflicted(nil, let fields, _): .merged(fields: fields)
         case .refused(let refusal): .refused(problem(refusal))
         case .blocked(let reason, let refusal): .blocked(blockedReason(reason), refusal.map(problem))
         case .dead: .dead
@@ -591,6 +592,7 @@ nonisolated enum MarfaMapping {
         case .conflictUnresolved: .conflictUnresolved
         case .failingAlone: .failingAlone
         case .instanceChanged: .instanceChanged
+        case .recordUnread: .recordUnread
         }
     }
 

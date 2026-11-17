@@ -175,7 +175,7 @@ nonisolated enum SampleLibrary {
     static let edgeTypes: [Marfa.EdgeType] = [
         EdgeType(
             id: "parent-of", label: "Children", reverseLabel: "Parent", description: "Files one item under another.",
-            cardinality: "one-to-many", reverseName: "child-of", writtenAt: .target, cascadeOnDelete: "cascade",
+            cardinality: "one-to-many", reverseName: "child-of", writtenFrom: .to, cascadeOnDelete: "cascade",
             shipped: true, acyclic: true),
         EdgeType(id: "about", label: "About", reverseLabel: "Subject of", cardinality: "many-to-many", shipped: true),
         EdgeType(id: "references", label: "References", reverseLabel: "Referenced by", cardinality: "many-to-many", shipped: true),
@@ -186,8 +186,8 @@ nonisolated enum SampleLibrary {
             shipped: true),
         EdgeType(
             id: "in-collection", label: "In collection", reverseLabel: "Contents",
-            description: "Source item is a member of the target container.", cardinality: "many-to-many",
-            targetTypeConstraints: ["role:container"],
+            description: "An item is a member of the container.", cardinality: "many-to-many",
+            toTypeConstraints: ["role:container"],
             properties: [TypeField(name: "position", type: "number", description: "Ordering within the collection (1-based).", declaredBy: "in-collection")],
             shipped: true, flat: true),
     ]
@@ -329,7 +329,7 @@ nonisolated enum SampleLibrary {
         collections.flatMap { collection in
             collection.members.enumerated().map { index, member in
                 Marfa.Edge(
-                    id: "\(collection.id)-\(member)", sourceId: member, targetId: collection.id, edgeType: "in-collection",
+                    id: "\(collection.id)-\(member)", fromId: member, toId: collection.id, edgeType: "in-collection",
                     properties: collection.positioned ? ["position": .number(Double(index + 1))] : [:], version: 1,
                     createdAt: stamp(now), updatedAt: stamp(now))
             }

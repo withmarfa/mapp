@@ -48,7 +48,7 @@ nonisolated struct Property: Identifiable, Hashable, Sendable {
 // Not `Tag`, which would shadow Testing.Tag.
 nonisolated enum ItemTag {
     static let favorite = "favorite"
-    /// What Marfa allows a tag, in UTF-16 code units, and how many an item holds (`items/tag-text`, `items/tags-count`).
+    /// What Marfa allows a tag, in Unicode characters, and how many an item holds (`items/tag-text`, `items/tags-count`).
     static let maxLength = 128
     static let maxPerItem = 100
 
@@ -82,7 +82,7 @@ nonisolated enum ItemTag {
     /// The refusal the rules of a tag's text give, before any item is looked at.
     static func refusal(of tag: String) -> Refusal? {
         if tag.isEmpty { return .empty }
-        if tag.utf16.count > maxLength { return .tooLong }
+        if tag.unicodeScalars.count > maxLength { return .tooLong }
         if tag == "." || tag == ".." { return .dotSegment }
         return nil
     }

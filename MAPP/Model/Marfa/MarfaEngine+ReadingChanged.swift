@@ -112,7 +112,7 @@ extension MarfaEngine {
 
         // Taken before the edges change, as the edges after are taken once they have.
         var ends = came.union(gone).union(moved).reduce(into: Set<String>()) { ends, id in
-            for edge in edges.edges(touching: id) { ends.formUnion([edge.sourceId, edge.targetId]) }
+            for edge in edges.edges(touching: id) { ends.formUnion([edge.fromId, edge.toId]) }
         }
         var hosts = Self.hosts(of: moved, in: edges)
         for row in present {
@@ -124,14 +124,14 @@ extension MarfaEngine {
             if rows.removeValue(forKey: id) != nil { bodyLinks[id] = nil }
         }
         for id in named.edges + named.removedEdges {
-            if let edge = edges.remove(id) { affected.formUnion([edge.sourceId, edge.targetId]) }
+            if let edge = edges.remove(id) { affected.formUnion([edge.fromId, edge.toId]) }
         }
         for edge in kept {
             edges.insert(edge)
-            affected.formUnion([edge.sourceId, edge.targetId])
+            affected.formUnion([edge.fromId, edge.toId])
         }
         for id in came.union(gone).union(moved) {
-            for edge in edges.edges(touching: id) { ends.formUnion([edge.sourceId, edge.targetId]) }
+            for edge in edges.edges(touching: id) { ends.formUnion([edge.fromId, edge.toId]) }
         }
         hosts.formUnion(Self.hosts(of: moved, in: edges))
         affected.formUnion(ends)
@@ -165,14 +165,14 @@ extension MarfaEngine {
 
     /// The placements of `id` among `edges`, in a fixed order.
     nonisolated static func placements(of id: String, in edges: [Marfa.Edge]) -> [Marfa.Edge] {
-        edges.filter { $0.edgeType == MarfaMapping.placementEdge && $0.sourceId == id }.sorted { $0.id < $1.id }
+        edges.filter { $0.edgeType == MarfaMapping.placementEdge && $0.fromId == id }.sorted { $0.id < $1.id }
     }
 
     /// The row whose placement an edge's change moved, which the package names by its placement's file name.
     nonisolated static func placed(_ before: Marfa.Edge?, _ after: Marfa.Edge?) -> Set<String> {
         guard before != after else { return [] }
         return Set([before, after].compactMap { edge in
-            edge.flatMap { $0.edgeType == MarfaMapping.placementEdge ? $0.sourceId : nil }
+            edge.flatMap { $0.edgeType == MarfaMapping.placementEdge ? $0.fromId : nil }
         })
     }
 
@@ -182,8 +182,8 @@ extension MarfaEngine {
         ids.reduce(into: []) { hosts, id in
             for edge in edges.edges(touching: id) {
                 switch edge.edgeType {
-                case MarfaMapping.bodyLinkEdge where edge.targetId == id: hosts.insert(edge.sourceId)
-                case MarfaMapping.attachmentEdge where edge.sourceId == id: hosts.insert(edge.targetId)
+                case MarfaMapping.bodyLinkEdge where edge.toId == id: hosts.insert(edge.fromId)
+                case MarfaMapping.attachmentEdge where edge.fromId == id: hosts.insert(edge.toId)
                 default: continue
                 }
             }
@@ -288,13 +288,13 @@ extension MarfaEngine {
             rows[id] = row
             if row == nil { bodyLinks[id] = nil }
             for edgeID in edges.ids(touching: id) {
-                if let edge = remove(edgeID) { affected.formUnion([edge.sourceId, edge.targetId]) }
+                if let edge = remove(edgeID) { affected.formUnion([edge.fromId, edge.toId]) }
             }
         }
         for (_, _, held) in read {
             for edge in held {
                 insert(edge)
-                affected.formUnion([edge.sourceId, edge.targetId])
+                affected.formUnion([edge.fromId, edge.toId])
             }
         }
         hosts.formUnion(Self.hosts(of: moved, in: edges))
