@@ -141,23 +141,20 @@ private struct CalendarWeekView: View {
     private static let margin: CGFloat = 56
     /// The hour the day opens scrolled to, a little above the working day's first hour.
     private static let workday = 8
+    @State private var position = ScrollPosition()
 
     var body: some View {
         VStack(spacing: 0) {
             header
             allDay
-            ScrollViewReader { proxy in
-                ScrollView {
-                    grid.id("grid")
-                        .overlay(alignment: .topLeading) {
-                            Color.clear.frame(width: 1, height: 1)
-                                .offset(y: CGFloat(Self.workday) * Self.hourHeight - 12)
-                                .id("workday")
-                        }
-                }
+            ScrollView { grid }
+                .scrollPosition($position)
                 .scrollBounceBehavior(.basedOnSize)
-                .onAppear { proxy.scrollTo("workday", anchor: .top) }
-            }
+                .task {
+                    // The grid has no size on the first pass, so scroll once it has been laid out.
+                    try? await Task.sleep(for: .milliseconds(100))
+                    position.scrollTo(y: CGFloat(Self.workday) * Self.hourHeight - 12)
+                }
         }
         .accessibilityLabel("Week")
     }

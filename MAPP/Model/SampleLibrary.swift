@@ -114,6 +114,8 @@ nonisolated enum SampleLibrary {
                 TypeField(name: "title", type: "string", required: true, declaredBy: "core.event"),
                 TypeField(name: "body", type: "string", declaredBy: "core.event"),
                 TypeField(name: "starts_at", type: "datetime", declaredBy: "core.event"),
+                TypeField(name: "ends_at", type: "datetime", declaredBy: "core.event"),
+                TypeField(name: "all_day", type: "boolean", declaredBy: "core.event"),
                 TypeField(
                     name: "attendees", type: "array", declaredBy: "core.event",
                     definition: ["items_type": "object", "items_fields": [
@@ -310,8 +312,8 @@ nonisolated enum SampleLibrary {
             if span.allDays > 0 {
                 properties["starts_at"] = .string(ItemDate.day(first, calendar: calendar))
                 properties["all_day"] = true
-                let last = calendar.date(byAdding: .day, value: span.allDays - 1, to: first) ?? first
-                properties["ends_at"] = .string(ItemDate.day(last, calendar: calendar))
+                let after = calendar.date(byAdding: .day, value: span.allDays, to: first) ?? first
+                properties["ends_at"] = .string(ItemDate.day(after, calendar: calendar))
             } else {
                 let start = calendar.date(bySettingHour: span.hour, minute: span.minute, second: 0, of: first) ?? first
                 properties["starts_at"] = .string(stamp(start))
