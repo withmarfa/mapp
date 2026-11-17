@@ -6,7 +6,7 @@ struct PaletteEntry: Identifiable {
     let title: String
     /// The type's name for an item, at the row's right.
     var detail: String?
-    /// The words a search shows under the title where it has no excerpt.
+    /// The words a search shows under the title where it has no excerpt: the item's text, or its type and collections.
     var snippet: String?
     /// The words around what a search found.
     var excerpt: SearchExcerpt?
@@ -42,12 +42,12 @@ enum PaletteMetrics {
 enum PaletteBar {
     static let inset: CGFloat = 10
     static let spacing: CGFloat = 8
-    /// The label size of the bar's buttons, a point larger than a large control's.
+    /// The label size of the bar's controls, a point larger than a large control's.
     static let fontSize: CGFloat = 14
-    /// A bar button's label height, a point taller than a large control's.
-    static let labelHeight: CGFloat = 19
-    /// The bar's height: what the large glass style pads a label of `labelHeight` out to, as measured on screen.
-    static let height: CGFloat = labelHeight + 12
+    /// The bar's height: a large glass button's, for a label a point larger than a large control's.
+    static let height: CGFloat = 31
+    /// How far a segment's fill, or the filter button's, sits inside its capsule.
+    static let fillInset: CGFloat = 3
     static let grow = Animation.snappy(duration: 0.18)
 }
 
@@ -89,13 +89,14 @@ struct PaletteRow: View {
     let entry: PaletteEntry
     let query: String
     let isHighlighted: Bool
-    /// Search Notes shows two lines: the title, then the words around the match.
+    /// Search Notes shows two lines on every row, so its rows are all one height: the title, then the words around the
+    /// match or the item's own words. The command palette's rows, commands among them, all take one line.
     let isSearch: Bool
     let onHover: () -> Void
     let onRun: () -> Void
 
     var body: some View {
-        let words = isSearch ? (entry.excerpt?.attributed() ?? entry.snippet.map { AttributedString($0) }) : nil
+        let words = isSearch ? (entry.excerpt?.attributed() ?? AttributedString(entry.snippet ?? " ")) : nil
         // A row with a second line keeps its mark and date on the title's line, as a one-line row has them.
         HStack(alignment: words == nil ? .center : .firstTextBaseline, spacing: PaletteMetrics.markGap) {
             PaletteMark(icon: entry.icon)
@@ -142,38 +143,40 @@ struct PaletteRow: View {
     }
 }
 
-/// A key of a shortcut, drawn as a small outlined cap.
+/// A key of a shortcut, drawn as MAPP draws key caps outside menus: one glyph in its own small outlined cap, with no
+/// fill, the glyph a touch lighter than secondary text.
 struct KeyCap: View {
     let key: String
 
     var body: some View {
         Text(key)
             .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Color.primary.opacity(0.42))
             .padding(.horizontal, 3)
-            .frame(minWidth: 16, minHeight: 16)
+            .frame(minWidth: 16)
+            .frame(height: 16)
             .overlay {
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .strokeBorder(.secondary.opacity(0.6), lineWidth: 1)
+                    .strokeBorder(Color.primary.opacity(0.2), lineWidth: 1)
             }
             .accessibilityHidden(true)
     }
 }
 
-/// Open and Actions, glass buttons of the bar's height at the bottom right of the results, each with its keys.
+/// Open and Actions as one glass capsule of the bar's height with two segments, as the toolbar groups its buttons:
+/// pointing at a segment fills only that segment.
 struct PaletteFooter: View {
     let openTitle: String
     let onOpen: () -> Void
     let onActions: () -> Void
 
     var body: some View {
-        HStack(spacing: PaletteBar.spacing) {
+        HStack(spacing: 0) {
             Button(action: onOpen) {
                 HStack(spacing: 6) {
                     Text(openTitle)
                     KeyCap(key: "↩")
                 }
-                .frame(minHeight: PaletteBar.labelHeight)
             }
             .accessibilityIdentifier("CommandPaletteOpen")
             Button(action: onActions) {
@@ -184,19 +187,40 @@ struct PaletteFooter: View {
                         KeyCap(key: "K")
                     }
                 }
-                .frame(minHeight: PaletteBar.labelHeight)
             }
             .accessibilityIdentifier("CommandPaletteActions")
         }
+        .buttonStyle(PaletteSegmentStyle())
         .font(.system(size: PaletteBar.fontSize))
-        .buttonStyle(.glass)
-        .controlSize(.large)
+        .padding(PaletteBar.fillInset)
         .frame(height: PaletteBar.height)
+        .glassEffect(.regular, in: .capsule)
     }
 }
 
-/// The glass button at the bar's left in Search Notes that shows and hides the filter row, with the number of
-/// filters set beside its symbol.
+/// A segment of the bar's capsule: a soft fill while the pointer is over it, and a deeper one while it is pressed.
+private struct PaletteSegmentStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Segment(configuration: configuration)
+    }
+
+    private struct Segment: View {
+        let configuration: Configuration
+        @State private var isHovered = false
+
+        var body: some View {
+            configuration.label
+                .padding(.horizontal, 10)
+                .frame(maxHeight: .infinity)
+                .background(.primary.opacity(configuration.isPressed ? 0.16 : isHovered ? 0.1 : 0), in: .capsule)
+                .contentShape(.capsule)
+                .onHover { isHovered = $0 }
+        }
+    }
+}
+
+/// The glass button at the bar's left in Search Notes that shows and hides the filter row. With filters set, it shows
+/// their number beside its symbol and a soft fill inside its glass, in the bar's own neutral color.
 struct PaletteFilterButton: View {
     let count: Int
     let isOn: Bool
@@ -211,15 +235,20 @@ struct PaletteFilterButton: View {
             .font(.system(size: PaletteBar.fontSize))
             .padding(.horizontal, count > 0 ? 9 : 0)
             .frame(minWidth: PaletteBar.height, minHeight: PaletteBar.height)
+            .background {
+                if count > 0 {
+                    Capsule().fill(.primary.opacity(0.12)).padding(PaletteBar.fillInset)
+                }
+            }
             .contentShape(.capsule)
-            // Drawn here, since the glass button style pads an icon out to a wide pill: as tall as Open and Actions,
-            // and as round, but only as wide as it is tall.
+            // Drawn here, since the glass button style pads an icon out to a wide pill: as tall and as round as the
+            // capsule beside it, but only as wide as it is tall.
             .glassEffect(.regular.interactive(), in: .capsule)
         }
         .buttonStyle(.plain)
-        // As the list's View Options button shows filters: the glass stays, and the symbol and count take the accent.
-        .foregroundStyle(count > 0 ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.primary))
+        .foregroundStyle(.primary)
         .accessibilityLabel(isOn ? "Hide Filters" : "Show Filters")
+        .accessibilityValue(count > 0 ? Text("\(count) set") : Text(""))
         .accessibilityIdentifier("CommandPaletteFilters")
     }
 }
@@ -242,7 +271,7 @@ struct PaletteFilterRow: View {
 
     var body: some View {
         FilterChipsBar(
-            chips: chips, leadingInset: PaletteMetrics.markInset, showsHelp: false, addSide: PaletteBar.height, anchors: anchors,
+            chips: chips, leadingInset: PaletteMetrics.markInset, showsHelp: false, anchors: anchors,
             open: { id in PaletteFilters.Field(rawValue: id).map(openValues) },
             remove: { id in if let field = PaletteFilters.Field(rawValue: id) { remove(field) } },
             add: openFields

@@ -67,8 +67,6 @@ struct FilterChipsBar: View {
     var leadingInset: CGFloat = 12
     /// The palette shows no tooltips; a list's row does.
     var showsHelp = true
-    /// The +'s side, when it must match something other than the chips, as the palette's filter button.
-    var addSide: CGFloat?
     let anchors: FilterChipAnchors
     let open: (String) -> Void
     let remove: (String) -> Void
@@ -87,7 +85,7 @@ struct FilterChipsBar: View {
                     Image(systemName: "plus")
                         .font(.system(size: 11 * scale, weight: .medium))
                         .foregroundStyle(.secondary)
-                        .frame(width: addSide ?? FilterChipMetrics.height * scale, height: addSide ?? FilterChipMetrics.height * scale)
+                        .frame(width: FilterChipMetrics.height * scale, height: FilterChipMetrics.height * scale)
                         .background(.quaternary.opacity(0.6), in: .rect(cornerRadius: FilterChipMetrics.radius * scale, style: .continuous))
                         .contentShape(.rect)
                 }

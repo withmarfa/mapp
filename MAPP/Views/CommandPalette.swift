@@ -309,8 +309,7 @@ struct CommandPalette: View {
     }
 
     private func openTitle(for row: Entry) -> String {
-        if row.item == nil { return String(localized: "Run") }
-        return mode == .search ? String(localized: "Open at Match") : String(localized: "Open")
+        row.item == nil ? String(localized: "Run") : String(localized: "Open")
     }
 
     // MARK: Running
@@ -359,8 +358,7 @@ struct CommandPalette: View {
     private func actions(for row: Entry) -> [PaletteAction] {
         guard let id = row.item, let item = library.item(id) else { return PaletteAction.forCommand }
         return PaletteAction.forItem(
-            isFile: item.isFile, isFavorite: item.isFavorite, isActive: item.state == .active,
-            openTitle: mode == .search ? String(localized: "Open at Match") : String(localized: "Open"))
+            isFile: item.isFile, isFavorite: item.isFavorite, isActive: item.state == .active)
     }
 
     /// Does what the action says through the same path as the menus, once the palette is put away.
@@ -500,7 +498,7 @@ struct CommandPalette: View {
             let excerpt = results?.excerpts[item.id].flatMap { $0.plainText == item.name ? nil : $0 }
             return Entry(
                 id: "note:\(item.id)", title: item.displayTitle, detail: library.placeLabel(of: item),
-                snippet: item.preview.isEmpty ? nil : item.preview, excerpt: excerpt,
+                snippet: item.preview.isEmpty ? about(item) : item.preview, excerpt: excerpt,
                 date: DateDisplay.text(of: item.modified, place: .list, format: dateFormat, now: now),
                 icon: .type(library.catalogue.icon(for: item.type)), item: item.id, takesFocus: true
             ) {
@@ -510,6 +508,15 @@ struct CommandPalette: View {
         return PaletteSections.forSearch(rows: entries, typed: isTyped) { entry in
             PaletteMatch.matchRange(in: entry.title, query) != nil
         }
+    }
+
+    /// A search row's second line for an item with no text of its own: its type, or Inbox, and the collections it is
+    /// in, so every row in Search Notes has two lines.
+    private func about(_ item: Item) -> String {
+        let place = library.placeLabel(of: item)
+        let collections = item.collectionIDs.compactMap { library.item($0)?.displayTitle }
+        guard !collections.isEmpty else { return place }
+        return String(localized: "\(place) in \(collections.formatted(.list(type: .and)))", comment: "A search row's second line: an item's type, then the collections it is in.")
     }
 
     private var commands: [Entry] {
