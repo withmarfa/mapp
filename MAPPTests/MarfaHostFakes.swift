@@ -191,10 +191,20 @@ nonisolated extension MarfaHost.DisconnectChoice {
         try? FileManager.default.removeItem(at: root)
     }
 
+    /// The fake source names the writes it reports `w0`, `w1` and so on, which the copy's queue does not, so the
+    /// copy's own writes stand in for those names in order.
+    static func standIn(for agreed: MarfaHost.Agreed, in store: URL) async throws -> MarfaHost.Agreed {
+        guard case .ids(let ids) = agreed else { return agreed }
+        let named = ids.filter { $0.wholeMatch(of: /w\d+/) != nil }
+        guard !named.isEmpty else { return agreed }
+        let held = try await WorkingCopy.unsentWrites(in: store).writes.map(\.id)
+        return .ids(ids.subtracting(named).union(held.prefix(named.count)))
+    }
+
     func host(opener: MarfaHost.Opener? = nil, remover: MarfaHost.Remover? = nil) -> MarfaHost {
         MarfaHost(
             defaults: defaults, signIns: signIns, location: location, opener: opener ?? servers.opener, describer: servers.describer,
-            remover: remover ?? { try await MarfaHost.removeStore($0, agreedToLose: $1) })
+            remover: remover ?? { try await MarfaHost.removeStore($0, agreedToLose: Self.standIn(for: $1, in: $0)) })
     }
 
     var savedAddress: String? { defaults.string(forKey: "MarfaAddress") }

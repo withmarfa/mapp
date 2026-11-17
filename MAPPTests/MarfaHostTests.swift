@@ -329,7 +329,7 @@ import Testing
         let bench = try HostBench()
         try FileManager.default.createDirectory(at: bench.location.directory(for: first), withIntermediateDirectories: true)
         bench.defaults.set(["http://first.test:8210": ["a", "b", "c"]], forKey: "MarfaDiscardedCopies")
-        let asked = Mutex<[Set<String>]>([])
+        let asked = Mutex<[MarfaHost.Agreed]>([])
         let host = bench.host(remover: { _, agreed in
             asked.withLock { $0.append(agreed) }
             throw MarfaError.unsentDiffers(path: "p", unsent: 2, message: "")
@@ -338,7 +338,7 @@ import Testing
         await expect(.copyKept(.changed(now: 2), signIn: nil)) { () throws(MarfaHost.Problem) in
             try await host.connect(address: "http://first.test:8210", key: "k")
         }
-        #expect(asked.withLock { $0 } == [["a", "b", "c"], ["a", "b", "c"]])
+        #expect(asked.withLock { $0 } == [.ids(["a", "b", "c"]), .ids(["a", "b", "c"])])
     }
 
     /// The package refuses a folder's store, which can't be made here, so its answer is given to the host. The
@@ -386,7 +386,7 @@ import Testing
             try await host.disconnect(.discardCopy(nil))
         }
         #expect(FileManager.default.fileExists(atPath: store.path))
-        #expect((bench.defaults.dictionary(forKey: "MarfaDiscardedCopies") as? [String: [String]])?.mapValues(\.count) == ["http://first.test:8210": 1])
+        #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies") as? [String: Int] == ["http://first.test:8210": 1])
 
         // Once that process lets go, the copy marked to go is removed before the address opens again.
         holder.release()

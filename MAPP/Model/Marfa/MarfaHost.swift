@@ -12,7 +12,7 @@ import Observation
     typealias Describer = @Sendable (MarfaConnection) async throws -> String
     /// Removes the copy at a store, provided every change it holds that the server has not taken is one of the ids
     /// the person agreed to lose. Tests stand in for the package's answers that a real copy can't be made to give.
-    typealias Remover = @Sendable (URL, Set<String>) async throws -> Void
+    typealias Remover = @Sendable (URL, Agreed) async throws -> Void
     /// Makes the reader of item histories for a connection, or nil where there is no server to ask, as in the sample.
     typealias Historian = @Sendable (MarfaConnection, any SignIns) -> (any ItemHistorySource)?
     /// Makes the keeper of the owner's type icons for a connection, or nil where there is no server to ask, as in the
@@ -77,6 +77,40 @@ import Observation
         case unreadable(folder: String)
         /// It is a folder's store, which is not MAPP's to remove.
         case notMapps(folder: String)
+    }
+
+    /// What the person agreed to lose with a copy they discard.
+    nonisolated enum Agreed: Hashable, Sendable {
+        /// The writes they were shown, by queue id.
+        case ids(Set<String>)
+        /// How many a copy another version made held, which the app cannot list.
+        case count(UInt64)
+
+        /// Whether a copy holding `held` loses nothing beyond what was agreed: a write sent meanwhile is no loss.
+        func covers(_ held: [String]) -> Bool {
+            switch self {
+            case .ids(let ids): Set(held).isSubset(of: ids)
+            case .count(let count): UInt64(held.count) <= count
+            }
+        }
+
+        /// As it is kept in the defaults, so a removal that stops part way is finished at the next launch.
+        var stored: Any {
+            switch self {
+            case .ids(let ids): ids.sorted()
+            case .count(let count): Int(clamping: count)
+            }
+        }
+
+        init?(stored: Any) {
+            if let ids = stored as? [String] {
+                self = .ids(Set(ids))
+            } else if let count = stored as? Int, count >= 0 {
+                self = .count(UInt64(count))
+            } else {
+                return nil
+            }
+        }
     }
 
     private static let addressKey = "MarfaAddress"
@@ -323,7 +357,7 @@ import Observation
         // Taken at once, so a step that stops before the approval is used or dropped does not leave it live.
         let kept = pendingSignIn
         pendingSignIn = nil
-        let agreed: Set<String>?
+        let agreed: Agreed?
         let current = source
         let fresh: Bool
         do throws(Problem) {
@@ -374,7 +408,7 @@ import Observation
                 // The move is abandoned, so the copy and the sign-in made for it go too.
                 await opened.close()
                 await endSignIn(of: connection)
-                if fresh { _ = await removeCopy(connection, agreed: []) }
+                if fresh { _ = await removeCopy(connection, agreed: .ids([])) }
                 throw error
             }
         }
