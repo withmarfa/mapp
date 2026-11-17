@@ -22,7 +22,7 @@ struct ItemTimeline: View {
         let groups = ItemTimelineLayout.groups(
             for: items, field: field, looks: looks, catalogue: library.catalogue, today: now)
         let list = RowList(
-            mixesTypes: Set(items.map(\.type)).count > 1, date: .look, format: dateFormat, day: Calendar.current.startOfDay(for: now))
+            mixesTypes: Set(items.map(\.type)).count > 1, date: .look, format: dateFormat, datesApart: true, day: Calendar.current.startOfDay(for: now))
         let contents = rowContents.contents(of: items, in: library, looks: looks, list: list, shape: CardShape())
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
 

@@ -37,6 +37,8 @@ nonisolated struct RowList: Hashable, Sendable {
     var mixesTypes = false
     var date = RowDateSource.look
     var format = DateFormat.standard
+    /// Whether the list gives the date a column of its own, so a row's Secondary line leaves out a time it would repeat.
+    var datesApart = false
     /// The start of today, which is all a row's dates need of the moment.
     var day: Date
 }
@@ -164,7 +166,7 @@ nonisolated struct RowContent: Hashable, Sendable {
                 guard let field = field(key) else { return nil }
                 return isBody(field) ? Self.line(item.preview) : fieldText(field)
             case .time(let key):
-                guard case .date(includesTime: true)? = field(key)?.kind, let moment = fieldMoment(key), moment.hasTime else { return nil }
+                guard !list.datesApart, case .date(includesTime: true)? = field(key)?.kind, let moment = fieldMoment(key), moment.hasTime else { return nil }
                 return DateDisplay.timeOfDay(of: moment.date, calendar: calendar, locale: locale)
             case .opening:
                 return Self.line(item.preview)
