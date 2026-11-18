@@ -50,6 +50,42 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 - **A flat, squared or hand-drawn segmented control.** MAPP uses the system's. See [Views and lists](views-and-lists.md).
 - **A separate filter button in the list toolbar.** Filters live in the row above the list.
 
+## Buttons and messages
+
+- **Capsule buttons, black buttons and the Mac's push buttons.** Every button MAPP draws is a rounded rectangle; see [Agreed designs](agreed-designs.md).
+- **A large 36-point button size.** There are two sizes, 22 and 28 points.
+- **A blue focus ring.** Keyboard focus is a gray ring.
+- **A solid red destructive button.** It is a pale red fill with red text.
+- **MAPP's own alert.** MAPP uses Apple's.
+- **A toast at the top of the page.** It rises at the bottom of the window.
+
+## Selection
+
+- **Blue for a chosen row, card or table row.** It is a soft gray.
+- **A gray plate behind a chosen gallery card.** The card keeps a soft ring.
+
+## The sidebar and Settings
+
+- **A tab bar when there is only one tab.**
+- **A Customize Sidebar button in the sidebar.** Customize from a Control-click or in Settings > Sidebar.
+- **Customizing the sidebar in a window of its own, or in a panel beside a section.**
+- **Checkboxes and a dashed Show More line while customizing.** A section's menu sets how many show.
+- **Handles at the leading edge, beside the marks.** They sit at each row's trailing edge.
+- **A view's mark as a round tinted tile.** It is the view's symbol in its own color.
+- **Settings taking over the window's sidebar**, with a way back and a search field. Settings keeps the app's sidebar and its list.
+- **Descriptions of three lines or more in Settings.** One line, two at most.
+
+## Collections and Sources
+
+- **Collections as a gallery**, for now. They are a table.
+- **Buttons in the right sidebar**, such as Rename, Change Mark and Show Items. The right sidebar can be narrow.
+- **A back button from an open collection**, for now.
+- **The bottom-right corner as a strip along the page's foot.**
+
+## Status
+
+- **Drawn status rings.** Status uses the app's SF Symbols.
+
 ## Palettes
 
 - **An Actions panel floating above the palette's bar.** Actions takes the bar's place. See [Views and lists](views-and-lists.md).
@@ -70,6 +106,7 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 
 ## Related pages
 
+- [Agreed designs](agreed-designs.md)
 - [Looks](looks.md)
 - [Value components](value-components.md)
 - [Item page](item-page.md)
