@@ -22,7 +22,7 @@ MAPP is a macOS app for a Marfa server's items, with a sidebar, a list and a pag
 
 ## Working here
 
-- MAPP is an app for items of every type. A name, string or comment says "note" only for a `core.note`'s own text or a type's own name.
+- MAPP is an app for items of every type. A name, string or comment says "note" only for a `core.note`'s own text , a type's own name or the Note callout.
 - Use American English. Put no time estimates, absolute paths, machine or account names or credentials in any file. A comment says only why.
 - Use scoped lowercase Conventional Commits in the present tense: `feat(app):`, `fix(editor):`.
 - Work on a branch in a worktree under `.claude/worktrees/` and reach `main` through a pull request. Merge it as `.agents/skills/land-a-pull-request/SKILL.md` says.
