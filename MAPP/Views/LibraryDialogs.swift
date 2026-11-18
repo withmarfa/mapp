@@ -78,7 +78,7 @@ private struct DeleteConfirmation: ViewModifier {
 
     func body(content: Content) -> some View {
         content.confirmationDialog(
-            "^[Move \(details.deletion?.ids.count ?? 0) item](inflect: true) to Recently Deleted?",
+            DeletionWords.moveTitle(count: details.deletion?.ids.count ?? 0),
             isPresented: Binding { details.deletion != nil } set: { if !$0 { details.deletion = nil } },
             presenting: details.deletion
         ) { request in
@@ -101,12 +101,12 @@ private struct LibraryDialogs: ViewModifier {
             .onChange(of: library.itemsToPurge, initial: true, take)
             .onChange(of: appearsActive, take)
             .confirmationDialog(
-                "^[Delete \(purging.count) item](inflect: true) immediately?",
+                DeletionWords.purgeTitle(count: purging.count),
                 isPresented: Binding { !purging.isEmpty } set: { if !$0 { purging = [] } }
             ) {
                 Button("Delete", role: .destructive) { library.deletePermanentlyOnConfirm(purging) }
             } message: {
-                Text("They’re already in Recently Deleted. Deleting them now erases them permanently, and you can’t undo it.")
+                Text(DeletionWords.purgeMessage(count: purging.count))
             }
     }
 
