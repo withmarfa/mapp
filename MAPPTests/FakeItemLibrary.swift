@@ -247,6 +247,8 @@ final class FakeItemLibrary: ItemLibrary {
     @ObservationIgnored var fetches = 0
     /// How long fetching each file takes, as a server's can.
     var fetchDelay: [ItemID: Duration] = [:]
+    /// Files whose fetch waits until a test lets it go, so a test can look at a page that is still loading.
+    var fetchGates: [ItemID: FetchGate] = [:]
 
     /// Notes whose saved text the copy has not read yet.
     var unreadSaves: Set<ItemID> = []
@@ -315,6 +317,7 @@ final class FakeItemLibrary: ItemLibrary {
         fetches += 1
         if fetchFails { throw SourceFailure(kind: .failed, message: "The server can’t be reached.") }
         if let delay = fetchDelay[id] { try await Task.sleep(for: delay) }
+        await fetchGates[id]?.passed()
         return files[id]
     }
 
@@ -737,5 +740,22 @@ extension FakeItemLibrary {
             answers[id] = ItemCountAnswer(total: counted.count, groups: groups)
         }
         return answers
+    }
+}
+
+/// Holds the fetch of a file until a test calls `open()`.
+@MainActor final class FetchGate {
+    private var isOpen = false
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+
+    func passed() async {
+        guard !isOpen else { return }
+        await withCheckedContinuation { waiting.append($0) }
+    }
+
+    func open() {
+        isOpen = true
+        for continuation in waiting { continuation.resume() }
+        waiting = []
     }
 }

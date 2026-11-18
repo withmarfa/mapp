@@ -105,17 +105,18 @@ struct WebPageItemPageTests {
             .flatMap { ($0.value(forKey: "accessibilityFrame") as? NSValue)?.rectValue }
     }
 
+    /// The file is held back so the page is measured while it loads, and the test does not depend on how long a large
+    /// page takes to analyze, which is long enough to pass the analysis limit when an assistive client is attached.
     @Test func theTitleStaysWhereItIsWhenTheArticleArrives() async throws {
         let folder = try temporaryFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let item = file("A.html")
-        // Long enough to be analyzed for a couple of seconds, so the header is read while the page still loads.
-        let long = "<html><head><title>The cliff path</title></head><body><article><h1>The cliff path</h1>"
-            + (1...Self.longParagraphs).map { "<p>Paragraph \($0) walks along the cliff, past the gorse and the old coastguard hut, and down to the cove where the boats lie.</p>" }.joined()
-            + "</article></body></html>"
-        try Data(long.utf8).write(to: folder.appending(path: "a.html"))
+        try Data(Self.article.utf8).write(to: folder.appending(path: "a.html"))
         let library = FakeItemLibrary(items: [item], now: .now)
         library.files[item.id] = folder.appending(path: "a.html")
+        let gate = FetchGate()
+        library.fetchGates[item.id] = gate
+        defer { gate.open() }
         let visit = Visit(item)
         let (window, view) = host(visit, in: library)
         defer { window.orderOut(nil); window.contentView = nil; window.close() }
@@ -123,6 +124,7 @@ struct WebPageItemPageTests {
         try #require(await settled(view) { titleFrame(item, in: view) != nil })
         let whileLoading = try #require(titleFrame(item, in: view))
         try #require(visit.details.pageLook == nil, "the article has not arrived yet")
+        gate.open()
         try #require(await settled(view) { visit.details.pageLook != nil })
         #expect(titleFrame(item, in: view)?.origin.y == whileLoading.origin.y)
     }
