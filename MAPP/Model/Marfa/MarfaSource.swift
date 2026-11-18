@@ -622,8 +622,7 @@ nonisolated final class MarfaHub: Sendable {
         connectionState.values()
     }
 
-    /// The engine publishes the changes to items one at a time, so telling readers outside the lock keeps their order. A
-    /// sync's `.counts` joins them, which no order matters to.
+    /// The engine publishes item changes in order. The sync can also request a count refresh between item changes.
     func publish(_ change: SourceChange) {
         let readers = state.withLock { state -> [AsyncStream<SourceChange>.Continuation] in
             switch change {

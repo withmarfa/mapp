@@ -155,19 +155,21 @@ import Testing
         total.value = 1
         let counts = answering(total, log: log)
         let id = ItemID("a")
-        counts.want([id], .children)
+        let visible = ItemID("b")
+        counts.want([id, visible], .children)
         #expect(await eventually { counts.answer(of: id, .children)?.total == 1 })
 
         counts.release([id], .children)
         total.value = 2
         counts.refresh()
-        try? await Task.sleep(for: .milliseconds(300))  // A refresh that wants nothing asks nothing.
-        #expect(await log.asked == [["a"]])
+        // The visible row's new answer proves the refresh ran while the other row was off screen.
+        #expect(await eventually { counts.answer(of: visible, .children)?.total == 2 })
+        #expect(await log.asked == [["a", "b"], ["b"]])
 
-        // Its old answer may be drawn until the new one comes, which is asked for as soon as it is wanted.
+        total.value = 3
         counts.want([id], .children)
-        #expect(await eventually { counts.answer(of: id, .children)?.total == 2 })
-        #expect(await log.asked.count >= 2)
+        #expect(await eventually { counts.answer(of: id, .children)?.total == 3 })
+        #expect(await log.asked == [["a", "b"], ["b"], ["a"]])
     }
 
     @Test func aCountWantedByTwoViewsIsKeptUntilBothLetGo() async {
@@ -194,6 +196,7 @@ import Testing
         #expect(await eventually { counts.questions == 1 })
         counts.release([id], .children)
         await gate.open()
+        // Allow the released request to finish before checking that its answer was discarded.
         try? await Task.sleep(for: .milliseconds(100))
         #expect(counts.answer(of: id, .children) == nil)
     }

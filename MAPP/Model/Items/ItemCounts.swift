@@ -40,8 +40,8 @@ nonisolated struct ItemCountUnavailable: Error, Hashable {}
 /// thread, one at a time. An answer is redrawn by the observation of `revision`. A count Marfa cannot answer holds nothing,
 /// so a view draws nothing in its place, never a zero or an old number.
 ///
-/// Only what is wanted is asked and asked again, so an item that is not on screen costs no question. The answer of one that
-/// was let go is kept for a moment, but asked again when it is wanted again, so an old number is never drawn for long.
+/// The last view to release a count leaves its answer cached. The next view to request it can draw that answer
+/// while a fresh request is in flight.
 @MainActor @Observable
 final class ItemCounts {
     typealias Answering = @Sendable ([ItemID], CountQuery) async throws -> [ItemID: ItemCountAnswer]
@@ -50,7 +50,7 @@ final class ItemCounts {
     nonisolated static let batch = 100
     /// How long a run of changes is let settle before the counts on screen are asked again.
     nonisolated static let settling = Duration.milliseconds(150)
-    /// How many answers of items no longer on screen are kept before they are let go.
+    /// Exceeding this limit evicts all answers that no view currently needs.
     nonisolated static let kept = 5_000
 
     private struct Key: Hashable {
@@ -109,8 +109,7 @@ final class ItemCounts {
         if asking { work() }
     }
 
-    /// Says a view that wanted the counts has gone. Nothing waits for them now: a count nobody wants is not asked, and its
-    /// answer is kept only for a while.
+    /// Releases one view's claim on the counts. Other views can still need the same answers.
     func release(_ ids: some Sequence<ItemID>, _ query: CountQuery) {
         for id in ids {
             let key = Key(id: id, query: query)

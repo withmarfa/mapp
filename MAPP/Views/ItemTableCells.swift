@@ -44,8 +44,7 @@ struct ItemTableCell: View {
                         .padding(.vertical, -bleed.vertical)
                 }
             }
-            // The name's cell is on screen whenever its row is, which a count column's cell is not while the column is hidden
-            // because no row has an answer yet; so it wants the counts the row's look shows.
+            // The name cell can request counts even while an empty count column is hidden.
             .background {
                 if case .title = column.content {
                     Color.clear.wantsCounts(of: row.id, browser.looks(in: library)[row.item.type]?.countQueries ?? [], in: library.counts)
