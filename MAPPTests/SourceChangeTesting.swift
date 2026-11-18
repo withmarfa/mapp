@@ -27,7 +27,7 @@ extension SourceSnapshot {
             for body in changes.bodies { bodies[body.id] = body }
         case .catalogue(let catalogue): self.catalogue = catalogue
         case .views(let views): self.views = views
-        case .answered, .taken, .unavailable: break
+        case .answered, .taken, .counts, .unavailable: break
         }
     }
 }

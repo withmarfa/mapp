@@ -84,13 +84,7 @@ struct ItemTable: View {
             // Only the columns showing. SwiftUI adds and hides every column it is given on live rows when the place
             // changes, which for the many columns of a mixed place costs far more than the few it shows.
             TableColumnForEach(browser.shownColumns(columns, stored: storedColumns)) { column in
-                TableColumn(Text(verbatim: column.label), sortUsing: ItemTableComparator(column: column, order: column.firstOrder)) { row in
-                    ItemTableCell(library: library, row: row, column: column, browser: browser, order: order, dateFormat: dateFormat, hover: hover)
-                }
-                .width(min: column.widths.min, ideal: column.widths.ideal, max: column.widths.max)
-                .customizationID(column.id)
-                // A view's order is the panel's to change, since the header cannot hold an arrangement Save waits for.
-                .disabledCustomizationBehavior(Self.disabledCustomization(of: column, inView: isView))
+                tableColumn(column, isView: isView)
             }
         } rows: {
             if let grouping {
@@ -139,6 +133,32 @@ struct ItemTable: View {
             let ids = browser.selection
             library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
         }
+    }
+
+    /// A count has no sort control: it is asked for only the rows on screen (`ItemTableColumn.isSortable`).
+    @TableColumnBuilder<ItemTableRow, ItemTableComparator>
+    private func tableColumn(_ column: ItemTableColumn, isView: Bool) -> some TableColumnContent<ItemTableRow, ItemTableComparator> {
+        if column.isSortable {
+            TableColumn(Text(verbatim: column.label), sortUsing: ItemTableComparator(column: column, order: column.firstOrder)) { row in
+                cell(of: row, in: column)
+            }
+            .width(min: column.widths.min, ideal: column.widths.ideal, max: column.widths.max)
+            .customizationID(column.id)
+            // A view's order is the panel's to change, since the header cannot hold an arrangement Save waits for.
+            .disabledCustomizationBehavior(Self.disabledCustomization(of: column, inView: isView))
+        }
+        if !column.isSortable {
+            TableColumn(Text(verbatim: column.label)) { row in
+                cell(of: row, in: column)
+            }
+            .width(min: column.widths.min, ideal: column.widths.ideal, max: column.widths.max)
+            .customizationID(column.id)
+            .disabledCustomizationBehavior(Self.disabledCustomization(of: column, inView: isView))
+        }
+    }
+
+    private func cell(of row: ItemTableRow, in column: ItemTableColumn) -> some View {
+        ItemTableCell(library: library, row: row, column: column, browser: browser, order: order, dateFormat: dateFormat, hover: hover)
     }
 
     @TableRowBuilder<ItemTableRow>
@@ -305,6 +325,7 @@ extension ItemTableColumn {
         case .date: (90, 116, 200)
         case .duration: (70, 92, 140)
         case .number: (60, 90, 160)
+        case .count: (80, 110, 180)
         case .boolean: (50, 70, 120)
         case .link, .links: (120, 200, 360)
         }

@@ -122,6 +122,57 @@ private actor FillServer: MarfaRefreshing {
         try #require(try await eventuallyAsking(condition))
     }
 
+    @Test func aCatchUpTellsReadersToAskTheServersCountsAgain() async throws {
+        let server = FillServer(.never)
+        let hub = MarfaHub()
+        hub.publish(.loaded(SourceSnapshot(items: [], catalogue: Catalogue())))
+        var changes = hub.changes().makeAsyncIterator()
+        _ = await changes.next()  // The held snapshot.
+        let fake = WorkingCopy.fake()
+        let sync = MarfaSync(copy: fake.copy, hub: hub, refreshing: server) { event in
+            if case .update(_, let done) = event { done.resume() }
+            if case .answers(let done) = event { done.resume() }
+            return true
+        }
+        try await sync.refreshNow()  // The fill.
+        try await sync.refreshNow()  // The catch-up.
+        var counts = 0
+        while let change = await changes.next() {
+            if case .counts(rowsOnly: true) = change { counts += 1 }
+            if counts == 2 { break }
+        }
+        #expect(counts == 2)
+        await sync.stop()
+        await server.release()
+        await fake.copy.close()
+    }
+
+    @Test func aCatchUpThatOnlyAdvancedLastSyncedStillTellsReadersToAskTheCountsAgain() async throws {
+        let server = FillServer(.complete)  // Nothing to fill, so nothing but the update tells readers.
+        let hub = MarfaHub()
+        hub.publish(.loaded(SourceSnapshot(items: [], catalogue: Catalogue())))
+        var changes = hub.changes().makeAsyncIterator()
+        _ = await changes.next()  // The held snapshot.
+        let fake = WorkingCopy.fake()
+        let sync = MarfaSync(copy: fake.copy, hub: hub, refreshing: server) { event in
+            if case .update(_, let done) = event { done.resume() }
+            return true
+        }
+        await sync.start()
+        // The package's own catch-up reports no item, edge or connection change, only when it finished.
+        fake.sendUpdate(CopyUpdate(
+            reread: .parts(Reread.Parts()), connection: .following, lastSynced: Date(timeIntervalSince1970: 1_000)))
+        var counts = 0
+        while let change = await changes.next() {
+            if case .counts(rowsOnly: true) = change { counts += 1 }
+            if counts == 1 { break }
+        }
+        #expect(counts == 1)
+        await sync.stop()
+        await server.release()
+        await fake.copy.close()
+    }
+
     @Test func fillsOnceThenCatchesUpAndFetchesAttachmentsAfterBoth() async throws {
         let server = FillServer(.never)
         try await withSync(server) { sync, _, _ in

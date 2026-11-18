@@ -63,6 +63,8 @@ nonisolated struct RowContent: Hashable, Sendable {
         /// A plain fact in secondary text, led by its field's label ("Location 1712") unless it is a flag, which is the
         /// label alone ("Archived").
         case text(String)
+        /// A count Marfa answered (`CountFact`) in secondary text, with a help tag that splits it where it can.
+        case count(String, help: String?)
     }
 
     var title: String
@@ -77,6 +79,9 @@ nonisolated struct RowContent: Hashable, Sendable {
     var chips: [Chip] = []
     /// How many values the bottom line leaves out, as "+N".
     var more = 0
+    /// What Marfa is asked for the counts the look shows, which the view that draws the row wants while it is on screen
+    /// (`ItemCounts.want`).
+    var countQueries: Set<CountQuery> = []
 
     /// The most facts a row shows after the status; the rest are counted.
     static let shownFacts = 2
@@ -89,7 +94,7 @@ nonisolated struct RowContent: Hashable, Sendable {
     var spoken: String {
         let chipWords = chips.map { chip -> String in
             switch chip {
-            case .type(_, let label), .status(_, let label), .option(let label, _), .tag(let label), .text(let label), .linked(_, let label): label
+            case .type(_, let label), .status(_, let label), .option(let label, _), .tag(let label), .text(let label), .linked(_, let label), .count(let label, _): label
             case .person(_, let name): name
             }
         }
@@ -112,6 +117,7 @@ nonisolated struct RowContent: Hashable, Sendable {
             title: item.displayTitle, date: includesDate ? maker.date(of: look, showsTime: showsTime) : nil, secondary: maker.secondary(of: look),
             typeIcon: catalogue.icon(for: item.type), typeLabel: catalogue.label(for: item.type), mixesTypes: list.mixesTypes)
         maker.addBottomLine(of: look, to: &content)
+        content.countQueries = look.countQueries
         return content
     }
 
@@ -263,6 +269,10 @@ nonisolated struct RowContent: Hashable, Sendable {
             case .relation(let relation):
                 let linked = relations.items(of: relation)
                 return (linked.prefix(RowContent.shownLinks).map { Chip.linked(icon: $0.icon, title: $0.title) }, max(0, relations.count(of: relation) - RowContent.shownLinks))
+            case .count(let count):
+                let answer = relations.counts[count]
+                guard let text = CountWording.text(of: count, answer: answer, hasStatus: info?.statusField != nil) else { return ([], 0) }
+                return ([.count(text, help: CountWording.help(of: count, answer: answer))], 0)
             case .tags:
                 let tags = item.tags.subtracting([ItemTag.favorite]).sorted()
                 return (tags.prefix(RowContent.shownTags).map(Chip.tag), max(0, tags.count - RowContent.shownTags))

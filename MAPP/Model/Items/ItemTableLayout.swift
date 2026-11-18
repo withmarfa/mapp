@@ -12,6 +12,8 @@ nonisolated struct ItemTableRow: Identifiable, Hashable, Sendable {
     /// only the links the table asked for (`rows(of:in:wanting:)`); the others are empty.
     var children: [RelatedItem] = []
     var collections: [RelatedItem] = []
+    /// What Marfa answered for the counts the table's looks ask for (`rows(of:in:wanting:looks:)`).
+    var counts: [CountFact: ItemCountAnswer] = [:]
     var id: ItemID { item.id }
 
     func items(of relation: Relation) -> [RelatedItem] {
@@ -25,15 +27,17 @@ nonisolated struct ItemTableRow: Identifiable, Hashable, Sendable {
 
 extension ItemTableRow {
     @MainActor
-    static func rows(of items: [Item], in library: any ItemLibrary, wanting wanted: Set<Relation> = []) -> [ItemTableRow] {
+    static func rows(
+        of items: [Item], in library: any ItemLibrary, wanting wanted: Set<Relation> = [], looks: [TypeID: TypeLook] = [:]
+    ) -> [ItemTableRow] {
         let catalogue = library.catalogue
         return items.map { item in
-            let relations = library.relations(of: item, wanting: wanted)
+            let relations = library.relations(of: item, wanting: wanted, counts: (looks[item.type] ?? .empty).counts)
             return ItemTableRow(
                 item: item,
                 typeLabel: catalogue.label(for: item.type),
                 typeIcon: catalogue.icon(for: item.type),
-                parent: relations.parent, children: relations.children, collections: relations.collections)
+                parent: relations.parent, children: relations.children, collections: relations.collections, counts: relations.counts)
         }
     }
 }
@@ -42,6 +46,8 @@ extension ItemTableRow {
 nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
     enum Content: Hashable, Sendable {
         case title, type, parent, children, collections, created, edited
+        /// A count worked out when read (`CountFact`), which a look shows as its fact.
+        case count(CountFact)
         /// When the item happened (Marfa's `occurred_at`), which a record's look shows as its date.
         case occurred
         /// The item's tags, which an item's look shows as its fact.
@@ -53,6 +59,7 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
 
     enum Style: Hashable, Sendable {
         case title, status, priority, choice, date, number, boolean, link, text, duration
+        case count
         /// Several linked items, shown as their chips. Not a value to group or filter by.
         case links
 
@@ -92,7 +99,7 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
     var isCategorical: Bool {
         switch style {
         case .status, .priority, .choice, .boolean, .link: true
-        case .title, .date, .number, .text, .duration, .links: content == .type
+        case .title, .date, .number, .text, .duration, .links, .count: content == .type
         }
     }
 
@@ -110,6 +117,13 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
         id: "occurred", label: String(localized: "Happened"), content: .occurred, style: .date, isShownByDefault: false)
     static let tags = ItemTableColumn(
         id: "tags", label: String(localized: "Tags"), content: .tags, style: .text, isShownByDefault: false)
+
+    /// The column of a count, headed as the count is named. A type with a status calls its children subtasks.
+    static func count(_ fact: CountFact, hasStatus: Bool) -> ItemTableColumn {
+        ItemTableColumn(
+            id: "count." + fact.word.dropFirst("count:".count).replacingOccurrences(of: ":", with: "."),
+            label: CountWording.heading(of: fact, hasStatus: hasStatus), content: .count(fact), style: .count)
+    }
 
     /// The column of a link, headed with Marfa's name for it (`Relation.label`).
     static func relation(_ relation: Relation, in catalogue: Catalogue) -> ItemTableColumn {
@@ -224,7 +238,7 @@ nonisolated extension ItemTableColumn {
         case .type: return row.item.type.rawValue
         case .parent: return row.parent?.id.rawValue
         case .field(let field): return ItemTableValue.string(row, key: field.key)
-        case .title, .children, .collections, .created, .edited, .occurred, .tags, .duration: return nil
+        case .title, .children, .collections, .count, .created, .edited, .occurred, .tags, .duration: return nil
         }
     }
 
@@ -236,8 +250,13 @@ nonisolated extension ItemTableColumn {
         case .field:
             if style == .boolean { return value == "true" ? String(localized: "Yes") : String(localized: "No") }
             return ItemTypeInfo.Field.label(ofOption: value)
-        case .title, .children, .collections, .created, .edited, .occurred, .tags, .duration: return value
+        case .title, .children, .collections, .count, .created, .edited, .occurred, .tags, .duration: return value
         }
+    }
+
+    /// Sorting by count would need answers for rows the table has yet to display.
+    var isSortable: Bool {
+        if case .count = content { false } else { true }
     }
 
     func sortValue(of row: ItemTableRow) -> ItemTableValue.Sort? {
@@ -247,6 +266,7 @@ nonisolated extension ItemTableColumn {
         case .parent: return row.parent.map { .text($0.title) }
         case .children: return row.children.first.map { .text($0.title) }
         case .collections: return row.collections.first.map { .text($0.title) }
+        case .count: return nil
         case .created: return .date(row.item.created)
         case .edited: return .date(row.item.modified)
         case .occurred: return .date(row.item.occurred ?? row.item.created)
@@ -480,6 +500,12 @@ nonisolated enum ItemTableLayout {
             case .relation(let relation):
                 guard rows.contains(where: { !$0.items(of: relation).isEmpty }) else { continue }
                 add(.relation(relation, in: catalogue), shown: true)
+            case .count(let fact):
+                guard !used.contains(ItemTableColumn.count(fact, hasStatus: false).id) else { continue }
+                let hasStatus = types.contains { catalogue.itemTypes[$0]?.statusField != nil && (looks[$0] ?? .empty).counts.contains(fact) }
+                // Until Marfa has answered a count for some row, the column has nothing to say and starts hidden.
+                let column = ItemTableColumn.count(fact, hasStatus: hasStatus)
+                add(column, shown: rows.contains { CountWording.text(of: fact, answer: $0.counts[fact], hasStatus: hasStatus) != nil })
             case .created: add(.created, shown: true)
             case .edited: add(.edited, shown: true)
             case .occurred: add(.occurred, shown: true)
@@ -515,7 +541,7 @@ nonisolated enum ItemTableLayout {
             case .type: 1
             case .field: column.style == .status ? 2 : 3
             case .parent: 4
-            case .children, .collections: 4
+            case .children, .collections, .count: 4
             case .duration, .occurred: 5
             case .edited: 6
             case .created: 7
@@ -523,7 +549,8 @@ nonisolated enum ItemTableLayout {
             }
         }
         let available = columns.filter { column in
-            switch column.content {
+            guard column.isSortable else { return false }
+            return switch column.content {
             case .field(let field): declared.contains(field.key)
             case .duration(let start, let end): declared.contains(start) && declared.contains(end)
             case .type: types.count > 1
@@ -538,6 +565,7 @@ nonisolated enum ItemTableLayout {
         case field(String)
         case tags, created, edited, occurred
         case relation(Relation)
+        case count(CountFact)
     }
 
     /// The facts of the types' looks in order, type by type, then their dates, each once.
@@ -551,6 +579,7 @@ nonisolated enum ItemTableLayout {
                 case .field(let key): .field(key)
                 case .tags: .tags
                 case .relation(let relation): .relation(relation)
+                case .count(let count): .count(count)
                 }
                 if !facts.contains(entry) { facts.append(entry) }
             }
@@ -594,9 +623,9 @@ nonisolated enum ItemTableLayout {
     /// place that keeps its own order, as a collection does, starts unsorted, so its rows stay in the order given.
     static func sort(_ options: ItemTableOptions, columns: [ItemTableColumn], keepsGivenOrder: Bool = false) -> [ItemTableComparator] {
         if let sort = options.sort {
-            // A column the place no longer has is dropped; its stored copy may also be out of date.
+            // Resolve stored sort keys against the columns the place offers now.
             let fresh = sort.compactMap { comparator in
-                columns.first { $0.id == comparator.column.id }.map { ItemTableComparator(column: $0, order: comparator.order) }
+                columns.first { $0.id == comparator.column.id && $0.isSortable }.map { ItemTableComparator(column: $0, order: comparator.order) }
             }
             if !fresh.isEmpty { return fresh }
         }

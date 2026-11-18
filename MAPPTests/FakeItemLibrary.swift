@@ -25,6 +25,11 @@ final class FakeItemLibrary: ItemLibrary {
     /// Every preview asked for, in order.
     @ObservationIgnored private(set) var previewsAsked: [LibraryViewQuery] = []
     var reachesServer = true
+    /// Whether counts cannot be answered, as when the copy cannot be sure and the server is out of reach.
+    var countsUnavailable = false
+    /// The counts the library works out from its items the way Marfa does: only active items, the groups of each child's
+    /// own type, an item with no status in the total alone.
+    @ObservationIgnored lazy var counts: ItemCounts = makeCounts()
     /// What the next icon choice answers: nil keeps it, a failure refuses it.
     var iconFailure: TypeIconFailure?
     private(set) var chosenIcons: [(type: TypeID, icon: String?)] = []
@@ -695,5 +700,42 @@ final class FakeItemLibrary: ItemLibrary {
             body(&items[index])
             items[index].version = ItemVersion(items[index].version.rawValue + 1)
         }
+    }
+}
+
+extension FakeItemLibrary {
+    func makeCounts() -> ItemCounts {
+        ItemCounts { [weak self] ids, query in
+            try await MainActor.run {
+                guard let self else { throw ItemCountUnavailable() }
+                return try self.countAnswers(ids, query)
+            }
+        }
+    }
+
+    func countAnswers(_ ids: [ItemID], _ query: CountQuery) throws -> [ItemID: ItemCountAnswer] {
+        guard !countsUnavailable else { throw ItemCountUnavailable() }
+        var answers: [ItemID: ItemCountAnswer] = [:]
+        for id in ids {
+            let counted: [Item]
+            switch query {
+            case .children: counted = items.filter { $0.parentID == id && $0.state == .active }
+            case .members: counted = items.filter { $0.collectionIDs.contains(id) && $0.state == .active }
+            case .rows: answers[id] = ItemCountAnswer(total: 0, groups: nil); continue
+            }
+            var groups = ItemCountAnswer.Groups()
+            for item in counted {
+                guard let info = catalogue.itemTypes[item.type], let status = info.statusField,
+                      let word = item.value(of: status.key)?.string, let group = status.statusGroup(of: word) else { continue }
+                switch group {
+                case .notStarted: groups.notStarted += 1
+                case .inProgress: groups.inProgress += 1
+                case .completed: groups.completed += 1
+                case .canceled: groups.canceled += 1
+                }
+            }
+            answers[id] = ItemCountAnswer(total: counted.count, groups: groups)
+        }
+        return answers
     }
 }

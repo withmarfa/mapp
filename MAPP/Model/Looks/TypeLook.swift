@@ -32,13 +32,15 @@ nonisolated enum LookPart: Hashable, Sendable {
     case parent
 }
 
-/// One thing on the bottom line, after the status. Later kinds MAPP builds (a count, a reading time) are new cases here.
+/// One value on the bottom line after the status.
 nonisolated enum LookFact: Hashable, Sendable {
     /// A field of the type: an option, a list of people, a number or a date.
     case field(String)
     case tags
     /// A link shown as a property: the parent, the children or the collections, each as the linked item's chip.
     case relation(Relation)
+    /// A count worked out when read, never stored: the children, a collection's members, a table's rows.
+    case count(CountFact)
 }
 
 /// How one type looks wherever its items are listed or shown as cards or rows of a table: the date, the line under the
@@ -91,6 +93,14 @@ nonisolated extension TypeLook {
         if secondary.contains(.parent) { relations.insert(.parent) }
         return relations
     }
+
+    /// The counts the look asks for, which a view asks Marfa for only for the types that show them.
+    var counts: Set<CountFact> {
+        Set(facts.compactMap { fact -> CountFact? in if case .count(let count) = fact { count } else { nil } })
+    }
+
+    /// What Marfa is asked for those counts, which children and progress share.
+    var countQueries: Set<CountQuery> { Set(counts.map(\.query)) }
 }
 
 // MARK: Stored words
@@ -183,6 +193,7 @@ nonisolated extension LookFact: LookWord {
         case .field(let key): "field:" + key
         case .tags: "tags"
         case .relation(let relation): relation.word
+        case .count(let count): count.word
         }
     }
 
@@ -191,6 +202,8 @@ nonisolated extension LookFact: LookWord {
             self = .tags
         } else if let relation = Relation(rawValue: word) {
             self = .relation(relation)
+        } else if let count = CountFact(word: word) {
+            self = .count(count)
         } else if let key = Self.fieldKey(in: word) {
             self = .field(key)
         } else {

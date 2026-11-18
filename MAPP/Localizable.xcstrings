@@ -503,6 +503,68 @@
         }
       }
     },
+    "%lld of %lld done" : {
+      "extractionState" : "manual"
+    },
+    "1 row in %@" : {
+      "extractionState" : "manual"
+    },
+    "look.count.tableRows" : {
+      "comment" : "The number of rows in an item's table, followed by the table name.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld %@"
+          }
+        }
+      }
+    },
+    "%lld canceled" : {
+      "extractionState" : "manual"
+    },
+    "%lld completed" : {
+      "extractionState" : "manual"
+    },
+    "%lld in progress" : {
+      "extractionState" : "manual"
+    },
+    "%lld not started" : {
+      "extractionState" : "manual"
+    },
+    "%lld with no status" : {
+      "extractionState" : "manual"
+    },
+    "Progress" : {
+      "extractionState" : "manual"
+    },
+    "Subtasks" : {
+      "extractionState" : "manual"
+    },
+    "%lld subtasks" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld subtask"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld subtasks"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld items already have the most tags an item can have." : {
       "extractionState" : "manual",
       "localizations" : {

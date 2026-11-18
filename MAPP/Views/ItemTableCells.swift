@@ -44,6 +44,12 @@ struct ItemTableCell: View {
                         .padding(.vertical, -bleed.vertical)
                 }
             }
+            // The name cell can request counts even while an empty count column is hidden.
+            .background {
+                if case .title = column.content {
+                    Color.clear.wantsCounts(of: row.id, browser.looks(in: library)[row.item.type]?.countQueries ?? [], in: library.counts)
+                }
+            }
             .onHover { setHovering($0) }
             .onDisappear { setHovering(false) }
             // A panel laid over the table gets the pointer and sends no exit to the cell beneath it.
@@ -91,6 +97,7 @@ struct ItemTableCell: View {
         case .edited: date(row.item.modified, isDue: false)
         case .occurred: date(row.item.occurred ?? row.item.created, isDue: false)
         case .tags: tags
+        case .count(let fact): count(fact)
         case .duration(let start, let end):
             if let seconds = ItemTableValue.duration(row, start: start, end: end) {
                 Text(Duration.seconds(seconds), format: .units(allowed: [.days, .hours, .minutes], width: .abbreviated, maximumUnitCount: 2))
@@ -100,6 +107,16 @@ struct ItemTableCell: View {
         // A mixed table's column holds the words of every type; each cell offers its own row's type's.
         case .field(let field):
             if let kind = addKind { add(kind) } else { value(of: rowField ?? field) }
+        }
+    }
+
+    /// A count Marfa answered, as a row says it, with the help tag that splits it. A count with nothing to say draws nothing.
+    @ViewBuilder private func count(_ fact: CountFact) -> some View {
+        let answer = row.counts[fact]
+        let hasStatus = library.catalogue.itemTypes[row.item.type]?.statusField != nil
+        if let text = CountWording.text(of: fact, answer: answer, hasStatus: hasStatus) {
+            Text(verbatim: text).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
+                .help(CountWording.help(of: fact, answer: answer) ?? "")
         }
     }
 

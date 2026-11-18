@@ -36,6 +36,9 @@ nonisolated struct ItemRelations: Hashable, Sendable {
     /// How many links a relation has where only its first few are held (`ItemLibrary.relations(of:wanting:limit:)`).
     /// A relation not named here holds all its links.
     var totals: [Relation: Int] = [:]
+    /// What Marfa answered for the counts the look asks for. A count it has not answered, or cannot, is not here, so a row
+    /// shows nothing for it (`CountFact`).
+    var counts: [CountFact: ItemCountAnswer] = [:]
 
     static let none = ItemRelations()
 
@@ -58,9 +61,16 @@ extension ItemLibrary {
     /// With a `limit`, the children and the collections hold only their first `limit` links in the usual order, found
     /// without sorting the rest, and `totals` says how many there are: what a row or a card needs to show a few and count
     /// the others.
-    func relations(of item: Item, wanting wanted: Set<Relation>, limit: Int? = nil) -> ItemRelations {
-        guard !wanted.isEmpty else { return .none }
+    ///
+    /// `counts` are the counts the look shows: each holds the last answer Marfa gave, and nothing where it has none, so a row
+    /// draws first and is drawn again when the answer comes. Reading asks for nothing: the view that shows the count wants it
+    /// when it appears (`ItemCounts.want`).
+    func relations(of item: Item, wanting wanted: Set<Relation>, counts: Set<CountFact> = [], limit: Int? = nil) -> ItemRelations {
+        guard !wanted.isEmpty || !counts.isEmpty else { return .none }
         var relations = ItemRelations()
+        for count in counts {
+            if let answer = self.counts.answer(of: item.id, count.query) { relations.counts[count] = answer }
+        }
         if wanted.contains(.parent) { relations.parent = item.parentID.flatMap(related) }
         if wanted.contains(.children) {
             let (held, total) = Self.first(limit, of: childIDs(of: item.id).lazy.compactMap(related))

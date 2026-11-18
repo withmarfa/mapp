@@ -7,6 +7,8 @@ nonisolated struct LookSurface: Sendable {
     let isFile: Bool
     /// Which links an item of the type can hold, by what Marfa's edge types admit of it.
     let relations: Set<Relation>
+    /// Whether the type is a collection, so it has members to count.
+    let isCollection: Bool
 
     init(_ type: TypeID, in catalogue: Catalogue) {
         info = catalogue.itemTypes[type]
@@ -18,6 +20,7 @@ nonisolated struct LookSurface: Sendable {
         }
         if catalogue.canJoinCollection(type) { relations.insert(.collections) }
         self.relations = relations
+        isCollection = catalogue.isCollection(type)
     }
 
     func field(_ key: String) -> ItemTypeInfo.Field? { info?.fields.first { $0.key == key } }
@@ -45,6 +48,19 @@ nonisolated struct LookSurface: Sendable {
         case .field(let key): field(key) != nil
         case .tags: true
         case .relation(let relation): relations.contains(relation)
+        case .count(let count): offers(count)
+        }
+    }
+
+    /// Children and progress need a type that can hold children, and progress a type whose children can have a status,
+    /// which only the children's own types say, so it is offered wherever children are. A collection has members.
+    /// A table's rows are named by the table, which the catalogue does not list per type, so a look may carry them and Edit
+    /// View does not suggest them; a table Marfa cannot count shows nothing.
+    func offers(_ count: CountFact) -> Bool {
+        switch count {
+        case .children, .progress: relations.contains(.children)
+        case .members: isCollection
+        case .rows: true
         }
     }
 
@@ -129,7 +145,7 @@ nonisolated enum LookPreset: String, CaseIterable, Codable, Identifiable, Hashab
             return Template(
                 dateFields: [MarfaMapping.dueField], fallback: .edited,
                 slots: [[field(MarfaMapping.projectField), field(MarfaMapping.repositoryField), .parent]],
-                facts: [[fact(MarfaMapping.priorityField)], [fact(MarfaMapping.assigneesField)]])
+                facts: [[.count(.progress)], [fact(MarfaMapping.priorityField)], [fact(MarfaMapping.assigneesField)]])
         case .event:
             return Template(
                 dateFields: [MarfaMapping.startField], fallback: .edited,

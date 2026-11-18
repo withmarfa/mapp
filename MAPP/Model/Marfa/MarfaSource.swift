@@ -69,10 +69,12 @@ nonisolated final class MarfaSource: ItemSource {
     private let hub = MarfaHub()
     let engine: MarfaEngine
     let events: MarfaEngine.Events
+    private let counting: MarfaCounts
 
     init(copy: WorkingCopy, connection: MarfaConnection,
          reading: (any MarfaReading)? = nil, refreshing: (any MarfaRefreshing)? = nil) {
         self.copy = copy
+        counting = MarfaCounts(copy: copy)
         let downloads = MarfaDownloads(copy: copy)
         downloadedFiles = downloads
         self.connection = connection
@@ -150,6 +152,10 @@ nonisolated final class MarfaSource: ItemSource {
     }
 
     var connectionState: MarfaConnectionState { hub.connection }
+
+    func counts(of ids: [ItemID], _ query: CountQuery) async throws -> [ItemID: ItemCountAnswer] {
+        try await counting.counts(of: ids, query)
+    }
 
     /// Hydrates a new copy or catches up a held one, then sends what waits in the queue. Call it once the
     /// first paint is shown; the package refills a copy whose place the server let go, as after a long sleep.
@@ -560,7 +566,7 @@ nonisolated final class MarfaHub: Sendable {
                 for body in changes.bodies { bodies[body.id] = body }
             case .catalogue(let catalogue): self.catalogue = catalogue
             case .views(let views): self.views = views
-            case .answered, .taken, .unavailable: break
+            case .answered, .taken, .counts, .unavailable: break
             }
         }
     }
@@ -616,7 +622,7 @@ nonisolated final class MarfaHub: Sendable {
         connectionState.values()
     }
 
-    /// Only the engine publishes, one change at a time, so telling readers outside the lock keeps their order.
+    /// The engine publishes item changes in order. The sync can also request a count refresh between item changes.
     func publish(_ change: SourceChange) {
         let readers = state.withLock { state -> [AsyncStream<SourceChange>.Continuation] in
             switch change {

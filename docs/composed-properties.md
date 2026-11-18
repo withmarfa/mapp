@@ -1,6 +1,6 @@
 # Composed properties
 
-Status: Location is built in v0.0.45. Relation is built, not yet released. Count and Reading Time are not built and are being reconsidered; see "Built today".
+Location shipped in v0.0.45 and Relation in v0.0.47. Count is available in this branch.
 
 Where it lives: `PropertyRow` (with its `Value`) under `MAPP/Model/Items/`, and `MarfaMapping` under `MAPP/Model/Marfa/`. Location is `ItemLocation` and `LocationFrame` under `MAPP/Model/Items/`, and `LocationPanelContent` and `LocationPanelModel` under `MAPP/Views/ValueEditing/`. Relation is `Relation`, `RelatedItem` and `ItemRelations` under `MAPP/Model/Items/`. Composed properties are built in a type's look from these.
 
@@ -10,11 +10,11 @@ A composed property is a property that MAPP builds from a type's fields and link
 
 - **Location.** A place on a map, built from the `latitude` and `longitude` fields. Marfa's `core.event`, `core.entity.place`, `core.file.image` and `core.file.video` types have them, and a type may also carry `place` or address fields. A person looks for an area with a search, clicks the map to place the pin and drags it to adjust, and MAPP writes only that point's latitude and longitude. The numbers stay hidden unless the person turns on Show Coordinates. An event's name is its `place` field, a place item's name is the item's own name and is never changed, and an image or video has no name, so it shows the map only. See "How Location works".
 - **Relation.** A link shown as a property: Parent, Children or In Collection. Marfa links items with edges, which are global, so a relation is how MAPP shows an edge as a row. See "How Relation works".
-- **Count.** How many items a link reaches, or how many steps are done, such as "4 subtasks" or "3 of 7 done".
-- **Reading time.** Worked out from the item's text.
+- **Count.** A look can show how many children an item has, how many children with a status are finished, how many members a collection has, or how many rows an item holds in a table. See [Looks](looks.md).
 
 ## Later, not now
 
+- **Reading time.** The proposed value uses the item's text.
 - **Rollup and Formula.** Marfa cannot sort or filter by a value that MAPP computes, so these wait.
 - **A Marfa location kind.** Marfa has none today. When one exists, Location reads it in place of the two numbers.
 
@@ -42,7 +42,7 @@ A composed property is a property that MAPP builds from a type's fields and link
 
 Location is built (see above). A geographic or object field maps to a shape that the app shows but does not edit (`MarfaMapping`): the page's property block skips it, and the right sidebar prints it as plain text.
 
-Relation is built (see "How Relation works"). Reading time and counts are not built. A saved web page's header shows only its description (`ReadingHeader`), and the right sidebar shows parent, children and links as the page's own sections, not as properties that a look can place.
+A saved web page's header shows its description (`ReadingHeader`). The right sidebar shows parent, children and links in their own sections.
 
 ## Open point
 

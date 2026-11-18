@@ -14,7 +14,7 @@ A type gets a preset from its fields (`LookPreset.suggested`), and the preset fi
 | --- | --- | --- | --- | --- |
 | Note | Notes, documents, meeting notes, transcripts | The opening line | Tags | Updated |
 | Message | Email, chat, comments | The sender | None | Sent |
-| Task | Tasks, issues, pull requests, sessions, checklists | Project or repository, else the parent's title | Status, priority, people, and "3 of 7 done" | Due, else updated |
+| Task | Tasks, issues, pull requests, sessions, checklists | Project or repository, else the parent's title | Status, then progress ("3 of 7 done"), priority, and people in fact order | Due, else updated |
 | Event | Events, meetings, bookings | Time and place | People | Starts |
 | Person | People, organizations | Role and organization | One way to reach them | None |
 | Place | Places, venues | The address | Category | None |

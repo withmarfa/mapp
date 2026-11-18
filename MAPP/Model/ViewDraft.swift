@@ -167,7 +167,7 @@ nonisolated enum ViewDraft {
         case .created: "created_at"
         case .edited: "updated_at"
         case .field(let field): isPropertyName(field.key) ? "properties." + field.key : nil
-        case .parent, .children, .collections, .duration, .occurred, .tags: nil
+        case .parent, .children, .collections, .count, .duration, .occurred, .tags: nil
         }
     }
 
@@ -349,7 +349,7 @@ nonisolated enum ViewDraft {
         case .type: .system(.type)
         case .parent: .edge(type: MarfaMapping.parentEdge, direction: .backref)
         case .field(let field): isPropertyName(field.key) ? .property(field.key) : nil
-        case .title, .children, .collections, .created, .edited, .occurred, .tags, .duration: nil
+        case .title, .children, .collections, .count, .created, .edited, .occurred, .tags, .duration: nil
         }
     }
 

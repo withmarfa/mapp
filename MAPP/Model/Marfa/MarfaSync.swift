@@ -13,8 +13,9 @@ actor MarfaSync {
     /// `*` leaves out every `system.*` type, so the saved views are named beside it. The engine keeps them out of
     /// the items it shows.
     nonisolated static let slice = ["*", "system.view"]
-    /// Held whole so a view that lists what is `beneath` an item can be answered from the copy.
-    nonisolated static let sliceEdgeTypes = ["parent-of"]
+    /// Held whole so a view that lists what is `beneath` an item, and the count of an item's children and of a collection's
+    /// members, can be answered from the copy, offline too.
+    nonisolated static let sliceEdgeTypes = [MarfaMapping.parentEdge, MarfaMapping.collectionEdge]
 
     nonisolated static func needsFill(_ status: Status) -> Bool {
         status.hydration != .complete || status.sliceTier != .all || Set(status.sliceTypes) != Set(slice)
@@ -35,6 +36,8 @@ actor MarfaSync {
     /// What the copy last said it was doing, so a change of it is told once.
     private var connection: CopyConnection?
     private var fill: FillProgress?
+    /// When the package last said a pull finished, so a catch-up that changed nothing else is still seen.
+    private var syncedAt: Date?
     /// The calls of the app's own refreshes under way, which the report shows as updating.
     private var refreshes = 0
     private var wantsRefresh = false
@@ -177,6 +180,12 @@ actor MarfaSync {
         show(update.connection, changed: before != update.connection)
         hub.report.update { report in
             if let date = update.lastSynced { report.lastSynced = date }
+        }
+        if let date = update.lastSynced, date != syncedAt {
+            // A catch-up brings no report of a row of a table the copy does not hold, so however little else it changed,
+            // the counts the server answers are asked again.
+            syncedAt = date
+            hub.publish(.counts(rowsOnly: true))
         }
         publishPhase()
         if !update.reread.isEmpty || update.fill != nil || before != update.connection {
@@ -334,6 +343,9 @@ actor MarfaSync {
             try await hydrate()
         }
         try Task.checkCancellation()
+        // The copy holds no table's rows it was not asked to, so a row another device changed in one raises no report of
+        // its own; the counts the server answers are asked again once the copy has caught up.
+        hub.publish(.counts(rowsOnly: true))
         fetchAttachments()
         wantsDrain = true
         work()

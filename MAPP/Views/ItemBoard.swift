@@ -12,6 +12,8 @@ struct ItemBoard: View {
     @State private var cursor: ItemID?
     @State private var anchor: ItemID?
     @State private var daysSeen = 0
+    /// The lanes in view in the horizontal scroll view, which are the only ones whose cards ask for counts.
+    @State private var visibleLanes: Set<ItemBoardLane.ID> = []
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     /// What each card says, worked out once for each item from its type's look.
     @State private var cardContents = CardContents()
@@ -81,6 +83,9 @@ struct ItemBoard: View {
                         ForEach(lanes) { lane in
                             laneView(lane, lanes: lanes, key: key, grouped: grouped, ids: ids, contents: contents)
                                 .frame(width: laneWidth(count: lanes.count, in: geometry.size.width))
+                                .onScrollVisibilityChange(threshold: 0.01) { visible in
+                                    if visible { visibleLanes.insert(lane.id) } else { visibleLanes.remove(lane.id) }
+                                }
                         }
                     }
                     .padding(.horizontal, Self.edge)
@@ -170,6 +175,7 @@ struct ItemBoard: View {
             : nil
         return BoardCell(
             item: item, browser: browser, content: content, compact: compact, invalidValue: invalid,
+            wantsCounts: visibleLanes.contains(lane.id),
             select: { extending, toggling in
                 select(item.id, ids: ids, extending: extending, toggling: toggling)
                 pane.wrappedValue = .list
@@ -258,11 +264,14 @@ struct ItemBoard: View {
 /// One card of a board as a control: it answers a click, a double click, the context menu and a drag, and reads the
 /// selection itself, so a selection that moves runs the bodies of the cells on show and of no card.
 private struct BoardCell<Actions: View>: View {
+    @CurrentLibrary private var library
     let item: Item
     let browser: Browser
     let content: RowContent
     let compact: Bool
     let invalidValue: String?
+    /// Whether the card's lane is in view; a lane scrolled out of view lets its cards' counts go.
+    let wantsCounts: Bool
     let select: (_ extending: Bool, _ toggling: Bool) -> Void
     let open: () -> Void
     @ViewBuilder let menu: (_ selection: Set<ItemID>) -> Actions
@@ -280,6 +289,7 @@ private struct BoardCell<Actions: View>: View {
         }
         .buttonStyle(.plain)
         .focusable(false)
+        .wantsCounts(of: item.id, wantsCounts ? content.countQueries : [], in: library.counts)
         .contentShape(.rect(cornerRadius: 10))
         .simultaneousGesture(TapGesture(count: 2).onEnded { open() })
         .accessibilityAddTraits(isSelected ? .isSelected : [])

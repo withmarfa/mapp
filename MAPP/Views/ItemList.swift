@@ -166,6 +166,7 @@ private struct SelectableList<Content: View>: View {
 
 /// A line of the list as a row: a section's heading, or an item.
 private struct ListLineRow: View {
+    @CurrentLibrary private var library
     let line: ListLine
     let content: RowContent?
     let density: Density
@@ -180,7 +181,10 @@ private struct ListLineRow: View {
                 .padding(.top, isFirst ? 0 : 10)
                 .accessibilityAddTraits(.isHeader)
         case .item:
-            if let content { ItemRow(content: content, density: density, excerpt: excerpt) }
+            if let content {
+                ItemRow(content: content, density: density, excerpt: excerpt)
+                    .wantsCounts(of: line.id, content.countQueries, in: library.counts)
+            }
         }
     }
 }

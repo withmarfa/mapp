@@ -60,6 +60,17 @@ extension MarfaEngine {
             taking.end(
                 ("everything", everything ? 1 : 0), ("rows", rowsChanged ? 1 : 0), ("filling", update.fill == nil ? 0 : 1))
         }
+        if painted, everything || rowsChanged || catalogueChanged || statusChanged {
+            // A count follows its items, their edges and a held table's rows; Marfa becoming reachable can answer one it could not.
+            let tablesOnly: Bool
+            if case .parts(let parts) = update.reread, !statusChanged {
+                tablesOnly = parts.rows.items.isEmpty && parts.rows.removedItems.isEmpty && parts.rows.edges.isEmpty
+                    && parts.rows.removedEdges.isEmpty && !catalogueChanged
+            } else {
+                tablesOnly = false
+            }
+            hub.publish(.counts(rowsOnly: tablesOnly))
+        }
         let fill = update.fill.map {
             LibraryFill(
                 state: hub.report.value.fill?.state == .updating ? .updating : .filling, listed: $0.listed,
