@@ -37,6 +37,32 @@ struct QuickAddTests {
     let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
     let disk = TestFiles()
 
+    // MARK: New Item from a palette with no results
+
+    @Test func whatWasTypedBecomesTheTitleOfANewDraftTrimmed() {
+        let browser = Browser()
+        browser.openQuickAdd(titled: "  Buy oat milk \n", in: FakeItemLibrary(now: start))
+        #expect(browser.quickAdd.isPresented)
+        #expect(browser.quickAdd.draft?.title == "Buy oat milk")
+    }
+
+    @Test func nothingTypedOpensAnEmptyDraft() {
+        let browser = Browser()
+        browser.openQuickAdd(titled: "   ", in: FakeItemLibrary(now: start))
+        #expect(browser.quickAdd.isPresented)
+        #expect(browser.quickAdd.draft?.title == "")
+    }
+
+    @Test func aDraftHoldingContentComesBackAsItWasAndItsTitleIsNotReplaced() {
+        let library = FakeItemLibrary(now: start)
+        let browser = Browser()
+        browser.openQuickAdd(in: library)
+        browser.quickAdd.draft?.title = "Call Sam"
+        browser.putAwayQuickAdd()
+        browser.openQuickAdd(titled: "Buy oat milk", in: library)
+        #expect(browser.quickAdd.draft?.title == "Call Sam")
+    }
+
     @Test func anItemIsMadeWithItsTitleTextAndPropertiesAndOpensWithTheCaretWhereItWas() async throws {
         let library = FakeItemLibrary(now: start)
         let browser = Browser()

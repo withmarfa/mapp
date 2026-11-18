@@ -79,6 +79,9 @@
     "“%@” isn’t part of this list. Remove it to save the list." : {
       "extractionState" : "manual"
     },
+    "Looks" : {
+
+    },
     "Looks can be imported once the library has loaded." : {
 
     },
@@ -3306,7 +3309,7 @@
     "Search" : {
 
     },
-    "Search Commands and Notes" : {
+    "Search Commands and Items" : {
 
     },
     "Search for Actions…" : {
@@ -3318,6 +3321,12 @@
     "Search Items" : {
       "extractionState" : "manual"
     },
+    "Search Items for “%@”" : {
+
+    },
+    "Search Items…" : {
+
+    },
     "Search Languages" : {
 
     },
@@ -3325,12 +3334,6 @@
 
     },
     "Search Notes" : {
-
-    },
-    "Search Notes for “%@”" : {
-
-    },
-    "Search Notes…" : {
 
     },
     "Search Scope" : {
@@ -3545,6 +3548,9 @@
 
     },
     "Sort %@" : {
+
+    },
+    "Sort and Group" : {
 
     },
     "Sort by" : {
@@ -4319,6 +4325,9 @@
     },
     "versions" : {
       "extractionState" : "manual"
+    },
+    "View" : {
+
     },
     "View As" : {
 

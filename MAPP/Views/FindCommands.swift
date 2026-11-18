@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// Edit > Find, as TextEdit and Notes lay it out, acting on the item whose page the window shows through the
-/// system find bar. Search List leads it with ⌥⌘F, as Search Notes does in Notes, so Find and Replace has no
+/// system find bar. Search List leads it with ⌥⌘F, as Search does in Notes, so Find and Replace has no
 /// shortcut of its own.
 struct FindCommands: Commands {
     @FocusedValue(\.editor) private var editor

@@ -65,7 +65,7 @@ struct PalettePicksTests {
 
     @Test func aTypedQueryListsAtMostFiftyOfTenThousandItemTitles() {
         let items = (0..<10_000).map { "Note \($0)" }
-        let picks = PaletteMatch.Titles().picks(fixed: ["New Note", "Search Notes"], items: items, "note")
+        let picks = PaletteMatch.Titles().picks(fixed: ["New Note", "Search Items"], items: items, "note")
         #expect(picks.count == PaletteMatch.listLimit + 2)
         #expect(picks.first == .item(0))
     }

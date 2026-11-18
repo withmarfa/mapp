@@ -81,6 +81,16 @@ struct ItemCommandContext {
 enum ItemCommand: CaseIterable {
     case quickLook, openInNewWindow, openOriginal, openInBrowser, addAttachment, toggleSource, toggleReader, print, exportPDF
 
+    /// The menu the menu bar puts it in, which is where ⌘K lists it: Add Attachment under Edit, the two ways of
+    /// showing the page under View, and the rest under File.
+    var paletteGroup: PaletteSections.CommandGroup {
+        switch self {
+        case .addAttachment: .edit
+        case .toggleSource, .toggleReader: .view
+        case .quickLook, .openInNewWindow, .openOriginal, .openInBrowser, .print, .exportPDF: .file
+        }
+    }
+
     func title(in context: ItemCommandContext) -> LocalizedStringResource {
         switch self {
         case .quickLook: "Quick Look"

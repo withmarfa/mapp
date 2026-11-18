@@ -1,8 +1,8 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// ⌘K: one field that reaches the window's commands, the places in the sidebar and the notes by title. ⇧⌘P: the
-/// same field searching the text of every note, each found note shown with the words around what was found. Both
+/// ⌘K: one field that reaches the window's commands, the places in the sidebar and the items by title. ⇧⌘P: the
+/// same field searching the text of every item, each found item shown with the words around what was found. Both
 /// list in sections, and what a row can do is in Actions (⌘K again). Arrow keys choose, Return runs, and Escape or
 /// a click outside puts it away. The commands are only what could be done now, so what it lists is what the menus
 /// have enabled.
@@ -36,7 +36,7 @@ struct CommandPalette: View {
     @State private var filterState = PaletteFilterState()
     /// Where the keyboard was before the palette took it, and goes back to once the palette is put away.
     @State private var returnFocus: Browser.Pane = .list
-    /// Every note's title folded once while the palette is open, so a keystroke folds only what was typed.
+    /// Every item's title folded once while the palette is open, so a keystroke folds only what was typed.
     @State private var titles = PaletteMatch.Titles()
     /// What the palette lists for the query as it stands, kept across the arrow keys and anything else that runs the
     /// body again. Nothing here is observed.
@@ -45,7 +45,7 @@ struct CommandPalette: View {
     /// What the Actions field holds and which action is chosen, kept here since the arrow keys reach the palette.
     @State private var actionsQuery = ""
     @State private var actionsHighlighted = 0
-    /// What Search Notes found for the query, asked once per query and again only when its answer changes (`watchSearch`),
+    /// What Search Items found for the query, asked once per query and again only when its answer changes (`watchSearch`),
     /// never by the body, which the arrow keys and the pointer run again and again.
     @State private var searched = SearchResults.none
     /// What `searched` lists once the filters have narrowed it: filtered when the answer or the filters change, never by the body.
@@ -102,7 +102,7 @@ struct CommandPalette: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(.secondary)
                     .frame(width: PaletteMetrics.markWidth)
-                TextField(mode == .search ? "Search Notes" : "Search Commands and Notes", text: $query)
+                TextField(mode == .search ? "Search Items" : "Search Commands and Items", text: $query)
                     .textFieldStyle(.plain)
                     .interfaceFont(.title3)
                     .focused($focus, equals: .field)
@@ -111,7 +111,9 @@ struct CommandPalette: View {
                     // Read afresh: Return can come before the view is drawn again after the last key.
                     .onSubmit {
                         let current = shown().flatMap(\.rows)
-                        if let id = actionsFor, let live = current.first(where: { $0.id == id }) {
+                        if current.isEmpty {
+                            newItem()
+                        } else if let id = actionsFor, let live = current.first(where: { $0.id == id }) {
                             performHighlighted(on: live)
                         } else {
                             run(current, at: current.indices.contains(highlighted) ? highlighted : max(current.count - 1, 0))
@@ -120,7 +122,7 @@ struct CommandPalette: View {
                     .onExitCommand { escape() }
                     .accessibilityIdentifier("CommandPaletteField")
                 if isTyped {
-                    let count = PaletteSections.resultCount(sections) { $0.id != Self.searchNotesID }
+                    let count = PaletteSections.resultCount(sections) { $0.id != Self.searchItemsID }
                     Text(count == 1 ? String(localized: "1 result") : String(localized: "\(count) results"))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -210,6 +212,7 @@ struct CommandPalette: View {
             try? await Task.sleep(for: .milliseconds(50))
             focus = .field
         }
+        .help("")
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Command Palette")
     }
@@ -223,7 +226,7 @@ struct CommandPalette: View {
                 if rows.isEmpty {
                     Text("No Results")
                         .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, minHeight: 110)
+                        .frame(maxWidth: .infinity, minHeight: PaletteMetrics.emptyResultsHeight)
                 } else {
                     list(sections, chosen: chosen)
                 }
@@ -239,6 +242,8 @@ struct CommandPalette: View {
                         PaletteFooter(
                             openTitle: openTitle(for: row), onOpen: { run(rows, at: chosen) },
                             onActions: { toggleActions(rows, chosen: chosen) })
+                    } else {
+                        PaletteFooter(openTitle: String(localized: "New Item"), onOpen: newItem, onActions: nil)
                     }
                 }
                 .opacity(target == nil ? 1 : 0)
@@ -324,6 +329,12 @@ struct CommandPalette: View {
             let editor = editor
             Task { @MainActor in await editor.find(words, in: id) }
         }
+    }
+
+    /// What was typed found nothing: quick add opens with the words as its title.
+    private func newItem() {
+        close(returningFocus: false)
+        browser.openQuickAdd(titled: query, remembered: lastType, in: library)
     }
 
     private func close(returningFocus: Bool = true) {
@@ -416,9 +427,9 @@ struct CommandPalette: View {
 
     // MARK: What it offers
 
-    /// The commands, places and notes that answer the query, in sections. The commands are built each time, since
+    /// The commands, places and items that answer the query, in sections. The commands are built each time, since
     /// what they offer changes under an open palette. The titles are ranked first and an entry is built only for each
-    /// of the best `PaletteMatch.listLimit` notes, never for every item in the library.
+    /// of the best `PaletteMatch.listLimit` items, never for every item in the library.
     private func matching(_ basis: Basis) -> [Section] {
         let commands = commands
         let fixed = commands + places
@@ -436,13 +447,13 @@ struct CommandPalette: View {
             scores = scored.map(\.score)
             listing.ranking = (key, picks, scores)
         }
-        let sections = PaletteSections.forCommands(picks: picks, scores: scores, typed: typed, commandCount: commands.count, recentCount: recent.count)
+        let sections = PaletteSections.forCommands(picks: picks, scores: scores, typed: typed, groups: commands.map(\.group), recentCount: recent.count)
         return sections.map { section in
             Section(kind: section.kind, rows: section.rows.map { pick in
                 switch pick {
                 case .fixed(let index): fixed[index]
-                case .item(let index): note(recent[index])
-                case .searchNotes: searchNotesEntry
+                case .item(let index): itemEntry(recent[index])
+                case .searchItems: searchItemsEntry
                 }
             })
         }
@@ -487,7 +498,7 @@ struct CommandPalette: View {
         Array(items.prefix(searchLimit))
     }
 
-    /// Items whose text or title has what was typed, best match first, with the notes named by the words typed
+    /// Items whose text or title has what was typed, best match first, with the items named by the words typed
     /// apart from those that hold them in the text; or the most recently edited before anything is typed.
     private var found: [Section] {
         let results = isTyped ? searched : nil
@@ -511,7 +522,7 @@ struct CommandPalette: View {
     }
 
     /// A search row's second line for an item with no text of its own: its type, or Inbox, and the collections it is
-    /// in, so every row in Search Notes has two lines.
+    /// in, so every row in Search Items has two lines.
     private func about(_ item: Item) -> String {
         let place = library.placeLabel(of: item)
         let collections = item.collectionIDs.compactMap { library.item($0)?.displayTitle }
@@ -526,8 +537,8 @@ struct CommandPalette: View {
         let one = browser.selection.count == 1 && selected.count == 1 ? selected.first : nil
         let hasVisibleEditor = browser.showsPage && one?.id == editor.noteID && editor.hasNote
         var entries: [Entry] = []
-        func add(_ title: String, _ systemImage: String, _ shortcut: String? = nil, id: String? = nil, action: @escaping () -> Void) {
-            entries.append(Entry(id: id ?? "command:" + title, title: title, icon: .symbol(systemImage), shortcut: shortcut, action: action))
+        func add(_ title: String, _ systemImage: String, _ shortcut: String? = nil, in group: PaletteSections.CommandGroup, id: String? = nil, action: @escaping () -> Void) {
+            entries.append(Entry(id: id ?? "command:" + title, title: title, icon: .symbol(systemImage), shortcut: shortcut, group: group, action: action))
         }
 
         // The page keeps ⌘[ and ⌘] while it has the keyboard (see AppCommands), so the palette does not suggest them.
@@ -535,11 +546,11 @@ struct CommandPalette: View {
 
         if library.isLoaded {
             if browser.canSearchList {
-                add(String(localized: "Search List"), "magnifyingglass", "⌥⌘F") { browser.focusRequest = .search }
+                add(String(localized: "Search List"), "magnifyingglass", "⌥⌘F", in: .edit) { browser.focusRequest = .search }
             }
             let modes = browser.showsSidebarIndex ? [] : browser.availableViewModes(in: library)
             func addLayout(_ mode: ItemViewMode, _ title: String, _ systemImage: String, _ shortcut: String) {
-                if modes.contains(mode) { add(title, systemImage, shortcut) { browser.viewMode = mode } }
+                if modes.contains(mode) { add(title, systemImage, shortcut, in: .view) { browser.viewMode = mode } }
             }
             addLayout(.list, String(localized: "View as List"), "list.bullet", "⌘1")
             addLayout(.gallery, String(localized: "View as Gallery"), "square.grid.2x2", "⌘2")
@@ -549,54 +560,51 @@ struct CommandPalette: View {
             addLayout(.calendar, String(localized: "View as Calendar"), ItemViewMode.calendar.symbol, "⌘6")
             if browser.stackableType(in: library) != nil {
                 let isOn = browser.stacksSubtypes(in: library)
-                add(isOn ? String(localized: "Show This Type Only") : String(localized: "Include Subtypes"), IncludeSubtypes.symbol) {
+                add(isOn ? String(localized: "Show This Type Only") : String(localized: "Include Subtypes"), IncludeSubtypes.symbol, in: .view) {
                     browser.setStacksSubtypes(!isOn, in: library)
                 }
             }
             let ordersList = browser.viewMode == .list || browser.viewMode == .gallery
             if ordersList && browser.isSearching && !browser.ordersByRelevance {
-                add(String(localized: "Sort by Relevance"), "arrow.up.arrow.down") { browser.orderSearch(byRelevance: true) }
+                add(String(localized: "Sort by Relevance"), "arrow.up.arrow.down", in: .sortAndGroup) { browser.orderSearch(byRelevance: true) }
             }
             for choice in NoteSort.allCases where (choice != sort || browser.ordersByRelevance) && ordersList {
-                add(String(localized: "Sort by \(String(localized: choice.title))"), "arrow.up.arrow.down") {
+                add(String(localized: "Sort by \(String(localized: choice.title))"), "arrow.up.arrow.down", in: .sortAndGroup) {
                     sort = choice
                     browser.orderSearch(byRelevance: false)
                 }
             }
             if sort != .title && !browser.ordersByRelevance && ordersList {
-                add(groupsByDate ? String(localized: "Ungroup by Date") : String(localized: "Group by Date"), "calendar") {
+                add(groupsByDate ? String(localized: "Ungroup by Date") : String(localized: "Group by Date"), "calendar", in: .sortAndGroup) {
                     groupsByDate.toggle()
                 }
             }
             if browser.usesCollection {
                 if !browser.showsCollection {
-                    add(String(localized: browser.viewMode.backTitle), "chevron.backward", historyKey("⌘[")) { browser.returnToCollection() }
+                    add(String(localized: browser.viewMode.backTitle), "chevron.backward", historyKey("⌘["), in: .go) { browser.returnToCollection() }
                 }
             } else {
                 if browser.canGoBack(in: library) {
-                    add(String(localized: "Back"), "chevron.backward", historyKey("⌘[")) { browser.go(.back, in: library) }
+                    add(String(localized: "Back"), "chevron.backward", historyKey("⌘["), in: .go) { browser.go(.back, in: library) }
                 }
                 if browser.canGoForward(in: library) {
-                    add(String(localized: "Forward"), "chevron.forward", historyKey("⌘]")) { browser.go(.forward, in: library) }
+                    add(String(localized: "Forward"), "chevron.forward", historyKey("⌘]"), in: .go) { browser.go(.forward, in: library) }
                 }
             }
-            if let host, host.canRefresh {
-                add(String(localized: "Refresh"), "arrow.clockwise", "⌘R") { host.refresh() }
-            }
             if let libraries {
-                add(String(localized: "Export Looks…"), "square.and.arrow.up") { LooksFiles.export(from: libraries) }
-                add(String(localized: "Import Looks…"), "square.and.arrow.down") { LooksFiles.importLooks(into: libraries) }
+                add(String(localized: "Export Looks…"), "square.and.arrow.up", in: .looks) { LooksFiles.export(from: libraries) }
+                add(String(localized: "Import Looks…"), "square.and.arrow.down", in: .looks) { LooksFiles.importLooks(into: libraries) }
             }
             // The palette holds the keyboard itself, so the page counts as focused where it was when the palette opened.
             let zoom = TextZoom.acting(pageFocused: returnFocus == .page)
             let size = UserDefaults.standard.object(forKey: zoom.key) as? Int ?? zoom.defaultSize
             if zoom.size(after: .bigger, from: size) != nil {
-                add(String(localized: "Make Text Bigger"), "textformat.size.larger", "⌘+") { zoom.apply(.bigger) }
+                add(String(localized: "Make Text Bigger"), "textformat.size.larger", "⌘+", in: .textSize) { zoom.apply(.bigger) }
             }
             if zoom.size(after: .smaller, from: size) != nil {
-                add(String(localized: "Make Text Smaller"), "textformat.size.smaller", "⌘-") { zoom.apply(.smaller) }
+                add(String(localized: "Make Text Smaller"), "textformat.size.smaller", "⌘-", in: .textSize) { zoom.apply(.smaller) }
             }
-            add(String(localized: "Actual Size"), "textformat.size", "⌘0") { zoom.apply(.actual) }
+            add(String(localized: "Actual Size"), "textformat.size", "⌘0", in: .textSize) { zoom.apply(.actual) }
             entries.append(Entry(id: "command:newItem", title: String(localized: "New Item"), icon: .symbol("plus"), shortcut: "⌘N",
                                  takesFocus: true) {
                 browser.openQuickAdd(remembered: lastType, in: library)
@@ -608,19 +616,22 @@ struct CommandPalette: View {
                 })
             }
             // After New Item and the typed ones, so the commands "new" finds lead with New Item.
-            add(String(localized: "New Window"), "macwindow.badge.plus", "⌥⌘N") { openWindow(id: "main") }
+            add(String(localized: "New Window"), "macwindow.badge.plus", "⌥⌘N", in: .file) { openWindow(id: "main") }
+            if let host, host.canRefresh {
+                add(String(localized: "Refresh"), "arrow.clockwise", "⌘R", in: .file) { host.refresh() }
+            }
             if browser.selection.count == 1, let details {
-                add(details.isPresented ? String(localized: "Hide Details") : String(localized: "Show Details"), "sidebar.right", "⌥⌘I") { details.isPresented.toggle() }
+                add(details.isPresented ? String(localized: "Hide Details") : String(localized: "Show Details"), "sidebar.right", "⌥⌘I", in: .view) { details.isPresented.toggle() }
             }
         }
-        let search = String(localized: "Search Notes")
-        entries.append(Entry(id: "command:" + search, title: search, icon: .symbol("magnifyingglass"), shortcut: "⇧⌘P", takesFocus: true) {
+        let search = String(localized: "Search Items")
+        entries.append(Entry(id: "command:" + search, title: search, icon: .symbol("magnifyingglass"), shortcut: "⇧⌘P", takesFocus: true, group: .edit) {
             browser.palette = .search
         })
 
         #if DEBUG
         // Dev-only and not a toolbar action, so it is not localized and has no toolbar button or shortcut.
-        add("Show Tuning Panel", "slider.horizontal.3") { openWindow(id: TuningPanel.windowID) }
+        add("Show Tuning Panel", "slider.horizontal.3", in: .debug) { openWindow(id: TuningPanel.windowID) }
         #endif
 
         if let one, one.isWritable {
@@ -629,7 +640,7 @@ struct CommandPalette: View {
                                .strikethrough, .highlight, .code, .link, .codeBlock, .quote, .bulletList, .orderedList, .checklist, .table]
                 where format != .table || !editor.caret.inTable {
                     let shortcut = format.shortcut.map { Self.symbols($0.modifiers) + String($0.key).uppercased() }
-                    add(String(localized: format.title), "textformat", shortcut) { editor.apply(format) }
+                    add(String(localized: format.title), "textformat", shortcut, in: .format) { editor.apply(format) }
                 }
             }
         }
@@ -637,70 +648,70 @@ struct CommandPalette: View {
         let itemContext = ItemCommandContext(library: library, ids: browser.selection, browser: browser, editor: editor, details: details)
         for command in ItemCommand.allCases where command.isEnabled(in: itemContext) {
             let shortcut = command.shortcut.map { Self.symbols($0.modifiers) + String($0.key.character).uppercased() }
-            add(String(localized: command.title(in: itemContext)), command.systemImage, shortcut) {
+            add(String(localized: command.title(in: itemContext)), command.systemImage, shortcut, in: command.paletteGroup) {
                 command.perform(in: itemContext, editor: editor) { openWindow(value: $0) }
             }
         }
         let single = browser.selection.count == 1 ? browser.selectedItems(in: library).first?.id : nil
         let share = NoteShare(note: one, fileURL: single.flatMap { browser.fileURL(of: $0) }, in: library)
         if share.isAvailable {
-            add(String(localized: "Share…"), "square.and.arrow.up") {
+            add(String(localized: "Share…"), "square.and.arrow.up", in: .file) {
                 share.present(near: hasVisibleEditor ? editor.webView : nil)
             }
         }
 
         if let details, details.history != nil {
-            add(String(localized: "Exit Version History"), "xmark") { details.leaveHistory() }
+            add(String(localized: "Exit Version History"), "xmark", in: .file) { details.leaveHistory() }
             if details.history?.canRestore(in: library) == true {
-                add(String(localized: "Restore Version"), "arrow.uturn.backward") {
+                add(String(localized: "Restore Version"), "arrow.uturn.backward", in: .file) {
                     details.restoreFromHistory(in: library, undoManager: undoManager)
                 }
             }
         } else if let details, selected.count == 1, let only = selected.first {
-            add(String(localized: "Version History…"), "clock.arrow.circlepath") {
+            add(String(localized: "Version History…"), "clock.arrow.circlepath", in: .file) {
                 details.showHistory(of: only.id, in: library)
             }
         }
         if let details, details.isCustomizingLayout {
-            add(String(localized: "Finish Customizing"), "slider.horizontal.3") { details.endLayout() }
+            add(String(localized: "Finish Customizing"), "slider.horizontal.3", in: .view) { details.endLayout() }
         } else if let details, let only = one, details.canBeginLayout(for: only) {
-            add(String(localized: "Customize Layout…"), "slider.horizontal.3") { details.beginLayout() }
+            add(String(localized: "Customize Layout…"), "slider.horizontal.3", in: .view) { details.beginLayout() }
         }
         // These act on the whole selection, files too; what an item can't take is left alone and the person is told.
         let ids = Set(everything.map(\.id))
         let active = everything.filter { $0.state == .active }
         if !everything.isEmpty, everything.allSatisfy({ $0.state == .trashed }) {
-            add(String(localized: "Recover"), "arrow.uturn.backward") { library.recover(ids, undoManager: undoManager) }
+            add(String(localized: "Recover"), "arrow.uturn.backward", in: .file) { library.recover(ids, undoManager: undoManager) }
         } else if !everything.isEmpty {
             let allFavorites = !active.isEmpty && active.allSatisfy(\.isFavorite)
             if !active.isEmpty {
-                add(allFavorites ? String(localized: "Remove from Favorites") : String(localized: "Add to Favorites"), allFavorites ? "star.slash" : "star") {
+                add(allFavorites ? String(localized: "Remove from Favorites") : String(localized: "Add to Favorites"), allFavorites ? "star.slash" : "star", in: .file) {
                     library.setFavorite(ids, !allFavorites, undoManager: undoManager)
                 }
             }
             if let details, library.canTag(ids) {
-                add(String(localized: "Add Tag…"), "tag") {
+                add(String(localized: "Add Tag…"), "tag", in: .file) {
                     details.tagRequest = TagRequest(ids: ids, undoManager: undoManager)
                 }
             }
             if let details, library.offersTypeChange(for: ids) {
-                add(String(localized: "Change Type…"), "square.on.square") {
+                add(String(localized: "Change Type…"), "square.on.square", in: .file) {
                     details.typeChange = TypeChangeRequest(ids: ids, undoManager: undoManager)
                 }
             }
-            add(String(localized: "Delete"), "trash") {
+            add(String(localized: "Delete"), "trash", in: .file) {
                 library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
             }
         }
         let members = library.collectionMembers(browser.selection)
         if !members.isEmpty {
             if let details, !library.collections.isEmpty {
-                add(String(localized: "Add to Collection…"), "rectangle.stack.badge.plus") {
+                add(String(localized: "Add to Collection…"), "rectangle.stack.badge.plus", in: .file) {
                     details.collectionPick = CollectionPickRequest(ids: browser.selection, undoManager: undoManager)
                 }
             }
             for collection in library.collections(holding: members) {
-                add(String(localized: "Remove from “\(collection.displayTitle)”"), "rectangle.stack.badge.minus", id: "command:removeFrom:\(collection.id)") {
+                add(String(localized: "Remove from “\(collection.displayTitle)”"), "rectangle.stack.badge.minus", in: .file, id: "command:removeFrom:\(collection.id)") {
                     library.removeFromCollection(browser.selection, collection.id, undoManager: undoManager)
                 }
             }
@@ -708,24 +719,24 @@ struct CommandPalette: View {
 
         if library.isLoaded {
             for command in ViewOptionCommand.commands(for: browser, in: library, storedColumns: $storedColumns) {
-                add(command.title, command.systemImage, action: command.action)
+                add(command.title, command.systemImage, in: command.group, action: command.action)
             }
             for command in SavedViewCommand.commands(for: browser, in: library, order: order) {
-                add(command.title, command.systemImage, action: command.action)
+                add(command.title, command.systemImage, in: .view, action: command.action)
             }
         }
         if fullWidth {
-            add(String(localized: "Standard Width"), "arrow.left.and.right") { fullWidth = false }
+            add(String(localized: "Standard Width"), "arrow.left.and.right", in: .view) { fullWidth = false }
         } else {
-            add(String(localized: "Full Width"), "arrow.left.and.right") { fullWidth = true }
+            add(String(localized: "Full Width"), "arrow.left.and.right", in: .view) { fullWidth = true }
         }
         let settingsTitle = String(localized: "Settings…")
-        entries.append(Entry(id: "command:" + settingsTitle, title: settingsTitle, icon: .symbol("gearshape"), shortcut: "⌘,", takesFocus: true) {
+        entries.append(Entry(id: "command:" + settingsTitle, title: settingsTitle, icon: .symbol("gearshape"), shortcut: "⌘,", takesFocus: true, group: .settings) {
             browser.showSettings()
         })
         for page in SettingsPage.allCases {
             let title = String(localized: "Settings: \(page.title)")
-            entries.append(Entry(id: "command:" + title, title: title, icon: .symbol(page.symbol), takesFocus: true) {
+            entries.append(Entry(id: "command:" + title, title: title, icon: .symbol(page.symbol), takesFocus: true, group: .settings) {
                 browser.showSettings(page)
             })
         }
@@ -744,12 +755,12 @@ struct CommandPalette: View {
         }
     }
 
-    static let searchNotesID = "command:searchNotesFor"
+    static let searchItemsID = "command:searchItemsFor"
 
-    /// The last row under Items: the same words, searched in the text of every note.
-    private var searchNotesEntry: Entry {
+    /// The last row under Items: the same words, searched in the text of every item.
+    private var searchItemsEntry: Entry {
         let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        return Entry(id: Self.searchNotesID, title: String(localized: "Search Notes for “\(typed)”"), icon: .symbol("magnifyingglass"),
+        return Entry(id: Self.searchItemsID, title: String(localized: "Search Items for “\(typed)”"), icon: .symbol("magnifyingglass"),
                      shortcut: "⇧⌘P", takesFocus: true) {
             browser.paletteSeed = typed
             browser.palette = .search
@@ -757,7 +768,7 @@ struct CommandPalette: View {
     }
 
     /// An item by title, with its type.
-    private func note(_ item: Item) -> Entry {
+    private func itemEntry(_ item: Item) -> Entry {
         Entry(id: "note:\(item.id)", title: item.displayTitle, detail: library.placeLabel(of: item),
               icon: .type(library.catalogue.icon(for: item.type)), item: item.id, takesFocus: true) {
             reveal(item)

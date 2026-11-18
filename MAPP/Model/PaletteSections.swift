@@ -6,7 +6,9 @@ import Foundation
 nonisolated enum PaletteSections {
     nonisolated enum Kind: Hashable, Sendable {
         case recent, items, places, commands
-        /// Search Notes: notes whose title has what was typed, then notes whose text does.
+        /// ⌘K with nothing typed: the commands that sit under one menu heading.
+        case group(CommandGroup)
+        /// Search Items: items whose title has what was typed, then items whose text does.
         case titles, inTheText
 
         var title: String {
@@ -15,8 +17,35 @@ nonisolated enum PaletteSections {
             case .items: String(localized: "Items")
             case .places: String(localized: "Places")
             case .commands: String(localized: "Commands")
+            case .group(let group): group.title
             case .titles: String(localized: "Titles")
             case .inTheText: String(localized: "In the Text")
+            }
+        }
+    }
+
+    /// The menu a command of ⌘K belongs under, in the menu bar's order. With nothing typed ⌘K lists its commands in
+    /// these groups, each under the menu's own name; the View menu is split at its dividers.
+    nonisolated enum CommandGroup: Int, CaseIterable, Hashable, Sendable {
+        case file, edit, format, view, sortAndGroup, textSize, go, looks, settings
+        #if DEBUG
+        case debug
+        #endif
+
+        var title: String {
+            switch self {
+            case .file: String(localized: "File")
+            case .edit: String(localized: "Edit")
+            case .format: String(localized: "Format")
+            case .view: String(localized: "View")
+            case .sortAndGroup: String(localized: "Sort and Group")
+            case .textSize: String(localized: "Text Size")
+            case .go: String(localized: "Go")
+            case .looks: String(localized: "Looks")
+            case .settings: String(localized: "Settings")
+            #if DEBUG
+            case .debug: "Debug"
+            #endif
             }
         }
     }
@@ -29,20 +58,24 @@ nonisolated enum PaletteSections {
     /// The most recent items ⌘K lists before anything is typed.
     static let recentLimit = 5
 
-    /// The most items ⌘K lists under Items, so Places and Commands stay in view. Search Notes has the rest.
+    /// The most items ⌘K lists under Items, so Places and Commands stay in view. Search Items has the rest.
     static let itemLimit = 8
 
-    /// ⌘K's sections. Before anything is typed, the most recent items and then every command. Once something is
+    /// ⌘K's sections. Before anything is typed, the most recent items and then every command, in a section for each
+    /// menu group that has one (`groups` holds each command's, by its place among the fixed picks), the groups in the
+    /// menu bar's order and the commands of a group in the order they were given. Once something is
     /// typed, the items, the places and the commands that answer it, each in the order it was ranked and each only
     /// if it has rows. The section holding the best match (`scores`, one per pick, lower is better) comes first, so
     /// Return runs it; sections whose best matches tie keep the order Items, Places, Commands. Items are cut to
-    /// `itemLimit`, and a last row sends the rest to Search Notes. `commandCount` is how many of the fixed picks
-    /// (commands first, then places) are commands.
-    static func forCommands(picks: [PaletteMatch.Pick], scores: [Int] = [], typed: Bool, commandCount: Int, recentCount: Int) -> [Section<PaletteMatch.Pick>] {
+    /// `itemLimit`, and a last row sends the rest to Search Items. The fixed picks are the commands, which `groups`
+    /// holds one entry for each, and then the places.
+    static func forCommands(picks: [PaletteMatch.Pick], scores: [Int] = [], typed: Bool, groups: [CommandGroup], recentCount: Int) -> [Section<PaletteMatch.Pick>] {
         guard typed else {
             let recent = (0..<min(recentCount, recentLimit)).map(PaletteMatch.Pick.item)
-            let commands = (0..<commandCount).map(PaletteMatch.Pick.fixed)
-            return dropEmpty([.init(kind: .recent, rows: recent), .init(kind: .commands, rows: commands)])
+            let grouped = CommandGroup.allCases.map { group in
+                Section(kind: .group(group), rows: groups.indices.filter { groups[$0] == group }.map(PaletteMatch.Pick.fixed))
+            }
+            return dropEmpty([.init(kind: .recent, rows: recent)] + grouped)
         }
         var items: [PaletteMatch.Pick] = []
         var places: [PaletteMatch.Pick] = []
@@ -52,14 +85,14 @@ nonisolated enum PaletteSections {
             let kind: Kind
             switch pick {
             case .item: kind = .items; items.append(pick)
-            case .searchNotes: continue
+            case .searchItems: continue
             case .fixed(let index):
-                if index < commandCount { kind = .commands; commands.append(pick) } else { kind = .places; places.append(pick) }
+                if index < groups.count { kind = .commands; commands.append(pick) } else { kind = .places; places.append(pick) }
             }
             let score = position < scores.count ? scores[position] : 0
             best[kind] = min(best[kind] ?? score, score)
         }
-        if items.count > itemLimit { items = Array(items.prefix(itemLimit)) + [.searchNotes] }
+        if items.count > itemLimit { items = Array(items.prefix(itemLimit)) + [.searchItems] }
         let sections = dropEmpty([.init(kind: .items, rows: items), .init(kind: .places, rows: places), .init(kind: .commands, rows: commands)])
         // A stable sort keeps the order above for sections whose best matches tie.
         return sections.enumerated().sorted { a, b in
@@ -67,8 +100,8 @@ nonisolated enum PaletteSections {
         }.map(\.element)
     }
 
-    /// Search Notes' sections: what was found by title, then what was found by its text, each in the order the
-    /// library ranked them. With nothing typed, the recent notes under one heading.
+    /// Search Items' sections: what was found by title, then what was found by its text, each in the order the
+    /// library ranked them. With nothing typed, the recent items under one heading.
     static func forSearch<Row>(rows: [Row], typed: Bool, inTitle: (Row) -> Bool) -> [Section<Row>] {
         guard typed else { return dropEmpty([.init(kind: .recent, rows: rows)]) }
         return dropEmpty([
@@ -82,7 +115,7 @@ nonisolated enum PaletteSections {
     }
 
     /// The count the field shows: the rows that are results, once something is typed. A row that only sends the
-    /// person elsewhere, such as the one that searches the notes, is not a result.
+    /// person elsewhere, such as the one that searches the items, is not a result.
     static func resultCount<Row>(_ sections: [Section<Row>], counting isResult: (Row) -> Bool = { _ in true }) -> Int {
         sections.reduce(0) { $0 + $1.rows.filter(isResult).count }
     }

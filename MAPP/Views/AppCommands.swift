@@ -68,7 +68,7 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(after: .textEditing) {
-            palette("Search Notes…", systemImage: "magnifyingglass", .search)
+            palette("Search Items…", systemImage: "magnifyingglass", .search)
                 .keyboardShortcut("p", modifiers: [.command, .shift])
             palette("Command Palette", systemImage: "command", .commands, asksActionsWhenOut: true)
                 .keyboardShortcut("k")

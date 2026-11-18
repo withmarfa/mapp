@@ -422,6 +422,16 @@ extension Browser {
         quickAdd.isPresented = true
     }
 
+    /// Opens quick add for what a palette found nothing for, with the words typed as the title of a new draft. The
+    /// words are trimmed, and nothing typed leaves the title empty. A draft already holding something comes back as
+    /// it was, its title untouched, since the person's own draft wins.
+    func openQuickAdd(titled typed: String, remembered: String? = nil, in library: any ItemLibrary) {
+        let keepsDraft = quickAdd.holdsContent
+        openQuickAdd(remembered: remembered, in: library)
+        let words = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !keepsDraft, !words.isEmpty { quickAdd.draft?.title = words }
+    }
+
     /// Changes the kind of item, keeping what was typed and the files given. A place, property or chip the new
     /// kind cannot take is dropped.
     func chooseQuickAddType(_ typeID: String, in library: any ItemLibrary) {
