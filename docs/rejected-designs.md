@@ -82,6 +82,20 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 - **A back button from an open collection**, for now.
 - **The bottom-right corner as a strip along the page's foot.**
 
+## The toolbar, the corner and opening an item
+
+- **Save as View… in the toolbar.** It is the last item of View Options.
+- **New Collection in the toolbar, with only the tabs on the page.** New Collection is on the page.
+- **Search beside an index page's tabs.** Search is in the toolbar.
+- **The Calendar's controls in the toolbar, or as one glass bar with dividers.** They are separate buttons in the corner.
+- **Today, Week and Month inside the month card.** The buttons stay, and the month opens above them.
+- **Small, Medium and Large as segments in the corner.** The size is one control, named, with a menu.
+- **Separate Zoom In, Zoom Out and Fit buttons.** Zoom is one control with a menu.
+- **"Page 3 of 12".** It reads "3 of 12".
+- **A Format panel copied from the iPhone's Notes.** MAPP's own formats, from its Format menu, in a compact card.
+- **An item's page sliding in over the list from the right (a side peek).** An item opens in a modal, a full page or a window.
+- **A back button labeled with the place, such as "‹ Items", or a path such as Items › name**, for now. Back has no label.
+
 ## Status
 
 - **Drawn status rings.** Status uses the app's SF Symbols.
