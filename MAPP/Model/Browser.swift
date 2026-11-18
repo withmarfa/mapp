@@ -182,7 +182,7 @@ final class Browser {
     /// Whether the search covers only the place shown rather than everything. It applies wherever the place can be
     /// searched alone (`SearchScope.narrows`) and means everything elsewhere.
     var searchesPlace = false
-    /// Where the keyboard should go next, asked for by an action such as New Note or Search Notes. Whatever
+    /// Where the keyboard should go next, asked for by an action such as New Item or Search Items. Whatever
     /// can take it grants it once, when it is able to, and clears it.
     var focusRequest: Pane?
     /// The palette that is out, if any: ⌘K's commands, or ⇧⌘P's search of every item. One panel is out at a time,
@@ -194,7 +194,7 @@ final class Browser {
             quickAdd.isPresented = false
         }
     }
-    /// What the next palette starts with typed, as ⌘K's "Search Notes for" hands its words on.
+    /// What the next palette starts with typed, as ⌘K's "Search Items for" hands its words on.
     var paletteSeed = ""
     /// Counts the ⌘K pressed while a palette is out, which opens or shuts its Actions.
     var paletteActionsRequests = 0

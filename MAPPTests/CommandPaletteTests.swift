@@ -76,22 +76,61 @@ struct CommandPaletteTests {
 
     private typealias Pick = PaletteMatch.Pick
 
+    /// `count` commands that all sit under File.
+    private static func files(_ count: Int) -> [PaletteSections.CommandGroup] { Array(repeating: .file, count: count) }
+
     @Test func beforeTypingItListsTheRecentItemsThenEveryCommandAndNoPlace() {
-        let sections = PaletteSections.forCommands(picks: [], typed: false, commandCount: 3, recentCount: 8)
-        #expect(sections.map(\.kind) == [.recent, .commands])
+        let sections = PaletteSections.forCommands(picks: [], typed: false, groups: Self.files(3), recentCount: 8)
+        #expect(sections.map(\.kind) == [.recent, .group(.file)])
         #expect(sections[0].rows == (0..<PaletteSections.recentLimit).map(Pick.item))
         #expect(sections[1].rows == [.fixed(0), .fixed(1), .fixed(2)])
     }
 
-    @Test func beforeTypingAnEmptyLibraryLeavesOnlyTheCommands() {
-        let sections = PaletteSections.forCommands(picks: [], typed: false, commandCount: 2, recentCount: 0)
+    @Test func beforeTypingTheCommandsSitInTheirMenusInTheMenuBarsOrderAndEmptyGroupsAreDropped() {
+        // Go, View, Settings, Looks, File, Edit, File: given out of order, listed in the menu bar's order, which opens
+        // with the app menu and holds Looks in the File menu.
+        let groups: [PaletteSections.CommandGroup] = [.go, .view, .settings, .looks, .file, .edit, .file, .sortAndGroup]
+        let sections = PaletteSections.forCommands(picks: [], typed: false, groups: groups, recentCount: 0)
+        #expect(sections.map(\.kind) == [.group(.settings), .group(.file), .group(.looks), .group(.edit), .group(.view), .group(.sortAndGroup), .group(.go)])
+        #expect(sections[1].rows == [.fixed(4), .fixed(6)], "a group keeps its commands in the order given")
+        #expect(sections.map(\.kind.title) == ["Settings", "File", "Looks", "Edit", "View", "Sort and Group", "Go"])
+    }
+
+    @Test func theGroupsFollowTheMenuBarFromTheAppMenuToDebug() {
+        let titles = PaletteSections.CommandGroup.allCases.map(\.title)
+        #expect(titles.prefix(9) == ["Settings", "File", "Looks", "Edit", "Format", "View", "Sort and Group", "Text Size", "Go"])
+        #if DEBUG
+        #expect(titles.last == "Debug", "Debug comes last")
+        #endif
+    }
+
+    @Test func beforeTypingACommandOnlyTypingFindsIsNotListedAndOnceTypedItIsStillRanked() {
+        // Fixed 1 is a "New Task" row: in no menu group, so only a typed query lists it.
+        let groups: [PaletteSections.CommandGroup?] = [.file, nil, .file]
+        let untyped = PaletteSections.forCommands(picks: [], typed: false, groups: groups, recentCount: 0)
+        #expect(untyped.map(\.kind) == [.group(.file)])
+        #expect(untyped[0].rows == [.fixed(0), .fixed(2)])
+        let typed = PaletteSections.forCommands(picks: [.fixed(1), .fixed(0)], scores: [0, 1], typed: true, groups: groups, recentCount: 0)
+        #expect(typed.map(\.kind) == [.commands])
+        #expect(typed[0].rows == [.fixed(1), .fixed(0)])
+    }
+
+    @Test func typingKeepsOneRankedCommandsSectionWhateverTheGroups() {
+        let groups: [PaletteSections.CommandGroup] = [.view, .file, .go]
+        let sections = PaletteSections.forCommands(picks: [.fixed(2), .fixed(0), .fixed(1)], scores: [0, 1, 2], typed: true, groups: groups, recentCount: 0)
         #expect(sections.map(\.kind) == [.commands])
+        #expect(sections[0].rows == [.fixed(2), .fixed(0), .fixed(1)], "in score order, so Return runs the best match")
+    }
+
+    @Test func beforeTypingAnEmptyLibraryLeavesOnlyTheCommands() {
+        let sections = PaletteSections.forCommands(picks: [], typed: false, groups: Self.files(2), recentCount: 0)
+        #expect(sections.map(\.kind) == [.group(.file)])
     }
 
     @Test func typingSplitsTheRankedRowsIntoItemsPlacesAndCommandsKeepingTheirOrder() {
         // Commands are fixed 0 and 1, places are fixed 2 and 3.
         let picks: [Pick] = [.fixed(3), .item(4), .fixed(1), .item(0), .fixed(2), .fixed(0)]
-        let sections = PaletteSections.forCommands(picks: picks, typed: true, commandCount: 2, recentCount: 9)
+        let sections = PaletteSections.forCommands(picks: picks, typed: true, groups: Self.files(2), recentCount: 9)
         #expect(sections.map(\.kind) == [.items, .places, .commands])
         #expect(sections[0].rows == [.item(4), .item(0)])
         #expect(sections[1].rows == [.fixed(3), .fixed(2)])
@@ -102,11 +141,11 @@ struct CommandPaletteTests {
     /// The sections ⌘K lists for a typed title, ranked as the palette ranks them. Commands are the first fixed titles.
     private func sections(fixed: [String], commandCount: Int, items: [String], typing query: String) -> [PaletteSections.Section<Pick>] {
         let scored = PaletteMatch.Titles().scoredPicks(fixed: fixed, items: items, query)
-        return PaletteSections.forCommands(picks: scored.map(\.pick), scores: scored.map(\.score), typed: true, commandCount: commandCount, recentCount: items.count)
+        return PaletteSections.forCommands(picks: scored.map(\.pick), scores: scored.map(\.score), typed: true, groups: Self.files(commandCount), recentCount: items.count)
     }
 
     @Test func theSectionHoldingTheBestMatchComesFirstSoReturnRunsTheCommandTyped() {
-        let sections = sections(fixed: ["New Item", "New Note", "Inbox"], commandCount: 2, items: ["Test the new item flow", "Garden ideas"], typing: "new item")
+        let sections = sections(fixed: ["New Item", "New Task", "Inbox"], commandCount: 2, items: ["Test the new item flow", "Garden ideas"], typing: "new item")
         #expect(sections.map(\.kind) == [.commands, .items])
         #expect(sections[0].rows.first == .fixed(0), "New Item is the first row")
         #expect(sections[1].rows == [.item(0)])
@@ -120,35 +159,35 @@ struct CommandPaletteTests {
     @Test func sectionsWhoseBestMatchesTieKeepItemsFirst() {
         let sections = sections(fixed: ["Rename Item", "Inbox"], commandCount: 1, items: ["Rename the shed", "Rename Garden"], typing: "ren")
         #expect(sections.first?.kind == .items)
-        let tied = PaletteSections.forCommands(picks: [.fixed(0), .item(0)], scores: [1, 1], typed: true, commandCount: 1, recentCount: 1)
+        let tied = PaletteSections.forCommands(picks: [.fixed(0), .item(0)], scores: [1, 1], typed: true, groups: Self.files(1), recentCount: 1)
         #expect(tied.map(\.kind) == [.items, .commands])
     }
 
     @Test func aPlaceLeadsWhenItHoldsTheBestMatch() {
-        let sections = sections(fixed: ["New Note", "Inbox"], commandCount: 1, items: ["Move to the inbox"], typing: "inbox")
+        let sections = sections(fixed: ["New Item", "Inbox"], commandCount: 1, items: ["Move to the inbox"], typing: "inbox")
         #expect(sections.map(\.kind) == [.places, .items])
     }
 
-    @Test func itemsAreCutToEightWithALastRowThatSearchesTheNotes() {
+    @Test func itemsAreCutToEightWithALastRowThatSearchesTheItems() {
         let picks: [Pick] = (0..<52).map(Pick.item) + [.fixed(1), .fixed(0)]
-        let sections = PaletteSections.forCommands(picks: picks, typed: true, commandCount: 1, recentCount: 60)
+        let sections = PaletteSections.forCommands(picks: picks, typed: true, groups: Self.files(1), recentCount: 60)
         #expect(sections.map(\.kind) == [.items, .places, .commands])
-        #expect(sections[0].rows == (0..<PaletteSections.itemLimit).map(Pick.item) + [.searchNotes])
+        #expect(sections[0].rows == (0..<PaletteSections.itemLimit).map(Pick.item) + [.searchItems])
         #expect(sections[1].rows == [.fixed(1)])
         #expect(sections[2].rows == [.fixed(0)])
     }
 
-    @Test func eightItemsOrFewerNeedNoRowToSearchTheNotes() {
+    @Test func eightItemsOrFewerNeedNoRowToSearchTheItems() {
         let picks: [Pick] = (0..<PaletteSections.itemLimit).map(Pick.item)
-        let sections = PaletteSections.forCommands(picks: picks, typed: true, commandCount: 0, recentCount: 20)
+        let sections = PaletteSections.forCommands(picks: picks, typed: true, groups: Self.files(0), recentCount: 20)
         #expect(sections[0].rows == picks)
     }
 
-    @Test func theCountLeavesOutTheRowThatSearchesTheNotes() {
+    @Test func theCountLeavesOutTheRowThatSearchesTheItems() {
         let picks: [Pick] = (0..<52).map(Pick.item) + [.fixed(0)]
-        let sections = PaletteSections.forCommands(picks: picks, typed: true, commandCount: 1, recentCount: 60)
+        let sections = PaletteSections.forCommands(picks: picks, typed: true, groups: Self.files(1), recentCount: 60)
         #expect(PaletteSections.resultCount(sections) == PaletteSections.itemLimit + 2)
-        #expect(PaletteSections.resultCount(sections) { $0 != .searchNotes } == PaletteSections.itemLimit + 1)
+        #expect(PaletteSections.resultCount(sections) { $0 != .searchItems } == PaletteSections.itemLimit + 1)
     }
 
     @Test func repeatedIdsAreMadeDistinctAndKeepTheirOrder() {
@@ -160,9 +199,9 @@ struct CommandPaletteTests {
     }
 
     @Test func aSectionWithNoRowsIsDropped() {
-        let sections = PaletteSections.forCommands(picks: [.fixed(0), .item(1)], typed: true, commandCount: 1, recentCount: 2)
+        let sections = PaletteSections.forCommands(picks: [.fixed(0), .item(1)], typed: true, groups: Self.files(1), recentCount: 2)
         #expect(sections.map(\.kind) == [.items, .commands])
-        let none = PaletteSections.forCommands(picks: [], typed: true, commandCount: 4, recentCount: 2)
+        let none = PaletteSections.forCommands(picks: [], typed: true, groups: Self.files(4), recentCount: 2)
         #expect(none.isEmpty)
         #expect(PaletteSections.resultCount(none) == 0)
     }
@@ -178,7 +217,7 @@ struct CommandPaletteTests {
         #expect(PaletteSections.forSearch(rows: [String](), typed: true) { _ in true }.isEmpty)
     }
 
-    @Test func searchWithNothingTypedListsTheRecentNotes() {
+    @Test func searchWithNothingTypedListsTheRecentItems() {
         let sections = PaletteSections.forSearch(rows: ["a", "b"], typed: false) { _ in true }
         #expect(sections.map(\.kind) == [.recent])
     }

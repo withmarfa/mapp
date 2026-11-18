@@ -16,8 +16,10 @@ struct PaletteEntry: Identifiable {
     var shortcut: String?
     /// Set for an item, which Actions offers more for than a command.
     var item: ItemID?
-    /// Another interface takes the keyboard itself, so the note should not regain focus first.
+    /// Another interface takes the keyboard itself, so the page should not regain focus first.
     var takesFocus = false
+    /// The menu group ⌘K lists it under with nothing typed; nil for a command only typing finds.
+    var group: PaletteSections.CommandGroup? = .file
     let action: () -> Void
 }
 
@@ -36,9 +38,12 @@ enum PaletteMetrics {
     static let markGap: CGFloat = 10
     /// The tallest the results grow, the filter row included; the bar adds its own height under them.
     static let resultsHeight: CGFloat = 460
+    /// The results' height with nothing found, so the palette is about 400 points tall with its field: taller than a
+    /// line of text asks for, and shorter than a full list.
+    static let emptyResultsHeight: CGFloat = 302
 }
 
-/// The bar at the foot of the results, which rows scroll under: the filter button in Search Notes, and Open and Actions.
+/// The bar at the foot of the results, which rows scroll under: the filter button in Search Items, and Open and Actions.
 enum PaletteBar {
     static let inset: CGFloat = 10
     static let spacing: CGFloat = 8
@@ -89,7 +94,7 @@ struct PaletteRow: View {
     let entry: PaletteEntry
     let query: String
     let isHighlighted: Bool
-    /// Search Notes shows two lines on every row, so its rows are all one height: the title, then the words around the
+    /// Search Items shows two lines on every row, so its rows are all one height: the title, then the words around the
     /// match or the item's own words. The command palette's rows, commands among them, all take one line.
     let isSearch: Bool
     let onHover: () -> Void
@@ -168,7 +173,8 @@ struct KeyCap: View {
 struct PaletteFooter: View {
     let openTitle: String
     let onOpen: () -> Void
-    let onActions: () -> Void
+    /// Nil where there is nothing to act on, as when nothing was found and the bar only offers New Item.
+    let onActions: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -179,16 +185,18 @@ struct PaletteFooter: View {
                 }
             }
             .accessibilityIdentifier("CommandPaletteOpen")
-            Button(action: onActions) {
-                HStack(spacing: 6) {
-                    Text("Actions")
-                    HStack(spacing: 2) {
-                        KeyCap(key: "⌘")
-                        KeyCap(key: "K")
+            if let onActions {
+                Button(action: onActions) {
+                    HStack(spacing: 6) {
+                        Text("Actions")
+                        HStack(spacing: 2) {
+                            KeyCap(key: "⌘")
+                            KeyCap(key: "K")
+                        }
                     }
                 }
+                .accessibilityIdentifier("CommandPaletteActions")
             }
-            .accessibilityIdentifier("CommandPaletteActions")
         }
         .buttonStyle(PaletteSegmentStyle())
         .font(.system(size: PaletteBar.fontSize))
@@ -219,7 +227,7 @@ private struct PaletteSegmentStyle: ButtonStyle {
     }
 }
 
-/// The glass button at the bar's left in Search Notes that shows and hides the filter row. With filters set, it shows
+/// The glass button at the bar's left in Search Items that shows and hides the filter row. With filters set, it shows
 /// their number beside its symbol and a soft fill inside its glass, in the bar's own neutral color.
 struct PaletteFilterButton: View {
     let count: Int

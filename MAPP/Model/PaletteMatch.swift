@@ -60,8 +60,8 @@ nonisolated enum PaletteMatch {
     enum Pick: Equatable, Sendable {
         case fixed(Int)
         case item(Int)
-        /// The last row of a cut-short Items section: the rest of the answer, in Search Notes.
-        case searchNotes
+        /// The last row of a cut-short Items section: the rest of the answer, in Search Items.
+        case searchItems
     }
 
     /// The most items a typed query lists. Entries are built for these only, never for every item in the library.

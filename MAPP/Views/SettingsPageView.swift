@@ -82,7 +82,7 @@ private struct AppearanceSettings: View {
             } header: {
                 Text("Panels")
             } footer: {
-                Text("Value panels open under a date, status, tags, or other value. Palettes are the command palette, Search Notes, and New Item. Translucent uses the system’s popover material, and Solid uses the window color.")
+                Text("Value panels open under a date, status, tags, or other value. Palettes are the command palette, Search Items, and New Item. Translucent uses the system’s popover material, and Solid uses the window color.")
             }
             Section {
                 ToolbarOptions()

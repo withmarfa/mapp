@@ -5,6 +5,8 @@ import SwiftUI
 struct ViewOptionCommand {
     let title: String
     let systemImage: String
+    /// The menu group ⌘K lists it under: the View menu's, unless it sorts or groups.
+    var group = PaletteSections.CommandGroup.view
     let action: () -> Void
 
     /// - Parameter storedColumns: Each place's table columns as kept (`ItemTableColumnLayouts`).
@@ -26,12 +28,12 @@ struct ViewOptionCommand {
         let first = content.sort.first
         var commands: [ViewOptionCommand] = []
         if browser.isSearching, !browser.ordersByRelevance {
-            commands.append(.init(title: String(localized: "Sort by Relevance"), systemImage: "arrow.up.arrow.down") {
+            commands.append(.init(title: String(localized: "Sort by Relevance"), systemImage: "arrow.up.arrow.down", group: .sortAndGroup) {
                 browser.orderSearch(byRelevance: true)
             })
         }
         for column in content.columns where browser.showsColumn(column, stored: storedColumns.wrappedValue) && column.id != first?.column.id {
-            commands.append(.init(title: String(localized: "Sort by \(column.label)"), systemImage: "arrow.up.arrow.down") {
+            commands.append(.init(title: String(localized: "Sort by \(column.label)"), systemImage: "arrow.up.arrow.down", group: .sortAndGroup) {
                 browser.orderSearch(byRelevance: false)
                 browser.tableOptions[place, default: .init()].sort = [ItemTableComparator(column: column, order: column.firstOrder)]
             })
@@ -39,19 +41,19 @@ struct ViewOptionCommand {
         if let first {
             let reversed: SortOrder = first.order == .forward ? .reverse : .forward
             let title = reversed == .forward ? first.column.ascendingTitle : first.column.descendingTitle
-            commands.append(.init(title: String(localized: "Sort \(title)"), systemImage: "arrow.up.arrow.down") {
+            commands.append(.init(title: String(localized: "Sort \(title)"), systemImage: "arrow.up.arrow.down", group: .sortAndGroup) {
                 browser.tableOptions[place, default: .init()].sort = [ItemTableComparator(column: first.column, order: reversed)]
                     + content.sort.dropFirst()
             })
         }
         for column in content.categoricalColumns where column.id != content.grouping?.id {
-            commands.append(.init(title: String(localized: "Group by \(column.label)"), systemImage: "rectangle.grid.1x2") {
+            commands.append(.init(title: String(localized: "Group by \(column.label)"), systemImage: "rectangle.grid.1x2", group: .sortAndGroup) {
                 browser.tableOptions[place, default: .init()].grouping = .column(column.id)
                 browser.tableOptions[place, default: .init()].collapsed = nil
             })
         }
         if content.grouping != nil {
-            commands.append(.init(title: String(localized: "Ungroup"), systemImage: "rectangle.grid.1x2") {
+            commands.append(.init(title: String(localized: "Ungroup"), systemImage: "rectangle.grid.1x2", group: .sortAndGroup) {
                 browser.tableOptions[place, default: .init()].grouping = .none
                 browser.tableOptions[place, default: .init()].collapsed = nil
             })
@@ -97,7 +99,7 @@ struct ViewOptionCommand {
         let fields = browser.boardFieldChoices(in: library)
         let field = ItemBoardLayout.selectedField(browser.boardFieldKey(in: place), available: fields)
         var commands = fields.filter { $0.key != field?.key }.map { field in
-            ViewOptionCommand(title: String(localized: "Group by \(field.label)"), systemImage: "rectangle.split.3x1") {
+            ViewOptionCommand(title: String(localized: "Group by \(field.label)"), systemImage: "rectangle.split.3x1", group: .sortAndGroup) {
                 browser.setBoardField(field.key, in: place)
             }
         }

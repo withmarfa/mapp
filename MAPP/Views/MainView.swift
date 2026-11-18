@@ -243,7 +243,7 @@ struct MainView: View {
                     browser.focusRequest = .list
                 } content: {
                     CommandPalette(browser: browser, editor: editor, mode: palette)
-                        // Each palette starts afresh, as ⌘K's Search Notes moves from one to the other.
+                        // Each palette starts afresh, as ⌘K's Search Items moves from one to the other.
                         .id(palette)
                 }
             } else if browser.quickAdd.isPresented, browser.quickAdd.draft != nil {
