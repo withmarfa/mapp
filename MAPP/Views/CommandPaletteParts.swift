@@ -18,8 +18,8 @@ struct PaletteEntry: Identifiable {
     var item: ItemID?
     /// Another interface takes the keyboard itself, so the page should not regain focus first.
     var takesFocus = false
-    /// For a command, the menu group ⌘K lists it under while nothing is typed.
-    var group = PaletteSections.CommandGroup.file
+    /// The menu group ⌘K lists it under with nothing typed; nil for a command only typing finds.
+    var group: PaletteSections.CommandGroup? = .file
     let action: () -> Void
 }
 
@@ -133,7 +133,6 @@ struct PaletteRow: View {
             if case .active = phase { onHover() }
         }
         .onTapGesture(perform: onRun)
-        .help("")
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityAddTraits(isHighlighted ? .isSelected : [])
@@ -185,7 +184,6 @@ struct PaletteFooter: View {
                     KeyCap(key: "↩")
                 }
             }
-            .help("")
             .accessibilityIdentifier("CommandPaletteOpen")
             if let onActions {
                 Button(action: onActions) {
@@ -197,7 +195,6 @@ struct PaletteFooter: View {
                         }
                     }
                 }
-                .help("")
                 .accessibilityIdentifier("CommandPaletteActions")
             }
         }
@@ -258,7 +255,6 @@ struct PaletteFilterButton: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.primary)
-        .help("")
         .accessibilityLabel(isOn ? "Hide Filters" : "Show Filters")
         .accessibilityValue(count > 0 ? Text("\(count) set") : Text(""))
         .accessibilityIdentifier("CommandPaletteFilters")
@@ -531,7 +527,6 @@ struct PaletteActionsPanel: View {
         .padding(.vertical, 5)
         .background(isHighlighted ? paletteSelection : .clear, in: .rect(cornerRadius: 8, style: .continuous))
         .contentShape(.rect)
-        .help("")
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityAddTraits(isHighlighted ? .isSelected : [])

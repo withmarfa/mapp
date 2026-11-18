@@ -212,7 +212,6 @@ struct CommandPalette: View {
             try? await Task.sleep(for: .milliseconds(50))
             focus = .field
         }
-        .help("")
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Command Palette")
     }
@@ -611,7 +610,7 @@ struct CommandPalette: View {
             })
             for type in QuickAdd.types(in: library) {
                 entries.append(Entry(id: "command:new:" + type.id.rawValue, title: String(localized: "New \(type.label)"),
-                                     icon: .type(library.catalogue.icon(for: type.id)), takesFocus: true) {
+                                     icon: .type(library.catalogue.icon(for: type.id)), takesFocus: true, group: nil) {
                     browser.openQuickAdd(typeID: type.id.rawValue, in: library)
                 })
             }

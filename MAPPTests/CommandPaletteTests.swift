@@ -87,13 +87,32 @@ struct CommandPaletteTests {
     }
 
     @Test func beforeTypingTheCommandsSitInTheirMenusInTheMenuBarsOrderAndEmptyGroupsAreDropped() {
-        // View, Go, File, Sort and Group, File, View: given out of order, listed in the menu bar's order.
-        let groups: [PaletteSections.CommandGroup] = [.view, .go, .file, .sortAndGroup, .file, .view]
+        // Go, View, Settings, Looks, File, Edit, File: given out of order, listed in the menu bar's order, which opens
+        // with the app menu and holds Looks in the File menu.
+        let groups: [PaletteSections.CommandGroup] = [.go, .view, .settings, .looks, .file, .edit, .file, .sortAndGroup]
         let sections = PaletteSections.forCommands(picks: [], typed: false, groups: groups, recentCount: 0)
-        #expect(sections.map(\.kind) == [.group(.file), .group(.view), .group(.sortAndGroup), .group(.go)])
-        #expect(sections[0].rows == [.fixed(2), .fixed(4)], "a group keeps its commands in the order given")
-        #expect(sections[1].rows == [.fixed(0), .fixed(5)])
-        #expect(sections.map(\.kind.title) == ["File", "View", "Sort and Group", "Go"])
+        #expect(sections.map(\.kind) == [.group(.settings), .group(.file), .group(.looks), .group(.edit), .group(.view), .group(.sortAndGroup), .group(.go)])
+        #expect(sections[1].rows == [.fixed(4), .fixed(6)], "a group keeps its commands in the order given")
+        #expect(sections.map(\.kind.title) == ["Settings", "File", "Looks", "Edit", "View", "Sort and Group", "Go"])
+    }
+
+    @Test func theGroupsFollowTheMenuBarFromTheAppMenuToDebug() {
+        let titles = PaletteSections.CommandGroup.allCases.map(\.title)
+        #expect(titles.prefix(9) == ["Settings", "File", "Looks", "Edit", "Format", "View", "Sort and Group", "Text Size", "Go"])
+        #if DEBUG
+        #expect(titles.last == "Debug", "Debug comes last")
+        #endif
+    }
+
+    @Test func beforeTypingACommandOnlyTypingFindsIsNotListedAndOnceTypedItIsStillRanked() {
+        // Fixed 1 is a "New Task" row: in no menu group, so only a typed query lists it.
+        let groups: [PaletteSections.CommandGroup?] = [.file, nil, .file]
+        let untyped = PaletteSections.forCommands(picks: [], typed: false, groups: groups, recentCount: 0)
+        #expect(untyped.map(\.kind) == [.group(.file)])
+        #expect(untyped[0].rows == [.fixed(0), .fixed(2)])
+        let typed = PaletteSections.forCommands(picks: [.fixed(1), .fixed(0)], scores: [0, 1], typed: true, groups: groups, recentCount: 0)
+        #expect(typed.map(\.kind) == [.commands])
+        #expect(typed[0].rows == [.fixed(1), .fixed(0)])
     }
 
     @Test func typingKeepsOneRankedCommandsSectionWhateverTheGroups() {

@@ -24,10 +24,11 @@ nonisolated enum PaletteSections {
         }
     }
 
-    /// The menu a command of ⌘K belongs under, in the menu bar's order. With nothing typed ⌘K lists its commands in
-    /// these groups, each under the menu's own name; the View menu is split at its dividers.
+    /// The menu a command of ⌘K belongs under, in the menu bar's order: the app menu (Settings), then File with Looks,
+    /// which its menu holds, and the rest. With nothing typed ⌘K lists its commands in these groups, each under the
+    /// menu's own name; the View menu is split at its dividers.
     nonisolated enum CommandGroup: Int, CaseIterable, Hashable, Sendable {
-        case file, edit, format, view, sortAndGroup, textSize, go, looks, settings
+        case settings, file, looks, edit, format, view, sortAndGroup, textSize, go
         #if DEBUG
         case debug
         #endif
@@ -62,14 +63,15 @@ nonisolated enum PaletteSections {
     static let itemLimit = 8
 
     /// ⌘K's sections. Before anything is typed, the most recent items and then every command, in a section for each
-    /// menu group that has one (`groups` holds each command's, by its place among the fixed picks), the groups in the
-    /// menu bar's order and the commands of a group in the order they were given. Once something is
+    /// menu group that has one (`groups` holds each command's, by its place among the fixed picks; nil is a command
+    /// only typing finds, as New Task is), the groups in the menu bar's order and the commands of a group in the order
+    /// they were given. Once something is
     /// typed, the items, the places and the commands that answer it, each in the order it was ranked and each only
     /// if it has rows. The section holding the best match (`scores`, one per pick, lower is better) comes first, so
     /// Return runs it; sections whose best matches tie keep the order Items, Places, Commands. Items are cut to
     /// `itemLimit`, and a last row sends the rest to Search Items. The fixed picks are the commands, which `groups`
     /// holds one entry for each, and then the places.
-    static func forCommands(picks: [PaletteMatch.Pick], scores: [Int] = [], typed: Bool, groups: [CommandGroup], recentCount: Int) -> [Section<PaletteMatch.Pick>] {
+    static func forCommands(picks: [PaletteMatch.Pick], scores: [Int] = [], typed: Bool, groups: [CommandGroup?], recentCount: Int) -> [Section<PaletteMatch.Pick>] {
         guard typed else {
             let recent = (0..<min(recentCount, recentLimit)).map(PaletteMatch.Pick.item)
             let grouped = CommandGroup.allCases.map { group in
