@@ -31,6 +31,9 @@ struct ChipLine: View {
                     PageChip(text: title, kind: .link(icon: icon), size: .row, underlinesOnHover: false)
                 case .text(let text):
                     Text(verbatim: text).font(.system(size: size)).foregroundStyle(.secondary).lineLimit(1)
+                case .count(let text, let help):
+                    Text(verbatim: text).font(.system(size: size)).foregroundStyle(.secondary).lineLimit(1).monospacedDigit()
+                        .help(help ?? "")
                 }
             }
             if more > 0 {

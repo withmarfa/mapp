@@ -91,6 +91,7 @@ struct ItemTableCell: View {
         case .edited: date(row.item.modified, isDue: false)
         case .occurred: date(row.item.occurred ?? row.item.created, isDue: false)
         case .tags: tags
+        case .count(let fact): count(fact)
         case .duration(let start, let end):
             if let seconds = ItemTableValue.duration(row, start: start, end: end) {
                 Text(Duration.seconds(seconds), format: .units(allowed: [.days, .hours, .minutes], width: .abbreviated, maximumUnitCount: 2))
@@ -100,6 +101,16 @@ struct ItemTableCell: View {
         // A mixed table's column holds the words of every type; each cell offers its own row's type's.
         case .field(let field):
             if let kind = addKind { add(kind) } else { value(of: rowField ?? field) }
+        }
+    }
+
+    /// A count Marfa answered, as a row says it, with the help tag that splits it. A count with nothing to say draws nothing.
+    @ViewBuilder private func count(_ fact: CountFact) -> some View {
+        let answer = row.counts[fact]
+        let hasStatus = library.catalogue.itemTypes[row.item.type]?.statusField != nil
+        if let text = CountWording.text(of: fact, answer: answer, hasStatus: hasStatus) {
+            Text(verbatim: text).foregroundStyle(.secondary).monospacedDigit().lineLimit(1)
+                .help(CountWording.help(of: fact, answer: answer) ?? "")
         }
     }
 

@@ -46,13 +46,13 @@ final class RowContents {
             made = [:]
         }
         // The links a type's look asks for, worked out once for each type in the pass.
-        var wanted: [TypeID: Set<Relation>] = [:]
+        var wanted: [TypeID: (relations: Set<Relation>, counts: Set<CountFact>)] = [:]
         for entry in entries {
             let id = entry.item.id
             let look = looks[entry.item.type] ?? .empty
-            let asked = wanted[entry.item.type] ?? { let asked = look.relations; wanted[entry.item.type] = asked; return asked }()
-            // A linked item's title, or its coming or going, changes this row though this item is the same.
-            let relations = library.relations(of: entry.item, wanting: asked, limit: RowContent.shownLinks)
+            let asked = wanted[entry.item.type] ?? { let asked = (look.relations, look.counts); wanted[entry.item.type] = asked; return asked }()
+            // A linked item's title, or its coming or going, or a count's answer coming, changes this row though this item is the same.
+            let relations = library.relations(of: entry.item, wanting: asked.relations, counts: asked.counts, limit: RowContent.shownLinks)
             if let known = held[id], known.item == entry.item, known.showsTime == entry.showsTime, known.relations == relations { continue }
             builds += 1
             made[id] = RowContent.make(

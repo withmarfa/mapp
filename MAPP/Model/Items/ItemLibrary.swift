@@ -76,6 +76,9 @@ protocol ItemLibrary: AnyObject, Observable {
     /// The property keys of the item that the inspector never lists: what the page shows as the title and the text,
     /// and any a library keeps for its own use.
     func hiddenPropertyKeys(of item: Item) -> Set<String>
+    /// The counts of what an item holds, worked out when read and never stored (`CountFact`): its children, a collection's
+    /// members, a table's rows. Reading an answer is observed, so a view is drawn again when one comes or changes.
+    var counts: ItemCounts { get }
     func relationships(for id: ItemID) -> [ItemRelationship]
     /// The items filed directly under `id` (`parent-of`), in no order, held or not. Observed, so a view that works
     /// something out from them is told when one comes or goes.

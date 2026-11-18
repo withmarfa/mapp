@@ -503,6 +503,32 @@
         }
       }
     },
+    "%lld of %lld done" : {
+      "extractionState" : "manual"
+    },
+    "%lld subtasks" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld subtask"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld subtasks"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld items already have the most tags an item can have." : {
       "extractionState" : "manual",
       "localizations" : {

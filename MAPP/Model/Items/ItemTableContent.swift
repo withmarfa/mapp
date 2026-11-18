@@ -35,7 +35,7 @@ final class ItemTableContent {
         let options = browser.tableOptions[browser.item] ?? ItemTableOptions()
         let wanted = ItemTableLayout.relations(
             of: Set(items.map(\.type)), looks: looks, options: options, shown: browser.shownRelations)
-        allRows = ItemTableRow.rows(of: items, in: library, wanting: wanted)
+        allRows = ItemTableRow.rows(of: items, in: library, wanting: wanted, looks: looks)
         let hidden = allRows.first.map { library.hiddenPropertyKeys(of: $0.item) } ?? []
         columns = ItemTableLayout.columns(for: allRows, catalogue: library.catalogue, hidden: hidden, looks: looks)
         catalogue = library.catalogue

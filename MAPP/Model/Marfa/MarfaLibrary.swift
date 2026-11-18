@@ -47,6 +47,7 @@ import Observation
     private var viewRevision = 0
 
     @ObservationIgnored let source: any ItemSource
+    @ObservationIgnored let counts: ItemCounts
     /// Reads an item's earlier versions from the server, which the copy does not hold. Nil where there is no server
     /// to ask, as in the sample library.
     @ObservationIgnored let history: (any ItemHistorySource)?
@@ -233,6 +234,7 @@ import Observation
         now: @escaping () -> Date = Date.init,
         cameOnline: @escaping () -> Void = {}) {
         self.source = source
+        counts = ItemCounts { ids, query in try await source.counts(of: ids, query) }
         self.history = history
         self.typeIcons = typeIcons
         self.config = config
@@ -496,6 +498,8 @@ import Observation
             reindex()
         case .views(let views):
             take(views)
+        case .counts(let rowsOnly):
+            counts.refresh(rowsOnly: rowsOnly)
         case .unavailable(let failure):
             // The window keeps showing the library while its copy is open, so an ended sign-in is told with the way
             // to Settings, where the person signs in again or disconnects the library.

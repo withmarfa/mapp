@@ -89,18 +89,18 @@ final class CardContents {
             made = [:]
         }
         // A type's look without what a card leaves out, and the links it asks for: worked out once for each type in the pass.
-        var shaped: [TypeID: (look: TypeLook, wanted: Set<Relation>)] = [:]
+        var shaped: [TypeID: (look: TypeLook, wanted: Set<Relation>, counts: Set<CountFact>)] = [:]
         for item in items {
             let id = item.id
-            let own: (look: TypeLook, wanted: Set<Relation>)
+            let own: (look: TypeLook, wanted: Set<Relation>, counts: Set<CountFact>)
             if let known = shaped[item.type] {
                 own = known
             } else {
                 let look = (looks[item.type] ?? .empty).shaped(by: shape)
-                own = (look, look.relations)
+                own = (look, look.relations, look.counts)
                 shaped[item.type] = own
             }
-            let relations = library.relations(of: item, wanting: own.wanted, limit: RowContent.shownLinks)
+            let relations = library.relations(of: item, wanting: own.wanted, counts: own.counts, limit: RowContent.shownLinks)
             if let known = held[id], known.item == item, known.relations == relations { continue }
             builds += 1
             made[id] = RowContent.card(

@@ -305,6 +305,7 @@ extension ItemTableColumn {
         case .date: (90, 116, 200)
         case .duration: (70, 92, 140)
         case .number: (60, 90, 160)
+        case .count: (80, 110, 180)
         case .boolean: (50, 70, 120)
         case .link, .links: (120, 200, 360)
         }

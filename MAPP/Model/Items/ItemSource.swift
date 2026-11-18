@@ -50,6 +50,9 @@ nonisolated enum SourceChange: Hashable, Sendable {
     case catalogue(Catalogue)
     /// Every view the copy holds, whenever one comes, goes or is renamed.
     case views([LibraryView])
+    /// Items, edges or a table's rows changed, or Marfa can be reached again, so a count worked out before may differ. A
+    /// change of rows alone says `rowsOnly`.
+    case counts(rowsOnly: Bool)
     case unavailable(SourceFailure)
 }
 
@@ -106,6 +109,9 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     func items(matching query: LibraryViewQuery) async throws -> [ItemID]
     /// What the copy's own search finds in `target`, best match first, at most `SearchResults.limit`.
     func search(_ text: String, in target: SearchTarget) async throws -> SourceSearch
+    /// How many items each of `ids` has under `query`, only for the ids it can answer. Throws `ItemCountUnavailable` where it
+    /// cannot answer at all, such as a copy that cannot be sure and a server out of reach: the count then shows nothing.
+    func counts(of ids: [ItemID], _ query: CountQuery) async throws -> [ItemID: ItemCountAnswer]
 
     // MARK: Views, written to the server at once and never queued
 
@@ -151,6 +157,8 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
 
 nonisolated extension ItemSource {
     var engineActivity: EngineActivity? { nil }
+
+    func counts(of ids: [ItemID], _ query: CountQuery) async throws -> [ItemID: ItemCountAnswer] { throw ItemCountUnavailable() }
 
     var downloadedFiles: (any DownloadedFiles)? { nil }
 

@@ -37,8 +37,8 @@ import Testing
 
     @Test func everyTypeIsOneStableSlice() {
         #expect(MarfaSync.slice == ["*", "system.view"])
-        #expect(MarfaSync.sliceEdgeTypes == ["parent-of"])
-        func status(_ types: [String], edges: [String] = ["parent-of"], _ hydration: Hydration) -> Status {
+        #expect(MarfaSync.sliceEdgeTypes == ["parent-of", "in-collection"])
+        func status(_ types: [String], edges: [String] = MarfaSync.sliceEdgeTypes, _ hydration: Hydration) -> Status {
             Status(sliceTypes: types, sliceTier: .all, sliceEdgeTypes: edges, hydration: hydration)
         }
         #expect(MarfaSync.needsFill(Status(hydration: .never)))
@@ -50,6 +50,8 @@ import Testing
         // A copy hydrated before the views joined the slice fills again, once.
         #expect(MarfaSync.needsFill(status(["*"], edges: [], .complete)))
         #expect(MarfaSync.needsFill(status(["*", "system.view"], edges: [], .complete)))
+        // A copy hydrated with only the parent edge held fills again, so a collection's members are held whole.
+        #expect(MarfaSync.needsFill(status(["*", "system.view"], edges: ["parent-of"], .complete)))
     }
 
     @Test func progressUsesListedRowsAndKeepsUnknownTotalsUnknown() {

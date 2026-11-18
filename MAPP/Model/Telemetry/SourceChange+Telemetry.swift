@@ -8,6 +8,7 @@ extension SourceChange {
         case .taken: "take.taken"
         case .catalogue: "take.catalogue"
         case .views: "take.views"
+        case .counts: "take.counts"
         case .unavailable: "take.unavailable"
         }
     }
@@ -18,7 +19,7 @@ extension SourceChange {
         case .loaded(let snapshot): snapshot.items.count
         case .changed(let changes): Set(changes.upserted.map(\.id) + changes.removed + changes.bodies.map(\.id)).count
         case .views(let views): views.count
-        case .answered, .taken, .catalogue, .unavailable: 0
+        case .answered, .taken, .catalogue, .counts, .unavailable: 0
         }
     }
 }
