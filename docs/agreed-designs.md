@@ -78,6 +78,7 @@ This page lists what has been agreed for MAPP and is not in the app yet, so the 
   - **PDF:** the page as "2 of 4" with arrows, the same zoom control, and full screen. Full screen hides the properties and puts the title in the toolbar.
   - **Gallery:** the card size by name, such as Medium, with a menu.
   - **Timeline:** Today.
+  - **A web page or newsletter with a Reader view:** Reader or Original, as one glass segmented control. The switch leaves the toolbar. A web page with no Reader view has no switch.
   - **An item's page with nothing to set:** nothing.
 
 ## Menus and empty states
