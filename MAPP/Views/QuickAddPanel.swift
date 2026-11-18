@@ -63,7 +63,7 @@ struct QuickAddPanel: View {
             .padding(.horizontal, 20)
             .padding(.top, 20)
             Spacer(minLength: 0)
-            // Files that are chips of their own are a note's attachments, or a file item's extra files.
+            // Files that are chips of their own are a text item's attachments, or a file item's extra files.
             chipRow(draft, files: !isFile || holdsFiles ? draft.files : [])
             Divider()
                 .padding(.top, 14)

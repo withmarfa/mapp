@@ -2,7 +2,7 @@ import Foundation
 
 /// How well a title answers what was typed, ignoring case and accents: best when the title starts with it, then
 /// when one of its words does, then when it holds it anywhere, and last when it holds its letters in order, so "nn"
-/// finds New Note. The command palette, Link to Note and the page's `[[` suggestions all rank by it.
+/// finds New Item. The command palette, Link to Item and the page's `[[` suggestions all rank by it.
 nonisolated enum PaletteMatch {
     /// What was typed, folded once for scoring many titles.
     struct Query: Sendable {

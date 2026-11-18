@@ -275,7 +275,7 @@ extension EditorTests {
         #expect(try await markdown(editor) == nil, "the item now on the page takes nothing")
         #expect(editor.noteID == second.id)
         #expect(library.notices.waiting.last?.title == "Images Weren’t Added to the Item")
-        #expect(library.notices.waiting.last?.message == "“Photo” was attached to “Plan” but isn’t in its text, because the note was no longer open for editing.")
+        #expect(library.notices.waiting.last?.message == "“Photo” was attached to “Plan” but isn’t in its text, because the item was no longer open for editing.")
     }
 
     @Test func filesQuickAddAttachedGoAtTheEndOfTheNewItemOnceThePageShowsIt() async throws {

@@ -42,7 +42,7 @@ extension EditorController {
         let largest = Int64(PastedImages.largestImage).formatted(.byteCount(style: .memory))
         let lines = skipped.map { String(localized: "“\($0)” is larger than \(largest) or can’t be read.") }
             + failed.map { String(localized: "“\($0.name)” couldn’t be attached. \($0.reason)") }
-            + unplaced.map { String(localized: "“\($0)” was attached to “\(note)” but isn’t in its text, because the note was no longer open for editing.") }
+            + unplaced.map { String(localized: "“\($0)” was attached to “\(note)” but isn’t in its text, because the item was no longer open for editing.") }
         let title = if skipped.isEmpty && failed.isEmpty {
             String(localized: "Images Weren’t Added to the Item")
         } else if attached == 0 {
