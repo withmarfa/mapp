@@ -68,9 +68,9 @@ extension EditorTests {
         try await page.wait { page.changes.last?.contains("typed") == true }
     }
 
-    /// Text from outside reloads the note under a new generation; the rewrite held for the old one is saved first,
+    /// Text from outside reloads the item under a new generation; the rewrite held for the old one is saved first,
     /// against the version it was made on, instead of being replaced by the next edit.
-    @Test func aRewriteHeldWhenTheNoteReloadsIsSavedBeforeTheReload() async throws {
+    @Test func aRewriteHeldWhenTheItemReloadsIsSavedBeforeTheReload() async throws {
         let library = FakeItemLibrary()
         let note = library.add("Draft\n")
         let page = try await Page(library: library)

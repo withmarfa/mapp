@@ -275,7 +275,7 @@ import Observation
         try begin()
         defer { isBusy = false }
         await dropPendingSignIn()
-        guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current note before changing libraries.")) }
+        guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current item before changing libraries.")) }
         try await signIn(to: connection, via: method)
         do {
             try await open(connection)
@@ -324,10 +324,10 @@ import Observation
         defer { isBusy = false }
         await dropPendingSignIn()
         // Edits are handed over before a sign-in that may take minutes, and again once the copy is about to close.
-        if source != nil { guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current note before changing libraries.")) } }
+        if source != nil { guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current item before changing libraries.")) } }
         try await signIn(to: connection, via: method)
         if let source {
-            guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current note before changing libraries.")) }
+            guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current item before changing libraries.")) }
             detach()
             standing = .connecting
             await source.close()
@@ -352,7 +352,7 @@ import Observation
         let fresh: Bool
         do throws(Problem) {
             agreed = try agreedLoss(choice, of: old)
-            if current != nil { guard await handOverEdits() else { throw Problem.unavailable(message: String(localized: "Finish editing the current note before changing libraries.")) } }
+            if current != nil { guard await handOverEdits() else { throw Problem.unavailable(message: String(localized: "Finish editing the current item before changing libraries.")) } }
             if let current, choice == nil {
                 let unsent = await current.unsentWrites()
                 if unsent?.ids.isEmpty != true { throw Problem.changesWaiting(unsent) }
@@ -376,7 +376,7 @@ import Observation
         if let current, choice != .keepCopy {
             guard await handOverEdits() else {
                 await endSignIn(of: connection)
-                throw .unavailable(message: String(localized: "Finish editing the current note before changing libraries."))
+                throw .unavailable(message: String(localized: "Finish editing the current item before changing libraries."))
             }
             let unsent = await current.unsentWrites()
             if !Self.covers(choice, unsent) {
@@ -493,7 +493,7 @@ import Observation
     /// copy reads its own queue, once the writes submitted before now are in it, and closes in the same step
     /// only if every write not sent is one the person agreed to lose: none, without a choice.
     private func close(_ source: any ItemSource, for choice: DisconnectChoice?) async throws(Problem) {
-        guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current note before changing libraries.")) }
+        guard await handOverEdits() else { throw .unavailable(message: String(localized: "Finish editing the current item before changing libraries.")) }
         let agreed: UnsentChanges
         switch choice {
         case .keepCopy:

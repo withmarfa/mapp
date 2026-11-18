@@ -29,9 +29,9 @@ nonisolated struct NoteLink: Hashable, Sendable {
     }
 }
 
-/// What the core says a link names, from the copy alone (`Items.linkCandidates`). Only `bound` names one note: an
-/// identity the copy holds, or a name the copy already bound. A name that one held note answers to stays
-/// `unresolved`, since the copy holds a slice and the server may hold another note by that name; its `candidates`
+/// What the core says a link names, from the copy alone (`Items.linkCandidates`). Only `bound` names one item: an
+/// identity the copy holds, or a name the copy already bound. A name that one held item answers to stays
+/// `unresolved`, since the copy holds a slice and the server may hold another item by that name; its `candidates`
 /// say which. An `ambiguous` link has more than one.
 nonisolated struct LinkAnswer: Hashable, Sendable {
     enum State: Hashable, Sendable { case bound, ambiguous, unresolved }
@@ -39,21 +39,21 @@ nonisolated struct LinkAnswer: Hashable, Sendable {
     /// The text between the link's brackets, as asked.
     let target: String
     let state: State
-    /// The note a `bound` link names.
+    /// The item a `bound` link names.
     let item: ItemID?
-    /// Every note outside the bin the name answers to, including the bound one.
+    /// Every item outside the bin the name answers to, including the bound one.
     let candidates: [ItemID]
 
-    /// Whether no held note answers to the link at all.
+    /// Whether no held item answers to the link at all.
     var isMissing: Bool { state == .unresolved && candidates.isEmpty }
 
-    /// Whether the core binds the link to this note. Only that is a link written to name the note: an `unresolved`
-    /// answer cannot tell that the one note held is the only one, so the server's lookup decides once the link is
+    /// Whether the core binds the link to this item. Only that is a link written to name the item: an `unresolved`
+    /// answer cannot tell that the one item held is the only one, so the server's lookup decides once the link is
     /// saved (`device/link-candidates-unresolved`).
     func names(_ note: ItemID) -> Bool { state == .bound && item == note }
 
-    /// Whether this title is a fair offer for the note while the person types it: bound to it, or not bound and
-    /// answered to by it alone among the notes held. The person sees the title and chooses it, and the server decides
+    /// Whether this title is a fair offer for the item while the person types it: bound to it, or not bound and
+    /// answered to by it alone among the items held. The person sees the title and chooses it, and the server decides
     /// at the save, so an offer can end unresolved; a link written for the person (`names`) never relies on that.
     func offers(_ note: ItemID) -> Bool { names(note) || (state == .unresolved && candidates == [note]) }
 }

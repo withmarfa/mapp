@@ -19,8 +19,8 @@ nonisolated enum SourceViewMode: String, CaseIterable, Identifiable, Sendable {
 /// works whether or not the document's scripts run, and none of the document's can see it). The document itself is
 /// never rewritten on disk or in the library.
 ///
-/// - Reader is the document `ReaderDocument` makes of the article (`PageAnalyzer` has already cleaned it): the note
-///   page's text size in a serif, in the text column of a note's page (`PageStyle.horizontalInset`), as CSS so it follows
+/// - Reader is the document `ReaderDocument` makes of the article (`PageAnalyzer` has already cleaned it): the item
+///   page's text size in a serif, in the text column of an item's page (`PageStyle.horizontalInset`), as CSS so it follows
 ///   the window as it resizes. It sits on the window's own background.
 /// - Original is the document as written, at its own width. Only a document that says nothing about its look, with no
 ///   style, color or background of its own, is given a baseline and the text column, since it has no look to keep;
@@ -53,7 +53,7 @@ nonisolated struct SourceLook: Equatable, Sendable {
     /// A page paints its own.
     var leavesBackground: Bool { mode == .reader || isMail }
 
-    /// The margin on each side of the text: the note page's rule, as a CSS length.
+    /// The margin on each side of the text: the item page's rule, as a CSS length.
     var inset: String {
         let minimum = textSize * 3
         guard !wide else { return "\(minimum)px" }

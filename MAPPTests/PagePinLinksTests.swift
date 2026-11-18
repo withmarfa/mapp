@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import MAPP
 
-/// What a pinned address or number opens on a saved web page, as it does on a note page.
+/// What a pinned address or number opens on a saved web page, as it does on an item page.
 struct PagePinLinksTests {
     @Test func onlyAWebAddressOpensInTheBrowser() {
         #expect(PagePinsView.webAddress("https://example.com/a")?.absoluteString == "https://example.com/a")

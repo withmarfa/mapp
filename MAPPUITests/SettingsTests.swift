@@ -26,7 +26,7 @@ final class SettingsTests: XCTestCase {
         app.terminate()
     }
 
-    func testSettingsUsesTheCurrentWindowAndReturnsToTheSelectedNote() throws {
+    func testSettingsUsesTheCurrentWindowAndReturnsToTheSelectedItem() throws {
         let row = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Trip to Lisbon")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         row.click()
@@ -57,7 +57,7 @@ final class SettingsTests: XCTestCase {
         leaveSettings()
         XCTAssertTrue(list.waitForExistence(timeout: 3))
         XCTAssertEqual(title.value as? String, "Trip to Lisbon")
-        XCTAssertEqual(list.frame.width, listFrame.width, accuracy: 2, "the note-list width is preserved")
+        XCTAssertEqual(list.frame.width, listFrame.width, accuracy: 2, "the item-list width is preserved")
     }
 
     func testEachSettingsPageShowsInTheDetailColumnWithItsTitle() {
@@ -168,7 +168,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(list.waitForExistence(timeout: 3))
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(spelling.waitForExistence(timeout: 3), "Settings opens at the page shown last")
-        XCTAssertEqual(spelling.value.map { String(describing: $0) }, "0", "the preference survives returning to the notes")
+        XCTAssertEqual(spelling.value.map { String(describing: $0) }, "0", "the preference survives returning to the items")
     }
 
     func testNewItemLeavesSettingsAndOpensThePageWithTheSidebarHidden() {
@@ -203,7 +203,7 @@ final class SettingsTests: XCTestCase {
         XCTAssertFalse(field.exists)
     }
 
-    func testBaseTextSizeChangesTheInterfaceAndPreservesNoteTextSize() {
+    func testBaseTextSizeChangesTheInterfaceAndPreservesItemTextSize() {
         let row = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Trip to Lisbon")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         let originalHeight = row.frame.height
@@ -232,7 +232,7 @@ final class SettingsTests: XCTestCase {
         element("SettingsPage-editor").click()
         let noteSize = window.popUpButtons["TextSize"]
         XCTAssertTrue(noteSize.waitForExistence(timeout: 3))
-        XCTAssertEqual(noteSize.value as? String, "13 pt", "the note's own text setting stays independent")
+        XCTAssertEqual(noteSize.value as? String, "13 pt", "the item's own text setting stays independent")
         attachScreenshot("SeparateEditorTextSize")
         app.terminate()
         app.launchArguments += ["-MAPPKeepSampleSettings"]

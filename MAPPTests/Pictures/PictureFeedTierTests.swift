@@ -4,7 +4,7 @@ import Testing
 @testable import MAPP
 
 /// Which items Always loads pictures for without asking. Marfa stamps every item with the source of the key that wrote
-/// it, so a note written in MAPP has a source too: the tier is what tells the feed from the library. The items are
+/// it, so an item written in MAPP has a source too: the tier is what tells the feed from the library. The items are
 /// mapped from rows as the library maps them, and the answers come from the editor's own wiring.
 @Suite(.hangLimit)
 @MainActor struct PictureFeedTierTests {
@@ -56,12 +56,12 @@ import Testing
         #expect(own == ["state": "waiting"])
         #expect(feed?["state"] == "loaded")
         #expect(other?["state"] == "loaded")
-        #expect(PictureStub.requests(to: addresses[0]).isEmpty, "nothing was asked of the website a note names")
+        #expect(PictureStub.requests(to: addresses[0]).isEmpty, "nothing was asked of the website an item names")
         #expect(PictureStub.requests(to: addresses[1]).count == 1)
         #expect(PictureStub.requests(to: addresses[2]).count == 1)
     }
 
-    @Test func choosingStillLoadsAPictureInALibraryNoteAndItThenShowsWithoutAsking() async throws {
+    @Test func choosingStillLoadsAPictureInALibraryItemAndItThenShowsWithoutAsking() async throws {
         let written = item("written-in-mapp", tier: .library, source: "mapp")
         let library = FakeItemLibrary(items: [written])
         let editor = editor(library)

@@ -128,7 +128,7 @@ import Testing
         #expect(library.body(of: F.n1)?.text == "Theirs")
     }
 
-    /// Text read on a note just made, at version 0, is saved once before the create is answered and again after both
+    /// Text read on an item just made, at version 0, is saved once before the create is answered and again after both
     /// answers land. The second save follows the first, which was typed on the same text, so the server never makes a
     /// conflicted copy of the person's own text.
     @Test func aSaveReadOnALocalCreateFollowsTheSaveBeforeTheAnswers() async throws {

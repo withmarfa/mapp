@@ -31,7 +31,7 @@ struct EditorTests {
             _ = try await editor.webView.evaluateJavaScript("1")
         }
 
-        /// What the page would save, or nil while the note is as it was loaded.
+        /// What the page would save, or nil while the item is as it was loaded.
         func markdown() async throws -> String? {
             try await editor.webView.evaluateJavaScript("window.editor.markdown()") as? String
         }
@@ -100,7 +100,7 @@ struct EditorTests {
         #expect(outline == "none")
     }
 
-    @Test func nativeFocusChangesUpdateSelectionWithoutEditingTheNote() async throws {
+    @Test func nativeFocusChangesUpdateSelectionWithoutEditingTheItem() async throws {
         let page = try await Page()
         try await page.load("Selected text")
         let window = ReadingPanel(contentRect: NSRect(x: 100, y: 100, width: 500, height: 600),
@@ -224,7 +224,7 @@ struct EditorTests {
         #expect(reopened == false)
     }
 
-    @Test func initialLoadingCannotBlockChoosingAnotherNote() async throws {
+    @Test func initialLoadingCannotBlockChoosingAnotherItem() async throws {
         let library = FakeItemLibrary()
         let first = library.add("First\n")
         let second = library.add("Second\n")
@@ -238,7 +238,7 @@ struct EditorTests {
         #expect(source == "Second\n")
     }
 
-    @Test func changesToTheNoteBeingOpenedWaitForTheOpenInsteadOfStartingAnother() async throws {
+    @Test func changesToTheItemBeingOpenedWaitForTheOpenInsteadOfStartingAnother() async throws {
         let library = FakeItemLibrary()
         let first = library.add("First\n")
         let second = library.add("Second\n")
@@ -246,12 +246,12 @@ struct EditorTests {
         try await page.show(first.id)
         try await page.run("window.flushes = 0; const flush = window.editor.flush.bind(window.editor); window.editor.flush = generation => { window.flushes++; return flush(generation) }")
         page.editor.select(try #require(library.item(second.id)))
-        // What SwiftUI delivers in the same pass as the selection: the note's text and version changed too.
+        // What SwiftUI delivers in the same pass as the selection: the item's text and version changed too.
         library.updateBody(of: second.id, to: "Second, edited\n")
         page.editor.noteChanged(try #require(library.item(second.id)))
         try await page.wait { page.editor.noteID == second.id }
         #expect(try await page.shownText(until: "Second, edited") == "Second, edited")
-        #expect(try await page.editor.webView.evaluateJavaScript("window.flushes") as? Int == 1, "the first note is handed over once")
+        #expect(try await page.editor.webView.evaluateJavaScript("window.flushes") as? Int == 1, "the first item is handed over once")
     }
 
     @Test func anOpenEndsWhenThePageReportsItsFirstFrame() async throws {
@@ -277,7 +277,7 @@ struct EditorTests {
         let reloaded = try #require(page.editor.opening)
         library.updateBody(of: note.id, to: "Drawn, then edited elsewhere\n")
         page.editor.noteChanged(try #require(library.item(note.id)))
-        #expect(page.editor.generation > reloaded.generation, "outside text reloads the note")
+        #expect(page.editor.generation > reloaded.generation, "outside text reloads the item")
         #expect(page.editor.opening == nil, "a reload drops the open")
 
         let other = library.add("Another\n")
@@ -294,7 +294,7 @@ struct EditorTests {
         page.editor.select(try #require(library.item(note.id)))
         try await page.wait { page.editor.noteID == note.id && page.editor.opening != nil }
         page.editor.close()
-        #expect(page.editor.opening == nil, "leaving the note drops the open")
+        #expect(page.editor.opening == nil, "leaving the item drops the open")
     }
 
     @Test func aCapturedFlushReplyIsSavedUnderItsOriginalVersionAfterReload() async throws {
@@ -311,7 +311,7 @@ struct EditorTests {
             library.updateBody(of: note.id, to: "Outside\n")
             page.editor.noteChanged(library.item(note.id)!)
         }
-        // The note is still the one being left, so leaving goes ahead.
+        // The item is still the one being left, so leaving goes ahead.
         #expect(kept)
         #expect(library.notices.waiting.isEmpty)
         #expect(captured == ["Pending\n"])
@@ -319,9 +319,9 @@ struct EditorTests {
         #expect(library.bodyWrites.contains { $0.text == "Pending\n" && $0.readAt == note.version })
     }
 
-    /// The page puts a reload off while the person composes, so after outside text reloads the note it can still hold
+    /// The page puts a reload off while the person composes, so after outside text reloads the item it can still hold
     /// text of the generation the flush began on, which the flush must still ask for.
-    @Test func aFlushRetriedAfterOutsideTextReloadsTheNoteStillAsksThePage() async throws {
+    @Test func aFlushRetriedAfterOutsideTextReloadsTheItemStillAsksThePage() async throws {
         let library = FakeItemLibrary()
         let note = library.add("Original\n")
         let page = try await Page(library: library)
@@ -343,7 +343,7 @@ struct EditorTests {
         #expect(library.bodyWrites.contains { $0.text == "Composed\n" && $0.readAt == note.version })
     }
 
-    @Test func aRejectedFlushCannotApproveLeavingOrSaveAnotherNotesText() async throws {
+    @Test func aRejectedFlushCannotApproveLeavingOrSaveAnotherItemsText() async throws {
         let page = try await Page()
         try await page.load("Original\n")
         try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new TypeError('flush failed') }")
@@ -360,7 +360,7 @@ struct EditorTests {
         try await page.run("window.editor.flush = window.savedFlush")
         let oldGeneration = try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().generation") as? Int
         try await page.load("Replacement\n")
-        // The page hands back no text of the note it replaced.
+        // The page hands back no text of the item it replaced.
         let handedBack = try await page.editor.webView.callAsyncJavaScript("return window.editor.flush(expected)", arguments: ["expected": try #require(oldGeneration)], in: nil, contentWorld: .page) as? String
         #expect(handedBack == nil)
         #expect(try await page.markdown() == nil)
@@ -395,7 +395,7 @@ struct EditorTests {
         #expect(clock.now - start < .seconds(1))
     }
 
-    @Test func reselectingTheNoteAfterAFailedSwitchRestoresItsUpdatesWithoutReloading() async throws {
+    @Test func reselectingTheItemAfterAFailedSwitchRestoresItsUpdatesWithoutReloading() async throws {
         let page = try await Page()
         try await page.load("Original\n")
         let originalID = try #require(page.editor.noteID)
@@ -422,7 +422,7 @@ struct EditorTests {
         #expect(page.changes.isEmpty)
     }
 
-    @Test func aHiddenNoteRetainsFailedEditsWithoutOfferingCommands() async throws {
+    @Test func aHiddenItemRetainsFailedEditsWithoutOfferingCommands() async throws {
         let page = try await Page()
         try await page.load("Original\n")
         let id = page.editor.noteID
@@ -504,7 +504,7 @@ struct EditorTests {
         window.close()
     }
 
-    @Test func aNoteOpenedAndLeftAloneIsNotRewritten() async throws {
+    @Test func anItemOpenedAndLeftAloneIsNotRewritten() async throws {
         let page = try await Page()
         try await page.load(kitchen)
         #expect(try await page.markdown() == nil)
@@ -543,7 +543,7 @@ struct EditorTests {
         #expect(page.changes.isEmpty)
     }
 
-    @Test func formattingReportsTheNoteAsMarkdown() async throws {
+    @Test func formattingReportsTheItemAsMarkdown() async throws {
         let page = try await Page()
         try await page.load("Milk\n")
         page.editor.format(.checklist)
@@ -572,7 +572,7 @@ struct EditorTests {
         #expect(try await page.markdown() == nil)
     }
 
-    @Test func aDeletedNoteCannotBeEdited() async throws {
+    @Test func aDeletedItemCannotBeEdited() async throws {
         let page = try await Page()
         try await page.load("Old list\n", deleted: true)
         #expect(!page.editor.isEditable)
@@ -591,17 +591,17 @@ struct EditorTests {
         #expect(page.changes == ["# Draft\n"])
     }
 
-    @Test func aNoteWhoseTextCannotBeReadIsNotOpenedForWriting() async throws {
+    @Test func anItemWhoseTextCannotBeReadIsNotOpenedForWriting() async throws {
         let page = try await Page()
         try await page.load("Kept\n")
         let item = FakeItemLibrary.note("Plan", modified: .now)
-        // The editor's library has no text for this item, so the page must not open an empty note to type into.
+        // The editor's library has no text for this item, so the page must not open an empty item to type into.
         page.editor.load(item)
         _ = try await page.editor.webView.evaluateJavaScript("1")
         #expect(page.editor.noteID != item.id)
         page.editor.noteChanged(item)
         #expect(page.editor.noteID != item.id)
-        // Nor does the page keep the note it showed before, which typing would then change out of sight.
+        // Nor does the page keep the item it showed before, which typing would then change out of sight.
         #expect(try await page.shownText(until: "") == "")
         try await page.run("document.querySelector('.ProseMirror').focus(); document.execCommand('insertText', false, 'X')")
         page.editor.flush()
@@ -612,8 +612,8 @@ struct EditorTests {
     }
 
     /// The page reports a heading's availability by its level, so the Format menu offers Title, Heading, and
-    /// Subheading in an editable note.
-    @Test func headingCommandsAreAvailableInANote() async throws {
+    /// Subheading in an editable item.
+    @Test func headingCommandsAreAvailableInAnItem() async throws {
         let page = try await Page()
         try await page.load("Milk\n")
         try await page.wait { page.editor.canApply(.title) }
@@ -711,7 +711,7 @@ struct EditorTests {
         #expect(page.changes.last == written.replacingOccurrences(of: "Milk", with: "- [ ] Milk"))
     }
 
-    @Test func aNoteExportsAsAPDFOfItsTextAndPageStyle() async throws {
+    @Test func anItemExportsAsAPDFOfItsTextAndPageStyle() async throws {
         let page = try await Page()
         let window = TestWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 500), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -728,7 +728,7 @@ struct EditorTests {
         let folder = try TemporaryFolder()
         let url = folder.url.appending(path: "Kitchen quotes.pdf")
         page.editor.exportPDF(to: url)
-        // The size is watched rather than the file read, and a PDF far larger than one short note's fails at once,
+        // The size is watched rather than the file read, and a PDF far larger than one short item's fails at once,
         // so pagination that runs away cannot fill the disk before the test gives up.
         var bytes = 0, runaway = 0
         _ = await eventually {
@@ -743,10 +743,10 @@ struct EditorTests {
         try #require(runaway == 0, "the PDF has grown to \(runaway) bytes")
         try #require(bytes > 0, "no PDF was written")
         let document = try #require(PDFDocument(url: url))
-        #expect((1...2).contains(document.pageCount), "a short note prints on a page or two")
+        #expect((1...2).contains(document.pageCount), "a short item prints on a page or two")
         #expect(document.string?.contains("Kitchen quotes") == true)
         #expect(document.string?.contains("Book a site visit") == true)
-        #expect(document.string?.contains("Header only words") == false, "the page's header is not part of the note")
+        #expect(document.string?.contains("Header only words") == false, "the page's header is not part of the item")
     }
 }
 

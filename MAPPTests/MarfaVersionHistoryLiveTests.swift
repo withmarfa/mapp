@@ -40,7 +40,7 @@ extension LiveMarfaTests {
             await end()
         }
 
-        /// A note written three times, so the server holds two earlier versions of it besides the current one.
+        /// An item written three times, so the server holds two earlier versions of it besides the current one.
         private func writtenNote(
             _ library: MarfaLibrary, _ source: MarfaSource, _ made: LiveMarfa.Made
         ) async throws -> ItemID {
@@ -102,7 +102,7 @@ extension LiveMarfaTests {
         }
 
         @Test(.timeLimit(.minutes(3)))
-        func aNoteInTheBinCannotBeRestoredAndKeepsItsText() async throws {
+        func anItemInTheBinCannotBeRestoredAndKeepsItsText() async throws {
             try await withLibrary { library, source, made in
                 let id = try await writtenNote(library, source, made)
                 let oldest = try #require(try await loadedHistory(of: id, in: library).snapshots.first)

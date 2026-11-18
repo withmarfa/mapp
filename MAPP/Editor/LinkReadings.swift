@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// What the library says a link in a note means, for the page to draw it: whether it names no note and, when it names
-/// exactly one, the type of that note.
+/// What the library says a link in an item means, for the page to draw it: whether it names no item and, when it names
+/// exactly one, the type of that item.
 nonisolated struct LinkReading: Equatable, Sendable {
-    /// The type of the one note the link names.
+    /// The type of the one item the link names.
     struct LinkedType: Equatable, Sendable {
         /// The Iconify ID of the type's icon; nil for a type the catalogue gives none.
         var icon: String?
@@ -11,18 +11,18 @@ nonisolated struct LinkReading: Equatable, Sendable {
     }
 
     var missing: Bool
-    /// Nil for a link to no note, which the page draws without a mark.
+    /// Nil for a link to no item, which the page draws without a mark.
     var type: LinkedType?
 
-    /// A live link that names no one note yet, or that the library cannot say anything about. It takes a neutral mark,
+    /// A live link that names no one item yet, or that the library cannot say anything about. It takes a neutral mark,
     /// because the look's underline may show only under the pointer and the mark is then all that says it is a link.
     static let plain = LinkReading(missing: false, type: .init(icon: "lucide:link", tone: TypeTone.neutral))
 }
 
 extension ItemLibrary {
     /// What each of `targets` (link texts as authored, brackets and all) means from `note`, in order, or nil where the
-    /// library cannot ask. A link names one note only when the core binds it (`LinkAnswer.state`); an ambiguous or
-    /// unresolved one has no single type, and a note in the bin is not named at all, so its link reads as missing.
+    /// library cannot ask. A link names one item only when the core binds it (`LinkAnswer.state`); an ambiguous or
+    /// unresolved one has no single type, and an item in the bin is not named at all, so its link reads as missing.
     func linkReadings(of targets: [String], in note: ItemID) async -> [LinkReading]? {
         guard let answers = await linkAnswers(of: targets, in: note), answers.count == targets.count else { return nil }
         return answers.map { answer in

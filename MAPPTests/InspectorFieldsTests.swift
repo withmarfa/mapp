@@ -286,7 +286,7 @@ struct InspectorFieldsTests {
         #expect(InspectorFields.accountedFor(type: Self.file, hidden: hidden).isSuperset(of: ["blob_ref", "mime_type", "size_bytes"]))
     }
 
-    @MainActor @Test func aMarfaNoteKeepsItsPropertiesNamedLikeAFilesFacts() async throws {
+    @MainActor @Test func aMarfanItemKeepsItsPropertiesNamedLikeAFilesFacts() async throws {
         let note = Self.item("core.note", properties: [Property(key: "size_bytes", value: .number(1))])
         let library = try await Self.marfa([note], types: [MarfaMapping.itemType(ItemType(id: "core.note", label: "Note", titleField: "title"))])
         #expect(library.hiddenPropertyKeys(of: note) == ["title"])

@@ -3,7 +3,7 @@ import Darwin
 import UniformTypeIdentifiers
 import WebKit
 
-/// An embed as the note's text holds it, such as `![[photo.png|400]]` or `![](a\_b.png)`: the page names an embed
+/// An embed as the item's text holds it, such as `![[photo.png|400]]` or `![](a\_b.png)`: the page names an embed
 /// this way and Marfa's core lists each one it bound this way (`BoundEmbed.text`), so the two are matched whole,
 /// kind included, and MAPP reads no name out of an embed itself.
 nonisolated struct EmbedReference: Hashable, Sendable {
@@ -55,7 +55,7 @@ nonisolated struct EmbedState: Hashable, Sendable {
 extension ItemLibrary {
     /// The file an item's embed shows, the one place an embed becomes a file, which the page's scheme, its Open
     /// and the gallery all ask. Marfa's core binds each embed to its file item when the text is saved
-    /// (`Item.boundEmbeds`), and lists no embed it does not take for a file, such as one of a note. An embed is
+    /// (`Item.boundEmbeds`), and lists no embed it does not take for a file, such as one of an item. An embed is
     /// waited on, for up to `waiting`, only while the text holding it has not been read by the copy, as one just
     /// pasted has not; once it has, an embed the core did not bind is no file. The file is fetched if this Mac
     /// doesn't hold it, unless `wanted` turns its item down, which answers `missing`.
@@ -70,7 +70,7 @@ extension ItemLibrary {
         }
         switch bound {
         case .resolved(let file):
-            // A file in the bin is no picture, as a note in the bin is no link's target.
+            // A file in the bin is no picture, as an item in the bin is no link's target.
             if let held = self.item(file), held.state == .trashed || !wanted(held) { return .missing }
             return await open(file)
         case .ambiguous:
@@ -84,7 +84,7 @@ extension ItemLibrary {
         }
     }
 
-    /// What each embed of the note shows, by its text, for the editor to tell the page which pictures to draw again:
+    /// What each embed of the item shows, by its text, for the editor to tell the page which pictures to draw again:
     /// the binding the copy holds and the facts of the file it names that change what is shown. Observed as items are.
     func embedStates(of note: ItemID) -> [String: EmbedState] {
         var states: [String: EmbedState] = [:]
@@ -148,7 +148,7 @@ extension ItemLibrary {
 
 // MARK: Serving
 
-/// Serves the page the files its note embeds, through the app's own URL scheme, and tells it what each is. The
+/// Serves the page the files its item embeds, through the app's own URL scheme, and tells it what each is. The
 /// page loads nothing else: a file is streamed from disk in pieces, answering ranges as sound and video ask for
 /// them, and never read whole into memory.
 final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerWithReply {
@@ -162,7 +162,7 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
     var openPicture: (URL) async -> OpenFile? = { _ in nil }
     /// The picture saved for a web address on an item, opened; `ItemLibrary.openSavedPicture` for the editor's library.
     var openSaved: (ItemID, URL) async -> OpenFile? = { _, _ in nil }
-    /// Changed for each note the page shows, so a file changed on disk is loaded again rather than taken from
+    /// Changed for each item the page shows, so a file changed on disk is loaded again rather than taken from
     /// WebKit's memory of the page.
     var version = 0
 
@@ -217,7 +217,7 @@ final class EmbeddedFiles: NSObject, WKURLSchemeHandler, WKScriptMessageHandlerW
 
     /// Whether Open may hand the file to the app the system opens it with: only a document or media file, never
     /// one that runs or points elsewhere when opened, such as a script, a program, a Terminal setting or an
-    /// internet location, nor any file marked executable, nor one of a kind this cannot tell. A note shared
+    /// internet location, nor any file marked executable, nor one of a kind this cannot tell. An item shared
     /// with a file beside it must not be able to run that file. Anything else is shown in the Finder instead.
     nonisolated static func opens(_ url: URL) -> Bool {
         var status = stat()

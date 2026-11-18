@@ -2,9 +2,9 @@ import AppKit
 import WebKit
 import os
 
-/// Handing over the page's last edit before a note, a window or the library goes.
+/// Handing over the page's last edit before an item, a window or the library goes.
 extension EditorController {
-    /// Hands over an edit the page has not yet reported, as when the window closes or another note is shown.
+    /// Hands over an edit the page has not yet reported, as when the window closes or another item is shown.
     /// The page answers in order, so this lands before anything asked of it later. The reply keeps this controller alive until it arrives.
     ///
     /// A page that cannot hand over its edit within `flushLimit` is given up on: the person is told, and the next
@@ -13,13 +13,13 @@ extension EditorController {
     /// it is composing or importing a picture. Any other failure in the page, an exception or another refusal, is
     /// logged and told at once with its own message, and the page is given up on the same way.
     ///
-    /// Outside text reloading the note mid-flush leaves the note the one being flushed, so the flush goes ahead. A
-    /// flush whose note was replaced on the page stops, and the person is told why.
+    /// Outside text reloading the item mid-flush leaves the item the one being flushed, so the flush goes ahead. A
+    /// flush whose item was replaced on the page stops, and the person is told why.
     ///
     /// Flushes take turns, and what one does once its edit is in is part of its turn: a selection's hand-over puts
-    /// the next note on the page, and leaving the note empties it. So a flush asked for meanwhile, as when the window
+    /// the next item on the page, and leaving the item empties it. So a flush asked for meanwhile, as when the window
     /// closes or the app quits just after a selection, waits and then hands over whatever is on the page, instead of
-    /// finding its note replaced. Those waiting behind a flush that fails fail with it, without asking the page: they
+    /// finding its item replaced. Those waiting behind a flush that fails fail with it, without asking the page: they
     /// were waiting on the edit it could not keep, and the person has been told once.
     func flush(then done: @escaping (Bool) -> Void = { _ in }) {
         releaseHeldEdit()
@@ -59,7 +59,7 @@ extension EditorController {
             guard !finished else { return }
             guard self.noteID == noteID else { return replaced() }
             guard isReady else { return finish(true) }
-            // Asked for the generation the flush began on even after outside text reloaded the note: the page puts
+            // Asked for the generation the flush began on even after outside text reloaded the item: the page puts
             // a reload off while the person composes, so it can still hold text of that generation. A page that
             // has moved past it reported that text as it moved, and answers nil.
             // An exception is caught here and answered as a refusal, since the page's error listener hears one thrown
@@ -123,7 +123,7 @@ extension EditorController {
     /// The page reports each change as it is made, so what it never reported is not on the page to give back.
     private func tellNotSaved(_ noteID: ItemID, reason: String) {
         let title = library?.item(noteID).map { String(localized: "Couldn’t Save “\($0.displayTitle)”") }
-        library?.notices.notKept(title ?? String(localized: "Couldn’t Save Note"), text: nil, reason: reason)
+        library?.notices.notKept(title ?? String(localized: "Couldn’t Save Item"), text: nil, reason: reason)
     }
 
     /// The page's refusals to hand over its edit that pass: a composition, a picture still being imported, and a load or
@@ -138,12 +138,12 @@ extension EditorController {
     }
 
     private static var replacedReason: String {
-        String(localized: "Another note opened before MAPP finished saving this one, so your most recent typing might not be saved. Try again.")
+        String(localized: "Another item opened before MAPP finished saving this one, so your most recent typing might not be saved. Try again.")
     }
 
     /// Destructive transitions proceed only once every editor has handed over its current text and its window's
     /// titles. Where the window or the library goes, a title that still cannot be saved stops them as a failed
-    /// capture does, since it would otherwise be lost; where they stay, as when a note is deleted, it waits.
+    /// capture does, since it would otherwise be lost; where they stay, as when an item is deleted, it waits.
     static func flushAll(leaving: Bool = true, trace: QuitTrace? = nil, then done: @escaping (Bool) -> Void) {
         let editors = open.allObjects
         let gate = Gate(waitingFor: editors.count, then: done)

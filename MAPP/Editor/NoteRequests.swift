@@ -1,13 +1,13 @@
 import Foundation
 import WebKit
 
-/// What the page asks of the app's notes through the `notes` message handler, which answers each request.
+/// What the page asks of the app's items through the `notes` message handler, which answers each request.
 nonisolated enum NoteRequest: Equatable, Sendable {
     /// Titles that answer what was typed after `[[`.
     case suggest(String, in: ItemID?)
-    /// The Link to Note command, from the note it was typed in.
+    /// The Link to Item command, from the item it was typed in.
     case pick(ItemID)
-    /// What each of a note's links names: no note, or a note of some type. A link the core does not read as the one link
+    /// What each of an item's links names: no item, or an item of some type. A link the core does not read as the one link
     /// the page posted is nil, and keeps its place so the answer lines up with the page's links.
     case resolve([NoteLink?], in: ItemID)
 
@@ -29,14 +29,14 @@ nonisolated enum NoteRequest: Equatable, Sendable {
     }
 }
 
-/// Answers the page's requests about notes. A request the app cannot read is answered with nothing, so the page
+/// Answers the page's requests about items. A request the app cannot read is answered with nothing, so the page
 /// never waits on a reply that will not come.
 final class NoteRequests: NSObject, WKScriptMessageHandlerWithReply {
     /// The titles to offer for what was typed, best first.
     var suggest: (String, ItemID?) async -> [String] = { _, _ in [] }
-    /// The link the person chose from the note, which may take as long as they do; nil if they chose none.
+    /// The link the person chose from the item, which may take as long as they do; nil if they chose none.
     var pick: (ItemID) async -> String? = { _ in nil }
-    /// What each link of the note names.
+    /// What each link of the item names.
     var readings: ([NoteLink], ItemID) async -> [LinkReading] = { links, _ in links.map { _ in .plain } }
     /// The image of a type's icon as a data URL, nil where it cannot be drawn.
     var drawIcon: (String?) -> String? = { LinkIcons.dataURL(for: $0) }
@@ -58,7 +58,7 @@ final class NoteRequests: NSObject, WKScriptMessageHandlerWithReply {
 
     /// One answer for each link the page posted. A link the core does not read as one link is not asked about and
     /// is answered as live with no type, so the page draws it as a live link rather than a red one it cannot vouch for;
-    /// the note's other links keep their marks. Each type icon is drawn and sent once, however many links name it.
+    /// the item's other links keep their marks. Each type icon is drawn and sent once, however many links name it.
     func answerLinks(_ links: [NoteLink?], in source: ItemID) async -> LinkReply {
         let readable = links.compactMap { $0 }
         let answers = readable.isEmpty ? [] : await readings(readable, source)

@@ -116,7 +116,7 @@ const editor = await NoteEditor.mount(
     headings(headings, generation) {
       postToHost({ type: 'headings', headings, generation })
     },
-    // Above the text, so a note with pictures that wait can load them all at once.
+    // Above the text, so an item with pictures that wait can load them all at once.
     picturesWaiting(count, sentence, button, shown) {
       pictureBar.hidden = !shown
       pictureSentence.textContent = sentence
@@ -143,7 +143,7 @@ window.addEventListener('keydown', (event) => {
   postToHost({ type: 'escape' })
 })
 
-// An image pasted on its own, a screenshot or an image file copied in the Finder, becomes a file of the notes
+// An image pasted on its own, a screenshot or an image file copied in the Finder, becomes a file of the items
 // folder, which the app takes from the pasteboard itself; a copied web page, images and all, is the page's.
 window.addEventListener(
   'paste',
@@ -175,7 +175,7 @@ window.addEventListener(
 
 let generation = 0
 // The toolbar shows the title once the header has gone under it; the app hears only when that changes. A page
-// with no header to show, as for a deleted note, has its title there from the start.
+// with no header to show, as for a deleted item, has its title there from the start.
 let headerScrolledAway = false
 function checkHeaderScrolledAway(): void {
   const away = header.isHidden || window.scrollY >= header.bottom
@@ -205,8 +205,8 @@ window.addEventListener('resize', () => {
   checkHeaderScrolledAway()
   checkContentUnderToolbar()
 })
-// The note's text fills the rest of the window between the header and the footer, so a click anywhere below it
-// places the caret and a short note does not scroll. The text's height changes in the next frame: changed while
+// The item's text fills the rest of the window between the header and the footer, so a click anywhere below it
+// places the caret and a short item does not scroll. The text's height changes in the next frame: changed while
 // the browser reports sizes, it would be reported late, which WebKit raises as an error.
 // A header that only grew wider moves nothing below it.
 let surround = -1

@@ -1,11 +1,11 @@
 import AppKit
 import SwiftUI
 
-/// What Share offers for one item: its file as itself where it has one, otherwise a note's markdown as text, the
+/// What Share offers for one item: its file as itself where it has one, otherwise an item's markdown as text, the
 /// form every destination can take. File > Share, More > Share and the palette's Share all read it from here.
 struct NoteShare {
     var title = ""
-    /// Nil when there is no one note to share.
+    /// Nil when there is no one item to share.
     var text: String?
     var fileURL: URL?
 
@@ -33,7 +33,7 @@ struct NoteShare {
     }
 }
 
-/// Shares a note's markdown as text, the form every destination can take, or a file as itself.
+/// Shares an item's markdown as text, the form every destination can take, or a file as itself.
 struct NoteShareLink: View {
     let share: NoteShare
     /// The More menu shows titles alone, so its Share does too.

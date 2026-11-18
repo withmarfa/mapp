@@ -28,7 +28,7 @@ struct ItemGallery: View {
         let columns: Int
         let thumbnailWidth: CGFloat
         let contents: [ItemID: RowContent]
-        /// Each note's attached files, read once here so no card reads the library's links.
+        /// Each item's attached files, read once here so no card reads the library's links.
         let attachments: [ItemID: [Item]]
     }
 

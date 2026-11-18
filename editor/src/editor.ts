@@ -33,7 +33,7 @@ export function isPreviewDiagnostic(error: Error): boolean {
 }
 
 /** The words the app hands the page. Inkkit rejects a label it does not know, so only Inkkit's own go to it;
- *  the header's and the Link to Note command's are MAPP's. */
+ *  the header's and the Link to Item command's are MAPP's. */
 export interface AppWords extends PictureWords {
   linkToNote?: string
 }
@@ -175,7 +175,7 @@ export interface EditorEvents {
   picturesWaiting?(count: number, sentence: string, button: string, shown: boolean): void
   /** A loaded document has had its first frame: said once for each `load`, after the browser has drawn it. */
   painted?(generation: number): void
-  /** The note's headings in Inkkit's own order (the ordinal is the index), said after each `load` and `reload`, and after
+  /** The item's headings in Inkkit's own order (the ordinal is the index), said after each `load` and `reload`, and after
    *  an edit that changes the list. Never said twice for one list under one generation. */
   headings?(headings: PageHeading[], generation: number): void
 }
@@ -193,12 +193,12 @@ const tables: Partial<Record<FormatCommand, TableCommand>> = {
   deleteRow: 'deleteRow',
   deleteColumn: 'deleteColumn',
 }
-/** An embed as the note's text holds it, which is how Marfa lists the embeds it bound. */
+/** An embed as the item's text holds it, which is how Marfa lists the embeds it bound. */
 function request(reference: FileReference, item: string): EmbedRequest {
   return { item, text: reference.raw }
 }
 
-/** The names of notes to offer after `[[`, unless the person has typed past the request. */
+/** The names of items to offer after `[[`, unless the person has typed past the request. */
 export function wikiSuggest(
   query: string,
   context: { documentId: string; signal: AbortSignal },
@@ -289,8 +289,8 @@ export class NoteEditor {
             const embed = request(reference, context.documentId)
             host.noteTarget(embed.text, reference.target)
             const file = await host.answer(embed)
-            // An embed of a note (`![[A note]]`, `![](Other.md)`) is not a file, so it is File Not Found here: the
-            // page never transcludes a note.
+            // An embed of an item (`![[A note]]`, `![](Other.md)`) is not a file, so it is File Not Found here: the
+            // page never transcludes an item.
             if (!file || context.signal.aborted)
               return { kind: 'missing', label: reference.label ?? reference.reference }
             if ('unavailable' in file)
@@ -357,10 +357,10 @@ export class NoteEditor {
         wikiLinks: {
           // The app matches names against its library; a request the person has typed past is not sent.
           suggest: wikiSuggest,
-          // The app tells which names no note answers to, and Inkkit draws those links as missing.
+          // The app tells which names no item answers to, and Inkkit draws those links as missing.
           resolve: (reference, context) =>
             host.links.status(linkRef(reference), context.documentId),
-          // A link to this note's own heading is the page's to follow. Any other names a note, which only the
+          // A link to this item's own heading is the page's to follow. Any other names an item, which only the
           // app can find, so the app opens it and scrolls to the heading once it is shown. Command-click, or
           // Enter or Space on the focused link, reaches here with the link's authored `raw` (see `LinkRef`).
           open(reference, context) {
@@ -375,9 +375,9 @@ export class NoteEditor {
           enabled: true,
           customCommands: [
             {
-              name: words.linkToNote ?? 'Link to Note',
-              keywords: ['note', 'wiki', 'reference'],
-              // The app asks the person which note, and answers with the link, or nothing if they decline.
+              name: words.linkToNote ?? 'Link to Item',
+              keywords: ['item', 'wiki', 'reference'],
+              // The app asks the person which item, and answers with the link, or nothing if they decline.
               action: (context) => pickNote(context.documentId),
             },
           ],
@@ -407,7 +407,7 @@ export class NoteEditor {
   picturesChanged() {
     this.pictures.changed()
   }
-  /** Files saved from these web addresses came to the note's item, changed or went: the pictures at those addresses
+  /** Files saved from these web addresses came to the item, changed or went: the pictures at those addresses
    *  are asked about again. */
   savedPicturesChanged(addresses: string[]) {
     this.pictures.savedChanged(addresses)
@@ -416,11 +416,11 @@ export class NoteEditor {
   loadPictures() {
     this.pictures.chooseAll()
   }
-  /** The person closed the callout that counts the pictures that wait: it stays hidden until a note is opened. */
+  /** The person closed the callout that counts the pictures that wait: it stays hidden until an item is opened. */
   dismissPictures() {
     this.pictures.dismiss()
   }
-  /** What the app answered for each embed of the note, by its text, so two embeds of one file, and one drawn
+  /** What the app answered for each embed of the item, by its text, so two embeds of one file, and one drawn
    *  again, ask it once. Only a file is kept: an embed the app could not show (`{unavailable: reason}`, or no file)
    *  is asked again. */
   private answers = new Map<
@@ -464,15 +464,15 @@ export class NoteEditor {
       if (!(error instanceof InkKitError)) throw error
     }
   }
-  /** The app's library changed: which notes the links name is asked again. */
+  /** The app's library changed: which items the links name is asked again. */
   linksChanged() {
     this.links.refresh()
   }
-  /** Draws the links to these notes again, after the app's answer for them changed. A page with no document yet,
+  /** Draws the links to these items again, after the app's answer for them changed. A page with no document yet,
    *  or one that has ended, draws nothing, and each link it draws later is drawn from the answers held.
-   *  `refreshReferences` changes no text, so this works in a read-only note and during composition. In source
+   *  `refreshReferences` changes no text, so this works in a read-only item and during composition. In source
    *  editing Inkkit draws no link, so there is nothing to redraw. Inkkit styles wiki links itself (the link color,
-   *  and a dashed underline for one that names no note); the page adds no rule for them. Loaded pictures are also
+   *  and a dashed underline for one that names no item); the page adds no rule for them. Loaded pictures are also
    *  redrawn through here, by their address. */
   private drawLinksAgain(targets: string[]) {
     try {
@@ -481,7 +481,7 @@ export class NoteEditor {
       if (!(error instanceof InkKitError)) throw error
     }
   }
-  /** Moves to the heading of the note on the page that has this text. Whether there was one. */
+  /** Moves to the heading of the item on the page that has this text. Whether there was one. */
   revealHeading(text: string, expected = this.generation): boolean {
     const wanted = headingKey(text)
     const heading = this.engine
@@ -503,7 +503,7 @@ export class NoteEditor {
     this.engine.revealTextRange({ snapshotId: snapshot.snapshotId, from: at, to: at })
     return true
   }
-  /** Moves to the n-th heading of the note on the page (from 0), in Inkkit's own list, so two headings that read the
+  /** Moves to the n-th heading of the item on the page (from 0), in Inkkit's own list, so two headings that read the
    *  same each have their own place. Whether there was one. */
   revealHeadingAt(ordinal: number, expected = this.generation): boolean {
     const heading = this.engine.headings(expected)[ordinal]
@@ -790,15 +790,15 @@ export class NoteEditor {
       x == null || y == null ? undefined : { clientX: x, clientY: y },
     )
   }
-  /** Puts images after everything in the text, as files quick add attached to a new note, leaving the selection
+  /** Puts images after everything in the text, as files quick add attached to a new item, leaving the selection
    *  and the keyboard where they were so typing goes on where the person is. False in source editing, where the page
-   *  leaves them for the app to send again. A note that ends in a code fence left open refuses them (`preservation`),
+   *  leaves them for the app to send again. An item that ends in a code fence left open refuses them (`preservation`),
    *  and the app tells the person the files are attached but not in the text.
    *
    *  Keep the defensive source check after Inkkit's append, even though Inkkit preserves lone rules, empty code
    *  fences, images and definitions: anything but trailing whitespace gone is taken back in the same step, before
    *  the change is reported, and refused as `preservation`, and the undone step is discarded so Redo cannot bring
-   *  it back. The images are one undo step, saved like typing, and do nothing to a note loaded since
+   *  it back. The images are one undo step, saved like typing, and do nothing to an item loaded since
    *  (`expected`). Never write them into the source here. */
   appendImages(images: { src: string; alt: string }[], expected = this.generation) {
     const before = this.snapshot(expected).text
@@ -814,7 +814,7 @@ export class NoteEditor {
     if (this.snapshot(expected).text !== before)
       throw new InkKitError(
         'preservation',
-        'The note could not be restored after adding the files.',
+        'The item could not be restored after adding the files.',
       )
     // Inkkit reported the lossy text and then the restored one, in this same turn. The app is told neither.
     this.pendingChanged = reportedBefore
@@ -824,7 +824,7 @@ export class NoteEditor {
     )
   }
   async printable(expected = this.generation) {
-    // A printed note shows the pictures at web addresses already on this Mac, and fetches none.
+    // A printed item shows the pictures at web addresses already on this Mac, and fetches none.
     this.pictures.cacheOnly = true
     try {
       const result = await this.engine.printableSnapshot(expected)

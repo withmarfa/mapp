@@ -35,13 +35,13 @@ enum TitleLines {
     }
 }
 
-/// How a note's page is set out. The defaults here are the only ones; stored settings fall back to them.
+/// How an item's page is set out. The defaults here are the only ones; stored settings fall back to them.
 nonisolated struct PageStyle: Equatable {
     var fullWidth = false
     /// The body text's size in points; headings, spacing and the reading width scale with it.
     var textSize = 13
     var checksSpelling = true
-    /// How wide the text runs when not full width, in ems of the note's text, so it holds about as many words
+    /// How wide the text runs when not full width, in ems of the item's text, so it holds about as many words
     /// whatever the text size.
     var readingWidth = 54
     /// How a link to another item reads in the text.
@@ -56,7 +56,7 @@ nonisolated struct PageStyle: Equatable {
     static let readingWidths = 36...80
 }
 
-/// Reads the stored page settings, for the views that show a note.
+/// Reads the stored page settings, for the views that show an item.
 @propertyWrapper
 struct StoredPageStyle: DynamicProperty {
     @AppStorage(PageKey.fullWidth) private var fullWidth = PageStyle().fullWidth
@@ -74,7 +74,7 @@ struct StoredPageStyle: DynamicProperty {
     }
 }
 
-/// How wide a note's text runs: a comfortable measure for reading, or the window's whole width. Offered alike
+/// How wide an item's text runs: a comfortable measure for reading, or the window's whole width. Offered alike
 /// by the View menu and Settings.
 struct PageWidthOptions: View {
     @AppStorage(PageKey.fullWidth) private var fullWidth = PageStyle().fullWidth
@@ -113,7 +113,7 @@ struct ReadingWidthOptions: View {
     }
 }
 
-/// The size of a note's text, and whether its spelling is checked as it is typed.
+/// The size of an item's text, and whether its spelling is checked as it is typed.
 struct TextOptions: View {
     @AppStorage(PageKey.textSize) private var textSize = PageStyle().textSize
     @AppStorage(PageKey.checksSpelling) private var checksSpelling = PageStyle().checksSpelling
@@ -146,7 +146,7 @@ struct TitleLinesOption: View {
     }
 }
 
-/// How a link to another item reads in a note's text, set in Settings.
+/// How a link to another item reads in an item's text, set in Settings.
 struct LinkLookOption: View {
     @AppStorage(PageKey.linkLook) private var look = LinkLook.standard
 

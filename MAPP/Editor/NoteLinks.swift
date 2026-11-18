@@ -1,8 +1,8 @@
 import Foundation
 import Marfa
 
-/// How the page names a note in a `[[link]]`: by its title, or by its identity with the title as a label. Whether a
-/// spelling names the note is the core's to say (`ItemLibrary.bodyLink(to:in:)`); this only builds the text.
+/// How the page names an item in a `[[link]]`: by its title, or by its identity with the title as a label. Whether a
+/// spelling names the item is the core's to say (`ItemLibrary.bodyLink(to:in:)`); this only builds the text.
 nonisolated enum NoteLinks {
     /// Whether `[[inner]]` is one link the core reads with exactly this name and alias, so the text survives
     /// as written: no `]]`, line break or padding in it. Marfa has no escape in a link and Inkkit reads a backslash
@@ -21,7 +21,7 @@ nonisolated enum NoteLinks {
     /// A title as one line of a link's label. Line breaks and control characters become one space, and so does a
     /// bracket that repeats the one before it or closes the label, since `[[` and `]]` there would end or open
     /// another link. Everything else stays: Inkkit and the core read `[`, a lone `]`, `|`, `#` and a backslash in a
-    /// label as the text they are. The label is only what the link shows; the identity before it names the note.
+    /// label as the text they are. The label is only what the link shows; the identity before it names the item.
     static func label(_ title: String) -> String {
         var words: [String] = []
         var word = String.UnicodeScalarView()
@@ -43,14 +43,14 @@ nonisolated enum NoteLinks {
         return label
     }
 
-    /// A note the page may offer by its title.
+    /// An item the page may offer by its title.
     struct Match: Hashable, Sendable {
         let id: ItemID
         let title: String
     }
 
-    /// Keeps each note's title folded for matching, so a query that grows one letter at a time folds nothing again
-    /// and a library of tens of thousands of notes is read in one pass. It works off the main actor, on a copy of
+    /// Keeps each item's title folded for matching, so a query that grows one letter at a time folds nothing again
+    /// and a library of tens of thousands of items is read in one pass. It works off the main actor, on a copy of
     /// the items, so typing in the page and the window never wait on it.
     actor Index {
         private struct Entry {
@@ -64,7 +64,7 @@ nonisolated enum NoteLinks {
         /// How many titles have been folded, so a test can tell that a query folded none again.
         private(set) var foldedCount = 0
 
-        /// The notes whose titles answer what was typed after `[[`, best first (the closest match, then the most
+        /// The items whose titles answer what was typed after `[[`, best first (the closest match, then the most
         /// recently edited). Whether a link to one names it alone is the core's to say, so the caller asks.
         func matches(for text: String, among items: [Item], limit: Int) -> [Match] {
             let query = PaletteMatch.Query(text)
@@ -97,7 +97,7 @@ nonisolated enum NoteLinks {
             return a.match.title < b.match.title
         }
 
-        /// Keeps the `limit` best without ordering the notes that did not make it.
+        /// Keeps the `limit` best without ordering the items that did not make it.
         private static func keep(_ match: Candidate, in best: inout [Candidate], limit: Int) {
             if best.count == limit, let last = best.last, !precedes(match, last) { return }
             let at = best.firstIndex { precedes(match, $0) } ?? best.endIndex
@@ -108,13 +108,13 @@ nonisolated enum NoteLinks {
 }
 
 extension ItemLibrary {
-    /// The notes the picker lists, most recently edited first. A note that cannot be linked is told when it is chosen.
+    /// The items the picker lists, most recently edited first. An item that cannot be linked is told when it is chosen.
     func notesToLink(excluding id: ItemID? = nil) -> [Item] {
         items(in: .allNotes).filter { !$0.isFile && $0.id != id }.sorted { $0.modified > $1.modified }
     }
 
     /// The titles to offer for what was typed after `[[` in `note`, best first, each one only where `[[title]]`, written
-    /// there, the core binds to that note or leaves unresolved with that note the only one held (`LinkAnswer.offers`). A title that two notes go by, or that a
+    /// there, the core binds to that item or leaves unresolved with that item the only one held (`LinkAnswer.offers`). A title that two items go by, or that a
     /// link cannot spell, is left out. The closest matches are asked of the core together, so a few left out leave the list full.
     func noteNames(matching query: String, in note: ItemID? = nil, using index: NoteLinks.Index, limit: Int = 12) async -> [String] {
         let matches = await index.matches(for: query, among: items(in: .allNotes), limit: limit * 4)

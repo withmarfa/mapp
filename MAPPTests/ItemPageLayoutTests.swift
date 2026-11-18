@@ -100,7 +100,7 @@ import UniformTypeIdentifiers
         let unknown = article("Unknown file")
         file("blob", type: nil, attachedTo: unknown.id)
 
-        #expect(library.pageLayout(of: note) == .text, "an attachment never hides a note's text")
+        #expect(library.pageLayout(of: note) == .text, "an attachment never hides an item's text")
         #expect(library.pageLayout(of: binned) == .text, "a document in the bin does not count")
         #expect(library.pageLayout(of: pictured) == .text)
         #expect(library.pageLayout(of: unknown) == .text, "a file of unknown type is not taken for HTML")

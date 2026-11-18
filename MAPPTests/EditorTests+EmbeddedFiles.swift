@@ -4,7 +4,7 @@ import Testing
 import WebKit
 @testable import MAPP
 
-/// Files a note embeds, and images attached to it.
+/// Files an item embeds, and images attached to it.
 extension EditorTests {
     // MARK: Embedded files of any kind
 
@@ -123,7 +123,7 @@ extension EditorTests {
         #expect(labels?.contains("Plan.pdf: Open to view this PDF") == true)
         #expect(try await editor.webView.evaluateJavaScript("!!document.querySelector('.inkkit-file iframe')") as? Bool == false)
 
-        #expect(try await page.markdown() == nil, "showing the files changes nothing in the note")
+        #expect(try await page.markdown() == nil, "showing the files changes nothing in the item")
     }
 
     @Test func aPictureAppearsWhenItsFileArrivesAndGoesWhenItIsBinned() async throws {
@@ -140,7 +140,7 @@ extension EditorTests {
 
         let id = try #require(page.library.bindEmbed(text, in: note.id, file: photo))
         let arrived = try await settle(page.editor, "document.querySelectorAll('.inkkit-file[data-inkkit-file-kind=image]').length", as: Int.self) { $0 == 1 }
-        #expect(arrived == 1, "the picture shows once its file arrives, with the note untouched")
+        #expect(arrived == 1, "the picture shows once its file arrives, with the item untouched")
         #expect(try await page.markdown() == nil)
 
         page.library.items[try #require(page.library.items.firstIndex { $0.id == id })].state = .trashed
@@ -211,7 +211,7 @@ extension EditorTests {
         try await editor.webView.evaluateJavaScript("window.editor.markdown()") as? String
     }
 
-    @Test func attachedImagesAreInsertedIntoTheNote() async throws {
+    @Test func attachedImagesAreInsertedIntoTheItem() async throws {
         let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
         library.attaching = { AttachReport(embeds: [Embed(link: "Attachments/Photo.png", name: "Photo")]) }
         let editor = try await attachingEditor(library)
@@ -249,7 +249,7 @@ extension EditorTests {
         #expect(library.notices.waiting.last?.message == "“Large.png” is larger than 50 MB or can’t be read.\n“Other.png” couldn’t be attached. The server is out of space.")
     }
 
-    @Test func imagesAttachedAfterTheNoteChangesAreNamedAndNotInsertedIntoTheNextOne() async throws {
+    @Test func imagesAttachedAfterTheItemChangesAreNamedAndNotInsertedIntoTheNextOne() async throws {
         let first = FakeItemLibrary.note("Plan", modified: .now)
         let second = FakeItemLibrary.note("Other", modified: .now)
         let library = FakeItemLibrary(items: [first, second])
@@ -272,13 +272,13 @@ extension EditorTests {
         try #require(await eventually { answered })
         // Time for an insertion made from the late answer to reach the page, which nothing signals when none is made.
         try await Task.sleep(for: .milliseconds(300))
-        #expect(try await markdown(editor) == nil, "the note now on the page takes nothing")
+        #expect(try await markdown(editor) == nil, "the item now on the page takes nothing")
         #expect(editor.noteID == second.id)
-        #expect(library.notices.waiting.last?.title == "Images Weren’t Added to the Note")
+        #expect(library.notices.waiting.last?.title == "Images Weren’t Added to the Item")
         #expect(library.notices.waiting.last?.message == "“Photo” was attached to “Plan” but isn’t in its text, because the note was no longer open for editing.")
     }
 
-    @Test func filesQuickAddAttachedGoAtTheEndOfTheNewNoteOnceThePageShowsIt() async throws {
+    @Test func filesQuickAddAttachedGoAtTheEndOfTheNewItemOnceThePageShowsIt() async throws {
         let shown = FakeItemLibrary.note("Plan", modified: .now)
         let new = FakeItemLibrary.note("Trip", modified: .now)
         let library = FakeItemLibrary(items: [shown, new])
@@ -289,7 +289,7 @@ extension EditorTests {
 
         editor.append([Embed(link: "map%201.png", name: "map 1.png"), Embed(link: "tickets.pdf", name: "tickets.pdf")], to: new.id)
         _ = try await editor.webView.evaluateJavaScript("1")
-        #expect(try await markdown(editor) == nil, "the note on the page is another one")
+        #expect(try await markdown(editor) == nil, "the item on the page is another one")
 
         editor.load(new)
         editor.focus(new.id, caret: .after("Pack"))
@@ -303,7 +303,7 @@ extension EditorTests {
         #expect(await eventually { saved.last?.contains("tickets.pdf") == true }, "the page saves them as it does typing")
     }
 
-    @Test func filesQuickAddAttachedWaitWhileTheNoteIsEditedAsSource() async throws {
+    @Test func filesQuickAddAttachedWaitWhileTheItemIsEditedAsSource() async throws {
         let new = FakeItemLibrary.note("Trip", modified: .now)
         let library = FakeItemLibrary(items: [new])
         library.bodies[new.id] = "Pack\n"
@@ -324,7 +324,7 @@ extension EditorTests {
         #expect(await eventually { editor.pendingEmbeds.isEmpty })
     }
 
-    @Test func filesQuickAddAttachedToANoteEndingInAnOpenCodeFenceAreTold() async throws {
+    @Test func filesQuickAddAttachedToAnItemEndingInAnOpenCodeFenceAreTold() async throws {
         let new = FakeItemLibrary.note("Trip", modified: .now)
         let library = FakeItemLibrary(items: [new])
         library.bodies[new.id] = "```\ncode"
@@ -335,7 +335,7 @@ extension EditorTests {
         #expect(await eventually { library.notices.waiting.contains { $0.message.contains("“tickets.pdf”") } })
         let told = try #require(library.notices.waiting.first { $0.message.contains("“tickets.pdf”") })
         #expect(told.message.contains("“Trip”"))
-        #expect(try await markdown(editor) == nil, "the note keeps its text exactly")
+        #expect(try await markdown(editor) == nil, "the item keeps its text exactly")
         #expect(editor.pendingEmbeds.isEmpty, "the refusal cannot change, so the files do not wait")
     }
 

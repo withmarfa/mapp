@@ -241,7 +241,7 @@ struct SidebarSectionsTests {
         let (library, note, relationships) = Self.fixture()
         let extras = SidebarExtras.of(note, in: library, relationships: relationships, outline: Self.pageHeadings)
         #expect(extras.apps.map(\.title) == ["Pull Requests (GitHub)"])
-        // Each item once, and neither one with no source nor a note with no link field.
+        // Each item once, and neither one with no source nor an item with no link field.
         #expect(extras.apps.first?.targets.map(\.title) == ["Fix soil", "Fix water"])
         #expect(extras.outline.map(\.text) == ["Soil", "Soil"])
         #expect(extras.collections.map(\.title) == ["Garden"])

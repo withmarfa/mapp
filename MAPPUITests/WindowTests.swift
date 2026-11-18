@@ -8,7 +8,7 @@ final class WindowTests: XCTestCase {
     private var sidebar: XCUIElement { window.outlines.matching(NSPredicate(format: "identifier == 'Sidebar'")).firstMatch }
     private var list: XCUIElement { window.outlines["NoteList"] }
     private var page: XCUIElement { window.webViews.firstMatch }
-    /// The note's text as the page shows it: formatted, so without markdown's marks.
+    /// The item's text as the page shows it: formatted, so without markdown's marks.
     private var editor: XCUIElement { app.itemPageBody }
     private var text: String { editor.value as? String ?? "" }
 
@@ -66,12 +66,12 @@ final class WindowTests: XCTestCase {
         XCTAssertGreaterThan(count(of: "Items"), 0)
     }
 
-    func testTheFirstNoteIsSelectedAndShownInThePage() {
+    func testTheFirstItemIsSelectedAndShownInThePage() {
         XCTAssertTrue(page.waitForExistence(timeout: 5))
         XCTAssertTrue(waitForNote("Kitchen quotes", containing: "Three quotes in so far."))
     }
 
-    func testSelectingANoteShowsIt() {
+    func testSelectingAnItemShowsIt() {
         row(titled: "Trip to Lisbon").click()
         XCTAssertTrue(waitForNote("Trip to Lisbon", containing: "Three days in October."))
     }
@@ -96,7 +96,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForText("CONTAINS", "Milk and eggs"))
     }
 
-    func testNewNoteWithOnlyATitleIsCreatedSelectedAndHasAnEmptyBody() {
+    func testNewItemWithOnlyATitleIsCreatedSelectedAndHasAnEmptyBody() {
         let before = count(of: "Items")
         sidebarItem("Inbox").click()
         beginNewItem(title: "Empty body note")
@@ -107,7 +107,7 @@ final class WindowTests: XCTestCase {
         XCTAssertEqual(count(of: "Items"), before + 1)
     }
 
-    func testDeletingFromTheContextMenuRemovesTheNoteAndUndoes() {
+    func testDeletingFromTheContextMenuRemovesTheItemAndUndoes() {
         let before = count(of: "Items")
         row(titled: "Bike service").rightClick()
         window.menuItems["Delete"].click()
@@ -118,7 +118,7 @@ final class WindowTests: XCTestCase {
         XCTAssertEqual(count(of: "Items"), before)
     }
 
-    func testRecentlyDeletedFromTheViewMenuRestoresANote() {
+    func testRecentlyDeletedFromTheViewMenuRestoresAnItem() {
         app.menuBars.menuBarItems["View"].click()
         let recentlyDeleted = app.menuBars.menuItems["Recently Deleted"].firstMatch
         XCTAssertTrue(recentlyDeleted.waitForExistence(timeout: 3))
@@ -142,7 +142,7 @@ final class WindowTests: XCTestCase {
     /// The list's search, a field only once its button beside View Options is clicked.
     private var listSearch: XCUIElement { window.textFields["ColumnSearch"] }
 
-    func testTheListsSearchFindsNotesAndEscapePutsItAway() {
+    func testTheListsSearchFindsItemsAndEscapePutsItAway() {
         XCTAssertFalse(listSearch.exists, "a button until it is clicked")
         window.toolbars.buttons["Search"].firstMatch.click()
         XCTAssertTrue(listSearch.waitForExistence(timeout: 2))
@@ -176,7 +176,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForText("NOT CONTAINS", "Draft"), "Escape handed the arrows back to the list")
     }
 
-    func testCommandNOpensQuickAddAndCreatesTheTitledNote() {
+    func testCommandNOpensQuickAddAndCreatesTheTitledItem() {
         let before = count(of: "Items")
         app.typeKey("n", modifierFlags: .command)
         XCTAssertTrue(window.descendants(matching: .any)["QuickAddTitle"].waitForExistence(timeout: 3))
@@ -210,20 +210,20 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(prompt.waitForExistence(timeout: 3), "the Edit menu's Select All selects every item in the list")
     }
 
-    func testCommandDeleteDeletesTheSelectedNote() {
+    func testCommandDeleteDeletesTheSelectedItem() {
         row(titled: "Bike service").click()
         app.typeKey(.delete, modifierFlags: .command)
         XCTAssertTrue(row(titled: "Bike service").waitForNonExistence(timeout: 2))
-        XCTAssertTrue(editor.exists, "the next note is selected")
+        XCTAssertTrue(editor.exists, "the next item is selected")
     }
 
-    func testOptionCommandFSearchesNotes() {
+    func testOptionCommandFSearchesItems() {
         app.typeKey("f", modifierFlags: [.command, .option])
         app.typeText("ragu")
         XCTAssertTrue(row(titled: "Recipes to try").waitForExistence(timeout: 2))
     }
 
-    func testTheCommandPaletteOpensANoteAndRunsACommand() {
+    func testTheCommandPaletteOpensAnItemAndRunsACommand() {
         app.typeKey("k", modifierFlags: .command)
         let field = window.textFields["CommandPaletteField"]
         XCTAssertTrue(field.waitForExistence(timeout: 2))
@@ -260,7 +260,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(listSearch.waitForExistence(timeout: 2))
         app.typeText("garden")
         app.typeKey("z", modifierFlags: .command)
-        XCTAssertTrue(waitForText("CONTAINS", "Draft"), "the note kept its typing; ⌘Z was the field's")
+        XCTAssertTrue(waitForText("CONTAINS", "Draft"), "the item kept its typing; ⌘Z was the field's")
     }
 
     func testOptionCommandFReturnsToAnOpenSearch() {
@@ -274,7 +274,7 @@ final class WindowTests: XCTestCase {
         XCTAssertEqual(listSearch.value as? String, "tomatoes", "the field took the keyboard again")
     }
 
-    func testShiftCommandPSearchesEveryNotesTextAndOpensTheOneChosen() {
+    func testShiftCommandPSearchesEveryItemsTextAndOpensTheOneChosen() {
         XCTAssertTrue(waitForNote("Kitchen quotes", containing: "Three quotes in so far."))
         editor.click()
         app.typeKey("p", modifierFlags: [.command, .shift])
@@ -287,7 +287,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForNote("Recipes to try", containing: "Slow-roast tomatoes"))
     }
 
-    func testDoubleClickingANoteOpensItInItsOwnWindow() {
+    func testDoubleClickingAnItemOpensItInItsOwnWindow() {
         row(titled: "Garden ideas").doubleClick()
         let twoWindows = expectation(for: NSPredicate(format: "count == 2"), evaluatedWith: app.windows)
         wait(for: [twoWindows], timeout: 3)
@@ -314,7 +314,7 @@ final class WindowTests: XCTestCase {
         XCTAssertTrue(waitForText("!=", "Groceries"))
     }
 
-    func testCommandZUndoesNewNoteOnceThePageHasNoTypingToUndo() {
+    func testCommandZUndoesNewItemOnceThePageHasNoTypingToUndo() {
         let before = count(of: "Items")
         beginNewItem()
         app.typeKey("z", modifierFlags: .command)
@@ -361,7 +361,7 @@ final class WindowTests: XCTestCase {
 
     // MARK: The page under the toolbar
 
-    func testALongNoteStartsBelowTheToolbarAndScrollsSteadilyUnderIt() {
+    func testALongItemStartsBelowTheToolbarAndScrollsSteadilyUnderIt() {
         row(titled: "The Design of Everyday Things").click()
         XCTAssertTrue(waitForNote("The Design of Everyday Things", containing: "Notes as I read."))
         // The sample alone can fit a restored, maximized window. Add enough text to overflow any
@@ -374,7 +374,7 @@ final class WindowTests: XCTestCase {
         app.typeKey(.upArrow, modifierFlags: .command)
         let title = window.itemPageTitle
         XCTAssertTrue(title.waitForExistence(timeout: 3))
-        XCTAssertGreaterThanOrEqual(title.frame.minY, window.toolbars.firstMatch.frame.maxY, "the note starts below the toolbar")
+        XCTAssertGreaterThanOrEqual(title.frame.minY, window.toolbars.firstMatch.frame.maxY, "the item starts below the toolbar")
         let heading = page.staticTexts["The psychology of everyday actions"].firstMatch
         var last = heading.frame.minY
         for _ in 0..<10 {
@@ -386,13 +386,13 @@ final class WindowTests: XCTestCase {
         }
     }
 
-    func testAShortNoteStaysPutWhenScrolled() {
+    func testAShortItemStaysPutWhenScrolled() {
         row(titled: "Garden ideas").click()
         XCTAssertTrue(waitForNote("Garden ideas", containing: "Raised beds along the south fence"))
         let title = window.itemPageTitle
         let before = title.frame.minY
         page.scroll(byDeltaX: 0, deltaY: -40)
-        XCTAssertEqual(title.frame.minY, before, accuracy: 2, "a note shorter than the window has nothing to scroll")
+        XCTAssertEqual(title.frame.minY, before, accuracy: 2, "an item shorter than the window has nothing to scroll")
     }
 
     func testMoreAndDetailsSitAtTheToolbarsEnd() {

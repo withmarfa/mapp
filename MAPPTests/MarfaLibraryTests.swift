@@ -307,7 +307,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(await library.changeItemRelationship(F.n1, field: "in-collection", adding: [album.id], removing: [], undoManager: nil))
     }
 
-    @Test func aFileIsFetchedAndANoteHasNoFile() async throws {
+    @Test func aFileIsFetchedAndAnItemHasNoFile() async throws {
         let (library, _) = try await loaded()
         #expect(try await library.fileURL(of: F.f1) == URL(filePath: "/dev/null"))
         #expect(try await library.fileURL(of: F.n1) == nil)
@@ -730,7 +730,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(source.writes.count == 1)
     }
 
-    /// The note's `about` links as the copy shows them after the source has taken the writes so far.
+    /// The item's `about` links as the copy shows them after the source has taken the writes so far.
     private static func note(about targets: [ItemID]) -> MAPP.Item {
         F.item(F.n1, F.note, "Plain note", age: 4, tags: [ItemTag.favorite], edges: targets.enumerated().map { position, target in
             Edge(id: EdgeID("a\(position + 1)"), type: "about", from: F.n1, to: .item(target), origin: .property("about"))

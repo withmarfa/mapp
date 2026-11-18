@@ -40,7 +40,7 @@ struct WindowToolbar: CustomizableToolbarContent {
         // In the list the item stays in the toolbar while the page's title is in view and only its text goes, rather
         // than the item being hidden and shown as the page scrolls. A hidden item keeps no place at the detail
         // column's leading edge, so the first time it was shown it could be laid out from the list column's side,
-        // under that column's buttons. Both kinds of page that scroll their header away (a note's, and a web page's)
+        // under that column's buttons. Both kinds of page that scroll their header away (an item's, and a web page's)
         // report through the window's `DetailsPresentation`, by item, so the title of the item shown before cannot
         // appear for the next. Any other page keeps no header to scroll, so its item is hidden.
         if hasListColumn || browser == nil {
@@ -209,7 +209,7 @@ struct ToolbarTrayWatch: ViewModifier {
     }
 }
 
-/// The title of the note on the page, in the toolbar once the page's header has scrolled away.
+/// The title of the item on the page, in the toolbar once the page's header has scrolled away.
 struct ScrolledItemTitle: View {
     let title: String
 
@@ -319,7 +319,7 @@ struct ItemToolbarActions {
         return note
     }
 
-    /// The one item the window's page shows, when it is one whose page scrolls a header away: a note's, or a web
+    /// The one item the window's page shows, when it is one whose page scrolls a header away: an item's, or a web
     /// page's.
     private var itemWithScrollingHeader: Item? {
         guard browser?.showsPage != false, (browser?.selection.count ?? items.count) == 1, items.count == 1,
@@ -329,18 +329,18 @@ struct ItemToolbarActions {
 
     var hasScrollingHeader: Bool { itemWithScrollingHeader != nil }
 
-    /// Whether that item's page has scrolled its header away, whatever the title says: a note with no title still
+    /// Whether that item's page has scrolled its header away, whatever the title says: an item with no title still
     /// brings its toolbar item, with no text.
     var hasHeaderAway: Bool { itemWithScrollingHeader.map { details.isHeaderAway(of: $0.id) } == true }
 
     /// The title the toolbar shows: the item's once its page has scrolled the header away, and nothing before. A
-    /// note's is the text it would be written with, as its header shows it; any other page's is the name it shows.
+    /// item's is the text it would be written with, as its header shows it; any other page's is the name it shows.
     var scrolledTitle: String {
         guard let item = itemWithScrollingHeader, details.isHeaderAway(of: item.id) else { return "" }
         return library.pageLayout(of: item) == .text ? item.title : item.displayTitle
     }
 
-    /// Formatting acts only on the writable note currently visible in the editor.
+    /// Formatting acts only on the writable item currently visible in the editor.
     var editableNote: Item? { visibleNote.flatMap { $0.isWritable ? $0 : nil } }
 
     private var selectedFileURL: URL? {

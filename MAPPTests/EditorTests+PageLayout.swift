@@ -42,7 +42,7 @@ extension EditorTests {
         for height in try #require(heights) { #expect(height <= 64, "a property row is at most two lines tall, not \(height) points") }
     }
 
-    /// The rows of a Readwise Highlight: many strings, short and long, an ISO date, a web address and a note with a break.
+    /// The rows of a Readwise Highlight: many strings, short and long, an ISO date, a web address and an item with a break.
     static func highlightRows() -> [PropertyRow] {
         [
             PropertyRow(id: "account", label: "Account", value: .text("aicayzer")),

@@ -251,7 +251,7 @@ private extension [ReadSpan] {
             if !intent.isEmpty { piece.inlinePresentationIntent = intent }
             // A link is marked, not made live: a version is read here, and its addresses are not followed from it.
             if span.link != nil { piece.underlineStyle = .single }
-            // A wiki link is tinted as the note page tints one, and is not followed either.
+            // A wiki link is tinted as the item page tints one, and is not followed either.
             if span.wikiLink { piece.foregroundColor = Color.accentColor }
             switch span.change {
             case .same: break

@@ -44,7 +44,7 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
         case title, type, parent, children, collections, created, edited
         /// When the item happened (Marfa's `occurred_at`), which a record's look shows as its date.
         case occurred
-        /// The item's tags, which a note's look shows as its fact.
+        /// The item's tags, which an item's look shows as its fact.
         case tags
         /// The time between two date fields, as a session's start and end.
         case duration(start: String, end: String)

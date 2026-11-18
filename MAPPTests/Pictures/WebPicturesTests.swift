@@ -196,7 +196,7 @@ import Testing
 
     // MARK: How many are fetched at once
 
-    /// Starts an answer for each address, all at once, as a note with many pictures does.
+    /// Starts an answer for each address, all at once, as an item with many pictures does.
     private func chooseAll(_ addresses: [URL], in pictures: WebPictures) -> Task<[PictureAnswer], Never> {
         let asking = addresses.map { address in Task { await pictures.answer(address, ask: .chosen, inFeed: false) } }
         return Task {

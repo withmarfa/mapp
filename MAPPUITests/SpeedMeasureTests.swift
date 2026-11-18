@@ -8,7 +8,7 @@ import XCTest
 ///
 /// It runs only in the `Measure UI` plan with `MAPP_MEASURE_UI` set and the instance's address and key given as
 /// `MARFA_API_URL` and `MARFA_API_KEY` (xcodebuild's `TEST_RUNNER_` prefix hands them over); otherwise each test is
-/// skipped. The one write is a note it makes for the typing; `Scripts/measure-ui.sh` removes it afterwards.
+/// skipped. The one write is an item it makes for the typing; `Scripts/measure-ui.sh` removes it afterwards.
 ///
 /// Each test prints `UI|<name>|<median>|<max>|<unit>` lines after XCTest's own report, for the time the test itself
 /// saw, from the action to the result it waited for. That includes UI testing's own query cost, so it bounds what a
@@ -293,11 +293,11 @@ final class SpeedMeasureTests: XCTestCase {
 
     // MARK: Typing
 
-    /// Makes a note and types forty characters into its page one key at a time; `Scripts/measure-ui.sh` removes the
-    /// note afterwards. A keystroke's time runs from the key event until the app is idle again; the page reports no
+    /// Makes an item and types forty characters into its page one key at a time; `Scripts/measure-ui.sh` removes the
+    /// item afterwards. A keystroke's time runs from the key event until the app is idle again; the page reports no
     /// echo to wait on, and reading its accessibility value costs more than a keystroke, so the text is checked once
     /// at the end. The total is the sum.
-    func testTypingInANote() throws {
+    func testTypingInAnItem() throws {
         try launchWarm()
         try begin("typing")
         let title = "Speed measure \(UUID().uuidString.prefix(8))"

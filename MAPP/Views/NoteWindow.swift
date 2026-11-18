@@ -19,7 +19,7 @@ struct NoteWindow: View {
         _id = id
     }
 
-    /// The window's editor, holding the window's title drafts. Made when a note is shown, never for a file, which
+    /// The window's editor, holding the window's title drafts. Made when an item is shown, never for a file, which
     /// the editor's web view would never show.
     private var editor: EditorController? {
         guard let item else { return nil }
@@ -34,14 +34,14 @@ struct NoteWindow: View {
         layout == .text ? slot.editor(make) : nil
     }
 
-    /// An editor for a window of its own: a link followed in the page shows the note it names in this window, by
+    /// An editor for a window of its own: a link followed in the page shows the item it names in this window, by
     /// handing the window's item over, and the window remembers that item for the next launch.
     static func makeEditor(library: any ItemLibrary, details: DetailsPresentation, showing id: Binding<ItemID?>) -> EditorController {
         let editor = EditorController(library: library)
         editor.titleDrafts = details
         editor.onEscape = { [details] in details.endLayout() }
         editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
-        // The keyboard follows the link to the note it opened, as it does in a main window.
+        // The keyboard follows the link to the item it opened, as it does in a main window.
         editor.onOpenNote = { [weak editor] linked in
             id.wrappedValue = linked
             editor?.focus(linked)
@@ -75,16 +75,16 @@ struct NoteWindow: View {
         .onChange(of: library.isGone(id), initial: true) {
             if library.isGone(id) { dismiss() }
         }
-        // Another server is another library, which does not hold this window's note.
+        // Another server is another library, which does not hold this window's item.
         .onChange(of: ObjectIdentifier(library)) { dismiss() }
-        // The note followed from a link is another item, which Version History is not of.
+        // The item followed from a link is another item, which Version History is not of.
         .onChange(of: id) { details.leaveHistory() }
         // The page goes when its library does, as when the window waits while the server's copy opens again, and
         // the window's undo would act on the library left.
         .onDisappear { [library] in
             // What was typed in the inspector goes to the library it was typed for, or back to the person.
             details.handOffProperties(in: library, undoManager: nil)
-            // A window that never showed a note made no editor.
+            // A window that never showed an item made no editor.
             editorSlot.made?.flush()
             editorSlot.made?.windowWent()
             undoManager?.removeAllActions()

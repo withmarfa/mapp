@@ -6,7 +6,7 @@ extension EditorController {
     struct WebLinkRequest: Identifiable {
         let id = UUID()
         let note: ItemID
-        /// The load of the note the sheet was opened on; a reload gives the page another, and the selection the sheet
+        /// The load of the item the sheet was opened on; a reload gives the page another, and the selection the sheet
         /// is for is gone with it.
         let generation: Int
         /// The caret is in a link, which the sheet can then also change or remove.
@@ -60,7 +60,7 @@ extension EditorController {
     func cancelWebLink() { webLinkRequest = nil }
 
     /// Ends both requests the page can be waiting on or the sheets can show, for a page that is about to show another
-    /// note or text, or that is going away.
+    /// item or text, or that is going away.
     func cancelRequests() {
         cancelLinkRequest()
         cancelWebLink()

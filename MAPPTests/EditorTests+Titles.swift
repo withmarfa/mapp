@@ -7,7 +7,7 @@ import WebKit
 
 /// Titles the library refuses, kept and told until they are saved or discarded.
 extension EditorTests {
-    @Test func aRefusedTitleInAClosedWindowNeverHoldsUpQuittingOrRenamesTheNote() async throws {
+    @Test func aRefusedTitleInAClosedWindowNeverHoldsUpQuittingOrRenamesTheItem() async throws {
         let library = ItemPreviewFixtures.library
         let ticket = ItemPreviewFixtures.ticketID
         _ = try await Self.openAndClose(library, item: ticket) { editor, web in
@@ -19,7 +19,7 @@ extension EditorTests {
             try #require(try await eventuallyAsking { try await web.evaluateJavaScript("!document.querySelector('.item-title-error').hidden") as? Bool == true })
             // Deleted from another window, so closing this one is allowed: the draft cannot be saved anywhere.
             library.delete([ticket], undoManager: nil)
-            #expect(await eventually { !editor.isEditable }, "the page shows the note deleted")
+            #expect(await eventually { !editor.isEditable }, "the page shows the item deleted")
         }
         library.recover([ticket], undoManager: nil)
         let kept = await withCheckedContinuation { continuation in EditorController.flushAll { continuation.resume(returning: $0) } }
@@ -76,7 +76,7 @@ extension EditorTests {
         try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
     }
 
-    @Test func aRefusedTitleForANoteNoLongerShownStillStopsQuittingAndNamesTheNote() async throws {
+    @Test func aRefusedTitleForAnItemNoLongerShownStillStopsQuittingAndNamesTheItem() async throws {
         let host = try await HostedPage()
         defer { host.close() }
         try await host.type("")
@@ -87,7 +87,7 @@ extension EditorTests {
         #expect(await !host.flushAll())
         let message = try #require(host.library.notices.waiting.last?.message)
         #expect(message.contains("“Review the findings” is empty"), "\(message)")
-        // Deleting a note keeps the window, so a refused title is tried again but stops nothing.
+        // Deleting an item keeps the window, so a refused title is tried again but stops nothing.
         host.library.notices.answerAll()
         #expect(await host.flushAll(leaving: false))
         #expect(host.library.notices.waiting.last == nil)

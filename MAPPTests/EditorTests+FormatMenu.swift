@@ -91,7 +91,7 @@ extension EditorTests {
         #expect(page.changes.isEmpty)
     }
 
-    /// Opens the Link sheet on "docs", then has the note changed elsewhere so the page reloads under a new generation.
+    /// Opens the Link sheet on "docs", then has the item changed elsewhere so the page reloads under a new generation.
     private func reload(_ page: Page, whileAsking ask: (() async -> Bool)? = nil) async throws -> Bool? {
         let note = page.library.add("Read the docs\n")
         try await page.show(note.id)

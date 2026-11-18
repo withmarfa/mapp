@@ -3,7 +3,7 @@ import Foundation
 import Testing
 @testable import MAPP
 
-/// How an embed in a note becomes the file Marfa's core bound it to, for the page and the gallery alike.
+/// How an embed in an item becomes the file Marfa's core bound it to, for the page and the gallery alike.
 @Suite(.hangLimit) struct EmbedResolutionTests {
     let folder: TemporaryFolder
     let library = FakeItemLibrary()
@@ -84,7 +84,7 @@ import Testing
 
         library.items[index].state = .trashed
         #expect(await open("![[Photo.png]]").file == nil)
-        #expect(reason(await open("![[Photo.png]]")) == nil, "an embed of a binned file is missing, as a link to a binned note is")
+        #expect(reason(await open("![[Photo.png]]")) == nil, "an embed of a binned file is missing, as a link to a binned item is")
     }
 
     @Test func theLibraryTellsWhichEmbedsChangedWhenAFileArrivesIsRenamedOrBinned() async throws {
@@ -107,7 +107,7 @@ import Testing
         #expect(after.filter { library.embedStates(of: note)[$0.key] != $0.value }.keys.sorted() == ["![[Photo.png]]"])
     }
 
-    @Test func aNotesPictureIsItsFirstEmbeddedImageReadThroughTheResolver() async throws {
+    @Test func anItemsPictureIsItsFirstEmbeddedImageReadThroughTheResolver() async throws {
         library.bindEmbed("![[Budget.csv]]", in: note, file: try file("Budget.csv", Data("a,b\n".utf8)))
         library.bindEmbed("![[Photo.png]]", in: note, file: try file("Photo.png", EmbedFixtures.png(width: 5, height: 2)))
         let item = try #require(library.item(note))
@@ -154,8 +154,8 @@ import Testing
         #expect(name(await GalleryArtworkCache.outcome(for: item, attachments: CardAttachments.of(item, in: library), width: 200, scale: 2, in: library)) == "picture")
     }
 
-    /// Binning, renaming or restoring the file changes nothing of the note, so the card follows the file itself.
-    @Test func aNotesCardFollowsItsFileWhenItIsBinnedRenamedAndRestored() async throws {
+    /// Binning, renaming or restoring the file changes nothing of the item, so the card follows the file itself.
+    @Test func anItemsCardFollowsItsFileWhenItIsBinnedRenamedAndRestored() async throws {
         let id = try #require(library.bindEmbed("![[Photo.png]]", in: note, file: try file("Photo.png", EmbedFixtures.png(width: 5, height: 2))))
         let item = try #require(library.item(note))
         let index = try #require(library.items.firstIndex { $0.id == id })

@@ -897,7 +897,7 @@ test('a refused edit stays out of the note and reaches the host, from a command 
   }
 })
 
-test('a Link to Note the app fails to answer reports an error to the host and leaves the line as typed', async () => {
+test('a Link to Item the app fails to answer reports an error to the host and leaves the line as typed', async () => {
   const posted: unknown[] = []
   Object.defineProperty(window, 'webkit', {
     configurable: true,

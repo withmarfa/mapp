@@ -37,9 +37,9 @@ nonisolated enum EditorMessage: Sendable {
     case ready
     case changed(String, generation: Int)
     case state(CaretState)
-    /// A loaded note has had its first frame, said once for each load.
+    /// A loaded item has had its first frame, said once for each load.
     case painted(generation: Int)
-    /// The headings of the loaded note in the editor's own order, each with its place in that list, under the load they
+    /// The headings of the loaded item in the editor's own order, each with its place in that list, under the load they
     /// belong to. Said after each load and when an edit changes the list. A heading with no words is counted, not listed.
     case headings([OutlineHeading], generation: Int)
     /// The item's header has gone under the toolbar, or come back; said only when it changes.
@@ -78,7 +78,7 @@ nonisolated enum EditorMessage: Sendable {
     case rowMenu((item: ItemID, row: String)?)
     /// A row of the property block was dragged: the whole order the page shows after the move, folded rows included.
     case moveRow(ItemID, row: String, order: [String])
-    /// A `[[link]]` to a note was command-clicked in the note `item`.
+    /// A `[[link]]` to an item was command-clicked in the item `item`.
     case openNote(ItemID, NoteLink)
     case find(FindState)
     case diagnostic(String)

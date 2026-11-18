@@ -3,7 +3,7 @@ import UniformTypeIdentifiers
 import WebKit
 
 /// The web view behaving as a Mac text view: Undo and Redo in the Edit menu drive the page's own history, the
-/// context menu offers only what applies to a note.
+/// context menu offers only what applies to an item.
 final class EditorWebView: WKWebView {
     weak var controller: EditorController?
 
@@ -26,7 +26,7 @@ final class EditorWebView: WKWebView {
 
     // MARK: Images
 
-    // Images dropped become attachments of the note, linked from its text; everything else is the page's to
+    // Images dropped become attachments of the item, linked from its text; everything else is the page's to
     // take. Pasted images reach the app from the page, which hears the paste.
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
         carriesImages(sender) ? .copy : super.draggingEntered(sender)
@@ -62,8 +62,8 @@ final class EditorWebView: WKWebView {
     private var windowUndoManager: UndoManager? { window?.undoManager }
 
     /// The item's title in the page is a plain text field, whose typing WebKit's own steps undo, as a field
-    /// editor's would. Steps left from typing in the note are dropped first, since undoing them would change the
-    /// note behind the page's back.
+    /// editor's would. Steps left from typing in the item are dropped first, since undoing them would change the
+    /// item behind the page's back.
     func beginEditingTitle() {
         pageUndoManager.removeAllActions()
     }
@@ -198,7 +198,7 @@ final class EditorWebView: WKWebView {
         return item
     }
 
-    /// Version History, for the note on the page, from the window the editor belongs to.
+    /// Version History, for the item on the page, from the window the editor belongs to.
     private var versionHistoryItem: NSMenuItem? {
         guard let controller, controller.noteID != nil, controller.titleDrafts != nil else { return nil }
         let item = NSMenuItem(title: String(localized: "Version History…"), action: #selector(versionHistory(_:)), keyEquivalent: "")
@@ -206,7 +206,7 @@ final class EditorWebView: WKWebView {
         return item
     }
 
-    /// Change Type, for the note on the page, from the window the editor belongs to.
+    /// Change Type, for the item on the page, from the window the editor belongs to.
     private var changeTypeItem: NSMenuItem? {
         guard let controller, let id = controller.noteID, controller.titleDrafts != nil, let library = controller.library,
               library.offersTypeChange(for: [id])
@@ -216,7 +216,7 @@ final class EditorWebView: WKWebView {
         return item
     }
 
-    /// WebKit's own items that mean nothing in a note: page navigation, and opening or saving what links and
+    /// WebKit's own items that mean nothing in an item: page navigation, and opening or saving what links and
     /// images point at, which the page never does (a link opens with Command-click). WebKit names them only in
     /// a private header, so were it to rename one, that item would simply stay.
     private static let unwantedItems: Set<String> = [
@@ -233,7 +233,7 @@ final class EditorWebView: WKWebView {
         "WKMenuItemIdentifierDownloadMedia",
     ]
 
-    /// Submenus for rich text, identified by what their items do: a note is markdown, which has no fonts,
+    /// Submenus for rich text, identified by what their items do: an item's text is markdown, which has no fonts,
     /// colours or vertical layout.
     private static let richTextActions: Set<Selector> = [
         #selector(NSFontManager.orderFrontFontPanel(_:)),

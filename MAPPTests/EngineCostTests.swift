@@ -125,7 +125,7 @@ nonisolated enum EngineServer {
         return (numbers.values.reduce(0, +), numbers["active"] ?? 0)
     }
 
-    /// Makes `count` notes tagged `tag`, in as few calls as the server takes, and answers their ids.
+    /// Makes `count` items tagged `tag`, in as few calls as the server takes, and answers their ids.
     static func createNotes(count: Int, tag: String) async throws -> [ItemID] {
         var ids: [ItemID] = []
         while ids.count < count {
@@ -458,7 +458,7 @@ struct EngineCostTests {
             let library = opened.library, source = opened.source
             var steps: [Double] = []
             for round in 0..<5 {
-                // A tag of its own each round, since a note's source id is its tag and its place in the call.
+                // A tag of its own each round, since an item's source id is its tag and its place in the call.
                 let tag = "mapptest-catchup-\(UUID().uuidString.prefix(8).lowercased())"
                 bench.tags.append(tag)
                 let made = try await EngineServer.createNotes(count: 1, tag: tag)

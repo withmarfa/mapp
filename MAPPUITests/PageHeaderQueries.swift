@@ -6,7 +6,7 @@ extension XCUIElement {
 
     var itemPageBody: XCUIElement {
         webViews.descendants(matching: .textView)
-            .matching(NSPredicate(format: "label == %@ OR title == %@", "Note", "Note"))
+            .matching(NSPredicate(format: "label == %@ OR title == %@", "Text", "Text"))
             .firstMatch
     }
 

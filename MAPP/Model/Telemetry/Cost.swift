@@ -40,7 +40,7 @@ nonisolated enum Cost: String, CaseIterable, Sendable {
     case paletteIndex
     /// One run of the body of `Sidebar` or of its Types section.
     case sidebarBody
-    /// One run of the note list's body, which lists every item the place holds.
+    /// One run of the item list's body, which lists every item the place holds.
     case listBody
 
     private static let signposter = Telemetry.signposter(.navigation)

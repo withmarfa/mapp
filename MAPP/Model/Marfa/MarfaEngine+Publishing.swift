@@ -68,7 +68,7 @@ extension MarfaEngine {
 
     /// The most rows asked about in one `items.displays` call. The core serves one call at a time, so a whole large
     /// library in one call holds every other read and write of the copy until it ends (about 16 microseconds a row
-    /// for 3 KB notes); in batches they interleave.
+    /// for 3 KB items); in batches they interleave.
     nonisolated static let displayBatch = 2_000
 
     /// The name and preview the core gives each of `own` the engine holds, from the copy's catalog in batches, and

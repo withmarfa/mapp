@@ -32,7 +32,7 @@ struct BrowserTests {
     }
 
     let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
-    /// The same three notes in a library held in memory, for what the browser asks of any library.
+    /// The same three items in a library held in memory, for what the browser asks of any library.
     func makeFakeLibrary() -> (FakeItemLibrary, older: Item, newer: Item, favorite: Item) {
         let older = FakeItemLibrary.note("Older", modified: start - 120, tier: .feed)
         let newer = FakeItemLibrary.note("Newer", modified: start - 60, tier: .feed)
@@ -141,7 +141,7 @@ struct BrowserTests {
         #expect(browser.selection == [newer.id])
     }
 
-    @Test func jumpingToANoteInAnotherPlaceLeavesNothingBetweenItAndTheNoteLeft() {
+    @Test func jumpingToAnItemInAnotherPlaceLeavesNothingBetweenItAndTheItemLeft() {
         let (library, older, newer, _) = makeFakeLibrary()
         let planning = FakeItemLibrary.note("Planning", modified: start - 7200)
         library.items.append(planning)
@@ -150,13 +150,13 @@ struct BrowserTests {
         browser.selection = [older.id]
         browser.reveal(planning, in: library, order: NoteOrder())
         #expect(browser.selection == [planning.id])
-        #expect(browser.history.entries.map(\.id) == [newer.id, older.id, planning.id], "the first note All Items showed on the way was not recorded")
+        #expect(browser.history.entries.map(\.id) == [newer.id, older.id, planning.id], "the first item All Items showed on the way was not recorded")
         browser.go(.back, in: library)
         #expect(browser.selection == [older.id])
         #expect(browser.sidebarItem == .inbox)
     }
 
-    @Test func theNoteAWindowOpensOnIsWhereBackCanReturnTo() {
+    @Test func theItemAWindowOpensOnIsWhereBackCanReturnTo() {
         let (library, older, newer, _) = makeFakeLibrary()
         let browser = Browser()
         browser.show(.inbox, in: library, order: NoteOrder())
@@ -180,7 +180,7 @@ struct BrowserTests {
         browser.keepSelection(from: [newer.id, older.id], to: browser.items(in: library).map(\.id))
         #expect(browser.selection == [newer.id], "the search moved the selection to a result")
         #expect(browser.history.entries.map(\.id) == [newer.id, older.id])
-        #expect(!browser.canGoBack(in: library), "the only earlier note is the one the search moved to")
+        #expect(!browser.canGoBack(in: library), "the only earlier item is the one the search moved to")
     }
 
     // MARK: Keeping the selection in the list
@@ -207,16 +207,16 @@ struct BrowserTests {
 
     let a = ItemID.mint(), b = ItemID.mint(), c = ItemID.mint(), d = ItemID.mint()
 
-    @Test func selectedNotesStillListedStaySelected() {
+    @Test func selectedItemsStillListedStaySelected() {
         #expect(Browser.selection([a, b], keptFrom: [a, b, c], in: [b, c]) == [b])
     }
 
-    @Test func aSelectionThatLeavesTheListMovesToTheNoteAfterIt() {
+    @Test func aSelectionThatLeavesTheListMovesToTheItemAfterIt() {
         #expect(Browser.selection([b], keptFrom: [a, b, c], in: [a, c]) == [c])
         #expect(Browser.selection([b, c], keptFrom: [a, b, c, d], in: [a, d]) == [d])
     }
 
-    @Test func withNothingAfterItTheSelectionMovesToTheNoteBefore() {
+    @Test func withNothingAfterItTheSelectionMovesToTheItemBefore() {
         #expect(Browser.selection([c], keptFrom: [a, b, c], in: [a, b]) == [b])
     }
 
@@ -364,7 +364,7 @@ struct BrowserTests {
         #expect(decoded.content == nil)
     }
 
-    @Test func turningOffDateGroupingListsNotesUnderOneHeadingAfterTheFavorites() {
+    @Test func turningOffDateGroupingListsItemsUnderOneHeadingAfterTheFavorites() {
         let (library, _, _, _) = makeFakeLibrary()
         let browser = Browser()
         browser.show(.allNotes, in: library, order: NoteOrder())

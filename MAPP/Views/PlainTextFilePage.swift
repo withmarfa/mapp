@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// File text is literal and selectable, using the same reading preferences as a note's page.
+/// File text is literal and selectable, using the same reading preferences as an item's page.
 struct PlainTextFilePage: View {
     let text: String
     let title: String

@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// The page owns its title; the inspector is reserved for the rest of the item's details. The page draws the
-/// title and pinned properties above the note, so they scroll with it as one surface, and this carries out what
+/// title and pinned properties above the item, so they scroll with it as one surface, and this carries out what
 /// the person does there: the title is saved as the item's property, and every other value opens in the panel under
 /// it (`ValueEditPresenter`). Applied to the editor's view, whose container the panel's frames arrive in.
 struct ItemPageHeader: ViewModifier {

@@ -271,7 +271,7 @@ private actor FillServer: MarfaRefreshing {
             await sync.flush()
             let drains = sync.hooks.drains
 
-            // The early retry has finished. Replay now adds a file and its relationship to a held note.
+            // The early retry has finished. Replay now adds a file and its relationship to a held item.
             let target = told.count.withLock { $0 } + 1
             fake.sendUpdate(CopyUpdate(
                 reread: .parts(Reread.Parts(rows: ChangedRows(edges: ["replayed"]))), connection: .following))

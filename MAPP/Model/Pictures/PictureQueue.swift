@@ -3,7 +3,7 @@ import Foundation
 /// Lets only a few fetches run at once, overall and for each website, and holds the rest in the order they came.
 /// A fetch that has to wait is not refused: it starts when a place is free.
 ///
-/// A note with many pictures asks for all of them at once, and a website sees the person's Mac as one client, so
+/// An item with many pictures asks for all of them at once, and a website sees the person's Mac as one client, so
 /// neither the Mac nor the website is sent a flood.
 actor PictureQueue {
     nonisolated static let standardTotal = 4

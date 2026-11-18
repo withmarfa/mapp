@@ -143,7 +143,7 @@ struct FileWindowEditorTests {
         #expect(slot.made == nil)
     }
 
-    @Test func aNoteWindowMakesItsEditorOnce() {
+    @Test func anItemWindowMakesItsEditorOnce() {
         let slot = EditorSlot()
         var made = 0
         func make() -> EditorController {

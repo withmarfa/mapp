@@ -10,7 +10,7 @@ struct ItemInspectorHost: View {
     let browser: Browser?
     let itemID: ItemID?
     let details: DetailsPresentation
-    /// The page beside the sidebar, which lists the headings of the note on it and goes to one, for the Outline section.
+    /// The page beside the sidebar, which lists the headings of the item on it and goes to one, for the Outline section.
     /// Nil where no page is beside the sidebar, and the Outline then has no rows.
     var editor: EditorController?
     @State private var editing: ItemRelationship?
@@ -337,7 +337,7 @@ struct ItemInspector: View {
         .showOnPageMenu(isShown: false, onChange: showOnPage(PagePlacement.linkedFrom))
     }
 
-    /// The note's headings; one goes to its place in the text.
+    /// The item's headings; one goes to its place in the text.
     private var outlineSection: some View {
         InspectorSectionView(.outline, title: "Outline", count: extras.outline.count) {
             ForEach(extras.outline) { heading in

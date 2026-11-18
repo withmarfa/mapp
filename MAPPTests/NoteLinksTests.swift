@@ -59,7 +59,7 @@ struct NoteLinksTests {
         #expect(try #require(NoteLink(linkText: "[[Cafe\u{301}]]")) != NoteLink(linkText: "[[Café]]"))
     }
 
-    @Test func suggestionsFavorPrefixesThenRecentNotes() async {
+    @Test func suggestionsFavorPrefixesThenRecentItems() async {
         let items = [
             note("Regarding gardens", minutes: 9), note("Gardening tools", minutes: 1), note("Garden ideas", minutes: 5),
             note("Bike service", minutes: 7),
@@ -77,7 +77,7 @@ struct NoteLinksTests {
         #expect(names == ["Garden ideas"])
     }
 
-    @Test func anEmptyQueryOffersTheMostRecentNotesUpToTheLimit() async {
+    @Test func anEmptyQueryOffersTheMostRecentItemsUpToTheLimit() async {
         let items = (0..<30).map { note("Note \($0)", minutes: $0) }
         let index = NoteLinks.Index()
         let names = await index.titles(matching: "", among: items, limit: 12)
@@ -85,16 +85,16 @@ struct NoteLinksTests {
         #expect(await index.titles(matching: "zzz", among: items, limit: 12).isEmpty)
     }
 
-    @Test func theIndexFollowsEditsAndRemovalsOfNotes() async {
+    @Test func theIndexFollowsEditsAndRemovalsOfItems() async {
         let index = NoteLinks.Index()
         var garden = note("Garden ideas")
         let bike = note("Bike service")
         #expect(await index.titles(matching: "ga", among: [garden, bike], limit: 5) == ["Garden ideas"])
         garden.title = "Allotment plan"
         garden.version = ItemVersion(garden.version.rawValue + 1)
-        #expect(await index.titles(matching: "ga", among: [garden, bike], limit: 5).isEmpty, "a renamed note is found by its new title")
+        #expect(await index.titles(matching: "ga", among: [garden, bike], limit: 5).isEmpty, "a renamed item is found by its new title")
         #expect(await index.titles(matching: "allot", among: [garden, bike], limit: 5) == ["Allotment plan"])
-        #expect(await index.titles(matching: "allot", among: [bike], limit: 5).isEmpty, "a removed note is forgotten")
+        #expect(await index.titles(matching: "allot", among: [bike], limit: 5).isEmpty, "a removed item is forgotten")
     }
 
     @Test func aLargeLibraryIsReadOnceAndAKeystrokeFoldsNothingAgain() async {
@@ -115,11 +115,11 @@ struct NoteLinksTests {
         items[7].title = "garden shed"
         items[7].version = ItemVersion(items[7].version.rawValue + 1)
         #expect(await index.titles(matching: "garden s", among: items, limit: 12).first == "garden shed")
-        #expect(await index.foldedCount == 20_001, "an edit folds only the note edited")
+        #expect(await index.foldedCount == 20_001, "an edit folds only the item edited")
         FileHandle.standardError.write(Data("NoteLinks index, 20,000 notes: first query \(first)\n".utf8))
     }
 
-    @Test func aLibraryNamesTheNoteChosenByTitleOrByIdentity() async {
+    @Test func aLibraryNamesTheItemChosenByTitleOrByIdentity() async {
         let alone = note("Garden ideas", minutes: 1)
         let twin = note("garden IDEAS", minutes: 2)
         let odd = note("A|B", minutes: 3)
@@ -130,16 +130,16 @@ struct NoteLinksTests {
         #expect(library.notesToLink(excluding: library.items[3].id).map(\.title) == ["A|B", "garden IDEAS", "Garden ideas"])
     }
 
-    @Test func aTitleLinkIsWrittenOnlyWhereTheCoreBindsItToTheNote() async {
+    @Test func aTitleLinkIsWrittenOnlyWhereTheCoreBindsItToTheItem() async {
         let plan = note("Plan")
         let library = FakeItemLibrary(items: [plan])
         library.linkAnswerOverrides["Plan"] = LinkAnswer(target: "Plan", state: .unresolved, item: nil, candidates: [plan.id])
-        #expect(await library.bodyLink(to: plan.id, in: nil) == "[[\(plan.id.rawValue)|Plan]]", "one held note is not proof it is the only one")
+        #expect(await library.bodyLink(to: plan.id, in: nil) == "[[\(plan.id.rawValue)|Plan]]", "one held item is not proof it is the only one")
         library.linkAnswerOverrides["Plan"] = LinkAnswer(target: "Plan", state: .bound, item: plan.id, candidates: [plan.id])
         #expect(await library.bodyLink(to: plan.id, in: nil) == "[[Plan]]")
     }
 
-    @Test func aSuggestionIsATitleTheCoreBindsToItsOwnNote() async {
+    @Test func aSuggestionIsATitleTheCoreBindsToItsOwnItem() async {
         let library = FakeItemLibrary(items: [note("Garden", minutes: 1), note("garden", minutes: 2), note("Gardening", minutes: 3), note("Garden | x", minutes: 4)])
         let index = NoteLinks.Index()
         #expect(await library.noteNames(matching: "gard", using: index) == ["Gardening"], "twins are ambiguous, and a title with a bar cannot be spelled")

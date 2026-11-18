@@ -5,7 +5,7 @@ import Testing
 @testable import MAPP
 
 extension LiveMarfaTests {
-    /// What Marfa answers for the links in a note's text, against the test instance, in the Live test plan. Every
+    /// What Marfa answers for the links in an item's text, against the test instance, in the Live test plan. Every
     /// item has a title starting `MAPPTEST ` and is purged when the test ends.
     @Suite(.serialized)
     struct MarfaBodyLinkLiveTests {
@@ -36,7 +36,7 @@ extension LiveMarfaTests {
             try? FileManager.default.removeItem(at: root)
         }
 
-        /// Each link in the text, as typed, with the note it names once the server has answered for all of them.
+        /// Each link in the text, as typed, with the item it names once the server has answered for all of them.
         private func targets(of reader: ItemID, in source: MarfaSource, count: Int) async throws -> [String: BodyTarget] {
             var found: [String: BodyTarget] = [:]
             _ = await LiveMarfa.until {
@@ -47,11 +47,11 @@ extension LiveMarfaTests {
             return found
         }
 
-        /// A link whose edge stands keeps the note it named when that note is renamed and another note takes its
-        /// title, and when a link to the other note is added to the same text, by its identity with the old title as
+        /// A link whose edge stands keeps the item it named when that item is renamed and another item takes its
+        /// title, and when a link to the other item is added to the same text, by its identity with the old title as
         /// the label (withmarfa/marfa#2045).
         @Test(.timeLimit(.minutes(2)))
-        func anOldLinkKeepsItsTargetWhenALinkToANoteWithItsTitleIsAdded() async throws {
+        func anOldLinkKeepsItsTargetWhenALinkToAnItemWithItsTitleIsAdded() async throws {
             try await withSource { source, log, made in
                 let token = UUID().uuidString.prefix(8)
                 let title = "MAPPTEST Plan \(token)"
@@ -76,15 +76,15 @@ extension LiveMarfaTests {
                 await source.flush()
 
                 let after = try await targets(of: reader, in: source, count: 2)
-                #expect(after["[[\(title)]]"] == .item(id: plan.rawValue), "the old link was moved to another note")
+                #expect(after["[[\(title)]]"] == .item(id: plan.rawValue), "the old link was moved to another item")
                 #expect(after[added] == .item(id: reused.rawValue))
             }
         }
 
-        /// A link by identity names the note with that identity, even when another note the text links to is titled
+        /// A link by identity names the item with that identity, even when another item the text links to is titled
         /// with that identity (withmarfa/marfa#2046).
         @Test(.timeLimit(.minutes(2)))
-        func aLinkByIdentityNamesThatNoteWhateverAnotherLinkedNoteIsTitled() async throws {
+        func aLinkByIdentityNamesThatItemWhateverAnotherLinkedItemIsTitled() async throws {
             try await withSource { source, log, made in
                 let token = UUID().uuidString.prefix(8)
                 let (target, decoy, reader) = (made.mint(), made.mint(), made.mint())
@@ -99,7 +99,7 @@ extension LiveMarfaTests {
                 source.submit(.editBody(reader, "See [[\(decoy.rawValue)]] and [[\(target.rawValue)]].", base: version, merge: .asRead), as: WriteID())
                 await source.flush()
                 let after = try await targets(of: reader, in: source, count: 2)
-                #expect(after["[[\(target.rawValue)]]"] == .item(id: target.rawValue), "the identity was read as the other note's title")
+                #expect(after["[[\(target.rawValue)]]"] == .item(id: target.rawValue), "the identity was read as the other item's title")
                 #expect(after["[[\(decoy.rawValue)]]"] == .item(id: decoy.rawValue))
             }
         }

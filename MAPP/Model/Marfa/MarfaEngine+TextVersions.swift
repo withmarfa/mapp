@@ -34,7 +34,7 @@ extension MarfaEngine {
         }
     }
 
-    /// The version that text read at `read` is on, now that the copy holds `held`. A page that opens a note as soon
+    /// The version that text read at `read` is on, now that the copy holds `held`. A page that opens an item as soon
     /// as it is made can read this device's own create before the server answers it, at version 0, which no server
     /// holds (`device/version-local-create`). Once the copy holds the answer, that text is version 1
     /// (`versions/create-version-one`), so an edit typed on it is sent on version 1; sent on 0, it would be refused.

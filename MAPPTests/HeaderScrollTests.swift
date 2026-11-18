@@ -79,7 +79,7 @@ struct HeaderScrollTests {
         #expect(!HeaderScroll.isUnderToolbar(scrolled: scroll.offset))
     }
 
-    @Test func aNoteWithNoTitleThatHasScrolledAwayStillBringsItsToolbarItem() {
+    @Test func anItemWithNoTitleThatHasScrolledAwayStillBringsItsToolbarItem() {
         let library = FakeItemLibrary()
         let untitled = FakeItemLibrary.note("", modified: .now)
         library.items = [untitled]
@@ -92,7 +92,7 @@ struct HeaderScrollTests {
         #expect(tools().scrolledTitle.isEmpty)
     }
 
-    @Test func aNotesToolbarTitleIsItsTextOnceItsHeaderHasScrolledAway() {
+    @Test func anItemsToolbarTitleIsItsTextOnceItsHeaderHasScrolledAway() {
         let library = FakeItemLibrary()
         let note = FakeItemLibrary.note("Cliff path", modified: .now)
         library.items = [note]

@@ -234,7 +234,7 @@ nonisolated enum SampleLibrary {
 
     static func items(now: Date, tasksAndEvents: Bool) -> [Marfa.Item] {
         let calendar = Calendar.current
-        /// Never later than now, so a note written "this morning" is not in the future before breakfast.
+        /// Never later than now, so an item written "this morning" is not in the future before breakfast.
         func date(daysAgo: Int, hour: Int, minute: Int = 0) -> Date {
             let day = calendar.date(byAdding: .day, value: -daysAgo, to: now) ?? now
             let date = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day) ?? day

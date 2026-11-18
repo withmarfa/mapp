@@ -3,7 +3,7 @@ import MarfaIcons
 import SwiftUI
 
 /// What the page's item header shows: the item's title, or the person's unsaved draft of it, its pinned properties
-/// (`PagePins`) and the rows of the property block. The page draws it above the note so the two scroll as one
+/// (`PagePins`) and the rows of the property block. The page draws it above the item so the two scroll as one
 /// surface; what it does stays native.
 nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     /// The status or the parent as the menu the page opens from it, wherever the page draws it. The page draws the
@@ -68,7 +68,7 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     }
 
     var item: String
-    /// A deleted note shows a banner instead.
+    /// A deleted item shows a banner instead.
     var hidden: Bool
     var title: String
     var draft: String?
@@ -304,7 +304,7 @@ nonisolated struct PageHeaderIcons: Encodable, Sendable {
 
     /// A type's icon as the page's mask: drawn black, since only its shape matters. With `square`, it is centered in a
     /// square of its longer side, so the page can scale it without distorting it. Shared by the header and the links
-    /// in a note, so a type's icon is drawn one way.
+    /// in an item, so a type's icon is drawn one way.
     @MainActor
     static func typeIcon(_ name: String?, size: CGFloat, square: Bool = false) -> Icon? {
         Cost.measure(.iconDraw) { drawTypeIcon(name, size: size, square: square) }

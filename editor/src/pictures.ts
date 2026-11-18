@@ -38,7 +38,7 @@ type PictureState =
 export type Ask = typeof askPicture
 
 /**
- * The pictures at web addresses (`![alt](https://…)`, as a feed's text holds) in the note on the page, and what each
+ * The pictures at web addresses (`![alt](https://…)`, as a feed's text holds) in the item on the page, and what each
  * card shows. The page decides nothing of the Remote Pictures setting, nor of which items Always applies to: the app
  * answers `waiting` for one it does not load without asking. The alt text, the host and the address are all the page
  * has of a picture. An `http` address is asked for too, and the app refuses it with a reason the card shows.
@@ -54,14 +54,14 @@ export type Ask = typeof askPicture
  *
  * The callout above the text (`#picture-bar`) counts the distinct addresses still waiting among the cards drawn, and
  * so drops as each one is chosen. Its close button (`dismiss`) hides it for the page on show, and nothing the
- * pictures do brings it back; a different note, or the same one opened anew (`opened`), does.
+ * pictures do brings it back; a different item, or the same one opened anew (`opened`), does.
  *
  * The asks mean: `chosen` when the person chose, `drawing` when a card is drawn, and `cached` for printing and
  * export, which show only what the app already holds and fetch nothing (`NoteEditor.printable` sets `cacheOnly`).
  *
  * Asking again (`changed`, `savedChanged`) keeps what a card and the callout's count showed until the new answer
  * arrives, and draws the card again only if the answer differs. A picture being chosen is left alone by both, so its
- * card ends with its own answer. An embed of a note is not a picture and never reaches this class.
+ * card ends with its own answer. An embed of an item is not a picture and never reaches this class.
  */
 export class WebPictures {
   private states = new Map<string, PictureState>()
@@ -90,7 +90,7 @@ export class WebPictures {
     private ask: Ask = askPicture,
   ) {}
 
-  /** A different note forgets what it was told of the last one's pictures. */
+  /** A different item forgets what it was told of the last one's pictures. */
   setItem(id: string) {
     if (id === this.item) return
     this.item = id
@@ -100,7 +100,7 @@ export class WebPictures {
     this.schedule()
   }
 
-  /** The note is opened anew, even if it is the one already on the page: a callout the person closed shows again. */
+  /** The item is opened anew, even if it is the one already on the page: a callout the person closed shows again. */
   opened() {
     this.dismissed = false
     this.schedule()
@@ -135,7 +135,7 @@ export class WebPictures {
     state: PictureState,
   ): FilePresentation {
     if (state.kind === 'loaded') return { kind: 'image', url: state.url, label: shown }
-    // A printed note names the picture; it says nothing of what the person could choose.
+    // A printed item names the picture; it says nothing of what the person could choose.
     if (this.cacheOnly) return { kind: 'file', label: shown }
     const host = hostOf(address)
     switch (state.kind) {
@@ -172,7 +172,7 @@ export class WebPictures {
   }
 
   /** Asks the app once for a picture however many cards ask at the same time, and keeps its answer, unless the
-   *  note on the page has changed meanwhile or the question was only for what is held. */
+   *  item on the page has changed meanwhile or the question was only for what is held. */
   private request(item: string, address: string, ask: PictureAsk): Promise<PictureState> {
     const key = `${ask}\n${address}`
     const held = this.asking.get(key)
@@ -208,7 +208,7 @@ export class WebPictures {
     return true
   }
 
-  /** Every picture of the note that waits for the person, chosen together, as the callout's button does. */
+  /** Every picture of the item that waits for the person, chosen together, as the callout's button does. */
   chooseAll() {
     for (const address of this.waiting()) void this.choose(address)
   }

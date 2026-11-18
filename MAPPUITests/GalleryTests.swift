@@ -67,7 +67,7 @@ final class GalleryTests: XCTestCase {
         }
     }
 
-    func testOpeningReturningAndListViewKeepTheNoteAndUndo() {
+    func testOpeningReturningAndListViewKeepTheItemAndUndo() {
         choose("Gallery")
         let target = card("Kitchen quotes")
         XCTAssertTrue(target.waitForExistence(timeout: 3))
@@ -120,7 +120,7 @@ final class GalleryTests: XCTestCase {
         XCTAssertTrue(first.waitForExistence(timeout: 3))
     }
 
-    func testAnOpenedGalleryNoteKeepsItsCompactTitleAndTrailingActions() {
+    func testAnOpenedGalleryItemKeepsItsCompactTitleAndTrailingActions() {
         choose("Gallery")
         let target = card("Kitchen quotes")
         XCTAssertTrue(target.waitForExistence(timeout: 3))

@@ -1,11 +1,11 @@
 import AppKit
 
-/// Link to Note, and following a link to the note it names.
+/// Link to Item, and following a link to the item it names.
 extension EditorController {
-    // MARK: Linking to a note
+    // MARK: Linking to an item
 
-    /// Asks the person which note to link to, and gives the page the link to write, or nil if they decline or the
-    /// page has moved on from the note the command was typed in. A new request cancels the earlier one. A request
+    /// Asks the person which item to link to, and gives the page the link to write, or nil if they decline or the
+    /// page has moved on from the item the command was typed in. A new request cancels the earlier one. A request
     /// made after the window went is answered with nothing.
     func chooseNoteToLink(from note: ItemID) async -> String? {
         cancelLinkRequest()
@@ -16,9 +16,9 @@ extension EditorController {
         }
     }
 
-    /// Answers the page with the link to the note chosen, read from the library as the note is now, not as the
-    /// picker listed it, and by identity, so a note renamed meanwhile is linked by its new name and one that shares
-    /// its name is not mistaken for it. Whether it was answered: a note no link can name alone leaves the request
+    /// Answers the page with the link to the item chosen, read from the library as the item is now, not as the
+    /// picker listed it, and by identity, so an item renamed meanwhile is linked by its new name and one that shares
+    /// its name is not mistaken for it. Whether it was answered: an item no link can name alone leaves the request
     /// open for the person to choose another.
     @discardableResult
     func finishLinkRequest(choosing id: ItemID) async -> Bool {
@@ -43,10 +43,10 @@ extension EditorController {
 
     // MARK: Following a link
 
-    /// Opens the note a link in `source` names, as the core reads that very link from that note
+    /// Opens the item a link in `source` names, as the core reads that very link from that item
     /// (`Items.linkCandidates`), and scrolls to the heading it asks for. A link the copy has not bound, which one
-    /// note or more answer to, offers them in a menu. A link that names no note, or that the core cannot be asked
-    /// about, opens nothing and beeps; no note is made for it. A click in a note the page has since left is ignored.
+    /// item or more answer to, offers them in a menu. A link that names no item, or that the core cannot be asked
+    /// about, opens nothing and beeps; no item is made for it. A click in an item the page has since left is ignored.
     func openNote(_ link: NoteLink, from source: ItemID) async {
         guard !windowIsGone, source == noteID, let library else { return }
         let answer = await library.linkAnswers(of: [link.raw], in: source)?.first
@@ -56,7 +56,7 @@ extension EditorController {
             guard let id = answer?.item, library.item(id) != nil else { return onUnopenableLink() }
             show(id, heading: link.heading)
         case .ambiguous, .unresolved:
-            // A name the copy has not bound is the person's to confirm, since the server may hold another note by it.
+            // A name the copy has not bound is the person's to confirm, since the server may hold another item by it.
             let held = (answer?.candidates ?? []).filter { library.item($0) != nil }
             guard !held.isEmpty else { return onUnopenableLink() }
             let choose = onChooseAmbiguousLink ?? { [weak self] ids, pick in self?.popUpCandidates(ids, pick: pick) }
@@ -71,7 +71,7 @@ extension EditorController {
         if id == noteID { revealPendingHeading(in: id) } else { onOpenNote(id) }
     }
 
-    /// A menu at the pointer naming each note a link could mean, by title.
+    /// A menu at the pointer naming each item a link could mean, by title.
     private func popUpCandidates(_ ids: [ItemID], pick: @escaping (ItemID) -> Void) {
         let menu = NSMenu()
         let chosen = CandidateChoice(pick: pick)
@@ -85,13 +85,13 @@ extension EditorController {
         withExtendedLifetime(chosen) { _ = menu.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil) }
     }
 
-    /// Scrolls the page to the heading of the note on it that has this text, as a link to the note's own heading does.
+    /// Scrolls the page to the heading of the item on it that has this text, as a link to the item's own heading does.
     func revealHeading(_ text: String) {
         guard isReady else { return }
         call("revealHeading", json(text), String(generation))
     }
 
-    /// The headings the Outline lists for `id`: those the page reported for the note now on it, and none while the page
+    /// The headings the Outline lists for `id`: those the page reported for the item now on it, and none while the page
     /// holds another item or has not loaded this one.
     func headings(of id: ItemID) -> [OutlineHeading] {
         guard isShowing(id) else { return [] }
@@ -111,7 +111,7 @@ extension EditorController {
         call("revealHeading", json(pending.text), String(generation))
     }
 
-    /// Tells the page when the library's notes change, since a link there may then name a note or none. Changes
+    /// Tells the page when the library's items change, since a link there may then name an item or none. Changes
     /// come in bursts, as typing is saved, so the page hears once they pause. Followed here, as the header is, so
     /// the page keeps up whether or not a view is updated.
     func watchLinks() {
@@ -119,7 +119,7 @@ extension EditorController {
         isWatchingLinks = true
         withObservationTracking {
             _ = library.items(in: .allNotes)
-            // A type given another icon or tone changes the mark of every link to its notes.
+            // A type given another icon or tone changes the mark of every link to its items.
             _ = library.membershipRevision
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in

@@ -32,9 +32,9 @@ import Testing
         #expect(long.preview?.count == 240 && long.preview?.hasSuffix("\u{2026}") == true)
     }
 
-    /// Text typed into a note the page opened before its create was answered, saved after each answer as the page
-    /// saves while the person types, is kept: each save follows the version the answers before it moved the note to.
-    @Test func textTypedOnANoteJustMadeIsKeptSaveAfterSave() async throws {
+    /// Text typed into an item the page opened before its create was answered, saved after each answer as the page
+    /// saves while the person types, is kept: each save follows the version the answers before it moved the item to.
+    @Test func textTypedOnAnItemJustMadeIsKeptSaveAfterSave() async throws {
         let (library, source) = try await Self.loaded()
         let id = try #require(library.createItem(
             typeID: "core.note", title: "Call the plumber", body: "Ask about the leak under the sink.", parentID: nil,
@@ -59,8 +59,8 @@ import Testing
         #expect(await eventually { library.body(of: id)?.text == typed }, "\(String(describing: library.body(of: id)))")
     }
 
-    /// The same holds for a note the sample started with.
-    @Test func textTypedOnANoteItHeldIsKeptSaveAfterSave() async throws {
+    /// The same holds for an item the sample started with.
+    @Test func textTypedOnAnItemItHeldIsKeptSaveAfterSave() async throws {
         let (library, source) = try await Self.loaded()
         let id = ItemID("weekly-review")
         let read = try #require(library.body(of: id))

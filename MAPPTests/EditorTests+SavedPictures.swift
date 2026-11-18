@@ -29,7 +29,7 @@ extension EditorTests {
 
         let attached = page.library.attachPicture(saved, to: note.id, from: address)
         let shown = try await settle(page.editor, images, as: Int.self) { $0 == 1 }
-        #expect(shown == 1, "the picture shows once its file is attached, with the note untouched")
+        #expect(shown == 1, "the picture shows once its file is attached, with the item untouched")
         #expect(try await page.markdown() == nil)
 
         page.library.items[try #require(page.library.items.firstIndex { $0.id == attached })].state = .trashed

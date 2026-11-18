@@ -1,13 +1,13 @@
 import AppKit
 import WebKit
 
-/// Images put into the note, and the files it embeds opened or shown.
+/// Images put into the item, and the files it embeds opened or shown.
 extension EditorController {
-    /// Attaches images to the note and links them where they were dropped, given in the page's own coordinates, or
+    /// Attaches images to the item and links them where they were dropped, given in the page's own coordinates, or
     /// at the caret. Whether there were images to take; they are read and placed once their files have been read,
-    /// if the note is still the one on the page. Each image that couldn't be taken is named, and the rest are
-    /// still placed, so trying again adds only those named. Images attached after the note left the page are named
-    /// too, since they are in the note's attachments but not in its text.
+    /// if the item is still the one on the page. Each image that couldn't be taken is named, and the rest are
+    /// still placed, so trying again adds only those named. Images attached after the item left the page are named
+    /// too, since they are in the item's attachments but not in its text.
     @discardableResult
     func insertImages(_ sources: [PastedImages.Source], at point: CGPoint? = nil) -> Bool {
         guard isEditable, let noteID, library != nil, !sources.isEmpty else { return false }
@@ -16,7 +16,7 @@ extension EditorController {
             let (files, skipped) = await PastedImages.read(sources)
             guard self.noteID == noteID, isEditable, let library else { return }
             let report = files.isEmpty ? AttachReport() : await library.attach(files, to: noteID)
-            // The images are kept either way; they go into the note only if it is still the one on the page.
+            // The images are kept either way; they go into the item only if it is still the one on the page.
             let placed = self.noteID == noteID && isEditable
             Self.reportUnplaced(
                 skipped: skipped, failed: report.failed, attached: report.embeds.count,
@@ -44,7 +44,7 @@ extension EditorController {
             + failed.map { String(localized: "“\($0.name)” couldn’t be attached. \($0.reason)") }
             + unplaced.map { String(localized: "“\($0)” was attached to “\(note)” but isn’t in its text, because the note was no longer open for editing.") }
         let title = if skipped.isEmpty && failed.isEmpty {
-            String(localized: "Images Weren’t Added to the Note")
+            String(localized: "Images Weren’t Added to the Item")
         } else if attached == 0 {
             String(localized: "Can’t Attach Images")
         } else {
@@ -56,17 +56,17 @@ extension EditorController {
     /// How long the page waits for Marfa to bind an embed not yet bound, as one just pasted is once its text is saved.
     nonisolated static let embedWait = Duration.seconds(10)
 
-    /// Puts what the page writes for files quick add attached to a new note at the end of its text, leaving the
-    /// caret where it is: now if the page shows that note, otherwise once it does. The page saves the change as it
-    /// does typing. Where the page never shows the note again, the files stay attached without being in its text.
+    /// Puts what the page writes for files quick add attached to a new item at the end of its text, leaving the
+    /// caret where it is: now if the page shows that item, otherwise once it does. The page saves the change as it
+    /// does typing. Where the page never shows the item again, the files stay attached without being in its text.
     func append(_ embeds: [Embed], to id: ItemID) {
         guard !windowIsGone, !embeds.isEmpty else { return }
         pendingEmbeds[id, default: []] += embeds
         appendPendingEmbeds()
     }
 
-    /// Sends what waits for the note on the page, and keeps it waiting until the page has written it: the page
-    /// takes none while the note is edited as source or composing, and they go once the page next reports its state
+    /// Sends what waits for the item on the page, and keeps it waiting until the page has written it: the page
+    /// takes none while the item is edited as source or composing, and they go once the page next reports its state
     /// in a mode that takes them. Only a failure that trying again cannot change gives them up, and says so.
     func appendPendingEmbeds() {
         guard !isAppendingEmbeds else {
@@ -128,12 +128,12 @@ extension EditorController {
         }
     }
 
-    /// Follows the library for the embeds of the note on the page, and tells the page which have changed: a file
+    /// Follows the library for the embeds of the item on the page, and tells the page which have changed: a file
     /// that arrived, was renamed or removed, or an embed the copy has since bound. The page then asks again for just
-    /// those (`refreshReferences`). It also follows the files attached to the note that were saved from a web
+    /// those (`refreshReferences`). It also follows the files attached to the item that were saved from a web
     /// address, and has the page ask again about the pictures at those addresses when a file arrives, is changed or goes
     /// (`ItemLibrary.openSavedPicture`). Changes come in bursts, as files arrive and text is saved, so the page hears
-    /// once they pause. Never rewrites the note.
+    /// once they pause. Never rewrites the item.
     ///
     /// Known limit: it follows the library's own state, so a connection that returns after an offline spell does not
     /// redraw an embed that showed an error card. The card's retry does, and so does any later change.
@@ -176,7 +176,7 @@ extension EditorController {
         watchEmbeds()
     }
 
-    /// Opens a file the note embeds in the app the system opens it with, or shows it in the Finder: always for
+    /// Opens a file the item embeds in the app the system opens it with, or shows it in the Finder: always for
     /// one that might run when opened (`EmbeddedFiles.opens`), whatever the page asked.
     func openEmbed(_ reference: EmbedReference, in item: ItemID, revealing: Bool = false) {
         Task {

@@ -48,20 +48,20 @@ struct MarfaLinkAnswerTests {
         return Scene(store: store, copy: copy, source: source, library: library, ids: ids)
     }
 
-    @Test func aNameOneHeldNoteAnswersToStaysUnresolvedBecauseTheCopyHoldsASliceButAnIdentityIsBound() async throws {
+    @Test func aNameOneHeldItemAnswersToStaysUnresolvedBecauseTheCopyHoldsASliceButAnIdentityIsBound() async throws {
         let scene = try await Self.scene(["Reader", "Plan"])
         let plan = scene.id("Plan")
         let answers = try #require(await scene.library.linkAnswers(of: ["Plan", "plan", "Nowhere", plan.rawValue + "|Plan"], in: scene.id("Reader")))
         #expect(answers.map(\.state) == [.unresolved, .unresolved, .unresolved, .bound], "case does not matter to the core")
         #expect(answers[0].candidates == [plan] && answers[1].candidates == [plan])
-        #expect(!answers[0].names(plan), "the copy cannot tell that this note is the only one, so the title does not name it")
-        #expect(answers[0].offers(plan) && !answers[0].isMissing, "but it is a fair offer while typing: answered to by this note alone")
+        #expect(!answers[0].names(plan), "the copy cannot tell that this item is the only one, so the title does not name it")
+        #expect(answers[0].offers(plan) && !answers[0].isMissing, "but it is a fair offer while typing: answered to by this item alone")
         #expect(answers[2].isMissing && answers[2].item == nil)
         #expect(answers[3].item == plan && answers[3].names(plan))
         await scene.finish()
     }
 
-    @Test func aLinkTwoNotesAnswerToIsAmbiguousAndOffersBoth() async throws {
+    @Test func aLinkTwoItemsAnswerToIsAmbiguousAndOffersBoth() async throws {
         let scene = try await Self.scene(["Reader", "Twin", "Twin"])
         let answer = try #require(await scene.library.linkAnswers(of: ["Twin"], in: scene.id("Reader"))?.first)
         #expect(answer.state == .ambiguous && answer.item == nil)
@@ -76,12 +76,12 @@ struct MarfaLinkAnswerTests {
         // `A\|B` is the name `A\` with the alias `B`: the bar still separates, and the backslash stays in the name.
         #expect(answers[1].candidates == [scene.id("A\\")])
         #expect(answers[2].isMissing)
-        // Not bound by title, so the note is named by identity.
+        // Not bound by title, so the item is named by identity.
         #expect(await scene.library.bodyLink(to: scene.id("back\\slash"), in: scene.id("Reader")) == "[[\(scene.id("back\\slash").rawValue)|back\\slash]]")
         await scene.finish()
     }
 
-    @Test func aNoteInTheBinIsNotWhatALinkNames() async throws {
+    @Test func anItemInTheBinIsNotWhatALinkNames() async throws {
         let scene = try await Self.scene(["Reader", "Plan"])
         _ = try await scene.copy.items.delete(scene.id("Plan").rawValue)
         try #require(await eventually { scene.library.item(scene.id("Plan"))?.state == .trashed })
@@ -90,7 +90,7 @@ struct MarfaLinkAnswerTests {
         await scene.finish()
     }
 
-    @Test func aNameAskedWithNoNoteBindsNothingAndANoteNotHeldIsNeverAsked() async throws {
+    @Test func aNameAskedWithNoItemBindsNothingAndAnItemNotHeldIsNeverAsked() async throws {
         let scene = try await Self.scene(["Reader", "Plan"])
         let named = try #require(await scene.library.linkAnswers(of: ["Plan", scene.id("Plan").rawValue], in: nil))
         #expect(named[0].state == .unresolved && named[0].candidates == [scene.id("Plan")])
@@ -99,7 +99,7 @@ struct MarfaLinkAnswerTests {
         await scene.finish()
     }
 
-    @Test func aTitleThatTwoNotesGoByIsLinkedByIdentityAndNotSuggested() async throws {
+    @Test func aTitleThatTwoItemsGoByIsLinkedByIdentityAndNotSuggested() async throws {
         let scene = try await Self.scene(["Reader", "Plan", "Plan", "Plan B"])
         let first = try #require(scene.library.items(in: .allNotes).first { $0.title == "Plan" })
         let link = try #require(await scene.library.bodyLink(to: first.id, in: scene.id("Reader")))

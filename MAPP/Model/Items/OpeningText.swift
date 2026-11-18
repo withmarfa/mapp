@@ -1,7 +1,7 @@
 import Foundation
 
-/// A note's opening lines as a card reads them: the Markdown's own marks left out or drawn as text, never the source.
-/// It reads a preview and writes nothing back, so the note keeps its bytes.
+/// An item's opening lines as a card reads them: the Markdown's own marks left out or drawn as text, never the source.
+/// It reads a preview and writes nothing back, so the item keeps its bytes.
 nonisolated enum OpeningText {
     private nonisolated(unsafe) static let rule = /^\s{0,3}([-*_])(\s*\1){2,}\s*$/
     private nonisolated(unsafe) static let tableSeparator = /^\s*\|?(\s*:?-+:?\s*\|)+(\s*:?-+:?\s*)?$/

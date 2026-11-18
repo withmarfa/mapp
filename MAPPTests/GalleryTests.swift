@@ -77,7 +77,7 @@ struct GalleryTests {
         return file
     }
 
-    @Test func attachmentsAreReadOncePerNoteAndOnlyWhereAPictureShows() {
+    @Test func attachmentsAreReadOncePerItemAndOnlyWhereAPictureShows() {
         let library = FakeItemLibrary()
         let note = library.add("A note\n").id
         let other = library.add("Another\n").id

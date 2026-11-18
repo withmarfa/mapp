@@ -203,13 +203,13 @@ struct MarfaEdgeCheckTests {
     @Test func aChangeOfSeveralLinksIsNotPartlyWrittenWhenTheCoreRefusesOne() async throws {
         let scene = try await Self.scene([("holiday", "core.collection"), ("archive", "core.collection"), ("note", "core.note")])
         let queued = try await scene.fake.copy.queue.all().count
-        // The note may join; the other collection may not, since the type is flat. Neither is written.
+        // The item may join; the other collection may not, since the type is flat. Neither is written.
         #expect(await scene.library.changeItemRelationship(
             scene.id("holiday"), field: "inverse:in-collection", adding: [scene.id("note"), scene.id("archive")], removing: [], undoManager: nil) == false)
         #expect(!scene.library.notices.waiting.isEmpty, "the core's refusal is told before the call answers")
         #expect(try await scene.fake.copy.queue.all().count == queued)
         #expect(scene.library.relationships(for: scene.id("holiday")).allSatisfy { $0.targets.isEmpty })
-        // The note alone is taken.
+        // The item alone is taken.
         #expect(await scene.library.changeItemRelationship(scene.id("holiday"), field: "inverse:in-collection", adding: [scene.id("note")], removing: [], undoManager: nil))
         try #require(await eventuallyAsking { try await scene.fake.copy.queue.all().count == queued + 1 })
         await scene.source.close()

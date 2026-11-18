@@ -8,8 +8,8 @@ nonisolated struct FetchedPicture: Sendable {
     let height: Int
 }
 
-/// Fetches one picture from a web address for a note, on the person's behalf and with as little trust in the website
-/// as can be had. It is the only code in the app that fetches a picture for a note.
+/// Fetches one picture from a web address for an item, on the person's behalf and with as little trust in the website
+/// as can be had. It is the only code in the app that fetches a picture for an item.
 ///
 /// - Only an `https` address is fetched, only by `GET`, in a session of its own that keeps no cookies, credentials or
 ///   cache, with no referrer and one fixed `User-Agent`.
@@ -92,7 +92,7 @@ nonisolated final class PictureFetcher: @unchecked Sendable {
         }
     }
 
-    /// The same request for the first address and for each redirect: nothing the website or the note could add.
+    /// The same request for the first address and for each redirect: nothing the website or the item could add.
     fileprivate static func request(for address: URL) -> URLRequest {
         var request = URLRequest(url: address, cachePolicy: .reloadIgnoringLocalAndRemoteCacheData)
         request.httpMethod = "GET"

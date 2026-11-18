@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Chooses the note the Link to Note command links to: the notes by title, the most recently edited first,
+/// Chooses the item the Link to Item command links to: the items by title, the most recently edited first,
 /// narrowed by what is typed. Return or a click chooses; Cancel or Escape leaves the line as it was typed.
 struct NoteLinkPicker: View {
     @CurrentLibrary private var library
@@ -10,9 +10,9 @@ struct NoteLinkPicker: View {
     @State private var highlighted = 0
     /// Read once, so typing in the field narrows a list that is already sorted.
     @State private var notes: [Item] = []
-    /// The notes' titles folded once, so a keystroke folds only what was typed.
+    /// The items' titles folded once, so a keystroke folds only what was typed.
     @State private var titles = PaletteMatch.Titles()
-    /// A note was chosen that no link can name alone, so the person is asked for another.
+    /// An item was chosen that no link can name alone, so the person is asked for another.
     @State private var refused = false
     @FocusState private var isFieldFocused: Bool
 
@@ -26,8 +26,8 @@ struct NoteLinkPicker: View {
     var body: some View {
         let matches = matches
         VStack(alignment: .leading, spacing: 12) {
-            Text("Link to Note").interfaceFont(.title2.bold())
-            TextField("Search Notes", text: $query)
+            Text("Link to Item").interfaceFont(.title2.bold())
+            TextField("Search Items", text: $query)
                 .textFieldStyle(.roundedBorder)
                 .focused($isFieldFocused)
                 .onSubmit { choose(matches, at: highlighted) }
@@ -100,7 +100,7 @@ struct NoteLinkPicker: View {
 
     private func choose(_ matches: [Item], at index: Int) {
         guard matches.indices.contains(index) else { return }
-        // The note is read again by identity as it is chosen, so a rename or a new twin since the list was made is seen.
+        // The item is read again by identity as it is chosen, so a rename or a new twin since the list was made is seen.
         let id = matches[index].id
         Task { refused = !(await editor.finishLinkRequest(choosing: id)) }
     }

@@ -101,7 +101,7 @@ nonisolated enum TypeChangeFixture {
     }
 
     @Test func aTitleNeverReplacesADifferentValueUnderTheNewTitleKey() throws {
-        // The entity's `title`, left by another app, becomes the note's title, and its name stays where it was.
+        // The entity's `title`, left by another app, becomes the item's title, and its name stays where it was.
         let plan = try F.plan(["name": .string("Ada"), "title": .string("Research notes")], F.entity, F.note).get()
         #expect(plan.changes.isEmpty)
         #expect(plan.unused == ["name"])

@@ -77,8 +77,8 @@ extension LiveMarfaTests {
             }
         }
 
-        /// Makes a note through a copy of its own, closes the copy, and has another device purge the note, then hands
-        /// the closed copy's place to `body`. Whatever `body` does, the note and the copy's folder are removed.
+        /// Makes an item through a copy of its own, closes the copy, and has another device purge the item, then hands
+        /// the closed copy's place to `body`. Whatever `body` does, the item and the copy's folder are removed.
         private func withPurgedItem(
             _ body: (MarfaConnection, MemorySignIns, MarfaStoreLocation, ItemID, ItemVersion) async throws -> Void
         ) async throws {

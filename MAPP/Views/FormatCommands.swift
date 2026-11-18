@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The Format menu: text styles, lists and tables, acting on the note whose page has the keyboard, with a
+/// The Format menu: text styles, lists and tables, acting on the item whose page has the keyboard, with a
 /// checkmark on the style the caret sits in.
 struct FormatCommands: Commands {
     @FocusedValue(\.editor) private var editor

@@ -24,7 +24,7 @@ struct NoteDetail: View {
             }
         } else {
             UnselectedItemContent(hasItems: !browser.items(in: library).isEmpty)
-                // The page no longer shows the note it had, so that note is left.
+                // The page no longer shows the item it had, so that item is left.
                 .onAppear { editor.close() }
         }
     }
@@ -63,8 +63,8 @@ private struct UnselectedItemContent: View {
         .frame(width: 600, height: 500)
 }
 
-/// One note as a formatted page, with the item's header drawn by the page above the text. The same editor shows
-/// each note in turn, so moving between notes loads text into a page that is already running.
+/// One item as a formatted page, with the item's header drawn by the page above the text. The same editor shows
+/// each item in turn, so moving between items loads text into a page that is already running.
 struct NotePage: View {
     @CurrentLibrary private var library
     let item: Item
@@ -124,16 +124,16 @@ struct NotePage: View {
         .onChange(of: editor.isHeaderScrolledAway) { feedHeaderScroll() }
         .onChange(of: editor.noteID) { feedHeaderScroll() }
         .onDisappear { headerDrafts.headerScrolled(away: false, for: item.id) }
-        // The editor takes in only a change to the note's text or to whether it can be written in. A change the
+        // The editor takes in only a change to the item's text or to whether it can be written in. A change the
         // server has taken takes a new version, but the copy shows a delete, a recovery or a problem before then,
         // and a server that keeps its own text over the person's changes the text without one. The action may run
-        // on an earlier copy of this view, so the note is read as it is now.
+        // on an earlier copy of this view, so the item is read as it is now.
         .onChange(of: item.version) { noteChanged() }
         .onChange(of: item.isWritable) { noteChanged() }
         .onChange(of: library.body(of: item.id)) { noteChanged() }
     }
 
-    /// Tells the window whether this item's header is away. The editor may still hold the note before, whose header it
+    /// Tells the window whether this item's header is away. The editor may still hold the item before, whose header it
     /// reports on, so only its own item's counts.
     private func feedHeaderScroll() {
         headerDrafts.headerScrolled(away: editor.noteID == item.id && editor.isHeaderScrolledAway, for: item.id)
@@ -145,7 +145,7 @@ struct NotePage: View {
 }
 
 /// The server kept another device's text over the person's and saved theirs as a copy, which the page now shows
-/// beside the text the server kept. It stays above the page while the note scrolls.
+/// beside the text the server kept. It stays above the page while the item scrolls.
 private struct SavedAsCopyBanner: View {
     @Environment(\.openWindow) private var openWindow
     let copy: ItemID
@@ -164,7 +164,7 @@ private struct SavedAsCopyBanner: View {
     }
 }
 
-/// The library could not read this note, so the page is empty and read-only. This says why, so an empty page is not
+/// The library could not read this item, so the page is empty and read-only. This says why, so an empty page is not
 /// taken for text the person lost.
 private struct UnreadableNoteBanner: View {
     let message: String
@@ -180,7 +180,7 @@ private struct UnreadableNoteBanner: View {
     }
 }
 
-/// Deleted notes cannot be edited; this says so and offers the way back, as Notes does.
+/// Deleted items cannot be edited; this says so and offers the way back, as Notes does.
 private struct DeletedNoteBanner: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
@@ -188,7 +188,7 @@ private struct DeletedNoteBanner: View {
 
     var body: some View {
         HStack {
-            Text("Recently deleted notes can’t be edited.")
+            Text("Recently deleted items can’t be edited.")
                 .foregroundStyle(.secondary)
             Spacer()
             Button("Recover") { library.recover([id], undoManager: undoManager) }

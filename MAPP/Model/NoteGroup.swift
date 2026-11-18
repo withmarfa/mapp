@@ -1,6 +1,6 @@
 import Foundation
 
-/// The sections of the note list, as Notes groups them.
+/// The sections of the item list, as Notes groups them.
 nonisolated enum NoteGroup: Hashable {
     case favorites
     case today
