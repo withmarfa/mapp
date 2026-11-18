@@ -98,6 +98,7 @@ struct ItemTimeline: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             .tag(row.id)
+                            .wantsCounts(of: row.id, content.countQueries, in: library.counts)
                             .accessibilityElement(children: .combine)
                             .accessibilityIdentifier("TimelineItem-\(row.id.rawValue)")
                             .accessibilityAction(named: Text("Open")) { open([row.id]) }

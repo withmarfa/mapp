@@ -79,6 +79,9 @@ nonisolated struct RowContent: Hashable, Sendable {
     var chips: [Chip] = []
     /// How many values the bottom line leaves out, as "+N".
     var more = 0
+    /// What Marfa is asked for the counts the look shows, which the view that draws the row wants while it is on screen
+    /// (`ItemCounts.want`).
+    var countQueries: Set<CountQuery> = []
 
     /// The most facts a row shows after the status; the rest are counted.
     static let shownFacts = 2
@@ -114,6 +117,7 @@ nonisolated struct RowContent: Hashable, Sendable {
             title: item.displayTitle, date: includesDate ? maker.date(of: look, showsTime: showsTime) : nil, secondary: maker.secondary(of: look),
             typeIcon: catalogue.icon(for: item.type), typeLabel: catalogue.label(for: item.type), mixesTypes: list.mixesTypes)
         maker.addBottomLine(of: look, to: &content)
+        content.countQueries = look.countQueries
         return content
     }
 

@@ -98,6 +98,9 @@ nonisolated extension TypeLook {
     var counts: Set<CountFact> {
         Set(facts.compactMap { fact -> CountFact? in if case .count(let count) = fact { count } else { nil } })
     }
+
+    /// What Marfa is asked for those counts, which children and progress share.
+    var countQueries: Set<CountQuery> { Set(counts.map(\.query)) }
 }
 
 // MARK: Stored words

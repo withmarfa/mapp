@@ -34,10 +34,14 @@ nonisolated struct ItemCountUnavailable: Error, Hashable {}
 
 /// The counts a library has worked out for the items on screen: what each answer was the last time Marfa was asked.
 ///
-/// Drawing never waits for a count. A view reads `answer(of:_:)`, which is nil until Marfa has answered, and says what it
-/// wants with `ask(_:_:)`, which returns at once: the question goes out in batches of at most `batch` ids, off the main
-/// thread, one at a time. An answer is redrawn by the observation of `revision`. A count Marfa cannot answer holds
-/// nothing, so a view draws nothing in its place, never a zero or an old number.
+/// Drawing never waits for a count, and never asks for one. A view reads `answer(of:_:)`, which is nil until Marfa has
+/// answered. A row, card or cell that is on screen says what it wants with `want(_:_:)` when it appears and lets go with
+/// `release(_:_:)` when it goes, both outside drawing. The questions go out in batches of at most `batch` ids, off the main
+/// thread, one at a time. An answer is redrawn by the observation of `revision`. A count Marfa cannot answer holds nothing,
+/// so a view draws nothing in its place, never a zero or an old number.
+///
+/// Only what is wanted is asked and asked again, so an item that is not on screen costs no question. The answer of one that
+/// was let go is kept for a moment, but asked again when it is wanted again, so an old number is never drawn for long.
 @MainActor @Observable
 final class ItemCounts {
     typealias Answering = @Sendable ([ItemID], CountQuery) async throws -> [ItemID: ItemCountAnswer]
@@ -46,24 +50,33 @@ final class ItemCounts {
     nonisolated static let batch = 100
     /// How long a run of changes is let settle before the counts on screen are asked again.
     nonisolated static let settling = Duration.milliseconds(150)
-    /// How many ids of each query are remembered for asking again after a change: more than a window shows.
-    nonisolated static let remembered = 2_000
+    /// How many answers of items no longer on screen are kept before they are let go.
+    nonisolated static let kept = 5_000
 
     private struct Key: Hashable {
         let id: ItemID
         let query: CountQuery
     }
 
+    /// What a change asks again for: everything wanted, or only what counts a table's rows.
+    private enum Scope { case rows, all }
+
     /// Counts the answers that changed, which a view reads to be told when to draw again.
     private(set) var revision = 0
 
     @ObservationIgnored private let answering: Answering
     @ObservationIgnored private var answers: [Key: ItemCountAnswer] = [:]
-    /// Asked for and not yet answered, or answered with nothing: not asked for again until something changes.
+    /// How many views want each count. A count nobody wants is neither asked nor asked again.
+    @ObservationIgnored private var wanted: [Key: Int] = [:]
+    /// Wanted counts that are queued, being asked, or answered since the last change: not asked again until one. Always a
+    /// subset of `wanted`, and a count joins it only as it is queued, so none is held as asked without being asked.
     @ObservationIgnored private var asked: Set<Key> = []
-    /// What the views last wanted, in the order they asked, to ask again after a change.
-    @ObservationIgnored private var wanted: [CountQuery: [ItemID]] = [:]
+    /// Answers kept for counts nobody wants now, which `want` asks again.
+    @ObservationIgnored private var unheld: Set<Key> = []
     @ObservationIgnored private var pending: [CountQuery: [ItemID]] = [:]
+    @ObservationIgnored private var queued: Set<Key> = []
+    /// What the changes that have not yet settled ask again for. A later change joins it rather than replacing it.
+    @ObservationIgnored private var stale: Scope?
     @ObservationIgnored private var worker: Task<Void, Never>?
     @ObservationIgnored private var settle: Task<Void, Never>?
     /// How many questions have gone out, for tests to see that a pass that wants nothing new asks nothing.
@@ -79,42 +92,75 @@ final class ItemCounts {
         return answers[Key(id: id, query: query)]
     }
 
-    /// Says the items' counts are wanted. Ids already asked for are not asked again until `refresh()`. It changes nothing a
-    /// view observes, so a view may call it while drawing.
-    func ask(_ ids: some Sequence<ItemID>, _ query: CountQuery) {
-        var fresh: [ItemID] = []
-        for id in ids where asked.insert(Key(id: id, query: query)).inserted { fresh.append(id) }
-        guard !fresh.isEmpty else { return }
-        var held = wanted[query, default: []]
-        held += fresh
-        if held.count > Self.remembered { held.removeFirst(held.count - Self.remembered) }
-        wanted[query] = held
-        pending[query, default: []] += fresh
-        work()
+    /// Says the counts are wanted, as a view that shows them appears. One that is not yet asked is asked at once, and
+    /// one that was let go with an answer is asked again, since it may have changed meanwhile. Call it from an action, never
+    /// from drawing.
+    func want(_ ids: some Sequence<ItemID>, _ query: CountQuery) {
+        var asking = false
+        for id in ids {
+            let key = Key(id: id, query: query)
+            wanted[key, default: 0] += 1
+            unheld.remove(key)
+            if asked.insert(key).inserted {
+                enqueue(key)
+                asking = true
+            }
+        }
+        if asking { work() }
     }
 
-    /// Asks again for everything the views last wanted, once changes have settled: a child or an edge changed, or a table
-    /// did (`rowsOnly`), or Marfa can be reached again. An answer held stays until the new one comes, so a count that
-    /// has not changed does not flicker, and goes where Marfa can no longer answer it.
-    func refresh(rowsOnly: Bool = false) {
-        settle?.cancel()
-        settle = Task { [weak self] in
-            try? await Task.sleep(for: Self.settling)  // Lets a burst of changes end, so one question covers it.
-            guard !Task.isCancelled, let self else { return }
-            self.askAgain(rowsOnly: rowsOnly)
+    /// Says a view that wanted the counts has gone. Nothing waits for them now: a count nobody wants is not asked, and its
+    /// answer is kept only for a while.
+    func release(_ ids: some Sequence<ItemID>, _ query: CountQuery) {
+        for id in ids {
+            let key = Key(id: id, query: query)
+            guard let holders = wanted[key] else { continue }
+            guard holders == 1 else {
+                wanted[key] = holders - 1
+                continue
+            }
+            wanted[key] = nil
+            asked.remove(key)
+            queued.remove(key)
+            if answers[key] != nil { unheld.insert(key) }
+        }
+        if unheld.count > Self.kept {
+            for key in unheld { answers[key] = nil }
+            unheld = []
         }
     }
 
-    private func askAgain(rowsOnly: Bool) {
-        for (query, ids) in wanted {
-            if rowsOnly { guard case .rows = query else { continue } }
-            let queued = Set(pending[query] ?? [])
-            pending[query, default: []] += ids.filter { !queued.contains($0) }
+    /// Asks again for what is wanted once changes have settled: a child or an edge changed, or a table did (`rowsOnly`), or
+    /// Marfa can be reached again. A request made while one waits joins it, so a table change never takes the place of a
+    /// wider one. An answer held stays until the new one comes, so a count that has not changed does not flicker, and goes
+    /// where Marfa can no longer answer it.
+    func refresh(rowsOnly: Bool = false) {
+        stale = rowsOnly && stale != .all ? .rows : .all
+        guard settle == nil else { return }
+        settle = Task { [weak self] in
+            try? await Task.sleep(for: Self.settling)  // Lets a burst of changes end, so one question covers it.
+            guard !Task.isCancelled, let self else { return }
+            self.askAgain()
+        }
+    }
+
+    private func askAgain() {
+        let scope = stale ?? .all
+        stale = nil
+        settle = nil
+        for key in wanted.keys {
+            if scope == .rows { guard case .rows = key.query else { continue } }
+            asked.insert(key)
+            enqueue(key)
         }
         work()
     }
 
     // MARK: Asking
+
+    private func enqueue(_ key: Key) {
+        if queued.insert(key).inserted { pending[key.query, default: []].append(key.id) }
+    }
 
     private func work() {
         guard worker == nil, !pending.isEmpty else { return }
@@ -124,13 +170,25 @@ final class ItemCounts {
         }
     }
 
+    /// The next ids to ask for one query, leaving out any let go since they were queued.
     private func nextBatch() -> (CountQuery, [ItemID])? {
-        guard let query = pending.keys.first, var ids = pending[query] else { return nil }
-        let batch = Array(ids.prefix(Self.batch))
-        ids.removeFirst(batch.count)
-        pending[query] = ids.isEmpty ? nil : ids
-        questions += 1
-        return (query, batch)
+        while let query = pending.keys.first {
+            var ids = pending[query] ?? []
+            var batch: [ItemID] = []
+            var read = 0
+            while read < ids.count, batch.count < Self.batch {
+                let id = ids[read]
+                read += 1
+                if queued.remove(Key(id: id, query: query)) != nil { batch.append(id) }
+            }
+            ids.removeFirst(read)
+            pending[query] = ids.isEmpty ? nil : ids
+            if !batch.isEmpty {
+                questions += 1
+                return (query, batch)
+            }
+        }
+        return nil
     }
 
     /// Nil where the source could not answer.
@@ -138,10 +196,12 @@ final class ItemCounts {
         try? await answering(ids, query)
     }
 
+    /// Keeps what Marfa answered for the counts still wanted. One let go while it was asked is dropped.
     private func take(_ got: [ItemID: ItemCountAnswer]?, for ids: [ItemID], _ query: CountQuery) {
         var changed = false
         for id in ids {
             let key = Key(id: id, query: query)
+            guard wanted[key] != nil else { continue }
             if let answer = got?[id] {
                 if answers.updateValue(answer, forKey: key) != answer { changed = true }
             } else if answers.removeValue(forKey: key) != nil {

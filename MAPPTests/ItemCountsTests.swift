@@ -42,27 +42,31 @@ import Testing
 
     // MARK: The store
 
-    @Test func anAnswerIsHeldAndAnIdAskedTwiceIsAskedOnce() async {
-        let log = Log()
-        let counts = ItemCounts { ids, _ in
-            await log.add(ids.map(\.rawValue))
-            return Dictionary(uniqueKeysWithValues: ids.map { ($0, ItemCountAnswer(total: 4, groups: nil)) })
+    private func answering(_ total: Counter, log: Log? = nil) -> ItemCounts {
+        ItemCounts { ids, _ in
+            if let log { await log.add(ids.map(\.rawValue)) }
+            return Dictionary(uniqueKeysWithValues: ids.map { ($0, ItemCountAnswer(total: total.value, groups: nil)) })
         }
-        counts.ask([ItemID("a")], .children)
-        counts.ask([ItemID("a")], .children)
+    }
+
+    @Test func anAnswerIsHeldAndAnIdWantedTwiceIsAskedOnce() async {
+        let log = Log()
+        let total = Counter()
+        total.value = 4
+        let counts = answering(total, log: log)
+        counts.want([ItemID("a")], .children)
+        counts.want([ItemID("a")], .children)
         #expect(await eventually { counts.answer(of: ItemID("a"), .children)?.total == 4 })
-        counts.ask([ItemID("a")], .children)
+        counts.want([ItemID("a")], .children)
         #expect(await log.asked == [["a"]])
     }
 
     @Test func aLongListIsAskedInBatchesOfAtMostAHundred() async {
         let log = Log()
-        let counts = ItemCounts { ids, _ in
-            await log.add(ids.map(\.rawValue))
-            return Dictionary(uniqueKeysWithValues: ids.map { ($0, ItemCountAnswer(total: 1, groups: nil)) })
-        }
+        let total = Counter()
+        let counts = answering(total, log: log)
         let ids = (0..<250).map { ItemID("i\($0)") }
-        counts.ask(ids, .children)
+        counts.want(ids, .children)
         #expect(await eventually { counts.answer(of: ids[249], .children) != nil })
         #expect(await log.asked.map(\.count) == [100, 100, 50])
     }
@@ -74,7 +78,7 @@ import Testing
             return Dictionary(uniqueKeysWithValues: ids.map { ($0, ItemCountAnswer(total: 2, groups: nil)) })
         }
         let id = ItemID("a")
-        counts.ask([id], .children)
+        counts.want([id], .children)
         #expect(await eventually { counts.questions == 1 })
         #expect(counts.answer(of: id, .children) == nil)
 
@@ -85,12 +89,10 @@ import Testing
 
     @Test func aChangeAsksAgainAndTheNewNumberReplacesTheOldOne() async {
         let total = Counter()
-        let counts = ItemCounts { ids, _ in
-            Dictionary(uniqueKeysWithValues: ids.map { ($0, ItemCountAnswer(total: total.value, groups: nil)) })
-        }
+        let counts = answering(total)
         let id = ItemID("a")
         total.value = 1
-        counts.ask([id], .members)
+        counts.want([id], .members)
         #expect(await eventually { counts.answer(of: id, .members)?.total == 1 })
         total.value = 2
         counts.refresh()
@@ -105,8 +107,8 @@ import Testing
             return Dictionary(uniqueKeysWithValues: ids.map { ($0, ItemCountAnswer(total: 3, groups: nil)) })
         }
         let id = ItemID("a")
-        counts.ask([id], .children)
-        counts.ask([id], .rows(table: "messages"))
+        counts.want([id], .children)
+        counts.want([id], .rows(table: "messages"))
         #expect(await eventually { counts.questions == 2 && counts.answer(of: id, .rows(table: "messages")) != nil })
 
         counts.refresh(rowsOnly: true)
@@ -118,6 +120,97 @@ import Testing
         works.unset()
         counts.refresh()
         #expect(await eventually { counts.answer(of: id, .children) == nil && counts.answer(of: id, .rows(table: "messages")) == nil })
+    }
+
+    @Test func aTableChangeDuringAWaitingRefreshDoesNotCancelTheWiderOne() async {
+        let total = Counter()
+        let counts = answering(total)
+        let id = ItemID("parent")
+        total.value = 1
+        counts.want([id], .children)
+        #expect(await eventually { counts.answer(of: id, .children)?.total == 1 })
+
+        total.value = 2
+        counts.refresh()
+        counts.refresh(rowsOnly: true)
+        #expect(await eventually { counts.answer(of: id, .children)?.total == 2 })
+    }
+
+    @Test func everyCountWantedIsAskedAgainHoweverManyThereAre() async {
+        let total = Counter()
+        let counts = answering(total)
+        let ids = (0..<2_001).map { ItemID("p\($0)") }
+        total.value = 1
+        counts.want(ids, .children)
+        #expect(await eventually { counts.answer(of: ids[2_000], .children)?.total == 1 })
+
+        total.value = 2
+        counts.refresh()
+        #expect(await eventually { counts.answer(of: ids[0], .children)?.total == 2 && counts.answer(of: ids[2_000], .children)?.total == 2 })
+    }
+
+    @Test func aCountLetGoIsNotAskedAgainAndIsAskedAfreshWhenWantedAgain() async {
+        let log = Log()
+        let total = Counter()
+        total.value = 1
+        let counts = answering(total, log: log)
+        let id = ItemID("a")
+        counts.want([id], .children)
+        #expect(await eventually { counts.answer(of: id, .children)?.total == 1 })
+
+        counts.release([id], .children)
+        total.value = 2
+        counts.refresh()
+        try? await Task.sleep(for: .milliseconds(300))  // A refresh that wants nothing asks nothing.
+        #expect(await log.asked == [["a"]])
+
+        // Its old answer may be drawn until the new one comes, which is asked for as soon as it is wanted.
+        counts.want([id], .children)
+        #expect(await eventually { counts.answer(of: id, .children)?.total == 2 })
+        #expect(await log.asked.count >= 2)
+    }
+
+    @Test func aCountWantedByTwoViewsIsKeptUntilBothLetGo() async {
+        let log = Log()
+        let total = Counter()
+        let counts = answering(total, log: log)
+        let id = ItemID("a")
+        counts.want([id], .children)
+        counts.want([id], .children)
+        counts.release([id], .children)
+        total.value = 5
+        counts.refresh()
+        #expect(await eventually { counts.answer(of: id, .children)?.total == 5 })
+    }
+
+    @Test func aCountAnsweredAfterItWasLetGoIsNotKept() async {
+        let gate = Gate()
+        let counts = ItemCounts { ids, _ in
+            await gate.wait()
+            return Dictionary(uniqueKeysWithValues: ids.map { ($0, ItemCountAnswer(total: 9, groups: nil)) })
+        }
+        let id = ItemID("a")
+        counts.want([id], .children)
+        #expect(await eventually { counts.questions == 1 })
+        counts.release([id], .children)
+        await gate.open()
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(counts.answer(of: id, .children) == nil)
+    }
+}
+
+/// Holds an answer until the test lets it go.
+private actor Gate {
+    private var isOpen = false
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+    func wait() async {
+        if isOpen { return }
+        await withCheckedContinuation { waiting.append($0) }
+    }
+    func open() {
+        isOpen = true
+        for continuation in waiting { continuation.resume() }
+        waiting = []
     }
 }
 

@@ -107,6 +107,7 @@ import Testing
         let looks = [project.type: Self.progress]
 
         let first = try #require(contents.contents(of: entries, in: library, looks: looks, list: Self.list)[project.id])
+        library.counts.want([project.id], .children)
         #expect(first.chips.filter { if case .count = $0 { true } else { false } }.isEmpty)
 
         let arrived = await eventually {
@@ -124,6 +125,7 @@ import Testing
         let entries = [RowContents.Entry(item: project, showsTime: false)]
         let looks = [project.type: Self.progress]
         _ = contents.contents(of: entries, in: library, looks: looks, list: Self.list)
+        library.counts.want([project.id], .children)
         #expect(await eventually { library.counts.questions == 1 })
         // Let the failed request finish before checking that the row still has no count.
         try await Task.sleep(for: .milliseconds(100))
@@ -132,11 +134,28 @@ import Testing
         #expect(library.counts.answer(of: project.id, .children) == nil)
     }
 
+    @Test func readingARowAsksForNothingAndAnEmptyCountColumnStartsHidden() async throws {
+        let project = Self.item("core.task", "Project", status: "todo")
+        let library = Self.library([project, Self.item("core.task", "A", status: "done", parent: project.id)])
+        let looks = [project.type: Self.progress]
+        let before = ItemTableRow.rows(of: [project], in: library, looks: looks)
+        #expect(library.counts.questions == 0)
+        let hidden = ItemTableLayout.columns(for: before, catalogue: Self.catalogue, hidden: [], looks: looks)
+        let column = try #require(hidden.first { $0.content == ItemTableColumn.Content.count(.progress) })
+        #expect(!column.isShownByDefault)
+
+        library.counts.want([project.id], .children)
+        #expect(await eventually { !ItemTableRow.rows(of: [project], in: library, looks: looks)[0].counts.isEmpty })
+        let after = ItemTableRow.rows(of: [project], in: library, looks: looks)
+        let shown = ItemTableLayout.columns(for: after, catalogue: Self.catalogue, hidden: [], looks: looks)
+        #expect(shown.first { $0.content == ItemTableColumn.Content.count(.progress) }?.isShownByDefault == true)
+    }
+
     @Test func aCardAndATableColumnSayTheSameCount() async throws {
         let project = Self.item("core.task", "Project", status: "todo")
         let library = Self.library([project, Self.item("core.task", "A", status: "done", parent: project.id)])
         let looks = [project.type: Self.progress]
-        _ = ItemTableRow.rows(of: [project], in: library, looks: looks)
+        library.counts.want([project.id], .children)
         #expect(await eventually { !ItemTableRow.rows(of: [project], in: library, looks: looks)[0].counts.isEmpty })
         let row = ItemTableRow.rows(of: [project], in: library, looks: looks)[0]
 
@@ -157,7 +176,7 @@ import Testing
             shelf, Self.item("core.note", "In", collection: shelf.id),
             Self.item("core.note", "Binned", collection: shelf.id, state: .trashed),
         ])
-        library.counts.ask([shelf.id], .members)
+        library.counts.want([shelf.id], .members)
         #expect(await eventually { library.counts.answer(of: shelf.id, .members)?.total == 1 })
     }
 }

@@ -497,7 +497,8 @@ final class Browser {
     func tableContent(in library: any ItemLibrary) -> ItemTableContent {
         let keyed = (tableOptions[item] ?? ItemTableOptions()).settled
         let derived = derivedKey(in: library)
-        let key = TableKey(derived: derived.key, options: keyed, choices: lookChoices, shownRelations: shownRelations)
+        let key = TableKey(
+            derived: derived.key, options: keyed, choices: lookChoices, shownRelations: shownRelations, counts: library.counts.revision)
         if let held = tableMemo, held.key == key { return held.content }
         let content = ItemTableContent(browser: self, library: library, items: derived.items ?? items(in: library))
         tableMemo = (key, content)
@@ -552,6 +553,8 @@ final class Browser {
         let options: ItemTableOptions
         let choices: [TypeID: TypeLookChoice]
         let shownRelations: Set<Relation>
+        /// How many count answers have come, which the rows hold and sort by.
+        let counts: Int
     }
 
     /// The links the table's shown columns hold, which its rows read besides those the looks and the options name.

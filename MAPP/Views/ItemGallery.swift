@@ -226,6 +226,7 @@ private struct GalleryCell: View {
         }
         .buttonStyle(.plain)
         .focusable(false)
+        .wantsCounts(of: item.id, content.countQueries, in: library.counts)
         .contentShape([.interaction, .accessibility], .rect(cornerRadius: 10))
         .simultaneousGesture(TapGesture(count: 2).onEnded {
             browser.selection = [item.id]

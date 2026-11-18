@@ -44,6 +44,13 @@ struct ItemTableCell: View {
                         .padding(.vertical, -bleed.vertical)
                 }
             }
+            // The name's cell is on screen whenever its row is, which a count column's cell is not while the column is hidden
+            // because no row has an answer yet; so it wants the counts the row's look shows.
+            .background {
+                if case .title = column.content {
+                    Color.clear.wantsCounts(of: row.id, browser.looks(in: library)[row.item.type]?.countQueries ?? [], in: library.counts)
+                }
+            }
             .onHover { setHovering($0) }
             .onDisappear { setHovering(false) }
             // A panel laid over the table gets the pointer and sends no exit to the cell beneath it.

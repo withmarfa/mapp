@@ -335,6 +335,9 @@ actor MarfaSync {
             try await hydrate()
         }
         try Task.checkCancellation()
+        // The copy holds no table's rows it was not asked to, so a row another device changed in one raises no report of
+        // its own; the counts the server answers are asked again once the copy has caught up.
+        hub.publish(.counts(rowsOnly: true))
         fetchAttachments()
         wantsDrain = true
         work()

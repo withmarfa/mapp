@@ -62,13 +62,13 @@ extension ItemLibrary {
     /// without sorting the rest, and `totals` says how many there are: what a row or a card needs to show a few and count
     /// the others.
     ///
-    /// `counts` are the counts the look asks for: each is asked of Marfa without waiting (`ItemCounts.ask`) and holds the
-    /// last answer, so a row draws first and is drawn again when the answer comes.
+    /// `counts` are the counts the look shows: each holds the last answer Marfa gave, and nothing where it has none, so a row
+    /// draws first and is drawn again when the answer comes. Reading asks for nothing: the view that shows the count wants it
+    /// when it appears (`ItemCounts.want`).
     func relations(of item: Item, wanting wanted: Set<Relation>, counts: Set<CountFact> = [], limit: Int? = nil) -> ItemRelations {
         guard !wanted.isEmpty || !counts.isEmpty else { return .none }
         var relations = ItemRelations()
         for count in counts {
-            self.counts.ask([item.id], count.query)
             if let answer = self.counts.answer(of: item.id, count.query) { relations.counts[count] = answer }
         }
         if wanted.contains(.parent) { relations.parent = item.parentID.flatMap(related) }

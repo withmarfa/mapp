@@ -258,6 +258,7 @@ struct ItemBoard: View {
 /// One card of a board as a control: it answers a click, a double click, the context menu and a drag, and reads the
 /// selection itself, so a selection that moves runs the bodies of the cells on show and of no card.
 private struct BoardCell<Actions: View>: View {
+    @CurrentLibrary private var library
     let item: Item
     let browser: Browser
     let content: RowContent
@@ -280,6 +281,7 @@ private struct BoardCell<Actions: View>: View {
         }
         .buttonStyle(.plain)
         .focusable(false)
+        .wantsCounts(of: item.id, content.countQueries, in: library.counts)
         .contentShape(.rect(cornerRadius: 10))
         .simultaneousGesture(TapGesture(count: 2).onEnded { open() })
         .accessibilityAddTraits(isSelected ? .isSelected : [])

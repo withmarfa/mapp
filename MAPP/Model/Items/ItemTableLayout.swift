@@ -508,7 +508,9 @@ nonisolated enum ItemTableLayout {
             case .count(let fact):
                 guard !used.contains(ItemTableColumn.count(fact, hasStatus: false).id) else { continue }
                 let hasStatus = types.contains { catalogue.itemTypes[$0]?.statusField != nil && (looks[$0] ?? .empty).counts.contains(fact) }
-                add(.count(fact, hasStatus: hasStatus), shown: true)
+                // Until Marfa has answered a count for some row, the column has nothing to say and starts hidden.
+                let column = ItemTableColumn.count(fact, hasStatus: hasStatus)
+                add(column, shown: rows.contains { column.sortValue(of: $0) != nil })
             case .created: add(.created, shown: true)
             case .edited: add(.edited, shown: true)
             case .occurred: add(.occurred, shown: true)
