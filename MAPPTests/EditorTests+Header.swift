@@ -5,7 +5,7 @@ import Testing
 import WebKit
 @testable import MAPP
 
-/// The item header the page draws above the note.
+/// The item header the page draws above the item.
 extension EditorTests {
     // MARK: The item header
 
@@ -105,7 +105,7 @@ extension EditorTests {
         try await page.wait { !page.editor.isHeaderScrolledAway }
         #expect(try await page.editor.webView.evaluateJavaScript("window.headerMessages") as? [Bool] == [true, false])
 
-        // A deleted note's page has no header, so the toolbar holds its title from the start.
+        // A deleted item's page has no header, so the toolbar holds its title from the start.
         page.editor.setHeader(Self.header("Review the findings", hidden: true))
         try await page.wait { page.editor.isHeaderScrolledAway }
         let hidden = try await page.editor.webView.evaluateJavaScript("document.getElementById('item-header').hidden") as? Bool
@@ -152,7 +152,7 @@ extension EditorTests {
         try await page.wait { !page.editor.isContentUnderToolbar }
         #expect(try await page.editor.webView.evaluateJavaScript("window.underMessages") as? [Bool] == [true, false])
 
-        // A note opened after scrolling starts at the top, with nothing under the toolbar.
+        // An item opened after scrolling starts at the top, with nothing under the toolbar.
         try await page.run("window.scrollTo(0, 300); window.dispatchEvent(new Event('scroll'))")
         try await page.wait { page.editor.isContentUnderToolbar }
         try await page.load("Another note\n")
@@ -192,7 +192,7 @@ extension EditorTests {
         #expect(page.editor.generation > current)
     }
 
-    @Test func leavingTheNoteClearsWhatIsUnderTheToolbar() async throws {
+    @Test func leavingTheItemClearsWhatIsUnderTheToolbar() async throws {
         let page = try await Page()
         try await page.load("A note\n")
         let current = page.editor.generation
@@ -200,7 +200,7 @@ extension EditorTests {
         try await Self.say("headerScrolledAway", "away: true, generation: \(current)", in: page)
         try await page.wait { page.editor.isContentUnderToolbar && page.editor.isHeaderScrolledAway }
 
-        // Several notes selected, or none, leaves the page empty.
+        // Several items selected, or none, leaves the page empty.
         page.editor.close()
         try await page.wait { page.editor.noteID == nil }
         #expect(!page.editor.isContentUnderToolbar)
@@ -367,7 +367,7 @@ extension EditorTests {
     }
 
     /// The paste itself is Inkkit's; this holds that it works through the pasteboard, the web view and the bridge.
-    @Test func htmlCopiedFromAWebPageIsPastedIntoTheNoteAsReadableText() async throws {
+    @Test func htmlCopiedFromAWebPageIsPastedIntoTheItemAsReadableText() async throws {
         let page = try await Page()
         let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 500), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
@@ -514,7 +514,7 @@ extension EditorTests {
             window.close()
         }
 
-        /// Hands over every page's edits, as quitting or changing library does, or as deleting a note does when
+        /// Hands over every page's edits, as quitting or changing library does, or as deleting an item does when
         /// `leaving` is false.
         func flushAll(leaving: Bool = true) async -> Bool {
             await withCheckedContinuation { continuation in EditorController.flushAll(leaving: leaving) { continuation.resume(returning: $0) } }
@@ -562,7 +562,7 @@ extension EditorTests {
         let status = try await host.value("document.querySelector('#ItemStatusPin .item-pin-label').textContent") as? String
         #expect(status == "In Progress")
 
-        // Return saves the title as the item's, once, and the note's text takes the keyboard.
+        // Return saves the title as the item's, once, and the item's text takes the keyboard.
         var commits = 0
         let handler = page.editor.onHeaderEvent
         page.editor.onHeaderEvent = { event in
@@ -588,7 +588,7 @@ extension EditorTests {
         try await host.waitForTitle("Review the findings")
 
         // A title the library refuses, as a Marfa library does an empty one, stays as typed, with the reason, and
-        // survives moving to another note and back.
+        // survives moving to another item and back.
         try await host.type("")
         try await host.pressReturn()
         try await host.waitFor("the page to show the refusal") { try await host.titleError() == true }
@@ -616,7 +616,7 @@ extension EditorTests {
             #expect(host.library.setItemProperty(host.ticket, key: "title", value: .string(title), undoManager: nil))
             try await host.waitForTitle(title)
         }
-        // Deleted elsewhere, the note becomes read-only and its header gives way to the banner.
+        // Deleted elsewhere, the item becomes read-only and its header gives way to the banner.
         host.library.delete([host.ticket], undoManager: nil)
         try await host.page.wait { !host.page.editor.isEditable }
         try await host.waitFor("the header to hide") { try await host.value("document.getElementById('item-header').hidden") as? Bool == true }

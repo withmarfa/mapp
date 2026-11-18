@@ -2,7 +2,7 @@ import CoreTransferable
 import UniformTypeIdentifiers
 
 /// What a dragged item carries. Inside the app it is the item's identity, which is all a drop on a collection or a
-/// board lane reads. Out of the app it is a file: a note as a markdown file and as text, and a file item as the
+/// board lane reads. Out of the app it is a file: an item as a markdown file and as text, and a file item as the
 /// file itself, each named after the item, so Finder and any app that takes files can be given it.
 nonisolated struct ItemReference: Codable, Transferable, Identifiable {
     /// What the item is when it leaves the app. Nil where the item has nothing to leave as, such as a file item
@@ -15,7 +15,7 @@ nonisolated struct ItemReference: Codable, Transferable, Identifiable {
 
     let id: ItemID
     let title: String
-    /// What the file is: the file's own type, or markdown for a note.
+    /// What the file is: the file's own type, or markdown for an item.
     let type: UTType
     let content: Content?
 
@@ -38,7 +38,7 @@ nonisolated struct ItemReference: Codable, Transferable, Identifiable {
         try container.encode(id, forKey: .id)
     }
 
-    /// The note's markdown, for an app that takes text.
+    /// The item's markdown, for an app that takes text.
     var text: String? {
         if case .text(let text) = content { text } else { nil }
     }
@@ -78,7 +78,7 @@ extension UTType {
 }
 
 extension ItemLibrary {
-    /// What a drag of `id` carries. A note brings its text, held now; a file brings the way to fetch it, since the
+    /// What a drag of `id` carries. An item brings its text, held now; a file brings the way to fetch it, since the
     /// file may be on the server until a drop target asks for it.
     func dragReference(of id: ItemID) -> ItemReference {
         guard let item = item(id) else { return ItemReference(id: id) }

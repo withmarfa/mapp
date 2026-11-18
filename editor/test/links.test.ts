@@ -8,9 +8,9 @@ const identity = '22222222-2222-4222-8222-222222222222'
 interface Page {
   hosted: EditorMessage[]
   asked: NoteRequest[]
-  /** Which links, as `target` or `target|alias`, the app says no note answers to. */
+  /** Which links, as `target` or `target|alias`, the app says no item answers to. */
   missing: Set<string>
-  /** The type icon key and tone the app says the note a link names has, by the link's inner text. */
+  /** The type icon key and tone the app says the item a link names has, by the link's inner text. */
   types: Map<string, { icon?: string; tone: string }>
   /** The bytes the app draws for each icon key. */
   drawn: Record<string, string>
@@ -245,7 +245,7 @@ test('a link is assumed to name a note until the app says otherwise, and when it
   withEditor('[[Here]]\n', async (_editor, root) => {
     page.silent = true
     page.missing.add('Here')
-    // Nothing answered yet, as in the first moment after a note is shown.
+    // Nothing answered yet, as in the first moment after an item is shown.
     expect(marks(root)).toEqual([null])
     await settle()
     expect(marks(root)).toEqual([null])
@@ -258,7 +258,7 @@ test('a library change asks again and a link becomes live or missing without the
     expect(marks(root)).toEqual([null, 'true'])
     const before = editor.snapshot().text
 
-    // A note named Soon is made and the one named Here is deleted.
+    // An item named Soon is made and the one named Here is deleted.
     page.missing.delete('Soon')
     page.missing.add('Here')
     page.asked.length = 0
@@ -358,7 +358,7 @@ test('answers are kept for the note on the page only', () =>
 
 test('names queued for a note that is replaced before they are sent are never sent', () =>
   withEditor('[[Early]]\n', async (editor) => {
-    // The links of the first note were queued while it rendered; the next note replaces it in the same task.
+    // The links of the first item were queued while it rendered; the next item replaces it in the same task.
     editor.setItem('other')
     editor.load('[[Late]]\n', 2)
     await settle()
@@ -378,7 +378,7 @@ test('an answer that arrives after the note was replaced is dropped', () =>
     editor.load('[[Early]]\n', 2)
     await settle()
     expect(releases).toHaveLength(1)
-    // The first note's request was sent before the handler was replaced; its answer is for a note gone.
+    // The first item's request was sent before the handler was replaced; its answer is for an item gone.
     editor.setItem('third')
     editor.load('[[Early]]\n', 3)
     await settle()
@@ -443,7 +443,7 @@ test('a suggestion request the person has typed past sends nothing', async () =>
   expect(page.asked).toEqual([{ type: 'suggest', query: 'Pl', item: 'note' }])
 })
 
-// What a link looks like follows the type of the note it names, which only the app knows.
+// What a link looks like follows the type of the item it names, which only the app knows.
 
 test('a link to a note of a type with an icon is drawn with that icon in the type tone, and tinted by it', () =>
   withEditor('[[Plan]] and [[Ana]] and [[Bare]]\n', async (_editor, root) => {

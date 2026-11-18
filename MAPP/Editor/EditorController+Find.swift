@@ -2,7 +2,7 @@ import AppKit
 
 /// Edit > Find, through the system find bar above the page.
 extension EditorController {
-    /// Whether a note is on the page to find in.
+    /// Whether an item is on the page to find in.
     var hasNote: Bool { isPresented && isReady && noteID != nil }
 
     /// Does what an item of Edit > Find asks, through the system find bar above the page.
@@ -11,7 +11,7 @@ extension EditorController {
         pageFinder.finder.performAction(action)
     }
 
-    /// Opens the find bar on `text` and goes to its first match, once the page holds the note `id`: what Search
+    /// Opens the find bar on `text` and goes to its first match, once the page holds the item `id`: what Search
     /// Notes' Open at Match does. The words go to the system's find pasteboard, as typing them in any find bar does.
     func find(_ text: String, in id: ItemID) async {
         for _ in 0..<80 where !(hasNote && noteID == id) {

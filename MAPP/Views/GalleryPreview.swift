@@ -10,7 +10,7 @@ enum GalleryPreview {
         case failed
     }
 
-    /// An image file's picture, or a note's first embedded image, which the embed resolver opens, else an image file attached
+    /// An image file's picture, or an item's first embedded image, which the embed resolver opens, else an image file attached
     /// to it (a bookmark's saved cover), at most `maxPixels` on
     /// its longer side.
     static func image(for item: Item, attachments: [Item], maxPixels: Int = 800, in library: any ItemLibrary) async -> Picture {
@@ -65,7 +65,7 @@ enum GalleryPreview {
         return type.conforms(to: .image) && byteCount <= CardPicture.fetchLimit(.image)
     }
 
-    /// How many of a note's embeds its picture is chosen from.
+    /// How many of an item's embeds its picture is chosen from.
     nonisolated static let embedLimit = 8
 
     /// Read from the descriptor the resolver checked, never reopened by path.

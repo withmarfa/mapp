@@ -66,12 +66,12 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Whether text saved to the item has not yet been read back from the library's copy, so what the copy bound
     /// in the text (`Item.boundEmbeds`) may not cover it yet.
     func hasUnreadSave(_ id: ItemID) -> Bool
-    /// The `[[link]]` that the text of `note` can hold and the core binds, from that note, to this item and no
+    /// The `[[link]]` that the text of `note` can hold and the core binds, from that item, to this item and no
     /// other, or nil when no spelling does.
     func bodyLink(to id: ItemID, in note: ItemID?) async -> String?
     /// What the core says each link target names, read as a link in `note` when given (`Items.linkCandidates`):
-    /// bound to one note, ambiguous with its candidates, or unresolved. Nil where the library cannot ask, such as
-    /// for a note it does not hold; the answer is never guessed from the titles held.
+    /// bound to one item, ambiguous with its candidates, or unresolved. Nil where the library cannot ask, such as
+    /// for an item it does not hold; the answer is never guessed from the titles held.
     func linkAnswers(of targets: [String], in note: ItemID?) async -> [LinkAnswer]?
     /// The property keys of the item that the inspector never lists: what the page shows as the title and the text,
     /// and any a library keeps for its own use.
@@ -140,7 +140,7 @@ protocol ItemLibrary: AnyObject, Observable {
     /// library now holds was made without seeing what replaced it, so it never silently overwrites that. Typing is
     /// undone by the page that holds it, so this registers nothing.
     func updateBody(of id: ItemID, to body: String, readAt: ItemVersion)
-    /// Every note being written is left and every change handed over, as the app quits or the library changes:
+    /// Every item being written is left and every change handed over, as the app quits or the library changes:
     /// returns once each is kept on this Mac, never waiting on a server.
     func finish() async
     /// Whether the create of `id` was refused before the library held the item, so the window has no item to open and the
@@ -205,7 +205,7 @@ protocol ItemLibrary: AnyObject, Observable {
     func recover(_ ids: Set<ItemID>, undoManager: UndoManager?)
     /// Not undoable, so the views confirm it first, and only where `reachesServer`.
     func deletePermanently(_ ids: Set<ItemID>)
-    /// Files the note points at, such as pasted images, with the links the page writes for them. A library that
+    /// Files the item points at, such as pasted images, with the links the page writes for them. A library that
     /// sends them elsewhere may have to wait. Each file is attached on its own, so one that fails leaves the
     /// others attached, and the report names it.
     func attach(_ files: [(name: String, data: Data)], to id: ItemID) async -> AttachReport
@@ -250,8 +250,8 @@ extension ItemLibrary {
     }
     func hiddenPropertyKeys(of item: Item) -> Set<String> { catalogue.pageKeys(of: item) }
 
-    /// The title as a link only where, from `note`, the core binds it to this note (`LinkAnswer.names`). The copy holds
-    /// a slice and cannot tell that a note it holds is the only one by its title, so a title the core has not bound is
+    /// The title as a link only where, from `note`, the core binds it to this item (`LinkAnswer.names`). The copy holds
+    /// a slice and cannot tell that an item it holds is the only one by its title, so a title the core has not bound is
     /// not enough. Otherwise the item's identity with its title as the label (`[[identity|Title]]`). Each spelling is
     /// read back through `linkParts` so it is the link it was meant to be.
     func bodyLink(to id: ItemID, in note: ItemID?) async -> String? {

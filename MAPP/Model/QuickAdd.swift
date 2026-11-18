@@ -348,7 +348,7 @@ final class QuickAdd {
         catalogue.isFileType(TypeID(typeID))
     }
 
-    /// Whether the draft holds text its kind does not keep, as when a note's text stays after the kind changes to
+    /// Whether the draft holds text its kind does not keep, as when a text item's text stays after the kind changes to
     /// a file. The text stays in sight and holds the draft back until it is removed or the kind changes back, so
     /// none is dropped.
     static func holdsTextItCannotKeep(_ draft: Draft, in catalogue: Catalogue) -> Bool {
@@ -362,7 +362,7 @@ final class QuickAdd {
             || holdsTextItCannotKeep(draft, in: catalogue)
     }
 
-    /// Whether a file draft holds more than the one file a file item keeps, as when a note's attachments stay
+    /// Whether a file draft holds more than the one file a file item keeps, as when a text item's attachments stay
     /// after the kind changes to File. The files stay in sight and hold the draft back until all but one are
     /// removed or the kind changes back.
     static func holdsFilesItCannotKeep(_ draft: Draft, in catalogue: Catalogue) -> Bool {

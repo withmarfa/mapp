@@ -160,7 +160,7 @@
     "Use Current Name" : {
       "extractionState" : "manual"
     },
-    "“%@” was attached to “%@” but isn’t in its text, because the note was no longer open for editing." : {
+    "“%@” was attached to “%@” but isn’t in its text, because the item was no longer open for editing." : {
       "extractionState" : "manual"
     },
     "“%@” wasn’t created" : {
@@ -968,12 +968,6 @@
     "A new item wasn’t created" : {
       "extractionState" : "manual"
     },
-    "A note names the website of a picture at a web address and loads it only when you choose to, or always for items in the Inbox. Pictures you have loaded stay on this Mac until you disconnect the library." : {
-
-    },
-    "A notes app for your Marfa server." : {
-
-    },
     "A restore wasn’t sent" : {
       "extractionState" : "manual"
     },
@@ -1128,6 +1122,9 @@
     "Always shown" : {
 
     },
+    "An app for your Marfa server’s items." : {
+
+    },
     "An entry needs at least one value." : {
       "extractionState" : "manual"
     },
@@ -1139,6 +1136,9 @@
     },
     "An item with more than %lld versions will lose its oldest ones for good the next time the server tidies up." : {
       "extractionState" : "manual"
+    },
+    "An item’s text can name a picture at a web address. MAPP loads it only when you choose to, or always for items in the Inbox. Pictures you have loaded stay on this Mac until you disconnect the library." : {
+
     },
     "And %lld more changes whose text can’t be shown." : {
       "localizations" : {
@@ -1168,11 +1168,11 @@
     "Another copy of MAPP or another app is using the sign-in on this Mac, so nothing changed. Wait a moment, then try again." : {
       "extractionState" : "manual"
     },
+    "Another item opened before MAPP finished saving this one, so your most recent typing might not be saved. Try again." : {
+
+    },
     "Another Marfa now answers at this address. Nothing was sent, and these are its settings, not the ones you were editing." : {
       "extractionState" : "manual"
-    },
-    "Another note opened before MAPP finished saving this one, so your most recent typing might not be saved. Try again." : {
-
     },
     "Apache-2.0" : {
 
@@ -1448,7 +1448,7 @@
     "Changes Haven’t Been Sent" : {
       "extractionState" : "manual"
     },
-    "Changes text in the sidebar, lists, and controls. Note text size is set in Editor." : {
+    "Changes text in the sidebar, lists, and controls. Text size on item pages is set in Editor." : {
 
     },
     "Changes to “%@” weren’t sent" : {
@@ -1644,7 +1644,7 @@
     "Couldn’t Make This Change" : {
       "extractionState" : "manual"
     },
-    "Couldn’t Print Note" : {
+    "Couldn’t Print Item" : {
 
     },
     "Couldn’t Quit" : {
@@ -1656,10 +1656,10 @@
     "Couldn’t remove downloaded files. %@" : {
       "extractionState" : "manual"
     },
-    "Couldn’t Save “%@”" : {
+    "Couldn’t Save Item" : {
 
     },
-    "Couldn’t Save Note" : {
+    "Couldn’t Save “%@”" : {
 
     },
     "Couldn’t Save Title" : {
@@ -2050,10 +2050,10 @@
     "Finish Customizing" : {
       "extractionState" : "manual"
     },
-    "Finish editing the current note before changing libraries." : {
+    "Finish editing the current item before changing libraries." : {
 
     },
-    "Finish editing the current note, then try again." : {
+    "Finish editing the current item, then try again." : {
       "extractionState" : "manual"
     },
     "Finished First" : {
@@ -2068,7 +2068,7 @@
     "Footnote" : {
 
     },
-    "For notes and items. Lists always keep their background." : {
+    "For item pages. Lists always keep their background." : {
 
     },
     "Format" : {
@@ -2191,7 +2191,7 @@
     "Highlight" : {
 
     },
-    "How a link to another item looks in a note. A link to an item that doesn’t exist keeps its dashed line in every look." : {
+    "How a link to another item looks in an item’s text. A link to an item that doesn’t exist keeps its dashed line in every look." : {
       "extractionState" : "manual"
     },
     "https://marfa.example.com" : {
@@ -2216,7 +2216,7 @@
         }
       }
     },
-    "Images Weren’t Added to the Note" : {
+    "Images Weren’t Added to the Item" : {
       "extractionState" : "manual"
     },
     "Important" : {
@@ -2369,7 +2369,7 @@
     "Link" : {
 
     },
-    "Link to Note" : {
+    "Link to Item" : {
 
     },
     "Link unavailable" : {
@@ -2489,10 +2489,10 @@
     "MAPP can’t reach the server. Changing a source needs the server, so try again once it’s back." : {
       "extractionState" : "manual"
     },
-    "MAPP can’t reach the server. If its address starts with http://, macOS may be refusing it. Your notes and changes aren’t affected." : {
+    "MAPP can’t reach the server. If its address starts with http://, macOS may be refusing it. Your items and changes aren’t affected." : {
       "extractionState" : "manual"
     },
-    "MAPP can’t reach the server. Version history comes from the server. If its address starts with http://, macOS may be refusing it. Your notes and changes aren’t affected." : {
+    "MAPP can’t reach the server. Version history comes from the server. If its address starts with http://, macOS may be refusing it. Your items and changes aren’t affected." : {
       "extractionState" : "manual"
     },
     "MAPP can’t reach the server. Your changes are kept on this Mac and sent when it can." : {
@@ -3136,7 +3136,7 @@
     "Recently Deleted" : {
 
     },
-    "Recently deleted notes can’t be edited." : {
+    "Recently deleted items can’t be edited." : {
 
     },
     "Recents" : {
@@ -3709,6 +3709,9 @@
     "The item can no longer be edited." : {
       "extractionState" : "manual"
     },
+    "The item could not be prepared for printing." : {
+
+    },
     "The item goes back to how the server has it. What you wrote is copied to the clipboard, so you can paste it back." : {
 
     },
@@ -3813,9 +3816,6 @@
     },
     "The previous server’s sign-in is still in your Keychain. Remove it in Keychain Access." : {
       "extractionState" : "manual"
-    },
-    "The printable note could not finish loading." : {
-
     },
     "The search for “%@”" : {
       "extractionState" : "manual"

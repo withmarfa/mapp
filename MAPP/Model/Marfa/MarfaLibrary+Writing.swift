@@ -39,7 +39,7 @@ extension MarfaLibrary {
 
     func updateBody(of id: ItemID, to body: String, readAt: ItemVersion) {
         // A page can hand over text for an item another device purged meanwhile, which no queue takes.
-        guard let item = item(id) else { return notices.notKept(String(localized: "Couldn’t Save Note"), text: body, reason: Self.cantChange) }
+        guard let item = item(id) else { return notices.notKept(String(localized: "Couldn’t Save Item"), text: body, reason: Self.cantChange) }
         guard self.body(of: id)?.text != body else { return }
         let title = String(localized: "Couldn’t Save “\(item.displayTitle)”")
         // A save that arrives after the row stopped being writable, such as a debounced edit over a row the copy
@@ -225,7 +225,7 @@ extension MarfaLibrary {
         handOverEdits { [weak self] kept in
             guard let self else { return }
             guard kept else {
-                return notices.tell(title, String(localized: "Finish editing the current note, then try again."))
+                return notices.tell(title, String(localized: "Finish editing the current item, then try again."))
             }
             // The writes belong to the undo or redo that waited for the pages, so the copy may hold them too.
             within(run, action)

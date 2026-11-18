@@ -7,7 +7,7 @@ import WebKit
 private let log = Telemetry.logger(.editor)
 
 /// One window's editor: a web page running the formatted markdown editor, loaded when the window opens so
-/// the first note shows without a wait, and reused for every note the window shows.
+/// the first item shows without a wait, and reused for every item the window shows.
 @Observable
 final class EditorController: NSObject {
     private(set) var caret = CaretState()
@@ -29,9 +29,9 @@ final class EditorController: NSObject {
     /// Whether the page has scrolled far enough for its text to pass under the toolbar, which then gets a band of
     /// glass to read against. At the top, and on a page too short to scroll, nothing is behind the toolbar.
     private(set) var isContentUnderToolbar = false
-    /// Whether the item's title in the page has the keyboard rather than the note's text.
+    /// Whether the item's title in the page has the keyboard rather than the item's text.
     private(set) var isEditingTitle = false
-    /// The headings the page reported for the note on it, which the sidebar's Outline lists and reveals. Nil until the
+    /// The headings the page reported for the item on it, which the sidebar's Outline lists and reveals. Nil until the
     /// page has reported for the load now on it.
     private(set) var outline: PageOutline?
     @ObservationIgnored private(set) var header: PageHeader?
@@ -44,15 +44,15 @@ final class EditorController: NSObject {
     @ObservationIgnored var titleDrafts: DetailsPresentation?
     /// Shows the item whose refused title is being told, in the window holding the draft.
     @ObservationIgnored var onShowRefusedTitle: (ItemID) -> Void = { _ in }
-    /// Whether the note on the page can be changed; a deleted note cannot.
+    /// Whether the item on the page can be changed; a deleted item cannot.
     private(set) var isEditable = true
-    /// Whether the window is asking which images to attach to the note, from the toolbar or the menu bar.
+    /// Whether the window is asking which images to attach to the item, from the toolbar or the menu bar.
     var isChoosingImages = false
 
-    /// An edit to a note, with the markdown the note now holds and the version of the text it was typed on.
+    /// An edit to an item, with the markdown the item now holds and the version of the text it was typed on.
     @ObservationIgnored var onChange: (ItemID, String, ItemVersion) -> Void = { _, _, _ in }
-    /// The library the notes come from: their text, and the files a note points at. Given when the editor is made,
-    /// so no note is ever shown before its text can be read.
+    /// The library the items come from: their text, and the files an item points at. Given when the editor is made,
+    /// so no item is ever shown before its text can be read.
     @ObservationIgnored private(set) weak var library: (any ItemLibrary)?
     @ObservationIgnored let embeds = EmbeddedFiles()
     /// The embedded file the context menu is opening over, which it offers to show, and to open where the page
@@ -63,27 +63,27 @@ final class EditorController: NSObject {
     @ObservationIgnored var menuRow: (item: ItemID, row: String)?
     /// Escape in the page, which hands the keyboard back to the list.
     @ObservationIgnored var onEscape: () -> Void = {}
-    /// A link in the page names this note, which the window opens as choosing it in the list does.
+    /// A link in the page names this item, which the window opens as choosing it in the list does.
     @ObservationIgnored var onOpenNote: (ItemID) -> Void = { _ in }
-    /// A link in the page names no note the window can open, which is told only by a beep: nothing is made.
+    /// A link in the page names no item the window can open, which is told only by a beep: nothing is made.
     @ObservationIgnored var onUnopenableLink: () -> Void = { NSSound.beep() }
-    /// Asks the person which of several notes an ambiguous link means, in place of the menu at the pointer. The
+    /// Asks the person which of several items an ambiguous link means, in place of the menu at the pointer. The
     /// handler is called with the one they chose, and not at all if they choose none.
     @ObservationIgnored var onChooseAmbiguousLink: (([ItemID], @escaping (ItemID) -> Void) -> Void)?
-    /// The heading a link asked for in the note it is opening, scrolled to once that note is on the page.
+    /// The heading a link asked for in the item it is opening, scrolled to once that item is on the page.
     @ObservationIgnored var pendingHeading: (note: ItemID, text: String)?
-    /// What the page writes for files quick add attached to a new note, put at the end of its text once the page
-    /// shows that note (`append(_:to:)`).
+    /// What the page writes for files quick add attached to a new item, put at the end of its text once the page
+    /// shows that item (`append(_:to:)`).
     @ObservationIgnored var pendingEmbeds: [ItemID: [Embed]] = [:]
     /// Whether the page is writing some of them now, and whether to send what still waits once it has answered.
     @ObservationIgnored var isAppendingEmbeds = false
     @ObservationIgnored var appendsAgain = false
     @ObservationIgnored var isWatchingLinks = false
-    /// What each embed of the note on the page was last told to draw from, by its text, to tell the page which have
-    /// changed since (`watchEmbeds`); `embedWatch` ends the watch of the note before.
+    /// What each embed of the item on the page was last told to draw from, by its text, to tell the page which have
+    /// changed since (`watchEmbeds`); `embedWatch` ends the watch of the item before.
     @ObservationIgnored var embedStates: (note: ItemID, states: [String: EmbedState])?
     @ObservationIgnored var embedWatch = 0
-    /// The files saved from web addresses that are attached to the note on the page, as the page was last told (see
+    /// The files saved from web addresses that are attached to the item on the page, as the page was last told (see
     /// `watchEmbeds`): the page draws its pictures again when one comes or goes.
     @ObservationIgnored var savedStates: (note: ItemID, states: [SavedPictureState])?
     @ObservationIgnored private let noteRequests = NoteRequests()
@@ -95,7 +95,7 @@ final class EditorController: NSObject {
     @ObservationIgnored var pictureSettingWatch: Task<Void, Never>?
     @ObservationIgnored var toldPictureSetting: RemotePictureSetting
 
-    /// The Link to Note command, until the person has chosen a note or declined; the page waits on it.
+    /// The Link to Item command, until the person has chosen an item or declined; the page waits on it.
     struct LinkRequest: Identifiable {
         let id = UUID()
         let note: ItemID
@@ -116,19 +116,19 @@ final class EditorController: NSObject {
     @ObservationIgnored let container: EditorContainer
     @ObservationIgnored private(set) var pageFinder: PageFinder!
 
-    /// The note on the page, and the markdown the page holds for it as far as the app knows, read from the
+    /// The item on the page, and the markdown the page holds for it as far as the app knows, read from the
     /// library at `read`.
     private(set) var noteID: ItemID?
     /// An explicit selection can outlive a missing body, so its next update can retry the load.
     @ObservationIgnored var requestedNoteID: ItemID?
 
-    /// Whether the page is showing this item's header, which an item of a type with no text is too: it has no note on
+    /// Whether the page is showing this item's header, which an item of a type with no text is too: it has no item on
     /// the page (`noteID`), only its header. What the page sends for any other item is stale.
     func isShowing(_ id: ItemID) -> Bool { requestedNoteID == id }
     @ObservationIgnored private var markdown = ""
     @ObservationIgnored private var read = ItemVersion(0)
     /// Each load gets a generation, and an edit reports the one it belongs to, so a late edit to the previous
-    /// note still reaches that note rather than the one now showing, and an edit typed before the page took in
+    /// item still reaches that item rather than the one now showing, and an edit typed before the page took in
     /// newer text says it was typed on the older text.
     @ObservationIgnored var generation = 0 {
         // Any other generation on the page (a newer open, a reload, an emptied page, a page process that started
@@ -167,7 +167,7 @@ final class EditorController: NSObject {
         let configuration = WKWebViewConfiguration()
         configuration.preferences.isElementFullscreenEnabled = false
         configuration.websiteDataStore = .nonPersistent()
-        // The full Writing Tools experience: its panel, and rewrites shown in place. `holdEdit` keeps the note from
+        // The full Writing Tools experience: its panel, and rewrites shown in place. `holdEdit` keeps the item from
         // being saved while a rewrite is not yet accepted.
         configuration.writingToolsBehavior = .complete
         configuration.setURLSchemeHandler(embeds, forURLScheme: EmbeddedFiles.scheme)
@@ -259,7 +259,7 @@ final class EditorController: NSObject {
 
     // MARK: Driving the page
 
-    /// A selection is navigation intent, including returning to a note whose outgoing capture failed.
+    /// A selection is navigation intent, including returning to an item whose outgoing capture failed.
     func select(_ item: Item) {
         requestedNoteID = item.id
         if wantsFocus?.id != item.id { wantsFocus = nil }
@@ -269,7 +269,7 @@ final class EditorController: NSObject {
         else { load(item) }
     }
 
-    /// Shows a note for reading. A deleted note is shown read-only. The note shown before is
+    /// Shows an item for reading. A deleted item is shown read-only. The item shown before is
     /// left once its last edit is in.
     func load(_ item: Item) {
         requestedNoteID = item.id
@@ -278,7 +278,7 @@ final class EditorController: NSObject {
         loadRequest += 1
         let request = loadRequest
         // `item.open` runs from the request to the page's first frame (`EditorMessage.painted`), `item.handoff` to the
-        // host having handed the note to the page. An open that never reaches its first frame is dropped unended,
+        // host having handed the item to the page. An open that never reaches its first frame is dropped unended,
         // so it leaves no sample.
         let interval = Telemetry.begin(.navigation, "item.open")
         let handoff = Telemetry.begin(.navigation, "item.handoff")
@@ -287,7 +287,7 @@ final class EditorController: NSObject {
             defer { handoff.end() }
             guard request == loadRequest else { return }
             loading = nil
-            // What changed while the last note was handed over is read now, so it is not loaded a second time.
+            // What changed while the last item was handed over is read now, so it is not loaded a second time.
             let item = library?.item(item.id) ?? item
             isHeaderScrolledAway = false
             isContentUnderToolbar = false
@@ -303,12 +303,12 @@ final class EditorController: NSObject {
         } else { present() }
     }
 
-    /// The note a `load` is still handing the last note over for. A change to it meanwhile waits for that load, which
-    /// reads the note as it is then, instead of starting another and handing the last note over twice.
+    /// The item a `load` is still handing the last item over for. A change to it meanwhile waits for that load, which
+    /// reads the item as it is then, instead of starting another and handing the last item over twice.
     @ObservationIgnored private var loading: ItemID?
 
-    /// The open waiting for its note's first frame, which only the page's `painted` for its generation ends. Leaving
-    /// the note, or another generation on the page, drops it unended.
+    /// The open waiting for its item's first frame, which only the page's `painted` for its generation ends. Leaving
+    /// the item, or another generation on the page, drops it unended.
     @ObservationIgnored private(set) var opening: (generation: Int, interval: Telemetry.Interval)?
 
     @ObservationIgnored private var headerSource: () -> PageHeader? = { nil }
@@ -375,7 +375,7 @@ final class EditorController: NSObject {
         return container.convert(inWebView, from: webView)
     }
 
-    /// The note changed from elsewhere, another window say, or was deleted or recovered. The page takes the new
+    /// The item changed from elsewhere, another window say, or was deleted or recovered. The page takes the new
     /// text where the caret is.
     func noteChanged(_ item: Item) {
         // SwiftUI can deliver a change from the page just left after another item has loaded.
@@ -392,8 +392,8 @@ final class EditorController: NSObject {
         show(item, as: "reload")
     }
 
-    /// A note whose text cannot be read is not shown at all: an empty page would take typing and save it over the
-    /// note. The note shown before is left and the page emptied, so nothing on the page acts for one out of sight.
+    /// An item whose text cannot be read is not shown at all: an empty page would take typing and save it over the
+    /// item. The item shown before is left and the page emptied, so nothing on the page acts for one out of sight.
     private func show(_ item: Item, as function: String) {
         // The request was typed into the text now being replaced, which the page would refuse an answer for.
         cancelRequests()
@@ -419,8 +419,8 @@ final class EditorController: NSObject {
         appendPendingEmbeds()
     }
 
-    /// Leaves the note once the page no longer shows it, as when nothing or several notes are selected, so the
-    /// commands for the note on the page (Print, Find) stop acting on one out of sight.
+    /// Leaves the item once the page no longer shows it, as when nothing or several items are selected, so the
+    /// commands for the item on the page (Print, Find) stop acting on one out of sight.
     func close() {
         requestedNoteID = nil
         hide()
@@ -447,8 +447,8 @@ final class EditorController: NSObject {
         }
     }
 
-    /// Empties the page and makes it read-only under a generation no note owns, so the text of the note just left
-    /// is not shown under another item's header and nothing typed there is saved to any note.
+    /// Empties the page and makes it read-only under a generation no item owns, so the text of the item just left
+    /// is not shown under another item's header and nothing typed there is saved to any item.
     private func clearPage() {
         guard isReady else { return }
         releaseHeldEdit()
@@ -590,7 +590,7 @@ final class EditorController: NSObject {
         }
         if isCurrent { self.markdown = markdown }
         onChange(page.id, markdown, page.read)
-        // An edit the library took from before a reload, as when the note was only deleted or recovered, is
+        // An edit the library took from before a reload, as when the item was only deleted or recovered, is
         // shown again; one it kept apart from newer text leaves the page as it is.
         if !isCurrent, page.id == noteID, let item = library?.item(page.id) { noteChanged(item) }
     }
@@ -707,7 +707,7 @@ private final class MessageProxy: NSObject, WKScriptMessageHandler {
 
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard let parsed = EditorMessage(body: message.body) else {
-            // The body may hold a note, which does not belong in the log; its type says what went wrong.
+            // The body may hold text, which does not belong in the log; its type says what went wrong.
             log.error("unreadable message of type \(String(describing: (message.body as? [String: Any])?["type"]), privacy: .public)")
             return
         }
@@ -717,7 +717,7 @@ private final class MessageProxy: NSObject, WKScriptMessageHandler {
 
 extension EditorController: WKNavigationDelegate {
     /// The page never navigates: a link opens in the browser on Command-click, and nothing else loads but the
-    /// frame a PDF the note embeds shows in.
+    /// frame a PDF the item embeds shows in.
     func webView(
         _ webView: WKWebView,
         decidePolicyFor action: WKNavigationAction,
@@ -735,7 +735,7 @@ extension EditorController: WKNavigationDelegate {
         log.error("load failed: \(error.localizedDescription)")
     }
 
-    /// A page that crashes after working comes back with the note it held. One that never got going is not
+    /// A page that crashes after working comes back with the item it held. One that never got going is not
     /// retried, since it would only fail again.
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         guard isReady, let pageURL else {

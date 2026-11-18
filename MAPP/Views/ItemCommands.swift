@@ -53,7 +53,7 @@ struct ItemCommandContext {
     }
 
     /// The item whose page is in front: the editor's, only while the page is what the window shows and the editor
-    /// has it ready. The editor stays mounted behind a collection, an index and Settings, and still holds its note.
+    /// has it ready. The editor stays mounted behind a collection, an index and Settings, and still holds its item.
     static func pageItem(showsPage: Bool, editorHasNote: Bool, noteID: ItemID?) -> ItemID? {
         showsPage && editorHasNote ? noteID : nil
     }
@@ -61,13 +61,13 @@ struct ItemCommandContext {
     /// The one selected item.
     var item: Item? { ids.count == 1 ? ids.first.flatMap { library?.item($0) } : nil }
 
-    /// The note on the page, which Print, Export, the source view and Add Attachment act on.
+    /// The item on the page, which Print, Export, the source view and Add Attachment act on.
     var visibleNote: Item? {
         guard let item, !item.isFile, item.id == pageItem else { return nil }
         return item
     }
 
-    /// The visible note when it can be written to.
+    /// The visible item when it can be written to.
     var editableNote: Item? { visibleNote.flatMap { $0.isWritable && pageIsEditable ? $0 : nil } }
 
     var originalAddress: URL? { item.flatMap { library?.originalAddress(of: $0) } }

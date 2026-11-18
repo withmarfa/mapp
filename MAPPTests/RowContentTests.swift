@@ -228,14 +228,14 @@ struct RowContentTests {
         #expect(Self.make(Self.item("core.highlight"), look: TypeLook(date: .off, secondary: [.field("text")], facts: [])).secondary == nil)
     }
 
-    @Test func aNotesTagsShowInSortedOrderWithTheRestCounted() {
+    @Test func anItemsTagsShowInSortedOrderWithTheRestCounted() {
         let note = Self.item("core.note", tags: ["d", "b", ItemTag.favorite, "a", "c"])
         let content = Self.make(note)
         #expect(content.chips == [.tag("a"), .tag("b"), .tag("c")])
         #expect(content.more == 1)
     }
 
-    @Test func aNotesSecondaryLineIsItsOpeningLine() {
+    @Test func anItemsSecondaryLineIsItsOpeningLine() {
         let note = Self.item("core.note", preview: "  Opening words of the note \n")
         #expect(Self.make(note).secondary == "Opening words of the note")
     }

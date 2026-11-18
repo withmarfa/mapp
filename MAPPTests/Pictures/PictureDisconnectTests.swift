@@ -4,7 +4,7 @@ import Testing
 
 @Suite(.hangLimit)
 @MainActor struct PictureDisconnectTests {
-    /// The pictures kept for a library's notes go with the library. The cache is the app's own folder in the caches
+    /// The pictures kept for a library's items go with the library. The cache is the app's own folder in the caches
     /// folder of the test host, which has a bundle identifier of its own, never the installed app's.
     @Test func disconnectingRemovesThePicturesKept() async throws {
         let bench = try HostBench()

@@ -49,7 +49,7 @@ final class PrintDocumentRenderer: NSObject, WKNavigationDelegate {
         case unavailable, limit
         var errorDescription: String? {
             switch self {
-            case .unavailable: String(localized: "The printable note could not finish loading.")
+            case .unavailable: String(localized: "The item could not be prepared for printing.")
             case .limit: String(localized: "The PDF exceeds the export limit of 200 pages or 64 MB.")
             }
         }

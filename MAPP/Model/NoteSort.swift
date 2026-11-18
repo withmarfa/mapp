@@ -1,6 +1,6 @@
 import Foundation
 
-/// How the list is ordered: by which date or by title, and whether dated notes fall into sections by day. The
+/// How the list is ordered: by which date or by title, and whether dated items fall into sections by day. The
 /// defaults here are the only ones; stored settings fall back to them.
 nonisolated struct NoteOrder: Equatable {
     var sort: NoteSort = .dateEdited

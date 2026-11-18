@@ -236,7 +236,7 @@ import WebKit
         #expect(reply == ["state": "loaded", "url": savedURL(note, address, file: usable)])
     }
 
-    @Test func aReplyAfterTheNoteChangedIsDropped() async throws {
+    @Test func aReplyAfterTheItemChangedIsDropped() async throws {
         let note = note()
         library.attachPicture(try file(), to: note, from: address)
         let requests = editor.pictureRequests

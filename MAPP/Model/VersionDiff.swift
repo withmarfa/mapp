@@ -216,7 +216,7 @@ nonisolated enum ReadableText {
         let text = String(characters.map(\.0))
         let trimmed = text.trimmingCharacters(in: .whitespaces)
         if trimmed.isEmpty { return ReadLine(id: id, kind: .blank, spans: spans(characters, drop: 0, marked: false)) }
-        // The editor writes an empty paragraph as a lone break, which the note page shows as an empty line.
+        // The editor writes an empty paragraph as a lone break, which the item page shows as an empty line.
         if !inFence, ["<br>", "<br/>", "<br />"].contains(trimmed) { return ReadLine(id: id, kind: .blank, spans: []) }
         if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
             inFence.toggle()
@@ -371,7 +371,7 @@ nonisolated enum ReadableText {
             } else if character == "[", index + 1 < characters.count, characters[index + 1].0 == "[",
                       let end = find(["]", "]"], from: index + 2),
                       !(index + 2..<end).contains(where: { characters[$0].0 == "[" || characters[$0].0 == "]" }) {
-                // `[[target|label]]` shows its label, and `[[target]]` its target, as the note page does.
+                // `[[target|label]]` shows its label, and `[[target]]` its target, as the item page does.
                 let inside = Array((index + 2)..<end)
                 let shown = inside.firstIndex { characters[$0].0 == "|" }.map { Array(inside[($0 + 1)...]) } ?? inside
                 for i in shown { add(characters[i].0, characters[i].1, wikiLink: true) }

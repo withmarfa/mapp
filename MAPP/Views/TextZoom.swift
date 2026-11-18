@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Make Text Bigger, Make Text Smaller and Actual Size. They act on the note text size while a note's page has the
+/// Make Text Bigger, Make Text Smaller and Actual Size. They act on the item text size while an item's page has the
 /// keyboard and on the interface's Base Text Size elsewhere, so the commands read the same whichever they change.
 struct TextZoom: Equatable {
     enum Step { case bigger, smaller, actual }

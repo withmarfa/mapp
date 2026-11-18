@@ -4,7 +4,7 @@ import Foundation
 /// identifier is what `PagePlacements` stores.
 nonisolated enum SidebarSection: Hashable, Sendable {
     case details, properties, relationships, linksInPage, linkedFrom, tags
-    /// The headings of the note's text.
+    /// The headings of the item's text.
     case outline
     /// The files attached to the item.
     case attachments
@@ -99,19 +99,19 @@ nonisolated enum SidebarSection: Hashable, Sendable {
     }
 }
 
-/// A heading of a note's text, for the Outline section.
+/// A heading of an item's text, for the Outline section.
 nonisolated struct OutlineHeading: Identifiable, Hashable, Sendable {
     let level: Int
     /// The words as the page renders them: bold, links and code marks are gone.
     let text: String
-    /// The heading's place in the page's own list of headings, from 0, counting each one the note has (a heading with
+    /// The heading's place in the page's own list of headings, from 0, counting each one the item has (a heading with
     /// no words too, though the Outline lists none). The page reveals the heading at this place, so two headings that
     /// read the same each go to their own.
     let index: Int
     var id: Int { index }
 }
 
-/// The headings the page last reported for the note on it, and the load they belong to. The page is the only source:
+/// The headings the page last reported for the item on it, and the load they belong to. The page is the only source:
 /// it lists the headings as its editor counts them, so the Outline never disagrees with what a row reveals.
 nonisolated struct PageOutline: Equatable, Sendable {
     let item: ItemID
@@ -147,7 +147,7 @@ nonisolated struct AppSection: Identifiable, Equatable, Sendable {
 }
 
 /// What the sections that need more than the inspector already reads hold for one item. Read from the library for the
-/// item on the page, and only when a person has the section: nothing here is parsed for every note.
+/// item on the page, and only when a person has the section: nothing here is parsed for every item.
 nonisolated struct SidebarExtras: Sendable {
     var outline: [OutlineHeading] = []
     var attachments: [ItemRelationshipTarget] = []

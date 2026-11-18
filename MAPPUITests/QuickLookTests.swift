@@ -15,12 +15,12 @@ final class QuickLookTests: XCTestCase {
 
     override func tearDown() async throws { app.terminate() }
 
-    func testSpaceOnASelectedNoteShowsItInQuickLookAndSpaceClosesIt() throws {
+    func testSpaceOnASelectedItemShowsItInQuickLookAndSpaceClosesIt() throws {
         let row = list.cells.firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         row.click()
         list.typeKey(" ", modifierFlags: [])
-        // The panel is titled Quick Look and shows the note as a markdown file named after it. Its service starts cold, so it can be slow.
+        // The panel is titled Quick Look and shows the item as a markdown file named after it. Its service starts cold, so it can be slow.
         let panel = app.windows["Quick Look"]
         XCTAssertTrue(panel.waitForExistence(timeout: 40))
         let preview = panel.webViews.firstMatch

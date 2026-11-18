@@ -5,7 +5,7 @@ import Testing
 import WebKit
 @testable import MAPP
 
-/// Links to notes in the editor's page, running in real WebKit through the app's bridge.
+/// Links to items in the editor's page, running in real WebKit through the app's bridge.
 extension EditorTests {
     private func marks(_ page: Page) async throws -> String {
         try await page.editor.webView.evaluateJavaScript(
@@ -37,24 +37,24 @@ extension EditorTests {
         try await Task.sleep(for: .milliseconds(200))
     }
 
-    @Test func aLinkToNoNoteIsMarkedMissingAndFollowsTheLibrary() async throws {
+    @Test func aLinkToNoItemIsMarkedMissingAndFollowsTheLibrary() async throws {
         let page = try await Page()
         let plan = page.library.add("Plan\n")
         try await page.load("Reader\n\nSee [[Plan]] and [[Later]].\n")
         #expect(try await marks(page, until: "live,missing") == "live,missing")
 
         let later = page.library.add("Later\n")
-        #expect(try await marks(page, until: "live,live") == "live,live", "a note made makes its link live")
+        #expect(try await marks(page, until: "live,live") == "live,live", "an item made makes its link live")
 
         let index = try #require(page.library.items.firstIndex { $0.id == plan.id })
         page.library.items[index].title = "Plan v2"
-        #expect(try await marks(page, until: "missing,live") == "missing,live", "a note renamed leaves its old link missing")
+        #expect(try await marks(page, until: "missing,live") == "missing,live", "an item renamed leaves its old link missing")
 
         page.library.items.removeAll { $0.id == later.id }
-        #expect(try await marks(page, until: "missing,missing") == "missing,missing", "a note deleted makes its link missing")
+        #expect(try await marks(page, until: "missing,missing") == "missing,missing", "an item deleted makes its link missing")
     }
 
-    @Test func aNoteOpenedWithItsLinksResolvedAndMarkedAndThenClosedIsNotRewritten() async throws {
+    @Test func anItemOpenedWithItsLinksResolvedAndMarkedAndThenClosedIsNotRewritten() async throws {
         let page = try await Page()
         page.library.add("Plan\n")
         let body = "Reader\n\nSee [[Plan]], [[Plan#Soil|soil]], [[Later]] and [[22222222-2222-4222-8222-222222222222|Plan]].\n"
@@ -72,7 +72,7 @@ extension EditorTests {
         #expect(page.library.bodies[reader] == body)
     }
 
-    @Test func commandClickingALinkOpensTheNoteItNamesAndBeepsForAnyOtherLink() async throws {
+    @Test func commandClickingALinkOpensTheItemItNamesAndBeepsForAnyOtherLink() async throws {
         let identity = "33333333-3333-4333-8333-333333333333"
         let page = try await Page()
         let plan = page.library.add("Plan\n", id: ItemID(identity))
@@ -99,13 +99,13 @@ extension EditorTests {
 
         try await commandClick(4, in: page)
         try await page.wait { beeps == 1 }
-        #expect(opened.count == 4, "a link to no note opens nothing")
+        #expect(opened.count == 4, "a link to no item opens nothing")
         try await commandClick(5, in: page)
         try await page.wait { opened.count == 5 }
-        #expect(beeps == 1, "a link to two notes offers both and does not beep")
+        #expect(beeps == 1, "a link to two items offers both and does not beep")
         #expect(offered == [[twinA.id, twinB.id]])
         #expect(opened.last == twinB.id, "the one chosen from the offer is opened")
-        #expect(page.library.items.count == 4, "no note is made for a link")
+        #expect(page.library.items.count == 4, "no item is made for a link")
 
         // A plain click only places the caret.
         try await page.run("document.querySelectorAll('.inkkit-wiki-link')[0].dispatchEvent(new MouseEvent('click', { button: 0, bubbles: true }))")
@@ -113,10 +113,10 @@ extension EditorTests {
         #expect(opened.count == 5)
     }
 
-    @Test func aLinkTheCopyHasNotBoundOffersTheNoteItsNameAnswersToAndOpensItOnlyWhenChosen() async throws {
+    @Test func aLinkTheCopyHasNotBoundOffersTheItemItsNameAnswersToAndOpensItOnlyWhenChosen() async throws {
         let page = try await Page()
         let plan = page.library.add("Plan\n")
-        // The copy holds a slice, so the server may hold another note by this name: the core leaves it unbound.
+        // The copy holds a slice, so the server may hold another item by this name: the core leaves it unbound.
         page.library.linkAnswerOverrides["Plan"] = LinkAnswer(target: "Plan", state: .unresolved, item: nil, candidates: [plan.id])
         try await page.load("Reader\n\nSee [[Plan]].\n")
         var opened: [ItemID] = [], beeps = 0
@@ -134,7 +134,7 @@ extension EditorTests {
         #expect(opened == [plan.id])
     }
 
-    @Test func aClickInANoteThePageHasLeftOpensNothing() async throws {
+    @Test func aClickInAnItemThePageHasLeftOpensNothing() async throws {
         let page = try await Page()
         page.library.add("Plan\n")
         try await page.load("Reader\n\nSee [[Plan]].\n")
@@ -148,7 +148,7 @@ extension EditorTests {
         #expect(opened == 0 && beeps == 0)
     }
 
-    @Test func aLinkWithAHeadingScrollsToItOnceTheNoteIsShown() async throws {
+    @Test func aLinkWithAHeadingScrollsToItOnceTheItemIsShown() async throws {
         let page = try await Page()
         let plan = page.library.add("Plan\n\n# Soil\n\nLoam.\n\n## Light and Water\n\nSun.\n")
         try await page.load("Reader\n\nSee [[Plan#light and water]] and [[Plan#Nowhere]].\n")
@@ -169,7 +169,7 @@ extension EditorTests {
         #expect(heading == "Light and Water", "the page moved to the heading, ignoring case")
     }
 
-    @Test func aHeadingThatIsNotThereStillOpensTheNote() async throws {
+    @Test func aHeadingThatIsNotThereStillOpensTheItem() async throws {
         let page = try await Page()
         let plan = page.library.add("Plan\n\n# Soil\n")
         try await page.load("Reader\n\nSee [[Plan#Nowhere]].\n")
@@ -181,7 +181,7 @@ extension EditorTests {
         #expect(opened == [plan.id])
     }
 
-    @Test func aLinkToAHeadingOfItsOwnNoteMovesThePageWithoutOpeningAnything() async throws {
+    @Test func aLinkToAHeadingOfItsOwnItemMovesThePageWithoutOpeningAnything() async throws {
         let page = try await Page()
         try await page.load("Reader\n\n# Soil\n\nSee [[#soil]].\n")
         var opened = 0, beeps = 0
@@ -203,7 +203,7 @@ extension EditorTests {
         var id: ItemID?
     }
 
-    @Test func aLinkFollowedInANoteWindowShowsTheLinkedNoteInThatWindow() async throws {
+    @Test func aLinkFollowedInAnItemWindowShowsTheLinkedItemInThatWindow() async throws {
         let library = FakeItemLibrary()
         let plan = library.add("Plan\n")
         let reader = library.add("Reader\n\nSee [[Plan]] and [[Gone]].\n")
@@ -223,17 +223,17 @@ extension EditorTests {
         editor.onUnopenableLink = { beeps += 1 }
 
         await editor.openNote(NoteLink(linkText: "[[Gone]]")!, from: reader.id)
-        #expect(shown.id == reader.id && beeps == 1, "a link to no note leaves the window as it is")
+        #expect(shown.id == reader.id && beeps == 1, "a link to no item leaves the window as it is")
         window.makeFirstResponder(nil)
         await editor.openNote(NoteLink(linkText: "[[Plan]]")!, from: reader.id)
-        #expect(shown.id == plan.id, "the window now shows the linked note, which it will find again at the next launch")
-        // The window's page loads the note it now shows, and the keyboard goes there with it.
+        #expect(shown.id == plan.id, "the window now shows the linked item, which it will find again at the next launch")
+        // The window's page loads the item it now shows, and the keyboard goes there with it.
         editor.load(try #require(library.item(plan.id)))
         func typing() async throws -> Bool {
             try await editor.webView.evaluateJavaScript("document.activeElement?.matches('.ProseMirror') === true") as? Bool ?? false
         }
         let focused = try await eventuallyAsking(typing)
-        #expect(focused && window.firstResponder === editor.webView, "the caret is in the linked note, so typing goes on there")
+        #expect(focused && window.firstResponder === editor.webView, "the caret is in the linked item, so typing goes on there")
         editor.windowWent()
     }
 }

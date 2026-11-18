@@ -54,9 +54,9 @@ This page lists what has been agreed for MAPP and is not in the app yet, so the 
 
 ## Pages
 
-- A code block and a file in a note show their actions as icons in a corner, under the pointer, with no words. Where a code block's language goes, and how it changes, is open.
+- A code block and a file in an item show their actions as icons in a corner, under the pointer, with no words. Where a code block's language goes, and how it changes, is open.
 - In the right sidebar, chips sit in the same white box as the rows.
-- The favorites mark is a heart everywhere. The gallery card, the table and the note's actions still draw a star.
+- The favorites mark is a heart everywhere. The gallery card, the table and the item's actions still draw a star.
 
 ## Settings
 

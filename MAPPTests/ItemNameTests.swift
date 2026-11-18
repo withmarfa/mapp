@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import MAPP
 
-/// The core names an item (`Item.name`), which is not always what MAPP stores as its title: a note with no title
+/// The core names an item (`Item.name`), which is not always what MAPP stores as its title: an item with no title
 /// is named by its first line. Wherever MAPP names an item to the person it uses the core's name, and the stored
 /// title stays what the page edits.
 @MainActor

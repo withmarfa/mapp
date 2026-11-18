@@ -61,7 +61,7 @@ import Testing
     @Test func aGroupOfFiveHundredLinksIsOneListInAFixedOrder() async throws {
         let (library, _) = try await Self.loaded((1...500).map { Self.note($0) })
         let group = try #require(linked(library))
-        // The note in the fixture that is about the project is among them.
+        // The item in the fixture that is about the project is among them.
         #expect(group.targets.count == 501)
         let cut = LinkLimit.split(group.targets, expanded: false)
         #expect(cut.shown.count == 20)

@@ -589,7 +589,7 @@ struct QuickAddTests {
         #expect(browser.quickAdd.isPresented)
     }
 
-    @Test func theKindIsTheOneChosenThenTheLastUsedThenThePlacesThenANote() {
+    @Test func theKindIsTheOneChosenThenTheLastUsedThenThePlacesThenAnItem() {
         let library = FakeItemLibrary(now: start)
         func kind(remembered: String? = nil, place: SidebarItem = .allNotes, chosen: String? = nil) -> String? {
             let browser = Browser()

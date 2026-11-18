@@ -18,11 +18,11 @@ enum InterfaceKey {
     static let inspectorAttachmentsOpen = "inspectorAttachmentsOpen"
     static let inspectorCollectionsOpen = "inspectorCollectionsOpen"
     static let inspectorAppOpen = "inspectorAppOpen"
-    /// Whether the window's toolbar shows a note's or item's title once the page's header has scrolled away.
+    /// Whether the window's toolbar shows an item's title once the page's header has scrolled away.
     static let showsScrolledTitle = "showsScrolledTitle"
     /// What the toolbar's items show, chosen under Show in Customize Toolbar.
     static let toolbarLabelStyle = "toolbarLabelStyle"
-    /// Whether a note's or item's page backs the toolbar with a blurred band while content scrolls under it.
+    /// Whether an item's page backs the toolbar with a blurred band while content scrolls under it.
     static let showsPageToolbarBackground = "showsPageToolbarBackground"
     /// Whether the panels that edit a value are glass or a solid color.
     static let valuePanelStyle = "valuePanelStyle"
@@ -102,7 +102,7 @@ extension View {
     }
 }
 
-/// What the toolbar does as a note's or item's page scrolls beneath it. Both are on until turned off.
+/// What the toolbar does as an item's page scrolls beneath it. Both are on until turned off.
 struct ToolbarOptions: View {
     @AppStorage(InterfaceKey.showsScrolledTitle) private var showsTitle = true
     @AppStorage(InterfaceKey.showsPageToolbarBackground) private var showsBackground = true

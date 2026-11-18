@@ -1,16 +1,16 @@
 import MarfaIcons
 import SwiftUI
 
-/// An item shown as an HTML document: its title and pins in the manner of the note page's header (`WebPageHeader`), then
+/// An item shown as an HTML document: its title and pins in the manner of the item page's header (`WebPageHeader`), then
 /// the HTML filling the rest of the detail area (`WebPageView`). The document is analyzed first (`PageAnalyzer`): an
-/// article is read in Reader, the article alone in the note page's text, or shown as it was written; any other page is
+/// article is read in Reader, the article alone in the item page's text, or shown as it was written; any other page is
 /// shown as it was written, with no Reader to switch to, and a mail sits centered on the surface behind pages. The
 /// document is the item's own file, for a Web Page or an HTML file, or the HTML file attached to it, for a document a
 /// connector keeps that way (`ItemLibrary.pageLayout(of:)`). The body is read only, and the title and properties are
 /// not edited on the page, except a pinned status, which keeps its menu; the inspector shows them all.
 ///
 /// Its pictures are the app's to give (`SealedPictures`), for this item: while some wait for the person, a callout at the
-/// top of the page says how many and loads them, as the pictures banner on a note's page does (`PicturesWaitingCallout`).
+/// top of the page says how many and loads them, as the pictures banner on an item's page does (`PicturesWaitingCallout`).
 /// Its close button hides it for the page until the page is opened again.
 struct WebPageItemPage: View {
     private enum Content: Equatable {
@@ -68,7 +68,7 @@ struct WebPageItemPage: View {
     /// The file that holds the HTML.
     let document: ItemID
     let runsScripts: Bool
-    /// The window's unsaved drafts, where a refused status is kept for the item, as on the note page. The page also
+    /// The window's unsaved drafts, where a refused status is kept for the item, as on the item page. The page also
     /// gives it the switch between its looks, which the window's toolbar and menus hold.
     let drafts: DetailsPresentation
     /// Shows the item a pinned link names.
@@ -76,7 +76,7 @@ struct WebPageItemPage: View {
     /// Told where the item's file is once it is, and nil when it is not, so the window can share it and open it in a
     /// browser. Never told of a document attached to the item.
     var onResolved: (URL?) -> Void = { _ in }
-    /// Whether the page backs the toolbar with a band while the page is under it, as the note page does. A window whose
+    /// Whether the page backs the toolbar with a band while the page is under it, as the item page does. A window whose
     /// toolbar draws its own background has no need.
     var backsToolbar = true
 
@@ -98,7 +98,7 @@ struct WebPageItemPage: View {
     @AppStorage(InterfaceKey.showsPageToolbarBackground) private var showsToolbarBackground = true
     @AppStorage(InterfaceKey.textSize) private var interfaceTextSize = InterfaceStyle.defaultTextSize
 
-    /// One step of the callout's spacing, as on the note page.
+    /// One step of the callout's spacing, as on the item page.
     private var calloutGap: CGFloat { CGFloat(interfaceTextSize) * 4 / 13 * 4 }
 
     /// The look the page is in, once it is known.
@@ -130,7 +130,7 @@ struct WebPageItemPage: View {
         GeometryReader { geometry in
             let inset = style.horizontalInset(for: geometry.size.width)
             // The page runs under the toolbar and starts below the header, which is drawn over the space it leaves and
-            // moves up with the page as it scrolls, as a note's header does inside its page.
+            // moves up with the page as it scrolls, as an item's header does inside its page.
             ZStack(alignment: .top) {
                 pageBody(toolbarHeight: geometry.safeAreaInsets.top)
                 ScrollingHeader(scroll: headerScroll) {
@@ -309,7 +309,7 @@ struct WebPageItemPage: View {
 
     func isAway(headerHeight: CGFloat) -> Bool { Self.isAway(scrolled: offset, headerHeight: headerHeight) }
 
-    /// Whether the header, which the page starts below, has gone under the toolbar, as the note page's has once it
+    /// Whether the header, which the page starts below, has gone under the toolbar, as the item page's has once it
     /// scrolls as far as the header is tall. Until the header has a height there is nothing to have gone.
     nonisolated static func isAway(scrolled: CGFloat, headerHeight: CGFloat) -> Bool {
         headerHeight > 0 && scrolled >= headerHeight
@@ -353,9 +353,9 @@ struct PicturesCalloutDismissal: Equatable {
 }
 
 /// At the top of the page while some of its pictures wait for the person, in the words and the look of the pictures
-/// banner at the top of a note's page (`#picture-bar` in the editor), which follows Mail's mailing-list banner: how
+/// banner at the top of an item's page (`#picture-bar` in the editor), which follows Mail's mailing-list banner: how
 /// many are not loaded, a pill button that loads them, and a small round close button that hides the banner for the
-/// page. Its measures are the note page's, in steps of 4/13 of the interface text size (4 points at 13).
+/// page. Its measures are the item page's, in steps of 4/13 of the interface text size (4 points at 13).
 struct PicturesWaitingCallout: View {
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
     let count: Int
@@ -405,7 +405,7 @@ struct PicturesWaitingCallout: View {
 }
 
 /// The pictures banner's buttons, as designed: the measures are points at the default 13 point interface text size,
-/// scaled with it, as the note page's are (`--picture-button-*` in the editor's style sheet). 22 and 30 are off the
+/// scaled with it, as the item page's are (`--picture-button-*` in the editor's style sheet). 22 and 30 are off the
 /// 4 point grid by August's choice.
 private enum PictureButtonMetrics {
     static func height(_ size: CGFloat) -> CGFloat { size * 22 / 13 }
@@ -467,7 +467,7 @@ struct SourceViewPicker: View {
     }
 }
 
-/// The page's header, drawn in SwiftUI as the note page's is drawn on the web: the title, then the pins. The same in
+/// The page's header, drawn in SwiftUI as the item page's is drawn on the web: the title, then the pins. The same in
 /// either look: the look sets only the title's type, so changing it never moves the pins.
 /// `PageHeaderParts` gives both pages their kind, lead and pins, and `PageChip` their looks.
 private struct WebPageHeader: View {
@@ -517,7 +517,7 @@ private struct WebPageHeader: View {
         .padding(.horizontal, inset)
         .padding(.top, 16)
         .padding(.bottom, 12)
-        // A refused status belongs to the visit, as the note page's does.
+        // A refused status belongs to the visit, as the item page's does.
         .onChange(of: item.id) { old, _ in
             if let key = library.item(old).flatMap({ library.catalogue.itemTypes[$0.type]?.statusField?.key }) {
                 drafts.draft(for: old, key: key).rejected = false

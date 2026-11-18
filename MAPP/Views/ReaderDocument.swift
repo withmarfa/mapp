@@ -1,7 +1,7 @@
 import Foundation
 
 /// The page Reader shows: the article `PageAnalyzer` found, alone in a document of its own, which `SourceLook` then
-/// styles in the note page's text. The article's pictures name their websites until `SealedPictureRewrite` points them at
+/// styles in the item page's text. The article's pictures name their websites until `SealedPictureRewrite` points them at
 /// the app, as for any document.
 ///
 /// The document allows no script, whatever the page allows: the article held none, and one that got in would not run.

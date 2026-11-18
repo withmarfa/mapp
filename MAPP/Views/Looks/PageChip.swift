@@ -1,7 +1,7 @@
 import MarfaIcons
 import SwiftUI
 
-/// One chip, for one kind of value, drawn in SwiftUI from the same looks as the note page's web header: the sizes
+/// One chip, for one kind of value, drawn in SwiftUI from the same looks as the item page's web header: the sizes
 /// and fills of `ChipLooks.current` and the colors of `TypeTone`, scaled with the interface's text size (the design's
 /// 13 points). It serves the page, the right sidebar and, at `.row` size, a list row. A chip is as tall as its size
 /// says whatever it holds, so chips side by side line up.

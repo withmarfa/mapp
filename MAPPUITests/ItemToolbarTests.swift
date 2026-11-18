@@ -96,7 +96,7 @@ final class ItemToolbarTests: XCTestCase {
         assertVersionHistoryWaitsForTheTray()
     }
 
-    func testVersionHistoryUnderTheOpenTrayOfANoteWindowWaitsForItToClose() {
+    func testVersionHistoryUnderTheOpenTrayOfAnItemWindowWaitsForItToClose() {
         app.menuBars.menuItems["Open in New Window"].click()
         XCTAssertTrue(app.windows.element(boundBy: 1).waitForExistence(timeout: 5))
         assertVersionHistoryWaitsForTheTray()

@@ -5,9 +5,9 @@ import Testing
 import WebKit
 @testable import MAPP
 
-/// Linking to notes from the page.
+/// Linking to items from the page.
 extension EditorTests {
-    // MARK: Notes the page links to
+    // MARK: Items the page links to
 
     private func addNotes(_ titles: [String], to page: Page) -> [ItemID] {
         titles.map { page.library.add($0 + "\n").id }
@@ -18,7 +18,7 @@ extension EditorTests {
             "return await window.webkit.messageHandlers.notes.postMessage(\(request))", arguments: [:], in: nil, contentWorld: .page)
     }
 
-    @Test func theNotesAreOfferedAfterDoubleBracketsFromTheLibrary() async throws {
+    @Test func theItemsAreOfferedAfterDoubleBracketsFromTheLibrary() async throws {
         let page = try await Page()
         _ = addNotes(["Garden ideas", "Bike service", "Gardening tools"], to: page)
         try await page.load("Intro\n")
@@ -29,7 +29,7 @@ extension EditorTests {
         #expect(unread == nil || unread is NSNull, "a request that cannot be read is answered, not left waiting")
     }
 
-    @Test func aLinkTheCoreReadsAsTwoDoesNotDropTheMarksOfTheNotesOtherLinks() async throws {
+    @Test func aLinkTheCoreReadsAsTwoDoesNotDropTheMarksOfTheItemsOtherLinks() async throws {
         let page = try await Page()
         _ = addNotes(["Plan"], to: page)
         try await page.load("Intro\n")
@@ -58,7 +58,7 @@ extension EditorTests {
 
     private func raw(_ texts: String...) -> String { "[" + texts.map { "{ raw: \(json($0)) }" }.joined(separator: ", ") + "]" }
 
-    @Test func aLinkAnswerNamesTheTypeIconAndToneOfTheNoteItBinds() async throws {
+    @Test func aLinkAnswerNamesTheTypeIconAndToneOfTheItemItBinds() async throws {
         let page = try await Page()
         let ids = addNotes(["Plan", "Errands", "Chores"], to: page)
         for id in ids.dropFirst() { page.library.items[page.library.items.firstIndex { $0.id == id }!].type = TypeID("core.task") }
@@ -76,7 +76,7 @@ extension EditorTests {
         #expect(answer.icons[icon]?.hasPrefix("data:image/png;base64,") == true)
     }
 
-    @Test func aLinkToAnAmbiguousUnresolvedOrBinnedNoteNamesNoType() async throws {
+    @Test func aLinkToAnAmbiguousUnresolvedOrBinnedItemNamesNoType() async throws {
         let page = try await Page()
         let twins = addNotes(["Twin", "Twin", "Gone"], to: page)
         let gone = try #require(page.library.items.firstIndex { $0.id == twins[2] })
@@ -84,7 +84,7 @@ extension EditorTests {
         try await page.load("Intro\n")
         let note = try #require(page.editor.noteID)
         let answer = try await resolve(page, note, raw("[[Twin]]", "[[Gone]]"))
-        #expect(answer.links[0].missing == false && answer.links[0].tone == TypeTone.neutral.rawValue, "two notes answer to it, so it takes the neutral mark")
+        #expect(answer.links[0].missing == false && answer.links[0].tone == TypeTone.neutral.rawValue, "two items answer to it, so it takes the neutral mark")
         #expect(answer.links[0].icon != nil, "its mark is what says it is a link where the underline waits for the pointer")
         #expect(answer.links[1].missing == true && answer.links[1].icon == nil && answer.links[1].tone == nil)
         #expect(answer.icons.count == 1)
@@ -105,7 +105,7 @@ extension EditorTests {
         #expect(short.links.count == 3 && short.links.allSatisfy { !$0.missing && $0.tone == TypeTone.neutral.rawValue }, "a count that does not line up says nothing of any link")
     }
 
-    @Test func linkToNoteWaitsForTheChoiceAndAnswersWithTheLink() async throws {
+    @Test func linkToItemWaitsForTheChoiceAndAnswersWithTheLink() async throws {
         let page = try await Page()
         let ids = addNotes(["Garden ideas"], to: page)
         try await page.load("Intro\n")
@@ -119,7 +119,7 @@ extension EditorTests {
         #expect(link as? String == "[[Garden ideas]]")
     }
 
-    @Test func linkToNoteDeclinedClosedOrAskedFromAnotherNoteAnswersWithNothing() async throws {
+    @Test func linkToItemDeclinedClosedOrAskedFromAnotherItemAnswersWithNothing() async throws {
         let page = try await Page()
         let ids = addNotes(["Garden ideas"], to: page)
         try await page.load("Intro\n")
@@ -140,12 +140,12 @@ extension EditorTests {
         try await page.wait { page.editor.linkRequest != nil }
         page.editor.close()
         #expect(page.editor.linkRequest == nil)
-        #expect(try await answered(), "leaving the note answers the page with nothing")
+        #expect(try await answered(), "leaving the item answers the page with nothing")
 
         try await page.load("Another\n")
         try await ask(from: ids[0])
         #expect(try await answered())
-        #expect(page.editor.linkRequest == nil, "a command typed in a note no longer shown opens nothing")
+        #expect(page.editor.linkRequest == nil, "a command typed in an item no longer shown opens nothing")
 
         let editor = page.editor
         try await ask(from: try #require(editor.noteID))
@@ -158,7 +158,7 @@ extension EditorTests {
         let page = try await Page()
         try await page.load("\n")
         let labels = try await page.editor.webView.evaluateJavaScript("window.mappLabels") as? [String: String]
-        #expect(labels?["linkToNote"] == "Link to Note")
+        #expect(labels?["linkToNote"] == "Link to Item")
         #expect(labels?["slashTable"] == "Table")
         #expect(labels?["suggestionsLoading"] == "Loading…")
         #expect(labels?["suggestionsEmpty"] == "No Results")
@@ -192,7 +192,7 @@ extension EditorTests {
         #expect(page.changes.last == "\"quoted\" it's -- done\n")
     }
 
-    // MARK: Link to Note keeps which note was chosen
+    // MARK: Link to Item keeps which item was chosen
 
     private func pending(_ page: Page) async throws -> ItemID {
         let current = try #require(page.editor.noteID)
@@ -208,22 +208,22 @@ extension EditorTests {
         return value as? String
     }
 
-    /// The note the library binds a `[[link]]` to, or nil where it binds none.
+    /// The item the library binds a `[[link]]` to, or nil where it binds none.
     private func bound(_ link: String, in library: FakeItemLibrary) async -> ItemID? {
         guard let target = linkParts(in: link).first?.target else { return nil }
         let answer = await library.linkAnswers(of: [target], in: nil)?.first
         return answer?.state == .bound ? answer?.item : nil
     }
 
-    @Test func choosingBetweenNotesWithTheSameTitleLinksToTheOneChosen() async throws {
+    @Test func choosingBetweenItemsWithTheSameTitleLinksToTheOneChosen() async throws {
         let page = try await Page()
         let older = page.library.add("Garden\n")
         page.library.add("garden\n")
         try await page.load("Intro\n")
         _ = try await pending(page)
         await page.editor.finishLinkRequest(choosing: older.id)
-        let link = try #require(try await answer(page), "a note that can be named is linked")
-        #expect(await bound(link, in: page.library) == older.id, "\(link) names the note chosen and no other")
+        let link = try #require(try await answer(page), "an item that can be named is linked")
+        #expect(await bound(link, in: page.library) == older.id, "\(link) names the item chosen and no other")
     }
 
     @Test func aTargetRenamedWhileThePickerIsOpenIsLinkedByItsNewTitle() async throws {
@@ -238,7 +238,7 @@ extension EditorTests {
         #expect(try await answer(page) == "[[Allotment]]")
     }
 
-    @Test func everySuggestionAndTheLinkForAnyNoteResolvesToThatNote() async throws {
+    @Test func everySuggestionAndTheLinkForAnyItemResolvesToThatItem() async throws {
         let page = try await Page()
         let identity = "11111111-1111-4111-8111-111111111111"
         let chosen = page.library.add("\(identity)\nBody\n")
@@ -256,10 +256,10 @@ extension EditorTests {
         _ = try await pending(page)
         #expect(await page.editor.finishLinkRequest(choosing: chosen.id))
         let link = try #require(try await answer(page))
-        #expect(await bound(link, in: library) == chosen.id, "\(link) names the note chosen")
+        #expect(await bound(link, in: library) == chosen.id, "\(link) names the item chosen")
     }
 
-    @Test func aLinkByIdentityShowsAnyTitleAndNamesTheNoteThatDeclaresIt() async throws {
+    @Test func aLinkByIdentityShowsAnyTitleAndNamesTheItemThatDeclaresIt() async throws {
         let page = try await Page()
         let titles = ["A|B", "A#B", "A]B", "[Draft]", "[[c", "c[[", "a]]b", "back\\slash", "Café 日本語", "line\nbreak"]
         for title in titles {
@@ -289,13 +289,13 @@ extension EditorTests {
         #expect(editor.linkRequest == nil)
     }
 
-    @Test func loadingAnotherNoteAnswersAPendingLinkRequestOnce() async throws {
+    @Test func loadingAnotherItemAnswersAPendingLinkRequestOnce() async throws {
         let page = try await Page()
         page.library.add("Garden\n")
         try await page.load("Intro\n")
         _ = try await pending(page)
         try await page.load("Another note\n")
-        #expect(page.editor.linkRequest == nil, "the request ended with the note it was typed in")
+        #expect(page.editor.linkRequest == nil, "the request ended with the item it was typed in")
         #expect(try await answer(page) == nil, "the page was answered")
     }
 

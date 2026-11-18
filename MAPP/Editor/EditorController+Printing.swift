@@ -2,11 +2,11 @@ import AppKit
 import UniformTypeIdentifiers
 import WebKit
 
-/// Printing the note and exporting it as a PDF.
+/// Printing the item and exporting it as a PDF.
 extension EditorController {
-    /// The note's title, which names a print job and an exported file.
+    /// The item's title, which names a print job and an exported file.
     private var title: String {
-        noteID.flatMap { library?.item($0)?.title } ?? String(localized: "Note")
+        noteID.flatMap { library?.item($0)?.title } ?? String(localized: "Item")
     }
 
 
@@ -49,7 +49,7 @@ extension EditorController {
                 }
                 guard let result = value as? [String: Any], let html = result["html"] as? String,
                       let revision = result["revision"] as? Int else {
-                    throw NSError(domain: "MAPP.Print", code: 1, userInfo: [NSLocalizedDescriptionKey: String(localized: "The printable note could not finish loading.")])
+                    throw NSError(domain: "MAPP.Print", code: 1, userInfo: [NSLocalizedDescriptionKey: String(localized: "The item could not be prepared for printing.")])
                 }
                 guard noteID == id, self.generation == generation else { return }
                 try await renderer.load(html, textSize: CGFloat(style.textSize))
@@ -60,7 +60,7 @@ extension EditorController {
                 else { _ = await renderer.printDocument(in: window, title: title) }
             } catch {
                 guard noteID == id, self.generation == generation else { return }
-                library?.notices.tell(String(localized: "Couldn’t Print Note"), error.localizedDescription)
+                library?.notices.tell(String(localized: "Couldn’t Print Item"), error.localizedDescription)
             }
         }
     }

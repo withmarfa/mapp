@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A main window: the notes of the library the app reads once there is one, and until then a page saying why not.
+/// A main window: the items of the library the app reads once there is one, and until then a page saying why not.
 struct RootView: View {
     @Environment(Libraries.self) private var libraries
     /// The window's browser lives here, above the library, so what the person was writing outlives a change of

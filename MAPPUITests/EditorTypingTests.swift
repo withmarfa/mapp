@@ -1,6 +1,6 @@
 import XCTest
 
-/// Types into the real page with the real keyboard: the slash menu, Link to Note, note suggestions after `[[`, the
+/// Types into the real page with the real keyboard: the slash menu, Link to Item, item suggestions after `[[`, the
 /// table shortcut and moving a block.
 @MainActor
 final class EditorTypingTests: XCTestCase {
@@ -40,7 +40,7 @@ final class EditorTypingTests: XCTestCase {
 
     func testTheSlashMenuListsBlocksInTheAppsWordsAndMakesATable() {
         app.typeText("/")
-        for name in ["Heading 1", "Bulleted List", "Checklist", "Code Block", "Table", "Callout", "Diagram", "Link to Note"] {
+        for name in ["Heading 1", "Bulleted List", "Checklist", "Code Block", "Table", "Callout", "Diagram", "Link to Item"] {
             XCTAssertTrue(menuRow(name).waitForExistence(timeout: 3), name)
         }
         app.typeText("tab")
@@ -54,26 +54,26 @@ final class EditorTypingTests: XCTestCase {
         XCTAssertTrue(page.tables.firstMatch.waitForExistence(timeout: 3))
     }
 
-    func testLinkToNoteAsksWhichNoteAndWritesTheLink() throws {
+    func testLinkToItemAsksWhichItemAndWritesTheLink() throws {
         try XCTSkipIf(true, "Sample library rejects [[…]] writes without link binding; fixture gap: https://github.com/withmarfa/mapp/issues/209")
         app.typeText("/link")
-        XCTAssertTrue(menuRow("Link to Note").waitForExistence(timeout: 3))
+        XCTAssertTrue(menuRow("Link to Item").waitForExistence(timeout: 3))
         app.typeKey(.return, modifierFlags: [])
         let field = app.sheets.firstMatch.textFields["NoteLinkField"]
-        XCTAssertTrue(field.waitForExistence(timeout: 3), "a sheet asks which note")
+        XCTAssertTrue(field.waitForExistence(timeout: 3), "a sheet asks which item")
         field.typeText("bike")
         XCTAssertTrue(app.sheets.firstMatch.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'NoteLinkRow.'")).firstMatch.waitForExistence(timeout: 3))
         app.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(app.sheets.firstMatch.waitForNonExistence(timeout: 3))
-        XCTAssertTrue(waitForText("CONTAINS", "Bike service"), "the link to the note is on the line: \(text)")
+        XCTAssertTrue(waitForText("CONTAINS", "Bike service"), "the link to the item is on the line: \(text)")
         XCTAssertFalse(text.contains("/link"))
         app.typeText(" and then more")
         XCTAssertTrue(waitForText("CONTAINS", "and then more"), "typing carries on after the link")
     }
 
-    func testLinkToNoteCancelledKeepsTheLineAsTyped() {
+    func testLinkToItemCancelledKeepsTheLineAsTyped() {
         app.typeText("/link")
-        XCTAssertTrue(menuRow("Link to Note").waitForExistence(timeout: 3))
+        XCTAssertTrue(menuRow("Link to Item").waitForExistence(timeout: 3))
         app.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(app.sheets.firstMatch.textFields["NoteLinkField"].waitForExistence(timeout: 3))
         app.typeKey(.escape, modifierFlags: [])
@@ -83,7 +83,7 @@ final class EditorTypingTests: XCTestCase {
         XCTAssertTrue(waitForText("CONTAINS", "/link!"), "the page has the keyboard back")
     }
 
-    func testDoubleBracketsOfferTheLibrarysNotes() throws {
+    func testDoubleBracketsOfferTheLibrarysItems() throws {
         try XCTSkipIf(true, "Sample library rejects [[…]] writes without link binding; fixture gap: https://github.com/withmarfa/mapp/issues/209")
         app.typeText("See [[bike")
         XCTAssertTrue(menuRow("Bike service").waitForExistence(timeout: 3))

@@ -963,7 +963,7 @@ import Observation
 
     /// What the core says each link target names (`Items.linkCandidates`), from the copy alone and read as a link in
     /// `note` when given, so an answer is whatever saving that link there would do. Nil where the core cannot ask,
-    /// such as for a note the copy does not hold.
+    /// such as for an item the copy does not hold.
     func linkAnswers(of targets: [String], in note: ItemID?) async -> [LinkAnswer]? {
         guard !targets.isEmpty else { return [] }
         return try? await source.linkAnswers(of: targets, in: note)

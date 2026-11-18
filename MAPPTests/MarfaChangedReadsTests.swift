@@ -174,7 +174,7 @@ import Testing
 
         func shown(_ title: String) -> MAPP.Item? { log.current.item(titled: title) }
 
-        /// A note whose text names `target` by its ID and that holds no edge to it, as the engine has read it.
+        /// An item whose text names `target` by its ID and that holds no edge to it, as the engine has read it.
         func host(naming target: String) async throws -> String {
             let host = try await note("Host", body: "See [[\(target)]]")
             for edge in try await copy.edges.from(host) where edge.edgeType == MarfaMapping.bodyLinkEdge {
@@ -555,7 +555,7 @@ import Testing
     /// the text of an item with no title reads no other item's links.
     @Test func theFirstLineOfAnUntitledItemNamesNothing() async throws {
         let scene = try await makeScene()
-        // Declared with the note, since a declaration replaces the types declared before.
+        // Declared with the item, since a declaration replaces the types declared before.
         try await scene.copy.declareTypes([[
             "id": "example.note", "label": "Note", "title_field": "title", "body_field": "body",
             "fields": ["title": ["type": "string"], "body": ["type": "string"]],

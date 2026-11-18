@@ -1,6 +1,6 @@
 import Foundation
 
-/// What an item page's header draws of the item, resolved once for every page that draws one: the note page's, which
+/// What an item page's header draws of the item, resolved once for every page that draws one: the item page's, which
 /// sends it to the editor's web page (`ItemPageHeader`), and a saved web page's, drawn in SwiftUI (`WebPageItemPage`).
 /// Both take their kind, their lead and their pins from here, so they cannot disagree about what a header shows.
 ///

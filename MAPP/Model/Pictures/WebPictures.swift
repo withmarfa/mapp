@@ -1,6 +1,6 @@
 import Foundation
 
-/// What a note's page is told about a picture at a web address.
+/// What an item's page is told about a picture at a web address.
 nonisolated enum PictureAnswer: Equatable, Sendable {
     /// The picture is on this Mac, at this file in the cache.
     case loaded(URL)
@@ -45,7 +45,7 @@ nonisolated enum PictureAsk: String, Sendable {
 
     /// Answers a question about the picture at `address`. `inFeed` is whether the item holding the picture is in the
     /// feed tier (`Item.tier`): Always loads a picture there without asking, and asks in the library tier, where the
-    /// person's own notes are, since the website would learn they opened one.
+    /// person's own items are, since the website would learn they opened one.
     ///
     /// A picture already kept shows under every setting, since showing it asks nothing of the website. A file attached to
     /// the item that was saved from `address` is looked for before this is asked (`PictureRequests.reply`), and the picture
@@ -100,6 +100,6 @@ nonisolated enum PictureAsk: String, Sendable {
 }
 
 extension WebPictures {
-    /// The one used by every window, so a picture two notes share is fetched once.
+    /// The one used by every window, so a picture two items share is fetched once.
     static let standard = WebPictures()
 }

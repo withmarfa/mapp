@@ -77,7 +77,7 @@ nonisolated final class QuitTrace: Sendable {
         log.info("\(self.purpose.label) stage \(stage.rawValue, privacy: .public) skipped: \(reason.description, privacy: .public)")
     }
 
-    /// An editor whose flush waits its turn behind a hand-over already under way, as when the note was left just
+    /// An editor whose flush waits its turn behind a hand-over already under way, as when the item was left just
     /// before, so the editors stage can take more than one editor's limit.
     func editorWaitsItsTurn() {
         editorsWaitingTheirTurn.withLock { $0 += 1 }

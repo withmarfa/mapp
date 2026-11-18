@@ -228,7 +228,7 @@ nonisolated extension Item {
         if case .file = content { true } else { false }
     }
 
-    /// What the library says a file item is, which is nil for a note and `.data` where it does not know.
+    /// What the library says a file item is, which is nil for an item and `.data` where it does not know.
     var fileType: UTType? {
         if case .file(let type, _) = content { type } else { nil }
     }

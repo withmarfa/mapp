@@ -54,7 +54,7 @@ struct CommandPaletteTests {
         #expect(try await offers("Settings", prefix: false), "the palette lists its commands")
         #expect(try await offers("New Window"), "New Window is a command of the palette")
 
-        // One palette, one query, held open while the page takes the note.
+        // One palette, one query, held open while the page takes the item.
         browser.paletteSeed = "Bold"
         let host = NSHostingView(rootView: CommandPalette(browser: browser, editor: page.editor, mode: .commands).environment(\.library, page.library))
         window.contentView = host

@@ -24,12 +24,12 @@ struct ItemCommandTests {
         #expect(enabled(context([])).isEmpty)
     }
 
-    @Test func aNoteOnThePageEnablesThePageCommands() {
+    @Test func anItemOnThePageEnablesThePageCommands() {
         let note = library.add("A note\n")
         #expect(enabled(context([note.id], page: note.id)) == [.quickLook, .openInNewWindow, .addAttachment, .toggleSource, .print, .exportPDF])
     }
 
-    @Test func aSelectedNoteNotOnThePageEnablesOnlyOpeningInAWindow() {
+    @Test func aSelectedItemNotOnThePageEnablesOnlyOpeningInAWindow() {
         let note = library.add("A note\n")
         #expect(enabled(context([note.id])) == [.quickLook, .openInNewWindow])
         #expect(enabled(context([note.id], page: .mint())) == [.quickLook, .openInNewWindow])
@@ -60,7 +60,7 @@ struct ItemCommandTests {
         #expect(enabled(context([id], page: id)) == [.quickLook, .openInNewWindow])
     }
 
-    @Test func severalNotesHaveNoSinglePage() {
+    @Test func severalItemsHaveNoSinglePage() {
         let one = library.add("One\n")
         let two = library.add("Two\n")
         #expect(enabled(context([one.id, two.id], page: one.id)) == [.quickLook, .openInNewWindow])

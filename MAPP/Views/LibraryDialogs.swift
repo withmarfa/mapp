@@ -2,8 +2,8 @@ import AppKit
 import SwiftUI
 
 extension View {
-    /// Asks whoever is in front to confirm erasing notes for good. Every window that shows a library carries this;
-    /// the one in front takes each request as it comes, so it shows once, in a note's own window too.
+    /// Asks whoever is in front to confirm erasing items for good. Every window that shows a library carries this;
+    /// the one in front takes each request as it comes, so it shows once, in an item's own window too.
     func libraryDialogs() -> some View {
         modifier(LibraryDialogs())
     }

@@ -51,7 +51,7 @@ struct CardArtTests {
         #expect(Self.face(note, .text) == .text)
     }
 
-    @Test func aNotesEmbeddedImageIsItsPicture() {
+    @Test func anItemsEmbeddedImageIsItsPicture() {
         let note = Self.item(preview: "Words", embeds: [BoundEmbed(text: "![[a.png]]", resolution: .missing)])
         #expect(CardPicture.sources(of: note, attachments: []) == [.embed])
         #expect(Self.face(note) == .picture)
@@ -129,7 +129,7 @@ struct CardArtTests {
         #expect(Self.said(Self.item(title: three)).title == three, "the card clips it to two lines and keeps room for two")
     }
 
-    @Test func anUntitledNoteSaysUntitled() {
+    @Test func anUntitledItemSaysUntitled() {
         let untitled = Self.item(title: nil)
         #expect(Self.said(untitled).title == untitled.displayTitle)
         #expect(!Self.said(untitled).title.isEmpty)

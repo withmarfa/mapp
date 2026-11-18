@@ -12,9 +12,9 @@ nonisolated struct GalleryArtwork: @unchecked Sendable {
 /// Makes and keeps the pictures cards show. Only a visible card asks, a file is fetched only when it is small,
 /// and a picture is kept by what decides it (`Basis`) and rough width, so scrolling back or resizing a little costs nothing.
 enum GalleryArtworkCache {
-    /// What decides a card's picture: the item's own version, and for a note the state of each embed its picture
+    /// What decides a card's picture: the item's own version, and for an item the state of each embed its picture
     /// is chosen from (`EmbedState`: what the embed is bound to, and that file's title, state and version). A file
-    /// binned, renamed or restored changes none of the note's own facts, so it is read from the library here, and
+    /// binned, renamed or restored changes none of the item's own facts, so it is read from the library here, and
     /// a card whose basis changes makes its picture again.
     nonisolated struct Basis: Hashable, Sendable {
         let item: ItemID

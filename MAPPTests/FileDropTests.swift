@@ -149,7 +149,7 @@ struct FileDropTests {
         #expect(QuickAdd.File(folderLink) == nil)
     }
 
-    @Test func aDraggedNoteLeavesAsAMarkdownFileNamedAfterIt() async throws {
+    @Test func aDraggedItemLeavesAsAMarkdownFileNamedAfterIt() async throws {
         let library = FakeItemLibrary()
         let note = library.add("# Plans\n\nSome text")
         let reference = library.dragReference(of: note.id)
@@ -183,7 +183,7 @@ struct FileDropTests {
         #expect(decoded.text == nil)
     }
 
-    @Test func quickLookShowsANoteAsTextAndAFileAsItself() async throws {
+    @Test func quickLookShowsAnItemAsTextAndAFileAsItself() async throws {
         let library = FakeItemLibrary()
         let note = library.add("# Plans\n\nSome text")
         let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .allNotes))

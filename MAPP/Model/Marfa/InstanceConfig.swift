@@ -186,7 +186,7 @@ nonisolated enum InstanceConfigFailure: Error, Hashable, Sendable {
     var message: String {
         switch self {
         case .unreachable:
-            String(localized: "MAPP can’t reach the server. If its address starts with http://, macOS may be refusing it. Your notes and changes aren’t affected.")
+            String(localized: "MAPP can’t reach the server. If its address starts with http://, macOS may be refusing it. Your items and changes aren’t affected.")
         case .notPermitted:
             String(localized: "MAPP’s sign-in isn’t allowed to change this server’s settings. Ask whoever runs the server to allow it, or use the server’s console.")
         case .instanceChanged:

@@ -109,7 +109,7 @@ extension ItemLibrary {
     ) {
         EditorController.flushAll(leaving: false) { [self] kept in
             guard kept else {
-                notices.tell(String(localized: "Can’t Change Type"), String(localized: "Finish editing the current note, then try again."))
+                notices.tell(String(localized: "Can’t Change Type"), String(localized: "Finish editing the current item, then try again."))
                 return done(false)
             }
             done(changeType(ids, to: type, filling: filling, undoManager: undoManager))

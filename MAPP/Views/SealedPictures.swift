@@ -2,14 +2,14 @@ import Foundation
 import UniformTypeIdentifiers
 import WebKit
 
-/// The pictures of the HTML document shown for one item in the sealed web page, answered by the app as the note page's
+/// The pictures of the HTML document shown for one item in the sealed web page, answered by the app as the item page's
 /// are (`PictureRequests`), so the page itself fetches nothing. They use the editor's scheme and URLs for a picture
 /// saved in an item (`EmbeddedFiles`), which in a sealed page only `SealedPictureScheme` answers.
 ///
 /// `SealedPictureRewrite` points each picture at this scheme, and only the addresses it found are answered, for this
 /// item alone. A picture saved as a file attached to the item from the same address comes first, under every setting,
 /// with no request to the website (`ItemLibrary.openSavedPicture`); then the Remote Pictures setting answers
-/// (`WebPictures.answer`), as for a note. Whatever is not loaded is drawn as an empty picture that keeps its place.
+/// (`WebPictures.answer`), as for an item. Whatever is not loaded is drawn as an empty picture that keeps its place.
 @MainActor @Observable final class SealedPictures {
     nonisolated static let scheme = EmbeddedFiles.scheme
 

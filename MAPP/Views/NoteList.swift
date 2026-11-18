@@ -55,7 +55,7 @@ struct NoteList: View, Equatable {
         .onCommand(#selector(NSResponder.deleteToBeginningOfLine(_:))) {
             if !browser.selection.isEmpty { deleteSelection() }
         }
-        // Return opens the note for writing; a deleted note or a file cannot be written in, so it stays in the list.
+        // Return opens the item for writing; a deleted item or a file cannot be written in, so it stays in the list.
         .onKeyPress(.return, phases: .down) { press in
             guard press.modifiers.isEmpty, browser.selection.count == 1,
                   browser.selectedItems(in: library).first?.isWritable == true
@@ -145,15 +145,15 @@ struct NoteList: View, Equatable {
         return counted.editedSubtitle(browser.hasViewChanges)
     }
 
-    /// What was just typed reaches the note before it goes, since a deleted note takes no edit.
+    /// What was just typed reaches the item before it goes, since a deleted item takes no edit.
     private func deleteSelection() {
         let ids = browser.selection
         library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
     }
 }
 
-/// The list, apart from the note list's body: a list reads its selection as it is made, so a change of selection
-/// runs this body rather than the note list's, which lists every item the place holds, and hands the list the same
+/// The list, apart from the item list's body: a list reads its selection as it is made, so a change of selection
+/// runs this body rather than the item list's, which lists every item the place holds, and hands the list the same
 /// rows as before, which SwiftUI does not go through again.
 private struct SelectableList<Content: View>: View {
     @Bindable var browser: Browser

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The menu bar. File makes and opens notes and acts on the selected ones; View chooses how the window shows its
+/// The menu bar. File makes and opens items and acts on the selected ones; View chooses how the window shows its
 /// items, holds the options of the view in front, and moves back and forward through the items the window has shown.
 struct AppCommands: Commands {
     /// Nil while no library is open: before a server is set, or while a server's copy opens.
@@ -34,10 +34,10 @@ struct AppCommands: Commands {
                 .disabled(!host.canRefresh)
         }
 
-        // The note commands sit with the File menu's making and opening, above Close, as Notes has them.
+        // The item commands sit with the File menu's making and opening, above Close, as Notes has them.
         CommandGroup(after: .newItem) {
             let ids: Set<ItemID> = notes?.ids ?? []
-            // Sharing a note reads one note; the commands below act on files too.
+            // Sharing an item reads one item; the commands below act on files too.
             let shown = ids.compactMap { library?.item($0) }.filter { !$0.isFile }
             let one = ids.count == 1 ? shown.first : nil
             command(.quickLook)

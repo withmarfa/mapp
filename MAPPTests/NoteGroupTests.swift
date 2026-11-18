@@ -35,7 +35,7 @@ struct NoteGroupTests {
         #expect(group(date(2026, 8, 26)) == .previous30Days)
     }
 
-    @Test func olderNotesThisYearGroupByMonthAndEarlierYearsByYear() {
+    @Test func olderItemsThisYearGroupByMonthAndEarlierYearsByYear() {
         #expect(group(date(2026, 8, 25)) == .month(year: 2026, month: 8))
         #expect(group(date(2026, 1, 3)) == .month(year: 2026, month: 1))
         #expect(group(date(2025, 12, 31)) == .year(2025))
@@ -90,7 +90,7 @@ struct NoteGroupTests {
         #expect(sections.map(\.group) == [.today])
     }
 
-    @Test func sortingByTitleListsNotesWithoutDateSections() {
+    @Test func sortingByTitleListsItemsWithoutDateSections() {
         let a = item("Apples", created: date(2026, 9, 25))
         let b = item("Bread", created: date(2025, 1, 1))
         let sections = NoteGroup.sections(of: [a, b], sort: .title, favoritesFirst: true, groupsByDate: true, now: now, calendar: calendar)

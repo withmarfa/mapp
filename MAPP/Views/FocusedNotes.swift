@@ -1,7 +1,7 @@
 import SwiftUI
 import Observation
 
-/// The notes the frontmost window is showing, and that window's undo manager, so the menu bar acts on them.
+/// The items the frontmost window is showing, and that window's undo manager, so the menu bar acts on them.
 struct FocusedNotes {
     let ids: Set<ItemID>
     let undoManager: UndoManager?
@@ -35,7 +35,7 @@ final class DetailsPresentation {
     /// The Reader and Original switch of the page showing, while it has an article. The toolbar and the menus hold it.
     private(set) var pageLook: PageLookSwitch?
     /// The item whose page has scrolled its header away, which the toolbar then names. Both kinds of page feed it: the
-    /// note's page from the editor, a web page from its web view. It names the item, not a flag, so a page that is
+    /// item's page from the editor, a web page from its web view. It names the item, not a flag, so a page that is
     /// still reporting for the item before cannot show that item's title for the next.
     private(set) var itemWithHeaderAway: ItemID?
     /// The items the window's Change Type panel is asked for.
@@ -46,7 +46,7 @@ final class DetailsPresentation {
     private(set) var history: VersionHistoryMode?
     /// Whether the window's right sidebar is arranging the page's layout (Customize Layout) in place of the inspector.
     /// It belongs to the window, not to an item: another item shows its own type's rows, and a file, which cannot be
-    /// arranged, shows the inspector until a note is back.
+    /// arranged, shows the inspector until an item is back.
     private(set) var isCustomizingLayout = false
     /// Whether the window shows an item's page, which is what Customize Layout arranges. A gallery, table, board or
     /// timeline with no item opened has none, nor do Settings and an index.
@@ -112,7 +112,7 @@ final class DetailsPresentation {
         EditorController.flushAll(leaving: false) { [weak self] kept in
             guard let self, history == nil else { return }
             guard kept else {
-                library.notices.tell(String(localized: "Can’t Open Version History"), String(localized: "Finish editing the current note, then try again."))
+                library.notices.tell(String(localized: "Can’t Open Version History"), String(localized: "Finish editing the current item, then try again."))
                 return
             }
             let mode = VersionHistoryMode(item: id, source: library.history)

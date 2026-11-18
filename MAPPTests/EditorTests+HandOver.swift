@@ -4,10 +4,10 @@ import Testing
 import WebKit
 @testable import MAPP
 
-/// Closing a window, quitting or changing library while a selection hands the last note over, or while the page
-/// leaves its note: the flush that asks for it waits for the hand-over, then hands over whatever is on the page.
+/// Closing a window, quitting or changing library while a selection hands the last item over, or while the page
+/// leaves its item: the flush that asks for it waits for the hand-over, then hands over whatever is on the page.
 extension EditorTests {
-    /// A page holding `typed` as the unreported edit of the note on it now, which only a flush brings in. While
+    /// A page holding `typed` as the unreported edit of the item on it now, which only a flush brings in. While
     /// `window.held` is true it refuses every flush as a page in the middle of a composition does.
     private static func holdingAnEdit(_ typed: String, in page: Page) async throws -> Int {
         let leaving = page.editor.generation
@@ -28,7 +28,7 @@ extension EditorTests {
         page.editor.onChange = { [library = page.library] id, text, read in library.updateBody(of: id, to: text, readAt: read) }
     }
 
-    @Test func closingAsASelectionHandsTheLastNoteOverSavesItAndGoesAhead() async throws {
+    @Test func closingAsASelectionHandsTheLastItemOverSavesItAndGoesAhead() async throws {
         let library = FakeItemLibrary()
         let first = library.add("First\n")
         let second = library.add("Second\n")
@@ -38,16 +38,16 @@ extension EditorTests {
         _ = try await Self.holdingAnEdit("First, typed\n", in: page)
         let kept = await withCheckedContinuation { continuation in
             page.editor.select(library.item(second.id)!)
-            // The page answers in order, so the hand-over's answer, and the next note put on the page, come first.
+            // The page answers in order, so the hand-over's answer, and the next item put on the page, come first.
             page.editor.flush { continuation.resume(returning: $0) }
         }
         #expect(kept)
-        #expect(library.notices.waiting.isEmpty, "the first note's text was kept, so nothing is told")
+        #expect(library.notices.waiting.isEmpty, "the first item's text was kept, so nothing is told")
         #expect(page.editor.noteID == second.id)
         #expect(library.body(of: first.id)?.text == "First, typed\n")
     }
 
-    @Test func quittingWhileAHandOverIsHeldWaitsForItThenHandsOverTheNoteOnThePage() async throws {
+    @Test func quittingWhileAHandOverIsHeldWaitsForItThenHandsOverTheItemOnThePage() async throws {
         let library = FakeItemLibrary()
         let first = library.add("First\n")
         let second = library.add("Second\n")
@@ -73,10 +73,10 @@ extension EditorTests {
         #expect(page.editor.noteID == second.id)
         #expect(library.body(of: first.id)?.text == "First, typed\n")
         let asked = try #require(try await page.editor.webView.evaluateJavaScript("window.asked") as? [Int])
-        #expect(asked == [leaving, page.editor.generation], "the hand-over asks for the first note, then the flush for the second")
+        #expect(asked == [leaving, page.editor.generation], "the hand-over asks for the first item, then the flush for the second")
     }
 
-    @Test func closingAsTheNoteIsLeftWaitsForItAndGoesAhead() async throws {
+    @Test func closingAsTheItemIsLeftWaitsForItAndGoesAhead() async throws {
         let library = FakeItemLibrary()
         let note = library.add("Note\n")
         let page = try await Page(library: library)
@@ -93,7 +93,7 @@ extension EditorTests {
         #expect(library.body(of: note.id)?.text == "Note, typed\n")
     }
 
-    /// The hand-over could not take the first note's last edit, so neither can the flush waiting for it: the close or
+    /// The hand-over could not take the first item's last edit, so neither can the flush waiting for it: the close or
     /// quit is refused, and the person is told once.
     @Test func closingAsAHandOverIsGivenUpOnRefusesAndTellsOnce() async throws {
         let library = FakeItemLibrary()
@@ -108,7 +108,7 @@ extension EditorTests {
         let kept = await withCheckedContinuation { continuation in page.editor.flush { continuation.resume(returning: $0) } }
         #expect(!kept)
         #expect(library.notices.told == 1)
-        #expect(page.editor.noteID == first.id, "the first note stays on the page")
+        #expect(page.editor.noteID == first.id, "the first item stays on the page")
     }
 
     /// A window that goes as the app's windows do: its editor leaves the open ones as it closes.
@@ -142,8 +142,8 @@ extension EditorTests {
     }
 
     /// Nothing is selected while the page is composing, then the window is closed and the app quits: the close and the
-    /// quit both wait for the note being left to hand over its typing, which reaches the library before either goes.
-    @Test func closingTheWindowAndQuittingWhileTheNoteIsLeftWaitForItsTyping() async throws {
+    /// quit both wait for the item being left to hand over its typing, which reaches the library before either goes.
+    @Test func closingTheWindowAndQuittingWhileTheItemIsLeftWaitForItsTyping() async throws {
         let library = FakeItemLibrary()
         let note = library.add("Note\n")
         let page = try await Page(library: library)
@@ -175,7 +175,7 @@ extension EditorTests {
 
     /// The same, with a page that never finishes composing: it is given up on once, and the close and the quit are
     /// both refused under that one notice.
-    @Test func closingTheWindowAndQuittingWhileTheNoteIsLeftAndGivenUpOnRefusesBothAndTellsOnce() async throws {
+    @Test func closingTheWindowAndQuittingWhileTheItemIsLeftAndGivenUpOnRefusesBothAndTellsOnce() async throws {
         let library = FakeItemLibrary()
         let note = library.add("Note\n")
         let page = try await Page(library: library)
@@ -192,7 +192,7 @@ extension EditorTests {
         try await page.wait { kept() != nil }
         #expect(kept() == false)
         #expect(library.notices.told == 1)
-        #expect(closing.window.isVisible, "the window stays with the note whose typing was not handed over")
+        #expect(closing.window.isVisible, "the window stays with the item whose typing was not handed over")
         #expect(!page.editor.windowIsGone)
     }
 

@@ -5,8 +5,8 @@ import Testing
 import WebKit
 @testable import MAPP
 
-/// A note with no text yet, as quick add makes from a title alone, holds no text property at all. The page shows it
-/// empty, and what is typed there is saved to it and to no other note.
+/// An item with no text yet, as quick add makes from a title alone, holds no text property at all. The page shows it
+/// empty, and what is typed there is saved to it and to no other item.
 extension EditorTests {
     private static let stamp = "2026-10-26T00:00:00Z"
 
@@ -18,7 +18,7 @@ extension EditorTests {
             source: "test", sourceId: nil, occurredAt: stamp, createdAt: stamp, updatedAt: stamp, tags: [])
     }
 
-    @Test func aNoteWithNoTextShowsAnEmptyPageAndSavesTypingToItself() async throws {
+    @Test func anItemWithNoTextShowsAnEmptyPageAndSavesTypingToItself() async throws {
         let itemTypes = [
             ItemType(
                 id: "core.note", label: "Note",
@@ -36,7 +36,7 @@ extension EditorTests {
         let library = MarfaLibrary(source: source, notices: Notices())
         let kitchenID = ItemID("kitchen"), emptyID = ItemID("empty")
         try #require(await eventually { library.isLoaded && library.item(emptyID) != nil })
-        #expect(library.body(of: emptyID)?.text == "", "a note without a text property has empty text")
+        #expect(library.body(of: emptyID)?.text == "", "an item without a text property has empty text")
 
         let page = try await Harness(library: library)
         var saved: [ItemID] = []

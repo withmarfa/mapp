@@ -4,8 +4,8 @@ import type { LinkAnswers, LinkRef } from './bridge'
 /** Asks the app what these links of the item name. */
 export type AskLinks = (item: string, links: LinkRef[]) => Promise<LinkAnswers | null>
 
-/** What the app last said of a link: whether it names no note and, for a link that names one note, the image of the
- *  icon of that note's type and the name of the type's tone. */
+/** What the app last said of a link: whether it names no item and, for a link that names one item, the image of the
+ *  icon of that item's type and the name of the type's tone. */
 interface Reading {
   missing: boolean
   icon?: string
@@ -18,12 +18,12 @@ function keyOf(link: LinkRef): string {
 }
 
 /**
- * What the page knows of the notes its links name: whether they exist, so Inkkit can draw a link to a missing note
+ * What the page knows of the items its links name: whether they exist, so Inkkit can draw a link to a missing item
  * differently, and the icon and tone of the type of one that does, so the person's chosen look for links can draw
  * them. Inkkit asks about each link as it draws it and wants the answer at once (`WikiLinkAdapter.resolve`),
  * but only the app can tell, and not at once. So an unknown link is drawn as a live one with no mark; the links of
- * one pass over the note go to the app together; and a link is drawn again only when an answer changes how it
- * looks. The answers belong to the note on the page and are asked again when the app says its library changed,
+ * one pass over the item go to the app together; and a link is drawn again only when an answer changes how it
+ * looks. The answers belong to the item on the page and are asked again when the app says its library changed,
  * keeping the old ones until the new arrive so a link does not flicker.
  *
  * The page decides no color: a link names its tone and the app's style (`window.editor.setLinkStyle`) says what that
@@ -32,7 +32,7 @@ function keyOf(link: LinkRef): string {
 export class NoteLinkStatus {
   private item = ''
   private readonly links = new Map<string, LinkRef>()
-  /** What each link of the note on the page was last answered. */
+  /** What each link of the item on the page was last answered. */
   private readonly readings = new Map<string, Reading>()
   private readonly asking = new Set<string>()
   /** The number of the latest request that named each link, so a slower earlier answer cannot replace a newer one. */
@@ -40,16 +40,16 @@ export class NoteLinkStatus {
   private requested = 0
   private queue = new Set<string>()
   private scheduled = false
-  /** Changes with the note on the page and when the page ends, so a late answer for either is dropped. */
+  /** Changes with the item on the page and when the page ends, so a late answer for either is dropped. */
   private epoch = 0
 
   constructor(
     private readonly ask: AskLinks,
-    /** Draws the links to these notes again, after answers that change how one looks. */
+    /** Draws the links to these items again, after answers that change how one looks. */
     private readonly redraw: (targets: string[]) => void,
   ) {}
 
-  /** What Inkkit draws for the link: `missing` once the app has said so, the icon and tint of the type of the note
+  /** What Inkkit draws for the link: `missing` once the app has said so, the icon and tint of the type of the item
    *  it names, or nothing. */
   status(link: LinkRef, item: string): ({ missing?: boolean } & WikiLinkPresentation) | undefined {
     this.adopt(item)
@@ -101,7 +101,7 @@ export class NoteLinkStatus {
     this.queue.add(key)
     if (this.scheduled) return
     this.scheduled = true
-    // Every link of a note is drawn in one pass, so the links wanted by then go in one request.
+    // Every link of an item is drawn in one pass, so the links wanted by then go in one request.
     queueMicrotask(() => this.send())
   }
 

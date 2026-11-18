@@ -2,8 +2,8 @@ import { canOpenLink } from '@aicayzer/inkkit'
 import type { CaretState, FindState } from './editor'
 import type { HeaderMenu } from './header'
 
-/** An embed as the note's text holds it, such as `![[photo.png|400]]` or `![](a.png)`, which the app
- *  matches against the embeds Marfa bound for the note. The text is exactly as written (`FileReference.raw`: alias,
+/** An embed as the item's text holds it, such as `![[photo.png|400]]` or `![](a.png)`, which the app
+ *  matches against the embeds Marfa bound for the item. The text is exactly as written (`FileReference.raw`: alias,
  *  size suffix, escapes, a table cell's `\|`), and the page applies no rule of its own for what an embed names. */
 export type EmbedRequest = { item: string; text: string; export?: boolean }
 
@@ -34,7 +34,7 @@ export type EditorMessage =
   /** Said once for each `load`, after the browser has drawn the document. The app ends its `item.open` signpost
    *  there, and drops it with no sample when the page takes another generation first. */
   | { type: 'painted'; generation: number }
-  /** The note's headings in Inkkit's own order, so a heading's ordinal is its index here. Said after each load and after
+  /** The item's headings in Inkkit's own order, so a heading's ordinal is its index here. Said after each load and after
    *  an edit changes the list; the app reveals a heading by ordinal under this generation. */
   | { type: 'headings'; headings: { level: number; text: string }[]; generation: number }
   | { type: 'headerScrolledAway'; away: boolean; generation: number }
@@ -86,7 +86,7 @@ export type EditorMessage =
 
 /** The authored spelling identifies the binding; decoded parts serve navigation and display. Forward `raw` unchanged
  *  through opening, resolution and cache identity: Marfa binds each spelling separately, including an alias that
- *  repeats the name and one with a backslash. The page never guesses which note a name means. */
+ *  repeats the name and one with a backslash. The page never guesses which item a name means. */
 export interface LinkRef {
   raw: string
   target: string
@@ -94,8 +94,8 @@ export interface LinkRef {
   alias?: string
 }
 
-/** What the page asks of the app's notes: names to offer after `[[`, which note the person links to, and what each
- *  link of a note names. */
+/** What the page asks of the app's items: names to offer after `[[`, which item the person links to, and what each
+ *  link of an item names. */
 export type NoteRequest =
   | { type: 'suggest'; query: string; item: string }
   | { type: 'pick'; item: string }
@@ -130,12 +130,12 @@ declare global {
     webkit?: {
       messageHandlers?: {
         host?: { postMessage(message: EditorMessage): void }
-        /** Answers with what the app knows of a file a note embeds, why the file can't be shown now, or null
+        /** Answers with what the app knows of a file an item embeds, why the file can't be shown now, or null
          *  when it has none. */
         embeds?: {
           postMessage(request: EmbedRequest): Promise<EmbeddedFile | UnavailableFile | null>
         }
-        /** Answers a `suggest` with note names, a `pick` with the link the person chose, or null, and a
+        /** Answers a `suggest` with item names, a `pick` with the link the person chose, or null, and a
          *  `resolve` with what each name is (`LinkAnswers`). */
         notes?: { postMessage(request: NoteRequest): Promise<unknown> }
         /** Answers a question about a picture at a web address, or null when the app has no answer. The page
@@ -153,12 +153,12 @@ export function postToHost(message: EditorMessage): void {
 }
 
 /** Asks the app to open a web, mail or phone address in the system's own app. Inkkit's `canOpenLink` decides what
- *  may be opened, so any other address, such as a `file:` or `javascript:` one in a note, is dropped here. */
+ *  may be opened, so any other address, such as a `file:` or `javascript:` one in an item, is dropped here. */
 export function openLink(href: string): void {
   if (canOpenLink(href)) postToHost({ type: 'openLink', href })
 }
 
-/** Note names that answer what was typed after `[[`, in the order to show them. */
+/** Item names that answer what was typed after `[[`, in the order to show them. */
 export async function suggestNotes(query: string, item: string): Promise<string[]> {
   const names = await window.webkit?.messageHandlers?.notes?.postMessage({
     type: 'suggest',
@@ -168,15 +168,15 @@ export async function suggestNotes(query: string, item: string): Promise<string[
   return Array.isArray(names) ? names.filter((name) => typeof name === 'string') : []
 }
 
-/** The Markdown link to the note the person chooses for the item, or undefined if they decline. The app
+/** The Markdown link to the item the person chooses for the item on the page, or undefined if they decline. The app
  *  answers when they have chosen, however long that takes. */
 export async function pickNote(item: string): Promise<string | undefined> {
   const link = await window.webkit?.messageHandlers?.notes?.postMessage({ type: 'pick', item })
   return typeof link === 'string' ? link : undefined
 }
 
-/** What the app says of one link of the item: whether it names no note, and otherwise, when it names exactly
- *  one, the icon of that note's type (a key of `LinkAnswers.icons`, absent for a type with none) and the name of
+/** What the app says of one link of the item: whether it names no item, and otherwise, when it names exactly
+ *  one, the icon of that item's type (a key of `LinkAnswers.icons`, absent for a type with none) and the name of
  *  the type's tone. */
 export interface LinkAnswer {
   missing: boolean

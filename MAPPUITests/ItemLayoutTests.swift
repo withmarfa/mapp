@@ -116,7 +116,7 @@ final class ItemLayoutTests: XCTestCase {
         // Choosing the place shown before leaves Settings with the window as it was.
         app.outlines["Sidebar"].staticTexts["Items"].click()
         XCTAssertTrue(settings.waitForNonExistence(timeout: 3))
-        XCTAssertTrue(compactTitle.waitForExistence(timeout: 3), "returning from Settings preserves the note's scroll position")
+        XCTAssertTrue(compactTitle.waitForExistence(timeout: 3), "returning from Settings preserves the item's scroll position")
         XCTAssertFalse(header.isHittable)
         app.typeKey("f", modifierFlags: .command)
         capture("Find bar on scrolled document")

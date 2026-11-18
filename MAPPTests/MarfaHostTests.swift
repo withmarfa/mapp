@@ -521,7 +521,7 @@ import Testing
         let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "old")
         host.handOverEdits = { false }
-        await expect(.unavailable(message: "Finish editing the current note before changing libraries.")) { () throws(MarfaHost.Problem) in
+        await expect(.unavailable(message: "Finish editing the current item before changing libraries.")) { () throws(MarfaHost.Problem) in
             try await host.signInAgain(via: host.scripted("new"))
         }
         #expect(bench.signIns.calls == ["browser http://first.test:8210"], "only the first sign-in was made")
@@ -580,7 +580,7 @@ import Testing
         #expect(try bench.signIns.key(for: second.address) == "two")
 
         host.handOverEdits = { false }
-        await expect(.unavailable(message: "Finish editing the current note before changing libraries.")) { () throws(MarfaHost.Problem) in
+        await expect(.unavailable(message: "Finish editing the current item before changing libraries.")) { () throws(MarfaHost.Problem) in
             try await host.changeAddress(to: "http://second.test:8210", key: "other", choice: .discardCopy(.fake(1)))
         }
         #expect(try bench.signIns.key(for: second.address) == nil, "nothing is left live for a question no one holds")

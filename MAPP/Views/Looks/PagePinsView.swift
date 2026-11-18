@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// The pins under an item page's title, drawn in SwiftUI from `PagePins` for a page the editor does not draw: each a
-/// key with its row's icon above its value, in a slot of a fixed width, as the note page's are, with the same chips
-/// (`PageChip`). The pins are read only, except the status, which opens a native menu and writes as the note page's
+/// key with its row's icon above its value, in a slot of a fixed width, as the item page's are, with the same chips
+/// (`PageChip`). The pins are read only, except the status, which opens a native menu and writes as the item page's
 /// does, and a linked item, which opens the item. A value keeps to one line, cut with an ellipsis, with the whole of it
 /// in the help, and a list shows what `PagePins` gave it (its first value) and "+N more", which never truncates, with
 /// every value of the list in the help.
@@ -116,7 +116,7 @@ struct PagePinsView: View {
         .foregroundStyle(.tint)
     }
 
-    /// An address that opens in the browser: only a web address, as on the note page.
+    /// An address that opens in the browser: only a web address, as on the item page.
     static func webAddress(_ text: String) -> URL? {
         guard text.lowercased().hasPrefix("http://") || text.lowercased().hasPrefix("https://") else { return nil }
         return URL(string: text)
@@ -134,7 +134,7 @@ struct PagePinsView: View {
 }
 
 /// The status pin: its group's mark and the status in a chip. Where the item can be changed it is a native menu of the
-/// type's statuses, which writes the choice as the note page's does and says so when the library refuses; where it
+/// type's statuses, which writes the choice as the item page's does and says so when the library refuses; where it
 /// cannot, the chip has no chevron and no menu.
 private struct StatusPin: View {
     @CurrentLibrary private var library
@@ -180,7 +180,7 @@ private struct StatusPin: View {
 }
 
 /// Lays the pins out in slots of a fixed width, 150 points at 13 points of text, so a pin stays where it is from page to
-/// page, as the note page's are: as many to a row as fit, and a pin wraps only where no slot is left.
+/// page, as the item page's are: as many to a row as fit, and a pin wraps only where no slot is left.
 private struct PinLayout: Layout {
     let step: CGFloat
     let size: CGFloat

@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// What one main window is showing: the sidebar item, the selected notes and the search. The window's views
+/// What one main window is showing: the sidebar item, the selected items and the search. The window's views
 /// and the menu bar's commands share it, so both act on the same selection.
 @Observable
 final class Browser {
@@ -28,8 +28,8 @@ final class Browser {
         }
     }
     /// The items the person chose in this window, for Back and Forward: a click, a key in the list, a link or a
-    /// palette jump's destination. The app's own moves (the first note of a place, the next note after a delete
-    /// or a search) are left out, except the note the window opens on, so Back can return to it. Kept for the
+    /// palette jump's destination. The app's own moves (the first item of a place, the next item after a delete
+    /// or a search) are left out, except the item the window opens on, so Back can return to it. Kept for the
     /// life of the window, not across launches.
     private(set) var history = SelectionHistory()
     @ObservationIgnored private var isMovingThroughHistory = false
@@ -185,7 +185,7 @@ final class Browser {
     /// Where the keyboard should go next, asked for by an action such as New Note or Search Notes. Whatever
     /// can take it grants it once, when it is able to, and clears it.
     var focusRequest: Pane?
-    /// The palette that is out, if any: ⌘K's commands, or ⇧⌘P's search of every note. One panel is out at a time,
+    /// The palette that is out, if any: ⌘K's commands, or ⇧⌘P's search of every item. One panel is out at a time,
     /// so the palette puts quick add away, keeping its draft.
     var palette: Palette? {
         didSet {
@@ -293,8 +293,8 @@ final class Browser {
         else { focusRequest = .list }
     }
 
-    /// Shows the note a link in the page names, as choosing it in the list does: the window's place, search, undo
-    /// and the rest of its state are left as they are unless the note is not in the list, which then shows the place
+    /// Shows the item a link in the page names, as choosing it in the list does: the window's place, search, undo
+    /// and the rest of its state are left as they are unless the item is not in the list, which then shows the place
     /// that lists it (`place(listing:)`). The keyboard stays with the page, as it does when a link is followed anywhere.
     func open(linked item: Item, in library: any ItemLibrary, order: NoteOrder) {
         reveal(item, in: library, order: order)
@@ -404,7 +404,7 @@ final class Browser {
     }
 
     /// The list's sections. Favorites lead wherever they mean something: not in Favorites itself, where every
-    /// note is one, nor in search results. A place that keeps its own order, and a search ordered by relevance, are
+    /// item is one, nor in search results. A place that keeps its own order, and a search ordered by relevance, are
     /// one section, in the order given. The filters apply, and a sort or group the person set, or a saved view
     /// has, orders and groups the items in place of the list's own order. The window's views ask for them as often
     /// as they are drawn, so the last answer stands until the items, the order, the filters, the day or the place
@@ -579,7 +579,7 @@ final class Browser {
         show(item, in: library, order: order)
     }
 
-    /// Shows a sidebar item as a person picks it: any search is cleared and the list's first note is selected.
+    /// Shows a sidebar item as a person picks it: any search is cleared and the list's first item is selected.
     func show(_ item: SidebarItem, in library: any ItemLibrary, order: NoteOrder) {
         let interval = Telemetry.begin(.navigation, "place.choose")
         defer { interval.end() }
@@ -623,7 +623,7 @@ final class Browser {
         return shown + content.allRows.map(\.id).filter { !isShown.contains($0) }
     }
 
-    /// Keeps the selection in the list after notes leave it or the search changes it (see `selection(_:keptFrom:in:)`).
+    /// Keeps the selection in the list after items leave it or the search changes it (see `selection(_:keptFrom:in:)`).
     ///
     /// A search not yet answered shows nothing, which says nothing about the selection: it is held, and the answer is
     /// compared with the list as it stood before the search.
@@ -826,8 +826,8 @@ final class Browser {
 
     // MARK: Keeping the selection in the list
 
-    /// When selected notes leave the list (deleted, moved elsewhere, filtered out by a search), the selection
-    /// keeps whichever are still there. If none are, it moves to the note that followed them, or failing that
+    /// When selected items leave the list (deleted, moved elsewhere, filtered out by a search), the selection
+    /// keeps whichever are still there. If none are, it moves to the item that followed them, or failing that
     /// the one before, as Notes and Mail do.
     static func selection(_ selection: Set<ItemID>, keptFrom old: [ItemID], in new: [ItemID]) -> Set<ItemID> {
         let visible = Set(new)

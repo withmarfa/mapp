@@ -74,7 +74,7 @@ private struct AppearanceSettings: View {
             } header: {
                 Text("Text")
             } footer: {
-                Text("Changes text in the sidebar, lists, and controls. Note text size is set in Editor.")
+                Text("Changes text in the sidebar, lists, and controls. Text size on item pages is set in Editor.")
             }
             Section {
                 ValuePanelOptions()
@@ -89,7 +89,7 @@ private struct AppearanceSettings: View {
             } header: {
                 Text("Toolbar")
             } footer: {
-                Text("For notes and items. Lists always keep their background.")
+                Text("For item pages. Lists always keep their background.")
             }
             Section {
                 ColumnWidthOptions()
@@ -125,14 +125,14 @@ private struct EditorSettings: View {
             } header: {
                 Text("Links")
             } footer: {
-                Text("How a link to another item looks in a note. A link to an item that doesn’t exist keeps its dashed line in every look.")
+                Text("How a link to another item looks in an item’s text. A link to an item that doesn’t exist keeps its dashed line in every look.")
             }
             Section {
                 RemotePictureOptions()
             } header: {
                 Text("Pictures")
             } footer: {
-                Text("A note names the website of a picture at a web address and loads it only when you choose to, or always for items in the Inbox. Pictures you have loaded stay on this Mac until you disconnect the library.")
+                Text("An item’s text can name a picture at a web address. MAPP loads it only when you choose to, or always for items in the Inbox. Pictures you have loaded stay on this Mac until you disconnect the library.")
             }
         }
         .labelStyle(.titleOnly)
@@ -206,7 +206,7 @@ private struct AboutSettings: View {
                 Text("Version \(Self.version)")
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
-                Text("A notes app for your Marfa server.")
+                Text("An app for your Marfa server’s items.")
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity)

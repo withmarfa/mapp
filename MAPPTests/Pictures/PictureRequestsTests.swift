@@ -93,11 +93,11 @@ import Testing
         #expect(wrong["retry"] == nil)
     }
 
-    @Test func aReplyAfterTheNoteChangedIsDropped() async throws {
+    @Test func aReplyAfterTheItemChangedIsDropped() async throws {
         let text = "https://\(PictureStub.newHost())/a.png"
         PictureStub.answer(text, with: .body([SamplePicture.png()]))
         let requests = requests()
-        // The reply asks for the version before the fetch and again after it: the note changes in between.
+        // The reply asks for the version before the fetch and again after it: the item changes in between.
         var asked = 0
         requests.version = {
             asked += 1

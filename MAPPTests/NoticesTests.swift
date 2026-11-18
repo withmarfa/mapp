@@ -13,11 +13,11 @@ import Testing
     @Test func aNoticeWaitsBehindTheOneShownUntilThatIsAnswered() throws {
         let notices = Notices()
         notices.tell("Can’t Search", "The search failed.")
-        notices.tell("Couldn’t Print Note", "The printer is gone.")
-        #expect(notices.waiting.map(\.title) == ["Can’t Search", "Couldn’t Print Note"])
+        notices.tell("Couldn’t Print Item", "The printer is gone.")
+        #expect(notices.waiting.map(\.title) == ["Can’t Search", "Couldn’t Print Item"])
 
         notices.answered(try #require(notices.waiting.first).id)
-        #expect(notices.waiting.map(\.title) == ["Couldn’t Print Note"])
+        #expect(notices.waiting.map(\.title) == ["Couldn’t Print Item"])
     }
 
     @Test func theSameWordsWaitingAreNotToldTwiceButTheTellIsCounted() {
@@ -71,7 +71,7 @@ import Testing
 
     @Test func aChangeNotKeptWithNoTextAsksThePersonToMakeItAgain() {
         let notices = Notices()
-        notices.notKept("Couldn’t Save Note", text: "")
+        notices.notKept("Couldn’t Save Item", text: "")
         #expect(notices.waiting.last?.text == nil)
         #expect(notices.waiting.last?.message == "MAPP closed the library before it could keep your change. Make the change again.")
     }

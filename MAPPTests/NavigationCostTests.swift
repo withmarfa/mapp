@@ -312,7 +312,7 @@ struct NavigationCostTests {
         }
     }
 
-    /// The gallery while a link changes: a file is attached to one note, then taken off, which should make that note's
+    /// The gallery while a link changes: a file is attached to one item, then taken off, which should make that item's
     /// card again and no other card.
     @Test func aHostedWindowOnTheGalleryWhileALinkChanges() async throws {
         try await hosted { browser, library, source, step in

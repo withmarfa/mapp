@@ -76,7 +76,7 @@ struct SyncStatusTests {
         #expect(status.primary?.kind == .unavailable)
     }
 
-    @Test func changesThatNeedThePersonCountedWithAnyOtherNote() throws {
+    @Test func changesThatNeedThePersonCountedWithAnyOtherItem() throws {
         let status = SyncStatus(
             state: .offline(reason: nil), report: report(waiting: 1, oldest: 2, problems: [entry(), entry(.dead)]), now: now)
         #expect(status.notes.map(\.kind) == [.needsAttention, .offline])

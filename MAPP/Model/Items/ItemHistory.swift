@@ -48,7 +48,7 @@ nonisolated enum ItemHistoryFailure: Error, Hashable, Sendable {
     var message: String {
         switch self {
         case .unreachable:
-            String(localized: "MAPP can’t reach the server. Version history comes from the server. If its address starts with http://, macOS may be refusing it. Your notes and changes aren’t affected.")
+            String(localized: "MAPP can’t reach the server. Version history comes from the server. If its address starts with http://, macOS may be refusing it. Your items and changes aren’t affected.")
         case .notPermitted:
             String(localized: "MAPP’s sign-in isn’t allowed to read this item’s history. Ask whoever runs the server to allow it.")
         case .unavailable:
@@ -117,7 +117,7 @@ nonisolated extension PropertyValue {
     }
 }
 
-/// How much of a version's text Version History lays out. A long note is cut here, for the person to read the start of it
+/// How much of a version's text Version History lays out. A long item is cut here, for the person to read the start of it
 /// and to see that it was cut, rather than laying out a text of any length.
 nonisolated struct TextExcerpt: Hashable, Sendable {
     static let limit = 20_000
@@ -159,7 +159,7 @@ nonisolated enum RestoreCheck: Hashable, Sendable {
 extension ItemLibrary {
     /// What restoring `snapshot` over item `id` would change, judged on the item as the library holds it now.
     ///
-    /// Only the text and the title are restored: they are what a note is, and they map between types whenever both
+    /// Only the text and the title are restored: they are what an item is, and they map between types whenever both
     /// types keep them. The item's other fields stay as they are, so a restore never brings back a value another
     /// device has since changed on purpose, and the version's own fields are shown for reading.
     func restoreCheck(of snapshot: ItemSnapshot, for id: ItemID) -> RestoreCheck {

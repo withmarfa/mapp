@@ -347,7 +347,7 @@ class LinkedSection {
   }
 }
 
-/** The item's title and pinned properties, drawn in the page above the note so they scroll with it as one
+/** The item's title and pinned properties, drawn in the page above the item so they scroll with it as one
  *  surface. What they do is the app's: the title is saved as the item's property, and each pin opens a native
  *  menu. The header belongs to MAPP's page, not to Inkkit; do not move it back into a native overlay that follows
  *  WebKit's scrolling.

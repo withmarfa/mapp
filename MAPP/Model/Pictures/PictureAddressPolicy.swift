@@ -28,8 +28,8 @@ nonisolated struct IPAddress: Hashable, Sendable {
     }
 
     /// Whether a page on the internet could be at this address. Everything a home or office network, the machine
-    /// itself or the address space's reserved ranges use is not: those are where a request made on a note's behalf
-    /// would reach something the note's writer could not.
+    /// itself or the address space's reserved ranges use is not: those are where a request made on an item's behalf
+    /// would reach something the item's writer could not.
     var isPublic: Bool {
         switch bytes.count {
         case 4: return Self.isPublic(four: bytes)

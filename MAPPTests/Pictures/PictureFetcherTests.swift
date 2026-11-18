@@ -42,7 +42,7 @@ import Testing
         #expect(try Data(contentsOf: picture.file) == SamplePicture.png(width: 12, height: 7))
     }
 
-    @Test func theRequestCarriesNothingOfThePersonOrTheNote() async throws {
+    @Test func theRequestCarriesNothingOfThePersonOrTheItem() async throws {
         let address = "https://\(PictureStub.newHost())/a.png"
         PictureStub.answer(address, with: .body([SamplePicture.png()]))
 

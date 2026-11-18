@@ -1,7 +1,7 @@
 import Foundation
 
-/// How a link to another item reads in a note's text, as the person chose in Settings. Every look, with its sizes and
-/// colors, is here and nowhere else; the page holds none of them. A link to a note that is missing keeps its dashed
+/// How a link to another item reads in an item's text, as the person chose in Settings. Every look, with its sizes and
+/// colors, is here and nowhere else; the page holds none of them. A link to an item that is missing keeps its dashed
 /// line in every look, and in the mark look a lighter dotted one.
 nonisolated enum LinkLook: String, CaseIterable, Identifiable, Sendable {
     /// The linked item's type icon in the type's color, then the title, with a dotted underline and the hand pointer.
@@ -67,7 +67,7 @@ nonisolated enum LinkLook: String, CaseIterable, Identifiable, Sendable {
     private static func appearance(_ light: String, _ dark: String) -> String { "light-dark(\(light), \(dark))" }
 
     /// The look as the page's custom properties: Inkkit's wiki link tokens, and for each tone the colors a link to
-    /// a note of a type with that tone takes (`--link-icon-<tone>`, `--link-tint-<tone>`), resolved for light and for
+    /// an item of a type with that tone takes (`--link-icon-<tone>`, `--link-tint-<tone>`), resolved for light and for
     /// dark at once by `light-dark()` so an appearance change needs no resend. The tint is the tone's chip color
     /// (`TypeTone.cssColors`), the same fill a chip in the item's header has.
     @MainActor

@@ -17,7 +17,7 @@ struct MarfaViewsTests {
 
     // The fake copy has no search, so search is checked against a server's copy in `MarfaViewsLiveTests`.
 
-    /// A copy holding a view's row as the slice brings it, beside two notes, read through the engine.
+    /// A copy holding a view's row as the slice brings it, beside two items, read through the engine.
     private static func source(views: SavedViews) -> MarfaSource {
         let stamp = "2026-10-06T00:00:00Z"
         func row(_ id: String, _ type: String, _ properties: JSONObject) -> Marfa.Item {

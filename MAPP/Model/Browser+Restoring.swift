@@ -49,7 +49,7 @@ extension Browser {
         }
     }
 
-    /// Restores what still exists: a place gone since gives way to All Notes, or Favorites for a favorite, and
+    /// Restores what still exists: a place gone since gives way to All Items, or Favorites for a favorite, and
     /// items no longer in the list are dropped, leaving the top row selected if none remain.
     func restore(_ snapshot: Snapshot, in library: any ItemLibrary, order: NoteOrder) {
         set(layout: snapshot.viewMode)

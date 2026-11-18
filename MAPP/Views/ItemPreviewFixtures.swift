@@ -23,7 +23,7 @@ enum ItemPreviewFixtures {
             defaults: defaults)
     }
 
-    /// A project with a task and a note filed under it, and a task with a status its type does not declare.
+    /// A project with a task and an item filed under it, and a task with a status its type does not declare.
     /// The library reads its copy as it opens, so a preview shows the items a moment after it starts.
     @MainActor static var library: MarfaLibrary {
         MarfaLibrary(source: SampleLibrary.open(SampleLibrary.connection, items: rows, edges: edges, now: date), notices: Notices())

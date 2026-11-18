@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The actions for a set of notes, shared by the list's context menu and the menu bar: whether it is a favorite, then
+/// The actions for a set of items, shared by the list's context menu and the menu bar: whether it is a favorite, then
 /// what removes it. The More menu places the same two parts apart, with other commands between them.
 struct NoteActions: View {
     @CurrentLibrary private var library
@@ -20,7 +20,7 @@ struct NoteActions: View {
     }
 }
 
-/// How the actions on notes read in the menu that shows them.
+/// How the actions on items read in the menu that shows them.
 private struct NoteActionContext {
     /// Every selected item, files too: a command that suits only some of them leaves the rest alone and says so.
     /// Looked up once, since a selection can hold every item in the library.
@@ -117,7 +117,7 @@ struct NoteRemoveActions: View {
 
 extension ItemLibrary {
     /// Moves items to Recently Deleted once every open page has handed over what was just typed, since a deleted
-    /// note takes no edit. Every way of deleting comes through here. More than one item asks the person first, in
+    /// item takes no edit. Every way of deleting comes through here. More than one item asks the person first, in
     /// the window whose presentation it is given.
     func deleteAfterSaving(_ ids: Set<ItemID>, undoManager: UndoManager?, asking details: DetailsPresentation?) {
         EditorController.flushAll(leaving: false) { [self] kept in
