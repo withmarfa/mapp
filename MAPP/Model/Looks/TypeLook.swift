@@ -32,7 +32,7 @@ nonisolated enum LookPart: Hashable, Sendable {
     case parent
 }
 
-/// One thing on the bottom line, after the status. Later kinds MAPP builds (a count, a reading time) are new cases here.
+/// One value on the bottom line after the status.
 nonisolated enum LookFact: Hashable, Sendable {
     /// A field of the type: an option, a list of people, a number or a date.
     case field(String)

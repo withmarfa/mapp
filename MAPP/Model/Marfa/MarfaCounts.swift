@@ -1,12 +1,7 @@
 import Foundation
 import Marfa
 
-/// The one place MAPP uses the package's count call (`WorkingCopy.counts(of:_:)`), so a change to that call
-/// changes this file alone.
-///
-/// The copy answers where it can be sure, and the server answers what the copy cannot, a table it does not hold among
-/// it. Where neither can, the call throws `ItemCountUnavailable` and an id the answer leaves out has no answer, so a
-/// count is never made up as a zero.
+/// Maps MAPP's count queries to the working copy and leaves unanswered items out of the result.
 nonisolated struct MarfaCounts: Sendable {
     /// The package's call behind one closure, which a test answers.
     typealias Ask = @Sendable ([String], Counted) async throws -> [Marfa.ItemCount]

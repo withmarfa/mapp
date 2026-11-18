@@ -85,11 +85,11 @@ import Testing
         #expect(CountWording.help(of: .progress, answer: nil) == nil)
     }
 
-    @Test func aTablesRowsAreNamedAsTheTableIsAndOneRowSaysItInTheSingular() {
+    @Test func aRowCountKeepsTheTableName() {
         let many = ItemCountAnswer(total: 214, groups: nil)
         let one = ItemCountAnswer(total: 1, groups: nil)
         #expect(CountWording.text(of: .rows(table: "messages"), answer: many, hasStatus: false) == "214 messages")
-        #expect(CountWording.text(of: .rows(table: "messages"), answer: one, hasStatus: false) == "1 message")
+        #expect(CountWording.text(of: .rows(table: "entries"), answer: one, hasStatus: false) == "1 row in entries")
         #expect(CountWording.help(of: .rows(table: "messages"), answer: many) == nil)
     }
 
@@ -125,6 +125,7 @@ import Testing
         let looks = [project.type: Self.progress]
         _ = contents.contents(of: entries, in: library, looks: looks, list: Self.list)
         #expect(await eventually { library.counts.questions == 1 })
+        // Let the failed request finish before checking that the row still has no count.
         try await Task.sleep(for: .milliseconds(100))
         let row = try #require(contents.contents(of: entries, in: library, looks: looks, list: Self.list)[project.id])
         #expect(!row.chips.contains { if case .count = $0 { true } else { false } })

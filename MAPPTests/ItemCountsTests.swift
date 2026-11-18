@@ -111,6 +111,7 @@ import Testing
 
         counts.refresh(rowsOnly: true)
         #expect(await eventually { counts.questions == 3 })
+        // Allow a second batch to start if the table change also queued the child count.
         try? await Task.sleep(for: .milliseconds(300))
         #expect(counts.questions == 3)
 

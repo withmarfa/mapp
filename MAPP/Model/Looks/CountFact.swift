@@ -43,7 +43,4 @@ nonisolated enum CountFact: Hashable, Sendable {
             self = .rows(table: String(word.dropFirst(Self.rowsPrefix.count)))
         }
     }
-
-    /// The facts a type with a status offers beside its children's total.
-    static let ofChildren: [CountFact] = [.children, .progress]
 }

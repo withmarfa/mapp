@@ -20,7 +20,7 @@ A value component is one drawing for one kind of value. The same component appea
 
 Dates, numbers, web addresses and sources are plain text, not chips.
 
-A linked item is a fact like any other: a type's look may put its parent, its children or its collections on a row's bottom line, a board card or a table column, and a row never shows one the look does not ask for (see [Relation](composed-properties.md)). A count fact is one chip of plain text with a help tag, drawn in the same line and never blocking the row (see [Looks](looks.md)). Tags show only in a Note's (a Note look's `tags` fact; see [Looks](looks.md)). A chip is a little smaller in a row (20 points high with 11.5-point text) than on the page (22 points high with 13-point text).
+A linked item is a fact like any other: a type's look may put its parent, its children or its collections on a row's bottom line, a board card or a table column, and a row never shows one the look does not ask for (see [Relation](composed-properties.md)). A count appears as text when Marfa answers. Child counts and progress show a breakdown by status in the help tag. The Note preset includes the `tags` fact. See [Looks](looks.md). A chip is a little smaller in a row (20 points high with 11.5-point text) than on the page (22 points high with 13-point text).
 
 A tint means a type, so no other chip uses a colored fill. A person has no chip round the name and is never colored. Bare chips are not used.
 

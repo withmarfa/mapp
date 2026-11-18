@@ -1,8 +1,6 @@
 import Foundation
 
-/// What a count says, in words: the chip of a row or a card, the cell of a table and the help tag that splits a
-/// progress into what is finished and what is not. A count that has nothing to say, because Marfa has not answered or
-/// the answer is nothing to count, says nothing at all: never a zero, a dash or an old number.
+/// Labels and help tags shared by rows, cards, and table cells.
 nonisolated enum CountWording {
     /// The chip text, or nil where there is nothing to say. `hasStatus` is whether the item's own type has a status, whose
     /// children are then subtasks rather than items.
@@ -20,7 +18,8 @@ nonisolated enum CountWording {
             return String(localized: "\(groups.finished) of \(groups.withStatus) done")
         case .rows(let table):
             guard answer.total > 0 else { return nil }
-            return "\(answer.total) \(answer.total == 1 ? singular(of: table) : table)"
+            if answer.total == 1 { return String(localized: "1 row in \(table)") }
+            return String(localized: "look.count.tableRows", defaultValue: "\(answer.total) \(table)")
         }
     }
 
@@ -50,10 +49,5 @@ nonisolated enum CountWording {
         case .members: String(localized: "Items")
         case .rows(let table): table.prefix(1).uppercased() + table.dropFirst()
         }
-    }
-
-    /// A table's name as Marfa gives it is plural ("messages"); one row says it in the singular.
-    private static func singular(of table: String) -> String {
-        table.count > 1 && table.hasSuffix("s") ? String(table.dropLast()) : table
     }
 }
