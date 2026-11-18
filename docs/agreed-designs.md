@@ -43,7 +43,49 @@ This page lists what has been agreed for MAPP and is not in the app yet, so the 
 - A collection's icon is gray. A type's icon in a table is in the type's color, with no tile.
 - The chosen container shows in the right sidebar, with no buttons there. The table takes the window's width when the right sidebar is closed.
 - Deleting a collection asks with Apple's alert, then shows the toast with Undo.
-- Where Search and New Collection go is decided with the toolbar.
+- Search and View Options are in the toolbar, as on every screen. New Collection is on the page, at the trailing edge of the tabs.
+
+## Items as an index
+
+- Items is an index page like Collections and Sources: a table with no list column. Views and types keep the list column.
+- Items has the tabs All, Yours (the library tier) and From Apps (the feed tier), and New Item on the page at the trailing edge of the tabs.
+- The chosen item shows in the right sidebar, with Open.
+- Tabs and a New button on the page appear only on the three index pages: Items, Collections and Sources. A view or a type is split by the sidebar, its filters and saved views, and New is the sidebar's New and Command-N.
+
+## Opening an item
+
+- Return, a double-click and Open open an item the way Settings > Lists > Open Items In says: **Modal** (the default), **Full Page** or **New Window**.
+- A modal is a large page over the screen, which dims behind it. Its toolbar has full page, new window, Share, More and close.
+- A full page takes the window, with a plain Back button at the toolbar's leading edge. The button has no label.
+- An item can always open in a window of its own.
+- A row's context menu starts with Open, which follows the setting, then the other two ways (Open as Full Page, Open in New Window). Quick Look, Share, Add to Favorites, Tag, Add to Collection and Delete follow.
+
+## Views
+
+- Every place opens in a default view. A person can change the default view, but can't rename or delete it.
+- Save as View… makes a second view with a name. It is the last item of View Options, shown only when there is something to keep. It is never in the toolbar.
+
+## The toolbar and the bottom-right corner
+
+- The toolbar holds the same buttons on every screen: Search, View Options, View As, Share, More and the right sidebar. A screen hides a button that does not apply. No screen adds its own controls to the toolbar.
+- The page holds at most one main action, such as New Collection.
+- The bottom-right corner of the window holds only how a person views the screen, as glass buttons like the toolbar's, each on its own. A card the corner opens, such as the month or the formats, opens above the buttons, which stay. The card is solid.
+- The corner holds nothing that changes items, and it is empty when there is nothing to set. Every control in the corner and the toolbar is also a menu command.
+- What each screen's corner holds:
+  - **Calendar:** Today, back and forward, Week or Month, and a month button. The month opens above the buttons at their width, with this week marked in gray. Choosing a day goes to its week.
+  - **Note:** Aa, which opens the formats: the text style (Title, Heading, Subheading, Body) as a row; bold, italic, strikethrough, highlight, code and link; bulleted, numbered and checklist; quote, code block and table; then Standard or Full Width beside smaller, actual and larger text. Format leaves the toolbar; the Format menu stays.
+  - **Image:** one zoom control, 100% with a menu that holds Fit and sizes. Clicking 100% lets a person type a size.
+  - **PDF:** the page as "2 of 4" with arrows, the same zoom control, and full screen. Full screen hides the properties and puts the title in the toolbar.
+  - **Gallery:** the card size by name, such as Medium, with a menu.
+  - **Timeline:** Today.
+  - **An item's page with nothing to set:** nothing.
+
+## Menus and empty states
+
+- The menu bar holds every command the toolbar, the corner and the row menus offer. Go lists the types and saved views as well as the places. Help holds MAPP's own items.
+- An empty state has a title, at most one line under it, and one button when there is something to do.
+- Recently Deleted is a page in Settings only, not a sidebar place.
+- The corner's cards and the item's modal are solid. The palettes keep the material chosen in Settings > Appearance.
 
 ## Editing in place
 
@@ -66,8 +108,8 @@ This page lists what has been agreed for MAPP and is not in the app yet, so the 
 
 ## Still open
 
-- The toolbar's look, and what it holds in each place.
-- The corner at the bottom right of the window.
+- A cover picture on an item's page, and how Marfa would hold the choice of cover. It is parked.
+- How the corner's controls are drawn on pages for each kind of item, such as a newsletter at its own width.
 
 ## Related pages
 
