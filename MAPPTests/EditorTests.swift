@@ -114,6 +114,11 @@ struct EditorTests {
         content.addSubview(page.editor.webView)
         window.contentView = content
         window.makeKeyAndOrderFront(nil)
+        // A locked screen gives no window the keyboard, and the page then never paints an active selection. That says
+        // nothing of the app, so the test stops here, saying why, instead of waiting out `waitLimit` for a color.
+        if !(await eventually(within: .seconds(2)) { window.isKeyWindow }) {
+            try Test.cancel("The window did not become key, as when the screen is locked.")
+        }
         page.editor.focus()
         try await page.run("document.execCommand('selectAll')")
         let color = "getComputedStyle(document.querySelector('.ProseMirror'), '::highlight(inkkit-selection)').backgroundColor"
