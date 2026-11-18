@@ -28,9 +28,9 @@ A `TypeLook` has three places, and a view adds only its layout and density.
 
 `count:children` counts active children. `count:members` counts active collection members. `count:progress` shows the proportion of active children with a status that are completed or canceled, such as "3 of 7 done". `count:rows:<table>` counts an item's rows in the named table, such as "214 messages". A count with nothing to display leaves the fact blank. A count column starts hidden until a row has a value to display.
 
-A row or card requests its counts when it appears, and again each time it returns to view, even while another window still shows it. A board builds only the lanes in view, so a card in a lane off screen asks for nothing until the lane scrolls in. MAPP asks again for the counts on screen after every catch-up with the server, whatever the catch-up changed, and when it receives a change to an item or edge. MAPP can display the last answer while it waits for the next one.
+A row or card requests its counts when it appears, even if another window already shows it. A wide board loads lanes as you scroll. When the working copy reports a new sync time, MAPP requests fresh table row counts for the items on display. Changes to items or edges also refresh counts. MAPP can display the previous answer while it waits.
 
-A count column cannot be sorted. It has no sort control in the table's header and is not offered in Add Sort, and a sort stored on one is dropped. MAPP asks for the counts of the rows on screen only, so ordering every row by a count would rank a row Marfa has not answered for below a row it has.
+Count columns do not support sorting in the table header or in Add Sort. MAPP drops a stored count sort because rows the table has yet to display may have no answer.
 
 A type with a status field always shows its status first, so a status is never a fact. A place the type has no field for stays empty: a look never names a field its type lacks, and a chosen date field the type lacks is replaced by the preset's date, while a chosen part or fact it lacks is left out.
 

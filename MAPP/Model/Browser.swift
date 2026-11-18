@@ -553,7 +553,7 @@ final class Browser {
         let options: ItemTableOptions
         let choices: [TypeID: TypeLookChoice]
         let shownRelations: Set<Relation>
-        /// How many count answers have come, which the rows hold and sort by.
+        /// A changed or evicted answer invalidates the cached table rows.
         let counts: Int
     }
 

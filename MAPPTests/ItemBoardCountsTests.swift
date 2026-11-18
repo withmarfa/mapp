@@ -3,7 +3,7 @@ import SwiftUI
 import Testing
 @testable import MAPP
 
-/// A board mounts only the lanes in view, so the cards of lanes off screen ask for no count.
+/// A wide board requests counts for a subset of its cards on first display.
 @MainActor
 @Suite(.hangLimit) struct ItemBoardCountsTests {
     private static let lanes = 40
@@ -20,7 +20,7 @@ import Testing
         var body: some View { ItemBoard(browser: browser, pane: $pane) }
     }
 
-    @Test func aBoardOfFortyLanesAsksForTheCardsInViewAndNotTheRest() async throws {
+    @Test func aBoardOfFortyLanesRequestsCountsForASubsetOfItsCards() async throws {
         let words = (0..<Self.lanes).map { StatusWord(value: "stage-\($0)", group: .notStarted) }
         let spec = LookFixture.Spec(id: "test.card", fields: [LookFixture.field("stage", .status(words))])
         let catalogue = LookFixture.catalogue([spec], edgeTypes: LookFixture.relationEdges)
@@ -51,7 +51,7 @@ import Testing
         defer { window.performClose(nil); window.contentView = nil }
 
         try #require(await eventuallyAsking { await asked.ids.count > 0 })
-        // Nothing waits for the lanes to be laid out again, so this gives any offscreen lane the time to ask, if it is going to.
+        // Allow requests from the initial layout to arrive before checking the upper bound.
         try await Task.sleep(for: .milliseconds(500))
         let count = await asked.ids.count
         #expect(count > 0 && count <= 15 * Self.perLane, "asked for \(count) of \(items.count) cards")

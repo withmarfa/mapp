@@ -89,17 +89,14 @@ final class ItemCounts {
         return answers[Key(id: id, query: query)]
     }
 
-    /// Says the counts are wanted, as a view that shows them appears. Each is asked at once unless a question for it is
-    /// queued, since an answer held, whether another view still holds it or it was let go, may have changed meanwhile. Call
-    /// it from an action, never from drawing.
+    /// A returning view can have an old answer even when another view still holds it.
+    /// Call on appearance. Views that ask before the next batch share its answer.
     func want(_ ids: some Sequence<ItemID>, _ query: CountQuery) {
         var asking = false
         for id in ids {
             let key = Key(id: id, query: query)
             wanted[key, default: 0] += 1
             unheld.remove(key)
-            // A view returning while another still holds the count asks again too: the answer held may be old, and a
-            // count queued already is the one question that will cover both.
             if !queued.contains(key) {
                 enqueue(key)
                 asking = true
@@ -124,7 +121,7 @@ final class ItemCounts {
         if unheld.count > Self.kept {
             for key in unheld { answers[key] = nil }
             unheld = []
-            // A view that read one of these answers is drawn again without it, and a cache keyed on the revision is made again.
+            // Cached table rows can still contain an evicted answer.
             revision += 1
         }
     }

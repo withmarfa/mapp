@@ -77,7 +77,7 @@ struct ItemBoard: View {
         return ScrollViewReader { proxy in
             GeometryReader { geometry in
                 ScrollView(.horizontal) {
-                    // Lazy, so a lane off screen builds no card and asks for no count until it scrolls into view.
+                    // Mounting every lane would request counts across the whole board.
                     LazyHStack(alignment: .top, spacing: Self.laneGap) {
                         ForEach(lanes) { lane in
                             laneView(lane, lanes: lanes, key: key, grouped: grouped, ids: ids, contents: contents)

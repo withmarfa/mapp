@@ -59,7 +59,6 @@ nonisolated struct ItemTableColumn: Identifiable, Hashable, Sendable {
 
     enum Style: Hashable, Sendable {
         case title, status, priority, choice, date, number, boolean, link, text, duration
-        /// A count Marfa answered: a whole number to sort by, or a few words ("3 of 7 done").
         case count
         /// Several linked items, shown as their chips. Not a value to group or filter by.
         case links
@@ -255,8 +254,7 @@ nonisolated extension ItemTableColumn {
         }
     }
 
-    /// Whether the header and Add Sort offer the column. A count is asked for only the rows on screen, so ordering every row
-    /// by it would rank the rows Marfa has not answered for as if they had none.
+    /// Sorting by count would need answers for rows the table has yet to display.
     var isSortable: Bool {
         if case .count = content { false } else { true }
     }
@@ -625,8 +623,7 @@ nonisolated enum ItemTableLayout {
     /// place that keeps its own order, as a collection does, starts unsorted, so its rows stay in the order given.
     static func sort(_ options: ItemTableOptions, columns: [ItemTableColumn], keepsGivenOrder: Bool = false) -> [ItemTableComparator] {
         if let sort = options.sort {
-            // A column the place no longer has is dropped, as is one that cannot be sorted, such as a count; its stored
-            // copy may also be out of date.
+            // Resolve stored sort keys against the columns the place offers now.
             let fresh = sort.compactMap { comparator in
                 columns.first { $0.id == comparator.column.id && $0.isSortable }.map { ItemTableComparator(column: $0, order: comparator.order) }
             }
