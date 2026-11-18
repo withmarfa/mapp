@@ -45,7 +45,7 @@ enum SavedViews {
 
     /// What the window shows in the layout it shows it in, with that layout's own order and grouping, so a new
     /// view keeps what the person sees.
-    static func window(_ browser: Browser, in library: any ItemLibrary, order: NoteOrder) -> ViewDraft.Window {
+    static func window(_ browser: Browser, in library: any ItemLibrary, order: ItemOrder) -> ViewDraft.Window {
         var window = window(browser, in: library)
         window.layout = layout(of: browser, in: library, order: order)
         return window
@@ -53,7 +53,7 @@ enum SavedViews {
 
     /// The layout the window shows. Without the list's order, which only a new view takes, a list or a gallery is
     /// read as the table is.
-    private static func layout(of browser: Browser, in library: any ItemLibrary, order: NoteOrder?) -> ViewDraft.Layout {
+    private static func layout(of browser: Browser, in library: any ItemLibrary, order: ItemOrder?) -> ViewDraft.Layout {
         switch browser.viewMode {
         case .table:
             return .table
@@ -111,7 +111,7 @@ enum SavedViews {
     }
 
     /// The order and grouping the layout beside the panel really uses, which the panel shows and the window's
-    /// choices become a view's from. The list and the gallery order and group by date (`NoteOrder`) unless the
+    /// choices become a view's from. The list and the gallery order and group by date (`ItemOrder`) unless the
     /// person or the view arranged them; the table, the board and the timeline use the table's own sort and grouping.
     struct Arrangement {
         var sort: [ItemTableComparator]
@@ -127,7 +127,7 @@ enum SavedViews {
         return browser.listShape?.arranged == true
     }
 
-    static func arrangement(_ browser: Browser, content: ItemTableContent, order: NoteOrder) -> Arrangement {
+    static func arrangement(_ browser: Browser, content: ItemTableContent, order: ItemOrder) -> Arrangement {
         guard !isArranged(browser) else {
             var grouping: ShownGrouping = content.grouping.map { .column($0.id) } ?? .none
             // The table groups by status on its own; an arranged list or gallery groups only by a column asked for.
@@ -140,7 +140,7 @@ enum SavedViews {
     }
 
     /// What the list shows while nothing arranges it: its own order, in sections by date where it has them.
-    static func datedArrangement(_ order: NoteOrder) -> Arrangement {
+    static func datedArrangement(_ order: ItemOrder) -> Arrangement {
         let column: ItemTableColumn = switch order.sort {
         case .dateEdited: .edited
         case .dateCreated: .created

@@ -97,7 +97,7 @@ nonisolated enum SearchScope: Hashable, Sendable {
     static func narrows(_ place: SidebarItem) -> Bool {
         switch place {
         case .inbox, .favorites, .itemType, .collection, .source, .files, .view: true
-        case .allNotes, .recents, .recentlyDeleted, .sources, .collections, .favoriteItem: false
+        case .allItems, .recents, .recentlyDeleted, .sources, .collections, .favoriteItem: false
         }
     }
 }

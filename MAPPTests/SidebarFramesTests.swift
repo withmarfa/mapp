@@ -78,7 +78,7 @@ struct SidebarFramesTests {
         try await move("list place") { browser.sidebarItem = .itemType("aic.decision") }
         try await move("list to gallery") { browser.viewMode = .gallery }
         try await move("gallery to index") { browser.sidebarItem = .sources }
-        try await move("index to gallery") { browser.sidebarItem = .allNotes }
+        try await move("index to gallery") { browser.sidebarItem = .allItems }
         try await move("gallery to list") { browser.viewMode = .list }
         try await move("list to settings") { browser.showSettings() }
         try await move("settings to list") { browser.leaveSettings() }

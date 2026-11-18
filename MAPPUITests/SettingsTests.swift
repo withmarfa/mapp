@@ -7,7 +7,7 @@ import XCTest
 final class SettingsTests: XCTestCase {
     private var app: XCUIApplication!
     private var window: XCUIElement { app.windows.firstMatch }
-    private var list: XCUIElement { window.outlines["NoteList"] }
+    private var list: XCUIElement { window.outlines["ItemList"] }
     private var sidebar: XCUIElement { window.outlines["Sidebar"] }
     /// Settings' pages, which take the list's column while Settings is the place.
     private var settings: XCUIElement { element("SettingsPageList") }
@@ -51,8 +51,8 @@ final class SettingsTests: XCTestCase {
         XCTAssertFalse(element("MoreToolbar").exists, "item commands are hidden in settings")
         attachScreenshot("SettingsAppearance")
         XCTAssertTrue(element("SettingsDetail").exists)
-        XCTAssertTrue(window.popUpButtons["NoteSort"].exists, "the real list preferences are available")
-        XCTAssertEqual(window.popUpButtons["NoteSort"].label, "Sort by")
+        XCTAssertTrue(window.popUpButtons["ItemSort"].exists, "the real list preferences are available")
+        XCTAssertEqual(window.popUpButtons["ItemSort"].label, "Sort by")
 
         leaveSettings()
         XCTAssertTrue(list.waitForExistence(timeout: 3))
@@ -230,9 +230,9 @@ final class SettingsTests: XCTestCase {
         XCTAssertTrue(size.waitForExistence(timeout: 3))
         XCTAssertEqual(size.value as? String, "18 pt", "the setting is retained on returning")
         element("SettingsPage-editor").click()
-        let noteSize = window.popUpButtons["TextSize"]
-        XCTAssertTrue(noteSize.waitForExistence(timeout: 3))
-        XCTAssertEqual(noteSize.value as? String, "13 pt", "the item's own text setting stays independent")
+        let pageSize = window.popUpButtons["TextSize"]
+        XCTAssertTrue(pageSize.waitForExistence(timeout: 3))
+        XCTAssertEqual(pageSize.value as? String, "13 pt", "the item's own text setting stays independent")
         attachScreenshot("SeparateEditorTextSize")
         app.terminate()
         app.launchArguments += ["-MAPPKeepSampleSettings"]

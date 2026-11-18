@@ -9,7 +9,7 @@ import WebKit
 extension EditorTests {
     // MARK: Items the page links to
 
-    private func addNotes(_ titles: [String], to page: Page) -> [ItemID] {
+    private func addItems(_ titles: [String], to page: Page) -> [ItemID] {
         titles.map { page.library.add($0 + "\n").id }
     }
 
@@ -20,7 +20,7 @@ extension EditorTests {
 
     @Test func theItemsAreOfferedAfterDoubleBracketsFromTheLibrary() async throws {
         let page = try await Page()
-        _ = addNotes(["Garden ideas", "Bike service", "Gardening tools"], to: page)
+        _ = addItems(["Garden ideas", "Bike service", "Gardening tools"], to: page)
         try await page.load("Intro\n")
         let names = try await ask(page, "{ type: 'suggest', query: 'gard' }") as? [String]
         #expect(Set(names ?? []) == ["Garden ideas", "Gardening tools"])
@@ -31,9 +31,9 @@ extension EditorTests {
 
     @Test func aLinkTheCoreReadsAsTwoDoesNotDropTheMarksOfTheItemsOtherLinks() async throws {
         let page = try await Page()
-        _ = addNotes(["Plan"], to: page)
+        _ = addItems(["Plan"], to: page)
         try await page.load("Intro\n")
-        let note = try #require(page.editor.noteID)
+        let note = try #require(page.editor.pageItemID)
         // Inkkit read `[[Plan\]] and [[B]]` as one link with an escape; the core finds two in the text it is posted.
         let links = "[{ raw: \(json("[[Plan\\]] and [[B]]")) }, { raw: \(json("[[Plan]]")) }, { raw: \(json("[[Nowhere]]")) }]"
         let answer = try await resolve(page, note, links)
@@ -60,10 +60,10 @@ extension EditorTests {
 
     @Test func aLinkAnswerNamesTheTypeIconAndToneOfTheItemItBinds() async throws {
         let page = try await Page()
-        let ids = addNotes(["Plan", "Errands", "Chores"], to: page)
+        let ids = addItems(["Plan", "Errands", "Chores"], to: page)
         for id in ids.dropFirst() { page.library.items[page.library.items.firstIndex { $0.id == id }!].type = TypeID("core.task") }
         try await page.load("Intro\n")
-        let note = try #require(page.editor.noteID)
+        let note = try #require(page.editor.pageItemID)
         let icon = TypeIconKey.value(for: "lucide:list-checks")
         let answer = try await resolve(page, note, raw("[[Plan]]", "[[Errands]]", "[[Chores]]", "[[Nowhere]]"))
         #expect(answer.links.map(\.missing) == [false, false, false, true])
@@ -78,11 +78,11 @@ extension EditorTests {
 
     @Test func aLinkToAnAmbiguousUnresolvedOrBinnedItemNamesNoType() async throws {
         let page = try await Page()
-        let twins = addNotes(["Twin", "Twin", "Gone"], to: page)
+        let twins = addItems(["Twin", "Twin", "Gone"], to: page)
         let gone = try #require(page.library.items.firstIndex { $0.id == twins[2] })
         page.library.items[gone].state = .trashed
         try await page.load("Intro\n")
-        let note = try #require(page.editor.noteID)
+        let note = try #require(page.editor.pageItemID)
         let answer = try await resolve(page, note, raw("[[Twin]]", "[[Gone]]"))
         #expect(answer.links[0].missing == false && answer.links[0].tone == TypeTone.neutral.rawValue, "two items answer to it, so it takes the neutral mark")
         #expect(answer.links[0].icon != nil, "its mark is what says it is a link where the underline waits for the pointer")
@@ -91,12 +91,12 @@ extension EditorTests {
     }
 
     @Test func anIconThatCannotBeDrawnLeavesTheToneAndAnswersEveryLink() async throws {
-        let requests = NoteRequests()
+        let requests = ItemRequests()
         requests.readings = { links, _ in
             links.map { _ in LinkReading(missing: false, type: .init(icon: "lucide:list-checks", tone: .teal)) }
         }
         requests.drawIcon = { _ in nil }
-        let links = [NoteLink(linkText: "[[A]]"), nil, NoteLink(linkText: "[[B]]")]
+        let links = [ItemLink(linkText: "[[A]]"), nil, ItemLink(linkText: "[[B]]")]
         let reply = await requests.answerLinks(links, in: ItemID("n"))
         #expect(reply.links.map(\.tone) == ["teal", TypeTone.neutral.rawValue, "teal"])
         #expect(reply.links.allSatisfy { $0.icon == nil } && reply.icons.isEmpty)
@@ -107,12 +107,12 @@ extension EditorTests {
 
     @Test func linkToItemWaitsForTheChoiceAndAnswersWithTheLink() async throws {
         let page = try await Page()
-        let ids = addNotes(["Garden ideas"], to: page)
+        let ids = addItems(["Garden ideas"], to: page)
         try await page.load("Intro\n")
-        let current = try #require(page.editor.noteID)
+        let current = try #require(page.editor.pageItemID)
         try await page.run("window.pick = window.webkit.messageHandlers.notes.postMessage({ type: 'pick', item: '\(current.rawValue)' })")
         try await page.wait { page.editor.linkRequest != nil }
-        #expect(page.editor.linkRequest?.note == current)
+        #expect(page.editor.linkRequest?.itemID == current)
         await page.editor.finishLinkRequest(choosing: ids[0])
         #expect(page.editor.linkRequest == nil)
         let link = try await page.editor.webView.callAsyncJavaScript("return await window.pick", arguments: [:], in: nil, contentWorld: .page)
@@ -121,9 +121,9 @@ extension EditorTests {
 
     @Test func linkToItemDeclinedClosedOrAskedFromAnotherItemAnswersWithNothing() async throws {
         let page = try await Page()
-        let ids = addNotes(["Garden ideas"], to: page)
+        let ids = addItems(["Garden ideas"], to: page)
         try await page.load("Intro\n")
-        let current = try #require(page.editor.noteID)
+        let current = try #require(page.editor.pageItemID)
         func ask(from item: ItemID) async throws {
             try await page.run("window.pick = window.webkit.messageHandlers.notes.postMessage({ type: 'pick', item: '\(item.rawValue)' })")
         }
@@ -148,7 +148,7 @@ extension EditorTests {
         #expect(page.editor.linkRequest == nil, "a command typed in an item no longer shown opens nothing")
 
         let editor = page.editor
-        try await ask(from: try #require(editor.noteID))
+        try await ask(from: try #require(editor.pageItemID))
         try await page.wait { editor.linkRequest != nil }
         editor.windowWent()
         #expect(try await answered(), "closing the window answers the page with nothing")
@@ -158,7 +158,7 @@ extension EditorTests {
         let page = try await Page()
         try await page.load("\n")
         let labels = try await page.editor.webView.evaluateJavaScript("window.mappLabels") as? [String: String]
-        #expect(labels?["linkToNote"] == "Link to Item")
+        #expect(labels?["linkToItem"] == "Link to Item")
         #expect(labels?["slashTable"] == "Table")
         #expect(labels?["suggestionsLoading"] == "Loading…")
         #expect(labels?["suggestionsEmpty"] == "No Results")
@@ -195,7 +195,7 @@ extension EditorTests {
     // MARK: Link to Item keeps which item was chosen
 
     private func pending(_ page: Page) async throws -> ItemID {
-        let current = try #require(page.editor.noteID)
+        let current = try #require(page.editor.pageItemID)
         try await page.run("window.pick = window.webkit.messageHandlers.notes.postMessage({ type: 'pick', item: '\(current.rawValue)' })")
         try await page.wait { page.editor.linkRequest != nil }
         return current
@@ -245,9 +245,9 @@ extension EditorTests {
         page.library.add("Garden\n")
         try await page.load("Intro\n")
         let library = page.library
-        let index = NoteLinks.Index()
+        let index = ItemLinks.Index()
         for query in ["", "1111", "gar", "oth"] {
-            for name in await library.noteNames(matching: query, using: index) {
+            for name in await library.itemNames(matching: query, using: index) {
                 let owner = try #require(library.items.first { $0.title == name }, "\(name)")
                 #expect(!name.isEmpty)
                 #expect(await bound("[[\(name)]]", in: library) == owner.id, "suggesting \(name) for \(query)")
@@ -283,7 +283,7 @@ extension EditorTests {
         try await page.load("Intro\n")
         let editor = page.editor
         editor.windowWent()
-        let current = try #require(editor.noteID)
+        let current = try #require(editor.pageItemID)
         try await page.run("window.pick = window.webkit.messageHandlers.notes.postMessage({ type: 'pick', item: '\(current.rawValue)' })")
         #expect(try await answer(page) == nil)
         #expect(editor.linkRequest == nil)

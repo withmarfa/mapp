@@ -100,7 +100,7 @@ struct SidebarFolding {
     let library: any ItemLibrary
     let libraries: Libraries
     let browser: Browser
-    let order: NoteOrder
+    let order: ItemOrder
     /// The plan the list was drawn from, so a fold or a key works on the rows the person sees.
     let plan: SidebarPlan
 

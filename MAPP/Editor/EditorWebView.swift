@@ -174,12 +174,12 @@ final class EditorWebView: WKWebView {
     }
 
     @objc private func changeType(_ sender: NSMenuItem) {
-        guard let controller, let id = controller.noteID else { return }
+        guard let controller, let id = controller.pageItemID else { return }
         controller.titleDrafts?.typeChange = TypeChangeRequest(ids: [id], undoManager: windowUndoManager)
     }
 
     @objc private func versionHistory(_ sender: NSMenuItem) {
-        guard let controller, let id = controller.noteID, let library = controller.library else { return }
+        guard let controller, let id = controller.pageItemID, let library = controller.library else { return }
         controller.titleDrafts?.showHistory(of: id, in: library)
     }
 
@@ -189,7 +189,7 @@ final class EditorWebView: WKWebView {
 
     /// Customize Layout, as the Item menu words it, for the page's own rows.
     private var customizeLayoutItem: NSMenuItem? {
-        guard let controller, let id = controller.noteID, let details = controller.titleDrafts, let library = controller.library,
+        guard let controller, let id = controller.pageItemID, let details = controller.titleDrafts, let library = controller.library,
               details.isCustomizingLayout || details.canBeginLayout(for: library.item(id))
         else { return nil }
         let title = details.isCustomizingLayout ? String(localized: "Finish Customizing") : String(localized: "Customize Layout…")
@@ -200,7 +200,7 @@ final class EditorWebView: WKWebView {
 
     /// Version History, for the item on the page, from the window the editor belongs to.
     private var versionHistoryItem: NSMenuItem? {
-        guard let controller, controller.noteID != nil, controller.titleDrafts != nil else { return nil }
+        guard let controller, controller.pageItemID != nil, controller.titleDrafts != nil else { return nil }
         let item = NSMenuItem(title: String(localized: "Version History…"), action: #selector(versionHistory(_:)), keyEquivalent: "")
         item.target = self
         return item
@@ -208,7 +208,7 @@ final class EditorWebView: WKWebView {
 
     /// Change Type, for the item on the page, from the window the editor belongs to.
     private var changeTypeItem: NSMenuItem? {
-        guard let controller, let id = controller.noteID, controller.titleDrafts != nil, let library = controller.library,
+        guard let controller, let id = controller.pageItemID, controller.titleDrafts != nil, let library = controller.library,
               library.offersTypeChange(for: [id])
         else { return nil }
         let item = NSMenuItem(title: String(localized: "Change Type…"), action: #selector(changeType(_:)), keyEquivalent: "")

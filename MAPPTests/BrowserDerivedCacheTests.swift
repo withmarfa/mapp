@@ -15,9 +15,9 @@ struct BrowserDerivedCacheTests {
     @Test func theSectionsOfAnUnchangedPlaceListNothingTheSecondTime() {
         let library = library()
         let browser = Browser()
-        let first = browser.sections(in: library, order: NoteOrder(), now: date)
+        let first = browser.sections(in: library, order: ItemOrder(), now: date)
         let reads = library.placeReads
-        let second = browser.sections(in: library, order: NoteOrder(), now: date)
+        let second = browser.sections(in: library, order: ItemOrder(), now: date)
         #expect(library.placeReads == reads)
         #expect(second.map { $0.items.map(\.id) } == first.map { $0.items.map(\.id) })
     }
@@ -25,9 +25,9 @@ struct BrowserDerivedCacheTests {
     @Test func anEditToAnItemMakesTheSectionsAgain() {
         let library = library()
         let browser = Browser()
-        _ = browser.sections(in: library, order: NoteOrder(), now: date)
+        _ = browser.sections(in: library, order: ItemOrder(), now: date)
         library.items[0].title = "Renamed"
-        let titles = browser.sections(in: library, order: NoteOrder(), now: date).flatMap { $0.items.map(\.title) }
+        let titles = browser.sections(in: library, order: ItemOrder(), now: date).flatMap { $0.items.map(\.title) }
         #expect(titles.contains("Renamed"))
     }
 
@@ -43,25 +43,25 @@ struct BrowserDerivedCacheTests {
     @Test func theFilteredSectionsAreKeptAndKeyOnTheFilters() {
         let library = library()
         let browser = Browser()
-        let before = browser.sections(in: library, order: NoteOrder(), now: date).flatMap { $0.items.map(\.id) }
+        let before = browser.sections(in: library, order: ItemOrder(), now: date).flatMap { $0.items.map(\.id) }
         #expect(before.count == 5)
-        browser.tableOptions[.allNotes] = ItemTableOptions(filters: ["title": ["Note 1"]])
-        let filtered = browser.sections(in: library, order: NoteOrder(), now: date).flatMap { $0.items.map(\.id) }
+        browser.tableOptions[.allItems] = ItemTableOptions(filters: ["title": ["Note 1"]])
+        let filtered = browser.sections(in: library, order: ItemOrder(), now: date).flatMap { $0.items.map(\.id) }
         #expect(filtered.count < before.count)
         let reads = library.placeReads
-        _ = browser.sections(in: library, order: NoteOrder(), now: date)
+        _ = browser.sections(in: library, order: ItemOrder(), now: date)
         #expect(library.placeReads == reads)
-        browser.tableOptions[.allNotes] = nil
-        #expect(browser.sections(in: library, order: NoteOrder(), now: date).flatMap { $0.items.map(\.id) } == before)
+        browser.tableOptions[.allItems] = nil
+        #expect(browser.sections(in: library, order: ItemOrder(), now: date).flatMap { $0.items.map(\.id) } == before)
     }
 
     @Test func anUnfilteredPlaceBuildsNoTableForTheList() {
         let library = library()
         let browser = Browser()
-        _ = browser.sections(in: library, order: NoteOrder(), now: date)
+        _ = browser.sections(in: library, order: ItemOrder(), now: date)
         #expect(!browser.holdsTableContent)
-        browser.tableOptions[.allNotes] = ItemTableOptions(sort: [ItemTableComparator(column: .title)])
-        _ = browser.sections(in: library, order: NoteOrder(), now: date)
+        browser.tableOptions[.allItems] = ItemTableOptions(sort: [ItemTableComparator(column: .title)])
+        _ = browser.sections(in: library, order: ItemOrder(), now: date)
         #expect(browser.holdsTableContent)
     }
 
@@ -88,53 +88,53 @@ struct BrowserDerivedCacheTests {
         let browser = Browser()
         // The table groups this place by status on its own.
         #expect(browser.tableContent(in: library).grouping != nil)
-        browser.tableOptions[.allNotes] = ItemTableOptions(sort: [ItemTableComparator(column: .title, order: .reverse)])
-        let sections = browser.sections(in: library, order: NoteOrder(), now: date)
+        browser.tableOptions[.allItems] = ItemTableOptions(sort: [ItemTableComparator(column: .title, order: .reverse)])
+        let sections = browser.sections(in: library, order: ItemOrder(), now: date)
         #expect(sections.count == 1)
         #expect(sections.first?.group == nil)
         #expect(sections.flatMap { $0.items.map(\.title) } == ["Task 2", "Task 1", "Task 0"])
         // A grouping the person chose still groups.
-        browser.tableOptions[.allNotes]?.grouping = .column("field.status")
-        #expect(browser.sections(in: library, order: NoteOrder(), now: date).count == 2)
+        browser.tableOptions[.allItems]?.grouping = .column("field.status")
+        #expect(browser.sections(in: library, order: ItemOrder(), now: date).count == 2)
     }
 
     @Test func aNewViewFromASortedListKeepsNoGroupingTheListDoesNotShow() {
         let library = tasks()
         let browser = Browser()
-        browser.tableOptions[.allNotes] = ItemTableOptions(sort: [ItemTableComparator(column: .title)])
+        browser.tableOptions[.allItems] = ItemTableOptions(sort: [ItemTableComparator(column: .title)])
         browser.viewMode = .table
-        #expect(SavedViews.window(browser, in: library, order: NoteOrder()).grouping != nil)
+        #expect(SavedViews.window(browser, in: library, order: ItemOrder()).grouping != nil)
         for mode in [ItemViewMode.list, .gallery] {
             browser.viewMode = mode
-            #expect(SavedViews.window(browser, in: library, order: NoteOrder()).grouping == nil, "\(mode) kept the table's grouping")
+            #expect(SavedViews.window(browser, in: library, order: ItemOrder()).grouping == nil, "\(mode) kept the table's grouping")
         }
-        browser.tableOptions[.allNotes]?.grouping = .column("field.status")
+        browser.tableOptions[.allItems]?.grouping = .column("field.status")
         browser.viewMode = .list
-        #expect(SavedViews.window(browser, in: library, order: NoteOrder()).grouping != nil)
+        #expect(SavedViews.window(browser, in: library, order: ItemOrder()).grouping != nil)
     }
 
     @Test func aNegationOnAColumnWithNoFilterMakesNeitherTheTableNorTheSectionsAgain() {
         let library = library()
         let browser = Browser()
-        browser.tableOptions[.allNotes] = ItemTableOptions(sort: [ItemTableComparator(column: .title)])
+        browser.tableOptions[.allItems] = ItemTableOptions(sort: [ItemTableComparator(column: .title)])
         let table = browser.tableContent(in: library)
-        let sections = browser.sections(in: library, order: NoteOrder(), now: date)
+        let sections = browser.sections(in: library, order: ItemOrder(), now: date)
         // Is Not on a column that holds no values changes nothing the rows depend on.
-        browser.tableOptions[.allNotes]?.negated = ["field.status"]
+        browser.tableOptions[.allItems]?.negated = ["field.status"]
         #expect(browser.tableContent(in: library) === table)
         let reads = library.placeReads
-        _ = browser.sections(in: library, order: NoteOrder(), now: date)
+        _ = browser.sections(in: library, order: ItemOrder(), now: date)
         #expect(library.placeReads == reads)
-        #expect(browser.sections(in: library, order: NoteOrder(), now: date).map { $0.items.map(\.id) } == sections.map { $0.items.map(\.id) })
+        #expect(browser.sections(in: library, order: ItemOrder(), now: date).map { $0.items.map(\.id) } == sections.map { $0.items.map(\.id) })
     }
 
     @Test func aSearchKeepsKeyingOnWhatItFinds() {
         let library = library()
         let browser = Browser()
         browser.searchText = "Note 1"
-        let one = browser.sections(in: library, order: NoteOrder(), now: date).flatMap { $0.items.map(\.title) }
+        let one = browser.sections(in: library, order: ItemOrder(), now: date).flatMap { $0.items.map(\.title) }
         browser.searchText = "Note 2"
-        let two = browser.sections(in: library, order: NoteOrder(), now: date).flatMap { $0.items.map(\.title) }
+        let two = browser.sections(in: library, order: ItemOrder(), now: date).flatMap { $0.items.map(\.title) }
         #expect(one == ["Note 1"])
         #expect(two == ["Note 2"])
     }
@@ -144,10 +144,10 @@ struct BrowserDerivedCacheTests {
         let view = LibraryView(id: .mint(), title: "Some")
         library.views = [view]
         let browser = Browser()
-        browser.show(.view(view.id), in: library, order: NoteOrder())
-        #expect(browser.sections(in: library, order: NoteOrder(), now: date).isEmpty)
+        browser.show(.view(view.id), in: library, order: ItemOrder())
+        #expect(browser.sections(in: library, order: ItemOrder(), now: date).isEmpty)
         library.viewMembers[view.id] = [library.items[0].id]
-        let titles = browser.sections(in: library, order: NoteOrder(), now: date).flatMap { $0.items.map(\.title) }
+        let titles = browser.sections(in: library, order: ItemOrder(), now: date).flatMap { $0.items.map(\.title) }
         #expect(titles == ["Note 1"])
     }
 
@@ -187,7 +187,7 @@ struct PlaceFallbackTests {
         let browser = Browser()
         browser.sidebarItem = .itemType("core.note")
         library.items = []
-        #expect(browser.placeFallback(in: library) == .allNotes)
+        #expect(browser.placeFallback(in: library) == .allItems)
         #expect(browser.sidebarItem == .itemType("core.note"))
     }
 
@@ -198,7 +198,7 @@ struct PlaceFallbackTests {
         browser.sidebarItem = .collection(collection.id)
         #expect(browser.placeFallback(in: library) == nil)
         library.items[0].state = .trashed
-        #expect(browser.placeFallback(in: library) == .allNotes)
+        #expect(browser.placeFallback(in: library) == .allItems)
     }
 
     @Test func aFavoriteThatIsNoLongerOneFallsBackToFavorites() {
@@ -218,7 +218,7 @@ struct PlaceFallbackTests {
         browser.sidebarItem = .view(view.id)
         #expect(browser.placeFallback(in: library) == nil)
         library.views = []
-        #expect(browser.placeFallback(in: library) == .allNotes)
+        #expect(browser.placeFallback(in: library) == .allItems)
     }
 
     @Test func nothingFallsBackBeforeTheLibraryIsRead() {
@@ -242,15 +242,15 @@ struct PlaceFallbackTests {
         source.send(.removed([LibraryFixture.en1]))
         try #require(await eventually { library.isGone(LibraryFixture.en1) })
         #expect(told.isSet)
-        #expect(browser.placeFallback(in: library) == .allNotes)
+        #expect(browser.placeFallback(in: library) == .allItems)
     }
 
     @Test func movingOnFromAGonePlaceShowsAllItems() {
         let library = FakeItemLibrary(items: [], now: date)
         let browser = Browser()
         browser.sidebarItem = .itemType("core.note")
-        browser.placeRemoved(in: library, order: NoteOrder())
-        #expect(browser.item == .allNotes)
+        browser.placeRemoved(in: library, order: ItemOrder())
+        #expect(browser.item == .allItems)
     }
 }
 

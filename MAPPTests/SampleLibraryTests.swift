@@ -38,7 +38,7 @@ import Testing
         let (library, source) = try await Self.loaded()
         let id = try #require(library.createItem(
             typeID: "core.note", title: "Call the plumber", body: "Ask about the leak under the sink.", parentID: nil,
-            in: .allNotes, undoManager: nil))
+            in: .allItems, undoManager: nil))
         let read = ItemBody(id: id, text: "Ask about the leak under the sink.", version: ItemVersion(0))
         await source.flush()
         try #require(await eventually {
@@ -98,7 +98,7 @@ import Testing
     @Test func aViewMadeOnTheSampleListsItsItems() async throws {
         let (library, _) = try await Self.loaded()
         #expect(library.views.map(\.title).sorted() == ["Recent Notes", "Tasks by Priority"])
-        let notes = Set(library.items(in: .allNotes).filter { $0.type == TypeID("core.note") }.map(\.id))
+        let notes = Set(library.items(in: .allItems).filter { $0.type == TypeID("core.note") }.map(\.id))
         let made = try #require(await library.createView(LibraryViewSettings(
             title: "Only Notes",
             query: LibraryViewQuery(types: [TypeID("core.note")], states: [.active]),

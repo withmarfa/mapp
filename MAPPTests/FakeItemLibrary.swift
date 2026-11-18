@@ -15,7 +15,7 @@ final class FakeItemLibrary: ItemLibrary {
     var bodies: [ItemID: String]
     var isLoaded = true
     let notices = Notices()
-    var notesToPurge: Set<ItemID> = []
+    var itemsToPurge: Set<ItemID> = []
     var catalogue = FakeItemLibrary.testCatalogue { didSet { contentRevision += 1; membershipRevision += 1 } }
     var views: [LibraryView] = []
     /// What each view lists, by view.
@@ -144,7 +144,7 @@ final class FakeItemLibrary: ItemLibrary {
         return items.filter { item in
             switch place {
             case .inbox: item.state == .active && item.tier == .feed
-            case .allNotes: item.state == .active
+            case .allItems: item.state == .active
             case .sources, .collections: false
             case .source(let name): item.state == .active && item.source == name
             case .recents: false
@@ -260,7 +260,7 @@ final class FakeItemLibrary: ItemLibrary {
     /// An embed the core does not take for a file, such as one of a note, is not `bound`.
     @discardableResult
     func bindEmbed(
-        _ text: String, in note: ItemID, file: URL? = nil, resolution: NoteReferenceResolution = .missing, bound: Bool = true
+        _ text: String, in note: ItemID, file: URL? = nil, resolution: ReferenceResolution = .missing, bound: Bool = true
     ) -> ItemID? {
         if bodies[note]?.contains(text) != true { bodies[note, default: ""] += text + "\n" }
         var binding = resolution
@@ -522,7 +522,7 @@ final class FakeItemLibrary: ItemLibrary {
 
     func deletePermanently(_ ids: Set<ItemID>) {
         items.removeAll { ids.contains($0.id) && $0.state == .trashed }
-        notesToPurge.subtract(ids)
+        itemsToPurge.subtract(ids)
     }
 
     func attach(_ files: [(name: String, data: Data)], to id: ItemID) async -> AttachReport {

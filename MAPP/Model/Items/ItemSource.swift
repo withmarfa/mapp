@@ -94,9 +94,9 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     /// What the core says of moving one end of the edge `edge` to `to`, which it judges as a move: an end that holds
     /// the one link of its type may be given another, which a new link to it would not be.
     func edgeVerdict(moving edge: EdgeID, end: EdgeTypeInfo.End, to: ItemID) async -> EdgeVerdict
-    /// What the copy says each link target names (`Items.linkCandidates`), read as a link in `note`'s text when
+    /// What the copy says each link target names (`Items.linkCandidates`), read as a link in `itemID`'s text when
     /// given. Throws for an item the copy does not hold.
-    func linkAnswers(of targets: [String], in note: ItemID?) async throws -> [LinkAnswer]
+    func linkAnswers(of targets: [String], in itemID: ItemID?) async throws -> [LinkAnswer]
     func fileURL(of item: ItemID) async throws -> URL
     /// The items the view lists that the copy holds, in the view's order. Throws where the copy cannot answer the
     /// view, such as one whose filter needs links the copy does not hold whole.

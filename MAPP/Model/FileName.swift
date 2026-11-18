@@ -1,7 +1,7 @@
 import Foundation
 
 /// Names for the files MAPP saves or attaches.
-nonisolated enum NoteText {
+nonisolated enum FileName {
     /// A name as a file can take it: characters no file name can hold replaced, leading dots dropped, which
     /// would hide the file, and short enough for any file system. The one place a name is made safe, for a file
     /// the person saves or attaches.

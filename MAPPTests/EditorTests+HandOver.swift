@@ -43,7 +43,7 @@ extension EditorTests {
         }
         #expect(kept)
         #expect(library.notices.waiting.isEmpty, "the first item's text was kept, so nothing is told")
-        #expect(page.editor.noteID == second.id)
+        #expect(page.editor.pageItemID == second.id)
         #expect(library.body(of: first.id)?.text == "First, typed\n")
     }
 
@@ -64,13 +64,13 @@ extension EditorTests {
         // Time for the held page to be asked again more than once.
         try await Task.sleep(for: .milliseconds(300))
         #expect(kept == nil, "the flush waits while the hand-over is held")
-        #expect(page.editor.noteID == first.id)
+        #expect(page.editor.pageItemID == first.id)
 
         try await page.run("window.held = false")
         try await page.wait { kept != nil }
         #expect(kept == true)
         #expect(library.notices.waiting.isEmpty)
-        #expect(page.editor.noteID == second.id)
+        #expect(page.editor.pageItemID == second.id)
         #expect(library.body(of: first.id)?.text == "First, typed\n")
         let asked = try #require(try await page.editor.webView.evaluateJavaScript("window.asked") as? [Int])
         #expect(asked == [leaving, page.editor.generation], "the hand-over asks for the first item, then the flush for the second")
@@ -89,7 +89,7 @@ extension EditorTests {
         }
         #expect(kept)
         #expect(library.notices.waiting.isEmpty)
-        #expect(page.editor.noteID == nil)
+        #expect(page.editor.pageItemID == nil)
         #expect(library.body(of: note.id)?.text == "Note, typed\n")
     }
 
@@ -108,7 +108,7 @@ extension EditorTests {
         let kept = await withCheckedContinuation { continuation in page.editor.flush { continuation.resume(returning: $0) } }
         #expect(!kept)
         #expect(library.notices.told == 1)
-        #expect(page.editor.noteID == first.id, "the first item stays on the page")
+        #expect(page.editor.pageItemID == first.id, "the first item stays on the page")
     }
 
     /// A window that goes as the app's windows do: its editor leaves the open ones as it closes.

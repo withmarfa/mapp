@@ -185,7 +185,7 @@ extension ItemLibrary {
             comparable = true
             if text != body(of: id)?.text { plan.text = text }
         }
-        if let title, !NoteName.trimmed(title).isEmpty, case .property = item.titleRule {
+        if let title, !NameText.trimmed(title).isEmpty, case .property = item.titleRule {
             comparable = true
             if title != item.title { plan.title = title }
         }

@@ -16,7 +16,7 @@ final class ItemLayoutTests: XCTestCase {
 
     func testHeaderAndBodyOccupySeparateRegions() {
         app.outlines["Sidebar"].staticTexts["Items"].click()
-        let row = app.outlines["NoteList"].staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Kitchen quotes")).firstMatch
+        let row = app.outlines["ItemList"].staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Kitchen quotes")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         row.click()
         let title = app.itemPageTitle
@@ -45,7 +45,7 @@ final class ItemLayoutTests: XCTestCase {
 
     func testSearchFieldStartsAtTheColumnAndEndsBeforeTheOptions() {
         app.outlines["Sidebar"].staticTexts["Items"].click()
-        let list = app.outlines["NoteList"]
+        let list = app.outlines["ItemList"]
         app.typeKey("f", modifierFlags: [.command, .option])
         let field = app.descendants(matching: .any)["ColumnSearchField"]
         XCTAssertTrue(field.waitForExistence(timeout: 3))
@@ -64,7 +64,7 @@ final class ItemLayoutTests: XCTestCase {
 
     func testHeaderScrollsWithTheBodyAndTitleMovesIntoToolbar() {
         app.outlines["Sidebar"].staticTexts["Items"].click()
-        let row = app.outlines["NoteList"].staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "The Design of Everyday Things")).firstMatch
+        let row = app.outlines["ItemList"].staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "The Design of Everyday Things")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         row.click()
         let page = app.webViews.firstMatch

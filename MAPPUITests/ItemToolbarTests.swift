@@ -227,7 +227,7 @@ final class ItemToolbarTests: XCTestCase {
         show("as Table")
         let table = control("ItemTable")
         XCTAssertTrue(table.waitForExistence(timeout: 3))
-        XCTAssertFalse(window.outlines["NoteList"].exists, "the table spans the window")
+        XCTAssertFalse(window.outlines["ItemList"].exists, "the table spans the window")
         XCTAssertFalse(window.webViews.firstMatch.exists)
         XCTAssertLessThan(control("ViewOptionsToolbar").frame.maxX, control("ViewModeMenu").frame.minX)
         control("ViewOptionsToolbar").click()
@@ -242,7 +242,7 @@ final class ItemToolbarTests: XCTestCase {
         app.typeKey("3", modifierFlags: .command)
         XCTAssertTrue(table.waitForExistence(timeout: 3))
         show("as List")
-        XCTAssertTrue(window.outlines["NoteList"].waitForExistence(timeout: 3))
+        XCTAssertTrue(window.outlines["ItemList"].waitForExistence(timeout: 3))
         XCTAssertTrue(table.waitForNonExistence(timeout: 3))
     }
 

@@ -96,7 +96,7 @@ final class QuickAdd {
 
         /// Whether the person put anything in it worth keeping: text, a file, a parent, a value or a chip they added.
         var hasContent: Bool {
-            !NoteName.trimmed(title).isEmpty || !isBlank(body) || !files.isEmpty || parentID != nil
+            !NameText.trimmed(title).isEmpty || !isBlank(body) || !files.isEmpty || parentID != nil
                 || properties.values.contains { $0 != .null } || !chips.isEmpty
         }
 
@@ -118,7 +118,7 @@ final class QuickAdd {
                 }
                 if let parentID { details.append("\(String(localized: "Parent")): \(parentID.rawValue)") }
             }
-            let parts = [NoteName.trimmed(title), isBlank(body) ? "" : body, details.joined(separator: "\n")].filter { !$0.isEmpty }
+            let parts = [NameText.trimmed(title), isBlank(body) ? "" : body, details.joined(separator: "\n")].filter { !$0.isEmpty }
             return parts.isEmpty ? nil : parts.joined(separator: "\n\n")
         }
 
@@ -229,7 +229,7 @@ final class QuickAdd {
         guard var draft else { return }
         if let sending {
             draft.files.removeAll { sending.files.contains($0) }
-            if NoteName.trimmed(draft.title) == NoteName.trimmed(sending.title) { draft.title = "" }
+            if NameText.trimmed(draft.title) == NameText.trimmed(sending.title) { draft.title = "" }
             if draft.parentID == sending.parentID { draft.parentID = nil }
             draft.properties = draft.properties.filter { sending.properties[$0.key] != $0.value }
             draft.chips.removeAll { sending.chips.contains($0) }
@@ -389,7 +389,7 @@ final class QuickAdd {
         let catalogue = library.catalogue
         if holdsMissingParent(draft, in: library) || holdsTextItCannotKeep(draft, in: catalogue) { return false }
         if isFile(draft.typeID, in: catalogue) { return draft.files.count == 1 }
-        guard !NoteName.trimmed(draft.title).isEmpty else { return false }
+        guard !NameText.trimmed(draft.title).isEmpty else { return false }
         return fields(of: draft.typeID, in: catalogue).allSatisfy { field in
             !field.required || draft.properties[field.key].map { $0 != .null } == true
         }
@@ -534,7 +534,7 @@ extension Browser {
         let id: ItemID?
         if isFile, let file = draft.files.first {
             quickAdd.saving(draft)
-            let title = NoteName.trimmed(draft.title)
+            let title = NameText.trimmed(draft.title)
             id = await library.addFile(
                 file.url, title: title.isEmpty ? nil : title, parentID: draft.parentID, in: item)
             quickAdd.saving(nil)

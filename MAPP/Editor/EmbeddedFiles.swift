@@ -47,7 +47,7 @@ nonisolated struct EmbedState: Hashable, Sendable {
         let version: ItemVersion
     }
 
-    let binding: NoteReferenceResolution
+    let binding: ReferenceResolution
     /// Nil where the library does not hold the file item (yet).
     let file: File?
 }
@@ -86,9 +86,9 @@ extension ItemLibrary {
 
     /// What each embed of the item shows, by its text, for the editor to tell the page which pictures to draw again:
     /// the binding the copy holds and the facts of the file it names that change what is shown. Observed as items are.
-    func embedStates(of note: ItemID) -> [String: EmbedState] {
+    func embedStates(of itemID: ItemID) -> [String: EmbedState] {
         var states: [String: EmbedState] = [:]
-        for embed in item(note)?.boundEmbeds ?? [] where states[embed.text] == nil {
+        for embed in item(itemID)?.boundEmbeds ?? [] where states[embed.text] == nil {
             states[embed.text] = embedState(of: embed)
         }
         return states
@@ -120,7 +120,7 @@ extension ItemLibrary {
         return failure.map(SavedPictureResolution.unavailable) ?? .none
     }
 
-    private func binding(of reference: EmbedReference, in item: ItemID) -> NoteReferenceResolution? {
+    private func binding(of reference: EmbedReference, in item: ItemID) -> ReferenceResolution? {
         self.item(item)?.boundEmbeds.first { $0.text == reference.text }?.resolution
     }
 

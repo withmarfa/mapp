@@ -65,8 +65,8 @@ struct ItemTableColumnsTests {
     @Test func aStoredLayoutSurvivesTheRoundTripPerPlace() {
         var layout = TableColumnCustomization<ItemTableRow>()
         layout[visibility: "created"] = .visible
-        let stored = ItemTableColumnLayouts.storing(layout, for: .allNotes, in: Data())
-        #expect(ItemTableColumnLayouts.layout(for: .allNotes, in: stored)[visibility: "created"] == .visible)
+        let stored = ItemTableColumnLayouts.storing(layout, for: .allItems, in: Data())
+        #expect(ItemTableColumnLayouts.layout(for: .allItems, in: stored)[visibility: "created"] == .visible)
         #expect(ItemTableColumnLayouts.layout(for: .itemType("aic.decision"), in: stored)[visibility: "created"] == .automatic)
     }
 
@@ -76,7 +76,7 @@ struct ItemTableColumnsTests {
         let browser: Browser
         @FocusState private var pane: Browser.Pane?
         var body: some View {
-            ItemTable(browser: browser, order: NoteOrder(), pane: $pane)
+            ItemTable(browser: browser, order: ItemOrder(), pane: $pane)
         }
     }
 
@@ -94,7 +94,7 @@ struct ItemTableColumnsTests {
     @Test func theWindowsTableHoldsOnlyShownColumnsAndKeepsAHiddenOnesWidth() async throws {
         let (library, _) = try await BigLibrary.loaded()
         let browser = Browser()
-        browser.sidebarItem = .allNotes
+        browser.sidebarItem = .allItems
         browser.viewMode = .table
         let suite = "MAPP.ItemTableColumnsTests"
         let defaults = try #require(UserDefaults(suiteName: suite))
@@ -114,7 +114,7 @@ struct ItemTableColumnsTests {
             return try #require(window.contentView.flatMap { Self.tableView(in: $0) })
         }
         func layout() -> TableColumnCustomization<ItemTableRow> {
-            ItemTableColumnLayouts.layout(for: .allNotes, in: defaults.data(forKey: ItemTableColumnLayouts.key) ?? Data())
+            ItemTableColumnLayouts.layout(for: .allItems, in: defaults.data(forKey: ItemTableColumnLayouts.key) ?? Data())
         }
         /// The width the table has written for a column. A layout offers no way to read one, so this reads the form it encodes to.
         func storedWidth(of id: String) -> Double? {
@@ -128,7 +128,7 @@ struct ItemTableColumnsTests {
         func store(_ change: (inout TableColumnCustomization<ItemTableRow>) -> Void) {
             var next = layout()
             change(&next)
-            defaults.set(ItemTableColumnLayouts.storing(next, for: .allNotes, in: defaults.data(forKey: ItemTableColumnLayouts.key) ?? Data()), forKey: ItemTableColumnLayouts.key)
+            defaults.set(ItemTableColumnLayouts.storing(next, for: .allItems, in: defaults.data(forKey: ItemTableColumnLayouts.key) ?? Data()), forKey: ItemTableColumnLayouts.key)
         }
 
         let first = try await table()
@@ -164,7 +164,7 @@ struct ItemTableColumnsTests {
     @Test(arguments: [false, true]) func aWideWindowsTableHoldsEveryShownColumn(inSavedView: Bool) async throws {
         let (library, _) = try await BigLibrary.loaded()
         let browser = Browser()
-        browser.sidebarItem = inSavedView ? .view(ItemID("view-1")) : .allNotes
+        browser.sidebarItem = inSavedView ? .view(ItemID("view-1")) : .allItems
         browser.viewMode = .table
         let suite = "MAPP.ItemTableColumnsTests.wide.\(inSavedView ? "view" : "all")"
         let defaults = try #require(UserDefaults(suiteName: suite))

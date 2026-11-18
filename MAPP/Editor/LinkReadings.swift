@@ -20,11 +20,11 @@ nonisolated struct LinkReading: Equatable, Sendable {
 }
 
 extension ItemLibrary {
-    /// What each of `targets` (link texts as authored, brackets and all) means from `note`, in order, or nil where the
+    /// What each of `targets` (link texts as authored, brackets and all) means from `itemID`, in order, or nil where the
     /// library cannot ask. A link names one item only when the core binds it (`LinkAnswer.state`); an ambiguous or
     /// unresolved one has no single type, and an item in the bin is not named at all, so its link reads as missing.
-    func linkReadings(of targets: [String], in note: ItemID) async -> [LinkReading]? {
-        guard let answers = await linkAnswers(of: targets, in: note), answers.count == targets.count else { return nil }
+    func linkReadings(of targets: [String], in itemID: ItemID) async -> [LinkReading]? {
+        guard let answers = await linkAnswers(of: targets, in: itemID), answers.count == targets.count else { return nil }
         return answers.map { answer in
             if answer.isMissing { return LinkReading(missing: true, type: nil) }
             guard answer.state == .bound, let id = answer.item, let item = item(id) else { return .plain }

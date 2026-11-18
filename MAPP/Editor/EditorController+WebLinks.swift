@@ -5,7 +5,7 @@ import WebKit
 extension EditorController {
     struct WebLinkRequest: Identifiable {
         let id = UUID()
-        let note: ItemID
+        let itemID: ItemID
         /// The load of the item the sheet was opened on; a reload gives the page another, and the selection the sheet
         /// is for is gone with it.
         let generation: Int
@@ -16,12 +16,12 @@ extension EditorController {
     }
 
     func askForWebLink() {
-        guard hasNote, isEditable, isReady, let noteID else { return }
+        guard hasItem, isEditable, isReady, let pageItemID else { return }
         guard caret.marks.contains(.link) else {
-            webLinkRequest = WebLinkRequest(note: noteID, generation: generation, removable: false)
+            webLinkRequest = WebLinkRequest(itemID: pageItemID, generation: generation, removable: false)
             return
         }
-        webLinkRequest = WebLinkRequest(note: noteID, generation: generation, removable: true, address: caret.href ?? "")
+        webLinkRequest = WebLinkRequest(itemID: pageItemID, generation: generation, removable: true, address: caret.href ?? "")
     }
 
     /// Sets the link on the selection. Whether the address was acceptable, as the page's `normalizeLinkAddress`
@@ -69,7 +69,7 @@ extension EditorController {
     /// Whether the request is still for the text on the page. One that is not is closed, since the selection it was
     /// opened for is gone and the link would land wherever the reloaded page's selection is.
     private func isCurrent(_ request: WebLinkRequest) -> Bool {
-        guard request.note == noteID, request.generation == generation else {
+        guard request.itemID == pageItemID, request.generation == generation else {
             if webLinkRequest?.id == request.id { webLinkRequest = nil }
             return false
         }

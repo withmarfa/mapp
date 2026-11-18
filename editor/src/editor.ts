@@ -12,16 +12,16 @@ import {
 } from '@aicayzer/inkkit'
 import {
   askLinks,
-  pickNote,
+  pickItem,
   postToHost,
-  suggestNotes,
+  suggestItems,
   type EmbeddedFile,
   type EmbedRequest,
   type UnavailableFile,
   type LinkRef,
 } from './bridge'
 import type { HeaderLabels } from './header'
-import { NoteLinkStatus } from './links'
+import { ItemLinkStatus } from './links'
 import { WebPictures, webAddress, type PictureWords } from './pictures'
 
 /** A preview that could not be drawn is a diagnostic for the log, not an error in the person's edit. */
@@ -35,7 +35,7 @@ export function isPreviewDiagnostic(error: Error): boolean {
 /** The words the app hands the page. Inkkit rejects a label it does not know, so only Inkkit's own go to it;
  *  the header's and the Link to Item command's are MAPP's. */
 export interface AppWords extends PictureWords {
-  linkToNote?: string
+  linkToItem?: string
 }
 export type AppLabels = Partial<EditorLabels & HeaderLabels> & AppWords
 const headerLabelKeys: readonly (keyof HeaderLabels)[] = [
@@ -57,7 +57,7 @@ export function splitLabels(all: AppLabels): {
   words: AppWords
 } {
   const {
-    linkToNote,
+    linkToItem,
     loadAction,
     loadingNamed,
     picturesOff,
@@ -77,7 +77,7 @@ export function splitLabels(all: AppLabels): {
     editor: rest,
     header,
     words: {
-      linkToNote,
+      linkToItem,
       loadAction,
       loadingNamed,
       picturesOff,
@@ -203,7 +203,7 @@ export function wikiSuggest(
   query: string,
   context: { documentId: string; signal: AbortSignal },
 ): Promise<string[]> {
-  return context.signal.aborted ? Promise.resolve([]) : suggestNotes(query, context.documentId)
+  return context.signal.aborted ? Promise.resolve([]) : suggestItems(query, context.documentId)
 }
 
 /** A link as the app tells links apart: the alias is what the link shows beyond its name and heading. */
@@ -223,14 +223,14 @@ function headingKey(text: string): string {
 }
 
 /** The app bridge uses only Inkkit's public facade; native libraries retain file and save policy. */
-export class NoteEditor {
+export class ItemEditor {
   private engine!: InkKitEditor
   private finding = false
   private findPending = 0
   private layoutObserver?: ResizeObserver
   private generation = 0
   private item = ''
-  private links!: NoteLinkStatus
+  private links!: ItemLinkStatus
   private pictures!: WebPictures
   private reported = ''
   private original = ''
@@ -240,10 +240,10 @@ export class NoteEditor {
     events: EditorEvents,
     labels: Partial<EditorLabels> = {},
     words: AppWords = {},
-  ): Promise<NoteEditor> {
-    const host = new NoteEditor(events)
+  ): Promise<ItemEditor> {
+    const host = new ItemEditor(events)
     const described = new Map<string, EmbeddedFile>()
-    host.links = new NoteLinkStatus(askLinks, (targets) => host.drawLinksAgain(targets))
+    host.links = new ItemLinkStatus(askLinks, (targets) => host.drawLinksAgain(targets))
     host.pictures = new WebPictures(
       words,
       (addresses) => host.drawLinksAgain(addresses),
@@ -368,17 +368,17 @@ export class NoteEditor {
               if (reference.fragment) host.revealHeading(reference.fragment)
               return
             }
-            postToHost({ type: 'openNote', item: context.documentId, ...linkRef(reference) })
+            postToHost({ type: 'openItemLink', item: context.documentId, ...linkRef(reference) })
           },
         },
         slashMenu: {
           enabled: true,
           customCommands: [
             {
-              name: words.linkToNote ?? 'Link to Item',
+              name: words.linkToItem ?? 'Link to Item',
               keywords: ['item', 'wiki', 'reference'],
               // The app asks the person which item, and answers with the link, or nothing if they decline.
-              action: (context) => pickNote(context.documentId),
+              action: (context) => pickItem(context.documentId),
             },
           ],
         },
@@ -708,7 +708,7 @@ export class NoteEditor {
       const from = visible[0]?.from ?? 0,
         to = visible.at(-1)?.to ?? 0
       const boxes: number[] = new Array((to - from) * 4).fill(0)
-      const characters: ReturnType<NoteEditor['range']>[] = []
+      const characters: ReturnType<ItemEditor['range']>[] = []
       for (const range of visible) {
         for (let at = range.from; at < range.to;) {
           const length = (snapshot.text.codePointAt(at) ?? 0) > 0xffff ? 2 : 1

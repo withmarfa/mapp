@@ -93,7 +93,7 @@ struct MAPPApp: App {
         WindowGroup("Item", for: ItemID.self) { $id in
             Group {
                 if let library = libraries.current {
-                    NoteWindow(id: $id)
+                    ItemWindow(id: $id)
                         .environment(\.library, library)
                 } else if libraries.mode == .opening {
                     // A window restored while the server's copy opens waits for it rather than closing.

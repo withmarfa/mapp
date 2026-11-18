@@ -3,7 +3,7 @@ import Marfa
 
 /// How the page names an item in a `[[link]]`: by its title, or by its identity with the title as a label. Whether a
 /// spelling names the item is the core's to say (`ItemLibrary.bodyLink(to:in:)`); this only builds the text.
-nonisolated enum NoteLinks {
+nonisolated enum ItemLinks {
     /// Whether `[[inner]]` is one link the core reads with exactly this name and alias, so the text survives
     /// as written: no `]]`, line break or padding in it. Marfa has no escape in a link and Inkkit reads a backslash
     /// literally too, so a backslash is part of the text for both and is never added or taken away.
@@ -38,8 +38,8 @@ nonisolated enum NoteLinks {
             }
         }
         end()
-        var label = NoteName.trimmed(words.joined(separator: " "))
-        while label.hasSuffix("]") { label = NoteName.trimmed(String(label.dropLast())) }
+        var label = NameText.trimmed(words.joined(separator: " "))
+        while label.hasSuffix("]") { label = NameText.trimmed(String(label.dropLast())) }
         return label
     }
 
@@ -68,16 +68,16 @@ nonisolated enum NoteLinks {
         /// recently edited). Whether a link to one names it alone is the core's to say, so the caller asks.
         func matches(for text: String, among items: [Item], limit: Int) -> [Match] {
             let query = PaletteMatch.Query(text)
-            var notes = 0
+            var counted = 0
             var best: [(match: Match, score: Int, modified: Date)] = []
             for item in items where !item.isFile {
-                notes += 1
+                counted += 1
                 if let kept = entries[item.id], kept.version == item.version, kept.title == item.title { continue }
                 entries[item.id] = Entry(
                     version: item.version, title: item.title, folded: Array(PaletteMatch.fold(item.title)), modified: item.modified)
                 foldedCount += 1
             }
-            if entries.count != notes {
+            if entries.count != counted {
                 let live = Set(items.lazy.filter { !$0.isFile }.map(\.id))
                 for id in entries.keys where !live.contains(id) { entries[id] = nil }
             }
@@ -109,17 +109,17 @@ nonisolated enum NoteLinks {
 
 extension ItemLibrary {
     /// The items the picker lists, most recently edited first. An item that cannot be linked is told when it is chosen.
-    func notesToLink(excluding id: ItemID? = nil) -> [Item] {
-        items(in: .allNotes).filter { !$0.isFile && $0.id != id }.sorted { $0.modified > $1.modified }
+    func itemsToLink(excluding id: ItemID? = nil) -> [Item] {
+        items(in: .allItems).filter { !$0.isFile && $0.id != id }.sorted { $0.modified > $1.modified }
     }
 
-    /// The titles to offer for what was typed after `[[` in `note`, best first, each one only where `[[title]]`, written
+    /// The titles to offer for what was typed after `[[` in `itemID`, best first, each one only where `[[title]]`, written
     /// there, the core binds to that item or leaves unresolved with that item the only one held (`LinkAnswer.offers`). A title that two items go by, or that a
     /// link cannot spell, is left out. The closest matches are asked of the core together, so a few left out leave the list full.
-    func noteNames(matching query: String, in note: ItemID? = nil, using index: NoteLinks.Index, limit: Int = 12) async -> [String] {
-        let matches = await index.matches(for: query, among: items(in: .allNotes), limit: limit * 4)
-            .filter { NoteLinks.spells($0.title, as: $0.title) }
-        guard !matches.isEmpty, let answers = await linkAnswers(of: matches.map(\.title), in: note) else { return [] }
+    func itemNames(matching query: String, in itemID: ItemID? = nil, using index: ItemLinks.Index, limit: Int = 12) async -> [String] {
+        let matches = await index.matches(for: query, among: items(in: .allItems), limit: limit * 4)
+            .filter { ItemLinks.spells($0.title, as: $0.title) }
+        guard !matches.isEmpty, let answers = await linkAnswers(of: matches.map(\.title), in: itemID) else { return [] }
         return zip(matches, answers).compactMap { $0.1.offers($0.0.id) ? $0.0.title : nil }.prefix(limit).map { $0 }
     }
 }

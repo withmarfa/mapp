@@ -4,7 +4,7 @@ import SwiftUI
 struct SidebarIndex: View {
     @CurrentLibrary private var library
     let browser: Browser
-    let order: NoteOrder
+    let order: ItemOrder
     @State private var model = IndexRowsModel()
     @State private var editing: SourceEditRequest?
 
@@ -67,14 +67,14 @@ private struct IndexContent: View {
     let isBuilt: Bool
     let slots: IndexSlots
     let browser: Browser
-    let order: NoteOrder
+    let order: ItemOrder
     let edit: ((SourceEditRequest) -> Void)?
     let open: (IndexRow) -> Void
     @AppStorage private var layout: IndexLayout
     @AppStorage private var width: IndexWidth
 
     init(
-        place: IndexPlace, rows: [IndexRow], isBuilt: Bool, slots: IndexSlots, browser: Browser, order: NoteOrder,
+        place: IndexPlace, rows: [IndexRow], isBuilt: Bool, slots: IndexSlots, browser: Browser, order: ItemOrder,
         edit: ((SourceEditRequest) -> Void)?, open: @escaping (IndexRow) -> Void
     ) {
         self.place = place

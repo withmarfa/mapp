@@ -57,7 +57,7 @@ struct IncludedSubtypesTests {
         // A type with no subtypes, and a place that is no type, have nothing to include.
         browser.sidebarItem = .itemType(LibraryFixture.project.rawValue)
         #expect(browser.stackableType(in: library) == nil)
-        browser.sidebarItem = .allNotes
+        browser.sidebarItem = .allItems
         #expect(browser.stackableType(in: library) == nil)
     }
 

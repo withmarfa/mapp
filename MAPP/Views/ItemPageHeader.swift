@@ -145,7 +145,7 @@ struct ItemPageHeader: ViewModifier {
                 guard editor.isShowing(id), let item = library.item(id) else { return }
                 // An item that cannot be edited has no panel to change the parent in; the pin then only opens it.
                 guard item.isEditable else {
-                    if let target = Self.parent(in: library.relationships(for: id))?.targets.first?.itemID { editor.onOpenNote(target) }
+                    if let target = Self.parent(in: library.relationships(for: id))?.targets.first?.itemID { editor.onOpenItem(target) }
                     return
                 }
                 editor.presentEditor(Self.request(.parent, of: id, in: library, undoManager: undoManager, editor: editor), under: rect)
@@ -211,7 +211,7 @@ struct ItemPageHeader: ViewModifier {
             guard let key = kind.field?.key else { return false }
             return library.setItemProperty(id, key: key, value: value, undoManager: undoManager)
         }
-        request.open = { [weak editor] in editor?.onOpenNote($0) }
+        request.open = { [weak editor] in editor?.onOpenItem($0) }
         return request
     }
 

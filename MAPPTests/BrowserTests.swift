@@ -24,8 +24,8 @@ struct BrowserTests {
         let (second, _, _, _) = makeFakeLibrary()
         let browser = Browser()
         browser.adopt(first)
-        browser.timelineFields[.allNotes] = "starts_at"
-        browser.compactBoards[.allNotes] = true
+        browser.timelineFields[.allItems] = "starts_at"
+        browser.compactBoards[.allItems] = true
         browser.adopt(second)
         #expect(browser.timelineFields.isEmpty)
         #expect(browser.compactBoards.isEmpty)
@@ -44,7 +44,7 @@ struct BrowserTests {
     @Test func settingsIsAPlaceThatKeepsTheListAndSelectionBehindIt() {
         let (library, _, newer, _) = makeFakeLibrary()
         let browser = Browser()
-        browser.show(.inbox, in: library, order: NoteOrder())
+        browser.show(.inbox, in: library, order: ItemOrder())
         browser.selection = [newer.id]
         browser.showSettings(.library)
         #expect(browser.showsSettings)
@@ -60,10 +60,10 @@ struct BrowserTests {
         let item = try #require(library.item(older.id))
         let browser = Browser()
         browser.showSettings()
-        browser.show(.allNotes, in: library, order: NoteOrder())
+        browser.show(.allItems, in: library, order: ItemOrder())
         #expect(!browser.showsSettings)
         browser.showSettings()
-        browser.reveal(item, in: library, order: NoteOrder())
+        browser.reveal(item, in: library, order: ItemOrder())
         #expect(!browser.showsSettings)
         browser.showSettings()
         browser.openQuickAdd(in: library)
@@ -81,12 +81,12 @@ struct BrowserTests {
         let item = try #require(library.item(older.id))
         let browser = Browser()
         browser.focusRequest = .page
-        browser.reveal(item, in: library, order: NoteOrder())
+        browser.reveal(item, in: library, order: ItemOrder())
         #expect(browser.selection == [item.id])
         #expect(browser.focusRequest == .list)
         browser.viewMode = .gallery
         browser.focusRequest = .page
-        browser.reveal(item, in: library, order: NoteOrder())
+        browser.reveal(item, in: library, order: ItemOrder())
         #expect(browser.isCollectionItemPresented)
         #expect(browser.focusRequest == nil)
     }
@@ -129,7 +129,7 @@ struct BrowserTests {
         let browser = Browser()
         browser.sidebarItem = .favorites
         browser.selection = [favorite.id]
-        browser.sidebarItem = .allNotes
+        browser.sidebarItem = .allItems
         browser.selection = [older.id]
         browser.selection = [newer.id]
         library.delete([older.id], undoManager: nil)
@@ -146,9 +146,9 @@ struct BrowserTests {
         let planning = FakeItemLibrary.note("Planning", modified: start - 7200)
         library.items.append(planning)
         let browser = Browser()
-        browser.show(.inbox, in: library, order: NoteOrder())
+        browser.show(.inbox, in: library, order: ItemOrder())
         browser.selection = [older.id]
-        browser.reveal(planning, in: library, order: NoteOrder())
+        browser.reveal(planning, in: library, order: ItemOrder())
         #expect(browser.selection == [planning.id])
         #expect(browser.history.entries.map(\.id) == [newer.id, older.id, planning.id], "the first item All Items showed on the way was not recorded")
         browser.go(.back, in: library)
@@ -159,7 +159,7 @@ struct BrowserTests {
     @Test func theItemAWindowOpensOnIsWhereBackCanReturnTo() {
         let (library, older, newer, _) = makeFakeLibrary()
         let browser = Browser()
-        browser.show(.inbox, in: library, order: NoteOrder())
+        browser.show(.inbox, in: library, order: ItemOrder())
         #expect(browser.selection == [newer.id])
         browser.selection = [older.id]
         #expect(browser.history.entries.map(\.id) == [newer.id, older.id])
@@ -170,11 +170,11 @@ struct BrowserTests {
     @Test func showingAPlaceOrSearchingMovesTheSelectionWithoutMakingHistory() {
         let (library, older, newer, favorite) = makeFakeLibrary()
         let browser = Browser()
-        browser.show(.inbox, in: library, order: NoteOrder())
+        browser.show(.inbox, in: library, order: ItemOrder())
         browser.selection = [older.id]
-        browser.show(.favorites, in: library, order: NoteOrder())
+        browser.show(.favorites, in: library, order: ItemOrder())
         #expect(browser.selection == [favorite.id])
-        browser.show(.inbox, in: library, order: NoteOrder())
+        browser.show(.inbox, in: library, order: ItemOrder())
         browser.selection = [older.id]
         browser.searchText = "Newer"
         browser.keepSelection(from: [newer.id, older.id], to: browser.items(in: library).map(\.id))
@@ -231,10 +231,10 @@ struct BrowserTests {
         let (library, _, newer, favorite) = makeFakeLibrary()
         let browser = Browser()
         browser.searchText = "Older"
-        browser.show(.allNotes, in: library, order: NoteOrder())
+        browser.show(.allItems, in: library, order: ItemOrder())
         #expect(browser.searchText.isEmpty)
         #expect(browser.selection == [favorite.id])
-        browser.show(.inbox, in: library, order: NoteOrder())
+        browser.show(.inbox, in: library, order: ItemOrder())
         #expect(browser.selection == [newer.id])
     }
 
@@ -258,11 +258,11 @@ struct BrowserTests {
     @Test func favoritesLeadOnlyWhereTheyMeanSomething() {
         let (library, _, newer, _) = makeFakeLibrary()
         let browser = Browser()
-        browser.show(.allNotes, in: library, order: NoteOrder())
-        #expect(browser.sections(in: library, order: NoteOrder(), now: start).first?.group == .favorites)
+        browser.show(.allItems, in: library, order: ItemOrder())
+        #expect(browser.sections(in: library, order: ItemOrder(), now: start).first?.group == .favorites)
         browser.searchText = "e"
         browser.orderSearch(byRelevance: false)
-        let results = browser.sections(in: library, order: NoteOrder(), now: start)
+        let results = browser.sections(in: library, order: ItemOrder(), now: start)
         #expect(results.first?.group != .favorites)
         #expect(results.first?.items.first?.id == newer.id)
     }
@@ -274,9 +274,9 @@ struct BrowserTests {
         // The fake lists members in the library's order: older before newer, whatever the list's sort.
         #expect(library.addToCollection([older.id, newer.id, favorite.id], collection.id, undoManager: nil))
         let browser = Browser()
-        browser.show(.collection(collection.id), in: library, order: NoteOrder())
+        browser.show(.collection(collection.id), in: library, order: ItemOrder())
         #expect(browser.keepsPlaceOrder)
-        let sections = browser.sections(in: library, order: NoteOrder(sort: .dateEdited, groupsByDate: true), now: start)
+        let sections = browser.sections(in: library, order: ItemOrder(sort: .dateEdited, groupsByDate: true), now: start)
         #expect(sections.count == 1)
         #expect(sections.first?.group == nil)
         #expect(sections.first?.items.map(\.id) == [older.id, newer.id, favorite.id])
@@ -291,10 +291,10 @@ struct BrowserTests {
         Browser.delete([older.id, newer.id], in: library, undoManager: nil)
         #expect(library.item(newer.id)?.state == .trashed, "what is live still goes to Recently Deleted")
         #expect(library.item(older.id)?.state == .trashed)
-        #expect(library.notesToPurge.isEmpty)
+        #expect(library.itemsToPurge.isEmpty)
         library.reachesServer = true
         Browser.delete([older.id], in: library, undoManager: nil)
-        #expect(library.notesToPurge == [older.id])
+        #expect(library.itemsToPurge == [older.id])
     }
 
     // MARK: Restoring
@@ -302,10 +302,10 @@ struct BrowserTests {
     @Test func aRestoredWindowShowsWhatItShowedBefore() {
         let (library, older, _, _) = makeFakeLibrary()
         let saved = Browser()
-        saved.show(.inbox, in: library, order: NoteOrder())
+        saved.show(.inbox, in: library, order: ItemOrder())
         saved.selection = [older.id]
         let restored = Browser()
-        restored.restore(saved.snapshot(), in: library, order: NoteOrder())
+        restored.restore(saved.snapshot(), in: library, order: ItemOrder())
         #expect(restored.item == .inbox)
         #expect(restored.selection == [older.id])
     }
@@ -315,18 +315,18 @@ struct BrowserTests {
         let held = library.itemTypeCounts.first.map(\.id.rawValue) ?? ""
         #expect(!held.isEmpty)
         let browser = Browser()
-        browser.restore(Browser.Snapshot(place: .itemType(held), selection: []), in: library, order: NoteOrder())
+        browser.restore(Browser.Snapshot(place: .itemType(held), selection: []), in: library, order: ItemOrder())
         #expect(browser.item == .itemType(held))
-        browser.restore(Browser.Snapshot(place: .itemType("aic.nothing"), selection: []), in: library, order: NoteOrder())
-        #expect(browser.item == .allNotes)
+        browser.restore(Browser.Snapshot(place: .itemType("aic.nothing"), selection: []), in: library, order: ItemOrder())
+        #expect(browser.item == .allItems)
     }
 
     @Test func aRestoredWindowDropsWhatNoLongerExists() {
         let (library, _, _, favorite) = makeFakeLibrary()
         let snapshot = Browser.Snapshot(place: .collection(.mint()), selection: [.mint()])
         let browser = Browser()
-        browser.restore(snapshot, in: library, order: NoteOrder())
-        #expect(browser.item == .allNotes)
+        browser.restore(snapshot, in: library, order: ItemOrder())
+        #expect(browser.item == .allItems)
         #expect(browser.selection == [favorite.id])
     }
 
@@ -348,8 +348,8 @@ struct BrowserTests {
     func aWindowKeptByPathBeforeIdentifiersOrNotAtAllOpensAtItsDefault(saved: Data?) {
         let (library, _, _, favorite) = makeFakeLibrary()
         let browser = Browser()
-        browser.restore(from: saved, in: library, order: NoteOrder())
-        #expect(browser.item == .allNotes)
+        browser.restore(from: saved, in: library, order: ItemOrder())
+        #expect(browser.item == .allItems)
         #expect(browser.selection == [favorite.id])
     }
 
@@ -367,8 +367,8 @@ struct BrowserTests {
     @Test func turningOffDateGroupingListsItemsUnderOneHeadingAfterTheFavorites() {
         let (library, _, _, _) = makeFakeLibrary()
         let browser = Browser()
-        browser.show(.allNotes, in: library, order: NoteOrder())
-        let sections = browser.sections(in: library, order: NoteOrder(sort: .dateEdited, groupsByDate: false), now: start)
+        browser.show(.allItems, in: library, order: ItemOrder())
+        let sections = browser.sections(in: library, order: ItemOrder(sort: .dateEdited, groupsByDate: false), now: start)
         #expect(sections.map(\.group) == [.favorites, nil])
     }
 }

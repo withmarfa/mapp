@@ -29,7 +29,7 @@ struct SourceNameSheet: View {
                 .disabled(!model.canChange)
                 .onSubmit(rename)
                 .accessibilityIdentifier("SourceName")
-            SourceEditNotes(model: model)
+            SourceEditNotice(model: model)
             HStack {
                 Button("Use Default Name") { run { await model.useDefaultName() } }
                     .disabled(!model.canUseDefaultName)
@@ -113,7 +113,7 @@ struct SourceMarkSheet: View {
             .overlay {
                 if results.isEmpty { ContentUnavailableView.search(text: model.search) }
             }
-            SourceEditNotes(model: model)
+            SourceEditNotice(model: model)
             HStack {
                 Button("Remove Mark") { choose(nil) }
                     .disabled(!model.canRemoveMark)
@@ -138,7 +138,7 @@ struct SourceMarkSheet: View {
 }
 
 /// Says why a source can't be changed now, or why the server refused the change.
-private struct SourceEditNotes: View {
+private struct SourceEditNotice: View {
     let model: SourceEditModel
 
     var body: some View {

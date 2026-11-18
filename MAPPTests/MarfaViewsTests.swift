@@ -43,8 +43,8 @@ struct MarfaViewsTests {
         let library = MarfaLibrary(source: source, notices: Notices())
         try #require(await eventually { library.isLoaded })
         #expect(library.views == [Self.planning])
-        #expect(Set(library.items(in: .allNotes).map(\.id)) == [ItemID("n1"), ItemID("n2")])
-        #expect(library.count(in: .allNotes) == 2)
+        #expect(Set(library.items(in: .allItems).map(\.id)) == [ItemID("n1"), ItemID("n2")])
+        #expect(library.count(in: .allItems) == 2)
         #expect(library.items(in: .recents).count == 2)
         #expect(library.item(ItemID("view-planning")) == nil)
         #expect(!library.itemTypeCounts.contains { $0.id.rawValue.hasPrefix("system.") })
@@ -73,13 +73,13 @@ struct MarfaViewsTests {
         let library = MarfaLibrary(source: source, notices: Notices())
         try #require(await eventually { library.views == [Self.planning] })
         let browser = Browser()
-        browser.show(.view(Self.planning.id), in: library, order: NoteOrder())
+        browser.show(.view(Self.planning.id), in: library, order: ItemOrder())
 
         views.completeness.withLock { $0 = .partial }
         views.list.withLock { $0 = [Self.reading] }
         await source.hear(Change(origin: .refreshed(.unfinished), itemId: nil, edgeId: nil))
         #expect(await eventually { library.views == [Self.planning, Self.reading] })
-        browser.placeRemoved(in: library, order: NoteOrder())
+        browser.placeRemoved(in: library, order: ItemOrder())
         #expect(browser.sidebarItem == .view(Self.planning.id))
 
         // Once whole, the answer is what the copy holds.
@@ -95,13 +95,13 @@ struct MarfaViewsTests {
         let library = MarfaLibrary(source: source, notices: Notices())
         try #require(await eventually { library.views == [Self.planning] })
         let browser = Browser()
-        browser.show(.view(Self.planning.id), in: library, order: NoteOrder())
+        browser.show(.view(Self.planning.id), in: library, order: ItemOrder())
         views.list.withLock { $0 = [] }
         // As the copy tells of a view deleted through it; the engine reads the views again for the view's id.
         await source.hear(Change(origin: .refreshed(.purged), itemId: Self.planning.id.rawValue, edgeId: nil))
         #expect(await eventually { library.views.isEmpty })
-        browser.placeRemoved(in: library, order: NoteOrder())
-        #expect(browser.sidebarItem == .allNotes)
+        browser.placeRemoved(in: library, order: ItemOrder())
+        #expect(browser.sidebarItem == .allItems)
         #expect(SidebarPlan(library, layout: SidebarLayout()).library.contains(.views) == false)
         await source.close()
     }
@@ -302,23 +302,23 @@ struct MarfaViewsTests {
         let library = FakeItemLibrary(items: [])
         library.views = [Self.planning]
         let browser = Browser()
-        browser.show(.view(Self.planning.id), in: library, order: NoteOrder())
-        browser.placeRemoved(in: library, order: NoteOrder())
+        browser.show(.view(Self.planning.id), in: library, order: ItemOrder())
+        browser.placeRemoved(in: library, order: ItemOrder())
         #expect(browser.sidebarItem == .view(Self.planning.id))
 
         library.views = []
-        browser.placeRemoved(in: library, order: NoteOrder())
-        #expect(browser.sidebarItem == .allNotes)
+        browser.placeRemoved(in: library, order: ItemOrder())
+        #expect(browser.sidebarItem == .allItems)
     }
 
     @Test func aWindowRestoresAViewOnlyWhileItIsThere() {
         let library = FakeItemLibrary(items: [])
         let snapshot = Browser.Snapshot(place: .view(Self.planning.id), selection: [])
         let browser = Browser()
-        browser.restore(snapshot, in: library, order: NoteOrder())
-        #expect(browser.sidebarItem == .allNotes)
+        browser.restore(snapshot, in: library, order: ItemOrder())
+        #expect(browser.sidebarItem == .allItems)
         library.views = [Self.planning]
-        browser.restore(snapshot, in: library, order: NoteOrder())
+        browser.restore(snapshot, in: library, order: ItemOrder())
         #expect(browser.sidebarItem == .view(Self.planning.id))
     }
 }

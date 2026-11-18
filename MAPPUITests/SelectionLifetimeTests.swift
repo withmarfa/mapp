@@ -9,7 +9,7 @@ final class SelectionLifetimeTests: XCTestCase {
         defer { app.terminate() }
 
         let window = app.windows.firstMatch
-        let list = window.outlines["NoteList"]
+        let list = window.outlines["ItemList"]
         XCTAssertTrue(list.waitForExistence(timeout: 5))
         let note = list.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Kitchen quotes")).firstMatch
         XCTAssertTrue(note.waitForExistence(timeout: 3))

@@ -103,7 +103,7 @@ extension EditorTests {
         // The task runs as far as the page's question; the page answers only after the reload below.
         await Task.yield()
         page.library.updateBody(of: note.id, to: "Read the docs, changed elsewhere\n")
-        page.editor.noteChanged(try #require(page.library.item(note.id)))
+        page.editor.itemChanged(try #require(page.library.item(note.id)))
         return await asking?.value
     }
 

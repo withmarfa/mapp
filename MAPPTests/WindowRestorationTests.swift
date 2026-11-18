@@ -33,10 +33,10 @@ struct WindowRestorationTests {
         let notes = items(1_000)
         let library = FakeItemLibrary(items: notes)
         let saved = Browser()
-        saved.show(.allNotes, in: library, order: NoteOrder())
+        saved.show(.allItems, in: library, order: ItemOrder())
         saved.selection = Set(notes.map(\.id))
         let restored = Browser()
-        restored.restore(saved.snapshot(), in: library, order: NoteOrder())
+        restored.restore(saved.snapshot(), in: library, order: ItemOrder())
         #expect(restored.selection.count == 1)
         #expect(restored.selection.isSubset(of: saved.selection))
     }
@@ -46,7 +46,7 @@ struct WindowBringBackTests {
     private func restored(_ saved: Browser, in library: FakeItemLibrary) throws -> Browser {
         let data = try JSONEncoder().encode(saved.snapshot())
         let restored = Browser()
-        restored.restore(from: data, in: library, order: NoteOrder())
+        restored.restore(from: data, in: library, order: ItemOrder())
         return restored
     }
 
@@ -88,7 +88,7 @@ struct WindowBringBackTests {
         let back = Browser()
         var rearmed = 0
         back.listMemory.rearm = { rearmed += 1 }
-        back.restore(from: data, in: library, order: NoteOrder())
+        back.restore(from: data, in: library, order: ItemOrder())
         #expect(back.listMemory.scrollOffset == 640)
         #expect(rearmed == 1)
     }
@@ -96,7 +96,7 @@ struct WindowBringBackTests {
     @Test func theScrollPositionIsForgottenWhenThePlaceOrTheLayoutChanges() {
         let browser = Browser()
         browser.listMemory.scrollOffset = 300
-        browser.sidebarItem = .allNotes
+        browser.sidebarItem = .allItems
         browser.viewMode = .list
         #expect(browser.listMemory.scrollOffset == 300, "setting what is already set keeps the position")
         browser.sidebarItem = .favorites
@@ -114,17 +114,17 @@ struct WindowBringBackTests {
         saved.listMemory.scrollOffset = 420
         let data = try JSONEncoder().encode(saved.snapshot())
         let back = Browser()
-        back.restore(from: data, in: library, order: NoteOrder())
+        back.restore(from: data, in: library, order: ItemOrder())
         #expect(back.listMemory.scrollOffset == 420)
     }
 
     @Test func aWindowKeptBeforeTheseThingsWereKeptStillOpens() throws {
         let (library, _, newer, _) = BrowserTests().makeFakeLibrary()
-        var snapshot = Browser.Snapshot(place: .allNotes, selection: [newer.id])
+        var snapshot = Browser.Snapshot(place: .allItems, selection: [newer.id])
         snapshot.opensItem = nil
         let data = try JSONEncoder().encode(snapshot)
         let back = Browser()
-        back.restore(from: data, in: library, order: NoteOrder())
+        back.restore(from: data, in: library, order: ItemOrder())
         #expect(back.selection == [newer.id])
         #expect(back.listMemory.scrollOffset == nil)
     }
@@ -134,7 +134,7 @@ struct FileWindowEditorTests {
     @Test func aFileWindowMakesNoEditor() {
         let slot = EditorSlot()
         var made = 0
-        let editor = NoteWindow.pageEditor(for: .file, in: slot) {
+        let editor = ItemWindow.pageEditor(for: .file, in: slot) {
             made += 1
             return EditorController(library: FakeItemLibrary())
         }
@@ -150,8 +150,8 @@ struct FileWindowEditorTests {
             made += 1
             return EditorController(library: FakeItemLibrary())
         }
-        let first = NoteWindow.pageEditor(for: .text, in: slot, make: make)
-        let second = NoteWindow.pageEditor(for: .text, in: slot, make: make)
+        let first = ItemWindow.pageEditor(for: .text, in: slot, make: make)
+        let second = ItemWindow.pageEditor(for: .text, in: slot, make: make)
         #expect(first != nil && first === second)
         #expect(made == 1)
     }

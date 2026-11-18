@@ -42,7 +42,7 @@ extension EditorController {
 
     /// One turn of `flush`: asks the page for its last edit and answers once.
     private func handOver(then done: @escaping (Bool) -> Void) {
-        guard let noteID else { return done(true) }
+        guard let pageItemID else { return done(true) }
         let generation = generation
         // A page that is not ready has nothing unreported: it reports every change as it is made, and one whose
         // process ended comes back with the text it last reported.
@@ -57,7 +57,7 @@ extension EditorController {
         }
         func capture() {
             guard !finished else { return }
-            guard self.noteID == noteID else { return replaced() }
+            guard self.pageItemID == pageItemID else { return replaced() }
             guard isReady else { return finish(true) }
             // Asked for the generation the flush began on even after outside text reloaded the item: the page puts
             // a reload off while the person composes, so it can still hold text of that generation. A page that
@@ -85,12 +85,12 @@ extension EditorController {
                 }
                 if let error { return failed(error.localizedDescription) }
                 if let code { return failed(refusal?["message"] as? String ?? code) }
-                guard self.noteID == noteID else { return replaced() }
+                guard self.pageItemID == pageItemID else { return replaced() }
                 finish(true)
             }
         }
         func replaced() {
-            tellNotSaved(noteID, reason: Self.replacedReason)
+            tellNotSaved(pageItemID, reason: Self.replacedReason)
             finish(false)
         }
         // The page answered, so it is not stuck, but asking again would only fail again. It is given up on as a page
@@ -98,7 +98,7 @@ extension EditorController {
         func failed(_ message: String) {
             abandonedGeneration = self.generation
             Telemetry.logger(.editor).error("flush failed: \(message)")
-            tellNotSaved(noteID, reason: String(localized: "The editor ran into a problem (“\(message)”), so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again."))
+            tellNotSaved(pageItemID, reason: String(localized: "The editor ran into a problem (“\(message)”), so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again."))
             finish(false)
         }
         // Held weakly, so a finished flush does not keep a closed editor among the open ones until the limit.
@@ -108,21 +108,21 @@ extension EditorController {
             guard let self else {
                 preconditionFailure("An unfinished flush's pending reply or retry holds its editor.")
             }
-            guard self.noteID == noteID else {
-                tellNotSaved(noteID, reason: Self.replacedReason)
+            guard self.pageItemID == pageItemID else {
+                tellNotSaved(pageItemID, reason: Self.replacedReason)
                 return finish(false)
             }
             // The page answers in order, so one that has not answered this flush holds every later load too.
             abandonedGeneration = self.generation
-            tellNotSaved(noteID, reason: String(localized: "The editor stopped responding, so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again."))
+            tellNotSaved(pageItemID, reason: String(localized: "The editor stopped responding, so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again."))
             finish(false)
         }
         capture()
     }
 
     /// The page reports each change as it is made, so what it never reported is not on the page to give back.
-    private func tellNotSaved(_ noteID: ItemID, reason: String) {
-        let title = library?.item(noteID).map { String(localized: "Couldn’t Save “\($0.displayTitle)”") }
+    private func tellNotSaved(_ pageItemID: ItemID, reason: String) {
+        let title = library?.item(pageItemID).map { String(localized: "Couldn’t Save “\($0.displayTitle)”") }
         library?.notices.notKept(title ?? String(localized: "Couldn’t Save Item"), text: nil, reason: reason)
     }
 
@@ -187,7 +187,7 @@ extension EditorController {
     /// while SwiftUI still holds the editor for a moment.
     func windowWent() {
         windowIsGone = true
-        requestedNoteID = nil
+        requestedItemID = nil
         cancelRequests()
         titleDrafts = nil
         for (id, embeds) in pendingEmbeds { notInText(embeds, of: id) }

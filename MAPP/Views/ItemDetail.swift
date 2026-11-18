@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct NoteDetail: View {
+struct ItemDetail: View {
     @CurrentLibrary private var library
     let browser: Browser
     let editor: EditorController
@@ -15,10 +15,10 @@ struct NoteDetail: View {
                 .onAppear { editor.close() }
         } else if let id = browser.selection.first, let item = library.item(id) {
             if library.pageLayout(of: item) != .text {
-                FileItemPage(item: item, drafts: details, open: { [editor] in editor.onOpenNote($0) }) { browser.fileFetched(id, at: $0) }
+                FileItemPage(item: item, drafts: details, open: { [editor] in editor.onOpenItem($0) }) { browser.fileFetched(id, at: $0) }
                     .onAppear { editor.close() }
             } else {
-                NotePage(item: item, editor: editor, headerDrafts: details)
+                ItemPage(item: item, editor: editor, headerDrafts: details)
                     .onAppear(perform: grantFocusRequest)
                     .onChange(of: browser.focusRequest, grantFocusRequest)
             }
@@ -65,7 +65,7 @@ private struct UnselectedItemContent: View {
 
 /// One item as a formatted page, with the item's header drawn by the page above the text. The same editor shows
 /// each item in turn, so moving between items loads text into a page that is already running.
-struct NotePage: View {
+struct ItemPage: View {
     @CurrentLibrary private var library
     let item: Item
     @Bindable var editor: EditorController
@@ -81,17 +81,17 @@ struct NotePage: View {
         GeometryReader { proxy in
             ZStack(alignment: .top) {
                 // The page runs under the toolbar and any banner, so it starts below them and scrolls beneath.
-                NoteEditor(controller: editor, topInset: proxy.safeAreaInsets.top + bannerHeight)
+                ItemEditor(controller: editor, topInset: proxy.safeAreaInsets.top + bannerHeight)
                     .ignoresSafeArea(.container, edges: .top)
                     .modifier(ItemPageHeader(item: item, editor: editor, drafts: headerDrafts))
                 ToolbarBand(toolbarHeight: proxy.safeAreaInsets.top, isShown: backsToolbar && showsToolbarBackground && editor.isContentUnderToolbar)
                 VStack(spacing: 0) {
                     if item.state == .trashed {
-                        DeletedNoteBanner(id: item.id)
+                        DeletedItemBanner(id: item.id)
                     } else if case .conflicted(let copy?, _) = item.sync {
                         SavedAsCopyBanner(copy: copy)
                     } else if let problem = item.problem, problem.withholdsText {
-                        UnreadableNoteBanner(message: problem.message)
+                        UnreadableItemBanner(message: problem.message)
                     }
                 }
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bannerHeight = $0 }
@@ -103,7 +103,7 @@ struct NotePage: View {
             editor.cancelLinkRequest()
             editor.focus(item.id)
         }) { request in
-            NoteLinkPicker(editor: editor, note: request.note)
+            ItemLinkPicker(editor: editor, itemID: request.itemID)
         }
         .sheet(item: $editor.webLinkRequest, onDismiss: { editor.focus(item.id) }) { request in
             WebLinkSheet(editor: editor, request: request)
@@ -122,25 +122,25 @@ struct NotePage: View {
             feedHeaderScroll()
         }
         .onChange(of: editor.isHeaderScrolledAway) { feedHeaderScroll() }
-        .onChange(of: editor.noteID) { feedHeaderScroll() }
+        .onChange(of: editor.pageItemID) { feedHeaderScroll() }
         .onDisappear { headerDrafts.headerScrolled(away: false, for: item.id) }
         // The editor takes in only a change to the item's text or to whether it can be written in. A change the
         // server has taken takes a new version, but the copy shows a delete, a recovery or a problem before then,
         // and a server that keeps its own text over the person's changes the text without one. The action may run
         // on an earlier copy of this view, so the item is read as it is now.
-        .onChange(of: item.version) { noteChanged() }
-        .onChange(of: item.isWritable) { noteChanged() }
-        .onChange(of: library.body(of: item.id)) { noteChanged() }
+        .onChange(of: item.version) { itemChanged() }
+        .onChange(of: item.isWritable) { itemChanged() }
+        .onChange(of: library.body(of: item.id)) { itemChanged() }
     }
 
     /// Tells the window whether this item's header is away. The editor may still hold the item before, whose header it
     /// reports on, so only its own item's counts.
     private func feedHeaderScroll() {
-        headerDrafts.headerScrolled(away: editor.noteID == item.id && editor.isHeaderScrolledAway, for: item.id)
+        headerDrafts.headerScrolled(away: editor.pageItemID == item.id && editor.isHeaderScrolledAway, for: item.id)
     }
 
-    private func noteChanged() {
-        if let item = library.item(item.id) { editor.noteChanged(item) }
+    private func itemChanged() {
+        if let item = library.item(item.id) { editor.itemChanged(item) }
     }
 }
 
@@ -166,7 +166,7 @@ private struct SavedAsCopyBanner: View {
 
 /// The library could not read this item, so the page is empty and read-only. This says why, so an empty page is not
 /// taken for text the person lost.
-private struct UnreadableNoteBanner: View {
+private struct UnreadableItemBanner: View {
     let message: String
 
     var body: some View {
@@ -181,7 +181,7 @@ private struct UnreadableNoteBanner: View {
 }
 
 /// Deleted items cannot be edited; this says so and offers the way back, as Notes does.
-private struct DeletedNoteBanner: View {
+private struct DeletedItemBanner: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     let id: ItemID

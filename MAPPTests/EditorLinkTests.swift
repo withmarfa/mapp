@@ -59,14 +59,14 @@ extension EditorTests {
         page.library.add("Plan\n")
         let body = "Reader\n\nSee [[Plan]], [[Plan#Soil|soil]], [[Later]] and [[22222222-2222-4222-8222-222222222222|Plan]].\n"
         try await page.load(body)
-        let reader = try #require(page.editor.noteID)
+        let reader = try #require(page.editor.pageItemID)
         #expect(try await marks(page, until: "live,live,missing,missing") == "live,live,missing,missing")
         page.library.add("Later\n")
         #expect(try await marks(page, until: "live,live,live,missing") == "live,live,live,missing")
 
         #expect(try await page.markdown() == nil, "the page holds the text it was given")
         page.editor.close()
-        try await page.wait { page.editor.noteID == nil }
+        try await page.wait { page.editor.pageItemID == nil }
         #expect(page.changes.isEmpty)
         #expect(page.library.bodyWrites.isEmpty)
         #expect(page.library.bodies[reader] == body)
@@ -81,7 +81,7 @@ extension EditorTests {
         try await page.load("Reader\n\n[[Plan]] [[Plan|alias]] [[\(identity)]] [[\(identity)|Plan]] [[Gone]] [[Twin]] [[Plan#Soil]]\n")
         var opened: [ItemID] = []
         var beeps = 0
-        page.editor.onOpenNote = { opened.append($0) }
+        page.editor.onOpenItem = { opened.append($0) }
         page.editor.onUnopenableLink = { beeps += 1 }
         var offered: [[ItemID]] = []
         page.editor.onChooseAmbiguousLink = { ids, pick in
@@ -122,13 +122,13 @@ extension EditorTests {
         var opened: [ItemID] = [], beeps = 0
         var offered: [[ItemID]] = []
         var choose: ((ItemID) -> Void)?
-        page.editor.onOpenNote = { opened.append($0) }
+        page.editor.onOpenItem = { opened.append($0) }
         page.editor.onUnopenableLink = { beeps += 1 }
         page.editor.onChooseAmbiguousLink = { ids, pick in
             offered.append(ids)
             choose = pick
         }
-        await page.editor.openNote(NoteLink(linkText: "[[Plan]]")!, from: try #require(page.editor.noteID))
+        await page.editor.openItemLink(ItemLink(linkText: "[[Plan]]")!, from: try #require(page.editor.pageItemID))
         #expect(offered == [[plan.id]] && opened.isEmpty && beeps == 0)
         choose?(plan.id)
         #expect(opened == [plan.id])
@@ -139,12 +139,12 @@ extension EditorTests {
         page.library.add("Plan\n")
         try await page.load("Reader\n\nSee [[Plan]].\n")
         var opened = 0, beeps = 0
-        page.editor.onOpenNote = { _ in opened += 1 }
+        page.editor.onOpenItem = { _ in opened += 1 }
         page.editor.onUnopenableLink = { beeps += 1 }
-        await page.editor.openNote(NoteLink(linkText: "[[Plan]]")!, from: ItemID("another"))
+        await page.editor.openItemLink(ItemLink(linkText: "[[Plan]]")!, from: ItemID("another"))
         #expect(opened == 0 && beeps == 0)
         page.editor.windowWent()
-        await page.editor.openNote(NoteLink(linkText: "[[Plan]]")!, from: try #require(page.editor.noteID))
+        await page.editor.openItemLink(ItemLink(linkText: "[[Plan]]")!, from: try #require(page.editor.pageItemID))
         #expect(opened == 0 && beeps == 0)
     }
 
@@ -154,12 +154,12 @@ extension EditorTests {
         try await page.load("Reader\n\nSee [[Plan#light and water]] and [[Plan#Nowhere]].\n")
         let library = page.library
         let editor = page.editor
-        editor.onOpenNote = { id in
+        editor.onOpenItem = { id in
             if let item = library.item(id) { editor.load(item) }
         }
         _ = try await marks(page, until: "live,live")
         try await commandClick(0, in: page)
-        try await page.wait { editor.noteID == plan.id }
+        try await page.wait { editor.pageItemID == plan.id }
         var heading = ""
         _ = try await eventuallyAsking {
             heading = try await editor.webView.evaluateJavaScript(
@@ -174,7 +174,7 @@ extension EditorTests {
         let plan = page.library.add("Plan\n\n# Soil\n")
         try await page.load("Reader\n\nSee [[Plan#Nowhere]].\n")
         var opened: [ItemID] = []
-        page.editor.onOpenNote = { opened.append($0) }
+        page.editor.onOpenItem = { opened.append($0) }
         _ = try await marks(page, until: "live")
         try await commandClick(0, in: page)
         try await page.wait { !opened.isEmpty }
@@ -185,7 +185,7 @@ extension EditorTests {
         let page = try await Page()
         try await page.load("Reader\n\n# Soil\n\nSee [[#soil]].\n")
         var opened = 0, beeps = 0
-        page.editor.onOpenNote = { _ in opened += 1 }
+        page.editor.onOpenItem = { _ in opened += 1 }
         page.editor.onUnopenableLink = { beeps += 1 }
         _ = try await marks(page, until: "live")
         try await commandClick(0, in: page)
@@ -209,11 +209,11 @@ extension EditorTests {
         let reader = library.add("Reader\n\nSee [[Plan]] and [[Gone]].\n")
         let shown = ShownItem()
         shown.id = reader.id
-        let editor = NoteWindow.makeEditor(
+        let editor = ItemWindow.makeEditor(
             library: library, details: DetailsPresentation(), showing: Binding { shown.id } set: { shown.id = $0 })
         try #require(await eventually { editor.isReady })
         editor.load(try #require(library.item(reader.id)))
-        try #require(await eventually { editor.noteID == reader.id })
+        try #require(await eventually { editor.pageItemID == reader.id })
         let window = TestWindow(contentRect: NSRect(x: 0, y: 0, width: 600, height: 400), styleMask: [.titled], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = editor.container
@@ -222,10 +222,10 @@ extension EditorTests {
         var beeps = 0
         editor.onUnopenableLink = { beeps += 1 }
 
-        await editor.openNote(NoteLink(linkText: "[[Gone]]")!, from: reader.id)
+        await editor.openItemLink(ItemLink(linkText: "[[Gone]]")!, from: reader.id)
         #expect(shown.id == reader.id && beeps == 1, "a link to no item leaves the window as it is")
         window.makeFirstResponder(nil)
-        await editor.openNote(NoteLink(linkText: "[[Plan]]")!, from: reader.id)
+        await editor.openItemLink(ItemLink(linkText: "[[Plan]]")!, from: reader.id)
         #expect(shown.id == plan.id, "the window now shows the linked item, which it will find again at the next launch")
         // The window's page loads the item it now shows, and the keyboard goes there with it.
         editor.load(try #require(library.item(plan.id)))

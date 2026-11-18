@@ -7,7 +7,7 @@ struct AppCommands: Commands {
     let library: (any ItemLibrary)?
     let host: MarfaHost
     @FocusedValue(\.browser) private var browser
-    @FocusedValue(\.focusedNotes) private var notes
+    @FocusedValue(\.focusedItems) private var focused
     @FocusedValue(\.editor) private var editor
     @FocusedValue(\.detailsPresentation) private var details
     @Environment(\.openWindow) private var openWindow
@@ -36,7 +36,7 @@ struct AppCommands: Commands {
 
         // The item commands sit with the File menu's making and opening, above Close, as Notes has them.
         CommandGroup(after: .newItem) {
-            let ids: Set<ItemID> = notes?.ids ?? []
+            let ids: Set<ItemID> = focused?.ids ?? []
             // Sharing an item reads one item; the commands below act on files too.
             let shown = ids.compactMap { library?.item($0) }.filter { !$0.isFile }
             let one = ids.count == 1 ? shown.first : nil
@@ -45,15 +45,15 @@ struct AppCommands: Commands {
             command(.openOriginal)
             command(.openInBrowser)
             Divider()
-            NoteShareLink(share: library.map { library in
-                NoteShare(note: one, fileURL: ids.count == 1 ? ids.first.flatMap { browser?.fileURL(of: $0) } : nil, in: library)
-            } ?? NoteShare())
+            ItemShareLink(share: library.map { library in
+                ItemShare(item: one, fileURL: ids.count == 1 ? ids.first.flatMap { browser?.fileURL(of: $0) } : nil, in: library)
+            } ?? ItemShare())
             if let library {
-                NoteActions(ids: ids, undoManager: notes?.undoManager, inMenuBar: true)
+                ItemActions(ids: ids, undoManager: focused?.undoManager, inMenuBar: true)
                     .environment(\.library, library)
                     .environment(details)
             }
-            VersionHistoryCommands(details: details, library: library, undoManager: notes?.undoManager)
+            VersionHistoryCommands(details: details, library: library, undoManager: focused?.undoManager)
         }
 
         // Print has ⌘P, as everywhere; the print panel sets the paper.
@@ -98,7 +98,7 @@ struct AppCommands: Commands {
                 details?.isPresented.toggle()
             }
             .keyboardShortcut("i", modifiers: [.command, .option])
-            .disabled(details == nil || notes?.ids.count != 1)
+            .disabled(details == nil || focused?.ids.count != 1)
             Divider()
             // The toolbar's View Options and its filters, for the view in front.
             Group {
@@ -145,7 +145,7 @@ extension AppCommands {
     private func command(_ command: ItemCommand) -> some View {
         ItemCommandButton(
             command: command,
-            context: ItemCommandContext(library: library, ids: notes?.ids ?? [], browser: browser, editor: editor, details: details),
+            context: ItemCommandContext(library: library, ids: focused?.ids ?? [], browser: browser, editor: editor, details: details),
             editor: editor, bindsShortcut: true)
     }
 

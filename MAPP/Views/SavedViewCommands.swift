@@ -6,7 +6,7 @@ struct SavedViewCommand {
     let systemImage: String
     let action: () -> Void
 
-    static func commands(for browser: Browser, in library: any ItemLibrary, order: NoteOrder) -> [SavedViewCommand] {
+    static func commands(for browser: Browser, in library: any ItemLibrary, order: ItemOrder) -> [SavedViewCommand] {
         var commands: [SavedViewCommand] = []
         let shown = SavedViews.shown(browser, in: library)
         if SavedViews.canEdit(browser, in: library) {

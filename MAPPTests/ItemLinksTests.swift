@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 @testable import MAPP
 
 @Suite(.hangLimit)
-struct NoteLinksTests {
+struct ItemLinksTests {
     private let start = Date(timeIntervalSince1970: 1_800_000_000)
 
     private func note(_ title: String, minutes: Int = 0) -> MAPP.Item {
@@ -14,15 +14,15 @@ struct NoteLinksTests {
 
     @Test func aTitleIsSpelledAsALinkOnlyIfTheCoreReadsItBackWhole() {
         for title in ["Garden ideas", "Café", "Q3: plan", "日本語のノート", "A \"quoted\" title", "back\\slash", "😀 plans", "Plan\\", "a\\b"] {
-            #expect(NoteLinks.spells(title, as: title), "\(title)")
+            #expect(ItemLinks.spells(title, as: title), "\(title)")
         }
         // Inkkit 0.7.2 and the core read a lone bracket as text, so these stand as `[[Title]]`.
         for title in ["A]B", "a[b", "[c", "[", "c[", "[ [c", "x [y] z"] {
-            #expect(NoteLinks.spells(title, as: title), "\(title.debugDescription)")
+            #expect(ItemLinks.spells(title, as: title), "\(title.debugDescription)")
         }
         // The core does not read these as a link to the title, whatever the page draws.
         for title in ["", " leading", "trailing ", "A|B", "A#B", "a|b|c", "a#", "a|", "a[b]", "A [x]]", "[[c", "[[[c", "c[[", "a[[b", "a]]b", "[[", "two\nlines", "two\r\nlines"] {
-            #expect(!NoteLinks.spells(title, as: title), "\(title.debugDescription)")
+            #expect(!ItemLinks.spells(title, as: title), "\(title.debugDescription)")
         }
     }
 
@@ -36,27 +36,27 @@ struct NoteLinksTests {
             #expect(ns.substring(with: part.name.range) == part.name.text)
         }
         #expect(parts[0].name.text == "Plan" && parts[0].heading?.text == "Soil" && parts[0].alias?.text == "soil")
-        let link = try #require(NoteLink(linkText: parts[0].text))
+        let link = try #require(ItemLink(linkText: parts[0].text))
         #expect(link.raw == "Plan#Soil|soil" && link.name == "Plan" && link.heading == "Soil")
     }
 
     @Test func aBackslashInALinkIsPartOfTheText() throws {
-        let link = try #require(NoteLink(linkText: "[[A\\B]]"))
+        let link = try #require(ItemLink(linkText: "[[A\\B]]"))
         #expect(link.name == "A\\B" && link.raw == "A\\B")
         // The page reads a backslash as an escape; the link is read again from its raw text.
-        let posted = try #require(NoteLink(page: ["raw": "[[A\\|B]]", "target": "A|B"]))
+        let posted = try #require(ItemLink(page: ["raw": "[[A\\|B]]", "target": "A|B"]))
         #expect(posted.name == "A\\" && posted.raw == "A\\|B")
-        #expect(NoteLink(page: ["target": "Plan"]) == nil)
-        #expect(NoteLink(page: ["raw": "Plan", "target": "Plan"]) == nil)
-        #expect(NoteLink(linkText: "[[Plan]] and more") == nil)
+        #expect(ItemLink(page: ["target": "Plan"]) == nil)
+        #expect(ItemLink(page: ["raw": "Plan", "target": "Plan"]) == nil)
+        #expect(ItemLink(linkText: "[[Plan]] and more") == nil)
     }
 
     @Test func linksAreTheSameOnlyWhenWrittenTheSame() throws {
-        let plain = try #require(NoteLink(linkText: "[[Plan]]"))
-        let aliased = try #require(NoteLink(linkText: "[[Plan|Plan]]"))
+        let plain = try #require(ItemLink(linkText: "[[Plan]]"))
+        let aliased = try #require(ItemLink(linkText: "[[Plan|Plan]]"))
         #expect(plain != aliased)
-        #expect(plain == NoteLink(linkText: "[[Plan]]"))
-        #expect(try #require(NoteLink(linkText: "[[Cafe\u{301}]]")) != NoteLink(linkText: "[[Café]]"))
+        #expect(plain == ItemLink(linkText: "[[Plan]]"))
+        #expect(try #require(ItemLink(linkText: "[[Cafe\u{301}]]")) != ItemLink(linkText: "[[Café]]"))
     }
 
     @Test func suggestionsFavorPrefixesThenRecentItems() async {
@@ -64,29 +64,29 @@ struct NoteLinksTests {
             note("Regarding gardens", minutes: 9), note("Gardening tools", minutes: 1), note("Garden ideas", minutes: 5),
             note("Bike service", minutes: 7),
         ]
-        let names = await NoteLinks.Index().titles(matching: "gard", among: items, limit: 10)
+        let names = await ItemLinks.Index().titles(matching: "gard", among: items, limit: 10)
         #expect(names == ["Garden ideas", "Gardening tools", "Regarding gardens"])
-        #expect(await NoteLinks.Index().titles(matching: "  GARD ", among: items, limit: 2) == ["Garden ideas", "Gardening tools"])
-        #expect(await NoteLinks.Index().titles(matching: "bk", among: items, limit: 10) == ["Bike service"], "letters in order")
+        #expect(await ItemLinks.Index().titles(matching: "  GARD ", among: items, limit: 2) == ["Garden ideas", "Gardening tools"])
+        #expect(await ItemLinks.Index().titles(matching: "bk", among: items, limit: 10) == ["Bike service"], "letters in order")
     }
 
     @Test func suggestionsLeaveOutFiles() async {
         var photo = note("Garden photo")
         photo.content = .file(.png, byteCount: 3)
-        let names = await NoteLinks.Index().titles(matching: "garden", among: [note("Garden ideas"), photo], limit: 10)
+        let names = await ItemLinks.Index().titles(matching: "garden", among: [note("Garden ideas"), photo], limit: 10)
         #expect(names == ["Garden ideas"])
     }
 
     @Test func anEmptyQueryOffersTheMostRecentItemsUpToTheLimit() async {
         let items = (0..<30).map { note("Note \($0)", minutes: $0) }
-        let index = NoteLinks.Index()
+        let index = ItemLinks.Index()
         let names = await index.titles(matching: "", among: items, limit: 12)
         #expect(names == (18..<30).reversed().map { "Note \($0)" })
         #expect(await index.titles(matching: "zzz", among: items, limit: 12).isEmpty)
     }
 
     @Test func theIndexFollowsEditsAndRemovalsOfItems() async {
-        let index = NoteLinks.Index()
+        let index = ItemLinks.Index()
         var garden = note("Garden ideas")
         let bike = note("Bike service")
         #expect(await index.titles(matching: "ga", among: [garden, bike], limit: 5) == ["Garden ideas"])
@@ -100,7 +100,7 @@ struct NoteLinksTests {
     @Test func aLargeLibraryIsReadOnceAndAKeystrokeFoldsNothingAgain() async {
         let titles = ["alpha", "beta", "gamma", "delta", "kitchen", "garden", "recipe", "meeting"]
         var items = (0..<20_000).map { note("\(titles[$0 % titles.count]) \($0)", minutes: $0) }
-        let index = NoteLinks.Index()
+        let index = ItemLinks.Index()
         let clock = ContinuousClock()
         var names: [String] = []
         let first = await clock.measure { names = await index.titles(matching: "g", among: items, limit: 12) }
@@ -116,7 +116,7 @@ struct NoteLinksTests {
         items[7].version = ItemVersion(items[7].version.rawValue + 1)
         #expect(await index.titles(matching: "garden s", among: items, limit: 12).first == "garden shed")
         #expect(await index.foldedCount == 20_001, "an edit folds only the item edited")
-        FileHandle.standardError.write(Data("NoteLinks index, 20,000 notes: first query \(first)\n".utf8))
+        FileHandle.standardError.write(Data("ItemLinks index, 20,000 notes: first query \(first)\n".utf8))
     }
 
     @Test func aLibraryNamesTheItemChosenByTitleOrByIdentity() async {
@@ -127,7 +127,7 @@ struct NoteLinksTests {
         #expect(await library.bodyLink(to: alone.id, in: nil) == "[[\(alone.id.rawValue)|Garden ideas]]", "a twin goes by the same name, so its identity names it")
         #expect(await library.bodyLink(to: odd.id, in: nil) == "[[\(odd.id.rawValue)|A|B]]", "a link cannot spell this title, so its identity names it")
         #expect(await library.bodyLink(to: library.items[3].id, in: nil) == "[[Old]]")
-        #expect(library.notesToLink(excluding: library.items[3].id).map(\.title) == ["A|B", "garden IDEAS", "Garden ideas"])
+        #expect(library.itemsToLink(excluding: library.items[3].id).map(\.title) == ["A|B", "garden IDEAS", "Garden ideas"])
     }
 
     @Test func aTitleLinkIsWrittenOnlyWhereTheCoreBindsItToTheItem() async {
@@ -141,18 +141,18 @@ struct NoteLinksTests {
 
     @Test func aSuggestionIsATitleTheCoreBindsToItsOwnItem() async {
         let library = FakeItemLibrary(items: [note("Garden", minutes: 1), note("garden", minutes: 2), note("Gardening", minutes: 3), note("Garden | x", minutes: 4)])
-        let index = NoteLinks.Index()
-        #expect(await library.noteNames(matching: "gard", using: index) == ["Gardening"], "twins are ambiguous, and a title with a bar cannot be spelled")
+        let index = ItemLinks.Index()
+        #expect(await library.itemNames(matching: "gard", using: index) == ["Gardening"], "twins are ambiguous, and a title with a bar cannot be spelled")
         // The core, not the app, decides: a name it says is unresolved is not offered.
         library.linkAnswerOverrides["Gardening"] = LinkAnswer(target: "Gardening", state: .ambiguous, item: nil, candidates: [])
-        #expect(await library.noteNames(matching: "gard", using: index).isEmpty)
+        #expect(await library.itemNames(matching: "gard", using: index).isEmpty)
     }
 
     @Test func aBackslashIsLiteralInEverySpelling() {
-        #expect(NoteLinks.spells("id|Plan\\", as: "id", alias: "Plan\\"))
-        #expect(NoteLinks.spells("id|C:\\dir", as: "id", alias: "C:\\dir"))
-        #expect(NoteLinks.spells("Plan\\", as: "Plan\\"))
-        #expect(NoteLinks.spells("a\\b", as: "a\\b"))
+        #expect(ItemLinks.spells("id|Plan\\", as: "id", alias: "Plan\\"))
+        #expect(ItemLinks.spells("id|C:\\dir", as: "id", alias: "C:\\dir"))
+        #expect(ItemLinks.spells("Plan\\", as: "Plan\\"))
+        #expect(ItemLinks.spells("a\\b", as: "a\\b"))
     }
 
     @Test func eachAwkwardTitleIsLinkedWithoutAnAddedBackslash() async {
@@ -188,11 +188,11 @@ struct NoteLinksTests {
             ("a]]b", "a] ]b"), ("c]", "c"), ("back\\slash", "back\\slash"), ("Plan\\", "Plan\\"), ("A\\|B", "A\\|B"),
             ("two\nlines", "two lines"), (" padded ", "padded"), ("\n\u{0}", ""), ("]]", ""),
         ]
-        for (title, label) in cases { #expect(NoteLinks.label(title) == label, "\(title.debugDescription)") }
+        for (title, label) in cases { #expect(ItemLinks.label(title) == label, "\(title.debugDescription)") }
     }
 }
 
-extension NoteLinks.Index {
+extension ItemLinks.Index {
     func titles(matching text: String, among items: [MAPP.Item], limit: Int) async -> [String] {
         await matches(for: text, among: items, limit: limit).map(\.title)
     }

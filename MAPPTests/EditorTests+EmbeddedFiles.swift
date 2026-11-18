@@ -273,7 +273,7 @@ extension EditorTests {
         // Time for an insertion made from the late answer to reach the page, which nothing signals when none is made.
         try await Task.sleep(for: .milliseconds(300))
         #expect(try await markdown(editor) == nil, "the item now on the page takes nothing")
-        #expect(editor.noteID == second.id)
+        #expect(editor.pageItemID == second.id)
         #expect(library.notices.waiting.last?.title == "Images Weren’t Added to the Item")
         #expect(library.notices.waiting.last?.message == "“Photo” was attached to “Plan” but isn’t in its text, because the item was no longer open for editing.")
     }

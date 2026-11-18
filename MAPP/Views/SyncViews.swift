@@ -28,7 +28,7 @@ struct SyncFootReading<Content: View>: View {
     }
 }
 
-extension SyncStatus.Note {
+extension SyncStatus.Notice {
     /// The colour of the dot beside the item: red where the person has to act, orange where something waits,
     /// and quiet while the app is only catching up.
     var dotColor: Color {

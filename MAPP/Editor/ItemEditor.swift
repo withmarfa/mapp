@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// WebKit scrolls the item's header and the item as one page; the toolbar, a banner and the find bar cover its top.
-struct NoteEditor: NSViewRepresentable {
+struct ItemEditor: NSViewRepresentable {
     let controller: EditorController
     let topInset: CGFloat
 

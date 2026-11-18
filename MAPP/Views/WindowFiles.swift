@@ -6,7 +6,7 @@ extension View {
     /// Makes the window take files: dropped from Finder anywhere in it, or imported from a nearby device by the File
     /// menu's Import from iPhone, each becoming an item through `Browser.importFiles`; and shows Quick Look for the
     /// browser's request.
-    func handlesFiles(in browser: Browser, order: NoteOrder) -> some View {
+    func handlesFiles(in browser: Browser, order: ItemOrder) -> some View {
         modifier(WindowFiles(browser: browser, order: order))
     }
 
@@ -18,7 +18,7 @@ extension View {
     /// Makes the view take files and items dropped on it as the collection `id`'s: items join it, and files are
     /// added to the library and join it. A nil `id` leaves the view as it is, so a row that is not a collection can carry it.
     @ViewBuilder
-    func dropsInto(collection id: ItemID?, browser: Browser, order: NoteOrder) -> some View {
+    func dropsInto(collection id: ItemID?, browser: Browser, order: ItemOrder) -> some View {
         if let id {
             modifier(CollectionDrop(collection: id, browser: browser, order: order))
         } else {
@@ -31,7 +31,7 @@ private struct WindowFiles: ViewModifier {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     let browser: Browser
-    let order: NoteOrder
+    let order: ItemOrder
     @State private var isTargeted = false
 
     func body(content: Content) -> some View {
@@ -87,7 +87,7 @@ private struct CollectionDrop: ViewModifier {
     @Environment(\.undoManager) private var undoManager
     let collection: ItemID
     let browser: Browser
-    let order: NoteOrder
+    let order: ItemOrder
     @State private var isTargeted = false
 
     func body(content: Content) -> some View {

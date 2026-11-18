@@ -29,11 +29,11 @@ struct MarfaBinTests {
         try #require(await eventually { library.items(in: .recentlyDeleted).count == 3 })
 
         let binned = library.items(in: .recentlyDeleted)
-        #expect(NoteSort.dateEdited.sorted(binned).map(\.id) == [ids["third"]!, ids["second"]!, ids["first"]!])
+        #expect(ItemSort.dateEdited.sorted(binned).map(\.id) == [ids["third"]!, ids["second"]!, ids["first"]!])
         let row = try #require(try await fake.copy.items.get([ids["second"]!.rawValue], includingBin: true).first)
         #expect(binned.first { $0.id == ids["second"]! }?.trashed == row.trashedDate)
         #expect(binned.allSatisfy { $0.trashed != nil })
-        #expect(library.items(in: .allNotes).map(\.id) == [ids["kept"]!])
+        #expect(library.items(in: .allItems).map(\.id) == [ids["kept"]!])
         await source.close()
     }
 }

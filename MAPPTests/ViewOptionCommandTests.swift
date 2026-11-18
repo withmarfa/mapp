@@ -12,7 +12,7 @@ struct ViewOptionCommandTests {
 
     private static func browser(_ mode: ItemViewMode, in library: FakeItemLibrary) -> Browser {
         let browser = Browser()
-        browser.show(.itemType("core.task"), in: library, order: NoteOrder())
+        browser.show(.itemType("core.task"), in: library, order: ItemOrder())
         browser.viewMode = mode
         return browser
     }

@@ -5,7 +5,7 @@ import Foundation
 ///
 /// Nothing is said while everything is in step.
 nonisolated struct SyncStatus: Hashable, Sendable {
-    nonisolated struct Note: Hashable, Sendable, Identifiable {
+    nonisolated struct Notice: Hashable, Sendable, Identifiable {
         enum Kind: Hashable, Sendable {
             case keyRefused, unavailable, needsAttention, offline, catchingUp, sending
         }
@@ -27,71 +27,71 @@ nonisolated struct SyncStatus: Hashable, Sendable {
     static let sendingDelay: TimeInterval = 5
 
     /// Most important first; the window shows the first and the list of problems shows them all.
-    private(set) var notes: [Note] = []
+    private(set) var notices: [Notice] = []
 
-    var primary: Note? { notes.first }
+    var primary: Notice? { notices.first }
 
     init(state: MarfaConnectionState, report: SyncReport, now: Date) {
         guard state != .disconnected else { return }
         let waiting = report.waiting
         switch state {
         case .keyRefused:
-            notes.append(Self.keyRefused(waiting: waiting))
+            notices.append(Self.keyRefused(waiting: waiting))
         case .unavailable, .otherVersion, .inUse:
-            notes.append(Self.unavailable)
+            notices.append(Self.unavailable)
         default:
             break
         }
-        if !report.problems.isEmpty { notes.append(Self.needsAttention(report.problems.count)) }
-        if case .offline = state { notes.append(Self.offline(waiting: waiting)) }
+        if !report.problems.isEmpty { notices.append(Self.needsAttention(report.problems.count)) }
+        if case .offline = state { notices.append(Self.offline(waiting: waiting)) }
         let isReachable = state == .online || state == .connecting
         if report.phase == .catchingUp, isReachable {
-            notes.append(Self.catchingUp)
+            notices.append(Self.catchingUp)
         } else if isReachable, waiting > 0, let oldest = report.oldestWaiting, now.timeIntervalSince(oldest) >= Self.sendingDelay {
-            notes.append(Self.sending(waiting: waiting))
+            notices.append(Self.sending(waiting: waiting))
         }
     }
 
     // MARK: Words
 
-    private static func keyRefused(waiting: Int) -> Note {
+    private static func keyRefused(waiting: Int) -> Notice {
         var detail = String(localized: "The server has ended MAPP’s sign-in. Sign in again in Settings.")
         if waiting > 0 { detail += " " + Words.waiting(waiting) }
         let line = waiting > 0 ? Words.keyRefusedLine(waiting) : String(localized: "Signed out")
-        return Note(kind: .keyRefused, title: String(localized: "Signed out"), line: line, detail: detail, symbol: "exclamationmark.triangle", isWarning: true)
+        return Notice(kind: .keyRefused, title: String(localized: "Signed out"), line: line, detail: detail, symbol: "exclamationmark.triangle", isWarning: true)
     }
 
-    private static var unavailable: Note {
-        Note(
+    private static var unavailable: Notice {
+        Notice(
             kind: .unavailable, title: String(localized: "Library unavailable"), line: String(localized: "Library unavailable"),
             detail: String(localized: "MAPP can’t open the copy of your library on this Mac. Open Settings to see what to do."),
             symbol: "exclamationmark.triangle", isWarning: true)
     }
 
-    private static func needsAttention(_ count: Int) -> Note {
-        Note(
+    private static func needsAttention(_ count: Int) -> Notice {
+        Notice(
             kind: .needsAttention, title: String(localized: "Needs attention"), line: Words.needAttentionLine(count),
             detail: Words.needAttention(count),
             symbol: "exclamationmark.triangle", isWarning: true)
     }
 
-    private static func offline(waiting: Int) -> Note {
+    private static func offline(waiting: Int) -> Notice {
         let detail = waiting == 0
             ? String(localized: "Your changes are kept on this Mac and sent when you’re back online.")
             : Words.sentWhenOnline(waiting)
         let line = waiting == 0 ? String(localized: "Offline") : Words.offlineLine(waiting)
-        return Note(kind: .offline, title: String(localized: "Offline"), line: line, detail: detail, symbol: "wifi.slash", isWarning: false)
+        return Notice(kind: .offline, title: String(localized: "Offline"), line: line, detail: detail, symbol: "wifi.slash", isWarning: false)
     }
 
-    private static var catchingUp: Note {
-        Note(
+    private static var catchingUp: Notice {
+        Notice(
             kind: .catchingUp, title: String(localized: "Catching up"), line: String(localized: "Catching up"),
             detail: String(localized: "Getting the latest changes from the server."),
             symbol: "arrow.triangle.2.circlepath", isWarning: false)
     }
 
-    private static func sending(waiting: Int) -> Note {
-        Note(
+    private static func sending(waiting: Int) -> Notice {
+        Notice(
             kind: .sending, title: Words.sending(waiting), line: Words.sending(waiting), detail: Words.waiting(waiting),
             symbol: "arrow.up.circle", isWarning: false)
     }

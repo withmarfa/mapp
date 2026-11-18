@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The actions for a set of items, shared by the list's context menu and the menu bar: whether it is a favorite, then
 /// what removes it. The More menu places the same two parts apart, with other commands between them.
-struct NoteActions: View {
+struct ItemActions: View {
     @CurrentLibrary private var library
     /// The window's, for the Add to Collection sheet; the menu bar passes the front window's in.
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
@@ -13,15 +13,15 @@ struct NoteActions: View {
     var inMenuBar = false
 
     var body: some View {
-        NoteOrganizeActions(ids: ids, undoManager: undoManager, inMenuBar: inMenuBar)
+        ItemOrganizeActions(ids: ids, undoManager: undoManager, inMenuBar: inMenuBar)
         CollectionActions(selection: ids, details: details, undoManager: undoManager)
         if inMenuBar || ids.contains(where: { library.item($0) != nil }) { Divider() }
-        NoteRemoveActions(ids: ids, undoManager: undoManager, inMenuBar: inMenuBar)
+        ItemRemoveActions(ids: ids, undoManager: undoManager, inMenuBar: inMenuBar)
     }
 }
 
 /// How the actions on items read in the menu that shows them.
-private struct NoteActionContext {
+private struct ItemActionContext {
     /// Every selected item, files too: a command that suits only some of them leaves the rest alone and says so.
     /// Looked up once, since a selection can hold every item in the library.
     let items: [Item]
@@ -39,7 +39,7 @@ private struct NoteActionContext {
 
 /// Favorites, Add Tag, Change Type, Customize Layout and Version History for the selection, or Recover for deleted items. The
 /// collection actions sit beside these (`CollectionActions`).
-struct NoteOrganizeActions: View {
+struct ItemOrganizeActions: View {
     @CurrentLibrary private var library
     /// The window's, for the Change Type panel; the menu bar passes the front window's in.
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
@@ -51,7 +51,7 @@ struct NoteOrganizeActions: View {
     var keepsPlace = false
 
     var body: some View {
-        let context = NoteActionContext(library: library, ids: ids, keepsPlace: inMenuBar || keepsPlace)
+        let context = ItemActionContext(library: library, ids: ids, keepsPlace: inMenuBar || keepsPlace)
         if context.isEmpty {
             EmptyView()
         } else if context.allDeleted {
@@ -78,7 +78,7 @@ struct FavoriteButton: View {
 
     var body: some View {
         // An item in the bin keeps its tags, so it neither decides the toggle nor takes the change.
-        let active = NoteActionContext(library: library, ids: ids, keepsPlace: true).items.filter { $0.state == .active }
+        let active = ItemActionContext(library: library, ids: ids, keepsPlace: true).items.filter { $0.state == .active }
         let allFavorites = !active.isEmpty && active.allSatisfy(\.isFavorite)
         Button(allFavorites ? "Remove from Favorites" : "Add to Favorites", systemImage: allFavorites ? "star.slash" : "star") {
             library.setFavorite(ids, !allFavorites, undoManager: undoManager)
@@ -88,7 +88,7 @@ struct FavoriteButton: View {
 }
 
 /// Delete for items, or Delete Immediately for items already deleted.
-struct NoteRemoveActions: View {
+struct ItemRemoveActions: View {
     @CurrentLibrary private var library
     /// The window's, to ask before moving several items; the menu bar passes the front window's in.
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
@@ -98,12 +98,12 @@ struct NoteRemoveActions: View {
     var keepsPlace = false
 
     var body: some View {
-        let context = NoteActionContext(library: library, ids: ids, keepsPlace: inMenuBar || keepsPlace)
+        let context = ItemActionContext(library: library, ids: ids, keepsPlace: inMenuBar || keepsPlace)
         if context.isEmpty {
             EmptyView()
         } else if context.allDeleted {
             Button("Delete Immediately…", systemImage: "trash", role: .destructive) {
-                library.notesToPurge = ids
+                library.itemsToPurge = ids
             }
             .disabled(!library.reachesServer)
         } else {

@@ -57,7 +57,7 @@ extension LiveMarfaTests {
                           in library: MarfaLibrary, made: LiveMarfa.Made) throws -> ItemID {
             let id = library.createItem(
                 typeID: type.rawValue, title: "MAPPTEST \(title) \(UUID().uuidString.prefix(8).lowercased())", body: body,
-                properties: properties, parentID: nil, in: .allNotes, undoManager: nil)
+                properties: properties, parentID: nil, in: .allItems, undoManager: nil)
             if let id { made.add(id) }
             return try #require(id)
         }

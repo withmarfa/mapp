@@ -25,7 +25,7 @@ import Observation
     /// Has every open page hand over its last edit, then says whether all of them did, so a change that moves an
     /// item's text moves what the person sees.
     @ObservationIgnored var handOverEdits: (@escaping (Bool) -> Void) -> Void = { EditorController.flushAll(leaving: false, then: $0) }
-    var notesToPurge: Set<ItemID> = []
+    var itemsToPurge: Set<ItemID> = []
     private(set) var catalogue = Catalogue()
     private(set) var views: [LibraryView] = []
     private(set) var syncReport: SyncReport
@@ -901,7 +901,7 @@ import Observation
     private func members(of place: SidebarItem) -> Set<ItemID> {
         switch place {
         case .inbox: return index.standalone(index.feed)
-        case .allNotes: return index.standalone(index.ids(in: .active))
+        case .allItems: return index.standalone(index.ids(in: .active))
         case .sources, .collections: return []
         case .source(let name):
             return index.standalone(Set(index.ids(in: .active).filter { records[$0]?.item.source == name }))
@@ -930,7 +930,7 @@ import Observation
         switch place {
         case .inbox: String(localized: "Inbox")
         case .recents: String(localized: "Recents")
-        case .allNotes: String(localized: "Items")
+        case .allItems: String(localized: "Items")
         case .sources: String(localized: "Sources")
         case .collections: String(localized: "Collections")
         case .source(let code): sources.name(code)
@@ -962,11 +962,11 @@ import Observation
     // MARK: Links
 
     /// What the core says each link target names (`Items.linkCandidates`), from the copy alone and read as a link in
-    /// `note` when given, so an answer is whatever saving that link there would do. Nil where the core cannot ask,
+    /// `itemID` when given, so an answer is whatever saving that link there would do. Nil where the core cannot ask,
     /// such as for an item the copy does not hold.
-    func linkAnswers(of targets: [String], in note: ItemID?) async -> [LinkAnswer]? {
+    func linkAnswers(of targets: [String], in itemID: ItemID?) async -> [LinkAnswer]? {
         guard !targets.isEmpty else { return [] }
-        return try? await source.linkAnswers(of: targets, in: note)
+        return try? await source.linkAnswers(of: targets, in: itemID)
     }
 
     // MARK: Search

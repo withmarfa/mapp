@@ -126,7 +126,7 @@ nonisolated enum EngineServer {
     }
 
     /// Makes `count` items tagged `tag`, in as few calls as the server takes, and answers their ids.
-    static func createNotes(count: Int, tag: String) async throws -> [ItemID] {
+    static func createItems(count: Int, tag: String) async throws -> [ItemID] {
         var ids: [ItemID] = []
         while ids.count < count {
             let batch = min(5000, count - ids.count)
@@ -287,12 +287,12 @@ struct EngineCostTests {
         try #require(await eventually { opened.library.isLoaded })
         let loaded = ContinuousClock.now - start
         line("\(label)_to_first_loaded", loaded)
-        line("\(label)_first_loaded_items", Double(opened.library.count(in: .allNotes)), "count")
+        line("\(label)_first_loaded_items", Double(opened.library.count(in: .allItems)), "count")
         try #require(await eventually { self.whole(opened.library) })
         line("\(label)_to_complete", ContinuousClock.now - start)
         await opened.source.engineTook()
         line("\(label)_to_engine_idle", ContinuousClock.now - start)
-        line("\(label)_library_items", Double(opened.library.count(in: .allNotes)), "count")
+        line("\(label)_library_items", Double(opened.library.count(in: .allItems)), "count")
         return opened
     }
 
@@ -362,11 +362,11 @@ struct EngineCostTests {
             let opened = try await openWhole(bench)
             let library = opened.library
             let id = try #require(library.createItem(
-                typeID: "core.note", title: "MAPPTEST change 0", body: "", properties: [:], parentID: nil, in: .allNotes, undoManager: nil))
+                typeID: "core.note", title: "MAPPTEST change 0", body: "", properties: [:], parentID: nil, in: .allItems, undoManager: nil))
             bench.made.add(id)
             try #require(await eventually { library.item(id)?.sync == .settled })
 
-            let places: [(String, SidebarItem)] = [("all_items", .allNotes), ("inbox", .inbox)]
+            let places: [(String, SidebarItem)] = [("all_items", .allItems), ("inbox", .inbox)]
                 + library.catalogue.itemTypes.keys.sorted { $0.rawValue < $1.rawValue }.map { ("type_\($0.rawValue)", .itemType($0.rawValue)) }
             var itemsTimes: [String: [Double]] = [:]
             var countTimes: [String: [Double]] = [:]
@@ -409,7 +409,7 @@ struct EngineCostTests {
             let opened = try await openWhole(bench)
             let library = opened.library, source = opened.source
             let id = try #require(library.createItem(
-                typeID: "core.note", title: "MAPPTEST write", body: "First", properties: [:], parentID: nil, in: .allNotes, undoManager: nil))
+                typeID: "core.note", title: "MAPPTEST write", body: "First", properties: [:], parentID: nil, in: .allItems, undoManager: nil))
             bench.made.add(id)
             try #require(await eventually { library.item(id)?.sync == .settled })
             await source.engineTook()
@@ -461,7 +461,7 @@ struct EngineCostTests {
                 // A tag of its own each round, since an item's source id is its tag and its place in the call.
                 let tag = "mapptest-catchup-\(UUID().uuidString.prefix(8).lowercased())"
                 bench.tags.append(tag)
-                let made = try await EngineServer.createNotes(count: 1, tag: tag)
+                let made = try await EngineServer.createItems(count: 1, tag: tag)
                 try #require(await eventually(within: .seconds(60)) { made.allSatisfy { library.item($0) != nil } }, "round \(round)")
                 await source.engineTook()
                 let start = ContinuousClock.now
@@ -509,7 +509,7 @@ struct EngineCostTests {
             meter.start()
             var probe = LoopProbe(source, every: .milliseconds(250))
             var start = ContinuousClock.now
-            let ids = try await EngineServer.createNotes(count: flood, tag: tag)
+            let ids = try await EngineServer.createItems(count: flood, tag: tag)
             line("flood_create_server", ContinuousClock.now - start)
             try #require(await eventually(within: .seconds(600)) { ids.allSatisfy { library.item($0) != nil } })
             line("flood_create_to_library_holds_all", ContinuousClock.now - start)

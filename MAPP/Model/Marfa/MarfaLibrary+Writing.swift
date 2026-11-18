@@ -10,7 +10,7 @@ extension MarfaLibrary {
         in place: SidebarItem, undoManager: UndoManager?
     ) -> ItemID? {
         let type = TypeID(typeID)
-        let title = NoteName.trimmed(title)
+        let title = NameText.trimmed(title)
         let cantCreate = String(localized: "Can’t Create Item")
         guard catalogue.itemTypes[type] != nil, !title.isEmpty else {
             notices.tell(cantCreate, String(localized: "Choose a kind of item and give it a title."))
@@ -89,7 +89,7 @@ extension MarfaLibrary {
                 notices.tell(cantEdit, String(localized: "This item’s title is the first line of its text."))
                 return false
             }
-            guard let title = value?.string.map(NoteName.trimmed), !title.isEmpty else { return false }
+            guard let title = value?.string.map(NameText.trimmed), !title.isEmpty else { return false }
             key = field
             return editProperty(id, key: key, to: .string(title), undoManager: undoManager)
         }
@@ -416,7 +416,7 @@ extension MarfaLibrary {
     /// Destroys items in the bin at the server, which only a server that can be reached does, so it is only where
     /// `reachesServer`. It is sent at the version the person was shown.
     func deletePermanently(_ ids: Set<ItemID>) {
-        notesToPurge.subtract(ids)
+        itemsToPurge.subtract(ids)
         guard reachesServer else {
             notices.tell(
                 String(localized: "Can’t Delete Immediately"),
@@ -453,7 +453,7 @@ extension MarfaLibrary {
             Result {
                 let folder = directory.appending(path: String(index), directoryHint: .isDirectory)
                 try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-                let url = folder.appending(path: NoteText.attachmentName(file.name))
+                let url = folder.appending(path: FileName.attachmentName(file.name))
                 try file.data.write(to: url)
                 return url
             }

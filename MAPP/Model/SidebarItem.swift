@@ -4,7 +4,7 @@ nonisolated enum SidebarItem: Hashable, Codable {
     case inbox
     /// The items edited most recently, as many as `ItemLibrary.recentLimit`.
     case recents
-    case allNotes
+    case allItems
     case favorites
     /// A shortcut to one favorite item, distinct from the collection containing every favorite.
     case favoriteItem(ItemID)
@@ -17,6 +17,12 @@ nonisolated enum SidebarItem: Hashable, Codable {
     /// A view saved on the server, listing what the copy holds of its items.
     case view(ItemID)
     case recentlyDeleted
+
+    /// `allItems` keeps the key it was stored under (`storageKey` names a place's saved columns and density by it).
+    private enum CodingKeys: String, CodingKey {
+        case inbox, recents, allItems = "allNotes", favorites, favoriteItem, itemType, collection, collections
+        case sources, source, files, view, recentlyDeleted
+    }
 }
 
 nonisolated extension SidebarItem {

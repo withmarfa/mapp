@@ -21,19 +21,19 @@ struct SyncStatusTests {
 
     @Test func nothingIsSaidWhileDisconnected() {
         let status = SyncStatus(state: .disconnected, report: report(waiting: 3, oldest: 99, problems: [entry()]), now: now)
-        #expect(status.notes.isEmpty)
+        #expect(status.notices.isEmpty)
         #expect(status.primary == nil)
     }
 
     @Test func nothingIsSaidWhileEverythingIsInStep() {
         for state in [MarfaConnectionState.online, .connecting] {
-            #expect(SyncStatus(state: state, report: report(), now: now).notes.isEmpty)
+            #expect(SyncStatus(state: state, report: report(), now: now).notices.isEmpty)
         }
     }
 
     @Test func aChangeSentWithinMomentsIsNotWorthALine() {
         let status = SyncStatus(state: .online, report: report(waiting: 1, oldest: 1), now: now)
-        #expect(status.notes.isEmpty)
+        #expect(status.notices.isEmpty)
     }
 
     @Test func aChangeStillWaitingOnlineSaysItIsBeingSent() throws {
@@ -68,7 +68,7 @@ struct SyncStatusTests {
         #expect(note.detail.contains("Settings") && note.detail.contains("2 changes"))
         #expect(note.isWarning)
         #expect(note.line == "Signed out, 2 changes waiting")
-        #expect(!status.notes.contains { $0.kind == .sending }, "the server is not being asked, so nothing is being sent")
+        #expect(!status.notices.contains { $0.kind == .sending }, "the server is not being asked, so nothing is being sent")
     }
 
     @Test func aLibraryThatCannotBeOpenedPointsToSettings() throws {
@@ -79,20 +79,20 @@ struct SyncStatusTests {
     @Test func changesThatNeedThePersonCountedWithAnyOtherItem() throws {
         let status = SyncStatus(
             state: .offline(reason: nil), report: report(waiting: 1, oldest: 2, problems: [entry(), entry(.dead)]), now: now)
-        #expect(status.notes.map(\.kind) == [.needsAttention, .offline])
+        #expect(status.notices.map(\.kind) == [.needsAttention, .offline])
         #expect(status.primary?.title == "Needs attention")
         #expect(status.primary?.line == "2 changes need attention")
     }
 
     @Test func aKeyThatIsRefusedComesBeforeAnythingElse() {
         let status = SyncStatus(state: .keyRefused, report: report(problems: [entry()]), now: now)
-        #expect(status.notes.map(\.kind) == [.keyRefused, .needsAttention])
+        #expect(status.notices.map(\.kind) == [.keyRefused, .needsAttention])
     }
 
     @Test func noWordIsJargon() {
         let all = [MarfaConnectionState.online, .offline(reason: nil), .keyRefused, .unavailable(message: ""), .otherVersion(unsent: 2), .inUse].flatMap { state in
             SyncStatus(state: state, report: report(waiting: 2, oldest: 60, phase: .catchingUp, problems: [entry()]), now: now)
-                .notes.flatMap { [$0.title, $0.detail] }
+                .notices.flatMap { [$0.title, $0.detail] }
         }
         for text in all {
             for word in ["sync", "write", "queue", "drain", "verdict"] {

@@ -10,17 +10,17 @@ extension EditorController {
     /// too, since they are in the item's attachments but not in its text.
     @discardableResult
     func insertImages(_ sources: [PastedImages.Source], at point: CGPoint? = nil) -> Bool {
-        guard isEditable, let noteID, library != nil, !sources.isEmpty else { return false }
+        guard isEditable, let pageItemID, library != nil, !sources.isEmpty else { return false }
         let height = webView.bounds.height
         Task {
             let (files, skipped) = await PastedImages.read(sources)
-            guard self.noteID == noteID, isEditable, let library else { return }
-            let report = files.isEmpty ? AttachReport() : await library.attach(files, to: noteID)
+            guard self.pageItemID == pageItemID, isEditable, let library else { return }
+            let report = files.isEmpty ? AttachReport() : await library.attach(files, to: pageItemID)
             // The images are kept either way; they go into the item only if it is still the one on the page.
-            let placed = self.noteID == noteID && isEditable
+            let placed = self.pageItemID == pageItemID && isEditable
             Self.reportUnplaced(
                 skipped: skipped, failed: report.failed, attached: report.embeds.count,
-                unplaced: placed ? [] : report.embeds.map(\.name), in: library.item(noteID)?.title ?? "", to: library
+                unplaced: placed ? [] : report.embeds.map(\.name), in: library.item(pageItemID)?.title ?? "", to: library
             )
             guard placed else { return }
             let images = report.embeds.map { ["src": $0.link, "alt": $0.name] }
@@ -35,14 +35,14 @@ extension EditorController {
     }
 
     private static func reportUnplaced(
-        skipped: [String], failed: [(name: String, reason: String)], attached: Int, unplaced: [String], in note: String,
+        skipped: [String], failed: [(name: String, reason: String)], attached: Int, unplaced: [String], in title: String,
         to library: any ItemLibrary
     ) {
         guard !skipped.isEmpty || !failed.isEmpty || !unplaced.isEmpty else { return }
         let largest = Int64(PastedImages.largestImage).formatted(.byteCount(style: .memory))
         let lines = skipped.map { String(localized: "“\($0)” is larger than \(largest) or can’t be read.") }
             + failed.map { String(localized: "“\($0.name)” couldn’t be attached. \($0.reason)") }
-            + unplaced.map { String(localized: "“\($0)” was attached to “\(note)” but isn’t in its text, because the item was no longer open for editing.") }
+            + unplaced.map { String(localized: "“\($0)” was attached to “\(title)” but isn’t in its text, because the item was no longer open for editing.") }
         let title = if skipped.isEmpty && failed.isEmpty {
             String(localized: "Images Weren’t Added to the Item")
         } else if attached == 0 {
@@ -73,7 +73,7 @@ extension EditorController {
             appendsAgain = true
             return
         }
-        guard let noteID, isReady, isEditable, let embeds = pendingEmbeds[noteID], !embeds.isEmpty else { return }
+        guard let pageItemID, isReady, isEditable, let embeds = pendingEmbeds[pageItemID], !embeds.isEmpty else { return }
         isAppendingEmbeds = true
         appendsAgain = false
         let generation = generation
@@ -89,11 +89,11 @@ extension EditorController {
             }
             isAppendingEmbeds = false
             if outcome as? Bool == true {
-                take(embeds, from: noteID)
+                take(embeds, from: pageItemID)
                 appendsAgain = true
             } else if let refusal = (outcome as? [String: Any])?["commandError"] as? String,
                       !Self.passingRefusals.contains(refusal) {
-                if take(embeds, from: noteID) { notInText(embeds, of: noteID) }
+                if take(embeds, from: pageItemID) { notInText(embeds, of: pageItemID) }
             }
             if appendsAgain { appendPendingEmbeds() }
         }
@@ -139,7 +139,7 @@ extension EditorController {
     /// redraw an embed that showed an error card. The card's retry does, and so does any later change.
     func watchEmbeds() {
         embedWatch += 1
-        guard let library, let note = noteID else {
+        guard let library, let itemID = pageItemID else {
             embedStates = nil
             savedStates = nil
             return
@@ -148,29 +148,29 @@ extension EditorController {
         var states: [String: EmbedState] = [:]
         var saved: [SavedPictureState] = []
         withObservationTracking {
-            states = library.embedStates(of: note)
-            saved = library.savedPictureStates(of: note)
+            states = library.embedStates(of: itemID)
+            saved = library.savedPictureStates(of: itemID)
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .milliseconds(300))
                 guard let self, !windowIsGone, embedWatch == watch else { return }
-                tellEmbedsChanged(in: note)
+                tellEmbedsChanged(in: itemID)
             }
         }
-        if embedStates?.note != note { embedStates = (note, states) }
-        if savedStates?.note != note { savedStates = (note, saved) }
+        if embedStates?.itemID != itemID { embedStates = (itemID, states) }
+        if savedStates?.itemID != itemID { savedStates = (itemID, saved) }
     }
 
-    private func tellEmbedsChanged(in note: ItemID) {
-        guard let library, noteID == note else { return }
-        let now = library.embedStates(of: note)
+    private func tellEmbedsChanged(in itemID: ItemID) {
+        guard let library, pageItemID == itemID else { return }
+        let now = library.embedStates(of: itemID)
         let before = embedStates?.states ?? [:]
-        embedStates = (note, now)
+        embedStates = (itemID, now)
         let changed = now.filter { before[$0.key] != $0.value }.keys.sorted()
         if !changed.isEmpty, isReady { call("embedsChanged", json(changed)) }
-        let saved = library.savedPictureStates(of: note)
+        let saved = library.savedPictureStates(of: itemID)
         let savedBefore = savedStates?.states ?? []
-        savedStates = (note, saved)
+        savedStates = (itemID, saved)
         let differing = Set(Set(saved).symmetricDifference(savedBefore).map(\.address)).sorted()
         if !differing.isEmpty, isReady { call("savedPicturesChanged", json(differing)) }
         watchEmbeds()

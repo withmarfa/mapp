@@ -79,7 +79,7 @@ nonisolated enum EditorMessage: Sendable {
     /// A row of the property block was dragged: the whole order the page shows after the move, folded rows included.
     case moveRow(ItemID, row: String, order: [String])
     /// A `[[link]]` to an item was command-clicked in the item `item`.
-    case openNote(ItemID, NoteLink)
+    case openItemLink(ItemID, ItemLink)
     case find(FindState)
     case diagnostic(String)
     case error(String)
@@ -188,9 +188,9 @@ nonisolated enum EditorMessage: Sendable {
                   let order = dict["order"] as? [String], order.contains(row)
             else { return nil }
             self = .moveRow(ItemID(item), row: row, order: order)
-        case "openNote":
-            guard let item = dict["item"] as? String, !item.isEmpty, let link = NoteLink(page: dict) else { return nil }
-            self = .openNote(ItemID(item), link)
+        case "openItemLink":
+            guard let item = dict["item"] as? String, !item.isEmpty, let link = ItemLink(page: dict) else { return nil }
+            self = .openItemLink(ItemID(item), link)
         case "find":
             guard let text = dict["text"] as? String,
                   let selection = dict["selection"] as? [Int], selection.count == 2,

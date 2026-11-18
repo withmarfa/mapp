@@ -10,7 +10,7 @@ struct ItemTable: View {
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     @Environment(\.openWindow) private var openWindow
     @Bindable var browser: Browser
-    let order: NoteOrder
+    let order: ItemOrder
     var pane: FocusState<Browser.Pane?>.Binding
     /// Each place's columns as the person arranged them: shown or hidden, in their order, at their widths.
     @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
@@ -120,7 +120,7 @@ struct ItemTable: View {
                     ItemWindows.open(library.idsForWindows(ids)) { openWindow(value: $0) }
                 }
                 Divider()
-                NoteActions(ids: ids, undoManager: undoManager)
+                ItemActions(ids: ids, undoManager: undoManager)
             }
         } primaryAction: { ids in
             open(ids)

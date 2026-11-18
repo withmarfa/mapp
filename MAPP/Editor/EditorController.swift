@@ -64,14 +64,14 @@ final class EditorController: NSObject {
     /// Escape in the page, which hands the keyboard back to the list.
     @ObservationIgnored var onEscape: () -> Void = {}
     /// A link in the page names this item, which the window opens as choosing it in the list does.
-    @ObservationIgnored var onOpenNote: (ItemID) -> Void = { _ in }
+    @ObservationIgnored var onOpenItem: (ItemID) -> Void = { _ in }
     /// A link in the page names no item the window can open, which is told only by a beep: nothing is made.
     @ObservationIgnored var onUnopenableLink: () -> Void = { NSSound.beep() }
     /// Asks the person which of several items an ambiguous link means, in place of the menu at the pointer. The
     /// handler is called with the one they chose, and not at all if they choose none.
     @ObservationIgnored var onChooseAmbiguousLink: (([ItemID], @escaping (ItemID) -> Void) -> Void)?
     /// The heading a link asked for in the item it is opening, scrolled to once that item is on the page.
-    @ObservationIgnored var pendingHeading: (note: ItemID, text: String)?
+    @ObservationIgnored var pendingHeading: (itemID: ItemID, text: String)?
     /// What the page writes for files quick add attached to a new item, put at the end of its text once the page
     /// shows that item (`append(_:to:)`).
     @ObservationIgnored var pendingEmbeds: [ItemID: [Embed]] = [:]
@@ -81,13 +81,13 @@ final class EditorController: NSObject {
     @ObservationIgnored var isWatchingLinks = false
     /// What each embed of the item on the page was last told to draw from, by its text, to tell the page which have
     /// changed since (`watchEmbeds`); `embedWatch` ends the watch of the item before.
-    @ObservationIgnored var embedStates: (note: ItemID, states: [String: EmbedState])?
+    @ObservationIgnored var embedStates: (itemID: ItemID, states: [String: EmbedState])?
     @ObservationIgnored var embedWatch = 0
     /// The files saved from web addresses that are attached to the item on the page, as the page was last told (see
     /// `watchEmbeds`): the page draws its pictures again when one comes or goes.
-    @ObservationIgnored var savedStates: (note: ItemID, states: [SavedPictureState])?
-    @ObservationIgnored private let noteRequests = NoteRequests()
-    @ObservationIgnored private let noteTitles = NoteLinks.Index()
+    @ObservationIgnored var savedStates: (itemID: ItemID, states: [SavedPictureState])?
+    @ObservationIgnored private let itemRequests = ItemRequests()
+    @ObservationIgnored private let itemTitles = ItemLinks.Index()
     /// Fetches the pictures at web addresses the page asks for, by the Remote Pictures setting.
     @ObservationIgnored let pictures: WebPictures
     @ObservationIgnored let pictureRequests: PictureRequests
@@ -98,7 +98,7 @@ final class EditorController: NSObject {
     /// The Link to Item command, until the person has chosen an item or declined; the page waits on it.
     struct LinkRequest: Identifiable {
         let id = UUID()
-        let note: ItemID
+        let itemID: ItemID
     }
     var linkRequest: LinkRequest?
     /// The Link command, until the person has given an address or declined.
@@ -118,13 +118,13 @@ final class EditorController: NSObject {
 
     /// The item on the page, and the markdown the page holds for it as far as the app knows, read from the
     /// library at `read`.
-    private(set) var noteID: ItemID?
+    private(set) var pageItemID: ItemID?
     /// An explicit selection can outlive a missing body, so its next update can retry the load.
-    @ObservationIgnored var requestedNoteID: ItemID?
+    @ObservationIgnored var requestedItemID: ItemID?
 
     /// Whether the page is showing this item's header, which an item of a type with no text is too: it has no item on
-    /// the page (`noteID`), only its header. What the page sends for any other item is stale.
-    func isShowing(_ id: ItemID) -> Bool { requestedNoteID == id }
+    /// the page (`pageItemID`), only its header. What the page sends for any other item is stale.
+    func isShowing(_ id: ItemID) -> Bool { requestedItemID == id }
     @ObservationIgnored private var markdown = ""
     @ObservationIgnored private var read = ItemVersion(0)
     /// Each load gets a generation, and an edit reports the one it belongs to, so a late edit to the previous
@@ -189,17 +189,17 @@ final class EditorController: NSObject {
             await self?.library?.openEmbeddedFile(reference, in: item, waiting: Self.embedWait) ?? .missing
         }
         configuration.userContentController.addScriptMessageHandler(embeds, contentWorld: .page, name: "embeds")
-        noteRequests.suggest = { [weak self] query, source in
+        itemRequests.suggest = { [weak self] query, source in
             guard let self, let current = self.library else { return [] }
-            return await current.noteNames(matching: query, in: source, using: self.noteTitles)
+            return await current.itemNames(matching: query, in: source, using: self.itemTitles)
         }
-        noteRequests.pick = { [weak self] note in await self?.chooseNoteToLink(from: note) }
-        noteRequests.readings = { [weak self] links, source in
+        itemRequests.pick = { [weak self] itemID in await self?.chooseItemToLink(from: itemID) }
+        itemRequests.readings = { [weak self] links, source in
             let readings = await self?.library?.linkReadings(of: links.map(\.raw), in: source)
             guard let readings, readings.count == links.count else { return links.map { _ in .plain } }
             return readings
         }
-        configuration.userContentController.addScriptMessageHandler(noteRequests, contentWorld: .page, name: "notes")
+        configuration.userContentController.addScriptMessageHandler(itemRequests, contentWorld: .page, name: "items")
         pictureRequests.inFeed = { [weak self] item in self?.library?.item(item)?.tier == .feed }
         pictureRequests.version = { [weak self] in self?.embeds.version ?? 0 }
         embeds.openPicture = { [pictures] address in await pictures.openKept(address) }
@@ -261,20 +261,20 @@ final class EditorController: NSObject {
 
     /// A selection is navigation intent, including returning to an item whose outgoing capture failed.
     func select(_ item: Item) {
-        requestedNoteID = item.id
+        requestedItemID = item.id
         if wantsFocus?.id != item.id { wantsFocus = nil }
-        if pendingHeading?.note != item.id { pendingHeading = nil }
+        if pendingHeading?.itemID != item.id { pendingHeading = nil }
         loadRequest += 1
-        if noteID == item.id, isPresented { noteChanged(item) }
+        if pageItemID == item.id, isPresented { itemChanged(item) }
         else { load(item) }
     }
 
     /// Shows an item for reading. A deleted item is shown read-only. The item shown before is
     /// left once its last edit is in.
     func load(_ item: Item) {
-        requestedNoteID = item.id
+        requestedItemID = item.id
         if wantsFocus?.id != item.id { wantsFocus = nil }
-        if pendingHeading?.note != item.id { pendingHeading = nil }
+        if pendingHeading?.itemID != item.id { pendingHeading = nil }
         loadRequest += 1
         let request = loadRequest
         // `item.open` runs from the request to the page's first frame (`EditorMessage.painted`), `item.handoff` to the
@@ -292,9 +292,9 @@ final class EditorController: NSObject {
             isHeaderScrolledAway = false
             isContentUnderToolbar = false
             show(item, as: "load")
-            if isReady, isPresented, noteID == item.id { opening = (generation, interval) }
+            if isReady, isPresented, pageItemID == item.id { opening = (generation, interval) }
         }
-        if noteID != nil, noteID != item.id {
+        if pageItemID != nil, pageItemID != item.id {
             flush { [self] kept in
                 if kept { return present() }
                 if request == loadRequest { loading = nil }
@@ -377,11 +377,11 @@ final class EditorController: NSObject {
 
     /// The item changed from elsewhere, another window say, or was deleted or recovered. The page takes the new
     /// text where the caret is.
-    func noteChanged(_ item: Item) {
+    func itemChanged(_ item: Item) {
         // SwiftUI can deliver a change from the page just left after another item has loaded.
         // Only an explicit selection or load may navigate; an old update must not take the page back.
-        guard item.id == requestedNoteID else { return }
-        guard item.id == noteID, isPresented else { return loading == item.id ? () : load(item) }
+        guard item.id == requestedItemID else { return }
+        guard item.id == pageItemID, isPresented else { return loading == item.id ? () : load(item) }
         guard let body = library?.body(of: item.id) else { return }
         guard body.text != markdown || item.isWritable != isEditable else {
             // The page already holds this text, so what is typed next is typed on this version of it.
@@ -401,7 +401,7 @@ final class EditorController: NSObject {
         releaseHeldEdit()
         guard let body = library?.body(of: item.id) else { return hide() }
         if function == "load" { isPresented = true }
-        noteID = item.id
+        pageItemID = item.id
         markdown = body.text
         read = body.version
         isEditable = item.isWritable
@@ -422,7 +422,7 @@ final class EditorController: NSObject {
     /// Leaves the item once the page no longer shows it, as when nothing or several items are selected, so the
     /// commands for the item on the page (Print, Find) stop acting on one out of sight.
     func close() {
-        requestedNoteID = nil
+        requestedItemID = nil
         hide()
     }
 
@@ -437,7 +437,7 @@ final class EditorController: NSObject {
         let request = loadRequest
         flush { [self] kept in
             guard kept, request == loadRequest else { return }
-            noteID = nil
+            pageItemID = nil
             watchEmbeds()
             markdown = ""
             isHeaderScrolledAway = false
@@ -466,8 +466,8 @@ final class EditorController: NSObject {
     /// gallery. One request, never repeated. With `caret`, from quick add, the caret goes after the same text in the
     /// page, or to its end.
     func focus(_ itemID: ItemID? = nil, onTitle: Bool = false, caret: PageCaret? = nil) {
-        guard let requested = itemID ?? noteID else { return }
-        guard requested == noteID, isReady, let window = webView.window else {
+        guard let requested = itemID ?? pageItemID else { return }
+        guard requested == pageItemID, isReady, let window = webView.window else {
             wantsFocus = FocusWish(id: requested, onTitle: onTitle, caret: caret)
             return
         }
@@ -534,7 +534,7 @@ final class EditorController: NSObject {
     }
 
     func canApply(_ format: Format) -> Bool {
-        guard hasNote, isEditable, caret.generation == generation else { return false }
+        guard hasItem, isEditable, caret.generation == generation else { return false }
         let (name, argument) = format.command
         let table: String? = switch name {
         case "table": "insert"
@@ -550,7 +550,7 @@ final class EditorController: NSObject {
     }
 
     func setSourceMode(_ source: Bool) {
-        guard hasNote, isReady else { return }
+        guard hasItem, isReady else { return }
         call("setEditingMode", json(source ? "source" : "formatted"), String(generation))
     }
 
@@ -582,7 +582,7 @@ final class EditorController: NSObject {
     func report(_ markdown: String, of generation: Int) {
         if heldEdit?.generation == generation { heldEdit = nil }
         guard var page = shown[generation] else { return }
-        let isCurrent = page.id == noteID && generation == self.generation
+        let isCurrent = page.id == pageItemID && generation == self.generation
         if isCurrent, let body = library?.body(of: page.id), body.text == self.markdown {
             page.read = body.version
             read = body.version
@@ -592,7 +592,7 @@ final class EditorController: NSObject {
         onChange(page.id, markdown, page.read)
         // An edit the library took from before a reload, as when the item was only deleted or recovered, is
         // shown again; one it kept apart from newer text leaves the page as it is.
-        if !isCurrent, page.id == noteID, let item = library?.item(page.id) { noteChanged(item) }
+        if !isCurrent, page.id == pageItemID, let item = library?.item(page.id) { itemChanged(item) }
     }
 
     fileprivate func receive(_ message: EditorMessage) {
@@ -613,11 +613,11 @@ final class EditorController: NSObject {
             headerIconSize = nil
             headerTypeIcons = []
             sendHeader()
-            if let noteID {
+            if let pageItemID {
                 embeds.version += 1
-                call("setItem", json(noteID.rawValue))
+                call("setItem", json(pageItemID.rawValue))
                 generation += 1
-                shown[generation] = Shown(id: noteID, read: read)
+                shown[generation] = Shown(id: pageItemID, read: read)
                 call("load", json(markdown), String(generation), String(isEditable))
             }
             if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle, caret: requested.caret) }
@@ -670,7 +670,7 @@ final class EditorController: NSObject {
             // The page has already refused what Inkkit's `canOpenLink` does not allow.
             if let url = URL(string: href) { NSWorkspace.shared.open(url) }
         case .openItem(let id):
-            onOpenNote(id)
+            onOpenItem(id)
         case .copy(let text):
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(text, forType: .string)
@@ -680,8 +680,8 @@ final class EditorController: NSObject {
             insertImages(PastedImages.sources(on: .general))
         case .openEmbed(let item, let reference):
             openEmbed(reference, in: item)
-        case .openNote(let item, let link):
-            Task { await openNote(link, from: item) }
+        case .openItemLink(let item, let link):
+            Task { await openItemLink(link, from: item) }
         case .embedMenu(let embed):
             menuEmbed = embed
         case .rowMenu(let row):

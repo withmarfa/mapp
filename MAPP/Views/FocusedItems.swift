@@ -2,7 +2,7 @@ import SwiftUI
 import Observation
 
 /// The items the frontmost window is showing, and that window's undo manager, so the menu bar acts on them.
-struct FocusedNotes {
+struct FocusedItems {
     let ids: Set<ItemID>
     let undoManager: UndoManager?
 }
@@ -11,7 +11,7 @@ extension FocusedValues {
     /// The main window in front, for commands that change what it shows.
     @Entry var browser: Browser?
     @Entry var detailsPresentation: DetailsPresentation?
-    @Entry var focusedNotes: FocusedNotes?
+    @Entry var focusedItems: FocusedItems?
     /// The editor of the window in front, for the Format menu. Held weakly: SwiftUI keeps the last focused
     /// values after their window closes, which would otherwise keep that window's editor, page and library.
     var editor: EditorController? {

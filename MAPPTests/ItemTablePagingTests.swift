@@ -73,7 +73,7 @@ struct ItemTablePagingTests {
     // MARK: When the count starts again
 
     private static func key(
-        place: SidebarItem = .allNotes, search: String = "", configure: (inout ItemTableOptions) -> Void = { _ in }
+        place: SidebarItem = .allItems, search: String = "", configure: (inout ItemTableOptions) -> Void = { _ in }
     ) -> TablePagingKey {
         var options = ItemTableOptions()
         configure(&options)

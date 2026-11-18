@@ -16,8 +16,8 @@ struct CommandPalette: View {
     @StoredOrder private var order
     @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
     @AppStorage(PageKey.fullWidth) private var fullWidth = PageStyle().fullWidth
-    @AppStorage(OrderKey.sort) private var sort = NoteOrder().sort
-    @AppStorage(OrderKey.groupsByDate) private var groupsByDate = NoteOrder().groupsByDate
+    @AppStorage(OrderKey.sort) private var sort = ItemOrder().sort
+    @AppStorage(OrderKey.groupsByDate) private var groupsByDate = ItemOrder().groupsByDate
     @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     let browser: Browser
@@ -534,7 +534,7 @@ struct CommandPalette: View {
         let everything = browser.selectedItems(in: library)
         let selected = everything.filter { !$0.isFile }
         let one = browser.selection.count == 1 && selected.count == 1 ? selected.first : nil
-        let hasVisibleEditor = browser.showsPage && one?.id == editor.noteID && editor.hasNote
+        let hasVisibleEditor = browser.showsPage && one?.id == editor.pageItemID && editor.hasItem
         var entries: [Entry] = []
         func add(_ title: String, _ systemImage: String, _ shortcut: String? = nil, in group: PaletteSections.CommandGroup, id: String? = nil, action: @escaping () -> Void) {
             entries.append(Entry(id: id ?? "command:" + title, title: title, icon: .symbol(systemImage), shortcut: shortcut, group: group, action: action))
@@ -567,7 +567,7 @@ struct CommandPalette: View {
             if ordersList && browser.isSearching && !browser.ordersByRelevance {
                 add(String(localized: "Sort by Relevance"), "arrow.up.arrow.down", in: .sortAndGroup) { browser.orderSearch(byRelevance: true) }
             }
-            for choice in NoteSort.allCases where (choice != sort || browser.ordersByRelevance) && ordersList {
+            for choice in ItemSort.allCases where (choice != sort || browser.ordersByRelevance) && ordersList {
                 add(String(localized: "Sort by \(String(localized: choice.title))"), "arrow.up.arrow.down", in: .sortAndGroup) {
                     sort = choice
                     browser.orderSearch(byRelevance: false)
@@ -652,7 +652,7 @@ struct CommandPalette: View {
             }
         }
         let single = browser.selection.count == 1 ? browser.selectedItems(in: library).first?.id : nil
-        let share = NoteShare(note: one, fileURL: single.flatMap { browser.fileURL(of: $0) }, in: library)
+        let share = ItemShare(item: one, fileURL: single.flatMap { browser.fileURL(of: $0) }, in: library)
         if share.isAvailable {
             add(String(localized: "Share…"), "square.and.arrow.up", in: .file) {
                 share.present(near: hasVisibleEditor ? editor.webView : nil)

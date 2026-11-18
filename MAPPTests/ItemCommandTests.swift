@@ -39,17 +39,17 @@ struct ItemCommandTests {
         let note = library.add("A note\n")
         let browser = Browser()
         browser.showSettings()
-        let page = ItemCommandContext.pageItem(showsPage: browser.showsPage, editorHasNote: true, noteID: note.id)
+        let page = ItemCommandContext.pageItem(showsPage: browser.showsPage, editorHasItem: true, pageItemID: note.id)
         #expect(page == nil)
         #expect(enabled(context([note.id], page: page)) == [.quickLook, .openInNewWindow])
 
         browser.leaveSettings()
-        let back = ItemCommandContext.pageItem(showsPage: browser.showsPage, editorHasNote: true, noteID: note.id)
+        let back = ItemCommandContext.pageItem(showsPage: browser.showsPage, editorHasItem: true, pageItemID: note.id)
         #expect(back == note.id)
     }
 
     @Test func aPageThatIsNotReadyIsNotThere() {
-        #expect(ItemCommandContext.pageItem(showsPage: true, editorHasNote: false, noteID: .mint()) == nil)
+        #expect(ItemCommandContext.pageItem(showsPage: true, editorHasItem: false, pageItemID: .mint()) == nil)
     }
 
     @Test func aFileHasNoPageCommands() {

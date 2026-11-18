@@ -30,7 +30,7 @@ extension Browser {
     @discardableResult
     func importFiles(
         _ urls: [URL], unreadable: Int = 0, into collection: ItemID? = nil, destination: ImportDestination? = nil,
-        in library: any ItemLibrary, order: NoteOrder, undoManager: UndoManager?
+        in library: any ItemLibrary, order: ItemOrder, undoManager: UndoManager?
     ) async -> [ItemID] {
         let destination = destination ?? importDestination(into: collection)
         var files: [QuickAdd.File] = []
@@ -65,7 +65,7 @@ extension Browser {
     /// Imports what a drop or a nearby device handed over, through `FileIntake`, then removes any copy made of it.
     /// Where the files go is fixed now, before the providers are read.
     func importProviders(
-        _ providers: [NSItemProvider], into collection: ItemID? = nil, in library: any ItemLibrary, order: NoteOrder,
+        _ providers: [NSItemProvider], into collection: ItemID? = nil, in library: any ItemLibrary, order: ItemOrder,
         undoManager: UndoManager?
     ) {
         let destination = importDestination(into: collection)

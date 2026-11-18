@@ -154,15 +154,15 @@ struct SidebarTests {
         source.send(.loaded(SourceSnapshot(items: LibraryFixture.items, catalogue: LibraryFixture.catalogue)))
         try #require(await eventually { library.isLoaded })
         let browser = Browser()
-        browser.show(.itemType(LibraryFixture.entity.rawValue), in: library, order: NoteOrder())
+        browser.show(.itemType(LibraryFixture.entity.rawValue), in: library, order: ItemOrder())
         #expect(browser.item == .itemType(LibraryFixture.entity.rawValue))
-        browser.placeRemoved(in: library, order: NoteOrder())
+        browser.placeRemoved(in: library, order: ItemOrder())
         #expect(browser.item == .itemType(LibraryFixture.entity.rawValue))
         source.send(.removed([LibraryFixture.en1]))
         try #require(await eventually { library.isGone(LibraryFixture.en1) })
         #expect(!library.itemTypeCounts.contains { $0.id == LibraryFixture.entity })
-        browser.placeRemoved(in: library, order: NoteOrder())
-        #expect(browser.item == .allNotes)
+        browser.placeRemoved(in: library, order: ItemOrder())
+        #expect(browser.item == .allItems)
     }
 
     @Test func theTypesToMakeAreEveryCatalogueTypeButFilesByLabel() async throws {
@@ -467,7 +467,7 @@ struct SidebarTests {
         #expect(outcome(.left, note) == nil)
         #expect(outcome(.right, note) == nil)
         #expect(outcome(.left, nil) == nil)
-        #expect(outcome(.right, .allNotes) == nil)
+        #expect(outcome(.right, .allItems) == nil)
     }
 
     @Test func foldingAParentThatHoldsTheSelectionSelectsTheParent() async throws {

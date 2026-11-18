@@ -7,12 +7,12 @@ extension EditorController {
     /// Asks the person which item to link to, and gives the page the link to write, or nil if they decline or the
     /// page has moved on from the item the command was typed in. A new request cancels the earlier one. A request
     /// made after the window went is answered with nothing.
-    func chooseNoteToLink(from note: ItemID) async -> String? {
+    func chooseItemToLink(from itemID: ItemID) async -> String? {
         cancelLinkRequest()
-        guard !windowIsGone, note == noteID, isEditable, isReady else { return nil }
+        guard !windowIsGone, itemID == pageItemID, isEditable, isReady else { return nil }
         return await withCheckedContinuation { continuation in
             linking = continuation
-            linkRequest = LinkRequest(note: note)
+            linkRequest = LinkRequest(itemID: itemID)
         }
     }
 
@@ -22,7 +22,7 @@ extension EditorController {
     /// open for the person to choose another.
     @discardableResult
     func finishLinkRequest(choosing id: ItemID) async -> Bool {
-        guard linking != nil, let request = linkRequest, let link = await library?.bodyLink(to: id, in: request.note) else {
+        guard linking != nil, let request = linkRequest, let link = await library?.bodyLink(to: id, in: request.itemID) else {
             return false
         }
         // The person may have gone on while the core was asked; the request is answered only if it is still theirs.
@@ -47,10 +47,10 @@ extension EditorController {
     /// (`Items.linkCandidates`), and scrolls to the heading it asks for. A link the copy has not bound, which one
     /// item or more answer to, offers them in a menu. A link that names no item, or that the core cannot be asked
     /// about, opens nothing and beeps; no item is made for it. A click in an item the page has since left is ignored.
-    func openNote(_ link: NoteLink, from source: ItemID) async {
-        guard !windowIsGone, source == noteID, let library else { return }
+    func openItemLink(_ link: ItemLink, from source: ItemID) async {
+        guard !windowIsGone, source == pageItemID, let library else { return }
         let answer = await library.linkAnswers(of: [link.raw], in: source)?.first
-        guard !windowIsGone, source == noteID else { return }
+        guard !windowIsGone, source == pageItemID else { return }
         switch answer?.state {
         case .bound:
             guard let id = answer?.item, library.item(id) != nil else { return onUnopenableLink() }
@@ -68,7 +68,7 @@ extension EditorController {
 
     private func show(_ id: ItemID, heading: String?) {
         pendingHeading = heading.map { (id, $0) }
-        if id == noteID { revealPendingHeading(in: id) } else { onOpenNote(id) }
+        if id == pageItemID { revealPendingHeading(in: id) } else { onOpenItem(id) }
     }
 
     /// A menu at the pointer naming each item a link could mean, by title.
@@ -105,8 +105,8 @@ extension EditorController {
         call("revealHeadingAt", String(ordinal), String(outline.generation))
     }
 
-    func revealPendingHeading(in note: ItemID) {
-        guard let pending = pendingHeading, pending.note == note, isReady else { return }
+    func revealPendingHeading(in itemID: ItemID) {
+        guard let pending = pendingHeading, pending.itemID == itemID, isReady else { return }
         pendingHeading = nil
         call("revealHeading", json(pending.text), String(generation))
     }
@@ -118,7 +118,7 @@ extension EditorController {
         guard !isWatchingLinks, let library else { return }
         isWatchingLinks = true
         withObservationTracking {
-            _ = library.items(in: .allNotes)
+            _ = library.items(in: .allItems)
             // A type given another icon or tone changes the mark of every link to its items.
             _ = library.membershipRevision
         } onChange: { [weak self] in
@@ -126,7 +126,7 @@ extension EditorController {
                 try? await Task.sleep(for: .milliseconds(300))
                 guard let self, !windowIsGone else { return }
                 isWatchingLinks = false
-                if noteID != nil, isReady { call("linksChanged") }
+                if pageItemID != nil, isReady { call("linksChanged") }
                 watchLinks()
             }
         }
