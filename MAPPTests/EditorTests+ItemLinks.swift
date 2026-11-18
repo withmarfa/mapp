@@ -15,7 +15,7 @@ extension EditorTests {
 
     private func ask(_ page: Page, _ request: String) async throws -> Any? {
         try await page.editor.webView.callAsyncJavaScript(
-            "return await window.webkit.messageHandlers.notes.postMessage(\(request))", arguments: [:], in: nil, contentWorld: .page)
+            "return await window.webkit.messageHandlers.items.postMessage(\(request))", arguments: [:], in: nil, contentWorld: .page)
     }
 
     @Test func theItemsAreOfferedAfterDoubleBracketsFromTheLibrary() async throws {
@@ -110,7 +110,7 @@ extension EditorTests {
         let ids = addItems(["Garden ideas"], to: page)
         try await page.load("Intro\n")
         let current = try #require(page.editor.pageItemID)
-        try await page.run("window.pick = window.webkit.messageHandlers.notes.postMessage({ type: 'pick', item: '\(current.rawValue)' })")
+        try await page.run("window.pick = window.webkit.messageHandlers.items.postMessage({ type: 'pick', item: '\(current.rawValue)' })")
         try await page.wait { page.editor.linkRequest != nil }
         #expect(page.editor.linkRequest?.itemID == current)
         await page.editor.finishLinkRequest(choosing: ids[0])
@@ -125,7 +125,7 @@ extension EditorTests {
         try await page.load("Intro\n")
         let current = try #require(page.editor.pageItemID)
         func ask(from item: ItemID) async throws {
-            try await page.run("window.pick = window.webkit.messageHandlers.notes.postMessage({ type: 'pick', item: '\(item.rawValue)' })")
+            try await page.run("window.pick = window.webkit.messageHandlers.items.postMessage({ type: 'pick', item: '\(item.rawValue)' })")
         }
         func answered() async throws -> Bool {
             let value = try await page.editor.webView.callAsyncJavaScript("return await window.pick", arguments: [:], in: nil, contentWorld: .page)
@@ -196,7 +196,7 @@ extension EditorTests {
 
     private func pending(_ page: Page) async throws -> ItemID {
         let current = try #require(page.editor.pageItemID)
-        try await page.run("window.pick = window.webkit.messageHandlers.notes.postMessage({ type: 'pick', item: '\(current.rawValue)' })")
+        try await page.run("window.pick = window.webkit.messageHandlers.items.postMessage({ type: 'pick', item: '\(current.rawValue)' })")
         try await page.wait { page.editor.linkRequest != nil }
         return current
     }
@@ -284,7 +284,7 @@ extension EditorTests {
         let editor = page.editor
         editor.windowWent()
         let current = try #require(editor.pageItemID)
-        try await page.run("window.pick = window.webkit.messageHandlers.notes.postMessage({ type: 'pick', item: '\(current.rawValue)' })")
+        try await page.run("window.pick = window.webkit.messageHandlers.items.postMessage({ type: 'pick', item: '\(current.rawValue)' })")
         #expect(try await answer(page) == nil)
         #expect(editor.linkRequest == nil)
     }
