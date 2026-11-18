@@ -18,6 +18,7 @@ struct ItemTableCell: View {
     let dateFormat: DateFormat
     /// Which row the pointer is on, shared by the row's cells, so the name's cell can answer to it from any of them.
     let hover: ItemTableHover
+    @Environment(\.colorScheme) private var scheme
     @State private var isHovering = false
     @State private var anchor = ValueEditAnchorBox()
 
@@ -170,9 +171,9 @@ struct ItemTableCell: View {
                 .foregroundStyle(row.item.isUntitled ? .secondary : .primary)
                 .truncationMode(.tail)
             if row.item.isFavorite {
-                Image(systemName: "star.fill")
+                Image(systemName: "heart.fill")
                     .imageScale(.small)
-                    .foregroundStyle(.yellow)
+                    .foregroundStyle(FavoriteMark.color(for: scheme))
                     .accessibilityLabel("Favorite")
             }
         }
@@ -193,8 +194,6 @@ struct ItemTableCell: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .frame(width: 22, height: 22)
-                .background(.thinMaterial, in: .rect(cornerRadius: 6, style: .continuous))
-                .overlay { RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(.separator) }
                 .contentShape(.rect)
         }
         .buttonStyle(.plain)

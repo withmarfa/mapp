@@ -299,7 +299,7 @@ private struct BoardCell<Actions: View>: View {
     }
 }
 
-/// The selected card's fill and edge. It reads the selection itself, so a selection that moves redraws these and no card.
+/// The selected card's soft grey fill. It reads the selection itself, so a selection that moves redraws these and no card.
 private struct BoardSelection: View {
     let browser: Browser
     let id: ItemID
@@ -307,8 +307,7 @@ private struct BoardSelection: View {
     var body: some View {
         if browser.selection.contains(id) {
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color.accentColor.opacity(0.12))
-                .overlay { RoundedRectangle(cornerRadius: 10).strokeBorder(Color.accentColor, lineWidth: 2) }
+                .fill(Color(nsColor: .labelColor).opacity(0.08))
                 .allowsHitTesting(false)
         }
     }

@@ -237,7 +237,7 @@ private struct SidebarPendingViewRow: View {
     var body: some View {
         if browser.viewPanel?.isNew == true {
             SidebarLabel(title: String(localized: "New View"), icon: .symbol(SidebarPlace.viewSymbol))
-                .listRowBackground(Color.accentColor.opacity(0.22).clipShape(.rect(cornerRadius: 6)))
+                .listRowBackground(Color(nsColor: .labelColor).opacity(0.08).clipShape(.rect(cornerRadius: 6)))
                 .selectionDisabled()
                 .accessibilityAddTraits(.isSelected)
                 .accessibilityIdentifier("SidebarNewView")

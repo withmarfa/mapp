@@ -1,8 +1,8 @@
 # Views and lists
 
-Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built in v0.0.45. The table's margin, whole-cell hover and add to an empty cell, and the palettes' bar, rows and material setting as described below, are built, not yet released. See [Looks](looks.md).
+Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built in v0.0.45. The table's margin, whole-cell hover and add to an empty cell, the palettes' bar, rows and material setting, and the selection and hover greys and the favorite's heart as described below, are built, not yet released. See [Looks](looks.md).
 
-Where it lives: `Browser`, `ItemViewMode`, `ViewLayouts` and `SidebarLayout` under `MAPP/Model/`, with `CardContents`, `ItemTableLayout`, `ItemTimelineLayout`, `ItemPlacement`, `EventSpan` and `CalendarLayout` under `MAPP/Model/Items/`; `ItemList`, `ItemRow`, `ItemGallery`, `GalleryCard`, `ItemBoard`, `ItemTable`, `ItemTableCell`, `ChipLine`, `ItemTimeline`, `ItemCalendar`, `CalendarToolbarItems`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
+Where it lives: `Browser`, `ItemViewMode`, `ViewLayouts` and `SidebarLayout` under `MAPP/Model/`, with `CardContents`, `ItemTableLayout`, `ItemTimelineLayout`, `ItemPlacement`, `EventSpan` and `CalendarLayout` under `MAPP/Model/Items/`; `ItemList`, `ItemRow`, `ItemGallery`, `GalleryCard`, `ItemBoard`, `ItemTable`, `ItemTableCell`, `SoftSelection`, `ChipLine`, `ItemTimeline`, `ItemCalendar`, `CalendarToolbarItems`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
 
 A view shows a set of items in a layout. This page explains the layouts, what a saved view is, and the controls that change what a list shows.
 
@@ -11,7 +11,7 @@ A view shows a set of items in a layout. This page explains the layouts, what a 
 An item list takes one of six layouts (`ItemViewMode`): list, gallery, table, board, timeline and calendar.
 
 - The list takes the rows described in [Looks](looks.md).
-- The gallery's card shows the item's picture, or its opening lines when it has none, then its title on up to two lines (two lines of room on every card) and the one line of context its type's look gives it. An item with neither a picture nor text shows its type's mark. A favorite's star sits on the picture and nothing else does. The panel chooses the preview, fit, shape and size; the look chooses what the card says.
+- The gallery's card shows the item's picture, or its opening lines when it has none, then its title on up to two lines (two lines of room on every card) and the one line of context its type's look gives it. An item with neither a picture nor text shows its type's mark. A favorite's heart sits on the picture and nothing else does. The panel chooses the preview, fit, shape and size; the look chooses what the card says.
 - The board shows its columns, which are the groups of its grouping field. Each lane's header is its status mark (a status field's words, and the four status groups, take the mark of their group), its title and its count, on a quiet rounded lane. The lanes share the window's width, each between 236 and 340 points (200 and 260 in a compact board), so a board of a few lanes stays at the left and one of many scrolls sideways to its last lane. A board of one type groups by that type's own words: a status field's words by their group (Not Started, In Progress, Completed, Canceled) and then as the type declares them, any other field's as declared. A board of a mixed list groups by Marfa's four status groups, which every type shares: Not Started, In Progress, Completed and Canceled, then No Status, which holds the items with no status and the types that have none. A person can hide the groups that have no items. A card is the title, the look's Secondary line and the bottom line (the type only where the board mixes types, the status, two facts and "+N"), without the field the board is grouped by: a board grouped by status leaves the status off every card, and one grouped by priority leaves the priority off. A compact board shows the title alone, with the type's mark where the board mixes types.
 - The table's column headings have no dividers between them. A column still resizes by dragging its edge, where the resize cursor shows, and reorders by dragging its heading; the heading keeps its bottom line and the sort mark.
 - The table's rows are 36 points high and it has one left edge, shared by the title, chips, headers, group names and rows. A group's chevron hangs in the margin before it, inside the pane with room at its left.
@@ -25,6 +25,16 @@ An item list takes one of six layouts (`ItemViewMode`): list, gallery, table, bo
 Agreed, not built:
 
 - The timeline starts from today's agenda and uses the window's width, and choosing a row, card or event opens the right sidebar.
+
+## Selection and hover
+
+- A chosen row, card or table row is gray at 8% of the label color, and a row under the pointer is gray at 4.7%. Neither is ever blue. The list, the item table, the timeline, the index pages' tables, Settings' page list and the sidebar's pending New View row take the 8%; the list, table and timeline take the 4.7% as well.
+- `SoftSelection` draws both as layers beneath the table's row views, and the 4.7% follows the pointer from the table's own mouse events, so a hover runs no row's body. A row that is chosen, or that the table will not select, such as a heading, gets no hover mark.
+- A table cell that changes or adds a value keeps its own tint across the whole cell, which shows over the row's.
+- A chosen board card is filled with the same gray. A chosen gallery card keeps a soft 3-point ring in that gray, touching the card, with no plate behind it.
+- A chosen calendar event keeps its color, and the palettes keep their own selection.
+- A table row under the pointer shows its open control as the arrow alone, in the secondary label color, with no tile.
+- The favorites mark is a heart everywhere, in the pink of the sidebar's Favorites view: on the gallery card, in the table, and as Add to Favorites and Remove from Favorites (`heart`, `heart.slash`) in the menus and the palette.
 
 ## Saved views
 
