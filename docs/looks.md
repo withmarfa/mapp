@@ -28,7 +28,7 @@ A `TypeLook` has three places, and a view adds only its layout and density.
 
 `count:children` counts active children. `count:members` counts active collection members. `count:progress` shows the proportion of active children with a status that are completed or canceled, such as "3 of 7 done". `count:rows:<table>` counts an item's rows in the named table, such as "214 messages". A count with nothing to display leaves the fact blank. A count column starts hidden until a row has a value to display.
 
-A row or card requests its counts when it appears, even if another window already shows it. A wide board loads lanes as you scroll. When the working copy reports a new sync time, MAPP requests fresh table row counts for the items on display. Changes to items or edges also refresh counts. MAPP can display the previous answer while it waits.
+A row or card requests its counts when it appears, even if another window already shows it. A wide board requests counts only for the lanes in view. When the working copy reports a new sync time, MAPP requests fresh table row counts for the items on display. Changes to items or edges also refresh counts. MAPP can display the previous answer while it waits.
 
 Count columns do not support sorting in the table header or in Add Sort. MAPP drops a stored count sort because rows the table has yet to display may have no answer.
 

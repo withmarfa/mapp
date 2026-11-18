@@ -12,6 +12,8 @@ struct ItemBoard: View {
     @State private var cursor: ItemID?
     @State private var anchor: ItemID?
     @State private var daysSeen = 0
+    /// The lanes in view in the horizontal scroll view, which are the only ones whose cards ask for counts.
+    @State private var visibleLanes: Set<ItemBoardLane.ID> = []
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     /// What each card says, worked out once for each item from its type's look.
     @State private var cardContents = CardContents()
@@ -77,11 +79,13 @@ struct ItemBoard: View {
         return ScrollViewReader { proxy in
             GeometryReader { geometry in
                 ScrollView(.horizontal) {
-                    // Mounting every lane would request counts across the whole board.
-                    LazyHStack(alignment: .top, spacing: Self.laneGap) {
+                    HStack(alignment: .top, spacing: Self.laneGap) {
                         ForEach(lanes) { lane in
                             laneView(lane, lanes: lanes, key: key, grouped: grouped, ids: ids, contents: contents)
                                 .frame(width: laneWidth(count: lanes.count, in: geometry.size.width))
+                                .onScrollVisibilityChange(threshold: 0.01) { visible in
+                                    if visible { visibleLanes.insert(lane.id) } else { visibleLanes.remove(lane.id) }
+                                }
                         }
                     }
                     .padding(.horizontal, Self.edge)
@@ -111,12 +115,7 @@ struct ItemBoard: View {
                 browser.selection = Set(ids)
                 return .handled
             }
-            .onChange(of: cursor) {
-                guard let cursor else { return }
-                // A lane that is not built yet has no card to scroll to, so its lane is brought into view first.
-                if let lane = lanes.first(where: { lane in lane.items.contains { $0.id == cursor } }) { proxy.scrollTo(lane.id) }
-                proxy.scrollTo(cursor)
-            }
+            .onChange(of: cursor) { if let cursor { proxy.scrollTo(cursor) } }
         }
         .dragContainer(for: ItemReference.self) { ids in ids.map(library.dragReference(of:)) }
         .dragsSelection(of: browser)
@@ -176,6 +175,7 @@ struct ItemBoard: View {
             : nil
         return BoardCell(
             item: item, browser: browser, content: content, compact: compact, invalidValue: invalid,
+            wantsCounts: visibleLanes.contains(lane.id),
             select: { extending, toggling in
                 select(item.id, ids: ids, extending: extending, toggling: toggling)
                 pane.wrappedValue = .list
@@ -270,6 +270,8 @@ private struct BoardCell<Actions: View>: View {
     let content: RowContent
     let compact: Bool
     let invalidValue: String?
+    /// Whether the card's lane is in view; a lane scrolled out of view lets its cards' counts go.
+    let wantsCounts: Bool
     let select: (_ extending: Bool, _ toggling: Bool) -> Void
     let open: () -> Void
     @ViewBuilder let menu: (_ selection: Set<ItemID>) -> Actions
@@ -287,7 +289,7 @@ private struct BoardCell<Actions: View>: View {
         }
         .buttonStyle(.plain)
         .focusable(false)
-        .wantsCounts(of: item.id, content.countQueries, in: library.counts)
+        .wantsCounts(of: item.id, wantsCounts ? content.countQueries : [], in: library.counts)
         .contentShape(.rect(cornerRadius: 10))
         .simultaneousGesture(TapGesture(count: 2).onEnded { open() })
         .accessibilityAddTraits(isSelected ? .isSelected : [])
