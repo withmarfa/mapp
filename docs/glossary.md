@@ -4,14 +4,14 @@ Status: Built in v0.0.43. Entries marked "agreed, not built" describe a design t
 
 Where it lives: `Catalogue`, `Item`, `SidebarItem`, `PropertyRow`, `PagePins` and `ItemViewMode`, under `MAPP/Model/`.
 
-This page defines the words MAPP uses. Each entry names who owns the thing, Marfa or MAPP, and links to the page that explains it. [Marfa and MAPP](marfa-and-mapp.md) explains the split.
+What is agreed and not built yet is in [Agreed designs](agreed-designs.md). This page defines the words MAPP uses. Each entry names who owns the thing, Marfa or MAPP, and links to the page that explains it. [Marfa and MAPP](marfa-and-mapp.md) explains the split.
 
 | Term | Owner | Meaning | Read more |
 | --- | --- | --- | --- |
 | Catalogue | Marfa | The server's list of types, fields and edge types. MAPP reads it as `Catalogue` and names no type of its own. | [Marfa and MAPP](marfa-and-mapp.md) |
 | Chip | MAPP | One value drawn as a small rounded label, 22 points tall (`PageChip`). | [Value components](value-components.md) |
 | Collection | Marfa | An item of a type that plays the `container` role. Other items are filed under it with an `in-collection` edge. | [Marfa and MAPP](marfa-and-mapp.md) |
-| Composed property | MAPP | A property that MAPP builds from fields or edges, such as Location or Count. Location is built in v0.0.45; the rest are not built and are being reconsidered. | [Composed properties](composed-properties.md) |
+| Composed property | MAPP | A property that MAPP builds from fields or edges, such as Location or Count. Location is built in v0.0.45 and Relation is built, not yet released; Count and Reading Time are not built and are being reconsidered. | [Composed properties](composed-properties.md) |
 | Density | MAPP | How much room a row takes: Standard or Compact. Built in v0.0.44. | [Presets and densities](presets-and-densities.md) |
 | Edge | Marfa | A typed link from one item to another. MAPP shows an edge's name as Marfa words it. | [Marfa and MAPP](marfa-and-mapp.md) |
 | Item | Marfa | A record in a library: a type, properties, a text body and edges. | [Marfa and MAPP](marfa-and-mapp.md) |
