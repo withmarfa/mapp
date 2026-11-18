@@ -95,6 +95,9 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 - **A Format panel copied from the iPhone's Notes.** MAPP's own formats, from its Format menu, in a compact card.
 - **An item's page sliding in over the list from the right (a side peek).** An item opens in a modal, a full page or a window.
 - **A back button labeled with the place, such as "‹ Items", or a path such as Items › name**, for now. Back has no label.
+- **Focus that hides the sidebar and the list.** Focus hides only the title and the properties.
+- **An on button in the corner drawn in the accent color.** It is gray.
+- **Full Screen as the name of the corner's last button.** It is Focus; Full Screen is the system's window command.
 
 ## Status
 
