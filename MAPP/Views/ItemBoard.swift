@@ -77,7 +77,8 @@ struct ItemBoard: View {
         return ScrollViewReader { proxy in
             GeometryReader { geometry in
                 ScrollView(.horizontal) {
-                    HStack(alignment: .top, spacing: Self.laneGap) {
+                    // Lazy, so a lane off screen builds no card and asks for no count until it scrolls into view.
+                    LazyHStack(alignment: .top, spacing: Self.laneGap) {
                         ForEach(lanes) { lane in
                             laneView(lane, lanes: lanes, key: key, grouped: grouped, ids: ids, contents: contents)
                                 .frame(width: laneWidth(count: lanes.count, in: geometry.size.width))
@@ -110,7 +111,12 @@ struct ItemBoard: View {
                 browser.selection = Set(ids)
                 return .handled
             }
-            .onChange(of: cursor) { if let cursor { proxy.scrollTo(cursor) } }
+            .onChange(of: cursor) {
+                guard let cursor else { return }
+                // A lane that is not built yet has no card to scroll to, so its lane is brought into view first.
+                if let lane = lanes.first(where: { lane in lane.items.contains { $0.id == cursor } }) { proxy.scrollTo(lane.id) }
+                proxy.scrollTo(cursor)
+            }
         }
         .dragContainer(for: ItemReference.self) { ids in ids.map(library.dragReference(of:)) }
         .dragsSelection(of: browser)

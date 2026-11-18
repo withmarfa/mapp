@@ -255,6 +255,12 @@ nonisolated extension ItemTableColumn {
         }
     }
 
+    /// Whether the header and Add Sort offer the column. A count is asked for only the rows on screen, so ordering every row
+    /// by it would rank the rows Marfa has not answered for as if they had none.
+    var isSortable: Bool {
+        if case .count = content { false } else { true }
+    }
+
     func sortValue(of row: ItemTableRow) -> ItemTableValue.Sort? {
         switch content {
         case .title: return .text(row.item.displayTitle)
@@ -262,16 +268,7 @@ nonisolated extension ItemTableColumn {
         case .parent: return row.parent.map { .text($0.title) }
         case .children: return row.children.first.map { .text($0.title) }
         case .collections: return row.collections.first.map { .text($0.title) }
-        case .count(let fact):
-            // A count with nothing to say sorts last, as an empty cell does.
-            guard let answer = row.counts[fact] else { return nil }
-            switch fact {
-            case .progress:
-                guard let groups = answer.groups, groups.withStatus > 0 else { return nil }
-                return .number(Decimal(groups.finished) / Decimal(groups.withStatus))
-            case .children, .members, .rows:
-                return answer.total > 0 ? .number(Decimal(answer.total)) : nil
-            }
+        case .count: return nil
         case .created: return .date(row.item.created)
         case .edited: return .date(row.item.modified)
         case .occurred: return .date(row.item.occurred ?? row.item.created)
@@ -303,7 +300,7 @@ nonisolated extension ItemTableColumn {
     /// Which way a column sorts when its header is first clicked: what matters most comes first.
     var firstOrder: SortOrder {
         switch style {
-        case .priority, .date, .number, .duration, .count: .reverse
+        case .priority, .date, .number, .duration: .reverse
         default: .forward
         }
     }
@@ -510,7 +507,7 @@ nonisolated enum ItemTableLayout {
                 let hasStatus = types.contains { catalogue.itemTypes[$0]?.statusField != nil && (looks[$0] ?? .empty).counts.contains(fact) }
                 // Until Marfa has answered a count for some row, the column has nothing to say and starts hidden.
                 let column = ItemTableColumn.count(fact, hasStatus: hasStatus)
-                add(column, shown: rows.contains { column.sortValue(of: $0) != nil })
+                add(column, shown: rows.contains { CountWording.text(of: fact, answer: $0.counts[fact], hasStatus: hasStatus) != nil })
             case .created: add(.created, shown: true)
             case .edited: add(.edited, shown: true)
             case .occurred: add(.occurred, shown: true)
@@ -554,7 +551,8 @@ nonisolated enum ItemTableLayout {
             }
         }
         let available = columns.filter { column in
-            switch column.content {
+            guard column.isSortable else { return false }
+            return switch column.content {
             case .field(let field): declared.contains(field.key)
             case .duration(let start, let end): declared.contains(start) && declared.contains(end)
             case .type: types.count > 1
@@ -627,9 +625,10 @@ nonisolated enum ItemTableLayout {
     /// place that keeps its own order, as a collection does, starts unsorted, so its rows stay in the order given.
     static func sort(_ options: ItemTableOptions, columns: [ItemTableColumn], keepsGivenOrder: Bool = false) -> [ItemTableComparator] {
         if let sort = options.sort {
-            // A column the place no longer has is dropped; its stored copy may also be out of date.
+            // A column the place no longer has is dropped, as is one that cannot be sorted, such as a count; its stored
+            // copy may also be out of date.
             let fresh = sort.compactMap { comparator in
-                columns.first { $0.id == comparator.column.id }.map { ItemTableComparator(column: $0, order: comparator.order) }
+                columns.first { $0.id == comparator.column.id && $0.isSortable }.map { ItemTableComparator(column: $0, order: comparator.order) }
             }
             if !fresh.isEmpty { return fresh }
         }

@@ -162,7 +162,8 @@ import Testing
         let columns = ItemTableLayout.columns(for: [row], catalogue: Self.catalogue, hidden: [], looks: looks)
         let column = try #require(columns.first { $0.content == ItemTableColumn.Content.count(.progress) })
         #expect(column.isShownByDefault && column.label == "Progress")
-        #expect(column.sortValue(of: row) == .number(1))
+        #expect(!column.isSortable)
+        #expect(column.sortValue(of: row) == nil)
 
         let card = RowContent.card(
             for: project, look: Self.progress, catalogue: Self.catalogue, list: Self.list, shape: CardShape(),
@@ -178,5 +179,26 @@ import Testing
         ])
         library.counts.want([shelf.id], .members)
         #expect(await eventually { library.counts.answer(of: shelf.id, .members)?.total == 1 })
+    }
+
+    @Test func aCountColumnIsNeverSortedOrOfferedToSortByAndAStoredSortOnOneIsDropped() throws {
+        let project = Self.item("core.task", "Project", status: "todo")
+        let library = Self.library([project, Self.item("core.task", "A", status: "done", parent: project.id)])
+        let looks = [project.type: Self.progress]
+        let rows = ItemTableRow.rows(of: [project], in: library, looks: looks)
+        let columns = ItemTableLayout.columns(for: rows, catalogue: Self.catalogue, hidden: [], looks: looks)
+        let count = try #require(columns.first { $0.content == ItemTableColumn.Content.count(.progress) })
+        #expect(!count.isSortable)
+        #expect(columns.filter(\.isSortable).count == columns.count - 1)
+
+        let offered = ItemTableLayout.sortChoices(from: columns, types: [project.type], catalogue: Self.catalogue)
+        #expect(!offered.contains { $0.id == count.id })
+
+        var options = ItemTableOptions()
+        options.sort = [ItemTableComparator(column: count, order: .reverse), ItemTableComparator(column: .title, order: .forward)]
+        let kept = ItemTableLayout.sort(options, columns: columns)
+        #expect(kept.map(\.column.id) == ["title"])
+        options.sort = [ItemTableComparator(column: count, order: .reverse)]
+        #expect(!ItemTableLayout.sort(options, columns: columns).contains { $0.column.id == count.id })
     }
 }

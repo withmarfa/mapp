@@ -36,6 +36,8 @@ actor MarfaSync {
     /// What the copy last said it was doing, so a change of it is told once.
     private var connection: CopyConnection?
     private var fill: FillProgress?
+    /// When the package last said a pull finished, so a catch-up that changed nothing else is still seen.
+    private var syncedAt: Date?
     /// The calls of the app's own refreshes under way, which the report shows as updating.
     private var refreshes = 0
     private var wantsRefresh = false
@@ -178,6 +180,12 @@ actor MarfaSync {
         show(update.connection, changed: before != update.connection)
         hub.report.update { report in
             if let date = update.lastSynced { report.lastSynced = date }
+        }
+        if let date = update.lastSynced, date != syncedAt {
+            // A catch-up brings no report of a row of a table the copy does not hold, so however little else it changed,
+            // the counts the server answers are asked again.
+            syncedAt = date
+            hub.publish(.counts(rowsOnly: true))
         }
         publishPhase()
         if !update.reread.isEmpty || update.fill != nil || before != update.connection {

@@ -68,9 +68,6 @@ final class ItemCounts {
     @ObservationIgnored private var answers: [Key: ItemCountAnswer] = [:]
     /// How many views want each count. A count nobody wants is neither asked nor asked again.
     @ObservationIgnored private var wanted: [Key: Int] = [:]
-    /// Wanted counts that are queued, being asked, or answered since the last change: not asked again until one. Always a
-    /// subset of `wanted`, and a count joins it only as it is queued, so none is held as asked without being asked.
-    @ObservationIgnored private var asked: Set<Key> = []
     /// Answers kept for counts nobody wants now, which `want` asks again.
     @ObservationIgnored private var unheld: Set<Key> = []
     @ObservationIgnored private var pending: [CountQuery: [ItemID]] = [:]
@@ -92,16 +89,18 @@ final class ItemCounts {
         return answers[Key(id: id, query: query)]
     }
 
-    /// Says the counts are wanted, as a view that shows them appears. One that is not yet asked is asked at once, and
-    /// one that was let go with an answer is asked again, since it may have changed meanwhile. Call it from an action, never
-    /// from drawing.
+    /// Says the counts are wanted, as a view that shows them appears. Each is asked at once unless a question for it is
+    /// queued, since an answer held, whether another view still holds it or it was let go, may have changed meanwhile. Call
+    /// it from an action, never from drawing.
     func want(_ ids: some Sequence<ItemID>, _ query: CountQuery) {
         var asking = false
         for id in ids {
             let key = Key(id: id, query: query)
             wanted[key, default: 0] += 1
             unheld.remove(key)
-            if asked.insert(key).inserted {
+            // A view returning while another still holds the count asks again too: the answer held may be old, and a
+            // count queued already is the one question that will cover both.
+            if !queued.contains(key) {
                 enqueue(key)
                 asking = true
             }
@@ -119,13 +118,14 @@ final class ItemCounts {
                 continue
             }
             wanted[key] = nil
-            asked.remove(key)
             queued.remove(key)
             if answers[key] != nil { unheld.insert(key) }
         }
         if unheld.count > Self.kept {
             for key in unheld { answers[key] = nil }
             unheld = []
+            // A view that read one of these answers is drawn again without it, and a cache keyed on the revision is made again.
+            revision += 1
         }
     }
 
@@ -149,7 +149,6 @@ final class ItemCounts {
         settle = nil
         for key in wanted.keys {
             if scope == .rows { guard case .rows = key.query else { continue } }
-            asked.insert(key)
             enqueue(key)
         }
         work()

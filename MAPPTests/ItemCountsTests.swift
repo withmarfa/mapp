@@ -57,8 +57,35 @@ import Testing
         counts.want([ItemID("a")], .children)
         counts.want([ItemID("a")], .children)
         #expect(await eventually { counts.answer(of: ItemID("a"), .children)?.total == 4 })
-        counts.want([ItemID("a")], .children)
         #expect(await log.asked == [["a"]])
+    }
+
+    @Test func aRowReturningToViewAsksAgainEvenWhileAnotherWindowStillShowsIt() async {
+        let log = Log()
+        let total = Counter()
+        total.value = 1
+        let counts = answering(total, log: log)
+        let id = ItemID("a")
+        counts.want([id], .rows(table: "t"))  // One window.
+        #expect(await eventually { counts.answer(of: id, .rows(table: "t"))?.total == 1 })
+
+        total.value = 2
+        counts.want([id], .rows(table: "t"))  // Another window, or the first returning, while the first still holds it.
+        #expect(await eventually { counts.answer(of: id, .rows(table: "t"))?.total == 2 })
+        #expect(await log.asked == [["a"], ["a"]])
+    }
+
+    @Test func releasingMoreAnswersThanAreKeptAdvancesTheRevisionSoNoOldNumberIsDrawnFromACachedRow() async {
+        let total = Counter()
+        total.value = 1
+        let counts = answering(total)
+        let ids = (0...ItemCounts.kept).map { ItemID("i\($0)") }
+        counts.want(ids, .children)
+        #expect(await eventually { counts.answer(of: ids.last!, .children) != nil })
+        let before = counts.revision
+        counts.release(ids, .children)
+        #expect(counts.revision > before)
+        #expect(counts.answer(of: ids[0], .children) == nil)
     }
 
     @Test func aLongListIsAskedInBatchesOfAtMostAHundred() async {
