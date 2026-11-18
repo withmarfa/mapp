@@ -2,14 +2,14 @@ import SwiftUI
 
 /// Chooses the item the Link to Item command links to: the items by title, the most recently edited first,
 /// narrowed by what is typed. Return or a click chooses; Cancel or Escape leaves the line as it was typed.
-struct NoteLinkPicker: View {
+struct ItemLinkPicker: View {
     @CurrentLibrary private var library
     let editor: EditorController
-    let note: ItemID
+    let itemID: ItemID
     @State private var query = ""
     @State private var highlighted = 0
     /// Read once, so typing in the field narrows a list that is already sorted.
-    @State private var notes: [Item] = []
+    @State private var candidates: [Item] = []
     /// The items' titles folded once, so a keystroke folds only what was typed.
     @State private var titles = PaletteMatch.Titles()
     /// An item was chosen that no link can name alone, so the person is asked for another.
@@ -19,8 +19,8 @@ struct NoteLinkPicker: View {
     private static let limit = 50
 
     private var matches: [Item] {
-        let ranked = titles.ranked(notes.map(\.title), query)
-        return ranked.prefix(Self.limit).map { notes[$0] }
+        let ranked = titles.ranked(candidates.map(\.title), query)
+        return ranked.prefix(Self.limit).map { candidates[$0] }
     }
 
     var body: some View {
@@ -31,7 +31,7 @@ struct NoteLinkPicker: View {
                 .textFieldStyle(.roundedBorder)
                 .focused($isFieldFocused)
                 .onSubmit { choose(matches, at: highlighted) }
-                .accessibilityIdentifier("NoteLinkField")
+                .accessibilityIdentifier("ItemLinkField")
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 0) {
@@ -69,11 +69,11 @@ struct NoteLinkPicker: View {
         }
         .onChange(of: query) { highlighted = 0; refused = false }
         .task {
-            notes = library.notesToLink(excluding: note)
+            candidates = library.itemsToLink(excluding: itemID)
             isFieldFocused = true
         }
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("NoteLinkPicker")
+        .accessibilityIdentifier("ItemLinkPicker")
     }
 
     private func row(_ item: Item, isHighlighted: Bool) -> some View {
@@ -95,7 +95,7 @@ struct NoteLinkPicker: View {
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityAddTraits(isHighlighted ? .isSelected : [])
-        .accessibilityIdentifier("NoteLinkRow.\(item.id.rawValue)")
+        .accessibilityIdentifier("ItemLinkRow.\(item.id.rawValue)")
     }
 
     private func choose(_ matches: [Item], at index: Int) {

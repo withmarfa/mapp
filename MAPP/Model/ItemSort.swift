@@ -2,12 +2,12 @@ import Foundation
 
 /// How the list is ordered: by which date or by title, and whether dated items fall into sections by day. The
 /// defaults here are the only ones; stored settings fall back to them.
-nonisolated struct NoteOrder: Equatable {
-    var sort: NoteSort = .dateEdited
+nonisolated struct ItemOrder: Equatable {
+    var sort: ItemSort = .dateEdited
     var groupsByDate = true
 }
 
-nonisolated enum NoteSort: String, CaseIterable {
+nonisolated enum ItemSort: String, CaseIterable {
     case dateEdited
     case dateCreated
     case title

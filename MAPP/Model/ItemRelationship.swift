@@ -3,7 +3,7 @@ import Foundation
 nonisolated struct ItemRelationshipTarget: Identifiable, Sendable {
     let title: String
     let itemID: ItemID?
-    let resolution: NoteReferenceResolution
+    let resolution: ReferenceResolution
     /// The item is in Recently Deleted. It still opens, there.
     var isDeleted = false
     var id: String { itemID?.rawValue ?? title }

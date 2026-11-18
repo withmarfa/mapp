@@ -41,14 +41,14 @@ nonisolated struct SyncFootLine: Hashable, Sendable {
         case .online, .connecting, .offline:
             let reachable = if case .offline = state { false } else { true }
             if !report.problems.isEmpty {
-                self.init(.needsAttention, Words.needAttentionLine(report.problems.count), help: status.notes.first { $0.kind == .needsAttention }?.detail)
+                self.init(.needsAttention, Words.needAttentionLine(report.problems.count), help: status.notices.first { $0.kind == .needsAttention }?.detail)
             } else if reachable, report.phase != .current || state == .connecting {
                 self.init(.syncing, String(localized: "Syncing…"), help: nil)
             } else if !reachable {
                 let line = report.waiting > 0
                     ? Words.offlineLine(report.waiting)
                     : lastSynced.map { Self.offline(since: $0, now: now, locale: locale) } ?? String(localized: "Offline")
-                self.init(.offline, line, help: status.notes.first { $0.kind == .offline }?.detail)
+                self.init(.offline, line, help: status.notices.first { $0.kind == .offline }?.detail)
             } else if status.primary?.kind == .sending {
                 self.init(.waiting, Words.waitingToSend(report.waiting), help: status.primary?.detail)
             } else if let lastSynced {

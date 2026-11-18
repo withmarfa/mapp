@@ -617,7 +617,7 @@ struct QuickAddTests {
 
     @Test func theKindIsTheOneChosenThenTheLastUsedThenThePlacesThenAnItem() {
         let library = FakeItemLibrary(now: start)
-        func kind(remembered: String? = nil, place: SidebarItem = .allNotes, chosen: String? = nil) -> String? {
+        func kind(remembered: String? = nil, place: SidebarItem = .allItems, chosen: String? = nil) -> String? {
             let browser = Browser()
             browser.sidebarItem = place
             browser.openQuickAdd(typeID: chosen, remembered: remembered, in: library)

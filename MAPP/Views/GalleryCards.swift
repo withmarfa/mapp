@@ -7,12 +7,12 @@ import UniformTypeIdentifiers
 /// What shape an item's card takes in the gallery: a file shows its own picture, and every other item is a miniature of
 /// its opening lines. What a card says is its type's look, never its shape.
 enum GalleryKind: Equatable {
-    case note
+    case text
     case file(UTType)
 
     static func of(_ item: Item) -> GalleryKind {
         if case .file(let type, _) = item.content { return .file(type) }
-        return .note
+        return .text
     }
 }
 

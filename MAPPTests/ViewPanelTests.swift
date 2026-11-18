@@ -16,7 +16,7 @@ struct ViewPanelTests {
     }
 
     private static let id = ItemID("view-open-tasks")
-    private static let order = NoteOrder()
+    private static let order = ItemOrder()
     private static let status = ViewDraft.columnID(of: "properties.status") ?? "field.status"
 
     private static func view(filter: String? = nil) -> LibraryView {
@@ -167,28 +167,28 @@ struct ViewPanelTests {
 
     @Test func aPlaceKeepsItsDensityOnThisMacAndUndoPutsItBack() {
         let (browser, _, undo) = Self.opened()
-        browser.sidebarItem = .allNotes
+        browser.sidebarItem = .allItems
         undo.beginUndoGrouping()
         browser.changeDensity(.compact)
         Self.close(undo)
         #expect(browser.density == .compact)
-        #expect(PlaceDensities.stored(in: browser.defaults).density(for: .allNotes) == .compact)
+        #expect(PlaceDensities.stored(in: browser.defaults).density(for: .allItems) == .compact)
         // Opening the view stored its layout; a place's density adds nothing to it.
         #expect(ViewLayouts.stored(in: browser.defaults).settings(for: Self.id)?.density == nil)
         undo.undo()
         #expect(browser.density == nil)
-        #expect(PlaceDensities.stored(in: browser.defaults).density(for: .allNotes) == nil)
+        #expect(PlaceDensities.stored(in: browser.defaults).density(for: .allItems) == nil)
     }
 
     @Test func aPlacesDensityChangedInAnotherWindowIsReadAtOnce() {
         let (browser, _, _) = Self.opened()
-        browser.sidebarItem = .allNotes
+        browser.sidebarItem = .allItems
         #expect(browser.density == nil)
         let other = Browser()
         other.defaults = browser.defaults
-        other.store(.compact, for: .allNotes)
+        other.store(.compact, for: .allItems)
         #expect(browser.density == .compact)
-        PlaceDensities.update(in: browser.defaults) { $0.set(nil, for: .allNotes) }
+        PlaceDensities.update(in: browser.defaults) { $0.set(nil, for: .allItems) }
         #expect(browser.density == nil)
     }
 
@@ -307,7 +307,7 @@ struct ViewPanelTests {
         browser.setFilter(Self.status, values: ["todo"])
         let task = browser.choicesChanged()
         #expect(await eventually(within: .seconds(20)) { release != nil })
-        browser.sidebarItem = .allNotes
+        browser.sidebarItem = .allItems
         release?.resume()
         await task?.value
         #expect(Self.held(library)?.query.filter?.contains("todo") == true)
@@ -361,7 +361,7 @@ struct ViewPanelTests {
         browser.tableOptions[browser.item]?.grouping = .automatic
         browser.tableOptions[browser.item]?.sort = nil
         let content = browser.tableContent(in: library)
-        let shown = SavedViews.arrangement(browser, content: content, order: NoteOrder())
+        let shown = SavedViews.arrangement(browser, content: content, order: ItemOrder())
         #expect(shown.grouping == .date)
         #expect(shown.isDated)
     }
@@ -370,7 +370,7 @@ struct ViewPanelTests {
         let (browser, library, _) = Self.opened()
         browser.viewMode = .table
         let content = browser.tableContent(in: library)
-        let shown = SavedViews.arrangement(browser, content: content, order: NoteOrder())
+        let shown = SavedViews.arrangement(browser, content: content, order: ItemOrder())
         #expect(shown.grouping != .date)
     }
 
@@ -466,7 +466,7 @@ struct ViewPanelTests {
         undo.beginUndoGrouping()
         browser.setFilter(Self.status, values: ["todo"])
         let task = browser.choicesChanged()
-        browser.sidebarItem = .allNotes
+        browser.sidebarItem = .allItems
         await task?.value
         #expect(Self.held(library)?.version == 1)
         browser.sidebarItem = .view(Self.id)

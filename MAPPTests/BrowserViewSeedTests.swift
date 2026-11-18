@@ -148,9 +148,9 @@ struct BrowserViewSeedTests {
         let browser = Browser()
         let library = FakeItemLibrary()
         browser.adopt(library)
-        browser.tableOptions[.allNotes] = ItemTableOptions(filters: ["field.status": ["todo"]])
+        browser.tableOptions[.allItems] = ItemTableOptions(filters: ["field.status": ["todo"]])
         browser.revertView(in: library)
-        #expect(browser.tableOptions[.allNotes]?.filters == ["field.status": ["todo"]])
+        #expect(browser.tableOptions[.allItems]?.filters == ["field.status": ["todo"]])
         #expect(!browser.hasViewChanges)
     }
 

@@ -12,7 +12,7 @@ private enum IndexMetrics {
 /// What a page needs to take drops on its rows: the window's browser, and the order it lists in.
 struct IndexDrop {
     let browser: Browser
-    let order: NoteOrder
+    let order: ItemOrder
 }
 
 private extension View {

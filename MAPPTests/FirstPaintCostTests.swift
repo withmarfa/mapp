@@ -6,7 +6,7 @@ import Testing
 /// What asking the core for every item's name and preview costs a large library's first paint, over a real working
 /// copy in a temporary folder: no server is involved. Run it with the Measure test plan. It prints one
 /// `PAINT|<name>|<value>|<unit>` line per number and checks only that each step reached its end: the numbers are
-/// for a person to read, never a gate. `MAPP_MEASURE_NOTES` sets how many notes the copy holds (20000 by default).
+/// for a person to read, never a gate. `MAPP_MEASURE_ITEMS` sets how many notes the copy holds (20000 by default).
 @MainActor
 @Suite(.tags(.measure), .enabled(if: ProcessInfo.processInfo.environment["MAPP_MEASURE"] != nil), .serialized)
 struct FirstPaintCostTests {
@@ -27,7 +27,7 @@ struct FirstPaintCostTests {
 
     @Test(.timeLimit(.minutes(10)))
     func displaysAgainstTheFirstPaint() async throws {
-        let count = Int(ProcessInfo.processInfo.environment["MAPP_MEASURE_NOTES"] ?? "") ?? 20_000
+        let count = Int(ProcessInfo.processInfo.environment["MAPP_MEASURE_ITEMS"] ?? "") ?? 20_000
         let store = try TemporaryMarfaCopy()
         defer { store.remove() }
         let copy = try await store.open()

@@ -32,7 +32,7 @@ struct ItemLibraryTests {
         var item = try #require(library.item(F.n1))
         item.title = "Changed"
         item.version = ItemVersion(2)
-        let list = follow { _ = library.items(in: .allNotes) }
+        let list = follow { _ = library.items(in: .allItems) }
         let one = follow { _ = library.item(F.n1) }
         source.send(.upserted([item]))
         #expect(await eventually { list() && one() })
@@ -57,7 +57,7 @@ struct ItemLibraryTests {
         let library = FakeItemLibrary(items: [trashed])
         library.reachesServer = true
         Browser.delete([trashed.id], in: library, undoManager: nil)
-        #expect(library.notesToPurge == [trashed.id], "the person is asked while the library can erase")
+        #expect(library.itemsToPurge == [trashed.id], "the person is asked while the library can erase")
         library.reachesServer = false
         library.deletePermanentlyOnConfirm([trashed.id])
         #expect(library.item(trashed.id) != nil, "nothing is erased once the library cannot")

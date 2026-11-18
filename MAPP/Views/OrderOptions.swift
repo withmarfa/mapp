@@ -13,8 +13,8 @@ struct OrderOptions: View {
     /// The window whose search the order applies to, which adds Relevance while it searches. Nil in Settings and
     /// while no window is in front.
     var browser: Browser?
-    @AppStorage(OrderKey.sort) private var sort = NoteOrder().sort
-    @AppStorage(OrderKey.groupsByDate) private var groupsByDate = NoteOrder().groupsByDate
+    @AppStorage(OrderKey.sort) private var sort = ItemOrder().sort
+    @AppStorage(OrderKey.groupsByDate) private var groupsByDate = ItemOrder().groupsByDate
 
     var body: some View {
         picker
@@ -22,7 +22,7 @@ struct OrderOptions: View {
     }
 
     private var picker: some View {
-        Picker("Sort by", systemImage: "arrow.up.arrow.down", selection: Binding<NoteSort?> {
+        Picker("Sort by", systemImage: "arrow.up.arrow.down", selection: Binding<ItemSort?> {
             browser?.ordersByRelevance == true ? nil : sort
         } set: { choice in
             if let choice { sort = choice }
@@ -31,15 +31,15 @@ struct OrderOptions: View {
             // Relevance is the search's own order, so it is offered only while the window searches. It leaves the
             // stored sort alone, which comes back when the search ends.
             if browser?.isSearching == true {
-                Text("Relevance").tag(NoteSort?.none)
+                Text("Relevance").tag(ItemSort?.none)
                 Divider()
             }
-            ForEach(NoteSort.allCases, id: \.self) { sort in
+            ForEach(ItemSort.allCases, id: \.self) { sort in
                 Text(sort.title).tag(Optional(sort))
             }
         }
         .accessibilityLabel("Sort by")
-        .accessibilityIdentifier("NoteSort")
+        .accessibilityIdentifier("ItemSort")
     }
 
     private var group: some View {
@@ -57,10 +57,10 @@ struct OrderOptions: View {
 /// Reads the stored order, for views that lay the list out rather than change it.
 @propertyWrapper
 struct StoredOrder: DynamicProperty {
-    @AppStorage(OrderKey.sort) private var sort = NoteOrder().sort
-    @AppStorage(OrderKey.groupsByDate) private var groupsByDate = NoteOrder().groupsByDate
+    @AppStorage(OrderKey.sort) private var sort = ItemOrder().sort
+    @AppStorage(OrderKey.groupsByDate) private var groupsByDate = ItemOrder().groupsByDate
 
     init() {}
 
-    var wrappedValue: NoteOrder { NoteOrder(sort: sort, groupsByDate: groupsByDate) }
+    var wrappedValue: ItemOrder { ItemOrder(sort: sort, groupsByDate: groupsByDate) }
 }

@@ -2,9 +2,9 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { expect, test, vi } from 'vitest'
 import { InkKitError } from '@aicayzer/inkkit'
-import { pickNote, suggestNotes } from '../src/bridge'
+import { pickItem, suggestItems } from '../src/bridge'
 import {
-  NoteEditor,
+  ItemEditor,
   caretOffset,
   isPreviewDiagnostic,
   guardedCommand,
@@ -15,12 +15,12 @@ import {
 
 async function withEditor(
   source: string,
-  run: (editor: NoteEditor) => void | Promise<void>,
+  run: (editor: ItemEditor) => void | Promise<void>,
   changed: (text: string) => void = () => {},
 ) {
   const root = document.createElement('div')
   document.body.append(root)
-  const editor = await NoteEditor.mount(root, {
+  const editor = await ItemEditor.mount(root, {
     find() {},
     changed,
     stateChanged() {},
@@ -272,7 +272,7 @@ test('one logical task-list command reports only final source while later turns 
   const root = document.createElement('div')
   document.body.append(root)
   const changes: string[] = []
-  const editor = await NoteEditor.mount(root, {
+  const editor = await ItemEditor.mount(root, {
     changed(text) {
       changes.push(text)
     },
@@ -301,7 +301,7 @@ test('a flush of a generation the page has reloaded past hands back nothing, sin
   const root = document.createElement('div')
   document.body.append(root)
   const changes: [string, number][] = []
-  const editor = await NoteEditor.mount(root, {
+  const editor = await ItemEditor.mount(root, {
     changed(text, generation) {
       changes.push([text, generation])
     },
@@ -327,7 +327,7 @@ test('explicit flush returns a pending logical edit without a later duplicate re
   const root = document.createElement('div')
   document.body.append(root)
   const changes: string[] = []
-  const editor = await NoteEditor.mount(root, {
+  const editor = await ItemEditor.mount(root, {
     changed(text) {
       changes.push(text)
     },
@@ -393,7 +393,7 @@ test('Find batches visible geometry, retains UTF-16 offsets, and coalesces layou
       disconnect = disconnect
     },
   )
-  const editor = await NoteEditor.mount(root, {
+  const editor = await ItemEditor.mount(root, {
     find: (state) => reports.push(state),
     changed() {},
     stateChanged() {},
@@ -458,7 +458,7 @@ test('a loaded note reports its first frame once, and not when another load has 
   const root = document.createElement('div')
   document.body.append(root)
   const painted: number[] = []
-  const editor = await NoteEditor.mount(root, {
+  const editor = await ItemEditor.mount(root, {
     find() {},
     changed() {},
     stateChanged() {},
@@ -535,13 +535,13 @@ test("the words the app sends mount Inkkit, with the app's own kept out of its l
       'untitled',
     ].sort(),
   )
-  expect(labels.words.linkToNote).toBeTruthy()
-  expect(Object.keys(labels.editor)).not.toContain('linkToNote')
+  expect(labels.words.linkToItem).toBeTruthy()
+  expect(Object.keys(labels.editor)).not.toContain('linkToItem')
   expect(Object.keys(labels.editor)).not.toContain('untitled')
 
   const root = document.createElement('div')
   document.body.append(root)
-  const editor = await NoteEditor.mount(
+  const editor = await ItemEditor.mount(
     root,
     { find() {}, changed() {}, stateChanged() {}, openLink() {}, copy() {} },
     labels.editor,
@@ -549,7 +549,7 @@ test("the words the app sends mount Inkkit, with the app's own kept out of its l
   )
   try {
     await expect(
-      NoteEditor.mount(
+      ItemEditor.mount(
         document.createElement('div'),
         {
           find() {},
@@ -571,7 +571,7 @@ test('the page reports a heading by its level and applies the level the app asks
   const root = document.createElement('div')
   document.body.append(root)
   const states: CaretState[] = []
-  const editor = await NoteEditor.mount(root, {
+  const editor = await ItemEditor.mount(root, {
     find() {},
     changed() {},
     stateChanged: (state) => states.push(state),
@@ -606,7 +606,7 @@ test('the native link shortcut opens a read-only page link without editing', asy
   const root = document.createElement('div')
   document.body.append(root)
   const opened: string[] = []
-  const editor = await NoteEditor.mount(root, {
+  const editor = await ItemEditor.mount(root, {
     find() {},
     changed() {},
     stateChanged() {},
@@ -904,7 +904,7 @@ test('a Link to Item the app fails to answer reports an error to the host and le
     value: {
       messageHandlers: {
         host: { postMessage: (message: unknown) => posted.push(message) },
-        notes: { postMessage: () => Promise.reject(new Error('The app went away.')) },
+        items: { postMessage: () => Promise.reject(new Error('The app went away.')) },
       },
     },
   })
@@ -944,14 +944,14 @@ test('load takes the focus off the text and focus after it restores it, with CRL
     expect(editor.snapshot().text).toBe('Five\r\n')
   }))
 
-test("the page asks the app's notes and falls back to nothing when it cannot", async () => {
+test("the page asks the app's items and falls back to nothing when it cannot", async () => {
   const requests: unknown[] = []
   const answer = { current: undefined as unknown }
   Object.defineProperty(window, 'webkit', {
     configurable: true,
     value: {
       messageHandlers: {
-        notes: {
+        items: {
           postMessage: async (request: unknown) => {
             requests.push(request)
             return answer.current
@@ -962,13 +962,13 @@ test("the page asks the app's notes and falls back to nothing when it cannot", a
   })
   try {
     answer.current = ['Garden ideas', 7, 'Bike service']
-    expect(await suggestNotes('g', 'note')).toEqual(['Garden ideas', 'Bike service'])
+    expect(await suggestItems('g', 'note')).toEqual(['Garden ideas', 'Bike service'])
     answer.current = null
-    expect(await suggestNotes('g', 'note')).toEqual([])
+    expect(await suggestItems('g', 'note')).toEqual([])
     answer.current = '[[Garden ideas]]'
-    expect(await pickNote('note')).toBe('[[Garden ideas]]')
+    expect(await pickItem('note')).toBe('[[Garden ideas]]')
     answer.current = null
-    expect(await pickNote('note')).toBeUndefined()
+    expect(await pickItem('note')).toBeUndefined()
     expect(requests).toEqual([
       { type: 'suggest', query: 'g', item: 'note' },
       { type: 'suggest', query: 'g', item: 'note' },
@@ -976,8 +976,8 @@ test("the page asks the app's notes and falls back to nothing when it cannot", a
       { type: 'pick', item: 'note' },
     ])
     delete (window as { webkit?: unknown }).webkit
-    expect(await suggestNotes('g', 'note')).toEqual([])
-    expect(await pickNote('note')).toBeUndefined()
+    expect(await suggestItems('g', 'note')).toEqual([])
+    expect(await pickItem('note')).toBeUndefined()
   } finally {
     delete (window as { webkit?: unknown }).webkit
   }

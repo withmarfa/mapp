@@ -51,7 +51,7 @@ import Testing
         #expect(SearchScope.narrows(.inbox))
         #expect(SearchScope.narrows(.itemType("core.note")))
         #expect(SearchScope.narrows(.view(ItemID("v"))))
-        #expect(!SearchScope.narrows(.allNotes))
+        #expect(!SearchScope.narrows(.allItems))
         #expect(!SearchScope.narrows(.recents))
         #expect(!SearchScope.narrows(.recentlyDeleted))
         #expect(!SearchScope.narrows(.favoriteItem(ItemID("f"))))

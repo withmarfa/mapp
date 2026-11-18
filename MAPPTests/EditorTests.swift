@@ -26,7 +26,7 @@ struct EditorTests {
         /// Shows the item and waits until the page holds it.
         func show(_ id: ItemID) async throws {
             editor.load(try #require(library.item(id)))
-            try await wait { self.editor.noteID == id }
+            try await wait { self.editor.pageItemID == id }
             // The page answers every load with its caret; a round trip through it means the load has landed.
             _ = try await editor.webView.evaluateJavaScript("1")
         }
@@ -186,7 +186,7 @@ struct EditorTests {
         page.editor.load(try #require(library.item(first.id)))
         page.editor.focus(first.id)
         page.editor.load(try #require(library.item(second.id)))
-        try await page.wait { page.editor.noteID == second.id }
+        try await page.wait { page.editor.pageItemID == second.id }
         _ = try await page.editor.webView.evaluateJavaScript("1")
         let window = ReadingPanel(contentRect: NSRect(x: 100, y: 100, width: 500, height: 600),
                                   styleMask: [.titled, .nonactivatingPanel], backing: .buffered, defer: false)
@@ -208,7 +208,7 @@ struct EditorTests {
         #expect(reading == false)
         page.editor.focus(first.id)
         page.editor.load(try #require(library.item(first.id)))
-        try await page.wait { page.editor.noteID == first.id }
+        try await page.wait { page.editor.pageItemID == first.id }
         let composing = try await page.editor.webView.evaluateJavaScript(
             "document.activeElement?.matches('.ProseMirror, .inkkit-plain') === true"
         ) as? Bool
@@ -216,7 +216,7 @@ struct EditorTests {
         page.editor.releaseFocus()
         window.contentView = nil
         window.contentView = page.editor.webView
-        page.editor.noteChanged(try #require(library.item(first.id)))
+        page.editor.itemChanged(try #require(library.item(first.id)))
         page.editor.pageDidMoveToWindow()
         let reopened = try await page.editor.webView.evaluateJavaScript(
             "document.activeElement?.matches('.ProseMirror, .inkkit-plain') === true"
@@ -232,7 +232,7 @@ struct EditorTests {
         editor.load(try #require(library.item(first.id)))
         #expect(!editor.isReady)
         editor.load(try #require(library.item(second.id)))
-        #expect(editor.noteID == second.id)
+        #expect(editor.pageItemID == second.id)
         try #require(await eventually { editor.isReady })
         let source = try await editor.webView.evaluateJavaScript("window.editor.snapshot().text") as? String
         #expect(source == "Second\n")
@@ -248,8 +248,8 @@ struct EditorTests {
         page.editor.select(try #require(library.item(second.id)))
         // What SwiftUI delivers in the same pass as the selection: the item's text and version changed too.
         library.updateBody(of: second.id, to: "Second, edited\n")
-        page.editor.noteChanged(try #require(library.item(second.id)))
-        try await page.wait { page.editor.noteID == second.id }
+        page.editor.itemChanged(try #require(library.item(second.id)))
+        try await page.wait { page.editor.pageItemID == second.id }
         #expect(try await page.shownText(until: "Second, edited") == "Second, edited")
         #expect(try await page.editor.webView.evaluateJavaScript("window.flushes") as? Int == 1, "the first item is handed over once")
     }
@@ -276,13 +276,13 @@ struct EditorTests {
         page.editor.select(try #require(library.item(note.id)))
         let reloaded = try #require(page.editor.opening)
         library.updateBody(of: note.id, to: "Drawn, then edited elsewhere\n")
-        page.editor.noteChanged(try #require(library.item(note.id)))
+        page.editor.itemChanged(try #require(library.item(note.id)))
         #expect(page.editor.generation > reloaded.generation, "outside text reloads the item")
         #expect(page.editor.opening == nil, "a reload drops the open")
 
         let other = library.add("Another\n")
         page.editor.select(try #require(library.item(other.id)))
-        try await page.wait { page.editor.noteID == other.id && page.editor.opening != nil }
+        try await page.wait { page.editor.pageItemID == other.id && page.editor.opening != nil }
         let restarted = try #require(page.editor.opening)
         // What a page whose process ended and started again says first.
         try await page.run("window.webkit.messageHandlers.host.postMessage({ type: 'ready' })")
@@ -292,7 +292,7 @@ struct EditorTests {
         #expect(page.editor.opening == nil)
 
         page.editor.select(try #require(library.item(note.id)))
-        try await page.wait { page.editor.noteID == note.id && page.editor.opening != nil }
+        try await page.wait { page.editor.pageItemID == note.id && page.editor.opening != nil }
         page.editor.close()
         #expect(page.editor.opening == nil, "leaving the item drops the open")
     }
@@ -309,7 +309,7 @@ struct EditorTests {
         let kept = await withCheckedContinuation { continuation in
             page.editor.flush { continuation.resume(returning: $0) }
             library.updateBody(of: note.id, to: "Outside\n")
-            page.editor.noteChanged(library.item(note.id)!)
+            page.editor.itemChanged(library.item(note.id)!)
         }
         // The item is still the one being left, so leaving goes ahead.
         #expect(kept)
@@ -336,7 +336,7 @@ struct EditorTests {
         let kept = await withCheckedContinuation { continuation in
             page.editor.flush { continuation.resume(returning: $0) }
             library.updateBody(of: note.id, to: "Outside\n")
-            page.editor.noteChanged(library.item(note.id)!)
+            page.editor.itemChanged(library.item(note.id)!)
         }
         #expect(kept)
         #expect(captured == ["Composed\n"])
@@ -347,13 +347,13 @@ struct EditorTests {
         let page = try await Page()
         try await page.load("Original\n")
         try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new TypeError('flush failed') }")
-        let originalID = page.editor.noteID
+        let originalID = page.editor.pageItemID
         let replacement = page.library.add("Replacement\n")
         let kept = await withCheckedContinuation { continuation in
             page.editor.flush { continuation.resume(returning: $0) }
             page.editor.load(page.library.item(replacement.id)!)
         }
-        #expect(page.editor.noteID == originalID)
+        #expect(page.editor.pageItemID == originalID)
         #expect(page.changes.isEmpty)
         #expect(!kept)
         #expect(!page.library.notices.waiting.isEmpty)
@@ -398,7 +398,7 @@ struct EditorTests {
     @Test func reselectingTheItemAfterAFailedSwitchRestoresItsUpdatesWithoutReloading() async throws {
         let page = try await Page()
         try await page.load("Original\n")
-        let originalID = try #require(page.editor.noteID)
+        let originalID = try #require(page.editor.pageItemID)
         let original = try #require(page.library.item(originalID))
         let generation = try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().generation") as? Int
         let replacement = page.library.add("Replacement\n")
@@ -406,40 +406,40 @@ struct EditorTests {
         try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new TypeError('flush failed') }")
         page.editor.select(replacementItem)
         try await page.wait { !page.library.notices.waiting.isEmpty }
-        #expect(page.editor.noteID == originalID)
+        #expect(page.editor.pageItemID == originalID)
 
         page.editor.select(original)
         try await page.run("window.editor.flush = window.savedFlush")
         #expect(try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().generation") as? Int == generation)
         #expect(try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().text") as? String == "Original\n")
-        page.editor.noteChanged(replacementItem)
-        #expect(page.editor.noteID == originalID)
+        page.editor.itemChanged(replacementItem)
+        #expect(page.editor.pageItemID == originalID)
 
         page.library.updateBody(of: originalID, to: "Outside\n")
-        page.editor.noteChanged(try #require(page.library.item(originalID)))
+        page.editor.itemChanged(try #require(page.library.item(originalID)))
         #expect(try await page.shownText(until: "Outside") == "Outside")
-        #expect(page.editor.noteID == originalID)
+        #expect(page.editor.pageItemID == originalID)
         #expect(page.changes.isEmpty)
     }
 
     @Test func aHiddenItemRetainsFailedEditsWithoutOfferingCommands() async throws {
         let page = try await Page()
         try await page.load("Original\n")
-        let id = page.editor.noteID
+        let id = page.editor.pageItemID
         try await page.run("window.savedFlush = window.editor.flush; window.editor.flush = () => { throw new TypeError('flush failed') }")
         page.editor.close()
-        #expect(!page.editor.hasNote)
+        #expect(!page.editor.hasItem)
         try await page.wait { !page.library.notices.waiting.isEmpty }
-        #expect(page.editor.noteID == id)
-        #expect(!page.editor.hasNote)
+        #expect(page.editor.pageItemID == id)
+        #expect(!page.editor.hasItem)
         let retainedID = try #require(id)
         let item = try #require(page.library.item(retainedID))
         page.library.updateBody(of: item.id, to: "Outside\n")
-        page.editor.noteChanged(item)
-        #expect(!page.editor.hasNote)
+        page.editor.itemChanged(item)
+        #expect(!page.editor.hasItem)
         try await page.run("window.editor.flush = window.savedFlush")
         page.editor.load(item)
-        #expect(page.editor.hasNote)
+        #expect(page.editor.hasItem)
     }
 
     @Test func anAutomaticDiagramFallbackDoesNotPresentAnActionFailure() async throws {
@@ -598,9 +598,9 @@ struct EditorTests {
         // The editor's library has no text for this item, so the page must not open an empty item to type into.
         page.editor.load(item)
         _ = try await page.editor.webView.evaluateJavaScript("1")
-        #expect(page.editor.noteID != item.id)
-        page.editor.noteChanged(item)
-        #expect(page.editor.noteID != item.id)
+        #expect(page.editor.pageItemID != item.id)
+        page.editor.itemChanged(item)
+        #expect(page.editor.pageItemID != item.id)
         // Nor does the page keep the item it showed before, which typing would then change out of sight.
         #expect(try await page.shownText(until: "") == "")
         try await page.run("document.querySelector('.ProseMirror').focus(); document.execCommand('insertText', false, 'X')")
@@ -643,7 +643,7 @@ struct EditorTests {
         source.setBody("Theirs", of: F.n1, version: 2)
         source.send(.upserted([theirs]))
         try #require(await eventually { library.body(of: F.n1)?.text == "Theirs" })
-        editor.noteChanged(try #require(library.item(F.n1)))
+        editor.itemChanged(try #require(library.item(F.n1)))
         let typed = await eventually {
             source.writes.contains { if case .editBody = $0 { true } else { false } }
         }
@@ -694,7 +694,7 @@ struct EditorTests {
         #expect(rejected?["assetCount"] as? Int == 1)
         #expect((rejected?["html"] as? String)?.contains("mapp-embed:") == false)
         library.updateBody(of: note.id, to: "![a](Attachments/Photo%201.png)\n")
-        page.editor.noteChanged(try #require(library.item(note.id)))
+        page.editor.itemChanged(try #require(library.item(note.id)))
         _ = try await page.editor.webView.evaluateJavaScript("1")
         let printable = try await page.editor.webView.callAsyncJavaScript("return await window.editor.printable()", arguments: [:], in: nil, contentWorld: .page) as? [String: Any]
         let html = try #require(printable?["html"] as? String)

@@ -25,7 +25,7 @@ extension EditorTests {
         let page = try await Page()
         try await page.load("A note.\n")
         var header = Self.header("A comment")
-        header.item = try #require(page.editor.noteID).rawValue
+        header.item = try #require(page.editor.pageItemID).rawValue
         header.properties = Self.rows(["aicayzer", "IC_kwDOVBCCyc8AAAABgosEEg", "aicayzer/inkkit"])
         // The app sends the header as soon as an item is chosen, before the window has sized the page.
         page.editor.setHeader(header)
@@ -64,7 +64,7 @@ extension EditorTests {
         let page = try await Page()
         try await page.load("A note.\n")
         var header = Self.header("A highlight")
-        header.item = try #require(page.editor.noteID).rawValue
+        header.item = try #require(page.editor.pageItemID).rawValue
         header.properties = Self.highlightRows()
         header.foldAfter = 20
         let window = try await Self.show(page, width: 900)
@@ -108,7 +108,7 @@ extension EditorTests {
         let page = try await Page()
         try await page.load("A note.\n")
         var header = Self.header("A highlight")
-        header.item = try #require(page.editor.noteID).rawValue
+        header.item = try #require(page.editor.pageItemID).rawValue
         let source = PropertyRow.Target(title: "A source article", item: ItemID("source"), icon: "lucide:book-open")
         let person = PropertyRow.Target(title: "Mira Castell", item: ItemID("mira"), icon: "lucide:user", kind: .person)
         header.properties.append(PropertyRow(id: "about", label: "About", value: .items([source, person])))
@@ -143,7 +143,7 @@ extension EditorTests {
         let page = try await Page()
         try await page.load("A note.\n")
         var header = Self.header("A comment")
-        header.item = try #require(page.editor.noteID).rawValue
+        header.item = try #require(page.editor.pageItemID).rawValue
         let address = "https://example.com/" + String(repeating: "a", count: 150)
         header.properties = [
             PropertyRow(id: "text", label: "Text", value: .text(String(repeating: "x", count: 110))),
@@ -183,7 +183,7 @@ extension EditorTests {
         let page = try await Page()
         try await page.load("A note.\n")
         var header = Self.header("A meeting")
-        header.item = try #require(page.editor.noteID).rawValue
+        header.item = try #require(page.editor.pageItemID).rawValue
         header.kind = .event
         let time = "Thu 29 Apr 2027, 09:00 to Fri 30 Apr 2027, 10:00"
         header.pins = [

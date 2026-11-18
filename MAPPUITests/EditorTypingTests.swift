@@ -59,10 +59,10 @@ final class EditorTypingTests: XCTestCase {
         app.typeText("/link")
         XCTAssertTrue(menuRow("Link to Item").waitForExistence(timeout: 3))
         app.typeKey(.return, modifierFlags: [])
-        let field = app.sheets.firstMatch.textFields["NoteLinkField"]
+        let field = app.sheets.firstMatch.textFields["ItemLinkField"]
         XCTAssertTrue(field.waitForExistence(timeout: 3), "a sheet asks which item")
         field.typeText("bike")
-        XCTAssertTrue(app.sheets.firstMatch.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'NoteLinkRow.'")).firstMatch.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.sheets.firstMatch.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'ItemLinkRow.'")).firstMatch.waitForExistence(timeout: 3))
         app.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(app.sheets.firstMatch.waitForNonExistence(timeout: 3))
         XCTAssertTrue(waitForText("CONTAINS", "Bike service"), "the link to the item is on the line: \(text)")
@@ -75,7 +75,7 @@ final class EditorTypingTests: XCTestCase {
         app.typeText("/link")
         XCTAssertTrue(menuRow("Link to Item").waitForExistence(timeout: 3))
         app.typeKey(.return, modifierFlags: [])
-        XCTAssertTrue(app.sheets.firstMatch.textFields["NoteLinkField"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.sheets.firstMatch.textFields["ItemLinkField"].waitForExistence(timeout: 3))
         app.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(app.sheets.firstMatch.waitForNonExistence(timeout: 3))
         XCTAssertTrue(waitForText("CONTAINS", "/link"))

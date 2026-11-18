@@ -7,7 +7,7 @@ struct Sidebar: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
     let browser: Browser
-    let order: NoteOrder
+    let order: ItemOrder
 
     /// Works out what the list draws once, from what the sidebar depends on and nothing else: the library's
     /// membership, its saved views and catalogue, and the person's layout. A click, a selection or an edit that
@@ -69,7 +69,7 @@ private struct SidebarList: View {
     @State private var choosingIcon: TypeIconRequest?
     let content: SidebarContent
     let browser: Browser
-    let order: NoteOrder
+    let order: ItemOrder
 
     /// Empty clicks leave the destination intact. Settings clears the visible selection, so choosing the previous
     /// destination returns to its existing state.

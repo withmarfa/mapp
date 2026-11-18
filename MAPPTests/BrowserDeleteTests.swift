@@ -32,7 +32,7 @@ import Testing
         var asked: [Set<ItemID>] = []
         Browser.delete([f.first.id, f.second.id, f.binned.id], in: f.library, undoManager: nil, asking: { asked.append($0) })
         #expect(asked == [[f.first.id, f.second.id]], "one confirmation, naming only the live items")
-        #expect(f.library.notesToPurge.isEmpty, "a command that also moves items never offers to erase")
+        #expect(f.library.itemsToPurge.isEmpty, "a command that also moves items never offers to erase")
         #expect(f.library.notices.told == 0)
         #expect(states(f.library) == before, "nothing changes until the person confirms")
 
@@ -48,7 +48,7 @@ import Testing
         let before = states(f.library)
         Browser.delete([f.first.id, f.second.id, f.binned.id], in: f.library, undoManager: nil, asking: { _ in })
         #expect(states(f.library) == before)
-        #expect(f.library.notesToPurge.isEmpty)
+        #expect(f.library.itemsToPurge.isEmpty)
     }
 
     @Test func aSingleLiveItemInAMixedSelectionMovesWithoutAskingAndErasesNothing() {
@@ -58,7 +58,7 @@ import Testing
         #expect(!asked)
         #expect(f.library.item(f.first.id)?.state == .trashed)
         #expect(f.library.item(f.binned.id)?.state == .trashed)
-        #expect(f.library.notesToPurge.isEmpty)
+        #expect(f.library.itemsToPurge.isEmpty)
         #expect(f.library.items.count == 4)
     }
 
@@ -67,13 +67,13 @@ import Testing
         let before = states(f.library)
         var asked = false
         Browser.delete([f.binned.id, f.alsoBinned.id], in: f.library, undoManager: nil, asking: { _ in asked = true })
-        #expect(f.library.notesToPurge == [f.binned.id, f.alsoBinned.id])
+        #expect(f.library.itemsToPurge == [f.binned.id, f.alsoBinned.id])
         #expect(!asked, "the move confirmation is not raised")
         #expect(states(f.library) == before, "nothing is erased until the person confirms")
         #expect(f.library.notices.told == 0)
 
         // Cancelling the erase dialog never calls the library, and the items stay.
-        f.library.notesToPurge = []
+        f.library.itemsToPurge = []
         #expect(states(f.library) == before)
 
         f.library.deletePermanentlyOnConfirm([f.binned.id, f.alsoBinned.id])
@@ -84,7 +84,7 @@ import Testing
         let f = fixture(reachesServer: false)
         let before = states(f.library)
         Browser.delete([f.binned.id, f.alsoBinned.id], in: f.library, undoManager: nil)
-        #expect(f.library.notesToPurge.isEmpty)
+        #expect(f.library.itemsToPurge.isEmpty)
         #expect(states(f.library) == before)
         #expect(f.library.notices.waiting.last?.title == "Can’t Delete Immediately")
         #expect(f.library.notices.waiting.last?.message.contains("server") == true)
@@ -102,7 +102,7 @@ import Testing
         let before = states(f.library)
         Browser.delete([], in: f.library, undoManager: nil, asking: { _ in Issue.record("asked about nothing") })
         #expect(states(f.library) == before)
-        #expect(f.library.notesToPurge.isEmpty)
+        #expect(f.library.itemsToPurge.isEmpty)
         #expect(f.library.notices.told == 0)
     }
 }

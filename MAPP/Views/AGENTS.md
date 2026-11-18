@@ -27,11 +27,11 @@ Windows, panes, toolbars, commands and Settings. How things are drawn is in `doc
 
 ## Large lists
 
-A view that lists items must not run every row's body for a change of selection or of one item. The types that keep this (`NoteList`, `SelectableList`, `GalleryCard`, `SoftSelection`, `Browser`'s cached content) say how in their doc comments. Read them before you change a list, and measure with the `Measure` plan. `ItemRow` takes only plain values (`RowContent`, a `Density`, an excerpt) that the list worked out once for each item value (`RowContents`); it reads no library, catalogue or look.
+A view that lists items must not run every row's body for a change of selection or of one item. The types that keep this (`ItemList`, `SelectableList`, `GalleryCard`, `SoftSelection`, `Browser`'s cached content) say how in their doc comments. Read them before you change a list, and measure with the `Measure` plan. `ItemRow` takes only plain values (`RowContent`, a `Density`, an excerpt) that the list worked out once for each item value (`RowContents`); it reads no library, catalogue or look.
 
 ## Code Review Rules
 
 - **Toolbar without an identifier.** Flag a plain `toolbar` in a customizable window, a toolbar item that comes and goes without `customizationBehavior(.disabled)`, or a change to a mounted split view's column count.
 - **Toolbar action without a command.** Flag a toolbar action that has no menu command or no palette entry.
-- **Row body runs for all.** Flag a change that makes every row's body run on a selection change or a one-item edit. Safe path: follow the doc comments of `NoteList` and `SelectableList`, and measure.
+- **Row body runs for all.** Flag a change that makes every row's body run on a selection change or a one-item edit. Safe path: follow the doc comments of `ItemList` and `SelectableList`, and measure.
 - **Design already rejected.** Flag a drawing that repeats an entry in `docs/rejected-designs.md`.

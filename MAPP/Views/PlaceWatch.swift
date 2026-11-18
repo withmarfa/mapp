@@ -4,7 +4,7 @@ extension View {
     /// Keeps the window's place and layout true to the library as it changes. The checks sit in a view of their own,
     /// behind the window, so a change that moves them re-runs only these few lines and never the window's body or
     /// the sidebar's.
-    func watchesPlace(_ browser: Browser, order: NoteOrder) -> some View {
+    func watchesPlace(_ browser: Browser, order: ItemOrder) -> some View {
         background { PlaceWatch(browser: browser, order: order) }
     }
 }
@@ -14,7 +14,7 @@ extension View {
 private struct PlaceWatch: View {
     @CurrentLibrary private var library
     let browser: Browser
-    let order: NoteOrder
+    let order: ItemOrder
 
     var body: some View {
         Color.clear

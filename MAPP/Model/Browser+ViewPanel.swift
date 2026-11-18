@@ -21,7 +21,7 @@ extension Browser {
     }
 
     /// Edit View on a row of the sidebar's Views, which opens the view first.
-    func editView(_ id: ItemID, in library: any ItemLibrary, order: NoteOrder) {
+    func editView(_ id: ItemID, in library: any ItemLibrary, order: ItemOrder) {
         guard library.views.contains(where: { $0.id == id }) else { return }
         if viewPanel?.viewID == id, item == .view(id) { return openViewPanel(in: library) }
         closeViewPanel(in: library)
@@ -46,7 +46,7 @@ extension Browser {
 
     /// Done on a view or a place closes the panel, with a name still being typed written first. On a new view it makes
     /// the view, with the name typed or the default one.
-    func finishViewPanel(in library: any ItemLibrary, order: NoteOrder) async {
+    func finishViewPanel(in library: any ItemLibrary, order: ItemOrder) async {
         guard let panel = viewPanel else { return }
         if panel.isNew { return await makeNewView(from: panel, in: library, order: order) }
         if panel.typedRename != nil { await commitViewName(of: panel, in: library) }
@@ -143,7 +143,7 @@ extension Browser {
 
     /// Makes the view of what the window shows, under the name typed or the default one, and shows it. What the view
     /// cannot keep of the window is said once it exists. A refusal leaves the panel and the name as they are.
-    func makeNewView(from panel: ViewPanel, in library: any ItemLibrary, order: NoteOrder) async {
+    func makeNewView(from panel: ViewPanel, in library: any ItemLibrary, order: ItemOrder) async {
         guard let form = panel.form, !form.isBusy else { return }
         if form.trimmedTitle.isEmpty { form.title = String(localized: "New View") }
         let window = SavedViews.window(self, in: library, order: order)
@@ -171,7 +171,7 @@ extension Browser {
     /// A view of the same query, sort and group named for the copy, with the Mac settings the original keeps. It
     /// shows the copy.
     @discardableResult
-    func duplicateView(_ id: ItemID, in library: any ItemLibrary, order: NoteOrder) async -> LibraryView? {
+    func duplicateView(_ id: ItemID, in library: any ItemLibrary, order: ItemOrder) async -> LibraryView? {
         guard library.reachesServer, let view = library.views.first(where: { $0.id == id }) else { return nil }
         let settings = LibraryViewSettings(title: String(localized: "\(view.title) Copy"), query: view.query, sort: view.sort, group: view.group)
         guard let copy = await library.createView(settings) else { return nil }

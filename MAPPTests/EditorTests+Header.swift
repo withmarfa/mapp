@@ -39,7 +39,7 @@ extension EditorTests {
         defer { window.orderOut(nil); window.contentView = nil; window.close() }
         let note = page.library.add("")
         page.editor.load(note)
-        try await page.wait { page.editor.noteID == note.id }
+        try await page.wait { page.editor.pageItemID == note.id }
         page.editor.focus(note.id, onTitle: true)
         page.editor.setHeader(Self.header("Untitled", id: note.id))
         var focused = ""
@@ -202,7 +202,7 @@ extension EditorTests {
 
         // Several items selected, or none, leaves the page empty.
         page.editor.close()
-        try await page.wait { page.editor.noteID == nil }
+        try await page.wait { page.editor.pageItemID == nil }
         #expect(!page.editor.isContentUnderToolbar)
         #expect(!page.editor.isHeaderScrolledAway)
     }
@@ -248,12 +248,12 @@ extension EditorTests {
         page.editor.load(try #require(library.item(first.id)))
         _ = try await page.editor.webView.evaluateJavaScript("1")
         page.editor.load(try #require(library.item(second.id)))
-        try await page.wait { page.editor.noteID == second.id }
+        try await page.wait { page.editor.pageItemID == second.id }
         _ = try await page.editor.webView.evaluateJavaScript("1")
-        page.editor.noteChanged(try #require(library.item(first.id)))
+        page.editor.itemChanged(try #require(library.item(first.id)))
         _ = try await page.editor.webView.evaluateJavaScript("1")
         _ = try await page.editor.webView.evaluateJavaScript("1")
-        #expect(page.editor.noteID == second.id)
+        #expect(page.editor.pageItemID == second.id)
         #expect(try await page.editor.webView.evaluateJavaScript("window.editor.snapshot().text") as? String == "Second item\n")
         #expect(page.changes.isEmpty)
     }
@@ -269,8 +269,8 @@ extension EditorTests {
         try #require(await eventually { editor.isReady })
         var item = try #require(library.item(F.n1))
         editor.load(item)
-        #expect(editor.noteID == nil)
-        #expect(!editor.hasNote)
+        #expect(editor.pageItemID == nil)
+        #expect(!editor.hasItem)
 
         source.setBody("Recovered body\n", of: item.id, version: 2)
         if versionChanged {
@@ -280,9 +280,9 @@ extension EditorTests {
             source.sendBody(of: item.id)
         }
         try #require(await eventually { library.body(of: item.id)?.text == "Recovered body\n" })
-        editor.noteChanged(try #require(library.item(item.id)))
-        try #require(await eventually { editor.noteID == item.id })
-        #expect(editor.hasNote)
+        editor.itemChanged(try #require(library.item(item.id)))
+        try #require(await eventually { editor.pageItemID == item.id })
+        #expect(editor.hasItem)
         #expect(try await editor.webView.evaluateJavaScript("window.editor.snapshot().text") as? String == "Recovered body\n")
         #expect(source.writes.isEmpty)
     }
@@ -301,21 +301,21 @@ extension EditorTests {
         if close {
             editor.close()
         } else {
-            let other = try #require(library.items(in: .allNotes).first { $0.id != item.id && !$0.isFile })
+            let other = try #require(library.items(in: .allItems).first { $0.id != item.id && !$0.isFile })
             source.setBody("Other body\n", of: other.id)
             source.sendBody(of: other.id)
             try #require(await eventually { library.body(of: other.id) != nil })
             editor.load(other)
-            try #require(await eventually { editor.noteID == other.id })
+            try #require(await eventually { editor.pageItemID == other.id })
         }
-        let selected = editor.noteID
+        let selected = editor.pageItemID
         source.setBody("Recovered body\n", of: item.id)
         source.sendBody(of: item.id)
         try #require(await eventually { library.body(of: item.id) != nil })
-        editor.noteChanged(item)
+        editor.itemChanged(item)
         _ = try await editor.webView.evaluateJavaScript("1")
-        #expect(editor.noteID == selected)
-        #expect(editor.hasNote == !close)
+        #expect(editor.pageItemID == selected)
+        #expect(editor.hasItem == !close)
         if !close {
             #expect(try await editor.webView.evaluateJavaScript("window.editor.snapshot().text") as? String == "Other body\n")
         }
@@ -335,7 +335,7 @@ extension EditorTests {
             window.orderOut(nil); window.contentView = nil; window.close()
         }
         try await page.load("Text\n")
-        let id = try #require(page.editor.noteID)
+        let id = try #require(page.editor.pageItemID)
         page.editor.setHeader(Self.header("Title", id: id))
         #expect(window.makeFirstResponder(page.editor.webView))
         func title() async throws -> String? {
@@ -415,7 +415,7 @@ extension EditorTests {
         window.orderFrontRegardless()
         defer { window.orderOut(nil); window.contentView = nil; window.close() }
         try await page.load(Array(repeating: "Some text.", count: 80).joined(separator: "\n\n") + "\n")
-        let id = try #require(page.editor.noteID)
+        let id = try #require(page.editor.pageItemID)
         page.editor.setHeader(Self.header("Review the findings", id: id))
         var menus: [(PageHeaderMenu, ItemID, CGRect)] = []
         page.editor.onHeaderEvent = { if case .menu(let menu, let item, let rect) = $0 { menus.append((menu, item, rect)) } }
@@ -443,7 +443,7 @@ extension EditorTests {
         window.orderFrontRegardless()
         defer { window.orderOut(nil); window.contentView = nil; window.close() }
         try await page.load("Some text.\n")
-        let id = try #require(page.editor.noteID)
+        let id = try #require(page.editor.pageItemID)
         var header = Self.header("Review the findings", id: id)
         header.properties.append(PropertyRow(id: "repo", label: "Repo", value: .text("withmarfa/mapp")))
         page.editor.setHeader(header)
@@ -479,7 +479,7 @@ extension EditorTests {
 
         var body: some View {
             if let item = library.item(shown.id) {
-                NotePage(item: item, editor: editor, headerDrafts: drafts)
+                ItemPage(item: item, editor: editor, headerDrafts: drafts)
             }
         }
     }

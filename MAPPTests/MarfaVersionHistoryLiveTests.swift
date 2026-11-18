@@ -41,12 +41,12 @@ extension LiveMarfaTests {
         }
 
         /// An item written three times, so the server holds two earlier versions of it besides the current one.
-        private func writtenNote(
+        private func writtenItem(
             _ library: MarfaLibrary, _ source: MarfaSource, _ made: LiveMarfa.Made
         ) async throws -> ItemID {
             let title = "MAPPTEST history \(UUID().uuidString.prefix(8).lowercased())"
             let id = try #require(library.createItem(
-                typeID: "core.note", title: title, body: Self.first, parentID: nil, in: .allNotes, undoManager: nil))
+                typeID: "core.note", title: title, body: Self.first, parentID: nil, in: .allItems, undoManager: nil))
             made.add(id)
             for text in [Self.second, Self.third] {
                 try #require(await eventually { library.body(of: id)?.text != nil && library.syncReport.waiting == 0 })
@@ -70,7 +70,7 @@ extension LiveMarfaTests {
         @Test(.timeLimit(.minutes(3)))
         func theServersVersionsAreListedAndAnOldOneIsRestoredAndUndone() async throws {
             try await withLibrary { library, source, made in
-                let id = try await writtenNote(library, source, made)
+                let id = try await writtenItem(library, source, made)
                 let history = try await loadedHistory(of: id, in: library)
                 // A snapshot is the item before the write that replaced it, so the current text has none.
                 let texts = history.snapshots.map { $0.text(in: library.catalogue) }
@@ -104,7 +104,7 @@ extension LiveMarfaTests {
         @Test(.timeLimit(.minutes(3)))
         func anItemInTheBinCannotBeRestoredAndKeepsItsText() async throws {
             try await withLibrary { library, source, made in
-                let id = try await writtenNote(library, source, made)
+                let id = try await writtenItem(library, source, made)
                 let oldest = try #require(try await loadedHistory(of: id, in: library).snapshots.first)
 
                 library.delete([id], undoManager: nil)

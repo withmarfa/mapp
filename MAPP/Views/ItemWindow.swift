@@ -2,7 +2,7 @@ import SwiftUI
 
 /// One item in a window of its own, opened by double-clicking it in the list. The window remembers its item's
 /// identifier, which outlasts a rename or a move, so it finds the item again at the next launch.
-struct NoteWindow: View {
+struct ItemWindow: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(\.dismiss) private var dismiss
@@ -42,7 +42,7 @@ struct NoteWindow: View {
         editor.onEscape = { [details] in details.endLayout() }
         editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
         // The keyboard follows the link to the item it opened, as it does in a main window.
-        editor.onOpenNote = { [weak editor] linked in
+        editor.onOpenItem = { [weak editor] linked in
             id.wrappedValue = linked
             editor?.focus(linked)
         }
@@ -96,18 +96,18 @@ struct NoteWindow: View {
     private var page: some View {
         Group {
             if let item, let editor {
-                NotePage(item: item, editor: editor, headerDrafts: details, backsToolbar: false)
+                ItemPage(item: item, editor: editor, headerDrafts: details, backsToolbar: false)
                     .navigationTitle(item.displayTitle)
                     .toolbar(removing: .title)
                     .focusedSceneValue(\.editor, editor)
-                    .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: [item.id], undoManager: undoManager))
+                    .focusedSceneValue(\.focusedItems, FocusedItems(ids: [item.id], undoManager: undoManager))
                     .toolbar(id: "note") {
                         WindowToolbar(browser: nil, items: [item], editor: editor, details: details)
                     }
             } else if let item {
                 FileItemPage(item: item, drafts: details, open: { id = $0 }, onResolved: { fileURL = $0 }, backsToolbar: false)
                     .navigationTitle(item.displayTitle)
-                    .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: [item.id], undoManager: undoManager))
+                    .focusedSceneValue(\.focusedItems, FocusedItems(ids: [item.id], undoManager: undoManager))
                     .toolbar(id: "note") {
                         WindowToolbar(browser: nil, items: [item], editor: nil, details: details, fileURL: fileURL)
                     }

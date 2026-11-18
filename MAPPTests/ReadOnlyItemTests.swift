@@ -131,7 +131,7 @@ import Testing
     @Test func aReadOnlyItemBesideItemsInTheBinErasesNothing() async throws {
         let (library, source) = try await loaded()
         Browser.delete([F.n2, MarfaCollectionsTests.oldAlbum], in: library, undoManager: nil)
-        #expect(library.notesToPurge.isEmpty, "a selection with a live item in it never erases anything")
+        #expect(library.itemsToPurge.isEmpty, "a selection with a live item in it never erases anything")
         #expect(source.writes.isEmpty)
     }
 

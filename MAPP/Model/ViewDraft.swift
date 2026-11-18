@@ -43,7 +43,7 @@ nonisolated enum ViewDraft {
         /// the person has set them or the place is a view.
         case table
         /// The list or the gallery, in the list's own order.
-        case list(NoteOrder)
+        case list(ItemOrder)
         /// Lanes by a choice field, or none where the board has no field.
         case board(key: String?, label: String)
         /// Days by a date field, or none where the timeline has no field.
@@ -86,7 +86,7 @@ nonisolated enum ViewDraft {
     ) -> LibraryViewQuery? {
         let active: Set<ItemState> = [.active]
         switch place {
-        case .allNotes: return LibraryViewQuery(states: active)
+        case .allItems: return LibraryViewQuery(states: active)
         case .inbox: return LibraryViewQuery(tier: .feed, states: active)
         case .favorites:
             return LibraryViewQuery(states: active, filter: text(of: FilterCondition(field: .tags, operator: .contains, value: .text(ItemTag.favorite))))

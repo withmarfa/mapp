@@ -122,7 +122,7 @@ extension LiveMarfaTests {
                 @MainActor func make(_ title: String, under parent: ItemID? = nil) throws -> ItemID {
                     let id = library.createItem(
                         typeID: "core.note", title: "MAPPTEST \(title) \(token)", body: "Made by the MAPP tests.",
-                        parentID: parent, in: .allNotes, undoManager: nil)
+                        parentID: parent, in: .allItems, undoManager: nil)
                     if let id { made.add(id) }
                     return try #require(id)
                 }

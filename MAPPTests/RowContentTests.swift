@@ -257,14 +257,14 @@ struct RowContentTests {
         let starts = try #require(Self.catalogue.itemTypes[TypeID("core.event")]?.fields.first { $0.key == "starts_at" })
         let startsColumn = ItemTableColumn(id: "starts_at", label: "", content: .field(starts), style: .date)
         let nameColumn = ItemTableColumn(id: "name", label: "", content: .field(LookFixture.field("name")), style: .text)
-        #expect(RowDateSource.of(sort: ItemTableComparator(column: startsColumn), order: NoteOrder(), ordersItself: false) == .field("starts_at"))
-        #expect(RowDateSource.of(sort: ItemTableComparator(column: .created), order: NoteOrder(), ordersItself: false) == .created)
-        #expect(RowDateSource.of(sort: ItemTableComparator(column: .edited), order: NoteOrder(), ordersItself: false) == .edited)
-        #expect(RowDateSource.of(sort: ItemTableComparator(column: nameColumn), order: NoteOrder(), ordersItself: false) == .look)
-        #expect(RowDateSource.of(sort: nil, order: NoteOrder(sort: .dateCreated), ordersItself: false) == .created)
-        #expect(RowDateSource.of(sort: nil, order: NoteOrder(sort: .dateEdited), ordersItself: false) == .edited)
-        #expect(RowDateSource.of(sort: nil, order: NoteOrder(sort: .title), ordersItself: false) == .look)
-        #expect(RowDateSource.of(sort: nil, order: NoteOrder(sort: .dateEdited), ordersItself: true) == .look)
+        #expect(RowDateSource.of(sort: ItemTableComparator(column: startsColumn), order: ItemOrder(), ordersItself: false) == .field("starts_at"))
+        #expect(RowDateSource.of(sort: ItemTableComparator(column: .created), order: ItemOrder(), ordersItself: false) == .created)
+        #expect(RowDateSource.of(sort: ItemTableComparator(column: .edited), order: ItemOrder(), ordersItself: false) == .edited)
+        #expect(RowDateSource.of(sort: ItemTableComparator(column: nameColumn), order: ItemOrder(), ordersItself: false) == .look)
+        #expect(RowDateSource.of(sort: nil, order: ItemOrder(sort: .dateCreated), ordersItself: false) == .created)
+        #expect(RowDateSource.of(sort: nil, order: ItemOrder(sort: .dateEdited), ordersItself: false) == .edited)
+        #expect(RowDateSource.of(sort: nil, order: ItemOrder(sort: .title), ordersItself: false) == .look)
+        #expect(RowDateSource.of(sort: nil, order: ItemOrder(sort: .dateEdited), ordersItself: true) == .look)
     }
 
     @Test func insideADaysGroupTheDateIsTheTimeAndElsewhereTheListsLabel() {
@@ -306,10 +306,10 @@ struct RowContentTests {
         let task = Self.item("core.task", modified: Self.now)
         let library = FakeItemLibrary(items: [note, other, task], now: Self.now)
         let browser = Browser()
-        browser.show(.allNotes, in: library, order: NoteOrder())
-        #expect(browser.rowList(of: [note, task], in: library, order: NoteOrder(), now: Self.now, format: .standard).mixesTypes)
-        #expect(!browser.rowList(of: [note, other], in: library, order: NoteOrder(), now: Self.now, format: .standard).mixesTypes)
-        #expect(!browser.rowList(of: [], in: library, order: NoteOrder(), now: Self.now, format: .standard).mixesTypes)
+        browser.show(.allItems, in: library, order: ItemOrder())
+        #expect(browser.rowList(of: [note, task], in: library, order: ItemOrder(), now: Self.now, format: .standard).mixesTypes)
+        #expect(!browser.rowList(of: [note, other], in: library, order: ItemOrder(), now: Self.now, format: .standard).mixesTypes)
+        #expect(!browser.rowList(of: [], in: library, order: ItemOrder(), now: Self.now, format: .standard).mixesTypes)
     }
 
     @Test func aListGroupedByTypeLeavesTheTypeOffItsRows() {
@@ -317,8 +317,8 @@ struct RowContentTests {
         let task = Self.item("core.task", modified: Self.now)
         let library = FakeItemLibrary(items: [note, task], now: Self.now)
         let browser = Browser()
-        browser.show(.allNotes, in: library, order: NoteOrder())
-        func list() -> RowList { browser.rowList(of: [note, task], in: library, order: NoteOrder(), now: Self.now, format: .standard) }
+        browser.show(.allItems, in: library, order: ItemOrder())
+        func list() -> RowList { browser.rowList(of: [note, task], in: library, order: ItemOrder(), now: Self.now, format: .standard) }
         #expect(list().mixesTypes)
         browser.tableOptions[browser.item, default: .init()].grouping = .column(ItemTableColumn.type.id)
         let grouped = list()

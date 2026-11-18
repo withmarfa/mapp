@@ -216,8 +216,8 @@ nonisolated final class MarfaSource: ItemSource {
         return ItemBody(id: item, text: text, version: ItemVersion(row.version))
     }
 
-    func linkAnswers(of targets: [String], in note: ItemID?) async throws -> [LinkAnswer] {
-        try await copy.items.linkCandidates(of: targets, in: note?.rawValue).map { answer in
+    func linkAnswers(of targets: [String], in itemID: ItemID?) async throws -> [LinkAnswer] {
+        try await copy.items.linkCandidates(of: targets, in: itemID?.rawValue).map { answer in
             let state: LinkAnswer.State
             switch answer.state {
             case .bound: state = .bound
@@ -309,7 +309,7 @@ nonisolated final class MarfaSource: ItemSource {
     /// The file's title as a name on disk, with the extension its type has where the title has none, since the
     /// page, Open and the Finder all tell a file's kind by its extension.
     static func keptName(title: String?, mimeType: String?) -> String {
-        let safe = NoteText.fileSafe(title ?? "")
+        let safe = FileName.fileSafe(title ?? "")
         let name = safe.isEmpty ? String(localized: "File") : safe
         guard (name as NSString).pathExtension.isEmpty,
               let ext = mimeType.flatMap({ UTType(mimeType: $0) })?.preferredFilenameExtension

@@ -13,7 +13,7 @@ nonisolated enum RowDateSource: Hashable, Sendable {
 
     /// The date the list is sorted by: the first key of a column sort that is a date field, Created or Edited, else the
     /// date of the list's own order, else (a list ordered by title, by relevance or by its place) the look's.
-    static func of(sort: ItemTableComparator?, order: NoteOrder, ordersItself: Bool) -> RowDateSource {
+    static func of(sort: ItemTableComparator?, order: ItemOrder, ordersItself: Bool) -> RowDateSource {
         if let sort {
             switch sort.column.content {
             case .created: return .created

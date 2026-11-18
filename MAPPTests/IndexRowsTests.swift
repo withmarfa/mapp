@@ -118,7 +118,7 @@ struct IndexRowsTests {
     @Test func sourcesAndTheirCountsComeFromOneGrouping() {
         let items = [item("a", source: "b"), item("b", source: "A"), item("c", source: "b"), item("d")]
         let library = FakeItemLibrary(items: items, now: base)
-        let groups = IndexRows.groupedBySource(library.items(in: .allNotes))
+        let groups = IndexRows.groupedBySource(library.items(in: .allItems))
         #expect(library.sourceCounts.map(\.code) == groups.map(\.code))
         #expect(library.sourceCounts.map(\.count) == groups.map(\.items.count))
     }
@@ -180,7 +180,7 @@ struct IndexRowsTests {
     @Test func theSidebarsSourcesAreTheRowsSources() {
         let library = FakeItemLibrary(items: [item("a", source: "readwise")], now: base)
         library.sources = directory(counts: ["readwise": 4, "gh": 9, "empty": 0])
-        #expect(library.sourceCounts.map(\.name) == IndexRows.sources(of: library.items(in: .allNotes), catalogue: catalogue, directory: library.sources).map(\.title))
+        #expect(library.sourceCounts.map(\.name) == IndexRows.sources(of: library.items(in: .allItems), catalogue: catalogue, directory: library.sources).map(\.title))
     }
 
     @Test func theInspectorsMarkIsTheSourcesMarkOrNone() {
@@ -235,7 +235,7 @@ struct IndexPreferencesTests {
     @Test func onlyTheTwoIndexesAreIndexPages() {
         #expect(IndexPlace(.sources) == .sources)
         #expect(IndexPlace(.collections) == .collections)
-        #expect(IndexPlace(.allNotes) == nil)
+        #expect(IndexPlace(.allItems) == nil)
         #expect(IndexPlace(.source("rss")) == nil)
     }
 }

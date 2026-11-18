@@ -52,7 +52,7 @@ struct ViewDraftTests {
         func query(_ place: SidebarItem) -> LibraryViewQuery? {
             ViewDraft.query(for: place, catalogue: Self.catalogue, views: [])
         }
-        #expect(query(.allNotes) == LibraryViewQuery(states: active))
+        #expect(query(.allItems) == LibraryViewQuery(states: active))
         #expect(query(.inbox) == LibraryViewQuery(tier: .feed, states: active))
         #expect(query(.favorites) == LibraryViewQuery(states: active, filter: #"tags contains "favorite""#))
         #expect(query(.files) == LibraryViewQuery(types: [TypeID.file], states: active))
@@ -85,7 +85,7 @@ struct ViewDraftTests {
 
     @Test func sortAndGroupKeepTheColumnsThatStandForFields() throws {
         let window = Self.window(
-            .allNotes,
+            .allItems,
             sort: [
                 ItemTableComparator(column: Self.statusColumn, order: .forward),
                 ItemTableComparator(column: Self.dueColumn, order: .forward),
@@ -154,23 +154,23 @@ struct ViewDraftTests {
         // The table's own order and grouping, which the other layouts do not show, and a filter, which they all do.
         let sort = [ItemTableComparator(column: Self.statusColumn, order: .forward)]
         func draft(_ layout: ViewDraft.Layout) throws -> ViewDraft.Draft {
-            try #require(Self.draft(Self.window(.allNotes, sort: sort, grouping: Self.statusColumn, filters: ["field.status": ["todo"]], layout: layout)))
+            try #require(Self.draft(Self.window(.allItems, sort: sort, grouping: Self.statusColumn, filters: ["field.status": ["todo"]], layout: layout)))
         }
-        let byTitle = try draft(.list(NoteOrder(sort: .title, groupsByDate: true)))
+        let byTitle = try draft(.list(ItemOrder(sort: .title, groupsByDate: true)))
         #expect(byTitle.sort == [LibraryViewSort(field: "title", ascending: true)])
         #expect(byTitle.group == nil)
         #expect(byTitle.query.filter == #"properties.status eq "todo""#)
         #expect(byTitle.unkept.isEmpty)
 
-        let byEdit = try draft(.list(NoteOrder(sort: .dateEdited, groupsByDate: true)))
+        let byEdit = try draft(.list(ItemOrder(sort: .dateEdited, groupsByDate: true)))
         #expect(byEdit.sort == [LibraryViewSort(field: "updated_at", ascending: false)])
         // The list's sections by date are told as not kept, and no month grouping is written for them.
         #expect(byEdit.group == nil)
         #expect(byEdit.unkept == [.dateSections])
-        let byCreated = try draft(.list(NoteOrder(sort: .dateCreated, groupsByDate: true)))
+        let byCreated = try draft(.list(ItemOrder(sort: .dateCreated, groupsByDate: true)))
         #expect(byCreated.group == nil)
         #expect(byCreated.unkept == [.dateSections])
-        #expect(try draft(.list(NoteOrder(sort: .dateCreated, groupsByDate: false))).sort
+        #expect(try draft(.list(ItemOrder(sort: .dateCreated, groupsByDate: false))).sort
             == [LibraryViewSort(field: "created_at", ascending: false)])
 
         let board = try draft(.board(key: "status", label: "Status"))
@@ -298,7 +298,7 @@ struct ViewDraftTests {
         let seed = ViewDraft.options(for: view, catalogue: Self.catalogue)
         var ungrouped = seed
         ungrouped.grouping = .none
-        var window = Self.window(.view(view.id), layout: .list(NoteOrder(sort: .dateEdited, groupsByDate: true)))
+        var window = Self.window(.view(view.id), layout: .list(ItemOrder(sort: .dateEdited, groupsByDate: true)))
         window.dated = ViewDraft.Dated(sort: [ItemTableComparator(column: .edited, order: .reverse)], hasSections: true)
         let result = ViewDraft.change(
             window, options: ungrouped, seed: seed, seedTimelineDate: nil, seededTypes: nil, view: view, catalogue: Self.catalogue)
@@ -403,19 +403,19 @@ struct ViewDraftTests {
     }
 
     @Test func aTypeFilterGoesIntoTheQueryTypes() throws {
-        let window = Self.window(.allNotes, filters: ["type": ["core.task"]])
+        let window = Self.window(.allItems, filters: ["type": ["core.task"]])
         let draft = try #require(Self.draft(window))
         #expect(draft.query.types == [Self.task])
         #expect(draft.query.filter == nil)
         #expect(draft.unkept.isEmpty)
         // Several types are all of them.
-        let several = try #require(Self.draft(Self.window(.allNotes, filters: ["type": ["core.task", "core.note"]])))
+        let several = try #require(Self.draft(Self.window(.allItems, filters: ["type": ["core.task", "core.note"]])))
         #expect(several.query.types == [TypeID("core.note"), Self.task])
     }
 
     @Test func aTypeWithSubtypesIsSavedAsAnExactTypeFilterBecauseMarfaListsItsSubtypesToo() throws {
         // Saving from the window with the Type filter on a type that has subtypes (#389).
-        let draft = try #require(Self.draft(Self.window(.allNotes, filters: ["type": ["aic.ticket"]])))
+        let draft = try #require(Self.draft(Self.window(.allItems, filters: ["type": ["aic.ticket"]])))
         #expect(draft.query.types.isEmpty)
         #expect(draft.query.filter == #"type eq "aic.ticket""#)
         #expect(draft.unkept.isEmpty)
@@ -425,11 +425,11 @@ struct ViewDraftTests {
         #expect(beside.query.filter == nil)
         #expect(beside.unkept.isEmpty)
         // With the list grouped by a column too, both are kept.
-        let grouped = try #require(Self.draft(Self.window(.allNotes, grouping: Self.statusColumn, filters: ["type": ["aic.ticket"]])))
+        let grouped = try #require(Self.draft(Self.window(.allItems, grouping: Self.statusColumn, filters: ["type": ["aic.ticket"]])))
         #expect(grouped.group == LibraryViewGroup(field: "properties.status"))
         #expect(grouped.query.filter == #"type eq "aic.ticket""#)
         // Is Not is a condition.
-        let not = try #require(Self.draft(Self.window(.allNotes, filters: ["type": ["core.task"]], negated: ["type"])))
+        let not = try #require(Self.draft(Self.window(.allItems, filters: ["type": ["core.task"]], negated: ["type"])))
         #expect(not.query.filter == #"type neq "core.task""#)
     }
 
@@ -530,11 +530,11 @@ struct ViewDraftTests {
     }
 
     @Test func aTypeFilterOfTwoTypesInItemsIsTheirTypes() throws {
-        let plain = try #require(Self.draft(Self.window(.allNotes, filters: ["type": ["core.task", "core.note"]])))
+        let plain = try #require(Self.draft(Self.window(.allItems, filters: ["type": ["core.task", "core.note"]])))
         #expect(plain.query.types == [TypeID("core.note"), Self.task])
         #expect(plain.query.filter == nil)
         // With a type that has subtypes, the types are exact conditions joined by or.
-        let exact = try #require(Self.draft(Self.window(.allNotes, filters: ["type": ["core.task", "aic.ticket"]])))
+        let exact = try #require(Self.draft(Self.window(.allItems, filters: ["type": ["core.task", "aic.ticket"]])))
         #expect(exact.query.types.isEmpty)
         #expect(exact.query.filter == #"type eq "aic.ticket" OR type eq "core.task""#)
         #expect(exact.unkept.isEmpty)

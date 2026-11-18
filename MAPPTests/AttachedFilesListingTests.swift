@@ -11,7 +11,7 @@ import UniformTypeIdentifiers
 
     /// A feed note and a library note with a picture each, a picture nothing holds, a picture held by a note in the
     /// bin, and a picture attached to a picture.
-    private static let onFeedNote = ItemID("pic-feed"), onLibraryNote = ItemID("pic-library"), alone = ItemID("pic-alone")
+    private static let onFeedItem = ItemID("pic-feed"), onLibraryItem = ItemID("pic-library"), alone = ItemID("pic-alone")
     private static let onBinned = ItemID("pic-binned"), onPicture = ItemID("pic-on-pic"), manifest = ItemID("manifest")
 
     private static func attachment(_ id: ItemID, to parent: ItemID, tier: Tier, type: TypeID = F.image) -> Item {
@@ -23,16 +23,16 @@ import UniformTypeIdentifiers
 
     private static var items: [Item] {
         F.items + [
-            attachment(onFeedNote, to: F.n2, tier: .feed),
-            attachment(onLibraryNote, to: F.n1, tier: .library),
+            attachment(onFeedItem, to: F.n2, tier: .feed),
+            attachment(onLibraryItem, to: F.n1, tier: .library),
             F.item(alone, F.image, "pic-alone", age: 21, tier: .feed, titleRule: .firstLine, content: .file(.png, byteCount: 0)),
             attachment(onBinned, to: F.n3, tier: .feed),
-            attachment(onPicture, to: onFeedNote, tier: .feed),
+            attachment(onPicture, to: onFeedItem, tier: .feed),
             attachment(manifest, to: F.n2, tier: .feed, type: MarfaMapping.fileType),
         ]
     }
 
-    private static let attached: Set<ItemID> = [onFeedNote, onLibraryNote, onBinned, onPicture, manifest]
+    private static let attached: Set<ItemID> = [onFeedItem, onLibraryItem, onBinned, onPicture, manifest]
 
     private func loaded() async throws -> (MarfaLibrary, FakeItemSource) {
         let source = FakeItemSource()
@@ -47,7 +47,7 @@ import UniformTypeIdentifiers
     @Test func theInboxAllItemsAndATypesPlaceLeaveOutAttachedFiles() async throws {
         let (library, _) = try await loaded()
         #expect(ids(.inbox, in: library) == [F.n2, Self.alone])
-        #expect(ids(.allNotes, in: library) == [F.p1, F.e1, F.t1, F.n1, F.n2, F.en1, F.f1, F.p2, Self.alone])
+        #expect(ids(.allItems, in: library) == [F.p1, F.e1, F.t1, F.n1, F.n2, F.en1, F.f1, F.p2, Self.alone])
         #expect(ids(.itemType("core.image"), in: library) == [F.f1, Self.alone])
         #expect(ids(.itemType("core.file"), in: library).isEmpty)
     }
@@ -55,25 +55,25 @@ import UniformTypeIdentifiers
     @Test func aFileWithNoParentStillShows() async throws {
         let (library, _) = try await loaded()
         #expect(ids(.inbox, in: library).contains(Self.alone))
-        #expect(ids(.allNotes, in: library).contains(F.f1))
+        #expect(ids(.allItems, in: library).contains(F.f1))
     }
 
     @Test func aFileWhoseParentIsInTheBinStaysOutWithIt() async throws {
         let (library, _) = try await loaded()
         #expect(ids(.recentlyDeleted, in: library) == [F.n3])
         #expect(!ids(.inbox, in: library).contains(Self.onBinned))
-        #expect(!ids(.allNotes, in: library).contains(Self.onBinned))
+        #expect(!ids(.allItems, in: library).contains(Self.onBinned))
     }
 
     @Test func theFilesPlaceAndTheParentsAttachmentsStillHoldEveryFile() async throws {
         let (library, _) = try await loaded()
         #expect(ids(.files, in: library) == Self.attached.union([F.f1, Self.alone]))
-        #expect(Set(library.attachments(of: F.n2)) == [Self.onFeedNote, Self.manifest])
+        #expect(Set(library.attachments(of: F.n2)) == [Self.onFeedItem, Self.manifest])
     }
 
     @Test func countsMatchTheLists() async throws {
         let (library, _) = try await loaded()
-        for place in [SidebarItem.inbox, .allNotes, .itemType("core.image"), .itemType("core.file"), .files] {
+        for place in [SidebarItem.inbox, .allItems, .itemType("core.image"), .itemType("core.file"), .files] {
             #expect(library.count(in: place) == library.items(in: place).count, "\(place)")
         }
     }
@@ -81,10 +81,10 @@ import UniformTypeIdentifiers
     @Test func detachingAFileBringsItBack() async throws {
         let (library, source) = try await loaded()
         #expect(library.count(in: .inbox) == 2)
-        var freed = try #require(library.item(Self.onFeedNote))
+        var freed = try #require(library.item(Self.onFeedItem))
         freed.edgesOut = []
         source.send(.upserted([freed]))
-        #expect(await eventually { ids(.inbox, in: library) == [F.n2, Self.alone, Self.onFeedNote] })
+        #expect(await eventually { ids(.inbox, in: library) == [F.n2, Self.alone, Self.onFeedItem] })
         #expect(library.count(in: .inbox) == 3)
 
         var attached = try #require(library.item(Self.alone))
@@ -96,9 +96,9 @@ import UniformTypeIdentifiers
 
     @Test func searchStillFindsAnAttachedFile() async throws {
         let (library, source) = try await loaded()
-        source.hits.withLock { $0["pic"] = [Self.onFeedNote, F.f1] }
-        #expect(await eventually { Set(library.search("pic", in: .everywhere).items.map(\.id)) == [Self.onFeedNote, F.f1] })
-        #expect(await eventually { Set(library.search("pic", in: .place(.inbox)).items.map(\.id)) == [Self.onFeedNote, F.f1] })
+        source.hits.withLock { $0["pic"] = [Self.onFeedItem, F.f1] }
+        #expect(await eventually { Set(library.search("pic", in: .everywhere).items.map(\.id)) == [Self.onFeedItem, F.f1] })
+        #expect(await eventually { Set(library.search("pic", in: .place(.inbox)).items.map(\.id)) == [Self.onFeedItem, F.f1] })
         // The copy is asked about the Inbox by its tier alone, so it does not hide the files.
         let asked = source.targets.withLock { $0 }
         #expect(asked.allSatisfy { target in
@@ -113,11 +113,11 @@ import UniformTypeIdentifiers
         source.send(.loaded(SourceSnapshot(items: F.items + [orphan], catalogue: F.catalogue)))
         try #require(await eventually { library.isLoaded })
         #expect(ids(.inbox, in: library).contains(orphan.id))
-        #expect(ids(.allNotes, in: library).contains(orphan.id))
+        #expect(ids(.allItems, in: library).contains(orphan.id))
         #expect(library.count(in: .inbox) == library.items(in: .inbox).count)
 
         source.send(.upserted([F.item(ItemID("purged"), F.note, "Arrived", age: 30)]))
-        #expect(await eventually { !ids(.allNotes, in: library).contains(orphan.id) })
+        #expect(await eventually { !ids(.allItems, in: library).contains(orphan.id) })
         #expect(!ids(.inbox, in: library).contains(orphan.id))
     }
 

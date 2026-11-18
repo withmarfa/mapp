@@ -5,7 +5,7 @@ import Testing
 @MainActor
 @Suite struct SearchOrderTests {
     private let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
-    private let ranked = NoteOrder(sort: .dateEdited, groupsByDate: true)
+    private let ranked = ItemOrder(sort: .dateEdited, groupsByDate: true)
 
     /// A strong match edited long ago, then a weak one edited just now, in the order the fake ranks them (its list order).
     private func makeLibrary() -> (FakeItemLibrary, strongOld: Item, weakNew: Item) {
@@ -21,7 +21,7 @@ import Testing
     @Test func theListRanksASearchAndClearingItGivesBackTheChosenSort() {
         let (library, strongOld, weakNew) = makeLibrary()
         let browser = Browser()
-        browser.show(.allNotes, in: library, order: ranked)
+        browser.show(.allItems, in: library, order: ranked)
         #expect(listed(browser, library) == [weakNew.id, strongOld.id])
 
         browser.searchText = "search"
@@ -48,7 +48,7 @@ import Testing
     @Test func theGalleryKeepsItsSortUntilRelevanceIsPickedThere() {
         let (library, strongOld, weakNew) = makeLibrary()
         let browser = Browser()
-        browser.show(.allNotes, in: library, order: ranked)
+        browser.show(.allItems, in: library, order: ranked)
         browser.viewMode = .gallery
         browser.searchText = "search"
         #expect(!browser.ordersByRelevance)
@@ -60,7 +60,7 @@ import Testing
     @Test func theTableKeepsItsSortUntilRelevanceIsPickedAndColumnSortingStillWorks() {
         let (library, strongOld, weakNew) = makeLibrary()
         let browser = Browser()
-        browser.show(.allNotes, in: library, order: ranked)
+        browser.show(.allItems, in: library, order: ranked)
         browser.viewMode = .table
         browser.searchText = "search"
         func rows() -> [ItemID] { browser.tableContent(in: library).rows.map(\.item.id) }
@@ -71,13 +71,13 @@ import Testing
 
         // A column sort the person picks replaces relevance, in either direction.
         browser.orderSearch(byRelevance: false)
-        browser.tableOptions[.allNotes, default: .init()].sort = [ItemTableComparator(column: .edited, order: .reverse)]
+        browser.tableOptions[.allItems, default: .init()].sort = [ItemTableComparator(column: .edited, order: .reverse)]
         #expect(rows() == [weakNew.id, strongOld.id])
-        browser.tableOptions[.allNotes, default: .init()].sort = [ItemTableComparator(column: .edited, order: .forward)]
+        browser.tableOptions[.allItems, default: .init()].sort = [ItemTableComparator(column: .edited, order: .forward)]
         #expect(rows() == [strongOld.id, weakNew.id])
 
         // Relevance sets the stored sort aside without erasing it.
-        browser.tableOptions[.allNotes, default: .init()].sort = [ItemTableComparator(column: .edited, order: .reverse)]
+        browser.tableOptions[.allItems, default: .init()].sort = [ItemTableComparator(column: .edited, order: .reverse)]
         browser.orderSearch(byRelevance: true)
         #expect(rows() == [strongOld.id, weakNew.id])
         browser.orderSearch(byRelevance: false)

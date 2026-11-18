@@ -2,13 +2,13 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// Equatable by browser and order so a window change does not re-run its body. Row traits are set in the `ForEach`, not in the row view.
-struct NoteList: View, Equatable {
+struct ItemList: View, Equatable {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     @Environment(\.openWindow) private var openWindow
     let browser: Browser
-    let order: NoteOrder
+    let order: ItemOrder
     var pane: FocusState<Browser.Pane?>.Binding
     @State private var daysSeen = 0
     @State private var width = ColumnWidth.list.defaultWidth
@@ -18,7 +18,7 @@ struct NoteList: View, Equatable {
     @AppStorage(PlaceDensities.key) private var placeDensities: Data?
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
 
-    static func == (a: NoteList, b: NoteList) -> Bool { a.browser === b.browser && a.order == b.order }
+    static func == (a: ItemList, b: ItemList) -> Bool { a.browser === b.browser && a.order == b.order }
 
     var body: some View {
         let _ = Cost.record(.listBody, since: .now)
@@ -84,7 +84,7 @@ struct NoteList: View, Equatable {
             if !isPending { browser.keepHeldSelection(in: ids) }
         }
         .contextMenu(forSelectionType: ItemID.self) { ids in
-            NoteActions(ids: ids, undoManager: undoManager)
+            ItemActions(ids: ids, undoManager: undoManager)
         } primaryAction: { ids in
             ItemWindows.open(library.idsForWindows(ids)) { openWindow(value: $0) }
         }
@@ -124,7 +124,7 @@ struct NoteList: View, Equatable {
         .selectsAll { browser.selection = Set(ids) }
         // While the toolbar re-places its items, the list is briefly measured narrower than its column can be.
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { if $0 >= 280 { width = $0 } }
-        .accessibilityIdentifier("NoteList")
+        .accessibilityIdentifier("ItemList")
         .accessibilityLabel(title)
         .focused(pane, equals: .list)
         .takesKeyboardOnClick { browser.focusRequest = .list }
@@ -187,8 +187,8 @@ private struct ListLineRow: View {
 
 /// A line of the list: a section's heading, or an item, with where it falls in its section.
 private enum ListLine: Identifiable {
-    case heading(NoteGroup, isFirst: Bool)
-    case item(Item, group: NoteGroup?, endsSection: Bool)
+    case heading(ItemGroup, isFirst: Bool)
+    case item(Item, group: ItemGroup?, endsSection: Bool)
 
     /// An item's line is known by the item, so the list's selection is its items; a heading takes an identifier
     /// of its own, never selected.
@@ -219,7 +219,7 @@ private enum ListLine: Identifiable {
         if case .item(_, _, let endsSection) = self { endsSection } else { false }
     }
 
-    static func lines(of sections: [NoteSection]) -> [ListLine] {
+    static func lines(of sections: [ItemSection]) -> [ListLine] {
         var lines: [ListLine] = []
         for section in sections {
             if let group = section.group { lines.append(.heading(group, isFirst: lines.isEmpty)) }

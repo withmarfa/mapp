@@ -15,7 +15,7 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Where the library tells the person what it could not do or keep.
     var notices: Notices { get }
     /// Items a person has asked to erase for good, until a window asks them to confirm.
-    var notesToPurge: Set<ItemID> { get set }
+    var itemsToPurge: Set<ItemID> { get set }
     var catalogue: Catalogue { get }
     /// The views saved on the server, by title, each a place of its own (`SidebarItem.view`). Empty where there are
     /// none or they cannot be read.
@@ -66,13 +66,13 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Whether text saved to the item has not yet been read back from the library's copy, so what the copy bound
     /// in the text (`Item.boundEmbeds`) may not cover it yet.
     func hasUnreadSave(_ id: ItemID) -> Bool
-    /// The `[[link]]` that the text of `note` can hold and the core binds, from that item, to this item and no
+    /// The `[[link]]` that the text of `itemID` can hold and the core binds, from that item, to this item and no
     /// other, or nil when no spelling does.
-    func bodyLink(to id: ItemID, in note: ItemID?) async -> String?
-    /// What the core says each link target names, read as a link in `note` when given (`Items.linkCandidates`):
+    func bodyLink(to id: ItemID, in itemID: ItemID?) async -> String?
+    /// What the core says each link target names, read as a link in `itemID` when given (`Items.linkCandidates`):
     /// bound to one item, ambiguous with its candidates, or unresolved. Nil where the library cannot ask, such as
     /// for an item it does not hold; the answer is never guessed from the titles held.
-    func linkAnswers(of targets: [String], in note: ItemID?) async -> [LinkAnswer]?
+    func linkAnswers(of targets: [String], in itemID: ItemID?) async -> [LinkAnswer]?
     /// The property keys of the item that the inspector never lists: what the page shows as the title and the text,
     /// and any a library keeps for its own use.
     func hiddenPropertyKeys(of item: Item) -> Set<String>
@@ -250,21 +250,21 @@ extension ItemLibrary {
     }
     func hiddenPropertyKeys(of item: Item) -> Set<String> { catalogue.pageKeys(of: item) }
 
-    /// The title as a link only where, from `note`, the core binds it to this item (`LinkAnswer.names`). The copy holds
+    /// The title as a link only where, from `itemID`, the core binds it to this item (`LinkAnswer.names`). The copy holds
     /// a slice and cannot tell that an item it holds is the only one by its title, so a title the core has not bound is
     /// not enough. Otherwise the item's identity with its title as the label (`[[identity|Title]]`). Each spelling is
     /// read back through `linkParts` so it is the link it was meant to be.
-    func bodyLink(to id: ItemID, in note: ItemID?) async -> String? {
+    func bodyLink(to id: ItemID, in itemID: ItemID?) async -> String? {
         guard let target = item(id), !target.isFile else { return nil }
         let title = target.title
         let identity = id.rawValue
-        let label = NoteLinks.label(title)
+        let label = ItemLinks.label(title)
         let spellings = [
-            NoteLinks.spells(title, as: title) ? title : nil,
-            label.isEmpty ? nil : NoteLinks.spells("\(identity)|\(label)", as: identity, alias: label) ? "\(identity)|\(label)" : nil,
-            NoteLinks.spells(identity, as: identity) ? identity : nil,
+            ItemLinks.spells(title, as: title) ? title : nil,
+            label.isEmpty ? nil : ItemLinks.spells("\(identity)|\(label)", as: identity, alias: label) ? "\(identity)|\(label)" : nil,
+            ItemLinks.spells(identity, as: identity) ? identity : nil,
         ].compactMap { $0 }
-        guard let answers = await linkAnswers(of: spellings, in: note) else { return nil }
+        guard let answers = await linkAnswers(of: spellings, in: itemID) else { return nil }
         for (spelling, answer) in zip(spellings, answers) where answer.names(id) {
             return "[[\(spelling)]]"
         }

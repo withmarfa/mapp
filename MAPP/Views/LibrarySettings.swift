@@ -69,7 +69,7 @@ private struct LibraryServer: View {
             }
             if let library {
                 LabeledContent("Items") {
-                    Text(library.count(in: .allNotes), format: .number).monospacedDigit()
+                    Text(library.count(in: .allItems), format: .number).monospacedDigit()
                 }
             }
             if let waiting = host.waitingChanges, waiting > 0 {

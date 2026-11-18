@@ -104,7 +104,7 @@ extension EditorController {
             "slashImportant": String(localized: "Important"),
             "slashWarning": String(localized: "Warning"),
             "slashCaution": String(localized: "Caution"),
-            "linkToNote": String(localized: "Link to Item"),
+            "linkToItem": String(localized: "Link to Item"),
             "untitled": String(localized: "Untitled"),
             "title": String(localized: "Title"),
             "status": String(localized: "Status"),

@@ -29,7 +29,7 @@ function keyOf(link: LinkRef): string {
  * The page decides no color: a link names its tone and the app's style (`window.editor.setLinkStyle`) says what that
  * tone is under the look in force, by `--link-icon-<tone>` and `--link-tint-<tone>`.
  */
-export class NoteLinkStatus {
+export class ItemLinkStatus {
   private item = ''
   private readonly links = new Map<string, LinkRef>()
   /** What each link of the item on the page was last answered. */

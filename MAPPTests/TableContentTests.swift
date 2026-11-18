@@ -65,7 +65,7 @@ import Testing
 
     @Test func aSearchThatAnswersReplacesWhatWasShownWhilePending() async throws {
         let (library, source) = try await BigLibrary.loaded()
-        let browser = browser(showing: .allNotes)
+        let browser = browser(showing: .allItems)
         let found = Array(library.items(in: tasks).prefix(3).map(\.id))
         source.hits.withLock { $0["sidebar"] = found }
         browser.searchText = "sidebar"
@@ -82,7 +82,7 @@ import Testing
         browser.tableOptions[tasks] = ItemTableOptions(
             sort: [ItemTableComparator(column: .title, order: .reverse)], filters: ["field.status": ["todo"]])
         let content = browser.tableContent(in: library)
-        let ids = browser.collectionItemIDs(in: library, order: NoteOrder())
+        let ids = browser.collectionItemIDs(in: library, order: ItemOrder())
         #expect(!content.rows.isEmpty && content.rows.count < content.allRows.count)
         #expect(Array(ids.prefix(content.rows.count)) == content.rows.map(\.id))
         #expect(ids.count == content.allRows.count)
@@ -90,13 +90,13 @@ import Testing
 
         // The gallery filters too: what it shows leads, then what the filters hide.
         browser.viewMode = .gallery
-        let shown = browser.sections(in: library, order: NoteOrder(), now: library.now()).flatMap { $0.items.map(\.id) }
+        let shown = browser.sections(in: library, order: ItemOrder(), now: library.now()).flatMap { $0.items.map(\.id) }
         #expect(shown.count == content.rows.count)
-        let galleryIDs = browser.collectionItemIDs(in: library, order: NoteOrder())
+        let galleryIDs = browser.collectionItemIDs(in: library, order: ItemOrder())
         #expect(Array(galleryIDs.prefix(shown.count)) == shown)
         #expect(Set(galleryIDs) == Set(content.allRows.map(\.id)))
         browser.viewMode = .list
-        #expect(browser.collectionItemIDs(in: library, order: NoteOrder()).isEmpty)
+        #expect(browser.collectionItemIDs(in: library, order: ItemOrder()).isEmpty)
     }
 
     /// A place with statuses is grouped by status, so the selection follows the rows group by group, as they show.
@@ -108,7 +108,7 @@ import Testing
         try #require(content.grouping != nil && content.groups.count > 1)
         let grouped = content.groups.flatMap(\.rows).map(\.id)
         #expect(grouped != content.rows.map(\.id), "the sort's order across groups differs from the order shown")
-        #expect(Array(browser.collectionItemIDs(in: library, order: NoteOrder()).prefix(grouped.count)) == grouped)
+        #expect(Array(browser.collectionItemIDs(in: library, order: ItemOrder()).prefix(grouped.count)) == grouped)
     }
 
     @Test func aPlaceWithNoItemsHasEmptyContent() async throws {
@@ -154,7 +154,7 @@ import Testing
 
     @Test func sortingByEachColumnGivesTheOrderComparingRowsGave() async throws {
         let (library, _) = try await BigLibrary.loaded()
-        let browser = browser(showing: .allNotes)
+        let browser = browser(showing: .allItems)
         let rows = browser.tableContent(in: library).allRows
         let columns = browser.tableContent(in: library).columns
         // Types that lack a field leave its cells empty, which sort last whichever way the column runs.

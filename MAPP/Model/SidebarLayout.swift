@@ -59,7 +59,7 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
         switch self {
         case .inbox: .inbox
         case .recents: .recents
-        case .all: .allNotes
+        case .all: .allItems
         case .favorites: .favorites
         case .sources: .sources
         case .collections: .collections

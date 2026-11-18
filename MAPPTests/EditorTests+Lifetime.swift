@@ -31,7 +31,7 @@ extension EditorTests {
         let window = autoreleasepool {
             let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled, .closable], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
-            window.contentView = NSHostingView(rootView: NoteWindow(id: .constant(item)).environment(\.library, library))
+            window.contentView = NSHostingView(rootView: ItemWindow(id: .constant(item)).environment(\.library, library))
             window.makeKeyAndOrderFront(nil)
             return window
         }
@@ -156,7 +156,7 @@ extension EditorTests {
     @Test func anItemWindowMakesOneEditorHoweverOftenItsViewIsMadeAgain() async throws {
         let library = ItemPreviewFixtures.library
         let (made, shown, drafts) = try await Self.editorsMade(remaking: 5) {
-            NoteWindow(id: .constant(ItemPreviewFixtures.ticketID))
+            ItemWindow(id: .constant(ItemPreviewFixtures.ticketID))
                 .environment(\.library, library)
         }
         #expect(made.count == 1, "one editor for the window, not one for each time its view is made")

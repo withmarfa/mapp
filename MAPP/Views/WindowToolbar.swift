@@ -73,7 +73,7 @@ struct WindowToolbar: CustomizableToolbarContent {
         ToolbarSpacer(.fixed)
             .hidden(hidesPageLook)
         ToolbarItem(id: "format") {
-            if let editor { FormatMenu(editor: editor, note: tools.editableNote) }
+            if let editor { FormatMenu(editor: editor, item: tools.editableItem) }
         }
             .defaultCustomization(.hidden)
             .hidden(browser?.showsCollection == true || !showsItem)
@@ -132,7 +132,7 @@ private struct ExtraToolbarItems: CustomizableToolbarContent {
             .defaultCustomization(.hidden)
         ToolbarItem(id: "exportPDF") { tools.command(.exportPDF) }
             .defaultCustomization(.hidden)
-        ToolbarItem(id: "delete") { tools.withUndo { NoteRemoveActions(ids: tools.ids, undoManager: $0, keepsPlace: true) } }
+        ToolbarItem(id: "delete") { tools.withUndo { ItemRemoveActions(ids: tools.ids, undoManager: $0, keepsPlace: true) } }
             .defaultCustomization(.hidden)
         ToolbarItem(id: "bold") { FormatToggle(format: .bold, symbol: "bold", tools: tools) }
             .defaultCustomization(.hidden)
@@ -170,7 +170,7 @@ private struct FormatToggle: View {
     let tools: ItemToolbarActions
 
     var body: some View {
-        let editor = tools.editableNote == nil ? nil : tools.editor
+        let editor = tools.editableItem == nil ? nil : tools.editor
         Toggle(isOn: Binding { editor.map { format.isActive(in: $0.caret) } ?? false } set: { _ in editor?.apply(format) }) {
             Label { Text(format.title) } icon: { Image(systemName: symbol) }
         }
@@ -296,7 +296,7 @@ struct ItemToolbarActions {
     let details: DetailsPresentation
     let fileURL: URL?
     /// The selected items that are not files, sorted out once, since a selection can hold every item in the library.
-    let notes: [Item]
+    let pageItems: [Item]
 
     init(
         library: any ItemLibrary, browser: Browser?, items: [Item], editor: EditorController?, details: DetailsPresentation,
@@ -308,15 +308,15 @@ struct ItemToolbarActions {
         self.editor = editor
         self.details = details
         self.fileURL = fileURL
-        notes = items.filter { !$0.isFile }
+        pageItems = items.filter { !$0.isFile }
     }
     var showsInspector: Bool { details.isPresented }
 
-    var visibleNote: Item? {
+    var visibleItem: Item? {
         guard browser?.showsPage != false,
-              (browser?.selection.count ?? notes.count) == 1, notes.count == 1,
-              let note = notes.first, let editor, editor.hasNote, editor.noteID == note.id else { return nil }
-        return note
+              (browser?.selection.count ?? pageItems.count) == 1, pageItems.count == 1,
+              let item = pageItems.first, let editor, editor.hasItem, editor.pageItemID == item.id else { return nil }
+        return item
     }
 
     /// The one item the window's page shows, when it is one whose page scrolls a header away: an item's, or a web
@@ -341,7 +341,7 @@ struct ItemToolbarActions {
     }
 
     /// Formatting acts only on the writable item currently visible in the editor.
-    var editableNote: Item? { visibleNote.flatMap { $0.isWritable ? $0 : nil } }
+    var editableItem: Item? { visibleItem.flatMap { $0.isWritable ? $0 : nil } }
 
     private var selectedFileURL: URL? {
         guard (browser?.selection.count ?? items.count) == 1,
@@ -351,8 +351,8 @@ struct ItemToolbarActions {
 
     var shareLink: some View {
         let hasSingleSelection = (browser?.selection.count ?? items.count) == 1
-        let note = hasSingleSelection && notes.count == 1 ? notes.first : nil
-        return NoteShareLink(share: NoteShare(note: note, fileURL: selectedFileURL, in: library))
+        let item = hasSingleSelection && pageItems.count == 1 ? pageItems.first : nil
+        return ItemShareLink(share: ItemShare(item: item, fileURL: selectedFileURL, in: library))
             .help("Share…")
             .accessibilityIdentifier("ShareToolbar")
     }
@@ -381,10 +381,10 @@ struct ItemToolbarActions {
     }
 
     var moreMenu: some View {
-        let isShowingSelection = (browser?.selection.count ?? notes.count) == notes.count
+        let isShowingSelection = (browser?.selection.count ?? pageItems.count) == pageItems.count
         return MoreMenu(
             ids: ids,
-            notes: isShowingSelection ? notes : [],
+            pageItems: isShowingSelection ? pageItems : [],
             fileURL: selectedFileURL, browser: browser, editor: editor)
     }
 }
@@ -400,7 +400,7 @@ private struct UndoManagerReader<Content: View>: View {
 /// Text styles and emphasis, as Notes offers them under Aa.
 private struct FormatMenu: View {
     let editor: EditorController
-    let note: Item?
+    let item: Item?
 
     var body: some View {
         Menu("Format", systemImage: "textformat") {
@@ -416,7 +416,7 @@ private struct FormatMenu: View {
         .menuIndicator(.hidden)
         .help("Format")
         .accessibilityIdentifier("FormatToolbar")
-        .disabled(note == nil)
+        .disabled(item == nil)
     }
 
     private func toggle(_ format: Format) -> some View {
@@ -433,7 +433,7 @@ private struct MoreMenu: View {
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     /// Everything selected, files too; the windows it opens, the share it makes and the collection actions take them all.
     let ids: Set<ItemID>
-    let notes: [Item]
+    let pageItems: [Item]
     let fileURL: URL?
     let browser: Browser?
     let editor: EditorController?
@@ -445,15 +445,15 @@ private struct MoreMenu: View {
     }
 
     var body: some View {
-        let note = notes.count == 1 ? notes.first : nil
+        let item = pageItems.count == 1 ? pageItems.first : nil
         Menu("More", systemImage: "ellipsis") {
             command(.quickLook)
             command(.openInNewWindow)
             command(.openOriginal)
             command(.openInBrowser)
-            NoteShareLink(share: NoteShare(note: note, fileURL: fileURL, in: library), showsIcon: false)
+            ItemShareLink(share: ItemShare(item: item, fileURL: fileURL, in: library), showsIcon: false)
             Divider()
-            NoteOrganizeActions(ids: ids, undoManager: undoManager, keepsPlace: true)
+            ItemOrganizeActions(ids: ids, undoManager: undoManager, keepsPlace: true)
             CollectionActions(selection: ids, details: details, undoManager: undoManager)
             Divider()
             command(.addAttachment)
@@ -467,7 +467,7 @@ private struct MoreMenu: View {
             command(.print)
             command(.exportPDF)
             Divider()
-            NoteRemoveActions(ids: ids, undoManager: undoManager, keepsPlace: true)
+            ItemRemoveActions(ids: ids, undoManager: undoManager, keepsPlace: true)
         }
         .menuIndicator(.hidden)
         .help("More")

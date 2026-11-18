@@ -6,7 +6,7 @@ final class GalleryTests: XCTestCase {
     private var app: XCUIApplication!
     private var window: XCUIElement { app.windows.firstMatch }
     private var gallery: XCUIElement { window.descendants(matching: .any).matching(identifier: "ItemGallery").element(boundBy: 0) }
-    private var list: XCUIElement { window.outlines["NoteList"] }
+    private var list: XCUIElement { window.outlines["ItemList"] }
     private var sidebar: XCUIElement { window.outlines["Sidebar"] }
 
     override func setUp() async throws {

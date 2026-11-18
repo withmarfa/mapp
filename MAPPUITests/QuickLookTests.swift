@@ -4,7 +4,7 @@ import XCTest
 final class QuickLookTests: XCTestCase {
     private var app: XCUIApplication!
     private var window: XCUIElement { app.windows.firstMatch }
-    private var list: XCUIElement { window.outlines["NoteList"] }
+    private var list: XCUIElement { window.outlines["ItemList"] }
 
     override func setUp() async throws {
         continueAfterFailure = false

@@ -154,7 +154,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     @Test func eachPlaceHoldsWhatItsNameSays() async throws {
         let (library, _) = try await loaded()
         #expect(ids(library.items(in: .inbox)) == [F.n2])
-        #expect(ids(library.items(in: .allNotes)) == [F.p1, F.e1, F.t1, F.n1, F.n2, F.en1, F.f1, F.p2])
+        #expect(ids(library.items(in: .allItems)) == [F.p1, F.e1, F.t1, F.n1, F.n2, F.en1, F.f1, F.p2])
         #expect(ids(library.items(in: .favorites)) == [F.t1, F.n1])
         #expect(ids(library.items(in: .favoriteItem(F.n1))) == [F.n1])
         #expect(library.items(in: .favoriteItem(F.n2)).isEmpty)
@@ -166,17 +166,17 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         #expect(library.items(in: .collection(F.p1)).isEmpty)
         #expect(ids(library.items(in: .files)) == [F.f1])
         #expect(ids(library.items(in: .recentlyDeleted)) == [F.n3])
-        for place in [SidebarItem.inbox, .allNotes, .favorites, .itemType("aic.ticket"), .itemType("aic.ticket.task"), .collection(F.p1), .files, .recentlyDeleted] {
+        for place in [SidebarItem.inbox, .allItems, .favorites, .itemType("aic.ticket"), .itemType("aic.ticket.task"), .collection(F.p1), .files, .recentlyDeleted] {
             #expect(library.count(in: place) == library.items(in: place).count, "\(place)")
         }
         // Newest first, as the source paints them.
-        #expect(library.items(in: .allNotes).first?.id == F.p1)
+        #expect(library.items(in: .allItems).first?.id == F.p1)
     }
 
     @Test func placesAreNamedForThePerson() async throws {
         let (library, _) = try await loaded()
         #expect(library.name(of: .inbox) == String(localized: "Inbox"))
-        #expect(library.name(of: .allNotes) == String(localized: "Items"))
+        #expect(library.name(of: .allItems) == String(localized: "Items"))
         #expect(library.name(of: .itemType("aic.project")) == "Projects")
         #expect(library.name(of: .itemType("aic.ticket.bug")) == "Bugs")
         #expect(library.name(of: .collection(F.p1)) == "Alpha")
@@ -324,7 +324,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         let undo = UndoManager()
         let id = try #require(library.createItem(
-            typeID: "aic.ticket.task", title: "  New task ", body: "Text", parentID: F.p1, in: .allNotes, undoManager: undo))
+            typeID: "aic.ticket.task", title: "  New task ", body: "Text", parentID: F.p1, in: .allItems, undoManager: undo))
         #expect(id.rawValue == id.rawValue.lowercased())
         #expect(id.rawValue.dropFirst(14).first == "7")
         #expect(source.writes == [.create(id: id, ItemDraft(type: F.task, title: "New task", body: "Text", parent: F.p1))])
@@ -346,10 +346,10 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
 
     @Test func aCreateTheCatalogueRefusesIsToldAndNotSent() async throws {
         let (library, source) = try await loaded()
-        #expect(library.createItem(typeID: "no.such", title: "X", body: "", parentID: nil, in: .allNotes, undoManager: nil) == nil)
+        #expect(library.createItem(typeID: "no.such", title: "X", body: "", parentID: nil, in: .allItems, undoManager: nil) == nil)
         #expect(library.notices.waiting.last?.title == String(localized: "Can’t Create Item"))
         library.notices.answerAll()
-        #expect(library.createItem(typeID: "core.note", title: " ", body: "", parentID: nil, in: .allNotes, undoManager: nil) == nil)
+        #expect(library.createItem(typeID: "core.note", title: " ", body: "", parentID: nil, in: .allItems, undoManager: nil) == nil)
         #expect(library.notices.waiting.last != nil)
         #expect(source.writes.isEmpty)
     }
@@ -563,11 +563,11 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         binned.version = ItemVersion(9)
         source.send(.upserted([binned]))
         #expect(await eventually { library.item(F.n3)?.version == ItemVersion(9) })
-        library.notesToPurge = [F.n3, F.n1]
+        library.itemsToPurge = [F.n3, F.n1]
         library.deletePermanentlyOnConfirm([F.n3, F.n1])
         // An item not in the bin is only moved there, never destroyed.
         #expect(source.writes == [.purge(F.n3, version: ItemVersion(9))])
-        #expect(library.notesToPurge.isEmpty)
+        #expect(library.itemsToPurge.isEmpty)
 
         let purge = try #require(source.submitted.last?.id)
         source.send(.answered(purge, .refused(SyncProblem(code: "version_conflict", message: "The item changed after you saw it."))))
@@ -940,7 +940,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         source.attaching.failure.withLock { $0 = SourceFailure(kind: .failed, message: "No room.") }
         source.attaching.failures.withLock { $0["b.pdf"] = SourceFailure(kind: .failed, message: "No room.") }
         await #expect(throws: SourceFailure.self) { try await library.attach(file: disk.url("b.pdf"), to: F.n1) }
-        #expect(await library.addFile(disk.url("c.png"), title: nil, parentID: nil, in: .allNotes) == nil)
+        #expect(await library.addFile(disk.url("c.png"), title: nil, parentID: nil, in: .allItems) == nil)
         #expect(library.notices.waiting.last?.message == "No room.")
     }
 
@@ -1256,7 +1256,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         let (library, source) = try await loaded()
         _ = try #require(library.createItem(
             typeID: LibraryFixture.task.rawValue, title: "Kept", body: "Only copy", properties: ["status": .string("open")],
-            parentID: nil, in: .allNotes, undoManager: nil))
+            parentID: nil, in: .allItems, undoManager: nil))
         let write = try #require(source.submitted.last?.id)
         source.send(.answered(write, .refused(SyncProblem(code: MarfaEngine.closedCode, message: MarfaEngine.notKept))))
         #expect(await eventually { !library.notices.waiting.isEmpty })
@@ -1320,7 +1320,7 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
     @Test func aCreateRefusedBeforeItWasQueuedGivesItsTextBack() async throws {
         let (library, source) = try await loaded()
         _ = try #require(library.createItem(
-            typeID: "core.note", title: "Kept", body: "Only copy", parentID: nil, in: .allNotes, undoManager: nil
+            typeID: "core.note", title: "Kept", body: "Only copy", parentID: nil, in: .allItems, undoManager: nil
         ))
         let write = try #require(source.submitted.last?.id)
         let problem = SyncProblem(code: "type_not_permitted", message: "Not this type.", notQueued: true)

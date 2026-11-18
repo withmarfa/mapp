@@ -17,7 +17,7 @@ final class PersonPageTests: XCTestCase {
     /// lines readable: each is wider than a few characters, not set one character to a line.
     func testPersonHeaderStaysReadableBesideTheInspector() {
         app.outlines["Sidebar"].staticTexts["SidebarType-core.entity.person"].click()
-        let row = app.outlines["NoteList"].staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Ruth Okonjo")).firstMatch
+        let row = app.outlines["ItemList"].staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Ruth Okonjo")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         row.click()
         let title = app.itemPageTitle

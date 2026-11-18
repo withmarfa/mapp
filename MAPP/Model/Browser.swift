@@ -5,7 +5,7 @@ import Observation
 /// and the menu bar's commands share it, so both act on the same selection.
 @Observable
 final class Browser {
-    var sidebarItem: SidebarItem? = .allNotes {
+    var sidebarItem: SidebarItem? = .allItems {
         // A scroll position belongs to the place and layout it was made in.
         didSet {
             guard sidebarItem != oldValue else { return }
@@ -150,7 +150,7 @@ final class Browser {
     /// which a page never makes again, and read as one page once the key has changed (`tablePaging`).
     var pagingState: (key: TablePagingKey, paging: TablePaging)?
     @ObservationIgnored private var tableMemo: (key: TableKey, content: ItemTableContent)?
-    @ObservationIgnored private var sectionsMemo: (key: SectionsKey, sections: [NoteSection])?
+    @ObservationIgnored private var sectionsMemo: (key: SectionsKey, sections: [ItemSection])?
     @ObservationIgnored private var viewModesMemo: (key: ViewModesKey, modes: [ItemViewMode])?
     @ObservationIgnored private var fieldsMemo: FieldsMemo?
     /// The content of the list's rows, held between passes (`Browser+Rows`).
@@ -234,7 +234,7 @@ final class Browser {
         case title
     }
 
-    var item: SidebarItem { sidebarItem ?? .allNotes }
+    var item: SidebarItem { sidebarItem ?? .allItems }
     var showsSidebarIndex: Bool { !showsSettings && (item == .sources || item == .collections) }
     var canSearchList: Bool { !showsSettings }
     /// Whether an item's page is what the window shows, as against a collection, an index or Settings. The editor
@@ -280,10 +280,10 @@ final class Browser {
 
     /// The place that lists an item no place on screen does: a deleted item is listed by Recently Deleted alone.
     func place(listing item: Item) -> SidebarItem {
-        item.state == .trashed ? .recentlyDeleted : .allNotes
+        item.state == .trashed ? .recentlyDeleted : .allItems
     }
 
-    func reveal(_ item: Item, in library: any ItemLibrary, order: NoteOrder) {
+    func reveal(_ item: Item, in library: any ItemLibrary, order: ItemOrder) {
         leaveSettings()
         if !items(in: library).contains(where: { $0.id == item.id }) {
             show(place(listing: item), in: library, order: order)
@@ -296,7 +296,7 @@ final class Browser {
     /// Shows the item a link in the page names, as choosing it in the list does: the window's place, search, undo
     /// and the rest of its state are left as they are unless the item is not in the list, which then shows the place
     /// that lists it (`place(listing:)`). The keyboard stays with the page, as it does when a link is followed anywhere.
-    func open(linked item: Item, in library: any ItemLibrary, order: NoteOrder) {
+    func open(linked item: Item, in library: any ItemLibrary, order: ItemOrder) {
         reveal(item, in: library, order: order)
         if !usesCollection { focusRequest = .page }
     }
@@ -323,7 +323,7 @@ final class Browser {
             isSearchExpanded = false
             sidebarItem = entry.place
         }
-        if !items(in: library).contains(where: { $0.id == entry.id }) { sidebarItem = .allNotes }
+        if !items(in: library).contains(where: { $0.id == entry.id }) { sidebarItem = .allItems }
         selection = [entry.id]
         history.move(to: index)
         focusRequest = .list
@@ -409,7 +409,7 @@ final class Browser {
     /// has, orders and groups the items in place of the list's own order. The window's views ask for them as often
     /// as they are drawn, so the last answer stands until the items, the order, the filters, the day or the place
     /// change.
-    func sections(in library: any ItemLibrary, order: NoteOrder, now: Date) -> [NoteSection] {
+    func sections(in library: any ItemLibrary, order: ItemOrder, now: Date) -> [ItemSection] {
         let derived = derivedKey(in: library)
         let shape = listShape
         let key = SectionsKey(derived: derived.key, order: order, day: Calendar.current.startOfDay(for: now), shape: shape)
@@ -422,11 +422,11 @@ final class Browser {
         return sections
     }
 
-    private func sectionsUnmeasured(of items: [Item], order: NoteOrder, now: Date) -> [NoteSection] {
+    private func sectionsUnmeasured(of items: [Item], order: ItemOrder, now: Date) -> [ItemSection] {
         if keepsPlaceOrder || ordersByRelevance {
-            return items.isEmpty ? [] : [NoteSection(group: nil, items: items)]
+            return items.isEmpty ? [] : [ItemSection(group: nil, items: items)]
         }
-        return NoteGroup.sections(
+        return ItemGroup.sections(
             of: items,
             sort: order.sort,
             favoritesFirst: !isSearching && !showsOnlyFavorites,
@@ -461,16 +461,16 @@ final class Browser {
 
     /// The sections of a place that is filtered or arranged, worked out from the table's content, which the table
     /// shares and a click on another item never makes again.
-    private func shapedSections(_ shape: ListShape, in library: any ItemLibrary, order: NoteOrder, now: Date) -> [NoteSection] {
+    private func shapedSections(_ shape: ListShape, in library: any ItemLibrary, order: ItemOrder, now: Date) -> [ItemSection] {
         let content = tableContent(in: library)
         guard shape.arranged, !ordersByRelevance else {
             return sectionsUnmeasured(of: content.kept.map(\.item), order: order, now: now)
         }
         // The table groups a place by status on its own; the list does only what a view or the person asked for.
         guard case .column = shape.options.grouping, content.grouping != nil else {
-            return content.rows.isEmpty ? [] : [NoteSection(group: nil, items: content.rows.map(\.item))]
+            return content.rows.isEmpty ? [] : [ItemSection(group: nil, items: content.rows.map(\.item))]
         }
-        return content.groups.map { NoteSection(group: .custom(id: $0.id, title: $0.title), items: $0.rows.map(\.item)) }
+        return content.groups.map { ItemSection(group: .custom(id: $0.id, title: $0.title), items: $0.rows.map(\.item)) }
     }
 
     /// The items the open place shows in the layouts that arrange them themselves (the board, the timeline): the
@@ -542,7 +542,7 @@ final class Browser {
 
     private struct SectionsKey: Equatable {
         let derived: DerivedKey
-        let order: NoteOrder
+        let order: ItemOrder
         let day: Date
         let shape: ListShape?
     }
@@ -574,13 +574,13 @@ final class Browser {
 
     /// Opens a destination the sidebar, the menus and the palette list. Items opens in a layout that spans the window,
     /// so a window on the list moves to the gallery; the person's own choice of another layout stands.
-    func choose(_ item: SidebarItem, in library: any ItemLibrary, order: NoteOrder) {
-        if item == .allNotes, viewMode == .list { set(layout: .gallery) }
+    func choose(_ item: SidebarItem, in library: any ItemLibrary, order: ItemOrder) {
+        if item == .allItems, viewMode == .list { set(layout: .gallery) }
         show(item, in: library, order: order)
     }
 
     /// Shows a sidebar item as a person picks it: any search is cleared and the list's first item is selected.
-    func show(_ item: SidebarItem, in library: any ItemLibrary, order: NoteOrder) {
+    func show(_ item: SidebarItem, in library: any ItemLibrary, order: ItemOrder) {
         let interval = Telemetry.begin(.navigation, "place.choose")
         defer { interval.end() }
         leaveSettings()
@@ -589,10 +589,10 @@ final class Browser {
         isSearchExpanded = false
         sidebarItem = item
         fallBackToListIfUnavailable(in: library)
-        selectFirstNote(in: library, order: order)
+        selectFirstItem(in: library, order: order)
     }
 
-    func selectFirstNote(in library: any ItemLibrary, order: NoteOrder) {
+    func selectFirstItem(in library: any ItemLibrary, order: ItemOrder) {
         let first = sections(in: library, order: order, now: library.now()).first?.items.first
         selectAutomatically(first.map { [$0.id] } ?? [])
     }
@@ -607,7 +607,7 @@ final class Browser {
     /// The items the layout that spans the window holds, which its selection follows as they change (`keepSelection`):
     /// the table's in the order it shows them, then those its filters hide, and the gallery's, the board's and the
     /// timeline's in the list's order. The table's come from its own content, so a move between its places sorts no list.
-    func collectionItemIDs(in library: any ItemLibrary, order: NoteOrder) -> [ItemID] {
+    func collectionItemIDs(in library: any ItemLibrary, order: ItemOrder) -> [ItemID] {
         guard usesCollection else { return [] }
         guard viewMode == .table else {
             let shown = sections(in: library, order: order, now: library.now()).flatMap { $0.items.map(\.id) }
@@ -691,7 +691,7 @@ final class Browser {
         selection = []
         history = SelectionHistory()
         isCollectionItemPresented = false
-        sidebarItem = .allNotes
+        sidebarItem = .allItems
         sidebarShowsAllTypes = false
         sidebarMemory.forget()
         listMemory.forget()
@@ -735,12 +735,12 @@ final class Browser {
                 library.delete(moving, undoManager: undoManager)
             }
         } else if !binned.isEmpty, ids.subtracting(binned).isEmpty {
-            if library.reachesServer { library.notesToPurge = binned } else { library.tellCannotPurge() }
+            if library.reachesServer { library.itemsToPurge = binned } else { library.tellCannotPurge() }
         }
     }
 
     /// A place that is gone can no longer be shown, so the window moves to where `placeFallback(in:)` says.
-    func placeRemoved(in library: any ItemLibrary, order: NoteOrder) {
+    func placeRemoved(in library: any ItemLibrary, order: ItemOrder) {
         if let place = placeFallback(in: library) { show(place, in: library, order: order) }
     }
 
@@ -753,12 +753,12 @@ final class Browser {
         case .collection(let id):
             // A collection's state is part of membership, which `item(_:)` follows only once the item is missing.
             _ = library.membershipRevision
-            return library.item(id)?.state != .active ? .allNotes : nil
+            return library.item(id)?.state != .active ? .allItems : nil
         // A type is in the sidebar while it holds an item, so one whose last item went has no row to stay on.
         case .itemType(let type):
-            return library.count(in: .itemType(type)) == 0 ? .allNotes : nil
+            return library.count(in: .itemType(type)) == 0 ? .allItems : nil
         case .view(let id):
-            return library.views.contains { $0.id == id } ? nil : .allNotes
+            return library.views.contains { $0.id == id } ? nil : .allItems
         case .favoriteItem(let id):
             _ = library.membershipRevision
             return library.item(id).map({ $0.state == .active && $0.isFavorite }) == true ? nil : .favorites

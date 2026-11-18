@@ -32,7 +32,7 @@ final class EditorCloseDelegate: NSObject, NSWindowDelegate {
         guard editor?.saveTitles(tellingRefusal: true) != false else { return false }
         // A hand-over still under way, as just after the item was left, holds the last edit of an item no longer
         // on the page; once the window goes, a quit no longer waits on its editor.
-        guard let editor, editor.hasNote || editor.isFlushing else { return true }
+        guard let editor, editor.hasItem || editor.isFlushing else { return true }
         guard !awaiting else { return false }
         awaiting = true
         editor.flush { [weak self, weak sender] kept in

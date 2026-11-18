@@ -30,7 +30,7 @@ import Testing
     }
 
     @Test func aTitleSortOrdersByTheNameShown() {
-        let sorted = NoteSort.title.sorted(Self.items())
+        let sorted = ItemSort.title.sorted(Self.items())
         #expect(sorted.map(\.displayTitle) == ["Alpha", "Untitled", "Zeta"].sorted { $0.localizedStandardCompare($1) == .orderedAscending })
         #expect(sorted.first?.id == F.n1)
     }

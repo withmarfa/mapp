@@ -30,6 +30,6 @@ struct FindCommands: Commands {
 
     private func item(_ title: LocalizedStringKey, systemImage: String, _ action: NSTextFinder.Action) -> some View {
         Button(title, systemImage: systemImage) { editor?.performFind(action) }
-            .disabled(editor?.hasNote != true)
+            .disabled(editor?.hasItem != true)
     }
 }

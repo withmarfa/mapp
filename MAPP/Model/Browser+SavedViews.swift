@@ -89,10 +89,10 @@ extension Browser {
     }
 
     /// The list's own order, from where the app keeps it.
-    var storedOrder: NoteOrder {
-        let sort = defaults.string(forKey: OrderKey.sort).flatMap(NoteSort.init(rawValue:)) ?? NoteOrder().sort
-        let groups = defaults.object(forKey: OrderKey.groupsByDate) as? Bool ?? NoteOrder().groupsByDate
-        return NoteOrder(sort: sort, groupsByDate: groups)
+    var storedOrder: ItemOrder {
+        let sort = defaults.string(forKey: OrderKey.sort).flatMap(ItemSort.init(rawValue:)) ?? ItemOrder().sort
+        let groups = defaults.object(forKey: OrderKey.groupsByDate) as? Bool ?? ItemOrder().groupsByDate
+        return ItemOrder(sort: sort, groupsByDate: groups)
     }
 
     /// What the list or gallery shows while neither the person nor the view arranged it: the list's own order. Nil in

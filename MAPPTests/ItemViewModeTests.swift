@@ -57,8 +57,8 @@ struct ItemViewModeTests {
             browser.adopt(library)
             browser.viewMode = .board
             // The collections index has no layout of its own, so a trip through it must not lose the fallback.
-            browser.show(.collections, in: library, order: NoteOrder())
-            browser.show(place, in: library, order: NoteOrder())
+            browser.show(.collections, in: library, order: ItemOrder())
+            browser.show(place, in: library, order: ItemOrder())
             #expect(browser.viewMode == .list, "\(place)")
         }
     }
@@ -73,15 +73,15 @@ struct ItemViewModeTests {
 
     @Test func aWindowKeptOnTheOldLayoutNameOpensInTheListAtItsPlace() throws {
         let (library, _, _, favorite) = BrowserTests().makeFakeLibrary()
-        let kept = Browser.Snapshot(place: .allNotes, selection: [favorite.id], viewMode: .table)
+        let kept = Browser.Snapshot(place: .allItems, selection: [favorite.id], viewMode: .table)
         let json = try #require(String(data: JSONEncoder().encode(kept), encoding: .utf8))
         let oldName = json.replacingOccurrences(of: #""viewMode":"table""#, with: #""viewMode":"agenda""#)
         try #require(oldName != json)
         let saved = Data(oldName.utf8)
         let browser = Browser()
-        browser.restore(from: saved, in: library, order: NoteOrder())
+        browser.restore(from: saved, in: library, order: ItemOrder())
         #expect(browser.viewMode == .list)
-        #expect(browser.item == .allNotes)
+        #expect(browser.item == .allItems)
         #expect(browser.selection == [favorite.id])
     }
 }

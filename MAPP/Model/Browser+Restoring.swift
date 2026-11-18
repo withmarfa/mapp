@@ -41,32 +41,32 @@ extension Browser {
 
     /// Restores a window from what it kept. A snapshot that does not read, one kept in an earlier form say,
     /// leaves the window at its default.
-    func restore(from data: Data?, in library: any ItemLibrary, order: NoteOrder) {
+    func restore(from data: Data?, in library: any ItemLibrary, order: ItemOrder) {
         if let data, let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) {
             restore(snapshot, in: library, order: order)
         } else {
-            selectFirstNote(in: library, order: order)
+            selectFirstItem(in: library, order: order)
         }
     }
 
     /// Restores what still exists: a place gone since gives way to All Items, or Favorites for a favorite, and
     /// items no longer in the list are dropped, leaving the top row selected if none remain.
-    func restore(_ snapshot: Snapshot, in library: any ItemLibrary, order: NoteOrder) {
+    func restore(_ snapshot: Snapshot, in library: any ItemLibrary, order: ItemOrder) {
         set(layout: snapshot.viewMode)
         let place = snapshot.place
         sidebarItem = switch snapshot.place {
         case .favoriteItem(let id):
             library.item(id).flatMap { $0.isFavorite && $0.state == .active ? snapshot.place : nil } ?? .favorites
-        case .collection(let id): library.item(id).map { _ in snapshot.place } ?? .allNotes
+        case .collection(let id): library.item(id).map { _ in snapshot.place } ?? .allItems
         case .itemType(let type):
-            library.itemTypeCounts.contains { $0.id.rawValue == type } ? snapshot.place : .allNotes
-        case .view(let id): library.views.contains { $0.id == id } ? snapshot.place : .allNotes
-        case .inbox, .recents, .allNotes, .favorites, .files, .sources, .source, .collections, .recentlyDeleted: snapshot.place
+            library.itemTypeCounts.contains { $0.id.rawValue == type } ? snapshot.place : .allItems
+        case .view(let id): library.views.contains { $0.id == id } ? snapshot.place : .allItems
+        case .inbox, .recents, .allItems, .favorites, .files, .sources, .source, .collections, .recentlyDeleted: snapshot.place
         }
         let ids = Set(snapshot.selection)
         selectAutomatically(Set(items(in: library).map(\.id).filter(ids.contains)))
         let keptSelection = !selection.isEmpty
-        if selection.isEmpty { selectFirstNote(in: library, order: order) }
+        if selection.isEmpty { selectFirstItem(in: library, order: order) }
         // Only where the window is back in the place it was left, and not with another item chosen in its stead.
         guard item == place else { return }
         if snapshot.opensItem == true, keptSelection, selection.count == 1, usesCollection {

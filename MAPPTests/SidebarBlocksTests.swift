@@ -157,11 +157,11 @@ struct SidebarBlocksTests {
     @Test func choosingItemsMovesAWindowOnTheListToTheGalleryAndLeavesAnotherLayoutBe() {
         let library = FakeItemLibrary(items: [FakeItemLibrary.note("One", modified: .now)])
         let onList = browser(.recents, mode: .list)
-        onList.choose(.allNotes, in: library, order: NoteOrder())
-        #expect(onList.item == .allNotes)
+        onList.choose(.allItems, in: library, order: ItemOrder())
+        #expect(onList.item == .allItems)
         #expect(onList.viewMode == .gallery)
         let onTable = browser(.recents, mode: .table)
-        onTable.choose(.allNotes, in: library, order: NoteOrder())
+        onTable.choose(.allItems, in: library, order: ItemOrder())
         #expect(onTable.viewMode == .table)
     }
 
@@ -169,7 +169,7 @@ struct SidebarBlocksTests {
 
     @Test func theSixPlacesEachOpenSomethingWithAMark() {
         let places = SidebarPlace.destinations + SidebarPlace.builtInViews
-        #expect(places.compactMap(\.item) == [.allNotes, .sources, .collections, .inbox, .recents, .favorites])
+        #expect(places.compactMap(\.item) == [.allItems, .sources, .collections, .inbox, .recents, .favorites])
         #expect(places.allSatisfy { $0.symbol != nil })
         #expect(Set(places.compactMap(\.symbol)).count == places.count)
     }

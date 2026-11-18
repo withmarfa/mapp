@@ -98,7 +98,7 @@ private struct LibraryDialogs: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            .onChange(of: library.notesToPurge, initial: true, take)
+            .onChange(of: library.itemsToPurge, initial: true, take)
             .onChange(of: appearsActive, take)
             .confirmationDialog(
                 "^[Delete \(purging.count) item](inflect: true) immediately?",
@@ -113,10 +113,10 @@ private struct LibraryDialogs: ViewModifier {
     /// The window in front takes what the library asks, which leaves the library's request answered for the rest.
     private func take() {
         guard appearsActive else { return }
-        if !library.notesToPurge.isEmpty {
+        if !library.itemsToPurge.isEmpty {
             // The server may have gone out of reach since the person asked.
-            if library.reachesServer { purging = library.notesToPurge } else { library.tellCannotPurge() }
-            library.notesToPurge = []
+            if library.reachesServer { purging = library.itemsToPurge } else { library.tellCannotPurge() }
+            library.itemsToPurge = []
         }
     }
 }

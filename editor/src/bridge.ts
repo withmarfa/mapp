@@ -81,7 +81,7 @@ export type EditorMessage =
   | { type: 'rowMenu'; row: { item: string; row: string } | null }
   /** A row of the property block was dragged: the whole order the page shows after the move, folded rows included. */
   | { type: 'moveRow'; item: string; row: string; order: string[] }
-  | ({ type: 'openNote'; item: string } & LinkRef)
+  | ({ type: 'openItemLink'; item: string } & LinkRef)
   | ({ type: 'find' } & FindState)
 
 /** The authored spelling identifies the binding; decoded parts serve navigation and display. Forward `raw` unchanged
@@ -96,7 +96,7 @@ export interface LinkRef {
 
 /** What the page asks of the app's items: names to offer after `[[`, which item the person links to, and what each
  *  link of an item names. */
-export type NoteRequest =
+export type ItemRequest =
   | { type: 'suggest'; query: string; item: string }
   | { type: 'pick'; item: string }
   | { type: 'resolve'; item: string; links: LinkRef[] }
@@ -137,7 +137,7 @@ declare global {
         }
         /** Answers a `suggest` with item names, a `pick` with the link the person chose, or null, and a
          *  `resolve` with what each name is (`LinkAnswers`). */
-        notes?: { postMessage(request: NoteRequest): Promise<unknown> }
+        items?: { postMessage(request: ItemRequest): Promise<unknown> }
         /** Answers a question about a picture at a web address, or null when the app has no answer. The page
          *  fetches nothing itself: this is the only way such a picture reaches it. */
         pictures?: { postMessage(request: PictureRequest): Promise<PictureAnswer | null> }
@@ -159,8 +159,8 @@ export function openLink(href: string): void {
 }
 
 /** Item names that answer what was typed after `[[`, in the order to show them. */
-export async function suggestNotes(query: string, item: string): Promise<string[]> {
-  const names = await window.webkit?.messageHandlers?.notes?.postMessage({
+export async function suggestItems(query: string, item: string): Promise<string[]> {
+  const names = await window.webkit?.messageHandlers?.items?.postMessage({
     type: 'suggest',
     query,
     item,
@@ -170,8 +170,8 @@ export async function suggestNotes(query: string, item: string): Promise<string[
 
 /** The Markdown link to the item the person chooses for the item on the page, or undefined if they decline. The app
  *  answers when they have chosen, however long that takes. */
-export async function pickNote(item: string): Promise<string | undefined> {
-  const link = await window.webkit?.messageHandlers?.notes?.postMessage({ type: 'pick', item })
+export async function pickItem(item: string): Promise<string | undefined> {
+  const link = await window.webkit?.messageHandlers?.items?.postMessage({ type: 'pick', item })
   return typeof link === 'string' ? link : undefined
 }
 
@@ -197,7 +197,7 @@ const isWord = (value: unknown): value is string =>
 /** What the app says of each link of the item, in the order asked; null when the app does not answer or the
  *  answer is not one the page can draw from, so the page assumes nothing. */
 export async function askLinks(item: string, links: LinkRef[]): Promise<LinkAnswers | null> {
-  const answer: unknown = await window.webkit?.messageHandlers?.notes?.postMessage({
+  const answer: unknown = await window.webkit?.messageHandlers?.items?.postMessage({
     type: 'resolve',
     item,
     links,

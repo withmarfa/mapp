@@ -8,7 +8,7 @@ struct ItemGallery: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.interfaceTextSize) private var textSize
     @Bindable var browser: Browser
-    let order: NoteOrder
+    let order: ItemOrder
     var pane: FocusState<Browser.Pane?>.Binding
     @State private var width: CGFloat = 900
     @State private var height: CGFloat = 600
@@ -80,7 +80,7 @@ struct ItemGallery: View {
         .dragsSelection(of: browser)
     }
 
-    private func collection(_ sections: [NoteSection], ids: [ItemID], plan: Plan) -> some View {
+    private func collection(_ sections: [ItemSection], ids: [ItemID], plan: Plan) -> some View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 24) {
@@ -121,7 +121,7 @@ struct ItemGallery: View {
         }
     }
 
-    private func sectionGrid(_ section: NoteSection, ids: [ItemID], plan: Plan) -> some View {
+    private func sectionGrid(_ section: ItemSection, ids: [ItemID], plan: Plan) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             if let group = section.group {
                 Text(group.title())
@@ -138,7 +138,7 @@ struct ItemGallery: View {
         }
     }
 
-    private func keyboardCollection(_ sections: [NoteSection], ids: [ItemID], plan: Plan) -> some View {
+    private func keyboardCollection(_ sections: [ItemSection], ids: [ItemID], plan: Plan) -> some View {
         collection(sections, ids: ids, plan: plan)
         .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow], phases: .down) { key in
             let current = cursor ?? ids.first(where: browser.selection.contains)
@@ -205,7 +205,7 @@ private struct GalleryCell: View {
     @Environment(\.openWindow) private var openWindow
     let item: Item
     let browser: Browser
-    let order: NoteOrder
+    let order: ItemOrder
     let width: CGFloat
     let cards: ViewCards
     let content: RowContent
@@ -252,7 +252,7 @@ private struct GalleryCell: View {
                 ItemWindows.open(library.idsForWindows(selected)) { openWindow(value: $0) }
             }
             Divider()
-            NoteActions(ids: selected, undoManager: undoManager)
+            ItemActions(ids: selected, undoManager: undoManager)
         }
         .draggable(containerItemID: item.id)
         .dropsInto(collection: library.catalogue.isCollection(item.type) ? item.id : nil, browser: browser, order: order)

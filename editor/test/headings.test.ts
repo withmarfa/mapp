@@ -1,20 +1,20 @@
 import { expect, test } from 'vitest'
 import type { InkKitEditor } from '@aicayzer/inkkit'
-import { NoteEditor, type PageHeading } from '../src/editor'
+import { ItemEditor, type PageHeading } from '../src/editor'
 
 interface Said {
   headings: PageHeading[]
   generation: number
 }
 
-async function withNote(
+async function withItem(
   source: string,
-  run: (note: { editor: NoteEditor; said: Said[]; engine: InkKitEditor }) => Promise<void>,
+  run: (note: { editor: ItemEditor; said: Said[]; engine: InkKitEditor }) => Promise<void>,
 ) {
   const root = document.createElement('div')
   document.body.append(root)
   const said: Said[] = []
-  const editor = await NoteEditor.mount(root, {
+  const editor = await ItemEditor.mount(root, {
     find() {},
     changed() {},
     stateChanged() {},
@@ -43,7 +43,7 @@ async function type(engine: InkKitEditor, after: string, text: string) {
 }
 
 test('a load says the headings once, with its generation', () =>
-  withNote('# Soil\n\ntext\n\n## Water\n', async ({ said }) => {
+  withItem('# Soil\n\ntext\n\n## Water\n', async ({ said }) => {
     await settle()
     expect(said).toEqual([
       {
@@ -57,12 +57,12 @@ test('a load says the headings once, with its generation', () =>
   }))
 
 test('a note with no headings says an empty list', () =>
-  withNote('just words\n', async ({ said }) => {
+  withItem('just words\n', async ({ said }) => {
     expect(said).toEqual([{ generation: 1, headings: [] }])
   }))
 
 test('an edit that leaves the headings alone says nothing, and one that changes them says the new list once', () =>
-  withNote('# Soil\n\ntext\n\n## Water\n', async ({ said, engine }) => {
+  withItem('# Soil\n\ntext\n\n## Water\n', async ({ said, engine }) => {
     await settle()
     said.length = 0
     await type(engine, 'text', ' more')
@@ -74,7 +74,7 @@ test('an edit that leaves the headings alone says nothing, and one that changes 
   }))
 
 test('another load says its list even when it equals the last one', () =>
-  withNote('# Soil\n', async ({ editor, said }) => {
+  withItem('# Soil\n', async ({ editor, said }) => {
     await settle()
     editor.load('# Soil\n', 2)
     editor.reload('# Soil\n', 3)
@@ -82,27 +82,27 @@ test('another load says its list even when it equals the last one', () =>
   }))
 
 test('a list followed by a rule has no heading, as Inkkit counts', () =>
-  withNote('- one\n- two\n\n---\n\n# Real\n', async ({ said }) => {
+  withItem('- one\n- two\n\n---\n\n# Real\n', async ({ said }) => {
     expect(said.map(texts)).toEqual([['Real']])
   }))
 
 test('a quote holding a fenced block with heading-like lines has none from the block', () =>
-  withNote('> ```\n> # not a heading\n> ```\n\n# After\n', async ({ said }) => {
+  withItem('> ```\n> # not a heading\n> ```\n\n# After\n', async ({ said }) => {
     expect(said.map(texts)).toEqual([['After']])
   }))
 
 test('a longer fence is not closed by a shorter one', () =>
-  withNote('````\n```\n# inside\n```\n````\n\n# Outside\n', async ({ said }) => {
+  withItem('````\n```\n# inside\n```\n````\n\n# Outside\n', async ({ said }) => {
     expect(said.map(texts)).toEqual([['Outside']])
   }))
 
 test('a rule on the first line is not front matter and the next heading is listed', () =>
-  withNote('---\n\n# Title\n', async ({ said }) => {
+  withItem('---\n\n# Title\n', async ({ said }) => {
     expect(said.map(texts)).toEqual([['Title']])
   }))
 
 test('setext headings count, and text is the words without marks', () =>
-  withNote('Plain **bold** and `code`\n=========\n\nSecond [link](u)\n---\n', async ({ said }) => {
+  withItem('Plain **bold** and `code`\n=========\n\nSecond [link](u)\n---\n', async ({ said }) => {
     expect(said[0]!.headings).toEqual([
       { level: 1, text: 'Plain bold and code' },
       { level: 2, text: 'Second link' },
@@ -110,13 +110,13 @@ test('setext headings count, and text is the words without marks', () =>
   }))
 
 test('a heading with no words is in the list, so the ordinals match Inkkit', () =>
-  withNote('# \n\n# Next\n', async ({ editor, said }) => {
+  withItem('# \n\n# Next\n', async ({ editor, said }) => {
     const list = said[0]!.headings
     expect(list.map((heading) => heading.text)).toEqual(['', 'Next'])
     expect(editor.revealHeadingAt(1)).toBe(true)
   }))
 
 test('two headings that read the same are two entries', () =>
-  withNote('# Soil\n\n## Soil\n', async ({ said }) => {
+  withItem('# Soil\n\n## Soil\n', async ({ said }) => {
     expect(said.map(texts)).toEqual([['Soil', 'Soil']])
   }))

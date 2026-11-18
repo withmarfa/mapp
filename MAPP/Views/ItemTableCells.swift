@@ -14,7 +14,7 @@ struct ItemTableCell: View {
     let row: ItemTableRow
     let column: ItemTableColumn
     let browser: Browser
-    let order: NoteOrder
+    let order: ItemOrder
     let dateFormat: DateFormat
     /// Which row the pointer is on, shared by the row's cells, so the name's cell can answer to it from any of them.
     let hover: ItemTableHover

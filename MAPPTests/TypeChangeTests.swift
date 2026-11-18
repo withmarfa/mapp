@@ -173,10 +173,10 @@ nonisolated enum TypeChangeFixture {
     }
 
     @Test func firstLines() {
-        #expect(NoteName.firstLine(of: "\n\n  Hello \nrest") == "Hello")
-        #expect(NoteName.removingFirstLine(of: "\n\n  Hello \n\n\nrest\n") == "rest\n")
-        #expect(NoteName.removingFirstLine(of: "Only") == "")
-        #expect(NoteName.removingFirstLine(of: "\n\n") == "\n\n")
+        #expect(NameText.firstLine(of: "\n\n  Hello \nrest") == "Hello")
+        #expect(NameText.removingFirstLine(of: "\n\n  Hello \n\n\nrest\n") == "rest\n")
+        #expect(NameText.removingFirstLine(of: "Only") == "")
+        #expect(NameText.removingFirstLine(of: "\n\n") == "\n\n")
     }
 }
 

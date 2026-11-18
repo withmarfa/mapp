@@ -110,7 +110,7 @@ struct MainView: View {
                 if shownPresentation == .settings {
                     SettingsPageList(browser: browser)
                 } else {
-                    NoteList(browser: browser, order: order, pane: $pane).equatable()
+                    ItemList(browser: browser, order: order, pane: $pane).equatable()
                         .filterChips(browser)
                         .filteredEmptyState(browser)
                 }
@@ -161,7 +161,7 @@ struct MainView: View {
     }
 
     private var itemPage: some View {
-        NoteDetail(browser: browser, editor: editor, details: details)
+        ItemDetail(browser: browser, editor: editor, details: details)
     }
 
     private var workspace: some View {
@@ -257,7 +257,7 @@ struct MainView: View {
         }
         .focusedSceneValue(\.browser, browser)
         .focusedSceneValue(\.editor, browser.showsPage ? editor : nil)
-        .focusedSceneValue(\.focusedNotes, FocusedNotes(ids: browser.selection, undoManager: undoManager))
+        .focusedSceneValue(\.focusedItems, FocusedItems(ids: browser.selection, undoManager: undoManager))
         // Last, so the toolbars, the context menus and the palette above the workspace all read it.
         .environment(details)
     }
@@ -303,7 +303,7 @@ struct MainView: View {
             editor.onEscape = { [browser, details, library] in
                 if details.isEditingView { browser.escapeViewPanel(in: library) } else if details.isCustomizingLayout { details.endLayout() } else { browser.focusRequest = .list }
             }
-            editor.onOpenNote = { [browser, library, order] id in
+            editor.onOpenItem = { [browser, library, order] id in
                 if let item = library.item(id) { browser.open(linked: item, in: library, order: order) }
             }
             editor.onShowRefusedTitle = { [browser, library, order] id in

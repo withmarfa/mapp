@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { InkKitEditor } from '@aicayzer/inkkit'
-import { NoteEditor, wikiSuggest } from '../src/editor'
-import type { EditorMessage, NoteRequest } from '../src/bridge'
+import { ItemEditor, wikiSuggest } from '../src/editor'
+import type { EditorMessage, ItemRequest } from '../src/bridge'
 
 const identity = '22222222-2222-4222-8222-222222222222'
 
 interface Page {
   hosted: EditorMessage[]
-  asked: NoteRequest[]
+  asked: ItemRequest[]
   /** Which links, as `target` or `target|alias`, the app says no item answers to. */
   missing: Set<string>
   /** The type icon key and tone the app says the item a link names has, by the link's inner text. */
@@ -36,8 +36,8 @@ beforeEach(() => {
     value: {
       messageHandlers: {
         host: { postMessage: (message: EditorMessage) => page.hosted.push(message) },
-        notes: {
-          postMessage: async (request: NoteRequest) => {
+        items: {
+          postMessage: async (request: ItemRequest) => {
             page.asked.push(request)
             if (page.silent) return null
             return request.type === 'resolve' ? answer(request) : null
@@ -48,7 +48,7 @@ beforeEach(() => {
   })
 })
 /** The app's answer to a `resolve`: each link's state and type, and the bytes of each distinct icon once. */
-function answer(request: Extract<NoteRequest, { type: 'resolve' }>) {
+function answer(request: Extract<ItemRequest, { type: 'resolve' }>) {
   const icons: Record<string, string> = {}
   const links = request.links.map((link) => {
     const inner = link.raw.slice(2, -2)
@@ -67,12 +67,12 @@ afterEach(() => {
 
 async function withEditor(
   source: string,
-  run: (editor: NoteEditor, root: HTMLElement) => Promise<void>,
+  run: (editor: ItemEditor, root: HTMLElement) => Promise<void>,
   editable = true,
 ) {
   const root = document.createElement('div')
   document.body.append(root)
-  const editor = await NoteEditor.mount(root, {
+  const editor = await ItemEditor.mount(root, {
     find() {},
     changed() {},
     stateChanged() {},
@@ -119,7 +119,7 @@ test('an alias repeating the name keeps its own binding and opening request', ()
     page.hosted.length = 0
     modClick(links(root)[1]!)
     expect(page.hosted).toEqual([
-      { type: 'openNote', item: 'note', raw: '[[Plan|Plan]]', target: 'Plan' },
+      { type: 'openItemLink', item: 'note', raw: '[[Plan|Plan]]', target: 'Plan' },
     ])
     expect(editor.snapshot().text).toBe('[[Plan]] and [[Plan|Plan]]\n')
   }))
@@ -135,7 +135,11 @@ test('a backslash in a link is part of its text, as in Marfa, and the link reach
     ])
     page.hosted.length = 0
     modClick(links(root)[1]!)
-    expect(page.hosted[0]).toMatchObject({ type: 'openNote', raw: '[[Plan\\]]', target: 'Plan\\' })
+    expect(page.hosted[0]).toMatchObject({
+      type: 'openItemLink',
+      raw: '[[Plan\\]]',
+      target: 'Plan\\',
+    })
     expect(editor.snapshot().text).toBe('\\[[x]] and [[Plan\\]] and [[A\\|B]]\n')
   }))
 
@@ -153,7 +157,7 @@ for (const [link, named] of forms) {
       await settle()
       page.hosted.length = 0
       modClick(links(root)[0]!)
-      expect(page.hosted).toEqual([{ type: 'openNote', item: 'note', raw: link, ...named }])
+      expect(page.hosted).toEqual([{ type: 'openItemLink', item: 'note', raw: link, ...named }])
     }))
 }
 
@@ -175,7 +179,7 @@ test('two links with one name but different spellings are told apart', () =>
     page.hosted.length = 0
     modClick(links(root)[1]!)
     expect(page.hosted).toEqual([
-      { type: 'openNote', item: 'note', raw: '[[Plan|new]]', target: 'Plan', alias: 'new' },
+      { type: 'openItemLink', item: 'note', raw: '[[Plan|new]]', target: 'Plan', alias: 'new' },
     ])
   }))
 
@@ -183,7 +187,7 @@ test('a plain click on a note link opens nothing', () =>
   withEditor('See [[Plan]]\n', async (_editor, root) => {
     await settle()
     links(root)[0]!.dispatchEvent(new MouseEvent('click', { button: 0, bubbles: true }))
-    expect(page.hosted.filter((m) => m.type === 'openNote')).toEqual([])
+    expect(page.hosted.filter((m) => m.type === 'openItemLink')).toEqual([])
   }))
 
 test('a link to a heading of its own note is scrolled to in the page and asks the app for nothing', () =>
@@ -192,7 +196,7 @@ test('a link to a heading of its own note is scrolled to in the page and asks th
     const reveal = vi.spyOn(editor, 'revealHeading')
     modClick(links(root)[0]!)
     expect(reveal).toHaveBeenCalledWith('Soil')
-    expect(page.hosted.filter((m) => m.type === 'openNote')).toEqual([])
+    expect(page.hosted.filter((m) => m.type === 'openItemLink')).toEqual([])
   }))
 
 test('revealing a heading finds it by its text, ignoring case, and answers whether it was there', () =>
@@ -279,7 +283,7 @@ test('a library change asks again and a link becomes live or missing without the
     expect(editor.markdown()).toBeNull()
   }))
 
-test('only the links whose answer changed are drawn again, by the notes they name', () =>
+test('only the links whose answer changed are drawn again, by the items they name', () =>
   withEditor('[[Here]] and [[Soon]] and [[Else]]\n', async (editor) => {
     const refresh = vi.spyOn(InkKitEditor.prototype, 'refreshReferences')
     try {
@@ -370,7 +374,7 @@ test('names queued for a note that is replaced before they are sent are never se
 test('an answer that arrives after the note was replaced is dropped', () =>
   withEditor('[[Early]]\n', async (editor, root) => {
     const releases: ((answer: unknown) => void)[] = []
-    window.webkit!.messageHandlers!.notes!.postMessage = ((request: NoteRequest) => {
+    window.webkit!.messageHandlers!.items!.postMessage = ((request: ItemRequest) => {
       page.asked.push(request)
       return new Promise((done) => releases.push(done))
     }) as never
@@ -394,7 +398,7 @@ test('an answer that arrives after the note was replaced is dropped', () =>
 test('an earlier answer that arrives after a newer one does not overwrite it', () =>
   withEditor('[[Early]]\n', async (editor, root) => {
     const releases: ((answer: unknown) => void)[] = []
-    window.webkit!.messageHandlers!.notes!.postMessage = ((request: NoteRequest) => {
+    window.webkit!.messageHandlers!.items!.postMessage = ((request: ItemRequest) => {
       page.asked.push(request)
       return new Promise((done) => releases.push(done))
     }) as never
@@ -417,7 +421,7 @@ test('an earlier answer that arrives after a newer one does not overwrite it', (
 test('an earlier answer that arrives before the newer one is replaced by it', () =>
   withEditor('[[Early]]\n', async (editor, root) => {
     const releases: ((answer: unknown) => void)[] = []
-    window.webkit!.messageHandlers!.notes!.postMessage = ((request: NoteRequest) => {
+    window.webkit!.messageHandlers!.items!.postMessage = ((request: ItemRequest) => {
       page.asked.push(request)
       return new Promise((done) => releases.push(done))
     }) as never
@@ -465,7 +469,7 @@ test('a link to a note of a type with an icon is drawn with that icon in the typ
     expect(marks(root)).toEqual([null, null, null])
   }))
 
-test('the bytes of one icon are sent once however many links name notes of that type', () =>
+test('the bytes of one icon are sent once however many links name items of that type', () =>
   withEditor('[[A]] [[B]] [[C]] [[D]]\n', async () => {
     page.drawn[note.icon] = mark
     for (const name of ['A', 'B', 'C', 'D']) page.types.set(name, note)
@@ -569,7 +573,7 @@ test('a link whose note becomes missing, or ambiguous, loses its icon', () =>
 
 test('an icon the answer did not send, or a tone that is not a word, is left out and nothing throws', () =>
   withEditor('[[A]] and [[B]]\n', async (editor, root) => {
-    window.webkit!.messageHandlers!.notes!.postMessage = (async () => ({
+    window.webkit!.messageHandlers!.items!.postMessage = (async () => ({
       links: [
         { missing: false, icon: 'type:unsent', tone: 'blue' },
         { missing: false, icon: 'type:x', tone: 'blue); background: red' },
@@ -592,7 +596,7 @@ test('an icon that is not an image is refused whole, and its links are drawn as 
     expect(drawn(links(root)[0]!).icon).toBe('')
   }))
 
-const engineOf = (editor: NoteEditor) => (editor as unknown as { engine: InkKitEditor }).engine
+const engineOf = (editor: ItemEditor) => (editor as unknown as { engine: InkKitEditor }).engine
 
 test('drawing an icon changes nothing in the saved text, through an edit, undo and redo', () =>
   withEditor('Intro [[Plan]] and [[Gone]].\n\nSecond\n', async (editor, root) => {

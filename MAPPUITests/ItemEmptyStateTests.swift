@@ -5,7 +5,7 @@ final class ItemEmptyStateTests: XCTestCase {
     private var app: XCUIApplication!
     private var window: XCUIElement { app.windows.firstMatch }
     private var sidebar: XCUIElement { window.outlines["Sidebar"] }
-    private var list: XCUIElement { window.outlines["NoteList"] }
+    private var list: XCUIElement { window.outlines["ItemList"] }
     private var prompt: XCUIElement { window.staticTexts["No Item Selected"] }
 
     override func setUp() async throws {

@@ -7,7 +7,7 @@ import Marfa
 ///
 /// `raw` defines equality, byte for byte as Marfa compares authored spellings, so `[[Plan]]` and `[[Plan|Plan]]` stay
 /// distinct.
-nonisolated struct NoteLink: Hashable, Sendable {
+nonisolated struct ItemLink: Hashable, Sendable {
     let raw: String
     let name: String
     let heading: String?
@@ -50,23 +50,23 @@ nonisolated struct LinkAnswer: Hashable, Sendable {
     /// Whether the core binds the link to this item. Only that is a link written to name the item: an `unresolved`
     /// answer cannot tell that the one item held is the only one, so the server's lookup decides once the link is
     /// saved (`device/link-candidates-unresolved`).
-    func names(_ note: ItemID) -> Bool { state == .bound && item == note }
+    func names(_ itemID: ItemID) -> Bool { state == .bound && item == itemID }
 
     /// Whether this title is a fair offer for the item while the person types it: bound to it, or not bound and
     /// answered to by it alone among the items held. The person sees the title and chooses it, and the server decides
     /// at the save, so an offer can end unresolved; a link written for the person (`names`) never relies on that.
-    func offers(_ note: ItemID) -> Bool { names(note) || (state == .unresolved && candidates == [note]) }
+    func offers(_ itemID: ItemID) -> Bool { names(itemID) || (state == .unresolved && candidates == [itemID]) }
 }
 
 /// An embed in an item's text with what the library bound it to: the file item it shows, or why there is none.
 nonisolated struct BoundEmbed: Hashable, Sendable {
     /// The embed as the text holds it, such as `![[photo.png|400]]`, which is how the page names it too.
     let text: String
-    let resolution: NoteReferenceResolution
+    let resolution: ReferenceResolution
 }
 
 /// Marfa trims Unicode White_Space, which excludes format characters such as U+200B.
-nonisolated enum NoteName {
+nonisolated enum NameText {
     static func trimmed(_ text: String) -> String {
         let scalars = text.unicodeScalars
         guard let first = scalars.firstIndex(where: { !$0.properties.isWhitespace }),
@@ -88,7 +88,7 @@ nonisolated enum NoteName {
     }
 }
 
-nonisolated enum NoteReferenceResolution: Hashable, Sendable {
+nonisolated enum ReferenceResolution: Hashable, Sendable {
     case resolved(ItemID)
     case missing
     case ambiguous([ItemID])

@@ -9,10 +9,10 @@ struct TextZoom: Equatable {
     let sizes: [Int]
     let defaultSize: Int
 
-    static let note = TextZoom(key: PageKey.textSize, sizes: PageStyle.textSizes, defaultSize: PageStyle().textSize)
+    static let page = TextZoom(key: PageKey.textSize, sizes: PageStyle.textSizes, defaultSize: PageStyle().textSize)
     static let interface = TextZoom(key: InterfaceKey.textSize, sizes: InterfaceStyle.textSizes, defaultSize: InterfaceStyle.defaultTextSize)
 
-    static func acting(pageFocused: Bool) -> TextZoom { pageFocused ? .note : .interface }
+    static func acting(pageFocused: Bool) -> TextZoom { pageFocused ? .page : .interface }
 
     /// The size after the step, or nil where it changes nothing. A stored size that is not one of the steps moves to
     /// the nearest step in the direction asked.
@@ -33,13 +33,13 @@ struct TextZoom: Equatable {
 
 /// The three commands as menu items, for the View menu, which keeps both sizes in view so the items follow them.
 struct TextZoomCommands: View {
-    @AppStorage(PageKey.textSize) private var noteSize = PageStyle().textSize
+    @AppStorage(PageKey.textSize) private var pageSize = PageStyle().textSize
     @AppStorage(InterfaceKey.textSize) private var interfaceSize = InterfaceStyle.defaultTextSize
     let pageFocused: Bool
 
     var body: some View {
         let zoom = TextZoom.acting(pageFocused: pageFocused)
-        let current = pageFocused ? noteSize : interfaceSize
+        let current = pageFocused ? pageSize : interfaceSize
         // ⌘= is the same key as ⌘+ without Shift, and AppKit matches a "+" shortcut with it.
         Button("Make Text Bigger", systemImage: "textformat.size.larger") { zoom.apply(.bigger) }
             .keyboardShortcut("+")

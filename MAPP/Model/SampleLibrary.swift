@@ -21,7 +21,7 @@ nonisolated enum SampleLibrary {
     /// With the sample flag, `-MAPPOpenPlace <type id>` opens that type's place (`items` opens Items) and
     /// `-MAPPLayout list|gallery|table|board|timeline|calendar` the layout, for a screenshot of one view.
     static var launchPlace: SidebarItem? {
-        argument(after: "-MAPPOpenPlace").map { $0 == "items" ? .allNotes : .itemType($0) }
+        argument(after: "-MAPPOpenPlace").map { $0 == "items" ? .allItems : .itemType($0) }
     }
 
     static var launchLayout: ItemViewMode? { argument(after: "-MAPPLayout").flatMap(ItemViewMode.init(rawValue:)) }

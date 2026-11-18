@@ -342,7 +342,7 @@ nonisolated enum MarfaMapping {
             title = row.properties[titleField]?.string ?? ""
             titleRule = .property(titleField)
         } else {
-            title = NoteName.firstLine(of: body)
+            title = NameText.firstLine(of: body)
             titleRule = .firstLine
         }
         let bodyField = bodyField(of: info)
@@ -376,7 +376,7 @@ nonisolated enum MarfaMapping {
     }
 
     /// What a link in an item's text names, as the package reads it from the copy.
-    static func resolution(of target: BodyTarget) -> NoteReferenceResolution {
+    static func resolution(of target: BodyTarget) -> ReferenceResolution {
         switch target {
         case .item(let id): .resolved(ItemID(id))
         case .pending: .pending

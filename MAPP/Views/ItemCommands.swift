@@ -46,7 +46,7 @@ struct ItemCommandContext {
         let single = ids.count == 1 ? ids.first : nil
         self.init(
             library: library, ids: ids, hasBrowser: browser != nil,
-            pageItem: Self.pageItem(showsPage: browser?.showsPage ?? true, editorHasNote: editor?.hasNote == true, noteID: editor?.noteID),
+            pageItem: Self.pageItem(showsPage: browser?.showsPage ?? true, editorHasItem: editor?.hasItem == true, pageItemID: editor?.pageItemID),
             pageIsEditable: editor?.isEditable ?? false, showsSource: editor?.caret.sourceMode ?? false,
             fileURL: single.flatMap { browser?.fileURL(of: $0) } ?? fileURL, browser: browser,
             pageLook: browser?.showsPage != false ? details?.pageLook : nil)
@@ -54,21 +54,21 @@ struct ItemCommandContext {
 
     /// The item whose page is in front: the editor's, only while the page is what the window shows and the editor
     /// has it ready. The editor stays mounted behind a collection, an index and Settings, and still holds its item.
-    static func pageItem(showsPage: Bool, editorHasNote: Bool, noteID: ItemID?) -> ItemID? {
-        showsPage && editorHasNote ? noteID : nil
+    static func pageItem(showsPage: Bool, editorHasItem: Bool, pageItemID: ItemID?) -> ItemID? {
+        showsPage && editorHasItem ? pageItemID : nil
     }
 
     /// The one selected item.
     var item: Item? { ids.count == 1 ? ids.first.flatMap { library?.item($0) } : nil }
 
     /// The item on the page, which Print, Export, the source view and Add Attachment act on.
-    var visibleNote: Item? {
+    var visibleItem: Item? {
         guard let item, !item.isFile, item.id == pageItem else { return nil }
         return item
     }
 
     /// The visible item when it can be written to.
-    var editableNote: Item? { visibleNote.flatMap { $0.isWritable && pageIsEditable ? $0 : nil } }
+    var editableItem: Item? { visibleItem.flatMap { $0.isWritable && pageIsEditable ? $0 : nil } }
 
     var originalAddress: URL? { item.flatMap { library?.originalAddress(of: $0) } }
 
@@ -134,8 +134,8 @@ enum ItemCommand: CaseIterable {
         case .quickLook, .openInNewWindow: context.hasBrowser && !context.ids.isEmpty
         case .openOriginal: context.originalAddress != nil
         case .openInBrowser: context.browserTarget != nil
-        case .addAttachment: context.editableNote != nil
-        case .toggleSource, .print, .exportPDF: context.visibleNote != nil
+        case .addAttachment: context.editableItem != nil
+        case .toggleSource, .print, .exportPDF: context.visibleItem != nil
         case .toggleReader: context.pageLook != nil
         }
     }
@@ -152,7 +152,7 @@ enum ItemCommand: CaseIterable {
         case .addAttachment: editor?.isChoosingImages = true
         case .toggleSource: editor.map { $0.setSourceMode(!$0.caret.sourceMode) }
         case .toggleReader: context.pageLook.map { $0.choose($0.mode == .reader ? .original : .reader) }
-        case .print: editor?.printNote()
+        case .print: editor?.printItem()
         case .exportPDF: editor?.exportPDF()
         }
     }

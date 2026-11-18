@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import type { PictureAnswer, PictureRequest } from '../src/bridge'
-import { NoteEditor } from '../src/editor'
+import { ItemEditor } from '../src/editor'
 import { sameAddress, WebPictures } from '../src/pictures'
 
 type Asked = Omit<PictureRequest, 'type'>
@@ -51,14 +51,14 @@ beforeEach(() => {
   opened.length = 0
 })
 
-async function withNote(
+async function withItem(
   source: string,
-  run: (editor: NoteEditor) => void | Promise<void>,
+  run: (editor: ItemEditor) => void | Promise<void>,
   words = {},
 ) {
   const root = document.createElement('div')
   document.body.append(root)
-  const editor = await NoteEditor.mount(
+  const editor = await ItemEditor.mount(
     root,
     {
       find() {},
@@ -96,7 +96,7 @@ const picture = '![A picture](https://example.com/a.png)\n'
 
 test('with Ask, a picture at a web address is a quiet box named by its alt text, and nothing is fetched', async () => {
   const { asked, embeds } = app(() => ({ state: 'waiting' }))
-  await withNote(picture, async () => {
+  await withItem(picture, async () => {
     await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
     await settled()
     expect(labels()).toEqual(['A picture'])
@@ -110,7 +110,7 @@ test('with Ask, a picture at a web address is a quiet box named by its alt text,
 
 test('a picture with no alt text is named for its website, whatever characters the host holds', async () => {
   app(() => ({ state: 'waiting' }))
-  await withNote('![](https://a$&b.com/a.png)\n', async () => {
+  await withItem('![](https://a$&b.com/a.png)\n', async () => {
     await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
     await settled()
     expect(labels()).toEqual(['a$&b.com'])
@@ -119,7 +119,7 @@ test('a picture with no alt text is named for its website, whatever characters t
 
 test('choosing a waiting picture asks the app to load it, and the card becomes the picture', async () => {
   const { asked } = app((request) => (request.ask === 'chosen' ? loaded : { state: 'waiting' }))
-  await withNote(picture, async () => {
+  await withItem(picture, async () => {
     await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
     open()
     await vi.waitFor(() => expect(document.querySelector('.inkkit-file img')).not.toBeNull())
@@ -131,7 +131,7 @@ test('choosing a waiting picture asks the app to load it, and the card becomes t
 
 test('a waiting picture is one quiet box with a Load button, not a card that fills the column', async () => {
   app(() => ({ state: 'waiting' }))
-  await withNote(`${picture}\n![](https://example.org/b.png)\n`, async () => {
+  await withItem(`${picture}\n![](https://example.org/b.png)\n`, async () => {
     await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(2))
     await settled()
     const waiting = cards() as HTMLElement[]
@@ -147,7 +147,7 @@ test('a waiting picture is one quiet box with a Load button, not a card that fil
 
 test('a card that is not waiting keeps the default card, with its Open arrow', async () => {
   app(() => ({ state: 'off' }))
-  await withNote(picture, async () => {
+  await withItem(picture, async () => {
     await vi.waitFor(() => expect(labels()).toHaveLength(1))
     await settled()
     const card = cards()[0] as HTMLElement
@@ -160,7 +160,7 @@ test('a card that is not waiting keeps the default card, with its Open arrow', a
 test('Load on one of two waiting pictures asks the app for that address alone and leaves the other waiting', async () => {
   const { asked } = app((request) => (request.ask === 'chosen' ? loaded : { state: 'waiting' }))
   const source = `${picture}\n![other](https://images.example.org/b.jpg)\n`
-  await withNote(source, async () => {
+  await withItem(source, async () => {
     await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(2))
     open(1)
     await vi.waitFor(() => expect(document.querySelectorAll('.inkkit-file img')).toHaveLength(1))
@@ -176,7 +176,7 @@ test('Load on one of two waiting pictures asks the app for that address alone an
 test('Load Pictures chooses every picture that waits, once each', async () => {
   const { asked } = app((request) => (request.ask === 'chosen' ? loaded : { state: 'waiting' }))
   const source = `${picture}\n![other](https://images.example.org/b.jpg)\n`
-  await withNote(source, async (editor) => {
+  await withItem(source, async (editor) => {
     await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(2))
     editor.loadPictures()
     await vi.waitFor(() => expect(document.querySelectorAll('.inkkit-file img')).toHaveLength(2))
@@ -189,7 +189,7 @@ test('Load Pictures chooses every picture that waits, once each', async () => {
 test('the callout counts 2, then 1, then 0 as each picture is loaded by its own Load', async () => {
   app((request) => (request.ask === 'chosen' ? loaded : { state: 'waiting' }))
   const source = `${picture}\n![other](https://images.example.org/b.jpg)\n`
-  await withNote(source, async () => {
+  await withItem(source, async () => {
     await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(2))
     open(0)
     await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
@@ -205,7 +205,7 @@ test('the callout counts 2, then 1, then 0 as each picture is loaded by its own 
 test('closing the callout keeps it hidden as pictures load, until a note is opened again', async () => {
   app((request) => (request.ask === 'chosen' ? loaded : { state: 'waiting' }))
   const source = `${picture}\n![other](https://images.example.org/b.jpg)\n`
-  await withNote(source, async (editor) => {
+  await withItem(source, async (editor) => {
     await vi.waitFor(() => expect(calloutShown).toBe(true))
     editor.dismissPictures()
     await vi.waitFor(() => expect(calloutShown).toBe(false))
@@ -228,7 +228,7 @@ test('closing the callout keeps it hidden as pictures load, until a note is open
 
 test('a note reloaded after an outside change keeps the callout closed', async () => {
   app(() => ({ state: 'waiting' }))
-  await withNote(picture, async (editor) => {
+  await withItem(picture, async (editor) => {
     await vi.waitFor(() => expect(calloutShown).toBe(true))
     editor.dismissPictures()
     await vi.waitFor(() => expect(calloutShown).toBe(false))
@@ -244,7 +244,7 @@ test('the line says it is loading, with no button, while the app fetches, and a 
     if (request.ask !== 'chosen') return { state: 'waiting' }
     return new Promise<PictureAnswer>((resolve) => (finish = resolve)) as unknown as PictureAnswer
   })
-  await withNote(picture, async () => {
+  await withItem(picture, async () => {
     await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
     open()
     await vi.waitFor(() => expect(labels()).toEqual(['Loading A picture…']))
@@ -263,7 +263,7 @@ test('pictures loading together are told apart: each line names its own, by desc
       ? (new Promise<PictureAnswer>(() => {}) as unknown as PictureAnswer)
       : { state: 'waiting' },
   )
-  await withNote(
+  await withItem(
     '![One $& two](https://a.example.com/a.png)\n\n![](https://b.example.com/b.png)\n',
     async (editor) => {
       await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(2))
@@ -281,7 +281,7 @@ test('a loading line is in the words the app gave, with its picture where the pl
       ? (new Promise<PictureAnswer>(() => {}) as unknown as PictureAnswer)
       : { state: 'waiting' },
   )
-  await withNote(
+  await withItem(
     picture,
     async () => {
       await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
@@ -295,7 +295,7 @@ test('a loading line is in the words the app gave, with its picture where the pl
 test('the bar counts the pictures that wait, once for an address however often it appears', async () => {
   app((request) => (request.ask === 'chosen' ? loaded : { state: 'waiting' }))
   const source = `${picture}\n![again](https://example.com/a.png)\n\n![other](https://images.example.org/b.jpg)\n`
-  await withNote(
+  await withItem(
     source,
     async (editor) => {
       await vi.waitFor(() =>
@@ -315,7 +315,7 @@ test('the bar counts the pictures that wait, once for an address however often i
 
 test('one waiting picture is told in the singular, and in the words the app gave', async () => {
   app(() => ({ state: 'waiting' }))
-  await withNote(
+  await withItem(
     '![](https://example.com/a.png)\n',
     async () => {
       await vi.waitFor(() =>
@@ -340,7 +340,7 @@ test('one waiting picture is told in the singular, and in the words the app gave
 
 test('a picture with no alt text is named by its website', async () => {
   app(() => ({ state: 'waiting' }))
-  await withNote('![](https://example.com/a.png)\n', async () => {
+  await withItem('![](https://example.com/a.png)\n', async () => {
     await vi.waitFor(() => expect(labels()).toEqual(['example.com']))
     expect(bar.at(-1)).toEqual({
       count: 1,
@@ -352,7 +352,7 @@ test('a picture with no alt text is named by its website', async () => {
 
 test('a picture left out of the text leaves the count', async () => {
   app(() => ({ state: 'waiting' }))
-  await withNote(picture, async (editor) => {
+  await withItem(picture, async (editor) => {
     await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
     editor.reload('Nothing here.\n', 2, true)
     await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(0))
@@ -361,7 +361,7 @@ test('a picture left out of the text leaves the count', async () => {
 
 test('with Never, the card stays and says so, opens the address, and is not counted', async () => {
   const { asked } = app(() => ({ state: 'off' }))
-  await withNote(picture, async () => {
+  await withItem(picture, async () => {
     await vi.waitFor(() => expect(labels()).toEqual(['example.com: Remote Pictures Are Off']))
     open()
     expect(opened).toEqual(['https://example.com/a.png'])
@@ -376,7 +376,7 @@ test('a refused picture names the reason, and is tried again only where the app 
     reason: request.address.includes('slow') ? 'The picture took too long to load.' : 'Private.',
     ...(request.address.includes('slow') ? { retry: 'true' } : {}),
   }))
-  await withNote(
+  await withItem(
     '![a](https://slow.example.com/a.png)\n\n![b](https://private.example.com/b.png)\n',
     async () => {
       await vi.waitFor(() =>
@@ -403,7 +403,7 @@ test('a changed setting asks again about pictures that waited or were off, and n
   const { asked } = app((request) =>
     request.address.includes('kept') ? loaded : { state: setting },
   )
-  await withNote(
+  await withItem(
     '![a](https://example.com/a.png)\n\n![b](https://kept.example.com/b.png)\n',
     async (editor) => {
       await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
@@ -425,7 +425,7 @@ test('a card keeps what it showed, and the bar its count, until the answer to as
       setTimeout(() => resolve(answer), 30),
     ) as unknown as PictureAnswer
   })
-  await withNote(picture, async (editor) => {
+  await withItem(picture, async (editor) => {
     await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
     delayed = true
     asked.length = 0
@@ -456,7 +456,7 @@ test('a picture saved as a file on the item is asked about again, loaded or not,
     }
     return saved ? loaded : { state: 'refused', reason: 'No', retry: 'true' }
   })
-  await withNote(
+  await withItem(
     '![a](https://example.com/a.png)\n\n![b](https://chosen.example.com/b.png)\n',
     async (editor) => {
       await vi.waitFor(() => expect(labels()[0]).toBe('example.com: No'))
@@ -486,7 +486,7 @@ test('a picture being chosen when a saved file comes still ends loaded with the 
     if (request.ask !== 'chosen') return { state: 'waiting' }
     return new Promise<PictureAnswer>((resolve) => (finish = resolve)) as unknown as PictureAnswer
   })
-  await withNote(picture, async (editor) => {
+  await withItem(picture, async (editor) => {
     await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
     open()
     await vi.waitFor(() => expect(labels()).toEqual(['Loading A picture…']))
@@ -504,7 +504,7 @@ test('a picture being chosen when the setting changes still ends loaded with the
     if (request.ask !== 'chosen') return { state: 'waiting' }
     return new Promise<PictureAnswer>((resolve) => (finish = resolve)) as unknown as PictureAnswer
   })
-  await withNote(picture, async (editor) => {
+  await withItem(picture, async (editor) => {
     await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
     open()
     await vi.waitFor(() => expect(labels()).toEqual(['Loading A picture…']))
@@ -525,7 +525,7 @@ test('a saved file coming asks again only about the pictures at its address', as
           ? loaded
           : { state: 'waiting' },
   )
-  await withNote(
+  await withItem(
     '![a](https://gone.example.com/a.png)\n\n![b](https://slow.example.com/b.png)\n\n![c](https://kept.example.com/c.png)\n',
     async (editor) => {
       await vi.waitFor(() =>
@@ -562,7 +562,7 @@ test('an address is compared as the app compares a saved file with a picture', (
 
 test('another note forgets what it was told of the last one', async () => {
   const { asked } = app(() => ({ state: 'waiting' }))
-  await withNote(picture, async (editor) => {
+  await withItem(picture, async (editor) => {
     await vi.waitFor(() => expect(asked).toHaveLength(1))
     editor.setItem('other')
     editor.load(picture, 2)
@@ -577,7 +577,7 @@ test('another note forgets what it was told of the last one', async () => {
 
 test('printing fetches nothing, and leaves the cards as the screen had them', async () => {
   const { asked } = app(() => ({ state: 'waiting' }))
-  await withNote(picture, async (editor) => {
+  await withItem(picture, async (editor) => {
     await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
     await editor.printable().catch(() => undefined)
     await settled()

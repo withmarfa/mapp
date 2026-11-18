@@ -13,7 +13,7 @@ struct FileDropTests {
         let browser = Browser()
         browser.adopt(library)
         let ids = await browser.importFiles(
-            [disk.url("one.txt"), disk.url("two.txt")], in: library, order: NoteOrder(), undoManager: nil)
+            [disk.url("one.txt"), disk.url("two.txt")], in: library, order: ItemOrder(), undoManager: nil)
         #expect(ids.count == 2)
         #expect(library.addedFiles.map(\.name) == ["one.txt", "two.txt"])
         #expect(browser.selection == Set(ids))
@@ -25,8 +25,8 @@ struct FileDropTests {
         let library = FakeItemLibrary(items: [collection])
         let browser = Browser()
         browser.adopt(library)
-        browser.show(.collection(collection.id), in: library, order: NoteOrder())
-        let ids = await browser.importFiles([disk.url("a.txt")], in: library, order: NoteOrder(), undoManager: nil)
+        browser.show(.collection(collection.id), in: library, order: ItemOrder())
+        let ids = await browser.importFiles([disk.url("a.txt")], in: library, order: ItemOrder(), undoManager: nil)
         let added = try #require(ids.first)
         #expect(library.item(added)?.edgesOut.contains { $0.to == .item(collection.id) } == true)
     }
@@ -36,7 +36,7 @@ struct FileDropTests {
         let library = FakeItemLibrary(items: [collection])
         let browser = Browser()
         browser.adopt(library)
-        let ids = await browser.importFiles([disk.url("a.txt")], into: collection.id, in: library, order: NoteOrder(), undoManager: nil)
+        let ids = await browser.importFiles([disk.url("a.txt")], into: collection.id, in: library, order: ItemOrder(), undoManager: nil)
         let added = try #require(ids.first)
         #expect(library.item(added)?.edgesOut.contains { $0.to == .item(collection.id) } == true)
         #expect(browser.selection == [added])
@@ -47,7 +47,7 @@ struct FileDropTests {
         let browser = Browser()
         browser.adopt(library)
         let missing = disk.directory.appending(path: "gone.txt")
-        let ids = await browser.importFiles([missing, disk.url("kept.txt")], in: library, order: NoteOrder(), undoManager: nil)
+        let ids = await browser.importFiles([missing, disk.url("kept.txt")], in: library, order: ItemOrder(), undoManager: nil)
         #expect(ids.count == 1)
         #expect(library.notices.waiting.count == 1)
     }
@@ -56,7 +56,7 @@ struct FileDropTests {
         let library = FakeItemLibrary()
         let browser = Browser()
         browser.adopt(library)
-        let ids = await browser.importFiles([], in: library, order: NoteOrder(), undoManager: nil)
+        let ids = await browser.importFiles([], in: library, order: ItemOrder(), undoManager: nil)
         #expect(ids.isEmpty)
         #expect(library.notices.waiting.isEmpty)
     }
@@ -66,21 +66,21 @@ struct FileDropTests {
         let library = FakeItemLibrary(items: [collection])
         let browser = Browser()
         browser.adopt(library)
-        browser.show(.collection(collection.id), in: library, order: NoteOrder())
-        library.sendingFile = { browser.show(.allNotes, in: library, order: NoteOrder()) }
-        let ids = await browser.importFiles([disk.url("a.txt"), disk.url("b.txt")], in: library, order: NoteOrder(), undoManager: nil)
+        browser.show(.collection(collection.id), in: library, order: ItemOrder())
+        library.sendingFile = { browser.show(.allItems, in: library, order: ItemOrder()) }
+        let ids = await browser.importFiles([disk.url("a.txt"), disk.url("b.txt")], in: library, order: ItemOrder(), undoManager: nil)
         #expect(ids.count == 2)
         for id in ids { #expect(library.item(id)?.edgesOut.contains { $0.to == .item(collection.id) } == true) }
-        #expect(browser.item == .allNotes)
+        #expect(browser.item == .allItems)
     }
 
     @Test func filesDroppedInTheInboxAllKeepTheInboxTierWhenThePersonMovesOnMidImport() async throws {
         let library = FakeItemLibrary()
         let browser = Browser()
         browser.adopt(library)
-        browser.show(.inbox, in: library, order: NoteOrder())
-        library.sendingFile = { browser.show(.allNotes, in: library, order: NoteOrder()) }
-        _ = await browser.importFiles([disk.url("a.txt"), disk.url("b.txt")], in: library, order: NoteOrder(), undoManager: nil)
+        browser.show(.inbox, in: library, order: ItemOrder())
+        library.sendingFile = { browser.show(.allItems, in: library, order: ItemOrder()) }
+        _ = await browser.importFiles([disk.url("a.txt"), disk.url("b.txt")], in: library, order: ItemOrder(), undoManager: nil)
         #expect(library.addedPlaces == [.inbox, .inbox])
     }
 
@@ -90,7 +90,7 @@ struct FileDropTests {
         let browser = Browser()
         browser.adopt(library)
         library.sendingFile = { browser.adopt(other) }
-        let ids = await browser.importFiles([disk.url("a.txt"), disk.url("b.txt")], in: library, order: NoteOrder(), undoManager: nil)
+        let ids = await browser.importFiles([disk.url("a.txt"), disk.url("b.txt")], in: library, order: ItemOrder(), undoManager: nil)
         #expect(library.addedFiles.map(\.name) == ["a.txt", "b.txt"])
         #expect(other.addedFiles.isEmpty)
         #expect(ids.count == 2)
@@ -103,7 +103,7 @@ struct FileDropTests {
         browser.adopt(library)
         library.sendingFile = { browser.adopt(FakeItemLibrary()) }
         let missing = disk.directory.appending(path: "gone.txt")
-        let ids = await browser.importFiles([disk.url("a.txt"), missing, disk.url("b.txt")], in: library, order: NoteOrder(), undoManager: nil)
+        let ids = await browser.importFiles([disk.url("a.txt"), missing, disk.url("b.txt")], in: library, order: ItemOrder(), undoManager: nil)
         #expect(ids.count == 2)
         #expect(library.notices.waiting.count == 1)
     }
@@ -113,7 +113,7 @@ struct FileDropTests {
         let browser = Browser()
         browser.adopt(library)
         browser.adopt(FakeItemLibrary())
-        let ids = await browser.importFiles([disk.url("a.txt")], in: library, order: NoteOrder(), undoManager: nil)
+        let ids = await browser.importFiles([disk.url("a.txt")], in: library, order: ItemOrder(), undoManager: nil)
         #expect(ids.count == 1)
         #expect(library.addedFiles.count == 1)
         #expect(browser.selection.isEmpty)
@@ -165,7 +165,7 @@ struct FileDropTests {
         let library = FakeItemLibrary()
         let browser = Browser()
         browser.adopt(library)
-        let id = try #require(await library.addFile(disk.url("scan.txt", "contents"), title: nil, parentID: nil, in: .allNotes))
+        let id = try #require(await library.addFile(disk.url("scan.txt", "contents"), title: nil, parentID: nil, in: .allItems))
         library.files[id] = disk.url("kept")
         let reference = library.dragReference(of: id)
         #expect(library.fetches == 0)
@@ -186,7 +186,7 @@ struct FileDropTests {
     @Test func quickLookShowsAnItemAsTextAndAFileAsItself() async throws {
         let library = FakeItemLibrary()
         let note = library.add("# Plans\n\nSome text")
-        let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .allNotes))
+        let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .allItems))
         library.files[fileID] = disk.url("kept", "file contents")
         let browser = Browser()
         browser.adopt(library)
@@ -208,7 +208,7 @@ struct FileDropTests {
         let library = FakeItemLibrary(items: [older, newer], bodies: [older.id: "# Apple", newer.id: "# Zebra"])
         let browser = Browser()
         browser.adopt(library)
-        let drawn = browser.sections(in: library, order: NoteOrder(), now: Date(timeIntervalSinceReferenceDate: 3_000))
+        let drawn = browser.sections(in: library, order: ItemOrder(), now: Date(timeIntervalSinceReferenceDate: 3_000))
             .flatMap { $0.items.map(\.title) }
         #expect(drawn == ["Zebra", "Apple"])
         browser.selection = [older.id, newer.id]
@@ -246,7 +246,7 @@ struct FileDropTests {
         let library = FakeItemLibrary()
         var empty: [ItemID] = []
         for index in 0..<12 {
-            empty.append(try #require(await library.addFile(disk.url("empty\(index).txt"), title: nil, parentID: nil, in: .allNotes)))
+            empty.append(try #require(await library.addFile(disk.url("empty\(index).txt"), title: nil, parentID: nil, in: .allItems)))
         }
         let notes = (0..<12).map { library.add("# Note \($0)") }
         let browser = Browser()
@@ -328,7 +328,7 @@ struct FileDropTests {
     @Test func aQuickLookReplacedWhileFetchingStopsAndLeavesNoCopies() async throws {
         let library = FakeItemLibrary()
         let note = library.add("# Plans")
-        let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .allNotes))
+        let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .allItems))
         library.files[fileID] = disk.url("kept", "file contents")
         library.fetchDelay[fileID] = .milliseconds(500)
         let browser = Browser()
@@ -349,7 +349,7 @@ struct FileDropTests {
 
     @Test func aQuickLookClosedWhileFetchingShowsNothingAndLeavesNoCopies() async throws {
         let library = FakeItemLibrary()
-        let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .allNotes))
+        let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .allItems))
         library.files[fileID] = disk.url("kept", "file contents")
         library.fetchDelay[fileID] = .milliseconds(300)
         let browser = Browser()
@@ -366,7 +366,7 @@ struct FileDropTests {
     @Test func aQuickLookClosesWhenTheWindowChangesLibraryMidFetch() async throws {
         let library = FakeItemLibrary()
         let note = library.add("# Plans")
-        let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .allNotes))
+        let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .allItems))
         library.files[fileID] = disk.url("kept", "file contents")
         library.fetchDelay[fileID] = .milliseconds(300)
         let browser = Browser()
@@ -383,7 +383,7 @@ struct FileDropTests {
 
     @Test func quickLookTellsThePersonWhenTheFileCannotBeFetched() async throws {
         let library = FakeItemLibrary()
-        let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .allNotes))
+        let fileID = try #require(await library.addFile(disk.url("scan.txt"), title: nil, parentID: nil, in: .allItems))
         library.fetchFails = true
         let browser = Browser()
         browser.adopt(library)

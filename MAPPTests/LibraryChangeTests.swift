@@ -38,7 +38,7 @@ struct LibraryChangeTests {
 
         browser.adopt(new)
         #expect(browser.selection.isEmpty, "the new library has none of the old selection's items")
-        #expect(browser.sidebarItem == .allNotes)
+        #expect(browser.sidebarItem == .allItems)
         #expect(browser.searchText == "")
     }
 

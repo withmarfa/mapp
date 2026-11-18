@@ -57,7 +57,7 @@ export type Ask = typeof askPicture
  * pictures do brings it back; a different item, or the same one opened anew (`opened`), does.
  *
  * The asks mean: `chosen` when the person chose, `drawing` when a card is drawn, and `cached` for printing and
- * export, which show only what the app already holds and fetch nothing (`NoteEditor.printable` sets `cacheOnly`).
+ * export, which show only what the app already holds and fetch nothing (`ItemEditor.printable` sets `cacheOnly`).
  *
  * Asking again (`changed`, `savedChanged`) keeps what a card and the callout's count showed until the new answer
  * arrives, and draws the card again only if the answer differs. A picture being chosen is left alone by both, so its

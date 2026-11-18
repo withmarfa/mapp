@@ -100,7 +100,7 @@ import Testing
         try await libraries.host.disconnect()
 
         library.updateBody(of: ItemID("gone"), to: "Book the hotel", readAt: ItemVersion(0))
-        _ = library.createItem(typeID: "", title: "", body: "", parentID: nil, in: .allNotes, undoManager: nil)
+        _ = library.createItem(typeID: "", title: "", body: "", parentID: nil, in: .allItems, undoManager: nil)
         let told = libraries.host.notices.waiting
         #expect(told.map(\.text) == ["Book the hotel", nil])
         #expect(told.last?.title == "Can’t Create Item")

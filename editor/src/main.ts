@@ -1,6 +1,6 @@
 import { openLink, postToHost } from './bridge'
 import {
-  NoteEditor,
+  ItemEditor,
   guardedCommand,
   splitLabels,
   type AppLabels,
@@ -94,7 +94,7 @@ if (
   throw new Error('editor root missing')
 const labels = splitLabels((window as unknown as { mappLabels?: AppLabels }).mappLabels ?? {})
 
-const editor = await NoteEditor.mount(
+const editor = await ItemEditor.mount(
   root,
   {
     find(state) {

@@ -33,7 +33,7 @@ final class KeyboardNavigationTests: XCTestCase {
             }
         }
         let areas = Set(seen)
-        XCTAssertTrue(areas.contains { $0.contains("NoteList") }, "Tab reaches the list: \(seen)")
+        XCTAssertTrue(areas.contains { $0.contains("ItemList") }, "Tab reaches the list: \(seen)")
         XCTAssertTrue(areas.contains { $0.contains("Sidebar") }, "Tab reaches the sidebar: \(seen)")
         XCTAssertGreaterThanOrEqual(areas.count, 3, "Tab goes on past the list and sidebar, to the page: \(seen)")
     }

@@ -41,26 +41,26 @@ nonisolated struct TypeChange: Hashable, Sendable {
             // A different title already under the new key, as another app may leave, is the one the new type reads,
             // and the old one stays under its own key, so neither is lost.
             let held = values[to]
-            let free = held == nil || held == .null || held?.string.map({ NoteName.trimmed($0).isEmpty }) == true
+            let free = held == nil || held == .null || held?.string.map({ NameText.trimmed($0).isEmpty }) == true
             if let value = values[from],
-               free || held?.string.map(NoteName.trimmed) == value.string.map(NoteName.trimmed) {
+               free || held?.string.map(NameText.trimmed) == value.string.map(NameText.trimmed) {
                 if free { set[to] = value }
                 removed.insert(from)
             }
         case (let from?, nil):
             if values[from] != nil { removed.insert(from) }
             // The title is kept as the text's first line, where the new type reads it.
-            let title = NoteName.trimmed(values[from]?.string ?? "")
-            if !title.isEmpty, NoteName.firstLine(of: body) != title {
+            let title = NameText.trimmed(values[from]?.string ?? "")
+            if !title.isEmpty, NameText.firstLine(of: body) != title {
                 body = body.isEmpty ? title : title + "\n\n" + body
             }
         case (nil, let to?):
             // The first line becomes the title and leaves the text, unless the item already holds a title there.
-            let title = NoteName.firstLine(of: body)
-            let held = values[to]?.string.map(NoteName.trimmed) ?? ""
+            let title = NameText.firstLine(of: body)
+            let held = values[to]?.string.map(NameText.trimmed) ?? ""
             if !title.isEmpty, held.isEmpty {
                 set[to] = .string(title)
-                body = NoteName.removingFirstLine(of: body)
+                body = NameText.removingFirstLine(of: body)
             }
         default:
             break
@@ -90,7 +90,7 @@ nonisolated struct TypeChange: Hashable, Sendable {
         for field in new.fields where field.required {
             let held = result[field.key]
             let empty = held == nil || held == .null
-                || (field.key == new.titleKey && NoteName.trimmed(held?.string ?? "").isEmpty)
+                || (field.key == new.titleKey && NameText.trimmed(held?.string ?? "").isEmpty)
             guard empty else { continue }
             if field.key == new.bodyKey, field.kind == .text {
                 set[field.key] = .string("")
@@ -98,7 +98,7 @@ nonisolated struct TypeChange: Hashable, Sendable {
             } else if field.kind.isOutsideForms {
                 return .failure(.cannotFill(field))
             } else if let value = filling[field.key], field.accepts(value),
-                      field.key != new.titleKey || !NoteName.trimmed(value.string ?? "").isEmpty {
+                      field.key != new.titleKey || !NameText.trimmed(value.string ?? "").isEmpty {
                 set[field.key] = value
                 result[field.key] = value
             } else {

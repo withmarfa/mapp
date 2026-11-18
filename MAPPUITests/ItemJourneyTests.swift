@@ -83,7 +83,7 @@ final class ItemJourneyTests: XCTestCase {
         title.typeKey("a", modifierFlags: .command)
         title.typeText("Body Focus Saved Task")
         title.typeKey(.return, modifierFlags: [])
-        let row = app.outlines["NoteList"].staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Body Focus Saved Task")).firstMatch
+        let row = app.outlines["ItemList"].staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Body Focus Saved Task")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 3))
         // A new task has no status, so its pin is an empty chip; the inspector sets the status in the same panel.
         app.descendants(matching: .any)["DetailsToggle"].click()
@@ -115,7 +115,7 @@ final class ItemJourneyTests: XCTestCase {
     /// Leaves the item for another and comes back, so the page reads it again from the library. The sample
     /// library lives only as long as the app, so a relaunch would find none of it.
     private func reopen(_ title: String) {
-        let rows = app.outlines["NoteList"].staticTexts
+        let rows = app.outlines["ItemList"].staticTexts
         let other = rows.matching(NSPredicate(format: "NOT (value BEGINSWITH %@)", title)).firstMatch
         XCTAssertTrue(other.waitForExistence(timeout: 5))
         other.click()

@@ -6,7 +6,7 @@ extension Browser {
     /// It reads the items shown, so it holds for every place, search results and Include Subtypes alike. The sort is the
     /// table's resolved one, since a saved view stores its sort by column identifier alone.
     func rowList(
-        of items: [Item], in library: any ItemLibrary, order: NoteOrder, now: Date, format: DateFormat, calendar: Calendar = .current
+        of items: [Item], in library: any ItemLibrary, order: ItemOrder, now: Date, format: DateFormat, calendar: Calendar = .current
     ) -> RowList {
         let arranged = listShape?.arranged == true && !ordersByRelevance
         var groupedByType = false

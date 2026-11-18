@@ -80,7 +80,7 @@ extension EditorTests {
         try await page.run("window.editor.focus(); document.execCommand('insertText', false, ' rewrite')")
         try await page.wait { page.editor.heldEdit != nil }
         library.updateBody(of: note.id, to: "Draft, changed elsewhere\n")
-        page.editor.noteChanged(try #require(library.item(note.id)))
+        page.editor.itemChanged(try #require(library.item(note.id)))
         #expect(page.changes.count == 1)
         #expect(page.changes.first?.contains("rewrite") == true, "the held rewrite is saved when the page is replaced")
         #expect(page.editor.heldEdit == nil)

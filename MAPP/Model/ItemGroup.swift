@@ -1,7 +1,7 @@
 import Foundation
 
 /// The sections of the item list, as Notes groups them.
-nonisolated enum NoteGroup: Hashable {
+nonisolated enum ItemGroup: Hashable {
     case favorites
     case today
     case yesterday
@@ -29,7 +29,7 @@ nonisolated enum NoteGroup: Hashable {
         }
     }
 
-    static func group(for date: Date, now: Date, calendar: Calendar = .current) -> NoteGroup {
+    static func group(for date: Date, now: Date, calendar: Calendar = .current) -> ItemGroup {
         let today = calendar.startOfDay(for: now)
         let day = calendar.startOfDay(for: date)
         let daysAgo = calendar.dateComponents([.day], from: day, to: today).day ?? 0
@@ -49,22 +49,22 @@ nonisolated enum NoteGroup: Hashable {
     /// sections follow only when grouping by date and the list is sorted by a date.
     static func sections(
         of items: [Item],
-        sort: NoteSort,
+        sort: ItemSort,
         favoritesFirst: Bool,
         groupsByDate: Bool,
         now: Date,
         calendar: Calendar = .current
-    ) -> [NoteSection] {
+    ) -> [ItemSection] {
         let items = sort.sorted(items)
-        var sections: [NoteSection] = []
+        var sections: [ItemSection] = []
         var rest = items
         if favoritesFirst {
             let favorites = items.filter(\.isFavorite)
-            if !favorites.isEmpty { sections.append(NoteSection(group: .favorites, items: favorites)) }
+            if !favorites.isEmpty { sections.append(ItemSection(group: .favorites, items: favorites)) }
             rest = items.filter { !$0.isFavorite }
         }
         guard groupsByDate, sort != .title else {
-            if !rest.isEmpty { sections.append(NoteSection(group: nil, items: rest)) }
+            if !rest.isEmpty { sections.append(ItemSection(group: nil, items: rest)) }
             return sections
         }
         for item in rest {
@@ -72,17 +72,17 @@ nonisolated enum NoteGroup: Hashable {
             if sections.last?.group == group {
                 sections[sections.count - 1].items.append(item)
             } else {
-                sections.append(NoteSection(group: group, items: [item]))
+                sections.append(ItemSection(group: group, items: [item]))
             }
         }
         return sections
     }
 }
 
-nonisolated struct NoteSection: Identifiable, Hashable {
+nonisolated struct ItemSection: Identifiable, Hashable {
     /// No group means the items are listed without a heading.
-    var group: NoteGroup?
+    var group: ItemGroup?
     var items: [Item]
 
-    var id: NoteGroup? { group }
+    var id: ItemGroup? { group }
 }

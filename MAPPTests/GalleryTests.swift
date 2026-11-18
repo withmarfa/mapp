@@ -37,7 +37,7 @@ struct GalleryTests {
         saved.selection = [newer.id]
         let data = try JSONEncoder().encode(saved.snapshot())
         let restored = Browser()
-        restored.restore(from: data, in: library, order: NoteOrder())
+        restored.restore(from: data, in: library, order: ItemOrder())
         #expect(restored.showsCollection)
         #expect(restored.selection == [newer.id])
     }
@@ -46,7 +46,7 @@ struct GalleryTests {
         let (library, _, _, _) = BrowserTests().makeFakeLibrary()
         let browser = Browser()
         browser.viewMode = .gallery
-        browser.show(.allNotes, in: library, order: NoteOrder())
+        browser.show(.allItems, in: library, order: ItemOrder())
         browser.openCollectionSelection()
         #expect(!browser.showsCollection)
         let id = await browser.quickAdded("New", in: library)
@@ -55,15 +55,15 @@ struct GalleryTests {
         browser.returnToCollection()
         #expect(browser.showsCollection)
         browser.openCollectionSelection()
-        browser.show(.inbox, in: library, order: NoteOrder())
+        browser.show(.inbox, in: library, order: ItemOrder())
         #expect(browser.showsCollection)
-        browser.show(.allNotes, in: library, order: NoteOrder())
+        browser.show(.allItems, in: library, order: ItemOrder())
         #expect(browser.showsCollection)
     }
 
     @Test func aCardsFactsFollowItsShape() {
         let (library, _, newer, _) = BrowserTests().makeFakeLibrary()
-        #expect(GalleryCardFacts(of: newer, attachments: [], in: library).kind == .note)
+        #expect(GalleryCardFacts(of: newer, attachments: [], in: library).kind == .text)
         var file = newer
         file.content = .file(.png, byteCount: 10)
         #expect(GalleryCardFacts(of: file, attachments: [], in: library).kind == .file(.png))
@@ -100,7 +100,7 @@ struct GalleryTests {
             GalleryCard(item: item, browser: browser, width: width, cards: cards, content: said ?? content(item), attachments: attached)
         }
         let before = card(newer)
-        browser.show(.allNotes, in: library, order: NoteOrder())
+        browser.show(.allItems, in: library, order: ItemOrder())
         browser.selection = [newer.id]
         #expect(before == card(newer), "a selection that moves leaves the card alone")
         browser.selection = [other.id]

@@ -28,7 +28,7 @@ struct ItemFileViewTests {
         autoreleasepool {
             let window = TestWindow(contentRect: NSRect(x: 100, y: 100, width: 800, height: 600), styleMask: [.titled, .closable], backing: .buffered, defer: false)
             window.isReleasedWhenClosed = false
-            window.contentView = NSHostingView(rootView: NoteWindow(id: .constant(id)).environment(\.library, library))
+            window.contentView = NSHostingView(rootView: ItemWindow(id: .constant(id)).environment(\.library, library))
             window.makeKeyAndOrderFront(nil)
             return window
         }

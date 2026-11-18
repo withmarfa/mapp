@@ -102,7 +102,7 @@ struct ItemInspectorHost: View {
             return
         }
         browser.searchText = ""
-        browser.sidebarItem = library.item(id).map(browser.place(listing:)) ?? .allNotes
+        browser.sidebarItem = library.item(id).map(browser.place(listing:)) ?? .allItems
         browser.selection = [id]
         browser.focusRequest = .list
     }

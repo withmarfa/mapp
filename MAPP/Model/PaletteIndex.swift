@@ -50,6 +50,6 @@ extension Browser {
         // The types the sidebar shows, under the names it gives them.
         places += library.itemTypeCounts.map { .init(item: .itemType($0.id.rawValue), icon: .type($0.icon), title: $0.label) }
         places += library.views.map { .init(item: .view($0.id), icon: .symbol(SidebarPlace.viewSymbol), title: $0.title) }
-        return PaletteIndex(places: places, recent: library.items(in: .allNotes).sorted { $0.modified > $1.modified })
+        return PaletteIndex(places: places, recent: library.items(in: .allItems).sorted { $0.modified > $1.modified })
     }
 }
