@@ -269,7 +269,7 @@ actor MarfaSync {
     /// The copy was made for another server: nothing in it is sent there. The writes it holds are counted for the
     /// person, who can start a new copy and lose them, or keep this one.
     private func otherServer() async {
-        let unsent = (try? await copy.queue.all()).map { UInt64(MarfaProblems.unsent($0).count) }
+        let unsent = (try? await MarfaEngine.asking { try await copy.queue.all() }).map { UInt64(MarfaProblems.unsent($0).count) }
         guard !stopped, connection?.fault != nil else { return }
         hub.set(.unavailable(message: Words.otherServer(unsent: unsent)))
         tellOnce(SourceFailure(kind: .failed, message: Words.otherServer(unsent: unsent)))
@@ -455,7 +455,7 @@ actor MarfaSync {
             #if DEBUG
             if let fault = hooks.faulting.current?(.drain) { throw fault }
             #endif
-            _ = try await copy.queue.drain()
+            _ = try await MarfaEngine.asking { try await copy.queue.drain() }
         } catch {
             // A drain that throws loses its report, and the writes it answered first are recorded, so the engine
             // takes them from the queue below. A copy that needs it hydrates again. The package retries a drain only

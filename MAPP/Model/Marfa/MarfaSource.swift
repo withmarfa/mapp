@@ -223,7 +223,7 @@ nonisolated final class MarfaSource: ItemSource {
     }
 
     func linkAnswers(of targets: [String], in itemID: ItemID?) async throws -> [LinkAnswer] {
-        try await copy.items.linkCandidates(of: targets, in: itemID?.rawValue).map { answer in
+        try await MarfaEngine.asking { try await copy.items.linkCandidates(of: targets, in: itemID?.rawValue) }.map { answer in
             let state: LinkAnswer.State
             switch answer.state {
             case .bound: state = .bound
@@ -235,15 +235,14 @@ nonisolated final class MarfaSource: ItemSource {
         }
     }
 
-    /// `Edges.check` throws `validation` or `notFound` for an edge the core refuses. Any other error (the key changing,
-    /// the copy closed or not yet whole, a canceled call) says nothing about the edge.
+    /// `Edges.check` throws `validation` or `notFound` for an edge the core refuses. Any other error (the copy closed or not yet whole, a canceled call) says nothing about the edge.
     func edgeVerdict(_ draft: EdgeDraft) async -> EdgeVerdict {
-        await verdict { try await copy.edges.check(from: draft.from.rawValue, to: draft.to.rawValue, type: draft.type) }
+        await verdict { try await MarfaEngine.asking { try await copy.edges.check(from: draft.from.rawValue, to: draft.to.rawValue, type: draft.type) } }
     }
 
     func edgeVerdict(moving edge: EdgeID, end: EdgeTypeInfo.End, to: ItemID) async -> EdgeVerdict {
         let move: EdgeEdit.Move = end == .from ? .from(to.rawValue) : .to(to.rawValue)
-        return await verdict { try await copy.edges.check(edge.rawValue, moving: move) }
+        return await verdict { try await MarfaEngine.asking { try await copy.edges.check(edge.rawValue, moving: move) } }
     }
 
     private func verdict(_ check: () async throws -> Void) async -> EdgeVerdict {
@@ -478,6 +477,26 @@ nonisolated final class MarfaSource: ItemSource {
         }
         if outcome == .closed { events.finish() }
         return outcome
+    }
+
+    /// A copy that could not be given the sign-in is told closed or open by asking it, since only the package knows
+    /// whether its store opened again.
+    func use(_ server: Server) async throws -> SourceRole {
+        do {
+            try await copy.use(server)
+        } catch {
+            let closed: Bool
+            do {
+                _ = try await copy.status()
+                closed = false
+            } catch MarfaError.closed {
+                closed = true
+            } catch {
+                closed = false
+            }
+            throw SourceUseFailure(cause: error, closed: closed)
+        }
+        return copy.handle == .writer ? .writer : .reader
     }
 
     /// Nothing submitted after this is taken, and a flush still waiting returns.

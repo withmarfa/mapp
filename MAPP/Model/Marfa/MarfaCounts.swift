@@ -13,7 +13,7 @@ nonisolated struct MarfaCounts: Sendable {
     }
 
     init(copy: WorkingCopy) {
-        ask = { ids, counted in try await copy.counts(of: ids, counted) }
+        ask = { ids, counted in try await MarfaEngine.asking { try await copy.counts(of: ids, counted) } }
     }
 
     @concurrent func counts(of ids: [ItemID], _ query: CountQuery) async throws -> [ItemID: ItemCountAnswer] {

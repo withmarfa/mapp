@@ -167,7 +167,7 @@ struct MarfaSyncFailureTests {
 
     @Test func aKeyTheKeychainWouldNotGiveIsNeitherMissingNorRefused() async throws {
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let keys = MemorySignIns([connection.address: "unused"])
+        let keys = ScriptedSignIns([connection.address: "unused"])
         keys.makeUnreadable(connection)
         let root = URL.temporaryDirectory.appending(path: "MarfaSyncFailureTests-\(UUID().uuidString)", directoryHint: .isDirectory)
         defer { try? FileManager.default.removeItem(at: root) }

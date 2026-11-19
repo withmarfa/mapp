@@ -144,7 +144,7 @@ import Testing
         #expect(!model.isConnected)
     }
 
-    @Test func aSignInAgainOnlyReopensTheCopyAndLeavesNoNotice() async throws {
+    @Test func aSignInAgainGivesTheOpenCopyTheSignInAndLeavesNoNotice() async throws {
         let bench = try HostBench()
         let (model, _) = model(bench)
         await connect(model)
@@ -158,8 +158,9 @@ import Testing
         await model.signInAgain()
         #expect(model.notice == nil)
         #expect(try bench.signIns.key(for: first.address) == "key-2")
-        #expect(model.host.source === bench.servers.last)
-        #expect(bench.servers.opened.count == 2)
+        #expect(model.host.source === source)
+        #expect(source.given == ["key-2"])
+        #expect(bench.servers.opened.count == 1, "the copy is not opened again")
     }
 
     @Test func aCodeIsShownWhileTheModelWaitsAndForgottenAfterwards() async throws {
@@ -221,7 +222,9 @@ import Testing
         let bench = try HostBench()
         let (model, _) = model(bench)
         await connect(model)
-        bench.servers.failure.withLock { $0 = SourceFailure(kind: .failed, message: "The store is damaged.") }
+        let source = try #require(bench.servers.last)
+        source.useFailure.withLock { $0 = SourceFailure(kind: .failed, message: "The store is damaged.") }
+        source.useCloses.withLock { $0 = true }
         _ = model.host.scripted("key-2")
         await model.signInAgain()
         #expect(model.notice?.title == "Can’t Open the Library")

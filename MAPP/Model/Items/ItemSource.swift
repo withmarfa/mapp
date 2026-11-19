@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 
 nonisolated struct SourceSnapshot: Hashable, Sendable {
     var items: [Item]
@@ -130,6 +131,13 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     var engineActivity: EngineActivity? { get }
     func close() async
 
+    /// Gives the open source the sign-in `server` carries, without closing it: what waits in its queue stays, and the
+    /// calls made meanwhile wait for the change. Throws as the package's `WorkingCopy.use(_:)` does, which
+    /// refuses a server at another address before it changes anything. A source with no server has nothing to give it to.
+    /// The answer is the role the source holds afterwards, since another opener may have taken the writer role
+    /// meanwhile. A failure is a `SourceUseFailure`, which says whether the source was closed by it.
+    func use(_ server: Server) async throws -> SourceRole
+
     // MARK: The server
 
     var downloadedFiles: (any DownloadedFiles)? { get }
@@ -158,6 +166,8 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
 nonisolated extension ItemSource {
     var engineActivity: EngineActivity? { nil }
 
+    func use(_ server: Server) async throws -> SourceRole { .writer }
+
     func counts(of ids: [ItemID], _ query: CountQuery) async throws -> [ItemID: ItemCountAnswer] { throw ItemCountUnavailable() }
 
     var downloadedFiles: (any DownloadedFiles)? { nil }
@@ -185,4 +195,17 @@ nonisolated enum EdgeVerdict: Equatable, Sendable {
     var refusal: String? {
         if case .refused(let message) = self { message } else { nil }
     }
+}
+
+/// The role an open source holds on its store: a reader's writes would all be refused.
+nonisolated enum SourceRole: Sendable, Equatable {
+    case writer
+    case reader
+}
+
+/// A sign-in the source could not be given. `closed` is true only where the source is closed by it, its store
+/// not opening again; otherwise the source is as it was.
+nonisolated struct SourceUseFailure: Error {
+    let cause: any Error
+    let closed: Bool
 }

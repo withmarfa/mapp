@@ -25,7 +25,7 @@ nonisolated protocol MarfaReading: Sendable {
 
 nonisolated struct MarfaRead: MarfaReading {
     let copy: WorkingCopy
-    func status() async throws -> Status { try await copy.status() }
+    func status() async throws -> Status { try await MarfaEngine.asking { try await copy.status() } }
     func items() async throws -> Rows<Marfa.Item> { try await copy.items.list(ListFilters(allStates: true)) }
     func items(_ ids: [String]) async throws -> Rows<Marfa.Item> { try await copy.items.get(ids, includingBin: true) }
     func edges(ofTypes types: [String]) async throws -> [Marfa.Edge] {

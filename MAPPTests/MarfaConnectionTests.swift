@@ -40,7 +40,7 @@ struct MarfaConnectionTests {
     @Test func aSignInIsKeptForItsServerAlone() throws {
         let one = try MarfaConnection(address: "http://one.example")
         let two = try MarfaConnection(address: "http://two.example")
-        let signIns = MemorySignIns()
+        let signIns = ScriptedSignIns()
         signIns.hold("first", for: one)
         #expect(try signIns.key(for: one.address) == "first")
         #expect(try signIns.key(for: two.address) == nil)

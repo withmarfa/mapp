@@ -138,7 +138,7 @@ struct MarfaSourceOfflineTests {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let keys = MemorySignIns([connection.address: "unused"])
+        let keys = ScriptedSignIns([connection.address: "unused"])
         let location = MarfaStoreLocation(root: root)
 
         let source = try await MarfaSource.open(connection, signIns: keys, location: location)
@@ -205,7 +205,7 @@ struct MarfaSourceOfflineTests {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let keys = MemorySignIns([connection.address: "unused"])
+        let keys = ScriptedSignIns([connection.address: "unused"])
         let location = MarfaStoreLocation(root: root)
         let source = try await MarfaSource.open(connection, signIns: keys, location: location)
         let log = ChangeLog(source)
@@ -230,7 +230,7 @@ struct MarfaSourceOfflineTests {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let keys = MemorySignIns([connection.address: "unused"])
+        let keys = ScriptedSignIns([connection.address: "unused"])
         let location = MarfaStoreLocation(root: root)
         let source = try await MarfaSource.open(connection, signIns: keys, location: location)
         let file = root.appending(path: "kept.txt")
@@ -259,7 +259,7 @@ struct MarfaSourceOfflineTests {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let keys = MemorySignIns([connection.address: "unused"])
+        let keys = ScriptedSignIns([connection.address: "unused"])
         let location = MarfaStoreLocation(root: root)
         try await MarfaSource.open(connection, signIns: keys, location: location).close()
         let store = location.store(for: connection)
@@ -281,7 +281,7 @@ struct MarfaSourceOfflineTests {
         let root = scratch()
         defer { try? FileManager.default.removeItem(at: root) }
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let keys = MemorySignIns([connection.address: "unused"])
+        let keys = ScriptedSignIns([connection.address: "unused"])
         let location = MarfaStoreLocation(root: root)
         try await MarfaSource.open(connection, signIns: keys, location: location).close()
         let store = location.store(for: connection)
@@ -349,14 +349,14 @@ struct MarfaSourceOfflineTests {
     @Test func aMissingKeyIsDenied() async throws {
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
         await #expect(throws: SourceFailure.self) {
-            _ = try await MarfaSource.open(connection, signIns: MemorySignIns(), location: MarfaStoreLocation(root: scratch()))
+            _ = try await MarfaSource.open(connection, signIns: ScriptedSignIns(), location: MarfaStoreLocation(root: scratch()))
         }
     }
 
     private func open(_ root: URL, at address: String = "http://127.0.0.1:9") async throws -> MarfaSource {
         let connection = try MarfaConnection(address: address)
         return try await MarfaSource.open(
-            connection, signIns: MemorySignIns([connection.address: "unused"]), location: MarfaStoreLocation(root: root))
+            connection, signIns: ScriptedSignIns([connection.address: "unused"]), location: MarfaStoreLocation(root: root))
     }
 
     /// A refresh that waits on the server must not hold up a write: the write is queued and shown at once.
@@ -841,7 +841,7 @@ extension LiveMarfaTests {
         private func open(_ root: URL) async throws -> MarfaSource {
             let connection = try MarfaConnection(address: try LiveMarfa.address())
             return try await MarfaSource.open(
-                connection, signIns: MemorySignIns([connection.address: try LiveMarfa.key()]),
+                connection, signIns: ScriptedSignIns([connection.address: try LiveMarfa.key()]),
                 location: MarfaStoreLocation(root: root))
         }
 
@@ -1113,7 +1113,7 @@ extension LiveMarfaTests {
             let address = try LiveMarfa.address(), key = try LiveMarfa.key()
             let connection = try MarfaConnection(address: address)
             let location = MarfaStoreLocation(root: root)
-            let keys = MemorySignIns([connection.address: key])
+            let keys = ScriptedSignIns([connection.address: key])
             let a = made.mint(), b = made.mint()
             let tag = UUID().uuidString.prefix(8)
 
@@ -1460,10 +1460,10 @@ nonisolated enum LiveMarfa {
 /// before the connect review's fixes.
 @Suite(.serialized, .hangLimit)
 struct MarfaSourceClosingTests {
-    private func open() async throws -> (MarfaSource, MarfaConnection, MemorySignIns, MarfaStoreLocation, URL) {
+    private func open() async throws -> (MarfaSource, MarfaConnection, ScriptedSignIns, MarfaStoreLocation, URL) {
         let root = scratch()
         let connection = try MarfaConnection(address: "http://127.0.0.1:9")
-        let keys = MemorySignIns([connection.address: "unused"])
+        let keys = ScriptedSignIns([connection.address: "unused"])
         let location = MarfaStoreLocation(root: root)
         let source = try await MarfaSource.open(connection, signIns: keys, location: location)
         return (source, connection, keys, location, root)

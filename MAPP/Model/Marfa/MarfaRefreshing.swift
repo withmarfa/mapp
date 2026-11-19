@@ -11,10 +11,10 @@ nonisolated protocol MarfaRefreshing: Sendable {
 nonisolated struct MarfaRefresh: MarfaRefreshing {
     let copy: WorkingCopy
 
-    func readStatus() async throws -> Status { try await copy.status() }
+    func readStatus() async throws -> Status { try await MarfaEngine.asking { try await copy.status() } }
     func hydrate(types: [String], tier: SliceTier, edgeTypes: [String]) async throws -> HydrateReport {
-        try await copy.hydrate(types: types, tier: tier, edgeTypes: edgeTypes)
+        try await MarfaEngine.asking { try await copy.hydrate(types: types, tier: tier, edgeTypes: edgeTypes) }
     }
-    func catchUp() async throws { _ = try await copy.catchUp() }
-    func fetchKept() async throws -> KeptFetch { try await copy.blobs.fetchKept() }
+    func catchUp() async throws { _ = try await MarfaEngine.asking { try await copy.catchUp() } }
+    func fetchKept() async throws -> KeptFetch { try await MarfaEngine.asking { try await copy.blobs.fetchKept() } }
 }

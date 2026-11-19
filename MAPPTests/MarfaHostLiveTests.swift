@@ -80,14 +80,14 @@ extension LiveMarfaTests {
         /// Makes an item through a copy of its own, closes the copy, and has another device purge the item, then hands
         /// the closed copy's place to `body`. Whatever `body` does, the item and the copy's folder are removed.
         private func withPurgedItem(
-            _ body: (MarfaConnection, MemorySignIns, MarfaStoreLocation, ItemID, ItemVersion) async throws -> Void
+            _ body: (MarfaConnection, ScriptedSignIns, MarfaStoreLocation, ItemID, ItemVersion) async throws -> Void
         ) async throws {
             let root = URL.temporaryDirectory.appending(path: "MarfaHostTests-\(UUID().uuidString)", directoryHint: .isDirectory)
             defer { try? FileManager.default.removeItem(at: root) }
             let made = LiveMarfa.Made()
             do {
                 let connection = try MarfaConnection(address: try LiveMarfa.address())
-                let keys = MemorySignIns([connection.address: try LiveMarfa.key()])
+                let keys = ScriptedSignIns([connection.address: try LiveMarfa.key()])
                 let location = MarfaStoreLocation(root: root)
                 let id = made.mint()
                 let first = try await MarfaSource.open(connection, signIns: keys, location: location)

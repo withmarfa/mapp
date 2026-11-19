@@ -17,7 +17,7 @@ extension LiveMarfaTests {
             let root = URL.temporaryDirectory.appending(path: "MarfaVersionHistoryLiveTests-\(UUID().uuidString)", directoryHint: .isDirectory)
             let made = LiveMarfa.Made()
             let connection = try MarfaConnection(address: try LiveMarfa.address())
-            let keys = MemorySignIns([connection.address: try LiveMarfa.key()])
+            let keys = ScriptedSignIns([connection.address: try LiveMarfa.key()])
             let source = try await MarfaSource.open(connection, signIns: keys, location: MarfaStoreLocation(root: root))
             let library = MarfaLibrary(
                 source: source, notices: Notices(), history: MarfaServerCalls(connection: connection, signIns: keys))

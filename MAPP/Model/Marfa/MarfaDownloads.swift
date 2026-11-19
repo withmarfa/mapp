@@ -54,18 +54,18 @@ struct MarfaDownloads: DownloadedFiles {
     }
 
     func read() async throws -> DownloadedFileState {
-        DownloadedFileState(try await copy.blobs.cache())
+        DownloadedFileState(try await MarfaEngine.asking { try await copy.blobs.cache() })
     }
 
     func setBudget(_ budget: DownloadBudget) async throws {
-        _ = try await copy.blobs.setBudget(budget.marfa)
+        _ = try await MarfaEngine.asking { try await copy.blobs.setBudget(budget.marfa) }
     }
 
     /// The package takes the files it can fetch again and leaves the budget alone. A cache it cannot read is an error
     /// to tell, never "nothing to remove".
     func removeDownloadedFiles() async throws {
         do {
-            _ = try await copy.blobs.removeFetchedFiles()
+            _ = try await MarfaEngine.asking { try await copy.blobs.removeFetchedFiles() }
         } catch let error as MarfaError {
             throw SourceFailure(kind: .failed, message: String(localized: "Couldn’t remove downloaded files. \(error.message)"))
         }
