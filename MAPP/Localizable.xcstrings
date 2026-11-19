@@ -4641,7 +4641,7 @@
     "Remove “%@” from every %@?" : {
 
     },
-    "The field leaves every %@, in every app. Items keep the values they hold, and an app can still read them, but this type can’t be given a field with this name again." : {
+    "The field leaves every %@, in every app. Items keep the values they hold, and an app can still read them." : {
 
     },
     "Remove Field" : {

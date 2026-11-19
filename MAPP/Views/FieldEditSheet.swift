@@ -155,7 +155,7 @@ enum FieldRemoval {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = String(localized: "Remove “\(plan.shown.label)” from every \(typeLabel)?")
-        alert.informativeText = String(localized: "The field leaves every \(typeLabel), in every app. Items keep the values they hold, and an app can still read them, but this type can’t be given a field with this name again.")
+        alert.informativeText = String(localized: "The field leaves every \(typeLabel), in every app. Items keep the values they hold, and an app can still read them.")
         let removeButton = alert.addButton(withTitle: String(localized: "Remove Field"))
         removeButton.hasDestructiveAction = true
         alert.addButton(withTitle: String(localized: "Cancel"))
