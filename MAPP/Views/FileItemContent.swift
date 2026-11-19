@@ -112,6 +112,10 @@ private struct FilePDFPreview: View {
                 } else {
                     ContentUnavailableView("Can’t Preview This PDF", systemImage: "doc", description: Text("The file may be damaged or unavailable. Try opening it in another app."))
                 }
+            } else {
+                // Something always shows, so the page keeps its height and the read below starts: a view with nothing in
+                // it never runs its task.
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .modifier(OfferedFileView(viewing: viewing, item: item, details: details, isReady: document != nil))
