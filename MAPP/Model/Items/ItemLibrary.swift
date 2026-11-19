@@ -208,6 +208,10 @@ protocol ItemLibrary: AnyObject, Observable {
     /// To Recently Deleted, in one undoable change. An item already there has nothing to change, and one a connector
     /// keeps is skipped and told.
     func delete(_ ids: Set<ItemID>, undoManager: UndoManager?)
+    /// For the question before moving several items: how many more items than `ids` the server says moving them also
+    /// takes, only where the library is online and `ids` are 2 to 20; nil otherwise and whenever it can't be read.
+    /// Reads only, and never blocks the move, which is each item's queued delete whatever this answers.
+    func moreItemsTaken(with ids: Set<ItemID>) async -> Int?
     func recover(_ ids: Set<ItemID>, undoManager: UndoManager?)
     /// Not undoable, so the views confirm it first, and only where `reachesServer`.
     func deletePermanently(_ ids: Set<ItemID>)

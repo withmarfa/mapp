@@ -3101,6 +3101,12 @@
     "Moved to Recently Deleted" : {
 
     },
+    "Moving them also moves at least %lld more items that go with them." : {
+      "extractionState" : "manual"
+    },
+    "Moving them also moves at least 1 more item that goes with them." : {
+      "extractionState" : "manual"
+    },
     "Move Up" : {
 
     },
@@ -4928,6 +4934,9 @@
 
     },
     "You are signed in again, but the copy of your library on this Mac can’t be opened." : {
+      "extractionState" : "manual"
+    },
+    "You can bring everything back from Recently Deleted." : {
       "extractionState" : "manual"
     },
     "You can bring them back from Recently Deleted." : {

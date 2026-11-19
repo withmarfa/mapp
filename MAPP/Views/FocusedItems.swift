@@ -328,6 +328,8 @@ struct CollectionPickRequest: Identifiable {
 struct DeleteRequest: Identifiable {
     let id = UUID()
     let ids: Set<ItemID>
+    /// At least how many more items the server says moving them takes, where it could be read; nil otherwise.
+    let alsoTaking: Int?
     let undoManager: UndoManager?
 }
 

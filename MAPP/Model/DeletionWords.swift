@@ -8,6 +8,17 @@ nonisolated enum DeletionWords {
         AttributedString(localized: "^[Move \(count) item](inflect: true) to Recently Deleted?").text
     }
 
+    /// What the question says before moving several items. Where the server says the move also takes more items, it
+    /// says at least how many: the server counts only items the sign-in can read. Where that couldn't be read, or
+    /// nothing goes with them, it says only that they can be brought back.
+    static func moveMessage(alsoTaking count: Int?) -> String {
+        guard let count, count > 0 else { return String(localized: "You can bring them back from Recently Deleted.") }
+        let also = count == 1
+            ? String(localized: "Moving them also moves at least 1 more item that goes with them.")
+            : String(localized: "Moving them also moves at least \(count) more items that go with them.")
+        return also + " " + String(localized: "You can bring everything back from Recently Deleted.")
+    }
+
     /// What the toast says after `count` items moved to Recently Deleted. One item is named by `title` where it has
     /// one.
     static func movedMessage(count: Int, title: String? = nil) -> String {

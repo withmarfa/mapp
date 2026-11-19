@@ -516,6 +516,11 @@ final class FakeItemLibrary: ItemLibrary {
         change(changing) { $0.tags.remove(tag) }
     }
 
+    /// What the question before moving several items is told goes with them; nil is a preview that could not be read.
+    var moreTaken: Int?
+
+    func moreItemsTaken(with ids: Set<ItemID>) async -> Int? { moreTaken }
+
     func delete(_ ids: Set<ItemID>, undoManager: UndoManager?) {
         let plan = deletePlan(ids)
         tellSkipped(plan.skips, didChange: !plan.moving.isEmpty, failing: "Can’t Delete")

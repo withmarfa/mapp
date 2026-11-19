@@ -85,8 +85,8 @@ private struct DeleteConfirmation: ViewModifier {
             Button("Move to Recently Deleted", role: .destructive) {
                 Browser.moveToRecentlyDeleted(request.ids, in: library, undoManager: request.undoManager, toasts: details.toasts)
             }
-        } message: { _ in
-            Text("You can bring them back from Recently Deleted.")
+        } message: { request in
+            Text(DeletionWords.moveMessage(alsoTaking: request.alsoTaking))
         }
     }
 }

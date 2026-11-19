@@ -138,6 +138,15 @@ nonisolated final class FakeItemSource: ItemSource {
         held.withLock { $0[id] = ItemBody(id: id, text: text, version: ItemVersion(version)) }
     }
 
+    /// What `moreItemsTaken` answers; nil is a preview the server could not read. `previewsAsked` lists each ask.
+    let moreTaken = Mutex<Int?>(nil)
+    let previewsAsked = Mutex<[[ItemID]]>([])
+
+    func moreItemsTaken(with ids: [ItemID]) async -> Int? {
+        previewsAsked.withLock { $0.append(ids) }
+        return moreTaken.withLock { $0 }
+    }
+
     func clearWrites() {
         written.withLock { $0 = [] }
     }
