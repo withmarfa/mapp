@@ -4,6 +4,18 @@
     "" : {
 
     },
+    "+%lld" : {
+
+    },
+    "All" : {
+
+    },
+    "Apps" : {
+
+    },
+    "Apps you sign in appear here." : {
+
+    },
     "as Calendar" : {
       "extractionState" : "manual"
     },
@@ -16,7 +28,84 @@
     "Change Density" : {
 
     },
+    "Collections that apps make appear here." : {
+
+    },
+    "Delete the collection “%@”?" : {
+
+    },
+    "Delete…" : {
+
+    },
     "Density" : {
+
+    },
+    "Its %lld items are kept." : {
+
+    },
+    "Its 1 item is kept." : {
+
+    },
+    "Keys" : {
+
+    },
+    "Keys you make appear here." : {
+
+    },
+    "Kinds" : {
+
+    },
+    "Latest" : {
+
+    },
+    "Moved “%@” to Recently Deleted" : {
+
+    },
+    "New Collection" : {
+
+    },
+    "No Apps" : {
+
+    },
+    "No Collections From Apps" : {
+
+    },
+    "No Collections Of Yours" : {
+
+    },
+    "No Keys" : {
+
+    },
+    "Show All %lld" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Show All %lld"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Show All %lld"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Sort By" : {
+
+    },
+    "The collection is deleted for every app connected to your Marfa server." : {
+
+    },
+    "Yours" : {
 
     },
     "“%@” already holds this link to “%@”. Remove it there first." : {
@@ -1688,9 +1777,6 @@
     "Console" : {
       "extractionState" : "manual"
     },
-    "Contains" : {
-      "extractionState" : "manual"
-    },
     "Contents" : {
       "extractionState" : "manual"
     },
@@ -2418,12 +2504,6 @@
     },
     "Last Week" : {
 
-    },
-    "Latest %@" : {
-      "extractionState" : "manual"
-    },
-    "Latest Item" : {
-      "extractionState" : "manual"
     },
     "Layout" : {
 
@@ -4412,9 +4492,6 @@
     "View as Calendar" : {
       "extractionState" : "manual"
     },
-    "View as Cards" : {
-      "extractionState" : "manual"
-    },
     "View as Gallery" : {
 
     },
@@ -4502,18 +4579,6 @@
     },
     "Wide" : {
 
-    },
-    "Width" : {
-      "extractionState" : "manual"
-    },
-    "Width: Narrow" : {
-      "extractionState" : "manual"
-    },
-    "Width: Standard" : {
-      "extractionState" : "manual"
-    },
-    "Width: Wide" : {
-      "extractionState" : "manual"
     },
     "Writes" : {
       "extractionState" : "manual"
