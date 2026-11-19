@@ -14,7 +14,9 @@ nonisolated final class ScriptedSignIns: SignIns {
         /// What each browser sign-in does, first to last; the last is repeated. Empty signs in with `signedInKey`.
         var browser: [Result<String, any Error>] = []
         var code: [Result<CodeSignIn, any Error>] = []
-        var signOutAnswer: Result<Bool, any Error> = .success(true)
+        var signOutAnswer: Result<SignOutOutcome, any Error> = .success(.endedAtServer)
+        /// Whether the sign-ins that succeed leave a replaced approval standing at the server.
+        var replacedStands = false
         var calls: [String] = []
     }
 
@@ -48,6 +50,9 @@ nonisolated final class ScriptedSignIns: SignIns {
     /// Run as each sign-out begins, before it forgets anything.
     let onSignOut = Mutex<(@Sendable () -> Void)?>(nil)
 
+    /// Waited on as each sign-out begins, after `onSignOut`, to stand for a server that does not answer.
+    let signOutGate = Mutex<(@Sendable () async -> Void)?>(nil)
+
     /// Run as each browser sign-in begins, before it answers, to stand for the minutes a person takes; it may wait,
     /// and a cancel reaches it as a thrown `CancellationError`.
     let onBrowser = Mutex<(@MainActor @Sendable () async throws -> Void)?>(nil)
@@ -69,9 +74,16 @@ nonisolated final class ScriptedSignIns: SignIns {
         state.withLock { $0.code = code }
     }
 
-    func script(signOut: Result<Bool, any Error>) {
+    func script(signOut: Result<SignOutOutcome, any Error>) {
         state.withLock { $0.signOutAnswer = signOut }
     }
+
+    func script(replacedApprovalStands: Bool) {
+        state.withLock { $0.replacedStands = replacedApprovalStands }
+    }
+
+    /// What a code sign-in's `finish` answers.
+    var signedIn: SignedIn { SignedIn(replacedApprovalStands: state.withLock { $0.replacedStands }) }
 
     private func authorization(for address: URL) throws -> Authorization {
         try Authorization(
@@ -88,7 +100,7 @@ nonisolated final class ScriptedSignIns: SignIns {
         try held(connection.address)
     }
 
-    @MainActor func signInWithBrowser(to connection: MarfaConnection) async throws {
+    @MainActor func signInWithBrowser(to connection: MarfaConnection) async throws -> SignedIn {
         let next: Result<String, any Error> = state.withLock { state in
             state.calls.append("browser \(connection.address.absoluteString)")
             return state.browser.count > 1 ? state.browser.removeFirst() : (state.browser.first ?? .success(signedInKey))
@@ -97,6 +109,7 @@ nonisolated final class ScriptedSignIns: SignIns {
         let token = try next.get()
         keychain.succeed()
         save(token, for: connection.address)
+        return signedIn
     }
 
     func startCodeSignIn(to connection: MarfaConnection) async throws -> CodeSignIn {
@@ -108,16 +121,17 @@ nonisolated final class ScriptedSignIns: SignIns {
         return try next.get()
     }
 
-    func signOut(of connection: MarfaConnection) async throws -> Bool {
+    func signOut(of connection: MarfaConnection) async throws -> SignOutOutcome {
         onSignOut.withLock { $0 }?()
         let answer = state.withLock { state in
             state.calls.append("signOut \(connection.address.absoluteString)")
             return state.signOutAnswer
         }
+        await signOutGate.withLock { $0 }?()
         // A sign-out that throws leaves the sign-in where it was, as a Keychain that would not delete it does.
-        let confirmed = try answer.get()
+        let outcome = try answer.get()
         _ = try await authorization(for: connection.address).signOut()
-        return confirmed
+        return outcome
     }
 }
 #endif

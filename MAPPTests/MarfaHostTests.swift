@@ -64,6 +64,35 @@ import Testing
         #expect(source.stateSubscriptions.withLock { $0 } == 1)
     }
 
+    /// The package names a server by its origin, which leaves out the scheme's own port, so the same server typed with
+    /// it is the same connection: a sign in again, not a switch that signs out "the old" server and so the new sign-in.
+    @Test func anAddressWithTheDefaultPortIsTheSameServerNotASwitch() async throws {
+        let bench = try HostBench()
+        let host = bench.host()
+        try await host.connect(address: "https://marfa.test", key: "old")
+        let source = try #require(bench.servers.last)
+        try await host.connect(address: "https://marfa.test:443", key: "new")
+        #expect(bench.signIns.calls == ["browser https://marfa.test", "browser https://marfa.test"], "no sign-out came after the new sign-in")
+        #expect(try bench.signIns.key(for: URL(string: "https://marfa.test")!) == "new")
+        #expect(host.source === source)
+        #expect(bench.servers.opened.count == 1)
+        #expect(bench.savedAddress == "https://marfa.test")
+    }
+
+    /// A save in This Marfa answers after the person has moved to another server: the answer is for the server it was
+    /// sent to, so the library now open does not take it.
+    @Test func aSaveInThisMarfaThatAnswersAfterASwitchLeavesTheNewLibraryAlone() async throws {
+        let bench = try HostBench()
+        let host = bench.host()
+        try await host.connect(address: "http://first.test:8210", key: "k")
+        try await host.changeAddress(to: "http://second.test:8210", key: "k")
+        let answer = InstanceConfig(values: [.trashRetentionDays: .number(90)])
+        host.instanceSaved(answer, changing: [.trashRetentionDays], of: first.address.absoluteString)
+        #expect(host.library?.trashDays == nil)
+        host.instanceSaved(answer, changing: [.trashRetentionDays], of: second.address.absoluteString)
+        #expect(host.library?.trashDays == 90)
+    }
+
     /// A key sent over plain http to another machine can be read on the way, so the person is told, once in a run
     /// for each address, including one switched to. The host remembers each address for the whole process, so
     /// these are made up for this test.
@@ -466,9 +495,9 @@ import Testing
     @Test(arguments: [
         (SignInError.denied, SignInOutcome.denied),
         (.expired, .expired),
-        (.refused(code: "invalid_grant", message: "No."), .refused(SignInError.refused(code: "invalid_grant", message: "No.").description)),
-        (.unavailable(message: "offline"), .unreachable("offline")),
-        (.unreadable(message: "locked"), .refused("locked")),
+        (.refused(code: "invalid_grant", message: "No."), .refused),
+        (.unavailable(message: "offline"), .unreachable),
+        (.unreadable(message: "locked"), .notMarfa),
         (.heldElsewhere, .inUse),
     ])
     func aSignInThatDoesNotFinishLeavesTheOldOneAndTheCopyAlone(_ error: SignInError, _ outcome: SignInOutcome) async throws {
@@ -605,15 +634,15 @@ import Testing
     /// that could not be finished.
     @Test func anErrorThatIsNotTheKeychainsIsNotToldAsOne() {
         struct Other: Error, LocalizedError { var errorDescription: String? { "Odd." } }
-        #expect(SignInOutcome(Other()) == .unreachable("Odd."))
-        #expect(SignInOutcome(Keychain.Failure(status: errSecInteractionNotAllowed)) == .keychain(String(describing: Keychain.Failure(status: errSecInteractionNotAllowed))))
+        #expect(SignInOutcome(Other()) == .failed)
+        #expect(SignInOutcome(Keychain.Failure(status: errSecInteractionNotAllowed)) == .keychain)
     }
 
     @Test func aKeychainThatWillNotKeepTheSignInIsToldAsThat() async throws {
         let bench = try HostBench()
         let host = bench.host()
         bench.signIns.script(browser: [.failure(Keychain.Failure(status: errSecInteractionNotAllowed))])
-        await expect(.signIn(.keychain(String(describing: Keychain.Failure(status: errSecInteractionNotAllowed))))) { () throws(MarfaHost.Problem) in
+        await expect(.signIn(.keychain)) { () throws(MarfaHost.Problem) in
             try await host.connect(address: "http://first.test:8210", via: .browser)
         }
         #expect(host.connection == nil)
@@ -643,7 +672,7 @@ import Testing
         let address = first.address
         signIns.script(code: [.success(CodeSignIn(
             code: "ABCD-1234", address: URL(string: "http://first.test:8210/device")!, completeAddress: nil,
-            expiresAt: .distantFuture, finish: { signIns.save("approved", for: address) }))])
+            expiresAt: .distantFuture, finish: { signIns.save("approved", for: address); return SignedIn() }))])
         try await host.connect(address: "http://first.test:8210", via: .code(shown: { code in shown.withLock { $0.append(code.code) } }))
         #expect(shown.withLock { $0 } == ["ABCD-1234"])
         #expect(try signIns.key(for: first.address) == "approved")

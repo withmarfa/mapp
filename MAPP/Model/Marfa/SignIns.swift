@@ -15,14 +15,15 @@ nonisolated protocol SignIns: Sendable {
 
     /// Signs in through the system's web authentication session, which shows the server's own pages over the
     /// window in front. The sign-in is kept before this returns, in place of any kept before.
-    @MainActor func signInWithBrowser(to connection: MarfaConnection) async throws
+    @MainActor func signInWithBrowser(to connection: MarfaConnection) async throws -> SignedIn
 
     /// Starts a device sign-in, for a Mac that cannot use the browser: the person types the code on any device.
     func startCodeSignIn(to connection: MarfaConnection) async throws -> CodeSignIn
 
-    /// Forgets the sign-in on this Mac and revokes it at the server. True where the server confirmed it; where it
-    /// did not, the approval stands there until the owner ends it.
-    func signOut(of connection: MarfaConnection) async throws -> Bool
+    /// Forgets the sign-in on this Mac and revokes it at the server. Only `.notConfirmed` leaves an approval that may
+    /// stand there until the owner ends it. A server that does not answer holds this for up to a minute, since the
+    /// package waits for a renewal in flight.
+    func signOut(of connection: MarfaConnection) async throws -> SignOutOutcome
 }
 
 /// A device sign-in waiting for the person to approve it on another device.
@@ -36,10 +37,17 @@ nonisolated struct CodeSignIn: Sendable {
     /// When the code stops working.
     let expiresAt: Date
     /// Waits until the person decides, then keeps the sign-in. Cancel the task to stop waiting.
-    let finish: @Sendable () async throws -> Void
+    let finish: @Sendable () async throws -> SignedIn
 }
 
-/// Why a sign-in did not finish, in the terms the app words, whichever sign-in it was.
+/// What a finished sign-in left behind that the person may need to act on.
+nonisolated struct SignedIn: Hashable, Sendable {
+    /// The server still holds the approval this sign-in replaced, which only its owner can end there.
+    var replacedApprovalStands = false
+}
+
+/// Why a sign-in did not finish, in the terms the app words, whichever sign-in it was. No case carries a word the
+/// package, the system or the server said: those are logged and never shown.
 nonisolated enum SignInOutcome: Hashable, Sendable {
     /// The person closed the browser or stopped waiting for the code.
     case canceled
@@ -47,17 +55,27 @@ nonisolated enum SignInOutcome: Hashable, Sendable {
     case denied
     /// The code stopped working before the person approved it.
     case expired
-    /// The server refused, or answered what MAPP can't use; the words are the package's.
-    case refused(String)
-    /// The server could not be reached, or the sign-in could not be finished; the words are the package's.
-    case unreachable(String)
+    /// The server refused the sign-in.
+    case refused
+    /// The server could not be reached, or the browser could not open.
+    case unreachable
+    /// The address answered, but not as a Marfa server MAPP can sign in to.
+    case notMarfa
+    /// The approval that came back was not for this sign-in or not from this server, so it was not used.
+    case notVerified
     /// Another process sharing the Keychain held the sign-in too long for the approval to be kept, and the approval
     /// was revoked.
     case inUse
-    /// The Keychain would not keep or give the sign-in; the words are the system's, logged and never shown.
-    case keychain(String)
+    /// The Keychain would not keep or give the sign-in.
+    case keychain
+    /// MAPP had no window to show the server's page over.
+    case noWindow
+    /// Anything else that stopped the sign-in.
+    case failed
 
     init(_ error: any Error) {
+        // A string logged without a privacy level is private, so what the system or server said stays out of the log.
+        let detail = String(describing: error)
         if error is CancellationError {
             self = .canceled
         } else if let error = error as? SignInError {
@@ -65,21 +83,35 @@ nonisolated enum SignInOutcome: Hashable, Sendable {
             case .canceled: self = .canceled
             case .denied: self = .denied
             case .expired: self = .expired
-            case .unavailable(let message): self = .unreachable(message)
+            case .unavailable: self = .unreachable
             case .heldElsewhere: self = .inUse
-            case .stateMismatch, .issuerMismatch, .notSignedIn, .notAServer, .otherServer, .noRedirect, .refused, .unreadable:
-                self = .refused(error.description)
+            case .refused: self = .refused
+            case .stateMismatch, .issuerMismatch: self = .notVerified
+            case .notAServer, .unreadable: self = .notMarfa
+            case .notSignedIn, .otherServer, .noRedirect: self = .failed
             }
+        } else if let error = error as? ASWebAuthenticationSessionError {
+            switch error.code {
+            case .canceledLogin: self = .canceled
+            case .presentationContextNotProvided, .presentationContextInvalid: self = .noWindow
+            @unknown default: self = .failed
+            }
+        } else if error is NoSignInWindow {
+            self = .noWindow
         } else if error is any KeychainRefusal {
-            let message = String(describing: error)
-            // A string logged without a privacy level is private, so the system's words stay out of the log.
-            Telemetry.logger(.library).error("The Keychain refused a sign-in: \(message)")
-            self = .keychain(message)
+            self = .keychain
+        } else if error is URLError {
+            self = .unreachable
         } else {
-            self = .unreachable(error.localizedDescription)
+            self = .failed
         }
+        let outcome = self
+        if outcome != .canceled { Telemetry.logger(.library).error("A sign-in did not finish (\(String(describing: outcome))): \(detail)") }
     }
 }
+
+/// There was no window to show the browser's sign-in over.
+nonisolated struct NoSignInWindow: Error {}
 
 /// An error that says the Keychain, not the server, would not keep or give a sign-in.
 nonisolated protocol KeychainRefusal: Error {}
@@ -129,21 +161,20 @@ nonisolated struct SystemSignIns: SignIns {
         }
     }
 
-    @MainActor func signInWithBrowser(to connection: MarfaConnection) async throws {
-        guard let window = anchor() else {
-            throw SignInError.unavailable(message: "MAPP has no window to show the sign-in over.")
-        }
-        _ = try await authorization(for: connection).signIn(presentingFrom: window)
+    @MainActor func signInWithBrowser(to connection: MarfaConnection) async throws -> SignedIn {
+        guard let window = anchor() else { throw NoSignInWindow() }
+        return SignedIn(replacedApprovalStands: try await authorization(for: connection).signIn(presentingFrom: window).replacedGrantStands)
     }
 
     func startCodeSignIn(to connection: MarfaConnection) async throws -> CodeSignIn {
         let device = try await authorization(for: connection).startDeviceSignIn()
         return CodeSignIn(
             code: device.userCode, address: device.verificationURL, completeAddress: device.verificationURLComplete,
-            expiresAt: device.expiresAt, finish: { _ = try await device.credential() })
+            expiresAt: device.expiresAt,
+            finish: { SignedIn(replacedApprovalStands: try await device.credential().replacedGrantStands) })
     }
 
-    func signOut(of connection: MarfaConnection) async throws -> Bool {
+    func signOut(of connection: MarfaConnection) async throws -> SignOutOutcome {
         try await authorization(for: connection).signOut()
     }
 }

@@ -217,6 +217,16 @@ nonisolated enum Words {
         String(localized: "MAPP couldn’t read this library’s sign-in from the Keychain. Unlock the Keychain and quit and reopen MAPP, or sign in again in Settings.")
     }
 
+    /// A sign-in that replaced another on the same server, where the server still holds the older approval, which
+    /// only its owner can end.
+    static var replacedApprovalTitle: String {
+        String(localized: "The Earlier Approval Is Still on the Server")
+    }
+
+    static var replacedApproval: String {
+        String(localized: "You are signed in, but the server still lists MAPP’s earlier approval. To end it, open Connected apps from Home on the server, choose the older MAPP and select Disconnect.")
+    }
+
     /// A server whose release is older than the oldest this build works with. Asking again cannot clear it, so
     /// the words say to update the server, never what the server said.
     static func serverTooOld(served: String, oldest: String) -> String {

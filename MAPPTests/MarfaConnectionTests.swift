@@ -12,6 +12,19 @@ struct MarfaConnectionTests {
         #expect(try MarfaConnection(address: "https://marfa.example/api/").address.absoluteString == "https://marfa.example/api")
     }
 
+    /// The package names a server by its origin, which leaves out a port the scheme already means, so MAPP does too:
+    /// else one sign-in is two connections, and leaving "the old" one ends the new one's sign-in.
+    @Test(arguments: [
+        ("https://marfa.example:443", "https://marfa.example"), ("HTTPS://Marfa.Example:443/", "https://marfa.example"),
+        ("http://marfa.example:80", "http://marfa.example"), ("https://marfa.example:443/api", "https://marfa.example/api"),
+        ("https://marfa.example:8443", "https://marfa.example:8443"), ("https://marfa.example:80", "https://marfa.example:80"),
+        ("http://marfa.example:443", "http://marfa.example:443"),
+    ])
+    func aPortTheSchemeAlreadyMeansIsLeftOut(_ typed: String, _ address: String) throws {
+        #expect(try MarfaConnection(address: typed).address.absoluteString == address)
+        #expect(try MarfaConnection(address: typed) == MarfaConnection(address: address))
+    }
+
     @Test(arguments: ["ftp://marfa.example", "marfa.example", "http://", "https://user:secret@marfa.example", "https://marfa.example/?key=1", ""])
     func anAddressThatNamesNoServerIsRefused(_ text: String) {
         #expect(throws: MarfaConnection.Problem.notAServer) { try MarfaConnection(address: text) }

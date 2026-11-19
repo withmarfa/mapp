@@ -302,16 +302,22 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             Notice(
                 title: String(localized: "The Code Expired"),
                 message: String(localized: "The code stopped working before it was approved. Ask for a new code and approve it sooner."))
-        case .refused(let message):
+        case .refused:
             Notice(
                 title: String(localized: "The Server Refused the Sign-In"),
-                message: sentences(String(localized: "Nothing changed."), message))
-        case .unreachable(let message):
+                message: String(localized: "The server wouldn’t approve MAPP, so nothing changed. Check that you are signing in to the right server and account, then try again."))
+        case .unreachable:
             Notice(
                 title: String(localized: "Can’t Reach the Server"),
-                message: sentences(
-                    String(localized: "MAPP couldn’t finish signing in. Check the address and your connection, then try again, or use a code if the browser won’t open."),
-                    message))
+                message: String(localized: "MAPP couldn’t finish signing in. Check the address and your connection, then try again, or use a code if the browser won’t open."))
+        case .notMarfa:
+            Notice(
+                title: String(localized: "Check the Address"),
+                message: String(localized: "That address isn’t a Marfa server MAPP can sign in to. Check the address, then try again."))
+        case .notVerified:
+            Notice(
+                title: String(localized: "Couldn’t Confirm the Sign-In"),
+                message: String(localized: "The approval didn’t come from this server, so MAPP didn’t use it and nothing changed. Try signing in again."))
         case .inUse:
             Notice(
                 title: String(localized: "The Sign-In Is in Use"),
@@ -320,6 +326,14 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             Notice(
                 title: String(localized: "Can’t Keep the Sign-In"),
                 message: String(localized: "The Keychain wouldn’t keep or give the sign-in. Check that MAPP can use the Keychain, then try again."))
+        case .noWindow:
+            Notice(
+                title: String(localized: "No Window to Sign In From"),
+                message: String(localized: "MAPP needs a window to show the server’s sign-in page over. Open a MAPP window, then try again, or use a code instead."))
+        case .failed:
+            Notice(
+                title: String(localized: "Couldn’t Sign In"),
+                message: String(localized: "Something went wrong while signing in, so nothing changed. Try again, or use a code if the browser won’t open."))
         }
     }
 

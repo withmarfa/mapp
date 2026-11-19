@@ -9,7 +9,9 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
         case notAServer
     }
 
-    /// Scheme and host in lower case and no trailing slash, so one server is one address however it was typed.
+    /// Scheme and host in lower case, no trailing slash and no port the scheme already means (443 for https, 80 for
+    /// http), so one server is one address however it was typed, and the package, which names a server by its origin
+    /// the same way, keeps one sign-in for it.
     let address: URL
 
     init(address text: String) throws(Problem) {
@@ -22,6 +24,7 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
         else { throw .notAServer }
         components.scheme = scheme
         components.host = host.lowercased()
+        if (scheme == "https" && components.port == 443) || (scheme == "http" && components.port == 80) { components.port = nil }
         while components.path.hasSuffix("/") { components.path.removeLast() }
         guard let address = components.url else { throw .notAServer }
         self.address = address

@@ -514,18 +514,20 @@ import Observation
     private func signIn(to connection: MarfaConnection, via method: SignInMethod) async throws(Problem) {
         isSigningIn = true
         defer { isSigningIn = false }
+        let signedIn: SignedIn
         do {
             switch method {
             case .browser:
-                try await signIns.signInWithBrowser(to: connection)
+                signedIn = try await signIns.signInWithBrowser(to: connection)
             case .code(let shown):
                 let code = try await signIns.startCodeSignIn(to: connection)
                 shown(code)
-                try await code.finish()
+                signedIn = try await code.finish()
             }
         } catch {
             throw .signIn(SignInOutcome(error))
         }
+        if signedIn.replacedApprovalStands { notices.tell(Words.replacedApprovalTitle, Words.replacedApproval) }
     }
 
     /// Whether the Keychain holds a sign-in for `connection` that can be used, read where the main actor never waits.
@@ -636,9 +638,10 @@ import Observation
     }
 
     /// Takes a save made in This Marfa: reads the server's name again where it changed, and gives the open library
-    /// the server's answer, for the server the windows show.
-    func instanceSaved(_ answer: InstanceConfig, changing settings: Set<InstanceSetting>) {
-        guard let connection, connection == configuredConnection else { return }
+    /// the server's answer, for the server the windows show. A save sent to `address` that
+    /// answers after the app has moved to another server is dropped.
+    func instanceSaved(_ answer: InstanceConfig, changing settings: Set<InstanceSetting>, of address: String) {
+        guard let connection, connection.address.absoluteString == address else { return }
         if settings.contains(.name) { readName(of: connection) }
         library?.take(answer)
     }

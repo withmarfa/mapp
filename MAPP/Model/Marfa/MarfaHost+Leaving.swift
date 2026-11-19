@@ -82,9 +82,9 @@ extension MarfaHost {
         var signIn: String?
         var copy: String?
         var kept: CopyKept?
-        var revoked = true
+        var outcome = SignOutOutcome.endedAtServer
         do {
-            revoked = try await signIns.signOut(of: connection)
+            outcome = try await signIns.signOut(of: connection)
         } catch {
             signIn = Self.message(error)
         }
@@ -101,7 +101,7 @@ extension MarfaHost {
         }
         if let kept { return .copyKept(kept, signIn: signIn) }
         if signIn != nil || copy != nil { return .notRemoved(signIn: signIn, copy: copy) }
-        return revoked ? nil : .notRevoked
+        return outcome == .notConfirmed ? .notRevoked : nil
     }
 
     var discarded: [String: Agreed] {
