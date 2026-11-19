@@ -23,6 +23,14 @@ nonisolated enum SettingsPage: String, CaseIterable, Identifiable, Hashable, Sen
         }
     }
 
+    /// A line under the title, for a page that has one.
+    var summary: String? {
+        switch self {
+        case .sidebar: String(localized: "Or Control-click the sidebar and choose Customize Sidebar.")
+        default: nil
+        }
+    }
+
     var symbol: String {
         switch self {
         case .appearance: "paintpalette"

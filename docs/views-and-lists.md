@@ -1,8 +1,8 @@
 # Views and lists
 
-Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built in v0.0.45. The table's margin, whole-cell hover and add to an empty cell, the palettes' bar, rows and material setting, and the selection and hover greys and the favorite's heart as described below, are built, not yet released, as is Collections and Sources as a table with tabs. See [Looks](looks.md).
+Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built in v0.0.45. The table's margin, whole-cell hover and add to an empty cell, the palettes' bar, rows and material setting, and the selection and hover greys and the favorite's heart as described below, are built, not yet released, as is Collections and Sources as a table with tabs, the sidebar customized in place and Settings > Sidebar. See [Looks](looks.md).
 
-Where it lives: `Browser`, `ItemViewMode`, `ViewLayouts`, `SidebarLayout`, `IndexPlace`, `IndexTab`, `IndexSort`, `IndexPreferences` and `IndexChoice` under `MAPP/Model/`, with `IndexRow`, `IndexRows`, `CardContents`, `ItemTableLayout`, `ItemTimelineLayout`, `ItemPlacement`, `EventSpan` and `CalendarLayout` under `MAPP/Model/Items/`; `ItemList`, `ItemRow`, `ItemGallery`, `GalleryCard`, `ItemBoard`, `ItemTable`, `ItemTableCell`, `SoftSelection`, `ChipLine`, `ItemTimeline`, `ItemCalendar`, `SidebarIndex`, `IndexPage`, `IndexInspector`, `IndexViewOptions`, `CalendarToolbarItems`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
+Where it lives: `Browser`, `ItemViewMode`, `ViewLayouts`, `SidebarLayout`, `IndexPlace`, `IndexTab`, `IndexSort`, `IndexPreferences` and `IndexChoice` under `MAPP/Model/`, with `IndexRow`, `IndexRows`, `CardContents`, `ItemTableLayout`, `ItemTimelineLayout`, `ItemPlacement`, `EventSpan` and `CalendarLayout` under `MAPP/Model/Items/`; `ItemList`, `ItemRow`, `ItemGallery`, `GalleryCard`, `ItemBoard`, `ItemTable`, `ItemTableCell`, `SoftSelection`, `ChipLine`, `ItemTimeline`, `ItemCalendar`, `SidebarIndex`, `SidebarSettings`, `SidebarSettingsPlan`, `SidebarColorPicker`, `IndexPage`, `IndexInspector`, `IndexViewOptions`, `CalendarToolbarItems`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
 
 A view shows a set of items in a layout. This page explains the layouts, what a saved view is, and the controls that change what a list shows.
 
@@ -88,7 +88,7 @@ Built, not yet released.
 
 ## Sidebar
 
-Status: the sidebar customized in place is built, not yet released. Settings > Sidebar is built as it was: it switches places on or off and reorders them within Library, Views and Types, and knows nothing of tabs, sections or colors. Its redesign is agreed and not built ([Agreed designs](agreed-designs.md)).
+Status: the sidebar customized in place and Settings > Sidebar are built, not yet released.
 
 The sidebar is a list of sections. A new library has four, in one tab: the shortcuts New and Search, Library (Items, Sources and Collections), Views (Inbox, Recents, Favorites and the saved views) and Types. The arrangement is kept for each server (`sidebarLayouts`).
 
@@ -97,7 +97,16 @@ The sidebar is a list of sections. A new library has four, in one tab: the short
 - **A section's menu** (at its heading while customizing) has Show (which rows the section lists), Rename, Move Up, Move Down, Move to Tab (including a new tab) and Hide Section. A section's handle drags it onto another section of the tab. Hiding a built-in section keeps it, and Add Section brings it back; hiding a section of the person's own removes it. Add Section also adds a new section, alone or holding a collection or a source.
 - **Rows.** A section of Library, Views or the person's own can hold views, collections and sources. A row whose view, collection or source is gone, or has not synced yet, is left out and the section stays; the layout still holds it, so the row returns with it. A section that holds only its own places keeps the order of the sidebar's blocks (the Library's three, then Inbox, Recents and Favorites, then the saved views); once a row is dragged or moved into it, the section is one list in the person's order. Removing a section the person made frees the collections and sources in it to be added again. A row's context menu has Move to Section and Hide from Sidebar. The Types section lists top-level types while customizing.
 - **Shortcuts** are rows that act or go somewhere and never take the selection: New, Search, Settings, a place to go to, or a kind of item to create. A new library has New and Search; no shortcut makes an item of a type the person made. Add Shortcut adds one to the tab, and a shortcut's context menu removes it.
-- **A view's mark** is its symbol in its own color, with no tile: Inbox is blue, Favorites pink and the other views gray until the person chooses a color from the view's context menu. The choice is kept on this Mac.
+- **A view's mark** is its symbol in its own color, with no tile: Inbox is blue, Favorites pink and the other views gray until the person chooses a color from the view's context menu or from Settings > Sidebar. The choice is kept on this Mac.
+
+### Settings > Sidebar
+
+Settings > Sidebar (`SidebarSettings`) customizes the layout the sidebar reads, so it does what customizing in place does and no more. A change applies at once and is kept on this Mac, and the sidebar follows live; customizing in place while Settings is open shows the same state. `SidebarSettingsPlan` works out what each row says from the same `SidebarPlan` the sidebar reads, and the page has no copy of the layout.
+
+- **Tabs.** A card lists each tab with its symbol and name and a Rename button; Add Tab is under it, and Remove Tab is in a tab's menu where there is more than one. With one tab the card says the sidebar shows no tab bar.
+- **Each tab's sections.** A card for each tab, titled with its name, lists its sections in the sidebar's order. A row has the section's mark, its name, one line (two at most) of what it holds, a Show menu where it has rows to choose (the count is how many are shown), a switch that hides it from the sidebar, and a handle. A hidden built-in section stays in its card, dimmed, so its switch brings it back where it was; the Types section reads as off whichever way the sidebar hides it, including a layout whose Show Types was switched off in an earlier Settings. The Types section's Show menu lists the top-level types and any subtype hidden from its own row, so a hidden subtype can come back. A section the person made has a Remove button in the switch's place. A row's menu renames it (not Shortcuts), moves it up or down or to another tab, and hides or shows it. A tab with no sections says so. Add Section adds a new section, alone or holding a collection or a source that has no row yet. Sections drag to reorder within a tab.
+- **Views.** A card lists Inbox, Recents, Favorites and the saved views in the sidebar's order, each with its symbol in its color, a color menu, a switch and a handle. A view deleted in Marfa, or not synced yet, has no row. With the saved views hidden as a whole (from the Views section's Show menu) their rows stay but cannot be switched. Rows drag to reorder, and Move Up and Move Down in a row's menu do the same, from the order the rows are drawn in, whatever order an earlier Settings stored.
+- **Subtype icons.** When the library has types, a small card holds Show Icons on Subtypes, which the Types section reads.
 
 Opening and closing sections, and parent types in the sidebar, are not built.
 
@@ -141,6 +150,8 @@ Settings is a place in the sidebar. See [Settings storage](settings-storage.md) 
 - Rows are 37 points high, rows of buttons are 44 points, and boxes sit 56 points apart.
 - Push buttons are gray with no edge.
 - The density setting is in the Lists pane, after Appearance.
+
+Settings keeps its structure: the app's sidebar, the Settings list, then the page. A page is a column of sections. Each section has its title outside one card of rows, and a row's description is one line, two at most. A page may have a line under its title (`SettingsPage.summary`). Sidebar is built to this ([Settings > Sidebar](#settings--sidebar)); the other pages are being redesigned to it ([Agreed designs](agreed-designs.md)).
 
 ## The list's rows
 

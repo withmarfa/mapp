@@ -30,13 +30,18 @@ struct SettingsPageView: View {
     }
 
     private var header: some View {
-        Text(page.title)
-            .interfaceFont(.title.weight(.semibold))
-            .accessibilityAddTraits(.isHeader)
-            .padding(.horizontal, Self.headerInset)
-            .padding(.top, 32)
-            .padding(.bottom, 8)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 4) {
+            Text(page.title)
+                .interfaceFont(.title.weight(.semibold))
+                .accessibilityAddTraits(.isHeader)
+            if let summary = page.summary {
+                Text(summary).interfaceFont(.body).foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, Self.headerInset)
+        .padding(.top, 32)
+        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// Where a grouped form starts its text: the form's own margin, then the section's inset.

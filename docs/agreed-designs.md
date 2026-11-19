@@ -6,13 +6,6 @@ Where it lives: not built yet.
 
 This page lists what has been agreed for MAPP and is not in the app yet, so the next build starts from one list. What was turned down is in [Rejected designs](rejected-designs.md).
 
-## Settings > Sidebar
-
-Customizing the sidebar in place is built (see [Views and lists](views-and-lists.md)). What is left is its page in Settings, which today only switches places on or off and reorders them.
-
-- Settings > Sidebar customizes the same layout: the tabs, each tab's sections, and the views with their colors.
-- A person chooses a view's color there as well as from the view's context menu. The color is kept on this Mac.
-
 ## Items as an index
 
 - Items is an index page like Collections and Sources: a table with no list column. Views and types keep the list column.
@@ -86,9 +79,7 @@ What is not built yet. The built part is in [Value components](value-components.
 
 ## Settings
 
-- Settings keeps its structure: the app's sidebar, the Settings list, then the page.
-- A page is a column of sections. Each section has its title outside one card of rows. A row's description is one line, two at most.
-- Settings > Sidebar is agreed: the tabs, each tab's sections, and the views with their colors. The other pages are being redesigned.
+- The other pages of Settings (Appearance, Lists, Library and Types) are being redesigned to the rules on the Settings page of [Views and lists](views-and-lists.md#settings), as Sidebar was.
 
 ## Still open
 
