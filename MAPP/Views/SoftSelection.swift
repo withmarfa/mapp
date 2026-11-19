@@ -131,6 +131,7 @@ struct SoftSelection: NSViewRepresentable {
         /// The mark under the pointer, when rows have one, and whether the pointer is over the table.
         private let hoverMark: CALayer?
         private var pointerIsOver = false
+        private var placedHover: (frame: NSRect?, color: CGColor)?
         /// How many rows beyond the visible ones are marked.
         private static let overscan = 10
 
@@ -229,7 +230,8 @@ struct SoftSelection: NSViewRepresentable {
         }
 
         /// Puts the faint mark on the row under the pointer: not on a row that is chosen, which has its own, nor on
-        /// one the table would not select, such as a heading.
+        /// one the table would not select, such as a heading. It places nothing while the pointer stays on the same
+        /// row, since a move inside a row is most of the events.
         private func updateHover() {
             guard let hoverMark, let table else { return }
             var row = -1
@@ -238,15 +240,18 @@ struct SoftSelection: NSViewRepresentable {
             }
             if row >= 0, table.isRowSelected(row) || table.rowView(atRow: row, makeIfNecessary: false)?.isSelected == true { row = -1 }
             if row >= 0, table.delegate?.tableView?(table, shouldSelectRow: row) == false { row = -1 }
+            let frame = row >= 0 ? Self.rect(ofRow: row, in: table) : nil
             var color = CGColor.clear
             effectiveAppearance.performAsCurrentDrawingAppearance {
                 color = NSColor.labelColor.withAlphaComponent(0.047).cgColor
             }
+            if let placedHover, placedHover.frame == frame, placedHover.color == color { return }
+            placedHover = (frame, color)
             CATransaction.begin()
             CATransaction.setDisableActions(true)
-            hoverMark.isHidden = row < 0
-            if row >= 0 {
-                hoverMark.frame = Self.rect(ofRow: row, in: table)
+            hoverMark.isHidden = frame == nil
+            if let frame {
+                hoverMark.frame = frame
                 hoverMark.backgroundColor = color
             }
             CATransaction.commit()

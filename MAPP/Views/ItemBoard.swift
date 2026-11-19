@@ -299,15 +299,16 @@ private struct BoardCell<Actions: View>: View {
     }
 }
 
-/// The selected card's soft grey fill. It reads the selection itself, so a selection that moves redraws these and no card.
+/// The selected card's soft ring: 3 points wide in the grey of a chosen row, touching the card, as the gallery's. It reads the selection itself, so a selection that moves redraws these and no card.
 private struct BoardSelection: View {
     let browser: Browser
     let id: ItemID
 
     var body: some View {
         if browser.selection.contains(id) {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color(nsColor: .labelColor).opacity(0.08))
+            RoundedRectangle(cornerRadius: 10 + 3)
+                .strokeBorder(Color(nsColor: .labelColor).opacity(0.08), lineWidth: 3)
+                .padding(-3)
                 .allowsHitTesting(false)
         }
     }
