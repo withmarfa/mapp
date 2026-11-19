@@ -4600,6 +4600,9 @@
     "This place can’t be saved as a view" : {
       "extractionState" : "manual"
     },
+    "This server runs Marfa %@. Update the server to Marfa %@ or later to use this app." : {
+      "extractionState" : "manual"
+    },
     "This value changed while you were editing. Your edit hasn’t been saved." : {
       "extractionState" : "manual"
     },
