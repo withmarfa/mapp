@@ -24,7 +24,7 @@ struct WindowToolbar: CustomizableToolbarContent {
     var body: some CustomizableToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details, fileURL: fileURL)
         let showsItem = browser?.showsSidebarIndex != true
-        let opensFromCollection = browser.map { $0.usesCollection && !$0.showsCollection } == true && !hasListColumn
+        let opensFromCollection = browser?.isCollectionItemPresented == true && !hasListColumn
         ToolbarItem(id: "newItem") {
             NewItemButton(browser: browser)
         }
@@ -32,7 +32,10 @@ struct WindowToolbar: CustomizableToolbarContent {
         // A navigation item that is merely hidden still moves the title in a collection, so these two come and go.
         if let browser, opensFromCollection {
             ToolbarItem(id: "backToCollection", placement: .navigation) {
-                Button(String(localized: browser.viewMode.backTitle), systemImage: "chevron.backward") { browser.returnToCollection() }
+                // A plain arrow with no label: it goes back to wherever the page was opened from.
+                Button("Back", systemImage: "chevron.backward") { browser.returnToCollection() }
+                    .labelStyle(.iconOnly)
+                    .help("Back")
                     .accessibilityIdentifier("BackToGallery")
             }
             .customizationBehavior(.disabled)
@@ -238,7 +241,7 @@ struct InspectorToolbar: CustomizableToolbarContent {
     var browser: Browser?
 
     var body: some CustomizableToolbarContent {
-        if details.isPresented {
+        if details.isPresented, browser?.isModalPresented != true {
             if let browser, details.isEditingView, let panel = browser.viewPanel {
                 ViewPanelToolbar(browser: browser, panel: panel, editor: editor)
             } else {
@@ -447,8 +450,11 @@ private struct MoreMenu: View {
     var body: some View {
         let item = pageItems.count == 1 ? pageItems.first : nil
         Menu("More", systemImage: "ellipsis") {
-            command(.quickLook)
+            command(.open)
+            command(.openAsModal)
+            command(.openAsFullPage)
             command(.openInNewWindow)
+            command(.quickLook)
             command(.openOriginal)
             command(.openInBrowser)
             ItemShareLink(share: ItemShare(item: item, fileURL: fileURL, in: library), showsIcon: false)

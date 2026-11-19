@@ -6,7 +6,6 @@ struct ItemList: View, Equatable {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
-    @Environment(\.openWindow) private var openWindow
     let browser: Browser
     let order: ItemOrder
     var pane: FocusState<Browser.Pane?>.Binding
@@ -84,9 +83,9 @@ struct ItemList: View, Equatable {
             if !isPending { browser.keepHeldSelection(in: ids) }
         }
         .contextMenu(forSelectionType: ItemID.self) { ids in
-            ItemActions(ids: ids, undoManager: undoManager)
+            ItemRowMenu(browser: browser, ids: ids, undoManager: undoManager)
         } primaryAction: { ids in
-            ItemWindows.open(library.idsForWindows(ids)) { openWindow(value: $0) }
+            browser.open(ids)
         }
         .overlay { emptyState(isEmpty: ids.isEmpty) }
         .navigationTitle(title)

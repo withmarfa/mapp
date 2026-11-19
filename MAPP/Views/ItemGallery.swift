@@ -5,7 +5,6 @@ struct ItemGallery: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
-    @Environment(\.openWindow) private var openWindow
     @Environment(\.interfaceTextSize) private var textSize
     @Bindable var browser: Browser
     let order: ItemOrder
@@ -154,9 +153,7 @@ struct ItemGallery: View {
         }
         .quickLooksOnSpace(browser)
         .onKeyPress(.return) {
-            guard browser.selection.count == 1 else { return .ignored }
-            browser.openCollectionSelection()
-            return .handled
+            browser.openSelection() ? .handled : .ignored
         }
         .onKeyPress(.escape) {
             browser.selection = []
@@ -202,7 +199,6 @@ struct ItemGallery: View {
 private struct GalleryCell: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
-    @Environment(\.openWindow) private var openWindow
     let item: Item
     let browser: Browser
     let order: ItemOrder
@@ -229,8 +225,7 @@ private struct GalleryCell: View {
         .wantsCounts(of: item.id, content.countQueries, in: library.counts)
         .contentShape([.interaction, .accessibility], .rect(cornerRadius: 10))
         .simultaneousGesture(TapGesture(count: 2).onEnded {
-            browser.selection = [item.id]
-            browser.openCollectionSelection()
+            browser.open([item.id])
         })
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(item.displayTitle)
@@ -243,17 +238,10 @@ private struct GalleryCell: View {
             pane.wrappedValue = .list
         }
         .accessibilityAction(named: Text("Open")) {
-            browser.selection = [item.id]
-            browser.openCollectionSelection()
+            browser.open([item.id])
         }
         .contextMenu {
-            let selected = browser.selection.contains(item.id) ? browser.selection : [item.id]
-            Button("Open") { browser.selection = [item.id]; browser.openCollectionSelection() }
-            Button("Open in New Window", systemImage: "macwindow") {
-                ItemWindows.open(library.idsForWindows(selected)) { openWindow(value: $0) }
-            }
-            Divider()
-            ItemActions(ids: selected, undoManager: undoManager)
+            ItemRowMenu(browser: browser, ids: browser.selection.contains(item.id) ? browser.selection : [item.id], undoManager: undoManager)
         }
         .draggable(containerItemID: item.id)
         .dropsInto(collection: library.catalogue.isCollection(item.type) ? item.id : nil, browser: browser, order: order)

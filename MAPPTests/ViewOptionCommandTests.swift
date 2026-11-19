@@ -71,7 +71,7 @@ struct ViewOptionCommandTests {
             // The fixture has no date, so the timeline has nothing to offer even while it shows.
             if mode != .timeline { #expect(!Self.titles(browser, library).isEmpty, "\(mode) while it shows") }
             browser.selection = [ItemID("A")]
-            browser.openCollectionSelection()
+            browser.open(browser.selection, as: .fullPage)
             #expect(!browser.showsCollection)
             #expect(Self.titles(browser, library).isEmpty, "\(mode) with an item page open")
             #expect(!browser.offersViewOptions)

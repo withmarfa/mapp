@@ -79,7 +79,7 @@ struct ItemCommandContext {
 /// once here: its title, symbol, shortcut, when it applies and what it does. A menu shows every one of them and
 /// dims the ones that do not apply, so the two menus never differ in what they offer or when.
 enum ItemCommand: CaseIterable {
-    case quickLook, openInNewWindow, openOriginal, openInBrowser, addAttachment, toggleSource, toggleReader, print, exportPDF
+    case open, openAsModal, openAsFullPage, quickLook, openInNewWindow, openOriginal, openInBrowser, addAttachment, toggleSource, toggleReader, print, exportPDF
 
     /// The menu the menu bar puts it in, which is where ⌘K lists it: Add Attachment under Edit, the two ways of
     /// showing the page under View, and the rest under File.
@@ -87,12 +87,15 @@ enum ItemCommand: CaseIterable {
         switch self {
         case .addAttachment: .edit
         case .toggleSource, .toggleReader: .view
-        case .quickLook, .openInNewWindow, .openOriginal, .openInBrowser, .print, .exportPDF: .file
+        case .open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow, .openOriginal, .openInBrowser, .print, .exportPDF: .file
         }
     }
 
     func title(in context: ItemCommandContext) -> LocalizedStringResource {
         switch self {
+        case .open: "Open"
+        case .openAsModal: ItemOpening.modal.commandTitle
+        case .openAsFullPage: ItemOpening.fullPage.commandTitle
         case .quickLook: "Quick Look"
         case .openInNewWindow: "Open in New Window"
         case .openOriginal: "Open Original"
@@ -107,6 +110,9 @@ enum ItemCommand: CaseIterable {
 
     var systemImage: String {
         switch self {
+        case .open: "arrow.up.right"
+        case .openAsModal: ItemOpening.modal.symbol
+        case .openAsFullPage: ItemOpening.fullPage.symbol
         case .quickLook: "eye"
         case .openInNewWindow: "macwindow"
         case .openOriginal, .openInBrowser: "safari"
@@ -124,13 +130,16 @@ enum ItemCommand: CaseIterable {
         case .openInNewWindow: KeyboardShortcut("o")
         case .addAttachment: KeyboardShortcut("a", modifiers: [.command, .shift])
         case .print: KeyboardShortcut("p")
-        case .quickLook, .openOriginal, .openInBrowser, .toggleSource, .toggleReader, .exportPDF: nil
+        case .open, .openAsModal, .openAsFullPage, .quickLook, .openOriginal, .openInBrowser, .toggleSource, .toggleReader, .exportPDF: nil
         }
     }
 
     func isEnabled(in context: ItemCommandContext) -> Bool {
         guard context.library != nil else { return false }
         return switch self {
+        case .open: context.hasBrowser && ItemOpening.stored().canOpen(context.ids.count)
+        case .openAsModal: context.hasBrowser && ItemOpening.modal.canOpen(context.ids.count)
+        case .openAsFullPage: context.hasBrowser && ItemOpening.fullPage.canOpen(context.ids.count)
         case .quickLook, .openInNewWindow: context.hasBrowser && !context.ids.isEmpty
         case .openOriginal: context.originalAddress != nil
         case .openInBrowser: context.browserTarget != nil
@@ -144,6 +153,9 @@ enum ItemCommand: CaseIterable {
     func perform(in context: ItemCommandContext, editor: EditorController?, openWindow: @escaping (ItemID) -> Void) {
         guard isEnabled(in: context), let library = context.library else { return }
         switch self {
+        case .open: context.browser?.open(context.ids)
+        case .openAsModal: context.browser?.open(context.ids, as: .modal)
+        case .openAsFullPage: context.browser?.open(context.ids, as: .fullPage)
         case .quickLook: if let browser = context.browser { Task { await browser.quickLookSelection(in: library) } }
         case .openInNewWindow: ItemWindows.open(library.idsForWindows(context.ids), opening: openWindow)
         case .openOriginal: context.originalAddress.map { _ = NSWorkspace.shared.open($0) }

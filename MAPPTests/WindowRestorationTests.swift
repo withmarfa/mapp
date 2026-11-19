@@ -55,7 +55,7 @@ struct WindowBringBackTests {
         let saved = Browser()
         saved.viewMode = .gallery
         saved.selection = [newer.id]
-        saved.openCollectionSelection()
+        saved.open(saved.selection, as: .fullPage)
         #expect(!saved.showsCollection)
         let back = try restored(saved, in: library)
         #expect(!back.showsCollection, "the item is open, not the grid behind it")
@@ -75,7 +75,7 @@ struct WindowBringBackTests {
         let saved = Browser()
         saved.viewMode = .gallery
         saved.selection = [newer.id]
-        saved.openCollectionSelection()
+        saved.open(saved.selection, as: .fullPage)
         library.items.removeAll { $0.id == newer.id }
         #expect(try restored(saved, in: library).showsCollection, "another item is chosen in its stead")
     }

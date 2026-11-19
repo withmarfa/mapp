@@ -6,6 +6,7 @@ struct MainView: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
     @Environment(\.undoManager) private var undoManager
+    @Environment(\.openWindow) private var openWindow
     @State private var browser = Browser()
     @State private var editorSlot = EditorSlot()
     @State private var details = DetailsPresentation()
@@ -42,9 +43,10 @@ struct MainView: View {
 
     var body: some View { lifecycleWindow }
 
-    /// The gallery and the table have no list column, so they mount the two-column split view. Settings
-    /// shows in the three-column one, in place of the list and the page, whatever the window is set to show.
-    private var usesCollectionLayout: Bool { browser.usesCollection && !browser.showsSettings }
+    /// The gallery and the table have no list column, so they mount the two-column split view, as does the list while
+    /// an item is open as a full page. Settings shows in the three-column one, in place of the list and the page,
+    /// whatever the window is set to show.
+    private var usesCollectionLayout: Bool { (browser.usesCollection || browser.isCollectionItemPresented) && !browser.showsSettings }
 
     private var workspacePresentation: WorkspacePresentation {
         if browser.showsSettings { return .settings }
@@ -66,6 +68,13 @@ struct MainView: View {
             heldViewMode = isOpen ? browser.viewMode : nil
         })
         .onChange(of: workspacePresentation) {
+            editor.flush()
+            // Version History takes the whole window, which the modal would otherwise stay over.
+            if workspacePresentation == .history { browser.closeModal(returningFocus: false) }
+        }
+        // What the modal held is saved as it opens and as it closes, and the page goes back to the layout.
+        .onChange(of: browser.isModalPresented) { _, isOpen in
+            if !isOpen { editor.releaseFocus() }
             editor.flush()
         }
         .onChange(of: appearsActive, initial: true) {
@@ -125,7 +134,10 @@ struct MainView: View {
                 SettingsPageView(page: browser.settingsPage, browser: browser)
                     .toastOverlay()
             } else {
-                itemPage
+                // The modal holds the window's one editor while it is open, so the page beside the list steps aside.
+                Group {
+                    if browser.isModalPresented { Color.clear } else { itemPage }
+                }
                     .toastOverlay()
                     .modifier(itemInspector(WindowToolbarLayout.list))
                     .toolbar(id: WindowToolbarLayout.list) { windowToolbar(hasListColumn: true) }
@@ -229,6 +241,15 @@ struct MainView: View {
                 RecentlyDeletedActions(chosen: browser.selectedItems(in: library))
             }
         }
+        .overlay {
+            ZStack {
+                if browser.isModalPresented {
+                    ItemModal(browser: browser, editor: editor, details: details)
+                        .transition(.opacity)
+                }
+            }
+            .animation(.easeOut(duration: 0.15), value: browser.isModalPresented)
+        }
         .focusedSceneValue(\.detailsPresentation, details)
         .modifier(CommandValuePanels(details: details))
         .modifier(FieldEditSheets(details: details))
@@ -306,7 +327,13 @@ struct MainView: View {
             }
             editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
             editor.onEscape = { [browser, details, library] in
-                if details.isEditingView { browser.escapeViewPanel(in: library) } else if details.isCustomizingLayout { details.endLayout() } else { browser.focusRequest = .list }
+                if details.isEditingView { browser.escapeViewPanel(in: library) }
+                else if details.isCustomizingLayout { details.endLayout() }
+                else if browser.isModalPresented { browser.closeModal() }
+                else { browser.focusRequest = .list }
+            }
+            browser.windowOpener = { [library, openWindow] ids in
+                ItemWindows.open(library.idsForWindows(ids)) { openWindow(value: $0) }
             }
             editor.onOpenItem = { [browser, library, order] id in
                 if let item = library.item(id) { browser.open(linked: item, in: library, order: order) }
@@ -381,6 +408,7 @@ struct MainView: View {
         switch browser.focusRequest {
         case .search:
             if browser.usesCollection { browser.isCollectionItemPresented = false }
+            browser.closeModal(returningFocus: false)
             browser.isSearchExpanded = true
             browser.searchFocusRequests += 1
         case .sidebar, .list:
@@ -389,7 +417,8 @@ struct MainView: View {
             let request = browser.focusRequest
             Task { pane = request }
         case .page, .title:
-            if browser.showsCollection { browser.isCollectionItemPresented = true }
+            // The modal's own page takes the request, and no full page is opened behind it.
+            if browser.showsCollection, !browser.isModalPresented { browser.isCollectionItemPresented = true }
             return
         case nil: return
         }
@@ -421,7 +450,8 @@ private struct ItemInspectorColumn: ViewModifier {
     }
 
     func body(content: Content) -> some View {
-        content.inspector(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
+        // While the modal is open its own sidebar shows the details, so this one is out and only one is mounted.
+        content.inspector(isPresented: Binding { details.isPresented && !browser.isModalPresented } set: { details.isPresented = $0 }) {
             ItemInspectorHost(browser: browser, details: details, editor: editor)
                 .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { newWidth in
                     guard details.isPresented, Self.isDraggingEdge(ofSidebarWidth: newWidth) else { return }

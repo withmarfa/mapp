@@ -40,8 +40,11 @@ struct AppCommands: Commands {
             // Sharing an item reads one item; the commands below act on files too.
             let shown = ids.compactMap { library?.item($0) }.filter { !$0.isFile }
             let one = ids.count == 1 ? shown.first : nil
-            command(.quickLook)
+            command(.open)
+            command(.openAsModal)
+            command(.openAsFullPage)
             command(.openInNewWindow)
+            command(.quickLook)
             command(.openOriginal)
             command(.openInBrowser)
             Divider()
@@ -122,7 +125,7 @@ struct AppCommands: Commands {
             // The page uses the same keys to outdent and indent a list item and to move between table cells, so
             // while it has the keyboard the menu items give the keys up (the items still work from the menu).
             Button(String(localized: browser?.viewMode.backTitle ?? "Back"), systemImage: "chevron.backward") {
-                if browser?.usesCollection == true { browser?.returnToCollection() }
+                if browser?.isCollectionItemPresented == true { browser?.returnToCollection() }
                 else if let browser, let library { browser.go(.back, in: library) }
             }
                 .keyboardShortcut(pageKeepsHistoryKeys ? nil : KeyboardShortcut("[", modifiers: .command))
@@ -132,6 +135,16 @@ struct AppCommands: Commands {
             }
                 .keyboardShortcut(pageKeepsHistoryKeys ? nil : KeyboardShortcut("]", modifiers: .command))
                 .disabled(!canGoForward)
+            Divider()
+            // The modal's own moves: through the items behind it, and out.
+            Button("Previous Item", systemImage: "chevron.up") { step(.previous) }
+                .keyboardShortcut(.upArrow, modifiers: [.command, .option])
+                .disabled(!canStep(.previous))
+            Button("Next Item", systemImage: "chevron.down") { step(.next) }
+                .keyboardShortcut(.downArrow, modifiers: [.command, .option])
+                .disabled(!canStep(.next))
+            Button("Close Modal", systemImage: "xmark") { browser?.closeModal() }
+                .disabled(browser?.isModalPresented != true)
             Divider()
         }
 
@@ -152,14 +165,26 @@ extension AppCommands {
     /// The page keeps Command-[ and Command-] while it has the keyboard (outdent and indent a list item, move between table cells), so Back and Forward give those keys up then.
     private var pageKeepsHistoryKeys: Bool { editor?.isFocused == true }
 
+    /// Whether the modal has an item to go to, which it has only while it is open and not at an end of the list behind it.
+    private func canStep(_ step: Browser.ModalStep) -> Bool {
+        guard let browser, let library, browser.isModalPresented else { return false }
+        let neighbors = browser.modalNeighbors(in: library, order: order)
+        return (step == .previous ? neighbors.previous : neighbors.next) != nil
+    }
+
+    private func step(_ step: Browser.ModalStep) {
+        guard let browser, let library else { return }
+        browser.moveModal(step, in: library, order: order)
+    }
+
     private var canGoBack: Bool {
         guard let browser else { return false }
-        if browser.usesCollection { return browser.showsCollection == false }
+        if browser.usesCollection || browser.isCollectionItemPresented { return browser.isCollectionItemPresented }
         return library.map { browser.canGoBack(in: $0) } ?? false
     }
 
     private var canGoForward: Bool {
-        guard let browser, !browser.usesCollection else { return false }
+        guard let browser, !browser.usesCollection, !browser.isCollectionItemPresented else { return false }
         return library.map { browser.canGoForward(in: $0) } ?? false
     }
 

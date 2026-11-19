@@ -578,17 +578,25 @@ struct CommandPalette: View {
                     groupsByDate.toggle()
                 }
             }
-            if browser.usesCollection {
-                if !browser.showsCollection {
-                    add(String(localized: browser.viewMode.backTitle), "chevron.backward", historyKey("⌘["), in: .go) { browser.returnToCollection() }
-                }
-            } else {
+            if browser.isCollectionItemPresented {
+                add(String(localized: browser.viewMode.backTitle), "chevron.backward", historyKey("⌘["), in: .go) { browser.returnToCollection() }
+            } else if !browser.usesCollection {
                 if browser.canGoBack(in: library) {
                     add(String(localized: "Back"), "chevron.backward", historyKey("⌘["), in: .go) { browser.go(.back, in: library) }
                 }
                 if browser.canGoForward(in: library) {
                     add(String(localized: "Forward"), "chevron.forward", historyKey("⌘]"), in: .go) { browser.go(.forward, in: library) }
                 }
+            }
+            if browser.isModalPresented {
+                let neighbors = browser.modalNeighbors(in: library, order: order)
+                if neighbors.previous != nil {
+                    add(String(localized: "Previous Item"), "chevron.up", "⌥⌘↑", in: .go) { browser.moveModal(.previous, in: library, order: order) }
+                }
+                if neighbors.next != nil {
+                    add(String(localized: "Next Item"), "chevron.down", "⌥⌘↓", in: .go) { browser.moveModal(.next, in: library, order: order) }
+                }
+                add(String(localized: "Close Modal"), "xmark", in: .go) { browser.closeModal() }
             }
             if let libraries {
                 add(String(localized: "Export Looks…"), "square.and.arrow.up", in: .looks) { LooksFiles.export(from: libraries) }

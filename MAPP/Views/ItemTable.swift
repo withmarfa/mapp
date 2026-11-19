@@ -8,7 +8,6 @@ struct ItemTable: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
-    @Environment(\.openWindow) private var openWindow
     @Bindable var browser: Browser
     let order: ItemOrder
     var pane: FocusState<Browser.Pane?>.Binding
@@ -107,23 +106,13 @@ struct ItemTable: View {
         .takesKeyboardOnClick { browser.focusRequest = .list }
         .accessibilityIdentifier("ItemTable")
         .contextMenu(forSelectionType: ItemID.self) { ids in
-            if !ids.isEmpty {
-                Button("Open") { open(ids) }
-                    .disabled(ids.count != 1)
-                Button("Open in New Window", systemImage: "macwindow") {
-                    ItemWindows.open(library.idsForWindows(ids)) { openWindow(value: $0) }
-                }
-                Divider()
-                ItemActions(ids: ids, undoManager: undoManager)
-            }
+            ItemRowMenu(browser: browser, ids: ids, undoManager: undoManager)
         } primaryAction: { ids in
-            open(ids)
+            browser.open(ids)
         }
         .quickLooksOnSpace(browser)
         .onKeyPress(.return) {
-            guard browser.selection.count == 1 else { return .ignored }
-            browser.openCollectionSelection()
-            return .handled
+            browser.openSelection() ? .handled : .ignored
         }
         .onKeyPress(.escape) {
             browser.selection = []
@@ -184,12 +173,6 @@ struct ItemTable: View {
         } header: {
             ItemTableLoadMore(remaining: remaining) { browser.loadMoreTableRows(group: group) }
         }
-    }
-
-    private func open(_ ids: Set<ItemID>) {
-        guard ids.count == 1 else { return }
-        browser.selection = ids
-        browser.openCollectionSelection()
     }
 
     private func toggle(_ group: String, collapsed: Set<String>) {

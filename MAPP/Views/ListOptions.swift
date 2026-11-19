@@ -4,5 +4,7 @@ import SwiftUI
 nonisolated enum ListKey {
     /// The density of every list (`Density`), until a saved view or a place chooses its own.
     static let density = "listDensity"
-    static let all = [density]
+    /// Where an item opens (`ItemOpening`), on this Mac, for every window and layout.
+    static let openItemsIn = "openItemsIn"
+    static let all = [density, openItemsIn]
 }

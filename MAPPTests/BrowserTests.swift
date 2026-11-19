@@ -11,7 +11,7 @@ struct BrowserTests {
         browser.adopt(library)
         browser.selection = [newer.id]
         browser.viewMode = mode
-        browser.openCollectionSelection()
+        browser.open(browser.selection, as: .fullPage)
         #expect(browser.isCollectionItemPresented)
         browser.returnToCollection()
         #expect(browser.showsCollection)

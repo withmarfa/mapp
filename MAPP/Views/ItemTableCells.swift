@@ -187,8 +187,7 @@ struct ItemTableCell: View {
     private var openButton: some View {
         let isShown = hover.row == row.id || (browser.selection.count == 1 && browser.selection.contains(row.id))
         return Button {
-            browser.selection = [row.id]
-            browser.openCollectionSelection()
+            browser.open([row.id])
         } label: {
             Image(systemName: "arrow.up.right")
                 .font(.caption.weight(.semibold))
