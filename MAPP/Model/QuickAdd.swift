@@ -90,6 +90,8 @@ final class QuickAdd {
         /// The values the kind gave the draft before anything was typed (`QuickAdd.prefill`), which are not the
         /// person's work: they leave with the kind that gave them, and alone they are not worth keeping.
         var prefilled: [String: PropertyValue] = [:]
+        /// Whether the person took away a value the kind gave, so a later kind gives none.
+        var declinedPrefill = false
         var parentID: ItemID?
         /// The chips the person added, in the order they were added, whether or not they hold a value yet. A
         /// required field is always shown, so it is not listed here.
@@ -156,7 +158,10 @@ final class QuickAdd {
             chips.removeAll { $0 == chip }
             switch chip {
             case .parent: parentID = nil
-            case .field(let key): properties[key] = nil
+            case .field(let key):
+                properties[key] = nil
+                if prefilled[key] != nil { declinedPrefill = true }
+                prefilled[key] = nil
             }
         }
     }
@@ -330,6 +335,14 @@ final class QuickAdd {
         return info.fields.filter { $0.required && $0.kind.isOutsideForms && $0.key != info.titleKey && $0.key != info.bodyKey }
     }
 
+    /// What the panel says under the title for a kind with such fields, before anything is typed. Add stays on: the
+    /// library refuses the create (`MarfaEngine.creationProperties`) and tells the person, so the note says that first.
+    static func unsettableNote(_ fields: [ItemTypeInfo.Field]) -> String? {
+        guard !fields.isEmpty else { return nil }
+        let names = fields.map(\.label).formatted(.list(type: .and))
+        return String(localized: "Adding will be refused: this kind of item needs \(names), which MAPP can’t fill in. Choose another kind.")
+    }
+
     /// The kind quick add opens in: the one asked for, else the one a type's own place holds, else the last used, then a
     /// note, then any. A kind not in `offered` (a type since deleted, or one nobody can make) is passed over.
     /// A type's place is its list, the Collections index (a collection) and Files.
@@ -482,7 +495,8 @@ extension Browser {
         // What the last kind gave goes with it, unless the person changed it; then the new kind gives its own.
         for (key, value) in draft.prefilled where draft.properties[key] == value { draft.properties[key] = nil }
         draft.properties = draft.properties.filter { keys.contains($0.key) }
-        draft.prefilled = QuickAdd.prefill(of: typeID, in: library.catalogue).filter { draft.properties[$0.key] == nil }
+        draft.prefilled = draft.declinedPrefill
+            ? [:] : QuickAdd.prefill(of: typeID, in: library.catalogue).filter { draft.properties[$0.key] == nil }
         draft.properties.merge(draft.prefilled) { current, _ in current }
         if let parent = draft.parentID, !library.creationParentCandidates(typeID: typeID).contains(where: { $0.id == parent }) {
             draft.parentID = nil

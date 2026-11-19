@@ -117,6 +117,18 @@ struct MakingAnItemTests {
         #expect(browser.quickAdd.draft?.properties["status"] == .string("doing"), "a word the person chose stays")
     }
 
+    @Test func aStatusThePersonRemovedStaysRemovedWhenTheKindChanges() throws {
+        let library = library()
+        let browser = Browser()
+        browser.openQuickAdd(typeID: "core.task", in: library)
+        browser.quickAdd.draft?.remove(.field("status"), in: Self.catalogue)
+        #expect(browser.quickAdd.draft?.properties.isEmpty == true)
+        browser.chooseQuickAddType("core.note", in: library)
+        browser.chooseQuickAddType("core.task", in: library)
+        #expect(browser.quickAdd.draft?.properties.isEmpty == true, "the person took the status away, so no kind gives it again")
+        #expect(try #require(browser.quickAdd.draft).typedProperties.isEmpty)
+    }
+
     @Test func theStatusTheKindGaveIsAddedWithTheItem() async throws {
         let library = library()
         let browser = Browser()
@@ -129,6 +141,9 @@ struct MakingAnItemTests {
     @Test func aRequiredFieldQuickAddCannotEditIsNamedAndNeverHoldsBackAdd() {
         let fields = QuickAdd.unsettableRequired(of: "test.odd", in: Self.catalogue)
         #expect(fields.map(\.key) == ["tags"])
+        let note = QuickAdd.unsettableNote(fields)
+        #expect(note?.contains("Tags") == true && note?.contains("refused") == true, "the note says what will happen, before anything is typed")
+        #expect(QuickAdd.unsettableNote([]) == nil)
         #expect(QuickAdd.unsettableRequired(of: "core.task", in: Self.catalogue).isEmpty)
         var draft = QuickAdd.Draft(typeID: "test.odd")
         draft.title = "Needs a reference"
@@ -210,6 +225,19 @@ struct MakingAnItemTests {
         for place in Self.otherPlaces { #expect(empty(place).makes == nil && empty(place).buttonTitle == nil, "\(place)") }
         #expect(empty(.favorites).title == "No Favorites")
         #expect(empty(.inbox).title == "Inbox Is Empty")
+    }
+
+    @Test func aLongPluralFallsBackToAShortLine() {
+        let id = TypeID("test.long")
+        let catalogue = Catalogue(
+            itemTypes: [ItemTypeInfo(
+                id: id, label: "Spec", plural: "Specifications of the manufacturer", fields: [],
+                titleField: "title", bodyField: "body", parent: nil)],
+            edgeTypes: [])
+        let empty = PlaceEmpty.of(.itemType(id.rawValue), in: catalogue, offered: [id.rawValue])
+        #expect(empty.title == "No Specifications of the manufacturer")
+        #expect(empty.line == "Nothing here yet.")
+        #expect(empty.makes == id.rawValue, "the button is kept")
     }
 
     @Test func everyLineIsUnderFortyCharacters() {

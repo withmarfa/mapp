@@ -127,6 +127,9 @@
     "Nothing from this source yet." : {
 
     },
+    "Nothing here yet." : {
+
+    },
     "Nothing matches your search." : {
 
     },
@@ -142,7 +145,7 @@
     "Purple" : {
 
     },
-    "Quick add can’t set %@, which this kind of item needs." : {
+    "Adding will be refused: this kind of item needs %@, which MAPP can’t fill in. Choose another kind." : {
 
     },
     "Red" : {
@@ -269,9 +272,6 @@
 
     },
     "No Items Of Yours" : {
-
-    },
-    "No Items Yet" : {
 
     },
     "No Keys" : {

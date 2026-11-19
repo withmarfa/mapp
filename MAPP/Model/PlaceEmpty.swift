@@ -9,6 +9,8 @@ nonisolated struct PlaceEmpty: Equatable {
     let makes: String?
     /// The button's name, such as New Project, with `makes`.
     let buttonTitle: String?
+    /// A line is shorter than this many characters.
+    static let lineLimit = 40
 
     /// `offered` is the types a person can make (`QuickAdd.types`), empty while the library cannot be written to or is
     /// not read yet. Only a type's own place has a button, and only for a type that is offered.
@@ -38,8 +40,10 @@ nonisolated struct PlaceEmpty: Equatable {
             let plural = catalogue.plural(for: TypeID(id))
             let label = catalogue.label(for: TypeID(id))
             let makes = offered.contains(id) ? id : nil
+            // A long custom plural would run past the limit, so a fixed short line takes its place.
+            let built = String(localized: "\(plural) you make show here.")
             return PlaceEmpty(
-                title: String(localized: "No \(plural)"), line: String(localized: "\(plural) you make show here."),
+                title: String(localized: "No \(plural)"), line: built.count < Self.lineLimit ? built : String(localized: "Nothing here yet."),
                 makes: makes, buttonTitle: makes == nil ? nil : String(localized: "New \(label)"))
         case .collections, .sources, .favoriteItem, .recentlyDeleted:
             return plain(String(localized: "No Items"))

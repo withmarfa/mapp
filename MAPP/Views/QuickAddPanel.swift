@@ -53,9 +53,8 @@ struct QuickAddPanel: View {
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("QuickAddFilesNotKept")
                 }
-                let unsettable = QuickAdd.unsettableRequired(of: draft.typeID, in: catalogue)
-                if !unsettable.isEmpty {
-                    Text("Quick add can’t set \(unsettable.map(\.label).formatted(.list(type: .and))), which this kind of item needs.")
+                if let note = QuickAdd.unsettableNote(QuickAdd.unsettableRequired(of: draft.typeID, in: catalogue)) {
+                    Text(note)
                         .interfaceFont(.callout)
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("QuickAddUnsettable")
