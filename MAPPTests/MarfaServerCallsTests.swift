@@ -50,7 +50,7 @@ import Testing
     // MARK: The sign-in
 
     @Test func anUnreadableSignInIsToldAsUnreadableAndNothingIsSent() async throws {
-        let signIns = MemorySignIns()
+        let signIns = ScriptedSignIns()
         signIns.makeUnreadable(try MarfaConnection(address: "https://marfa.test"))
         let calls = try calls(signIns)
         let unreadable = Words.signInUnreadable
@@ -63,7 +63,7 @@ import Testing
     }
 
     @Test func noSignInIsToldAsARefusedOneAndNothingIsSent() async throws {
-        let calls = try calls(MemorySignIns())
+        let calls = try calls(ScriptedSignIns())
         await #expect(throws: ItemHistoryFailure.keyRefused) { _ = try await calls.page(of: ItemID("a"), after: nil, limit: 50) }
         await #expect(throws: InstanceConfigFailure.keyRefused) { _ = try await calls.read() }
         await #expect(throws: TypeIconFailure.keyRefused) { _ = try await calls.setIcon(nil, ofType: TypeID("core.note")) }

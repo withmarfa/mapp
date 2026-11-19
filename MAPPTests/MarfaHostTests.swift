@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import Security
 import Synchronization
 import Testing
 @testable import MAPP
@@ -447,28 +448,6 @@ import Testing
         #expect(try bench.signIns.key(for: first.address) == nil)
     }
 
-    @Test func aSignedOutLibraryIsSignedInAgainAndItsCopyOpensAgain() async throws {
-        let bench = try HostBench()
-        let host = bench.host()
-        try await host.connect(address: "http://first.test:8210", key: "old")
-        let source = try #require(bench.servers.last)
-        source.state.set(.keyRefused)
-        #expect(await eventually { host.state == .keyRefused })
-
-        try await host.signInAgain(via: host.scripted("new"))
-        #expect(try bench.signIns.key(for: first.address) == "new")
-        #expect(source.calls == ["close"], "the copy is closed, never discarded, so its queue stays")
-        #expect(bench.servers.opened.count == 2)
-        #expect(host.source === bench.servers.last)
-        #expect(host.state == .connecting)
-
-        // Connecting to the same address again only signs in again.
-        try await host.connect(address: "http://first.test:8210/", key: "again")
-        #expect(try bench.signIns.key(for: first.address) == "again")
-        #expect(bench.servers.opened.count == 3)
-        #expect(bench.signIns.calls.filter { $0.hasPrefix("browser") }.count == 3)
-    }
-
     @Test func aSignInThePersonCancelsChangesNothing() async throws {
         let bench = try HostBench()
         let host = bench.host()
@@ -502,30 +481,6 @@ import Testing
         #expect(try bench.signIns.key(for: first.address) == "old")
         #expect(source.calls.isEmpty)
         #expect(host.source === source)
-    }
-
-    /// Edits typed in a page are in the copy before a sign-in that may take minutes starts, as when switching.
-    @Test func signingInAgainHandsOverEditsBeforeTheSignInStarts() async throws {
-        let bench = try HostBench()
-        let host = bench.host()
-        try await host.connect(address: "http://first.test:8210", key: "old")
-        let order = Mutex<[String]>([])
-        host.handOverEdits = { order.withLock { $0.append("edits") }; return true }
-        bench.signIns.onBrowser.withLock { $0 = { order.withLock { $0.append("browser") } } }
-        try await host.signInAgain(via: host.scripted("new"))
-        #expect(order.withLock { $0 }.first == "edits")
-    }
-
-    @Test func anEditorThatCannotHandOverStopsASignInAgainBeforeItStarts() async throws {
-        let bench = try HostBench()
-        let host = bench.host()
-        try await host.connect(address: "http://first.test:8210", key: "old")
-        host.handOverEdits = { false }
-        await expect(.unavailable(message: "Finish editing the current item before changing libraries.")) { () throws(MarfaHost.Problem) in
-            try await host.signInAgain(via: host.scripted("new"))
-        }
-        #expect(bench.signIns.calls == ["browser http://first.test:8210"], "only the first sign-in was made")
-        #expect(try bench.signIns.key(for: first.address) == "old")
     }
 
     /// Writes made while the person approves a switch on another server are counted again once the approval is
@@ -651,14 +606,14 @@ import Testing
     @Test func anErrorThatIsNotTheKeychainsIsNotToldAsOne() {
         struct Other: Error, LocalizedError { var errorDescription: String? { "Odd." } }
         #expect(SignInOutcome(Other()) == .unreachable("Odd."))
-        #expect(SignInOutcome(MemorySignIns.Unreadable()) == .keychain(String(describing: MemorySignIns.Unreadable())))
+        #expect(SignInOutcome(Keychain.Failure(status: errSecInteractionNotAllowed)) == .keychain(String(describing: Keychain.Failure(status: errSecInteractionNotAllowed))))
     }
 
     @Test func aKeychainThatWillNotKeepTheSignInIsToldAsThat() async throws {
         let bench = try HostBench()
         let host = bench.host()
-        bench.signIns.script(browser: [.failure(MemorySignIns.Unreadable())])
-        await expect(.signIn(.keychain(String(describing: MemorySignIns.Unreadable())))) { () throws(MarfaHost.Problem) in
+        bench.signIns.script(browser: [.failure(Keychain.Failure(status: errSecInteractionNotAllowed))])
+        await expect(.signIn(.keychain(String(describing: Keychain.Failure(status: errSecInteractionNotAllowed))))) { () throws(MarfaHost.Problem) in
             try await host.connect(address: "http://first.test:8210", via: .browser)
         }
         #expect(host.connection == nil)
@@ -710,20 +665,6 @@ import Testing
         #expect(host.connection == nil)
         #expect(try bench.signIns.key(for: first.address) == nil)
         #expect(bench.servers.opened.isEmpty)
-    }
-
-    /// The new sign-in is kept, since the server gave it; only the copy could not be opened, and nothing in it is lost.
-    @Test func aCopyThatCannotOpenAfterSigningInAgainIsToldAndKeepsTheSignIn() async throws {
-        let bench = try HostBench()
-        let host = bench.host()
-        try await host.connect(address: "http://first.test:8210", key: "old")
-        bench.servers.failure.withLock { $0 = SourceFailure(kind: .failed, message: "The copy closed.") }
-        await expect(.unavailable(message: "The copy closed.")) { () throws(MarfaHost.Problem) in
-            try await host.signInAgain(via: host.scripted("new"))
-        }
-        #expect(try bench.signIns.key(for: first.address) == "new")
-        #expect(host.connection == first)
-        #expect(bench.hasCopy(first))
     }
 
     @Test func aSignInThatEndsWhileTheAppRunsIsSignedInAgainWithoutDiscardingAnything() async throws {

@@ -65,6 +65,7 @@ nonisolated final class FakeMarfaSource: MAPP.ItemSource {
         let covered = if let unsent { agreed.map { unsent.ids.isSubset(of: $0.ids) } ?? true } else { agreed == nil }
         guard covered else { return .waiting(unsent) }
         record("close")
+        await onClose.withLock { $0 }?()
         return .closed
     }
 
@@ -103,10 +104,28 @@ nonisolated final class FakeMarfaSource: MAPP.ItemSource {
 
     /// While set, closing waits, as a copy finishing its last step does.
     let closesSlowly = Mutex(false)
+    /// Run as a close begins, before it answers, to stand for a quit while the copy closes.
+    let onClose = Mutex<(@Sendable () async -> Void)?>(nil)
 
     func close() async {
         record("close")
+        await onClose.withLock { $0 }?()
         while closesSlowly.withLock({ $0 }) { try? await Task.sleep(for: .milliseconds(10)) }
+    }
+
+    /// The tokens of the sign-ins the copy was given, in order. A sign-in given while it was not open is never here.
+    var given: [String] { gave.withLock { $0 } }
+    private let gave = Mutex<[String]>([])
+    /// What giving the copy a sign-in does: nothing, or throw, as the package's `use(_:)` does.
+    let useFailure = Mutex<(any Error)?>(nil)
+    /// Run as the copy is given a sign-in, to stand for the copy's calls waiting while it changes.
+    let onUse = Mutex<(@Sendable () async -> Void)?>(nil)
+
+    func use(_ server: Server) async throws {
+        record("use")
+        await onUse.withLock { $0 }?()
+        if let failure = useFailure.withLock({ $0 }) { throw failure }
+        gave.withLock { $0.append(server.key) }
     }
 }
 
@@ -189,7 +208,7 @@ nonisolated extension MarfaHost.DisconnectChoice {
     let root = URL.temporaryDirectory.appending(path: "MarfaHostTests-\(UUID().uuidString)", directoryHint: .isDirectory)
     let suite = "MarfaHostTests-\(UUID().uuidString)"
     let defaults: UserDefaults
-    let signIns = MemorySignIns()
+    let signIns = ScriptedSignIns()
     let location: MarfaStoreLocation
     let servers = FakeServers()
 
@@ -204,10 +223,11 @@ nonisolated extension MarfaHost.DisconnectChoice {
         try? FileManager.default.removeItem(at: root)
     }
 
-    func host(opener: MarfaHost.Opener? = nil, remover: MarfaHost.Remover? = nil) -> MarfaHost {
+    /// A host that removes nothing outside its own copy: `cleaner` stands for the kept files and cached pictures, which a test must not touch.
+    func host(opener: MarfaHost.Opener? = nil, remover: MarfaHost.Remover? = nil, cleaner: MarfaHost.Cleaner? = nil) -> MarfaHost {
         MarfaHost(
             defaults: defaults, signIns: signIns, location: location, opener: opener ?? servers.opener, describer: servers.describer,
-            remover: remover ?? { try await MarfaHost.removeStore($0, agreedToLose: $1) })
+            remover: remover ?? { try await MarfaHost.removeStore($0, agreedToLose: $1) }, cleaner: cleaner ?? {})
     }
 
     var savedAddress: String? { defaults.string(forKey: "MarfaAddress") }
@@ -218,7 +238,7 @@ nonisolated extension MarfaHost.DisconnectChoice {
 }
 
 @MainActor extension MarfaHost {
-    /// Signs in by the browser, which the test's `MemorySignIns` answers by holding `key` for the address.
+    /// Signs in by the browser, which the test's `ScriptedSignIns` answers by holding `key` for the address.
     func connect(address: String, key: String) async throws(Problem) {
         try await connect(address: address, via: scripted(key))
     }
@@ -229,7 +249,7 @@ nonisolated extension MarfaHost.DisconnectChoice {
 
     /// A browser sign-in that leaves `key` held.
     func scripted(_ key: String) -> SignInMethod {
-        (signIns as? MemorySignIns)?.script(browser: [.success(key)])
+        (signIns as? ScriptedSignIns)?.script(browser: [.success(key)])
         return .browser
     }
 }

@@ -13,7 +13,7 @@ struct TestHostTests {
 
     @Test func standardLibrariesKeepSignInsInMemoryAndAwayFromTheSavedServer() {
         let libraries = Libraries.standard()
-        #expect(libraries.host.signIns is MemorySignIns)
+        #expect(libraries.host.signIns is ScriptedSignIns)
         #expect(libraries.host.location.root != MarfaStoreLocation.applicationSupport)
         #expect(libraries.host.connection == nil)
     }

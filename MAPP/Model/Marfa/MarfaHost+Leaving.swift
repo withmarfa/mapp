@@ -48,6 +48,31 @@ extension MarfaHost {
         try await WorkingCopy.remove(store: store, confirming: held)
     }
 
+    /// What a copy's discard mark was before a step marked it early.
+    struct PriorMark {
+        let agreed: Agreed?
+    }
+
+    /// Marks the copy the person chose to discard, and forgets its address where the step leaves it, before the
+    /// copy closes, so a quit while it closes never opens it again to send what the person discarded. The mark names
+    /// only what the person was shown, so a write that lands meanwhile keeps the copy (`removeCopy`). Nil where
+    /// there is nothing to mark early: a kept copy, or no discard chosen, whose closing decides first.
+    func markBeforeLeaving(
+        _ connection: MarfaConnection, agreed: Agreed?, choice: DisconnectChoice?, forgettingAddress: Bool = true
+    ) -> PriorMark? {
+        guard case .discardCopy = choice, let agreed else { return nil }
+        let prior = PriorMark(agreed: discarded[connection.address.absoluteString])
+        if forgettingAddress { defaults.removeObject(forKey: Self.addressKey) }
+        markDiscarded(connection, agreed: agreed)
+        return prior
+    }
+
+    /// Undoes `markBeforeLeaving` for a closing that refused: the copy is still open and still the person's.
+    func restoreAfterRefusal(_ connection: MarfaConnection, _ prior: PriorMark, rememberingAddress: Bool = true) {
+        markDiscarded(connection, agreed: prior.agreed)
+        if rememberingAddress { defaults.set(connection.address.absoluteString, forKey: Self.addressKey) }
+    }
+
     /// Ends the sign-in, and removes the copy where it was discarded (`agreed` is the changes the person agreed
     /// to lose with it), once the copy is closed. A discarded copy is marked before anything is removed and
     /// unmarked only once it is gone or the package has refused it, so neither a removal that fails nor a quit
@@ -79,11 +104,11 @@ extension MarfaHost {
         return revoked ? nil : .notRevoked
     }
 
-    private var discarded: [String: Agreed] {
+    var discarded: [String: Agreed] {
         (defaults.dictionary(forKey: Self.discardedKey) ?? [:]).mapValues(Agreed.init(stored:))
     }
 
-    private func markDiscarded(_ connection: MarfaConnection, agreed: Agreed?) {
+    func markDiscarded(_ connection: MarfaConnection, agreed: Agreed?) {
         var marks = defaults.dictionary(forKey: Self.discardedKey) ?? [:]
         marks[connection.address.absoluteString] = agreed?.stored
         defaults.set(marks, forKey: Self.discardedKey)
@@ -100,6 +125,16 @@ extension MarfaHost {
         case .kept(let reason):
             markDiscarded(connection, agreed: nil)
             throw .copyKept(reason, signIn: nil)
+        }
+    }
+
+    /// Removes `directory` only while nothing is in it. `rmdir` refuses a folder with anything in it, as one made since
+    /// is, so no check and removal can come apart.
+    nonisolated static func removeIfEmpty(_ directory: URL) throws {
+        guard rmdir(directory.path) != 0 else { return }
+        switch errno {
+        case ENOENT, ENOTEMPTY, EEXIST: return
+        default: throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: directory.path, NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: Int(errno))])
         }
     }
 
@@ -121,12 +156,9 @@ extension MarfaHost {
         let directory = location.directory(for: connection)
         do {
             try await remover(location.store(for: connection), agreed)
-            // The package removes the copy's files and leaves the folder that held them.
-            try await Self.offMain {
-                if FileManager.default.fileExists(atPath: directory.path) {
-                    try FileManager.default.removeItem(at: directory)
-                }
-            }
+            // The package removes the copy's files and leaves the folder that held them, which it releases its
+            // lock on first: the folder goes only if it is empty, so a copy opened in the gap is never taken with it.
+            try await Self.offMain { try Self.removeIfEmpty(directory) }
             return .removed
         } catch MarfaError.readingHandle, MarfaError.storeBusy {
             return .failed(Words.inUse)

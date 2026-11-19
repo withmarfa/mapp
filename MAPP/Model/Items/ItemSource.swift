@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 
 nonisolated struct SourceSnapshot: Hashable, Sendable {
     var items: [Item]
@@ -130,6 +131,11 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     var engineActivity: EngineActivity? { get }
     func close() async
 
+    /// Gives the open source the sign-in `server` carries, without closing it: what waits in its queue stays, and the
+    /// calls made meanwhile wait for the change. Throws as the package's `WorkingCopy.use(_:)` does, which
+    /// refuses a server at another address before it changes anything. A source with no server has nothing to give it to.
+    func use(_ server: Server) async throws
+
     // MARK: The server
 
     var downloadedFiles: (any DownloadedFiles)? { get }
@@ -157,6 +163,8 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
 
 nonisolated extension ItemSource {
     var engineActivity: EngineActivity? { nil }
+
+    func use(_ server: Server) async throws {}
 
     func counts(of ids: [ItemID], _ query: CountQuery) async throws -> [ItemID: ItemCountAnswer] { throw ItemCountUnavailable() }
 

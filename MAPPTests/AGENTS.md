@@ -45,7 +45,7 @@ Replace `test` with `build` to build only. `Scripts/measure-ui.sh` times the win
 
 ## Tests never touch real data
 
-Under the unit tests' background-only host, previews and the sample library, `Libraries.standard()` uses `MemorySignIns`, a temporary store and defaults of its own, never the Keychain or the saved server, and each `Browser` keeps its Mac settings in defaults of its own, so what one test leaves in a place's default view never reaches another's. A unit test drives `MarfaLibrary` through `FakeItemSource` or the sample's fake copy (`WorkingCopy.fake`). Only the `Live` plan reaches a server, and only a test instance.
+Under the unit tests' background-only host, previews and the sample library, `Libraries.standard()` uses `ScriptedSignIns` (a `MemoryKeychain` holding the package's `Credential`, with the browser and code answers scripted), a temporary store and defaults of its own, never the Keychain or the saved server, and each `Browser` keeps its Mac settings in defaults of its own, so what one test leaves in a place's default view never reaches another's. A unit test drives `MarfaLibrary` through `FakeItemSource` or the sample's fake copy (`WorkingCopy.fake`). Only the `Live` plan reaches a server, and only a test instance.
 
 ## Code Review Rules
 

@@ -76,27 +76,22 @@ import Testing
         #expect(libraries.host.connection == second)
     }
 
-    /// A copy closed to sign in again is waited for while it opens again, not shown as failed.
-    @Test func aCopyOpenedAgainForASignInIsWaitedForNotShownAsFailed() async throws {
+    /// A copy given a new sign-in stays the library on show while it changes: no wait or failure is shown in its place.
+    @Test func aCopyGivenANewSignInStaysOnShowWhileItChanges() async throws {
         let bench = try HostBench()
         let libraries = try libraries(bench)
         try await libraries.host.connect(address: "http://first.test:8210", key: "good")
         let source = try #require(bench.servers.last)
         source.state.set(.online)
-        source.closesSlowly.withLock { $0 = true }
+        let library = try #require(libraries.current)
+        source.onUse.withLock { $0 = { try? await Task.sleep(for: .milliseconds(60)) } }
 
         let watch = ModeWatch(libraries)
-        let method = libraries.host.scripted("new")
-        let signingIn = Task { try await libraries.host.signInAgain(via: method) }
-        #expect(await eventually { source.calls.contains("close") })
-        // Holds the close a little, as a slow one would be held.
-        try await Task.sleep(for: .milliseconds(50))
-        source.closesSlowly.withLock { $0 = false }
-        _ = await signingIn.result
+        try await libraries.host.signInAgain(via: libraries.host.scripted("new"))
         watch.stop()
-        #expect(!watch.seen.contains(.failed), "\(watch.seen)")
-        #expect(watch.seen.contains(.opening), "\(watch.seen)")
-        #expect(libraries.mode == .marfa)
+        #expect(watch.seen.allSatisfy { $0 == .marfa }, "\(watch.seen)")
+        #expect(libraries.current === library)
+        #expect(source.given == ["new"])
     }
 
     /// Quitting waits until the copy has queued every write, but only so long, and says why it did not quit.
