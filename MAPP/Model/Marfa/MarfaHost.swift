@@ -122,6 +122,8 @@ import Observation
     private let describer: Describer
     let remover: Remover
     private let cleaner: Cleaner
+    /// Removes what a library kept outside its copy: the files it fetched and the pictures it cached.
+    static let standardCleaner: Cleaner = { await MarfaSource.removeKeptCopies(); await PictureCache.removeAll() }
     private let historian: Historian
     private let configurer: Configurer
     private let iconKeeper: IconKeeper
@@ -169,7 +171,7 @@ import Observation
         opener: @escaping Opener = { try await MarfaSource.open($0, signIns: $1, location: $2) },
         describer: @escaping Describer = { try await $0.server(key: "").instanceDescription().name },
         remover: @escaping Remover = { try await MarfaHost.removeStore($0, agreedToLose: $1) },
-        cleaner: @escaping Cleaner = { await MarfaSource.removeKeptCopies(); await PictureCache.removeAll() },
+        cleaner: @escaping Cleaner = MarfaHost.standardCleaner,
         historian: @escaping Historian = { MarfaServerCalls(connection: $0, signIns: $1) },
         configurer: @escaping Configurer = { MarfaServerCalls(connection: $0, signIns: $1) },
         iconKeeper: @escaping IconKeeper = { MarfaServerCalls(connection: $0, signIns: $1) },

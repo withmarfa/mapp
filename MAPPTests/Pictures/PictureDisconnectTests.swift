@@ -8,7 +8,7 @@ import Testing
     /// folder of the test host, which has a bundle identifier of its own, never the installed app's.
     @Test func disconnectingRemovesThePicturesKept() async throws {
         let bench = try HostBench()
-        let host = bench.host()
+        let host = bench.host(cleaner: MarfaHost.standardCleaner)
         try await host.connect(address: "http://first.test:8210", key: "k")
         let marker = PictureCache.standardFolder.appending(path: "marker-\(UUID().uuidString)/picture.png")
         try FileManager.default.createDirectory(at: marker.deletingLastPathComponent(), withIntermediateDirectories: true)
