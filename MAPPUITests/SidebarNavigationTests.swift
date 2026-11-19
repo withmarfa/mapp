@@ -159,10 +159,13 @@ final class SidebarNavigationTests: XCTestCase {
         let page = element("SettingsPage-sidebar")
         XCTAssertTrue(page.waitForExistence(timeout: 3))
         page.click()
-        let toggle = element("SidebarSetting-sources")
-        XCTAssertTrue(toggle.waitForExistence(timeout: 3))
-        XCTAssertEqual(toggle.value as? Int, 0, "Settings lists the place switched off")
-        toggle.click()
+        // Sources is a row of the Library section, so its Show menu offers it back.
+        let show = element("SidebarSettingsShow-library")
+        XCTAssertTrue(show.waitForExistence(timeout: 3))
+        show.click()
+        let sources = window.menuItems["Sources"]
+        XCTAssertTrue(sources.waitForExistence(timeout: 3), "Settings lists the place that is hidden")
+        sources.click()
         XCTAssertTrue(sidebarText("Sources").waitForExistence(timeout: 3), "the sidebar beside Settings follows at once")
         sidebarText("Items").click()
         XCTAssertTrue(list.waitForExistence(timeout: 3))

@@ -16,6 +16,9 @@
     "Add Shortcut" : {
 
     },
+    "Add Tab" : {
+
+    },
     "Blue" : {
 
     },
@@ -58,6 +61,12 @@
     "New Tab…" : {
 
     },
+    "No sections in this tab." : {
+
+    },
+    "Or Control-click the sidebar and choose Customize Sidebar." : {
+
+    },
     "Orange" : {
 
     },
@@ -94,10 +103,25 @@
     "Shortcuts" : {
 
     },
+    "Show Section" : {
+
+    },
+    "Show %lld" : {
+
+    },
     "Tab" : {
 
     },
+    "Tabs" : {
+
+    },
     "Teal" : {
+
+    },
+    "With one tab, the sidebar shows no tab bar." : {
+
+    },
+    "The sidebar lists the first six types and keeps the rest under Show More. New types appear in the Types section automatically." : {
 
     },
     "Yellow" : {
@@ -1096,6 +1120,52 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld sources"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld types" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld type"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld types"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld views" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld view"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld views"
                 }
               }
             }
@@ -3719,9 +3789,6 @@
     "Show Reader" : {
 
     },
-    "Show Saved Views" : {
-
-    },
     "Show This Type Only" : {
 
     },
@@ -3729,9 +3796,6 @@
 
     },
     "Show Toolbar Background When Scrolling" : {
-
-    },
-    "Show Types" : {
 
     },
     "Showing the first %lld of ^[%lld item](inflect: true)." : {
@@ -4114,9 +4178,6 @@
     },
     "The server was told not to approve MAPP, so nothing changed. Sign in again to try again." : {
       "extractionState" : "manual"
-    },
-    "The sidebar lists the first six types and keeps the rest under Show More. New types appear here automatically." : {
-
     },
     "The Sign-In Is in Use" : {
       "extractionState" : "manual"
