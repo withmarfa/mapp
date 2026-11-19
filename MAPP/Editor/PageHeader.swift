@@ -70,6 +70,8 @@ nonisolated struct PageHeader: Encodable, Equatable, Sendable {
     var item: String
     /// A deleted item shows a banner instead.
     var hidden: Bool
+    /// The page is in Focus: the title and the properties are hidden, and the footer and the kind stay as they are.
+    var focused = false
     var title: String
     var draft: String?
     var titleRejected: Bool

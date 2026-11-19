@@ -131,6 +131,9 @@ export interface HeaderPerson {
 export interface HeaderModel {
   item: string
   hidden: boolean
+  /** The page is in Focus: the title, the pins and the properties are hidden. The footer, the kind and the text's
+   *  typography are left as they are. */
+  focused: boolean
   title: string
   /** The title the person typed and the app has not saved, kept by the app for each item. */
   draft: string | null
@@ -590,7 +593,7 @@ export class ItemHeader {
       this.editing = undefined
       this.title.blur()
     }
-    this.root.hidden = model.hidden
+    this.root.hidden = model.hidden || model.focused === true
     this.footer.hidden = model.hidden
     this.root.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)
     this.footer.style.setProperty('--interface-text-size', `${model.interfaceTextSize}px`)
