@@ -193,6 +193,30 @@ nonisolated extension SidebarLayout {
         for (slot, group) in zip(slots, inTab) { groups?[slot] = group }
     }
 
+    /// Moves the sections at `source` of a tab's full list, hidden ones included, as a list's drag does: Settings
+    /// shows a hidden built-in section where it sits, so it can be dragged too. The tab's other sections keep their
+    /// slots in the layout.
+    mutating func moveGroups(inTab tab: String, fromOffsets source: IndexSet, toOffset destination: Int) {
+        let all = allGroups
+        let slots = all.indices.filter { tabID(of: all[$0]) == tab }
+        var inTab = slots.map { all[$0] }
+        let moved = source.sorted().filter { inTab.indices.contains($0) }.map { inTab[$0] }
+        guard !moved.isEmpty else { return }
+        let target = destination - source.filter { $0 < destination }.count
+        for position in source.sorted().reversed() where inTab.indices.contains(position) { inTab.remove(at: position) }
+        inTab.insert(contentsOf: moved, at: max(0, min(target, inTab.count)))
+        guard inTab != slots.map({ all[$0] }) else { return }
+        materialize()
+        for (slot, group) in zip(slots, inTab) { groups?[slot] = group }
+    }
+
+    /// Shows a hidden section again where it sits. Add Section brings it back at the end of a tab instead.
+    mutating func showGroup(_ id: String) {
+        guard let index = allGroups.firstIndex(where: { $0.id == id }), allGroups[index].isHidden else { return }
+        materialize()
+        groups?[index].isHidden = false
+    }
+
     /// Moves a section to the end of another tab. Nothing happens for a tab that does not exist.
     mutating func moveGroup(_ id: String, toTab tab: String) {
         guard allTabs.contains(where: { $0.id == tab }), let group = allGroups.first(where: { $0.id == id }), tabID(of: group) != tab else { return }
@@ -287,6 +311,16 @@ nonisolated extension SidebarLayout {
         default: return nil
         }
         return allGroups.first { $0.kind == kind }?.id
+    }
+
+    /// Orders the views as Settings lists them. Each view is recorded in the section it sits in, so a section that held
+    /// only its own places reads as the one list the person arranged and a saved view can come before Inbox
+    /// (`SidebarGroupPlan`).
+    mutating func moveViews(_ views: [SidebarPlace], fromOffsets source: IndexSet, toOffset destination: Int) {
+        move(views, fromOffsets: source, toOffset: destination)
+        let placed = views.compactMap { place in home(of: place).map { (place.key, $0) } }
+        materialize()
+        homes = (homes ?? [:]).merging(placed) { _, new in new }
     }
 
     // MARK: View colors

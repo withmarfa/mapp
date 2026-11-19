@@ -398,7 +398,6 @@ struct SidebarPlaceRow: View, Equatable {
 /// A place's context menu: a view's own commands and its color, where it goes, and Hide from Sidebar.
 struct SidebarPlaceMenu: View {
     @Environment(Libraries.self) private var libraries
-    @Environment(\.colorScheme) private var scheme
     let data: SidebarPlaceRowData
     let groups: [SidebarGroupChoice]
     let browser: Browser
@@ -408,20 +407,7 @@ struct SidebarPlaceMenu: View {
             SavedViewRowMenu(view: id, browser: browser)
             Divider()
         }
-        if data.place.defaultTone != nil {
-            Picker("Color", selection: Binding {
-                libraries.sidebarLayout.color(of: data.place)
-            } set: { tone in
-                libraries.updateSidebarLayout { $0.setColor(tone, of: data.place) }
-            }) {
-                ForEach(TypeTone.allCases, id: \.self) { tone in
-                    Label(tone.name, systemImage: "circle.fill")
-                        .tint(tone.color(for: scheme))
-                        .tag(tone)
-                }
-            }
-            .pickerStyle(.palette)
-        }
+        if data.place.defaultTone != nil { SidebarColorPicker(place: data.place) }
         if !groups.isEmpty {
             Menu("Move to Section") {
                 ForEach(groups) { group in
@@ -433,6 +419,29 @@ struct SidebarPlaceMenu: View {
         SidebarHideButtons(place: data.place)
         Divider()
         SidebarCustomizeButton(browser: browser)
+    }
+}
+
+/// The palette that chooses a view's color, in the sidebar's context menu and in Settings > Sidebar. It reads and
+/// writes the one layout, so both show the same color.
+struct SidebarColorPicker: View {
+    @Environment(Libraries.self) private var libraries
+    @Environment(\.colorScheme) private var scheme
+    let place: SidebarPlace
+
+    var body: some View {
+        Picker("Color", selection: Binding {
+            libraries.sidebarLayout.color(of: place)
+        } set: { tone in
+            libraries.updateSidebarLayout { $0.setColor(tone, of: place) }
+        }) {
+            ForEach(TypeTone.allCases, id: \.self) { tone in
+                Label(tone.name, systemImage: "circle.fill")
+                    .tint(tone.color(for: scheme))
+                    .tag(tone)
+            }
+        }
+        .pickerStyle(.palette)
     }
 }
 
