@@ -34,12 +34,20 @@ final class ToastPresenter {
         self.clock = clock
     }
 
-    /// Shows `message`, in place of any toast showing, with Undo where `undo` is given.
-    func show(_ message: String, symbol: String? = nil, undo: (@MainActor () -> Void)? = nil) {
+    /// Shows `message`, in place of any toast showing, with Undo where `undo` is given. Answers the toast's identity,
+    /// for `dismiss(ifShowing:)`.
+    @discardableResult
+    func show(_ message: String, symbol: String? = nil, undo: (@MainActor () -> Void)? = nil) -> Toast.ID {
         let toast = Toast(message: message, symbol: symbol, undo: undo)
         current = toast
         isHeld = false
         startTimer(for: toast.id)
+        return toast.id
+    }
+
+    /// Takes the toast away only while it is the one with `id`, so a toast that replaced it stays.
+    func dismiss(ifShowing id: Toast.ID) {
+        if current?.id == id { dismiss() }
     }
 
     /// Takes the toast away, whether it is held or not.

@@ -2707,6 +2707,9 @@
     "Move to Recently Deleted" : {
       "extractionState" : "manual"
     },
+    "Moved “%@” to Recently Deleted" : {
+
+    },
     "Moved to Recently Deleted" : {
 
     },

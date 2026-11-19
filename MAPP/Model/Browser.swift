@@ -742,23 +742,30 @@ final class Browser {
         }
     }
 
-    /// Moves `ids` to Recently Deleted, then says so in the window's toast with an Undo that takes back that one step.
-    /// The step is the undo manager's latest, so Undo does nothing once another change has been registered after it.
+    /// Moves `ids` to Recently Deleted, then says so in the window's toast with an Undo that takes back that move.
+    /// The toast's Undo is bound to the step (`StepUndo`), not to its name: any step registered, undone or redone
+    /// after it takes the toast away. It is offered only where no undo group was open before the move, since the move
+    /// would then share that group and `undo()` would take back the other steps in it too. A manager that does not
+    /// group by event has none open, so the move gets a group of its own, closed at once.
     static func moveToRecentlyDeleted(
         _ ids: Set<ItemID>, in library: any ItemLibrary, undoManager: UndoManager?, toasts: ToastPresenter?
     ) {
-        let moved = library.deletePlan(ids).moving.count
+        let moving = library.deletePlan(ids).moving
+        let name = moving.count == 1 ? moving.first.flatMap { library.item($0)?.name } : nil
+        let startsGroup = undoManager?.groupingLevel == 0
+        let opensGroup = startsGroup && undoManager?.groupsByEvent == false
+        if opensGroup { undoManager?.beginUndoGrouping() }
         library.delete(ids, undoManager: undoManager)
-        guard moved > 0, let toasts else { return }
-        var undo: (@MainActor () -> Void)?
-        if let undoManager, undoManager.canUndo {
-            let step = undoManager.undoActionName
-            undo = { [weak undoManager] in
-                guard let undoManager, undoManager.canUndo, undoManager.undoActionName == step else { return }
-                undoManager.undo()
-            }
+        if opensGroup { undoManager?.endUndoGrouping() }
+        guard !moving.isEmpty, let toasts else { return }
+        let message = DeletionWords.movedMessage(count: moving.count, title: name)
+        guard startsGroup, let undoManager, undoManager.canUndo else {
+            toasts.show(message, symbol: "trash")
+            return
         }
-        toasts.show(DeletionWords.movedMessage(count: moved), symbol: "trash", undo: undo)
+        let step = StepUndo(undoManager: undoManager)
+        let id = toasts.show(message, symbol: "trash", undo: { step.perform() })
+        step.onLapse = { [weak toasts] in toasts?.dismiss(ifShowing: id) }
     }
 
     /// A place that is gone can no longer be shown, so the window moves to where `placeFallback(in:)` says.
