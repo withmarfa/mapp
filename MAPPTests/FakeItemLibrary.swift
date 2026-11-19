@@ -32,6 +32,9 @@ final class FakeItemLibrary: ItemLibrary {
     @ObservationIgnored lazy var counts: ItemCounts = makeCounts()
     /// What the next icon choice answers: nil keeps it, a failure refuses it.
     var iconFailure: TypeIconFailure?
+    /// What the next change to a field answers where it fails, which leaves the catalogue as it was.
+    var fieldFailure: TypeSchemaFailure?
+    private(set) var editedFields: [FieldEditPlan] = []
     private(set) var chosenIcons: [(type: TypeID, icon: String?)] = []
     /// While set, an icon choice waits for `answerIcon()` before it answers.
     var holdsIconAnswers = false
@@ -546,6 +549,13 @@ final class FakeItemLibrary: ItemLibrary {
         if refusedAttachments.contains(name) { throw SourceFailure(kind: .failed, message: "The upload failed.") }
         attachedFiles.append((name, try Data(contentsOf: file), id))
         return Embed(link: name.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? name, name: name)
+    }
+
+    func editField(_ plan: FieldEditPlan) async -> TypeSchemaFailure? {
+        if let fieldFailure { return fieldFailure }
+        editedFields.append(plan)
+        catalogue = catalogue.applying(plan)
+        return nil
     }
 
     func answerIcon() {

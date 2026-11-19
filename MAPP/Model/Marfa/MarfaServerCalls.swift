@@ -3,13 +3,13 @@ import Marfa
 import MarfaAPI
 
 /// The calls that ask the Marfa server itself instead of the working copy: an item's snapshots (Version History),
-/// the server's own settings (This Marfa), the owner's icon for a type and the names, marks and counts of sources.
+/// the server's own settings (This Marfa), the owner's icon for a type, changes to a type's fields and the names, marks and counts of sources.
 /// They need a connection, so they fail while the server cannot be reached. Every call goes through the package's `Server`
 /// (This Marfa's through the generated `Client` made from it), with the address and the sign-in read
 /// from the Keychain on each call, so a sign-in the person has since made again is the one used. Both go over
 /// `URLSession`, so App Transport Security applies to a plain http address, unlike the copy, which goes through the
 /// package's core.
-nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, TypeIconSource, SourceNameSource {
+nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, TypeIconSource, TypeSchemaSource, SourceNameSource {
     let connection: MarfaConnection
     let signIns: any SignIns
     /// How long a call waits for the server before it fails, so an unreachable server never leaves a page waiting.
@@ -185,6 +185,39 @@ nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, Ty
         case .notPermitted: .notPermitted
         case .refused(let reason): .refused(reason)
         case .notFound(let message), .instanceChanged(let message), .failed(let message): .failed(message)
+        }
+    }
+
+    // MARK: Type fields (`GET /types`, then `PUT /types/{id}`, which need `schema.write` and write on the type)
+
+    /// The server has no version guard on `PUT /types/{id}`: `version` is a number for callers to track and is never
+    /// compared. So the type's own definition is read again right before the replacement and must still hold the field
+    /// as the page showed it. The server judges each write against the registry as it stands when it lands
+    /// (`types/write-race`), so only the moment between the two calls is open.
+    @concurrent func apply(_ plan: FieldEditPlan) async throws(TypeSchemaFailure) {
+        do {
+            let client = try Client(server(), timeout: timeout)
+            try await TypeDefinitionEdit.run(
+                plan,
+                read: { try await client.listTypes().ok.body.json.data },
+                replace: { _ = try await client.replace(itemType: plan.type.rawValue, with: $0) })
+        } catch let failure as TypeSchemaFailure {
+            throw failure
+        } catch let ending as Ending {
+            throw Self.schemaFailure(ending)
+        } catch {
+            throw Self.schemaFailure(Self.ending(error))
+        }
+    }
+
+    static func schemaFailure(_ ending: Ending) -> TypeSchemaFailure {
+        switch ending {
+        case .unreachable: .unreachable
+        case .keyRefused: .keyRefused
+        case .notPermitted: .notPermitted
+        case .refused(let reason): .refused(reason)
+        case .notFound: .changedOnServer
+        case .instanceChanged(let message), .failed(let message): .failed(message)
         }
     }
 

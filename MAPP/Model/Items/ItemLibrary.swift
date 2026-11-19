@@ -21,7 +21,7 @@ protocol ItemLibrary: AnyObject, Observable {
     /// none or they cannot be read.
     var views: [LibraryView] { get }
     /// Whether the server can be reached now, which is what every write that is never queued needs: deleting items
-    /// in Recently Deleted for good, saving, changing and deleting a view, and choosing a type's icon.
+    /// in Recently Deleted for good, saving, changing and deleting a view, and choosing a type's icon, and changing a type's fields.
     var reachesServer: Bool { get }
     /// How many days an item stays in Recently Deleted, where the server says; nil where it does not.
     var trashDays: Int? { get }
@@ -222,6 +222,10 @@ protocol ItemLibrary: AnyObject, Observable {
     /// Chooses the icon of `type` for every app, or the type's own default where `icon` is nil, and draws the answer at
     /// once. Nil on success; otherwise why not, in words for the person.
     func setIcon(_ icon: String?, ofType type: TypeID) async -> TypeIconFailure?
+    /// Changes one field of a type for every item of it, and shows the change at once. Never queued: it needs the
+    /// server, which is asked for the type as it stands before anything is sent. Nil on success; otherwise why not, in
+    /// words for the person, and nothing has changed.
+    func editField(_ plan: FieldEditPlan) async -> TypeSchemaFailure?
     /// The names, marks and counts of sources the server last gave. Empty before it answers, so a view falls back to the
     /// code (`SourceDirectory.info`); a rename shows at once, and a refresh follows the server.
     var sources: SourceDirectory { get }
