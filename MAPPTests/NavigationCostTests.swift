@@ -524,9 +524,9 @@ struct NavigationCostTests {
         }
     }
 
-    /// How many marks each soft selection in the window holds.
+    /// How many chosen-row marks each soft selection in the window holds, not counting the hover mark.
     private static func marks(in view: NSView) -> [Int] {
-        (view as? SoftSelection.Marks).map { [$0.layer?.sublayers?.count ?? 0] } ?? view.subviews.flatMap { marks(in: $0) }
+        (view as? SoftSelection.Marks).map { [$0.selectionLayers.count] } ?? view.subviews.flatMap { marks(in: $0) }
     }
 
     /// The window's longest table, which is the list.

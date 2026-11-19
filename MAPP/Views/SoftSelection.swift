@@ -132,6 +132,9 @@ struct SoftSelection: NSViewRepresentable {
         private let hoverMark: CALayer?
         private var pointerIsOver = false
         private var placedHover: (frame: NSRect?, color: CGColor)?
+        /// The row the pointer was last over and the appearance the mark was colored for, so a move inside one row
+        /// asks nothing further.
+        private var lastHover: (row: Int, appearance: NSAppearance.Name)?
         /// How many rows beyond the visible ones are marked.
         private static let overscan = 10
 
@@ -170,6 +173,16 @@ struct SoftSelection: NSViewRepresentable {
                 })
             }
             table.postsFrameChangedNotifications = true
+            // A window that is no longer key, as when a sheet or another window takes over, sends no event to say
+            // the pointer has gone, and its mark would stay on the last row.
+            if let window = table.window {
+                observers.append(center.addObserver(forName: NSWindow.didResignKeyNotification, object: window, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated {
+                        self?.pointerIsOver = false
+                        self?.updateHover()
+                    }
+                })
+            }
             // Rows scrolled into view get row views of their own, which the marks are placed by.
             if let clip = table.enclosingScrollView?.contentView {
                 clip.postsBoundsChangedNotifications = true
@@ -230,14 +243,19 @@ struct SoftSelection: NSViewRepresentable {
         }
 
         /// Puts the faint mark on the row under the pointer: not on a row that is chosen, which has its own, nor on
-        /// one the table would not select, such as a heading. It places nothing while the pointer stays on the same
-        /// row, since a move inside a row is most of the events.
-        private func updateHover() {
+        /// one the table would not select, such as a heading. Nothing is asked or placed while the pointer stays on the
+        /// same row, since a move inside a row is most of the events; a change of selection asks again, with `forced`.
+        /// The pointer counts only where the table is what shows there: an overlay above it, such as the command
+        /// palette, leaves the table's rows unhovered.
+        private func updateHover(forced: Bool = false) {
             guard let hoverMark, let table else { return }
             var row = -1
-            if pointerIsOver, let window {
+            if pointerIsOver, let window, isTableShown(at: window.mouseLocationOutsideOfEventStream, in: window) {
                 row = table.row(at: table.convert(window.mouseLocationOutsideOfEventStream, from: nil))
             }
+            let appearance = effectiveAppearance.name
+            if !forced, let lastHover, lastHover.row == row, lastHover.appearance == appearance { return }
+            lastHover = (row, appearance)
             if row >= 0, table.isRowSelected(row) || table.rowView(atRow: row, makeIfNecessary: false)?.isSelected == true { row = -1 }
             if row >= 0, table.delegate?.tableView?(table, shouldSelectRow: row) == false { row = -1 }
             let frame = row >= 0 ? Self.rect(ofRow: row, in: table) : nil
@@ -257,10 +275,20 @@ struct SoftSelection: NSViewRepresentable {
             CATransaction.commit()
         }
 
+        /// Whether the view at a point in the window, as a click there would find it, is the table or inside it.
+        private func isTableShown(at point: NSPoint, in window: NSWindow) -> Bool {
+            guard let table, let content = window.contentView, let frameView = content.superview,
+                  let hit = content.hitTest(frameView.convert(point, from: nil)) else { return false }
+            return hit.isDescendant(of: table)
+        }
+
         override func viewDidChangeEffectiveAppearance() {
             super.viewDidChangeEffectiveAppearance()
             update()
         }
+
+        /// The layers that mark chosen rows, not the one under the pointer.
+        var selectionLayers: [CALayer] { layer?.sublayers?.filter { $0 !== hoverMark } ?? [] }
 
         func update() {
             guard let table, let layer else { return }
@@ -269,7 +297,7 @@ struct SoftSelection: NSViewRepresentable {
                 color = NSColor.labelColor.withAlphaComponent(0.08).cgColor
             }
             // The table's selection, and any row view it marks as selected, since SwiftUI can set either first.
-            updateHover()
+            updateHover(forced: true)
             var rows = table.selectedRowIndexes
             table.enumerateAvailableRowViews { view, row in
                 if view.isSelected { rows.insert(row) }
@@ -293,7 +321,7 @@ struct SoftSelection: NSViewRepresentable {
             Cost.measure(.softSelection) {
                 CATransaction.begin()
                 CATransaction.setDisableActions(true)
-                layer.sublayers?.filter { $0 !== hoverMark }.forEach { $0.removeFromSuperlayer() }
+                selectionLayers.forEach { $0.removeFromSuperlayer() }
                 for frame in frames {
                     let mark = CALayer()
                     mark.frame = frame
