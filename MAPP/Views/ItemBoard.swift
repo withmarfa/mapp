@@ -6,7 +6,6 @@ struct ItemBoard: View {
     @CurrentLibrary private var library
     @Environment(\.undoManager) private var undoManager
     /// The window's, for the Change Type panel.
-    @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     @Bindable var browser: Browser
     var pane: FocusState<Browser.Pane?>.Binding
     @State private var cursor: ItemID?
@@ -105,9 +104,7 @@ struct ItemBoard: View {
                 return .handled
             }
             .onKeyPress(.return) {
-                guard browser.selection.count == 1 else { return .ignored }
-                browser.openCollectionSelection()
-                return .handled
+                browser.openSelection() ? .handled : .ignored
             }
             .onKeyPress(.escape) { browser.selection = []; return .handled }
             .onKeyPress("a", phases: .down) { press in
@@ -182,27 +179,25 @@ struct ItemBoard: View {
             },
             open: { open(item.id) }
         ) { selection in
-            Button("Open") { open(item.id) }
             // A card inside the selection acts for all of it, as in the other layouts.
             let acting = selection.contains(item.id) ? selection : [item.id]
-            Menu("Move To") {
-                ForEach(lanes.filter(isDestination)) { target in
-                    Button {
-                        move(Array(acting), to: target.id, key: key)
-                    } label: {
-                        if acting.count == 1, target.id == lane.id { Label(target.title, systemImage: "checkmark") }
-                        else { Text(verbatim: target.title) }
+            ItemRowMenu(browser: browser, ids: acting, undoManager: undoManager) {
+                Menu("Move To") {
+                    ForEach(lanes.filter(isDestination)) { target in
+                        Button {
+                            move(Array(acting), to: target.id, key: key)
+                        } label: {
+                            if acting.count == 1, target.id == lane.id { Label(target.title, systemImage: "checkmark") }
+                            else { Text(verbatim: target.title) }
+                        }
+                        .disabled(!acting.contains { id in
+                            guard let moving = library.item(id) else { return false }
+                            if case .set = ItemBoardLayout.move(moving, key: key, to: target.id, catalogue: library.catalogue) { return true }
+                            return false
+                        })
                     }
-                    .disabled(!acting.contains { id in
-                        guard let moving = library.item(id) else { return false }
-                        if case .set = ItemBoardLayout.move(moving, key: key, to: target.id, catalogue: library.catalogue) { return true }
-                        return false
-                    })
                 }
             }
-            AddTagButton(ids: acting, details: details, undoManager: undoManager)
-            TypeChangeButton(ids: acting, details: details, undoManager: undoManager)
-            VersionHistoryButton(ids: [item.id], details: details)
         }
     }
 
@@ -232,7 +227,7 @@ struct ItemBoard: View {
         library.tellSkipped(skips, didChange: moved > 0, failing: String(localized: "Can’t Move Items"))
     }
 
-    private func open(_ id: ItemID) { browser.selection = [id]; browser.openCollectionSelection() }
+    private func open(_ id: ItemID) { browser.open([id]) }
 
     private func select(_ id: ItemID, ids: [ItemID], extending: Bool, toggling: Bool) {
         if anchor == nil { anchor = ids.first(where: browser.selection.contains) }

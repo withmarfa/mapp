@@ -9,6 +9,7 @@ final class Browser {
         // A scroll position belongs to the place and layout it was made in.
         didSet {
             guard sidebarItem != oldValue else { return }
+            modalItem = nil
             listMemory.scrollOffset = nil
             viewPanelPlaceChanged()
         }
@@ -28,6 +29,8 @@ final class Browser {
     @ObservationIgnored let listMemory = ColumnMemory()
     var selection: Set<ItemID> = [] {
         didSet {
+            // The modal shows the one item it was opened on, so any other selection, whoever made it, is the end of it.
+            if let open = modalItem, selection != [open] { modalItem = nil }
             guard !isMovingThroughHistory, !isSelectingAutomatically || history.entries.isEmpty else { return }
             history.record(selection, in: item)
         }
@@ -47,10 +50,19 @@ final class Browser {
                 recordLayout(from: oldValue)
             }
             isCollectionItemPresented = false
+            modalItem = nil
             if viewMode.spansWindow { focusRequest = .list }
         }
     }
+    /// Whether an item's page takes the window in place of the layout, with a Back button: opened as a full page from
+    /// a layout that spans the window or from the list (`open(_:as:)`).
     var isCollectionItemPresented = false
+    /// The item open in the modal over the window, or nil. The selection is always this item while it is set
+    /// (`selection`'s observer ends the modal otherwise), so the page, the toolbar and the commands read the selection
+    /// as they do anywhere else. Set only through `open(_:as:)`, `moveModal` and `closeModal` (`Browser+Opening`).
+    var modalItem: ItemID?
+    /// Opens items in windows of their own, which only a view can do. The window wires it where it makes its editor.
+    @ObservationIgnored var windowOpener: ((Set<ItemID>) -> Void)?
 
     /// The layouts the current place can show. Search is left out, so a search with no results keeps the layout.
     /// A type's own place counts the type even while it holds no items. The last answer stands until the library's
@@ -175,7 +187,9 @@ final class Browser {
     var timelineFields: [SidebarItem: String] = [:]
     /// Whether the window shows Settings in place of the list and the item page. The place the window was
     /// showing, and its selection are kept, so choosing that place again returns to them.
-    private(set) var showsSettings = false
+    private(set) var showsSettings = false {
+        didSet { if showsSettings { modalItem = nil } }
+    }
     /// The page of Settings shown, and the one shown next time Settings is.
     var settingsPage = SettingsPage.appearance
     var searchText = "" {
@@ -207,7 +221,7 @@ final class Browser {
 
     /// Whether a floating panel, the palette or quick add, is out over the window, which the views beneath it
     /// are sent no pointer exit for.
-    var panelIsOut: Bool { palette != nil || (quickAdd.isPresented && quickAdd.draft != nil) }
+    var panelIsOut: Bool { palette != nil || (quickAdd.isPresented && quickAdd.draft != nil) || isModalPresented }
     /// The window's quick-add panel and what is typed in it.
     let quickAdd = QuickAdd()
     /// Whether the list's search is out as a field, rather than a button beside View Options.
@@ -245,7 +259,7 @@ final class Browser {
     var canSearchList: Bool { !showsSettings }
     /// Whether an item's page is what the window shows, as against a collection, an index or Settings. The editor
     /// stays mounted behind the others, so every command that acts on the page asks this first.
-    var showsPage: Bool { !showsCollection && !showsSidebarIndex && !showsSettings }
+    var showsPage: Bool { (!showsCollection || isModalPresented) && !showsSidebarIndex && !showsSettings }
 
     /// Shows Settings, at `page` when one is given and at the page shown last otherwise.
     func showSettings(_ page: SettingsPage? = nil) {
@@ -275,14 +289,7 @@ final class Browser {
 
     /// Whether the view's options are on offer: the list and the gallery always, the table, board and timeline only
     /// while they are showing, not an item page opened from them, which hides their controls.
-    var offersViewOptions: Bool { !usesCollection || showsCollection }
-
-    func openCollectionSelection() {
-        leaveSettings()
-        guard usesCollection, selection.count == 1 else { return }
-        isCollectionItemPresented = true
-        focusRequest = nil
-    }
+    var offersViewOptions: Bool { !isCollectionItemPresented }
 
     /// The place that lists an item no place on screen does: a deleted item is listed by Recently Deleted alone.
     func place(listing item: Item) -> SidebarItem {
@@ -290,12 +297,15 @@ final class Browser {
     }
 
     func reveal(_ item: Item, in library: any ItemLibrary, order: ItemOrder) {
+        // An item reached from the modal, by a link or the palette, is shown in the modal.
+        let staysInModal = isModalPresented
         leaveSettings()
         if !items(in: library).contains(where: { $0.id == item.id }) {
             show(place(listing: item), in: library, order: order)
         }
         selection = [item.id]
-        if usesCollection { openCollectionSelection() }
+        if staysInModal { open([item.id], as: .modal) }
+        else if usesCollection { open([item.id], as: .fullPage) }
         else { focusRequest = .list }
     }
 
@@ -324,6 +334,7 @@ final class Browser {
         isMovingThroughHistory = true
         defer { isMovingThroughHistory = false }
         isCollectionItemPresented = false
+        modalItem = nil
         if isSearching || sidebarItem != entry.place {
             searchText = ""
             isSearchExpanded = false
@@ -594,6 +605,7 @@ final class Browser {
         defer { interval.end() }
         leaveSettings()
         isCollectionItemPresented = false
+        modalItem = nil
         searchText = ""
         isSearchExpanded = false
         sidebarItem = item
@@ -613,11 +625,21 @@ final class Browser {
         selection = ids
     }
 
+    /// Whether the selection follows the items the window's layout holds as they change: a layout that spans the window
+    /// has no list to do it, and nor has a full page opened from the list, which takes the list's place.
+    var followsCollection: Bool { usesCollection || isCollectionItemPresented }
+
+    /// Keeps the selection true as the items the window holds change (`collectionItemIDs`), while it follows them.
+    func collectionItemsChanged(from old: [ItemID], to new: [ItemID]) {
+        guard followsCollection else { return }
+        keepSelection(from: old, to: new)
+    }
+
     /// The items the layout that spans the window holds, which its selection follows as they change (`keepSelection`):
     /// the table's in the order it shows them, then those its filters hide, and the gallery's, the board's and the
-    /// timeline's in the list's order. The table's come from its own content, so a move between its places sorts no list.
+    /// timeline's in the list's order, which is also the order of a full page opened from the list. The table's come from its own content, so a move between its places sorts no list.
     func collectionItemIDs(in library: any ItemLibrary, order: ItemOrder) -> [ItemID] {
-        guard usesCollection else { return [] }
+        guard followsCollection else { return [] }
         guard viewMode == .table else {
             let shown = sections(in: library, order: order, now: library.now()).flatMap { $0.items.map(\.id) }
             guard tableOptions[item]?.isFiltering == true else { return shown }

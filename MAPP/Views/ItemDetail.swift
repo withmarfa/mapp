@@ -7,6 +7,8 @@ struct ItemDetail: View {
     let browser: Browser
     let editor: EditorController
     let details: DetailsPresentation
+    /// Whether the page backs the window's toolbar with glass. The modal draws its own toolbar and has no need.
+    var backsToolbar = true
 
     var body: some View {
         if browser.selection.count > 1 {
@@ -16,10 +18,10 @@ struct ItemDetail: View {
                 .onAppear { editor.close() }
         } else if let id = browser.selection.first, let item = library.item(id) {
             if library.pageLayout(of: item) != .text {
-                FileItemPage(item: item, drafts: details, open: { [editor] in editor.onOpenItem($0) }) { browser.fileFetched(id, at: $0) }
+                FileItemPage(item: item, drafts: details, open: { [editor] in editor.onOpenItem($0) }, onResolved: { browser.fileFetched(id, at: $0) }, backsToolbar: backsToolbar)
                     .onAppear { editor.close() }
             } else {
-                ItemPage(item: item, editor: editor, headerDrafts: details)
+                ItemPage(item: item, editor: editor, headerDrafts: details, backsToolbar: backsToolbar)
                     .onAppear(perform: grantFocusRequest)
                     .onChange(of: browser.focusRequest, grantFocusRequest)
             }

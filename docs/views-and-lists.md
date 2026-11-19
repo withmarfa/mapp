@@ -1,8 +1,8 @@
 # Views and lists
 
-Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built in v0.0.45. The table's margin, whole-cell hover and add to an empty cell, the palettes' bar, rows and material setting, and the selection and hover greys and the favorite's heart as described below, are built, not yet released, as is Collections and Sources as a table with tabs, the sidebar customized in place and Settings > Sidebar. See [Looks](looks.md).
+Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built in v0.0.45. The table's margin, whole-cell hover and add to an empty cell, the palettes' bar, rows and material setting, and the selection and hover greys and the favorite's heart as described below, are built, not yet released, as is Collections and Sources as a table with tabs, the sidebar customized in place and Settings > Sidebar, and opening an item as a modal, a full page or a window with one row menu for every layout. See [Looks](looks.md).
 
-Where it lives: `Browser`, `ItemViewMode`, `ViewLayouts`, `SidebarLayout`, `IndexPlace`, `IndexTab`, `IndexSort`, `IndexPreferences` and `IndexChoice` under `MAPP/Model/`, with `IndexRow`, `IndexRows`, `CardContents`, `ItemTableLayout`, `ItemTimelineLayout`, `ItemPlacement`, `EventSpan`, `CalendarLayout` and `CalendarCorner` under `MAPP/Model/Items/`; `ItemList`, `ItemRow`, `ItemGallery`, `GalleryCard`, `ItemBoard`, `ItemTable`, `ItemTableCell`, `SoftSelection`, `ChipLine`, `ItemTimeline`, `ItemCalendar`, `SidebarIndex`, `SidebarSettings`, `SidebarSettingsPlan`, `SidebarColorPicker`, `IndexPage`, `IndexInspector`, `IndexViewOptions`, `WindowCorner`, `ViewCorner`, `CalendarCornerView`, `CalendarMonthCard`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
+Where it lives: `Browser`, `ItemViewMode`, `ItemOpening`, `ListNeighbors`, `RowMenuEntry`, `ViewLayouts`, `SidebarLayout`, `IndexPlace`, `IndexTab`, `IndexSort`, `IndexPreferences` and `IndexChoice` under `MAPP/Model/`, with `IndexRow`, `IndexRows`, `CardContents`, `ItemTableLayout`, `ItemTimelineLayout`, `ItemPlacement`, `EventSpan`, `CalendarLayout` and `CalendarCorner` under `MAPP/Model/Items/`; `ItemList`, `ItemRow`, `ItemRowMenu`, `ItemModal`, `ItemGallery`, `GalleryCard`, `ItemBoard`, `ItemTable`, `ItemTableCell`, `SoftSelection`, `ChipLine`, `ItemTimeline`, `ItemCalendar`, `SidebarIndex`, `SidebarSettings`, `SidebarSettingsPlan`, `SidebarColorPicker`, `IndexPage`, `IndexInspector`, `IndexViewOptions`, `WindowCorner`, `ViewCorner`, `CalendarCornerView`, `CalendarMonthCard`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
 
 A view shows a set of items in a layout. This page explains the layouts, what a saved view is, and the controls that change what a list shows.
 
@@ -42,6 +42,17 @@ The window's bottom-right corner (`WindowCorner`) holds how a person views the s
 Agreed, not built:
 
 - The timeline starts from today's agenda and uses the window's width, and choosing a row, card or event opens the right sidebar.
+
+## Opening an item
+
+Built, not yet released. The page itself is in [Item page](item-page.md#opened-as-a-modal-or-a-full-page).
+
+- Return, a double-click and Open open an item the way Settings > Lists > Open Items In says (`ItemOpening`): **Modal** (the default), **Full Page** or **New Window**. It is a Mac setting kept in one key in the defaults (`openItemsIn`) and never written to Marfa. Changing it does not close a modal that is open; it reads at the next open.
+- Every layout opens an item the same way: the table, board, gallery, timeline, calendar and the list. A list with the page beside it keeps the page there: Return moves the keyboard to the page, and a double-click and Open follow the setting.
+- A modal and a full page show one item, so Open does nothing for a selection of several. New Window opens a window for each item, and asks first when there are more than 10 (`ItemWindows`).
+- One row menu serves every layout (`ItemRowMenu`, ordered by `RowMenuEntry`). It starts with Open, which follows the setting, then the other two ways (Open as Modal, Open as Full Page or Open in New Window), then Quick Look and Share…, then Add to Favorites, Add Tag, Add to Collection, what the layout adds (a board's Move To), Change Type, Customize Layout and Version History, and Delete last. The menu of items in Recently Deleted holds Recover in their place. It shows no key glyphs for Return and Space.
+- Open, Open as Modal, Open as Full Page, Previous Item, Next Item and Close Modal are menu commands and palette entries. Previous Item and Next Item are Option-Command-Up Arrow and Option-Command-Down Arrow, and work only while a modal is open.
+- Not built: the modal's up and down arrows in a board, a timeline or a calendar follow the list's sort order, not the layout's own.
 
 ## Selection and hover
 
@@ -166,7 +177,7 @@ Settings is a place in the sidebar. See [Settings storage](settings-storage.md) 
 - The pages list is the Settings column, 280 points by default (see [Settings storage](settings-storage.md)), and a page's column is 580 points.
 - Rows are 37 points high, rows of buttons are 44 points, and boxes sit 56 points apart.
 - Push buttons are gray with no edge.
-- The density setting is in the Lists pane, after Appearance.
+- The density setting is in the Lists pane, after Appearance. Open Items In is in the same pane, in In Every List, after Group by.
 
 Settings keeps its structure: the app's sidebar, the Settings list, then the page. A page is a column of sections. Each section has its title outside one card of rows, and a row's description is one line, two at most. A page may have a line under its title (`SettingsPage.summary`). Sidebar is built to this ([Settings > Sidebar](#settings--sidebar)); the other pages are being redesigned to it ([Agreed designs](agreed-designs.md)).
 

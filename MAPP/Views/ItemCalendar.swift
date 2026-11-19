@@ -40,9 +40,7 @@ struct ItemCalendar: View {
         .focusEffectDisabled()
         .focused(pane, equals: .list)
         .onKeyPress(.return) {
-            guard browser.selection.count == 1 else { return .ignored }
-            browser.openCollectionSelection()
-            return .handled
+            browser.openSelection() ? .handled : .ignored
         }
         .onKeyPress(keys: [.upArrow, .downArrow, .leftArrow, .rightArrow], phases: .down) { press in
             guard !press.modifiers.contains(.command) else { return .ignored }
@@ -92,10 +90,7 @@ struct ItemCalendar: View {
         browser.selection = [id]
     }
 
-    private func open(_ id: ItemID) {
-        browser.selection = [id]
-        browser.openCollectionSelection()
-    }
+    private func open(_ id: ItemID) { browser.open([id]) }
 
     /// The month of the span, or both months where a week crosses two, with the year.
     static func title(of interval: DateInterval, calendar: Calendar) -> String {
@@ -135,6 +130,7 @@ private extension CalendarEntry {
 /// One item as a control: it answers a click and a double click, and reads the selection itself, so a selection that
 /// moves runs these small bodies and not the calendar's.
 private struct CalendarCell<Label: View>: View {
+    @Environment(\.undoManager) private var undoManager
     let browser: Browser
     let entry: CalendarEntry
     /// The day this one is drawn on, since an event over midnight is drawn on each.
@@ -156,7 +152,9 @@ private struct CalendarCell<Label: View>: View {
         .focusable(false)
         .simultaneousGesture(TapGesture(count: 2).onEnded { open(id) })
         .help(entry.title)
-        .contextMenu { Button("Open") { open(id) } }
+        .contextMenu {
+            ItemRowMenu(browser: browser, ids: browser.selection.contains(id) ? browser.selection : [id], undoManager: undoManager)
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: entry.title))
         .accessibilityValue(Text(verbatim: entry.spoken(calendar: calendar)))

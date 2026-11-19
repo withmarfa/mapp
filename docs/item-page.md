@@ -1,6 +1,6 @@
 # Item page
 
-Status: Built in v0.0.43.
+Status: Built in v0.0.43. Opening an item as a modal or a full page is built, not yet released.
 
 Where it lives: `ItemPageHeader`, `PagePinsView` and `PageChip` for the header; `PropertyRow`, `PagePlacements`, `PageLayout` and `PagePins` for what the page shows; `ItemInspector` for the right sidebar; `ItemLayoutPanel` for arranging; `ValueEditing/` for editing a value; `FieldMenu`, `FieldMenuPresenter` and `FieldEditSheet` for a field's menu; `VersionHistoryWorkspace` for history. The web part of the header is `editor/src/header.ts`.
 
@@ -115,6 +115,17 @@ A field's name on the page opens its menu (`FieldMenu`, drawn by `FieldMenuPrese
 - **Rename** changes the field's label only, to a name no other field has, of 100 characters at most. A key is never renamed, because Marfa carries no values to a new name.
 - **Edit Choices** adds, orders and takes out choices; a choice the field already offers is shown as text and never retyped. Items that hold a choice taken out keep it. The last choice can't be taken out.
 - **Remove Field** asks first (an alert) and says the items keep their values, which an app can still read.
+
+## Opened as a modal or a full page
+
+Built, not yet released. Where an item opens is Settings > Lists > Open Items In ([Views and lists](views-and-lists.md#opening-an-item)).
+
+- A modal is a large, solid page over the window, with the window dimmed behind it (`ItemModal`). It is 1000 points wide, centered, with 60 points above and below; the right sidebar adds its own width to the card, as far as the window has room, and the page keeps nearly its width. Customize Layout opened in it shows Done in place of the Details button. It hosts the same page the window shows, with the window's one editor, so no second editor writes the item: the page beside the list steps aside while the modal is open.
+- The modal's toolbar holds, from the leading side: up and down arrows, full page and new window, Share and More, the right sidebar (filled while it is open), and close. The up and down arrows move to the item before or after it in the list behind, and the selection follows, and Back does not stop at each item stepped over. They are dimmed at the first and last item. The right sidebar opens inside the modal.
+- Escape, the close button and a click on the dimmed area close the modal, and what was typed is saved as it closes. The modal also closes when another item, place or layout is chosen, when Settings opens, when Version History opens, and when its item is gone from the library, and a search puts it, or a full page, away in every layout. An item that leaves the list while the modal is open closes it with the selection that held it.
+- New window from the modal closes it and opens the item in a window, after saving what was typed.
+- A link followed from the modal opens in the modal.
+- A full page takes the window in place of the layout, with a plain Back button at the toolbar's leading edge. The button has no label; Back in the View menu and Command-[ do the same. It is available from the list as well as from the other layouts. A full page has no view options.
 
 ## Spacing
 

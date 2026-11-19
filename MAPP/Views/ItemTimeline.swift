@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ItemTimeline: View {
     @CurrentLibrary private var library
+    @Environment(\.undoManager) private var undoManager
     @Bindable var browser: Browser
     var pane: FocusState<Browser.Pane?>.Binding
     @State private var daysSeen = 0
@@ -112,7 +113,7 @@ struct ItemTimeline: View {
                             .wantsCounts(of: row.id, content.countQueries, in: library.counts)
                             .accessibilityElement(children: .combine)
                             .accessibilityIdentifier("TimelineItem-\(row.id.rawValue)")
-                            .accessibilityAction(named: Text("Open")) { open([row.id]) }
+                            .accessibilityAction(named: Text("Open")) { browser.open([row.id]) }
                             .listRowSeparator(endsDay ? .visible : .hidden, edges: .bottom)
                         }
                     case .earlier:
@@ -154,17 +155,11 @@ struct ItemTimeline: View {
         .accessibilityLabel("Timeline")
         .accessibilityIdentifier("ItemTimeline")
         .contextMenu(forSelectionType: ItemID.self) { ids in
-            if ids.count == 1 {
-                Button("Open") { open(ids) }
-            }
+            ItemRowMenu(browser: browser, ids: ids, undoManager: undoManager)
         } primaryAction: { ids in
-            open(ids)
+            browser.open(ids)
         }
-        .onKeyPress(.return) {
-            guard browser.selection.count == 1 else { return .ignored }
-            browser.openCollectionSelection()
-            return .handled
-        }
+        .onKeyPress(.return) { browser.openSelection() ? .handled : .ignored }
     }
 
     /// The row's date is its time, so the row itself says no second date.
@@ -222,12 +217,6 @@ struct ItemTimeline: View {
             Text("Not Applicable").interfaceFont(.headline).foregroundStyle(.secondary)
         }
     }
-
-    private func open(_ ids: Set<ItemID>) {
-        guard ids.count == 1 else { return }
-        browser.selection = ids
-        browser.openCollectionSelection()
-    }
 }
 
 /// Opens the right sidebar when a row is chosen. It reads the selection itself, so the timeline's body does not, and a
@@ -239,7 +228,7 @@ struct ChosenRowOpensSidebar: View {
 
     var body: some View {
         Color.clear.onChange(of: browser.selection) { _, selection in
-            if selection.count == 1, browser.showsCollection { details?.isPresented = true }
+            if selection.count == 1, browser.showsCollection, !browser.isModalPresented { details?.isPresented = true }
         }
     }
 }

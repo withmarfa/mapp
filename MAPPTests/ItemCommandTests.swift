@@ -26,13 +26,13 @@ struct ItemCommandTests {
 
     @Test func anItemOnThePageEnablesThePageCommands() {
         let note = library.add("A note\n")
-        #expect(enabled(context([note.id], page: note.id)) == [.quickLook, .openInNewWindow, .addAttachment, .toggleSource, .print, .exportPDF])
+        #expect(enabled(context([note.id], page: note.id)) == [.open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow, .addAttachment, .toggleSource, .print, .exportPDF])
     }
 
     @Test func aSelectedItemNotOnThePageEnablesOnlyOpeningInAWindow() {
         let note = library.add("A note\n")
-        #expect(enabled(context([note.id])) == [.quickLook, .openInNewWindow])
-        #expect(enabled(context([note.id], page: .mint())) == [.quickLook, .openInNewWindow])
+        #expect(enabled(context([note.id])) == [.open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow])
+        #expect(enabled(context([note.id], page: .mint())) == [.open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow])
     }
 
     @Test func settingsShowingLeavesNoPageForTheCommandsToAct() {
@@ -41,7 +41,7 @@ struct ItemCommandTests {
         browser.showSettings()
         let page = ItemCommandContext.pageItem(showsPage: browser.showsPage, editorHasItem: true, pageItemID: note.id)
         #expect(page == nil)
-        #expect(enabled(context([note.id], page: page)) == [.quickLook, .openInNewWindow])
+        #expect(enabled(context([note.id], page: page)) == [.open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow])
 
         browser.leaveSettings()
         let back = ItemCommandContext.pageItem(showsPage: browser.showsPage, editorHasItem: true, pageItemID: note.id)
@@ -57,7 +57,7 @@ struct ItemCommandTests {
         library.items.append(Item(
             id: id, type: TypeID("core.file"), title: "Report.pdf", titleRule: .property("title"), content: .file(.pdf, byteCount: 10),
             version: ItemVersion(1), created: .now, modified: .now))
-        #expect(enabled(context([id], page: id)) == [.quickLook, .openInNewWindow])
+        #expect(enabled(context([id], page: id)) == [.open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow])
     }
 
     @Test func severalItemsHaveNoSinglePage() {

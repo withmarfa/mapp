@@ -10,7 +10,7 @@ extension View {
 }
 
 /// What a window does when the library changes under the place it shows: moves on from a place that is gone, goes
-/// back to the list when its layout is no longer offered, and keeps a selection that follows the collection.
+/// back to the list when its layout is no longer offered, and keeps a selection that follows the collection, or the list's items under a full page opened from the list.
 private struct PlaceWatch: View {
     @CurrentLibrary private var library
     let browser: Browser
@@ -24,8 +24,7 @@ private struct PlaceWatch: View {
             .onChange(of: browser.placeFallback(in: library)) { browser.placeRemoved(in: library, order: order) }
             // The gallery or table disappears while an item is open; selection must still follow deletes and moves.
             .onChange(of: browser.collectionItemIDs(in: library, order: order)) { old, new in
-                guard browser.usesCollection else { return }
-                browser.keepSelection(from: old, to: new)
+                browser.collectionItemsChanged(from: old, to: new)
             }
             // A layout the place cannot show (Board with no choice fields) is not offered, and a window left on one
             // returns to the list. Changing `viewMode` only moves between layouts the workspace already handles.
