@@ -3,9 +3,9 @@ import Foundation
 /// What a field's name on the item page offers, decided once and drawn by the page's menu. Pure, with no SwiftUI.
 ///
 /// The Mac's own placement (pin, move, hide) is offered for every row of the page. What changes the type for every
-/// item (rename, edit choices, remove) is offered only for a field the type declares itself, on a type that is not
-/// Marfa's own, and only while the server can be reached. A field that is not the person's to change shows what stops
-/// them instead, and none of those entries.
+/// item (rename, edit choices, remove) is offered only for a field the type declares and no type above it does, on a
+/// type that is not Marfa's own, and only while the server can be reached. A field that is not the person's to change
+/// shows what stops them instead, and none of those entries.
 nonisolated struct FieldMenu: Equatable, Sendable {
     enum Command: Hashable, Sendable {
         /// The value's own editor, for a value whose click follows a link instead.

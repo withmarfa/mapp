@@ -102,9 +102,9 @@ nonisolated struct FieldEditPlan: Hashable, Sendable {
     let shown: ItemTypeInfo.Field
 }
 
-/// The list of choices a person edits: the words the field already offers, which can be taken out and put in another
-/// order (the sheet moves `rows`) but never retyped, and the words they add. A choice is not renamed, since an item holding the old word keeps
-/// it and the plan cannot tell a rename from taking one word out and adding another.
+/// The choices a person edits: the words the field already offers, which can be taken out or moved but never retyped,
+/// and the words they add. A choice is not renamed, since an item holding the old word keeps it and the plan cannot
+/// tell a rename from taking one word out and adding another.
 nonisolated struct ChoiceDraft: Sendable {
     struct Row: Identifiable, Sendable {
         let id = UUID()
