@@ -38,9 +38,7 @@ struct ItemCorner: View {
                         Text("Reader").tag(SourceViewMode.reader)
                         Text("Original").tag(SourceViewMode.original)
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
+                    .cornerSegmented()
                     .help("Reader or Original")
                     .accessibilityIdentifier("SourceViewMode")
                 case .pages:
@@ -135,8 +133,7 @@ struct FormatsCard: View {
             Divider()
             HStack(spacing: 8) {
                 PageWidthOptions()
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
+                    .cornerSegmented()
                 textSizeButtons
             }
         }

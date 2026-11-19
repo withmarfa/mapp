@@ -183,6 +183,16 @@ struct MainView: View {
         ItemDetail(browser: browser, editor: editor, details: details)
     }
 
+    /// An item's page filling the content, where the list that held the keyboard has gone. The page takes the keyboard
+    /// itself, so Escape still reaches `escapesFromPage` before anything is clicked.
+    private var fullPage: some View {
+        itemPage
+            .focusable()
+            .focusEffectDisabled()
+            .focused($pane, equals: .page)
+            .onAppear { pane = .page }
+    }
+
     private var workspace: some View {
         Group {
             if let history = details.history, shownPresentation == .history {
@@ -229,7 +239,7 @@ struct MainView: View {
                             .viewCorner(browser)
                         } else {
                             // The page has no title of the window's own to show beside Back, which is the arrow alone.
-                            itemPage.toolbar(removing: .title)
+                            fullPage.toolbar(removing: .title)
                         }
                     }
                     .toastOverlay()

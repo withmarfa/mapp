@@ -326,8 +326,7 @@ private struct CalendarWeekView: View {
                     let blockWidth = max(slot - 2, 8)
                     CalendarCell(browser: browser, entry: block.entry, day: day.date, calendar: calendar, choose: choose, open: open) { isSelected in
                         CalendarBlockLabel(
-                            entry: block.entry, isSelected: isSelected, calendar: calendar, showsTime: tall >= 34, width: blockWidth,
-                            height: tall - 1)
+                            entry: block.entry, isSelected: isSelected, calendar: calendar, width: blockWidth, height: tall - 1)
                             .frame(width: blockWidth, height: tall - 1, alignment: .topLeading)
                             .calendarFill(isSelected, radius: 6)
                             .shadow(color: isSelected ? .black.opacity(0.18) : .clear, radius: 3, y: 2)
@@ -370,26 +369,26 @@ private struct CalendarReveal: View {
     }
 }
 
-/// What a block says: its title on up to two lines, by word and ending in an ellipsis where it is cut, and its start.
+/// What a block says: its title on up to two lines, by word and ending in an ellipsis where it is cut, and its start
+/// where there is room left after the title (`CalendarLayout.blockLabel`).
 private struct CalendarBlockLabel: View {
     let entry: CalendarEntry
     let isSelected: Bool
     let calendar: Calendar
-    let showsTime: Bool
     let width: CGFloat
     let height: CGFloat
     @Environment(\.interfaceTextSize) private var textSize
 
-    private static let padding = EdgeInsets(top: 4, leading: 6, bottom: 4, trailing: 6)
-
     var body: some View {
         let scale = InterfaceStyle.scale(for: textSize)
         let font = NSFont.systemFont(ofSize: 11.5 * scale, weight: .medium)
-        let room = height - Self.padding.top - Self.padding.bottom - (showsTime ? 12 * scale : 0)
-        let lineCount = max(1, min(2, Int(room / (14 * scale))))
+        // A narrow block gives its sides up to the title.
+        let side: CGFloat = width < 60 * scale ? 3 : 6
+        let plan = CalendarLayout.blockLabel(height: height, width: width - side * 2, scale: scale)
+        let showsTime = plan.showsTime
         // A point is kept back so a line that measures as fitting is not cut by the text's own rounding.
         let lines = CalendarLayout.titleLines(
-            entry.title, lines: lineCount, fitting: width - Self.padding.leading - Self.padding.trailing - 1
+            entry.title, lines: plan.titleLines, fitting: width - side * 2 - 1
         ) { ($0 as NSString).size(withAttributes: [.font: font]).width }
         VStack(alignment: .leading, spacing: 1) {
             VStack(alignment: .leading, spacing: 0) {
@@ -408,7 +407,7 @@ private struct CalendarBlockLabel: View {
                     .foregroundStyle(isSelected ? Color.white.opacity(0.85) : .secondary)
             }
         }
-        .padding(Self.padding)
+        .padding(EdgeInsets(top: 3 * scale, leading: side, bottom: 3 * scale, trailing: side))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }

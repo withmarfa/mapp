@@ -29,6 +29,9 @@ struct WindowCorner<Buttons: View, Card: View>: View {
             if isCardOpen {
                 card
                     .frame(width: cardWidth ?? (buttonsWidth > 0 ? buttonsWidth : nil))
+                    // The corner fills the content's height, which a card's flexible parts (a divider, a spacer, an
+                    // empty cell) would take; the card keeps its content's own height.
+                    .fixedSize(horizontal: false, vertical: true)
                     .background(.background, in: .rect(cornerRadius: 16, style: .continuous))
                     .overlay { RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5) }
                     .shadow(color: .black.opacity(0.12), radius: 14, y: 8)
@@ -79,13 +82,16 @@ private struct CornerButtonLabel<Label: View>: View {
             .foregroundStyle(.primary)
             .padding(.horizontal, 12)
             .frame(minWidth: height, minHeight: height)
-            .background { if isOn || isPressed { Capsule().fill(.primary.opacity(isOn ? 0.14 : 0.08)).padding(3) } }
+            .background { if isPressed && !isOn { Capsule().fill(.primary.opacity(0.08)).padding(3) } }
             .contentShape(.capsule)
-            .glassEffect(.regular.interactive(), in: .capsule)
+            .glassEffect(isOn ? .regular.tint(CornerMetrics.onTint).interactive() : .regular.interactive(), in: .capsule)
     }
 }
 
 enum CornerMetrics {
+    /// What a button or a chosen segment that is on is tinted with: gray, never the accent color.
+    static let onTint = Color.gray.opacity(0.45)
+
     /// The height of a button at the default interface text size.
     static let height: CGFloat = 32
 
@@ -156,5 +162,16 @@ struct CornerMenu<Content: View>: View {
         .menuIndicator(.hidden)
         .buttonStyle(CornerButtonStyle())
         .fixedSize()
+    }
+}
+
+extension View {
+    /// A corner's choice of a few as the system's segmented control, its chosen segment gray rather than the accent
+    /// color, and as wide as its labels.
+    func cornerSegmented() -> some View {
+        pickerStyle(.segmented)
+            .labelsHidden()
+            .tint(.gray)
+            .fixedSize()
     }
 }

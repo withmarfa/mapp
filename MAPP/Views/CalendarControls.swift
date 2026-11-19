@@ -14,13 +14,16 @@ struct CalendarCornerView: View {
         WindowCorner(isCardOpen: browser.showsCalendarMonth) {
             Button("Today") { browser.moveCalendar(by: nil, now: library.now()) }
                 .buttonStyle(CornerButtonStyle())
+                .accessibilityLabel("Today")
                 .accessibilityIdentifier("CalendarToday")
             CornerButtonGroup {
                 Button("Previous", systemImage: "chevron.left") { browser.moveCalendar(by: -1, now: library.now()) }
                     .help(scale == .week ? "Previous Week" : "Previous Month")
+                    .accessibilityLabel(scale == .week ? "Previous Week" : "Previous Month")
                     .accessibilityIdentifier("CalendarPrevious")
                 Button("Next", systemImage: "chevron.right") { browser.moveCalendar(by: 1, now: library.now()) }
                     .help(scale == .week ? "Next Week" : "Next Month")
+                    .accessibilityLabel(scale == .week ? "Next Week" : "Next Month")
                     .accessibilityIdentifier("CalendarNext")
             }
             .labelStyle(.iconOnly)
@@ -29,6 +32,7 @@ struct CalendarCornerView: View {
                 .labelStyle(.iconOnly)
                 .buttonStyle(CornerButtonStyle(isOn: browser.showsCalendarMonth))
                 .help(browser.showsCalendarMonth ? "Hide Month" : "Show Month")
+                .accessibilityLabel(browser.showsCalendarMonth ? "Hide Month" : "Show Month")
                 .accessibilityIdentifier("CalendarShowMonth")
         } card: {
             CalendarMonthCard(browser: browser)
@@ -47,15 +51,15 @@ struct CalendarCornerView: View {
                 .pickerStyle(.inline)
             }
             .help("Show a Week or a Month")
+            .accessibilityLabel("Show a Week or a Month")
             .accessibilityIdentifier("CalendarScale")
         } else {
             Picker("Show", selection: choice) {
                 ForEach(CalendarScale.allCases, id: \.self) { Text($0.title).tag($0) }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .fixedSize()
+            .cornerSegmented()
             .help("Show a Week or a Month")
+            .accessibilityLabel("Show a Week or a Month")
             .accessibilityIdentifier("CalendarScale")
         }
     }

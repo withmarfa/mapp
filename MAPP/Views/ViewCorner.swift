@@ -14,6 +14,7 @@ struct ViewCorner: View {
             WindowCorner {
                 Button("Today") { browser.requestTimelineToday() }
                     .buttonStyle(CornerButtonStyle())
+                    .accessibilityLabel("Today")
                     .accessibilityIdentifier("TimelineToday")
             }
         case .gallery:
