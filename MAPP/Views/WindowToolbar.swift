@@ -58,40 +58,46 @@ struct WindowToolbar: CustomizableToolbarContent {
         if let browser {
             ViewChangeItems(browser: browser)
         }
+        // A hidden spacer still leaves its gap, so the fixed spacers are not hidden: each stands after a group that
+        // shows and before another that does, which keeps one standard gap between groups in every state. They are
+        // locked, so they come and go like the items that are.
+        // While a view is edited the toolbar keeps to what edits it: its layout is chosen in the panel, and Share and
+        // More act on items, not on the view.
+        let editsView = browser?.showsViewPanel == true
+        let hidesPageLook = details.pageLook == nil || browser?.showsCollection == true || !showsItem
+        let showsViewTools = browser != nil && !hasListColumn && !opensFromCollection
+        let showsViewMode = browser != nil && showsItem && !editsView
+        let showsActions = showsItem && !editsView
+        let showsDetails = !tools.showsInspector
+        let showsAfterViewTools = !hidesPageLook || showsViewMode || showsActions || showsDetails
+        let showsAfterPageLook = showsViewMode || showsActions || showsDetails
+        let showsAfterViewMode = showsActions || showsDetails
         if let browser, !hasListColumn {
             ViewToolbarItems(browser: browser, layout: .item, isHidden: opensFromCollection)
-            ToolbarSpacer(.fixed)
-                .hidden(opensFromCollection || !showsItem)
+            if showsViewTools && showsAfterViewTools { ToolbarSpacer(.fixed).customizationBehavior(.disabled) }
         }
-        let hidesPageLook = details.pageLook == nil || browser?.showsCollection == true || !showsItem
         ToolbarItem(id: "pageLook") { SourceViewPicker(details: details) }
             .hidden(hidesPageLook)
-        ToolbarSpacer(.fixed)
-            .hidden(hidesPageLook)
+        if !hidesPageLook && showsAfterPageLook { ToolbarSpacer(.fixed).customizationBehavior(.disabled) }
         ToolbarItem(id: "format") {
             if let editor { FormatMenu(editor: editor, item: tools.editableItem) }
         }
             .defaultCustomization(.hidden)
             .hidden(browser?.showsCollection == true || !showsItem)
-        // While a view is edited the toolbar keeps to what edits it: its layout is chosen in the panel, and Share and
-        // More act on items, not on the view.
-        let editsView = browser?.showsViewPanel == true
         if let browser {
             ToolbarItem(id: "viewMode") { ViewModeMenu(browser: browser) }
-                .hidden(!showsItem || editsView)
-            ToolbarSpacer(.fixed)
-                .hidden(!showsItem || editsView)
+                .hidden(!showsViewMode)
+            if showsViewMode && showsAfterViewMode { ToolbarSpacer(.fixed).customizationBehavior(.disabled) }
         }
         ToolbarItem(id: "share") { tools.shareLink }
-            .hidden(!showsItem || editsView)
+            .hidden(!showsActions)
         ToolbarItem(id: "more") {
             tools.moreMenu.disabled(items.isEmpty)
         }
-        .hidden(!showsItem || editsView)
-        ToolbarSpacer(.fixed)
-            .hidden(tools.showsInspector)
+        .hidden(!showsActions)
+        if showsActions && showsDetails { ToolbarSpacer(.fixed).customizationBehavior(.disabled) }
         ToolbarItem(id: "details") { tools.detailsButton }
-            .hidden(tools.showsInspector)
+            .hidden(!showsDetails)
         ExtraToolbarItems(tools: tools)
     }
 }
