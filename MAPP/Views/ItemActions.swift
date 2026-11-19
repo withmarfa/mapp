@@ -4,7 +4,7 @@ import SwiftUI
 /// what removes it. The More menu places the same two parts apart, with other commands between them.
 struct ItemActions: View {
     @CurrentLibrary private var library
-    /// The window's, for the Add to Collection sheet; the menu bar passes the front window's in.
+    /// The window's, for the Add to Collection panel; the menu bar passes the front window's in.
     @Environment(DetailsPresentation.self) private var details: DetailsPresentation?
     let ids: Set<ItemID>
     /// Passed in, since the menu bar has no window of its own to read one from.
