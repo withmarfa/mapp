@@ -119,10 +119,10 @@ extension ItemLibrary {
     /// Moves items to Recently Deleted once every open page has handed over what was just typed, since a deleted
     /// item takes no edit. Every way of deleting comes through here. More than one item asks the person first, in
     /// the window whose presentation it is given.
-    func deleteAfterSaving(_ ids: Set<ItemID>, undoManager: UndoManager?, asking details: DetailsPresentation?) {
+    func deleteAfterSaving(_ ids: Set<ItemID>, undoManager: UndoManager?, asking details: DetailsPresentation?, naming title: String? = nil) {
         EditorController.flushAll(leaving: false) { [self] kept in
             guard kept else { return }
-            Browser.delete(ids, in: self, undoManager: undoManager, toasts: details?.toasts, asking: details.map { details in
+            Browser.delete(ids, in: self, undoManager: undoManager, toasts: details?.toasts, naming: title, asking: details.map { details in
                 { details.deletion = DeleteRequest(ids: $0, undoManager: undoManager) }
             })
         }

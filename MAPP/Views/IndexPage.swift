@@ -1,113 +1,149 @@
-import Charts
 import SwiftUI
 
-/// The measures the three layouts share, on a 4 point grid.
+/// The measures of an index page, on a 4 point grid.
 private enum IndexMetrics {
-    static let top: CGFloat = 16
-    static let side: CGFloat = 24
-    static let tile: CGFloat = 28
-    static let radius: CGFloat = 12
+    static let top: CGFloat = 12
+    static let side: CGFloat = 16
+    static let icon: CGFloat = 16
 }
 
-/// What a page needs to take drops on its rows: the window's browser, and the order it lists in.
-struct IndexDrop {
-    let browser: Browser
-    let order: ItemOrder
-}
-
-private extension View {
-    /// Makes a row that is a collection take items and files dropped on it.
-    @ViewBuilder
-    func takingDrops(_ drop: IndexDrop?, on row: IndexRow) -> some View {
-        if let drop, case .collection(let id) = row.place {
-            dropsInto(collection: id, browser: drop.browser, order: drop.order)
-        } else {
-            self
+/// The title of a tab, as the page words it.
+extension IndexTab {
+    var title: LocalizedStringKey {
+        switch self {
+        case .all: "All"
+        case .yours: "Yours"
+        case .fromApps: "From Apps"
+        case .apps: "Apps"
+        case .keys: "Keys"
         }
     }
 }
 
-/// The menu of a row that is a source.
-private struct SourceMenu: View {
-    let place: SidebarItem
-    let edit: (SourceEditRequest) -> Void
-
-    var body: some View {
-        if case .source(let code) = place {
-            Button("Rename…") { edit(SourceEditRequest(code: code, mode: .name)) }
-            Button("Choose Mark…") { edit(SourceEditRequest(code: code, mode: .mark)) }
+extension IndexColumn {
+    /// The column's heading: a source writes types and its latest item is when it last wrote, and a collection's date is
+    /// its own update.
+    func title(in place: IndexPlace) -> LocalizedStringKey {
+        switch self {
+        case .name: place == .sources ? "Source" : "Name"
+        case .types: "Writes"
+        case .source: "Source"
+        case .count: "Items"
+        case .latest: place == .sources ? "Latest" : "Updated"
         }
     }
 }
 
-private extension View {
-    /// Gives a source's row a context menu to rename it and choose its mark.
-    @ViewBuilder
-    func editingSource(_ edit: ((SourceEditRequest) -> Void)?, on row: IndexRow) -> some View {
-        if let edit {
-            contextMenu { SourceMenu(place: row.place, edit: edit) }
-        } else {
-            self
-        }
-    }
-}
-
-/// A page of rows that each lead to a place, shown as a list, as cards or as a table, within a width. Sources and
-/// Collections are two of them.
+/// An index of containers drawn as a table, under its tabs. The page holds no state of its own about the chosen row:
+/// the table and the right sidebar read it from `IndexChoice`, so choosing one runs no row's body.
 struct IndexPage: View {
+    let place: IndexPlace
+    /// The rows of the chosen tab and the search, in no order; the table orders them.
     let rows: [IndexRow]
-    /// The colors of the types of all the places, not only the rows shown, so a search keeps each type's color.
-    let palette: IndexPalette
-    let layout: IndexLayout
-    let width: IndexWidth
-    /// The heading of the table column that names the types of a row's items.
-    let typesTitle: LocalizedStringKey
-    /// Whether a card names `secondary` under its title; false where the key under the bar already says it.
-    var showsSecondaryOnCards = true
-    /// Set where the rows are items' places, so a collection's row takes drops. The table does not take them.
-    var drop: IndexDrop?
+    let tabs: [(tab: IndexTab, count: Int)]
+    @Binding var tab: IndexTab
+    let choice: IndexChoice
+    /// Opens the row's place: a double click, Return, or the context menu.
+    let open: (IndexRow) -> Void
     /// Set where a row's source can be renamed or given a mark, by its context menu.
     var edit: ((SourceEditRequest) -> Void)?
-    let open: (IndexRow) -> Void
-    @State private var isUnderToolbar = false
+    /// Set where a row's collection can be deleted, by its context menu and the Delete key.
+    var delete: ((IndexRow) -> Void)?
+    /// The button at the trailing edge of the tabs.
+    var newCollection: (() -> Void)?
+    /// What the table says while the tab has no rows.
+    let emptyTab: EmptyState<EmptyView>
 
     var body: some View {
-        Group {
-            switch layout {
-            case .list: IndexList(rows: rows, drop: drop, edit: edit, isUnderToolbar: $isUnderToolbar, open: open)
-            case .cards: IndexCards(rows: rows, palette: palette, showsSecondary: showsSecondaryOnCards, drop: drop, edit: edit, isUnderToolbar: $isUnderToolbar, open: open)
-            case .table: IndexTable(rows: rows, typesTitle: typesTitle, edit: edit, open: open)
+        VStack(spacing: 0) {
+            HStack(spacing: 4) {
+                ForEach(tabs, id: \.tab) { entry in
+                    IndexTabButton(tab: entry.tab, count: entry.count, isSelected: tab == entry.tab) { tab = entry.tab }
+                }
+                Spacer(minLength: 12)
+                if let newCollection {
+                    Button("New Collection", systemImage: "plus", action: newCollection)
+                        .mappButton(.secondary)
+                        .accessibilityIdentifier("NewCollection")
+                }
+            }
+            .padding(.horizontal, IndexMetrics.side)
+            .padding(.top, IndexMetrics.top)
+            .padding(.bottom, 8)
+            if rows.isEmpty {
+                emptyTab
+            } else {
+                IndexTable(place: place, rows: rows, choice: choice, open: open, edit: edit, delete: delete)
             }
         }
-        .contentMargins(.top, IndexMetrics.top, for: .scrollContent)
-        .frame(maxWidth: width.points.map { CGFloat($0) } ?? .infinity)
-        .frame(maxWidth: .infinity)
-        // The content is narrower than its column, so the band is drawn at the column's width, here, and not by the
-        // scroll view at the content's.
-        .toolbarBand(isUnderToolbar: isUnderToolbar)
-        // A new layout's scroll view starts at the top and reports only a change, and the table reports nothing.
-        .onChange(of: layout) { isUnderToolbar = false }
         .accessibilityIdentifier("IndexPage")
     }
 }
 
-/// The icon of a row. Every row has the same neutral look until something about it is known that should tell
-/// rows apart.
-struct IndexTile: View {
-    let icon: RowIcon
-    var size: CGFloat = IndexMetrics.tile
+/// One tab: its name and how many rows it holds. The chosen one has the secondary button's fill.
+private struct IndexTabButton: View {
+    let tab: IndexTab
+    let count: Int
+    let isSelected: Bool
+    let action: () -> Void
 
     var body: some View {
-        RowIconImage(icon: icon)
-            .font(.system(size: size * 0.5))
-            .foregroundStyle(.secondary)
-            .frame(width: size, height: size)
-            .overlay(RoundedRectangle(cornerRadius: size * 0.25).strokeBorder(.separator))
-            .accessibilityHidden(true)
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Text(tab.title)
+                Text(count, format: .number).monospacedDigit().foregroundStyle(.secondary)
+            }
+        }
+        .mappButton(isSelected ? .secondary : .plain)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityIdentifier("IndexTab.\(tab.rawValue)")
     }
 }
 
-/// When a row's latest item changed, as the system words a time before now.
+/// The mark of a container in the Name column: gray, with no tile, whatever the container is.
+private struct IndexNameCell: View {
+    let row: IndexRow
+
+    var body: some View {
+        HStack(spacing: 8) {
+            RowIconImage(icon: row.icon)
+                .font(.system(size: IndexMetrics.icon * 0.8))
+                .foregroundStyle(.secondary)
+                .frame(width: IndexMetrics.icon, height: IndexMetrics.icon)
+                .accessibilityHidden(true)
+            Text(verbatim: row.title).lineLimit(1)
+        }
+    }
+}
+
+/// The types a source writes: each type's icon in the type's color, with no tile, and its name.
+/// A type with no icon takes the neutral color and mark. Three are named and the rest counted.
+private struct IndexTypesCell: View {
+    @Environment(\.colorScheme) private var scheme
+    let shares: [TypeShare]
+    private static let shown = 3
+
+    var body: some View {
+        HStack(spacing: 10) {
+            ForEach(shares.prefix(Self.shown)) { share in
+                HStack(spacing: 4) {
+                    TypeGlyph(id: share.icon)
+                        .font(.system(size: 12))
+                        .foregroundStyle(TypeTone(icon: share.icon).color(for: scheme))
+                        .accessibilityHidden(true)
+                    Text(verbatim: share.label).lineLimit(1)
+                }
+            }
+            if shares.count > Self.shown {
+                Text("+\(shares.count - Self.shown)").foregroundStyle(.secondary)
+            }
+        }
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+    }
+}
+
+/// When a container's latest item changed, as the system words a time before now.
 struct IndexLatest: View {
     let date: Date?
 
@@ -120,226 +156,93 @@ struct IndexLatest: View {
     }
 }
 
-private struct IndexList: View {
-    let rows: [IndexRow]
-    let drop: IndexDrop?
-    let edit: ((SourceEditRequest) -> Void)?
-    @Binding var isUnderToolbar: Bool
-    let open: (IndexRow) -> Void
-    @State private var hovered: IndexRow.ID?
-    private let inset = IndexMetrics.side
-    private let spacing: CGFloat = 12
-
-    var body: some View {
-        List(rows) { row in
-            Button { open(row) } label: {
-                HStack(spacing: spacing) {
-                    IndexTile(icon: row.icon)
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(verbatim: row.title).fontWeight(.semibold).lineLimit(1)
-                        if !row.secondary.isEmpty {
-                            Text(verbatim: row.secondary).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
-                        }
-                    }
-                    Spacer(minLength: 12)
-                    Text(row.count, format: .number)
-                        .monospacedDigit()
-                        .frame(minWidth: 48, alignment: .trailing)
-                    IndexLatest(date: row.latest)
-                        .font(.subheadline).foregroundStyle(.secondary)
-                        .frame(minWidth: 72, alignment: .trailing)
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold)).foregroundStyle(.tertiary).accessibilityHidden(true)
-                }
-                .padding(.horizontal, inset)
-                .padding(.vertical, 10)
-                .contentShape(.rect)
-            }
-            .buttonStyle(.plain)
-            .onHover { inside in
-                if inside { hovered = row.id } else if hovered == row.id { hovered = nil }
-            }
-            .listRowInsets(EdgeInsets())
-            .alignmentGuide(.listRowSeparatorLeading) { _ in inset + IndexMetrics.tile + spacing }
-            .listRowBackground(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(hovered == row.id ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear))
-                    .padding(.horizontal, 8)
-            )
-            .takingDrops(drop, on: row)
-            .editingSource(edit, on: row)
-            .accessibilityIdentifier("IndexRow")
-        }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .reportsContentUnderToolbar($isUnderToolbar)
-    }
-}
-
-private struct IndexCards: View {
-    let rows: [IndexRow]
-    let palette: IndexPalette
-    let showsSecondary: Bool
-    let drop: IndexDrop?
-    let edit: ((SourceEditRequest) -> Void)?
-    @Binding var isUnderToolbar: Bool
-    let open: (IndexRow) -> Void
-
-    var body: some View {
-        ScrollView {
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 280, maximum: 480), spacing: 16, alignment: .top)], spacing: 16) {
-                ForEach(rows) { row in
-                    IndexCard(row: row, palette: palette, showsSecondary: showsSecondary, open: open)
-                        .takingDrops(drop, on: row)
-                        .editingSource(edit, on: row)
-                }
-            }
-            .padding(.horizontal, IndexMetrics.side)
-            .padding(.bottom, IndexMetrics.side)
-        }
-        .reportsContentUnderToolbar($isUnderToolbar)
-    }
-}
-
-private struct IndexCard: View {
-    let row: IndexRow
-    let palette: IndexPalette
-    let showsSecondary: Bool
-    let open: (IndexRow) -> Void
-    @State private var isHovered = false
-
-    var body: some View {
-        let shares = IndexRows.collapsing(row.breakdown)
-        let shape = RoundedRectangle(cornerRadius: IndexMetrics.radius)
-        Button { open(row) } label: {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 12) {
-                    IndexTile(icon: row.icon)
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(verbatim: row.title).fontWeight(.semibold).lineLimit(1)
-                        if showsSecondary, !row.secondary.isEmpty {
-                            Text(verbatim: row.secondary).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
-                        }
-                    }
-                    Spacer(minLength: 8)
-                    Text(row.count, format: .number).font(.title3.weight(.semibold)).monospacedDigit()
-                }
-                IndexBreakdownBar(shares: shares, palette: palette)
-                IndexBreakdownKey(shares: shares, palette: palette)
-                Group {
-                    if let latest = row.latest {
-                        Text("Latest \(latest, format: .relative(presentation: .named, unitsStyle: .abbreviated))")
-                    } else {
-                        Text("No Items")
-                    }
-                }
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(isHovered ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.quinary), in: shape)
-            .overlay(shape.strokeBorder(.separator))
-            .contentShape(shape)
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
-        .accessibilityIdentifier("IndexCard")
-    }
-}
-
-/// The colors of the types on one page, so a type has the same color on every card. They are muted, so they sit
-/// quietly in light and dark; the share that gathers the rest is gray.
-struct IndexPalette: Equatable {
-    private static let colors: [Color] = [Color.blue, .purple, .green, .orange, .pink, .teal, .indigo, .yellow]
-        .map { $0.mix(with: Color.gray, by: 0.35) }
-    private static let other = Color.gray.opacity(0.5)
-    private let slots: IndexSlots
-
-    init(slots: IndexSlots = IndexSlots()) { self.slots = slots }
-
-    func color(for share: TypeShare) -> Color {
-        slots.slot(for: share.type).map { Self.colors[$0] } ?? Self.other
-    }
-}
-
-/// One bar split by type. The key beside it gives the numbers, so the bar is not read out on its own.
-struct IndexBreakdownBar: View {
-    let shares: [TypeShare]
-    let palette: IndexPalette
-
-    var body: some View {
-        Chart(shares) { share in
-            BarMark(x: .value("Items", share.count))
-                .foregroundStyle(palette.color(for: share))
-        }
-        .chartXAxis(.hidden)
-        .chartYAxis(.hidden)
-        .chartLegend(.hidden)
-        .frame(height: 4)
-        .clipShape(.capsule)
-        .accessibilityHidden(true)
-    }
-}
-
-struct IndexBreakdownKey: View {
-    let shares: [TypeShare]
-    let palette: IndexPalette
-
-    var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 8, alignment: .leading)], alignment: .leading, spacing: 4) {
-            ForEach(shares) { share in
-                HStack(spacing: 4) {
-                    Circle().fill(palette.color(for: share)).frame(width: 6, height: 6).accessibilityHidden(true)
-                    Text(verbatim: "\(share.count.formatted()) \(share.label)").monospacedDigit().lineLimit(1)
-                }
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            }
-        }
-    }
-}
-
+/// The rows as a table, as wide as the page. Its cells are views of plain values, so a change of the chosen row
+/// finds each unchanged and runs none of their bodies. The order is worked out from the rows and the sort each time
+/// this body runs, so the table never draws the rows of another tab or one that has gone; the chosen row is read only
+/// by the table's own closures, so choosing one does not run this body.
 private struct IndexTable: View {
+    let place: IndexPlace
     let rows: [IndexRow]
-    let typesTitle: LocalizedStringKey
-    let edit: ((SourceEditRequest) -> Void)?
+    let choice: IndexChoice
     let open: (IndexRow) -> Void
-    @State private var sortOrder = [KeyPathComparator(\IndexRow.title, comparator: .localizedStandard)]
-    @State private var sorted: [IndexRow] = []
-    @State private var selection: Set<IndexRow.ID> = []
+    let edit: ((SourceEditRequest) -> Void)?
+    let delete: ((IndexRow) -> Void)?
+    @AppStorage private var sort: IndexSort
+
+    init(
+        place: IndexPlace, rows: [IndexRow], choice: IndexChoice, open: @escaping (IndexRow) -> Void,
+        edit: ((SourceEditRequest) -> Void)?, delete: ((IndexRow) -> Void)?
+    ) {
+        self.place = place
+        self.rows = rows
+        self.choice = choice
+        self.open = open
+        self.edit = edit
+        self.delete = delete
+        _sort = AppStorage(wrappedValue: place.defaultSort, place.sortKey)
+    }
+
+    /// The table's second column: what a source writes, or the source that wrote a collection.
+    private var secondColumn: IndexColumn { place.columns[1] }
+    private var secondKey: KeyPath<IndexRow, String> { place == .sources ? \.types : \.sourceName }
+
+    /// The kept sort, or the page's own while what is kept is of a column the page lacks.
+    private var shownSort: IndexSort { place.columns.contains(sort.column) ? sort : place.defaultSort }
+
+    private var sortOrder: Binding<[KeyPathComparator<IndexRow>]> {
+        Binding { shownSort.comparators } set: { if let next = IndexSort(comparators: $0) { sort = next } }
+    }
+
+    private var selection: Binding<IndexRow.ID?> {
+        Binding { choice.chosen } set: { choice.chosen = $0 }
+    }
 
     var body: some View {
-        Table(sorted, selection: $selection, sortOrder: $sortOrder) {
-            TableColumn("Name", value: \.title, comparator: .localizedStandard) { row in
-                HStack(spacing: 8) {
-                    IndexTile(icon: row.icon, size: 20)
-                    Text(verbatim: row.title).fontWeight(.semibold).lineLimit(1)
+        let ordered = shownSort.sorted(rows)
+        Table(ordered, selection: selection, sortOrder: sortOrder) {
+            TableColumn(IndexColumn.name.title(in: place), value: \.title, comparator: .localizedStandard) { row in
+                IndexNameCell(row: row)
+            }
+            .width(min: 140, ideal: 240)
+            TableColumn(secondColumn.title(in: place), value: secondKey, comparator: .localizedStandard) { row in
+                if place == .sources {
+                    IndexTypesCell(shares: row.breakdown)
+                } else {
+                    Text(verbatim: row.sourceName).foregroundStyle(.secondary).lineLimit(1)
                 }
             }
-            .width(min: 140, ideal: 220)
-            TableColumn(typesTitle, value: \.types, comparator: .localizedStandard) { row in
-                Text(verbatim: row.types).foregroundStyle(.secondary).lineLimit(1)
-            }
-            .width(min: 140, ideal: 260)
-            TableColumn("Items", value: \.count) { row in
+            .width(min: 140, ideal: 280)
+            TableColumn(IndexColumn.count.title(in: place), value: \.count) { row in
                 Text(row.count, format: .number).monospacedDigit()
             }
             .width(min: 60, ideal: 80, max: 120)
             .alignment(.numeric)
-            TableColumn("Latest Item", value: \.latestOrOldest) { row in
+            TableColumn(IndexColumn.latest.title(in: place), value: \.latestOrOldest) { row in
                 IndexLatest(date: row.latest).foregroundStyle(.secondary)
             }
             .width(min: 100, ideal: 140, max: 200)
         }
         .alternatingRowBackgrounds(.disabled)
-        .softSelection(rows: sorted.map(\.id), hovers: true, selection: { selection })
-        .onChange(of: rows, initial: true) { sorted = rows.sorted(using: sortOrder) }
-        .onChange(of: sortOrder) { sorted = rows.sorted(using: sortOrder) }
+        .softSelection(rows: ordered.map(\.id), hovers: true, selection: { choice.chosen })
         .contextMenu(forSelectionType: IndexRow.ID.self) { ids in
-            if let edit, ids.count == 1, let place = ids.first { SourceMenu(place: place, edit: edit) }
+            if let row = ordered.first(where: { ids.contains($0.id) }), ids.count == 1 {
+                Button("Open") { open(row) }
+                if let edit, let code = row.sourceCode {
+                    Button("Rename…") { edit(SourceEditRequest(code: code, mode: .name)) }
+                    Button("Choose Mark…") { edit(SourceEditRequest(code: code, mode: .mark)) }
+                }
+                if let delete, row.canDelete {
+                    Divider()
+                    Button("Delete…", role: .destructive) { delete(row) }
+                }
+            }
         } primaryAction: { ids in
-            if let row = rows.first(where: { ids.contains($0.id) }) { open(row) }
+            if let row = ordered.first(where: { ids.contains($0.id) }) { open(row) }
         }
+        .onDeleteCommand {
+            if let delete, let row = choice.row(in: ordered), row.canDelete { delete(row) }
+        }
+        .contentMargins(.horizontal, IndexMetrics.side, for: .scrollContent)
+        .accessibilityIdentifier("IndexTable")
     }
 }

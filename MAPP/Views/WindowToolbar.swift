@@ -93,9 +93,9 @@ struct WindowToolbar: CustomizableToolbarContent {
         }
         .hidden(!showsItem || editsView)
         ToolbarSpacer(.fixed)
-            .hidden(tools.showsInspector || !showsItem)
+            .hidden(tools.showsInspector)
         ToolbarItem(id: "details") { tools.detailsButton }
-            .hidden(tools.showsInspector || !showsItem)
+            .hidden(tools.showsInspector)
         ExtraToolbarItems(tools: tools)
     }
 }
@@ -363,7 +363,8 @@ struct ItemToolbarActions {
         } else {
             Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
                 .help(details.isPresented ? "Hide Details" : "Show Details")
-                .disabled((browser?.selection.count ?? items.count) != 1)
+                // An index page shows the container chosen in its table, so it has details whatever items are selected.
+                .disabled(browser?.showsSidebarIndex != true && (browser?.selection.count ?? items.count) != 1)
                 .accessibilityIdentifier("DetailsToggle")
         }
     }

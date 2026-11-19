@@ -34,9 +34,9 @@ final class ItemEmptyStateTests: XCTestCase {
         window.quickAdd(type: "Collection", title: "Empty collection check")
         sidebar.staticTexts["Collections"].click()
         let index = window.descendants(matching: .any).matching(identifier: "SidebarIndex").firstMatch
-        let collection = index.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Empty collection check")).firstMatch
+        let collection = index.staticTexts.matching(NSPredicate(format: "value BEGINSWITH %@", "Empty collection check")).firstMatch
         XCTAssertTrue(collection.waitForExistence(timeout: 3))
-        collection.click()
+        collection.doubleClick()
         XCTAssertTrue(window.staticTexts["No Items"].waitForExistence(timeout: 3))
         XCTAssertFalse(prompt.exists)
         XCTAssertFalse(window.itemPageTitle.exists)

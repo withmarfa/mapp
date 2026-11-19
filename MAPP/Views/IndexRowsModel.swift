@@ -2,13 +2,11 @@ import Observation
 import SwiftUI
 
 /// The rows of an index page, worked out once and again only when what they read changes. Reading the library's
-/// items for every redraw would walk them all each time the person types in the search or picks a layout.
+/// items for every redraw would walk them all each time the person types in the search or chooses a tab.
 @MainActor
 @Observable
 final class IndexRowsModel {
     private var built: [IndexRow] = []
-    /// The color slots of the types in all of the rows, worked out with them, so searching never recolors a type.
-    private(set) var slots = IndexSlots()
     /// The place the rows are of; nil until they have been worked out.
     private(set) var builtPlace: IndexPlace?
     @ObservationIgnored private var generation = 0
@@ -25,7 +23,6 @@ final class IndexRowsModel {
         generation += 1
         builtPlace = nil
         built = []
-        slots = IndexSlots()
         self.library = library
         rebuild(place, generation: generation)
     }
@@ -35,7 +32,6 @@ final class IndexRowsModel {
         library = nil
         builtPlace = nil
         built = []
-        slots = IndexSlots()
     }
 
     private func rebuild(_ place: IndexPlace, generation: Int) {
@@ -51,7 +47,6 @@ final class IndexRowsModel {
         }
         if built != next {
             built = next
-            slots = IndexSlots(rows: next)
         }
         builtPlace = place
     }
@@ -62,7 +57,8 @@ final class IndexRowsModel {
             IndexRows.sources(of: library.items(in: .allItems), catalogue: library.catalogue, directory: library.sources)
         case .collections:
             IndexRows.collections(
-                library.collections, membersOf: { library.items(in: .collection($0.id)) }, catalogue: library.catalogue)
+                library.collections, membersOf: { library.items(in: .collection($0.id)) }, catalogue: library.catalogue,
+                directory: library.sources)
         }
     }
 }
