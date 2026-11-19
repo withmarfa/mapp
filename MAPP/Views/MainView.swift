@@ -149,7 +149,7 @@ struct MainView: View {
     private func windowToolbar(hasListColumn: Bool = false) -> WindowToolbar {
         WindowToolbar(
             browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details,
-            showsCreation: !isSidebarVisible, hasListColumn: hasListColumn)
+            hasListColumn: hasListColumn)
     }
 
     /// Only the three-column split has a list column to measure.

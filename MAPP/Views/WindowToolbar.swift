@@ -4,10 +4,9 @@ import SwiftUI
 /// layout of its own (`WindowToolbarLayout`), since the system reshuffles a saved layout when one identifier moves between
 /// split views. Nothing else in a window may declare a plain `toolbar`, which turns customization off for the whole window.
 ///
-/// The defaults run New Item at the leading side when the sidebar is hidden, then
-/// Save as View while a place that is not a view has something to keep, Search and View Options, the Reader and Original switch on a
-/// page with an article, View As, Share and More, and Details at the far right. In the list Search
-/// and View Options are the list column's (`ListToolbar`). Format and `ExtraToolbarItems` start in the tray.
+/// The defaults run Save as View while a place that is not a view has something to keep, Search and View Options, the
+/// Reader and Original switch on a page with an article, View As, Share and More, and Details at the far right. In the
+/// list Search and View Options are the list column's (`ListToolbar`). Format and `ExtraToolbarItems` start in the tray.
 struct WindowToolbar: CustomizableToolbarContent {
     @CurrentLibrary private var library
     @AppStorage(InterfaceKey.showsScrolledTitle) private var showsScrolledTitle = true
@@ -17,7 +16,6 @@ struct WindowToolbar: CustomizableToolbarContent {
     let editor: EditorController?
     let details: DetailsPresentation
     var fileURL: URL?
-    var showsCreation = false
     /// Whether the list column holds Search and View Options, which otherwise come here.
     var hasListColumn = false
 
@@ -25,10 +23,6 @@ struct WindowToolbar: CustomizableToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details, fileURL: fileURL)
         let showsItem = browser?.showsSidebarIndex != true
         let opensFromCollection = browser?.isCollectionItemPresented == true && !hasListColumn
-        ToolbarItem(id: "newItem") {
-            NewItemButton(browser: browser)
-        }
-        .hidden(!showsCreation)
         // A navigation item that is merely hidden still moves the title in a collection, so these two come and go.
         if let browser, opensFromCollection {
             ToolbarItem(id: "backToCollection", placement: .navigation) {
