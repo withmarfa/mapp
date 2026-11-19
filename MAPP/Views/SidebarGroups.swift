@@ -24,8 +24,12 @@ nonisolated struct SidebarPick: Equatable, Identifiable {
 nonisolated struct SidebarChoices: Equatable {
     var views: [SidebarPick] = []
     var types: [SidebarPick] = []
+    /// Every collection and source, for a shortcut that goes to one.
     var collections: [SidebarPick] = []
     var sources: [SidebarPick] = []
+    /// The collections and sources with no row yet, for a new section to hold.
+    var unplacedCollections: [SidebarPick] = []
+    var unplacedSources: [SidebarPick] = []
     /// The kinds a Create shortcut can make, by type identifier.
     var creatable: [SidebarPick] = []
 }
@@ -58,7 +62,7 @@ struct SidebarHandle: View {
 
 /// A section's heading. Outside customizing it is the name alone, with New View on hover for the section that holds
 /// the saved views. While customizing it has the section's menu and a handle that drags the section.
-struct SidebarGroupHeader: View {
+struct SidebarGroupHeader: View, Equatable {
     @Environment(Libraries.self) private var libraries
     let section: SidebarSectionData
     let tabs: [SidebarTab]
@@ -68,6 +72,11 @@ struct SidebarGroupHeader: View {
     let isFirst: Bool
     let isLast: Bool
     let ask: (SidebarNaming) -> Void
+
+    static func == (a: Self, b: Self) -> Bool {
+        a.section == b.section && a.tabs == b.tabs && a.tab == b.tab && a.customizing == b.customizing
+            && a.isFirst == b.isFirst && a.isLast == b.isLast
+    }
 
     var body: some View {
         let group = section.plan.group
@@ -137,7 +146,7 @@ struct SidebarGroupHeader: View {
 
 /// The shortcuts block: rows that act or go somewhere, never taking the selection. While customizing each has a
 /// handle, a context menu that removes it, and the Add Shortcut row follows.
-struct SidebarShortcutsSection: View {
+struct SidebarShortcutsSection: View, Equatable {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
     @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
@@ -149,6 +158,12 @@ struct SidebarShortcutsSection: View {
     let choices: SidebarChoices
     let browser: Browser
     let order: ItemOrder
+
+    /// The section's data and nothing else, so a change of selection does not run its body.
+    static func == (a: Self, b: Self) -> Bool {
+        a.section == b.section && a.tab == b.tab && a.canCreate == b.canCreate && a.customizing == b.customizing
+            && a.addsShortcuts == b.addsShortcuts && a.choices == b.choices && a.order == b.order
+    }
 
     var body: some View {
         Section {
@@ -279,8 +294,8 @@ struct SidebarAddSectionRow: View {
             }
             Button("New Section") { libraries.updateSidebarLayout { $0.addGroup(.custom, toTab: tab) } }
             Divider()
-            holding("A Collection", choices.collections)
-            holding("A Source", choices.sources)
+            holding("A Collection", choices.unplacedCollections)
+            holding("A Source", choices.unplacedSources)
         } label: {
             SidebarLabel(title: String(localized: "Add Section"), icon: .symbol("plus"))
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -314,13 +329,18 @@ struct SidebarAddSectionRow: View {
 
 /// A section of places: the library's indexes, views, collections and sources, in the order the person arranged. While
 /// customizing, the rows carry handles and drag to reorder.
-struct SidebarPlacesSection: View {
+struct SidebarPlacesSection: View, Equatable {
     @Environment(Libraries.self) private var libraries
     let section: SidebarSectionData
     let groups: [SidebarGroupChoice]
     let customizing: Bool
     let browser: Browser
     let header: SidebarGroupHeader
+
+    /// The section's data and nothing else, so a change of selection does not run its body.
+    static func == (a: Self, b: Self) -> Bool {
+        a.section == b.section && a.groups == b.groups && a.customizing == b.customizing && a.header == b.header
+    }
 
     var body: some View {
         let group = section.plan.group
@@ -330,7 +350,9 @@ struct SidebarPlacesSection: View {
                     .tag(data.item)
             }
             .onMove { source, destination in
-                libraries.updateSidebarLayout { $0.move(section.plan.members, shown: section.plan.shown, by: \.key, fromOffsets: source, toOffset: destination) }
+                libraries.updateSidebarLayout {
+                    $0.moveInSection(section.id, places: section.plan.members, shown: section.plan.shown, fromOffsets: source, toOffset: destination)
+                }
             }
             if group.kind == .views { SidebarPendingViewRow(browser: browser) }
         } header: {
@@ -489,8 +511,7 @@ struct SidebarTabBar: View {
             Spacer(minLength: 0)
             Button("New Tab", systemImage: "plus") { ask(.newTab(moving: nil)) }
                 .labelStyle(.iconOnly)
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+                .mappButton(.plain, size: .small, icon: true)
                 .accessibilityIdentifier("SidebarNewTab")
         }
         .padding(.horizontal, 12)

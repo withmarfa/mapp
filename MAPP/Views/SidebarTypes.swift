@@ -3,7 +3,7 @@ import SwiftUI
 /// The types section: the library's types as one list of rows that fold their subtypes open, at most
 /// `SidebarPlan.shownTypeCount` types until Show More. While the sidebar is being customized it lists the top-level
 /// types alone, each with a handle, and they drag to reorder; the section's menu shows or hides them.
-struct SidebarTypesSection: View {
+struct SidebarTypesSection: View, Equatable {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
     @AppStorage(SidebarTypeRow.subtypeIconsKey) private var showsSubtypeIcons = false
@@ -16,6 +16,13 @@ struct SidebarTypesSection: View {
     let browser: Browser
     @Binding var choosingIcon: TypeIconRequest?
     let header: SidebarGroupHeader
+
+    /// The section's data and nothing else, so a change of selection does not run its body. `folding` and the plan it
+    /// holds are worked out from the same layout and types, which are compared; the closures and the binding are not.
+    static func == (a: Self, b: Self) -> Bool {
+        a.rows == b.rows && a.showsAll == b.showsAll && a.customizing == b.customizing && a.header == b.header
+            && a.plan.types == b.plan.types && a.plan.layout == b.plan.layout && a.folding.order == b.folding.order
+    }
 
     var body: some View {
         let _ = Cost.record(.sidebarBody, since: .now)

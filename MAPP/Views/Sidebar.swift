@@ -85,6 +85,7 @@ struct SidebarContent {
         hasher.combine(self.tab.id)
         hasher.combine(tabs)
         hasher.combine(sections.map { [$0.id, $0.plan.group.name] + $0.rows.map(\.title) + $0.shortcuts.map(\.title) })
+        hasher.combine(sections.flatMap(\.rows).map { $0.tone?.rawValue ?? "" })
         hasher.combine(layout.collapsed.sorted() + layout.hidden.sorted())
         hasher.combine(plan.types.map(\.id))
         hasher.combine(plan.views.map(\.id))
@@ -97,14 +98,18 @@ struct SidebarContent {
         func types(_ ids: [TypeID]) -> [SidebarPick] {
             ids.map { SidebarPick(key: SidebarPlace.type($0.rawValue).key, title: catalogue.plural(for: $0)) }
         }
-        let placed = Set((layout.homes ?? [:]).keys)
+        let collections = library.collections.map { SidebarPick(key: SidebarPlace.collection($0.id).key, title: $0.displayTitle) }
+        let sources = library.sourceCounts.map { SidebarPick(key: SidebarPlace.source($0.code).key, title: $0.name) }
+        // A collection or a source has a row only where it was put, in a section that is still there, so only one with
+        // no home can be added to a new section. Going to one is always possible, placed or not.
+        func unplaced(_ picks: [SidebarPick]) -> [SidebarPick] {
+            picks.filter { pick in SidebarPlace(key: pick.key).map { layout.home(of: $0) == nil } ?? false }
+        }
         return SidebarChoices(
             views: plan.views.map { SidebarPick(key: SidebarPlace.view($0.id).key, title: $0.title) },
             types: types(QuickAdd.typeIDs(of: plan.types)),
-            collections: library.collections.map { SidebarPick(key: SidebarPlace.collection($0.id).key, title: $0.displayTitle) }
-                .filter { !placed.contains($0.key) },
-            sources: library.sourceCounts.map { SidebarPick(key: SidebarPlace.source($0.code).key, title: $0.name) }
-                .filter { !placed.contains($0.key) },
+            collections: collections, sources: sources,
+            unplacedCollections: unplaced(collections), unplacedSources: unplaced(sources),
             creatable: QuickAdd.types(in: library).map { SidebarPick(key: $0.id.rawValue, title: $0.label) })
     }
 
@@ -354,8 +359,7 @@ private struct SidebarDoneBar: View {
         Button { browser.customizesSidebar = false } label: {
             Text("Done").frame(maxWidth: .infinity)
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
+        .mappButton(.primary)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .accessibilityIdentifier("SidebarDone")
