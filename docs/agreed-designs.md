@@ -15,12 +15,6 @@ This page lists what has been agreed for MAPP and is not in the app yet, so the 
 - A menu among buttons is an outlined button with a chevron, the same height as the buttons beside it.
 - A sheet puts a destructive action alone at the leading edge, and Cancel and the primary action at the trailing edge. A text field has its label above it, such as Name. The button reads Delete, not Delete Collection.
 
-## Selection and hover
-
-- A chosen row, card or table row is gray at 8% of the label color, and a row under the pointer is gray at 4.7%. Neither is ever blue.
-- A chosen gallery card keeps a soft 3-point ring in the same gray.
-- A table row under the pointer shows its open control as the arrow alone.
-
 ## Keyboard shortcuts and messages
 
 - Wherever MAPP draws a shortcut itself, it uses the palettes' keycaps: small and outlined, one glyph each, with no fill. Menus are the system's and keep its glyphs.
@@ -113,7 +107,6 @@ This page lists what has been agreed for MAPP and is not in the app yet, so the 
 
 - A code block and a file in an item show their actions as icons in a corner, under the pointer, with no words. Where a code block's language goes, and how it changes, is open.
 - In the right sidebar, chips sit in the same white box as the rows.
-- The favorites mark is a heart everywhere. The gallery card, the table and the item's actions still draw a star.
 
 ## Settings
 

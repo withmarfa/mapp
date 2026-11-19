@@ -131,14 +131,14 @@ private nonisolated struct GalleryShape: InsettableShape {
     }
 }
 
-/// A favorite's star on the picture's corner, the one mark a card puts on its picture.
+/// A favorite's heart on the picture's corner, the one mark a card puts on its picture.
 private struct FavoriteBadge: View {
     let unit: CGFloat
 
     var body: some View {
-        Image(systemName: "star.fill")
+        Image(systemName: "heart.fill")
             .font(.system(size: 10 * unit))
-            .foregroundStyle(.yellow)
+            .foregroundStyle(.secondary)
             .padding(5 * unit)
             .background(.regularMaterial, in: .circle)
             .accessibilityHidden(true)
@@ -207,15 +207,14 @@ private struct GalleryThumbnail: View {
             switch CardFace.fallback(preview: cards.preview, isFile: item.isFile, text: item.preview) {
             case .fileIcon:
                 if case .file(let type) = facts.kind { FileGlyph(type: type) }
-            case .text: OpeningLines(text: item.preview, unit: cards.size == .large ? 12.0 / 11 : 1, clearsStar: item.isFavorite)
+            case .text: OpeningLines(text: item.preview, unit: cards.size == .large ? 12.0 / 11 : 1, clearsHeart: item.isFavorite)
             case .picture, .placeholder: QuietMark(icon: facts.icon)
             }
         }
     }
 }
 
-/// The ring around a selected card's picture, in the accent color with a gap of the window's color, as a Finder icon's
-/// is. It reads the selection itself, so a selection that moves redraws the rings and no card.
+/// The soft ring around a selected card's picture: 3 points wide in the grey of a chosen row, touching the card. It reads the selection itself, so a selection that moves redraws the rings and no card.
 private struct GalleryRing: View {
     let browser: Browser
     let id: ItemID
@@ -224,8 +223,8 @@ private struct GalleryRing: View {
     var body: some View {
         if browser.selection.contains(id) {
             shape
-                .strokeBorder(Color.accentColor, lineWidth: 2)
-                .padding(-4)
+                .strokeBorder(Color(nsColor: .labelColor).opacity(0.08), lineWidth: 3)
+                .padding(-3)
         }
     }
 }
@@ -234,15 +233,15 @@ private struct GalleryRing: View {
 private struct OpeningLines: View {
     let text: String
     let unit: CGFloat
-    /// Whether the favorite's star sits on the corner, so the first line stops short of it.
-    let clearsStar: Bool
+    /// Whether the favorite's heart sits on the corner, so the first line stops short of it.
+    let clearsHeart: Bool
 
     var body: some View {
         Text(OpeningText.attributed(from: text))
             .font(.system(size: 11 * unit))
             .foregroundStyle(.secondary)
             .lineSpacing(2 * unit)
-            .padding(.trailing, clearsStar ? 20 * unit : 0)
+            .padding(.trailing, clearsHeart ? 20 * unit : 0)
             .padding(12 * unit)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .mask {

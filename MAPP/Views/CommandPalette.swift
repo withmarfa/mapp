@@ -684,7 +684,7 @@ struct CommandPalette: View {
         } else if !everything.isEmpty {
             let allFavorites = !active.isEmpty && active.allSatisfy(\.isFavorite)
             if !active.isEmpty {
-                add(allFavorites ? String(localized: "Remove from Favorites") : String(localized: "Add to Favorites"), allFavorites ? "star.slash" : "star", in: .file) {
+                add(allFavorites ? String(localized: "Remove from Favorites") : String(localized: "Add to Favorites"), allFavorites ? "heart.slash" : "heart", in: .file) {
                     library.setFavorite(ids, !allFavorites, undoManager: undoManager)
                 }
             }

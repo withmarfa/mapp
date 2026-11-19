@@ -6,27 +6,38 @@ extension View {
     /// the system's accent fill, which reads as too loud across a whole list. Apply it to a `List` or `Table`,
     /// with `rows`, the identifiers it shows, and `selection`, so the marks follow rows that move and every change
     /// of selection, however it is made. The selection is read by the marks alone, so a change of selection does not
-    /// run the body of the view that holds the list, which would have the list look at every row again.
-    func softSelection(rows: some Hashable, selection: @escaping () -> some Hashable) -> some View {
-        background(SoftSelectionReader(rows: rows.hashValue, selection: selection))
+    /// run the body of the view that holds the list, which would have the list look at every row again. With
+    /// `hovers`, the row under the pointer gets a fainter mark of its own, drawn and followed by the same layer view
+    /// from the table's mouse events, so that mark runs no row's body.
+    func softSelection(rows: some Hashable, hovers: Bool = false, selection: @escaping () -> some Hashable) -> some View {
+        background(SoftSelectionReader(rows: rows.hashValue, hovers: hovers, selection: selection))
     }
 }
 
 private struct SoftSelectionReader<Selection: Hashable>: View {
     let rows: Int
+    let hovers: Bool
     let selection: () -> Selection
 
-    var body: some View { SoftSelection(rows: rows, selection: selection().hashValue) }
+    var body: some View { SoftSelection(rows: rows, hovers: hovers, selection: selection().hashValue) }
 }
 
 /// SwiftUI cannot style a list's selection, which the `NSTableView` behind it draws. This finds that table, turns
 /// its highlight off, so rows keep their own text colors, and draws the selected rows' marks beneath them.
 struct SoftSelection: NSViewRepresentable {
     let rows: Int
+    let hovers: Bool
     let selection: Int
 
-    func makeNSView(context: Context) -> Probe { Probe() }
-    func updateNSView(_ probe: Probe, context: Context) { probe.refresh(rows: rows, selection: selection) }
+    func makeNSView(context: Context) -> Probe {
+        let probe = Probe()
+        probe.hovers = hovers
+        return probe
+    }
+    func updateNSView(_ probe: Probe, context: Context) {
+        probe.hovers = hovers
+        probe.refresh(rows: rows, selection: selection)
+    }
     static func dismantleNSView(_ probe: Probe, coordinator: ()) { probe.dismantle() }
 
     final class Probe: NSView {
@@ -34,6 +45,7 @@ struct SoftSelection: NSViewRepresentable {
         private weak var marks: Marks?
         private var originalHighlightStyle: NSTableView.SelectionHighlightStyle?
         private var isDismantled = false
+        var hovers = false
         /// The rows and selection the marks were last asked to follow, so an update SwiftUI makes for any other
         /// reason leaves them alone.
         private var seen: Followed?
@@ -84,7 +96,7 @@ struct SoftSelection: NSViewRepresentable {
             self.table = table
             originalHighlightStyle = table.selectionHighlightStyle
             table.selectionHighlightStyle = .none
-            let marks = Marks(table: table)
+            let marks = Marks(table: table, hovers: hovers)
             table.addSubview(marks, positioned: .below, relativeTo: nil)
             self.marks = marks
         }
@@ -116,6 +128,13 @@ struct SoftSelection: NSViewRepresentable {
         private var isUpdatePending = false
         /// Where the marks are and in what color, so a pass that finds them already there places nothing.
         private var placed: (frames: [NSRect], color: CGColor)?
+        /// The mark under the pointer, when rows have one, and whether the pointer is over the table.
+        private let hoverMark: CALayer?
+        private var pointerIsOver = false
+        private var placedHover: (frame: NSRect?, color: CGColor)?
+        /// The row the pointer was last over and the appearance the mark was colored for, so a move inside one row
+        /// asks nothing further.
+        private var lastHover: (row: Int, appearance: NSAppearance.Name)?
         /// How many rows beyond the visible ones are marked.
         private static let overscan = 10
 
@@ -124,11 +143,19 @@ struct SoftSelection: NSViewRepresentable {
             init(_ object: Object) { self.object = object }
         }
 
-        init(table: NSTableView) {
+        init(table: NSTableView, hovers: Bool) {
             self.table = table
+            hoverMark = hovers ? CALayer() : nil
             super.init(frame: table.bounds)
             autoresizingMask = [.width, .height]
             wantsLayer = true
+            if let hoverMark {
+                hoverMark.cornerRadius = 8
+                hoverMark.cornerCurve = .continuous
+                hoverMark.isHidden = true
+                layer?.addSublayer(hoverMark)
+                addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self))
+            }
             let center = NotificationCenter.default
             var changes = [NSTableView.selectionDidChangeNotification, NSView.frameDidChangeNotification]
             if table is NSOutlineView {
@@ -146,11 +173,24 @@ struct SoftSelection: NSViewRepresentable {
                 })
             }
             table.postsFrameChangedNotifications = true
+            // A window that is no longer key, as when a sheet or another window takes over, sends no event to say
+            // the pointer has gone, and its mark would stay on the last row.
+            if let window = table.window {
+                observers.append(center.addObserver(forName: NSWindow.didResignKeyNotification, object: window, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated {
+                        self?.pointerIsOver = false
+                        self?.updateHover()
+                    }
+                })
+            }
             // Rows scrolled into view get row views of their own, which the marks are placed by.
             if let clip = table.enclosingScrollView?.contentView {
                 clip.postsBoundsChangedNotifications = true
                 observers.append(center.addObserver(forName: NSView.boundsDidChangeNotification, object: clip, queue: .main) { [weak self] _ in
-                    MainActor.assumeIsolated { self?.setNeedsUpdate() }
+                    MainActor.assumeIsolated {
+                        self?.setNeedsUpdate()
+                        self?.updateHover()
+                    }
                 })
             }
         }
@@ -187,10 +227,68 @@ struct SoftSelection: NSViewRepresentable {
         override var isFlipped: Bool { true }
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
+        override func mouseEntered(with event: NSEvent) {
+            pointerIsOver = true
+            updateHover()
+        }
+
+        override func mouseMoved(with event: NSEvent) {
+            pointerIsOver = true
+            updateHover()
+        }
+
+        override func mouseExited(with event: NSEvent) {
+            pointerIsOver = false
+            updateHover()
+        }
+
+        /// Puts the faint mark on the row under the pointer: not on a row that is chosen, which has its own, nor on
+        /// one the table would not select, such as a heading. Nothing is asked or placed while the pointer stays on the
+        /// same row, since a move inside a row is most of the events; a change of selection asks again, with `forced`.
+        /// The pointer counts only where the table is what shows there: an overlay above it, such as the command
+        /// palette, leaves the table's rows unhovered.
+        private func updateHover(forced: Bool = false) {
+            guard let hoverMark, let table else { return }
+            var row = -1
+            if pointerIsOver, let window, isTableShown(at: window.mouseLocationOutsideOfEventStream, in: window) {
+                row = table.row(at: table.convert(window.mouseLocationOutsideOfEventStream, from: nil))
+            }
+            let appearance = effectiveAppearance.name
+            if !forced, let lastHover, lastHover.row == row, lastHover.appearance == appearance { return }
+            lastHover = (row, appearance)
+            if row >= 0, table.isRowSelected(row) || table.rowView(atRow: row, makeIfNecessary: false)?.isSelected == true { row = -1 }
+            if row >= 0, table.delegate?.tableView?(table, shouldSelectRow: row) == false { row = -1 }
+            let frame = row >= 0 ? Self.rect(ofRow: row, in: table) : nil
+            var color = CGColor.clear
+            effectiveAppearance.performAsCurrentDrawingAppearance {
+                color = NSColor.labelColor.withAlphaComponent(0.047).cgColor
+            }
+            if let placedHover, placedHover.frame == frame, placedHover.color == color { return }
+            placedHover = (frame, color)
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            hoverMark.isHidden = frame == nil
+            if let frame {
+                hoverMark.frame = frame
+                hoverMark.backgroundColor = color
+            }
+            CATransaction.commit()
+        }
+
+        /// Whether the view at a point in the window, as a click there would find it, is the table or inside it.
+        private func isTableShown(at point: NSPoint, in window: NSWindow) -> Bool {
+            guard let table, let content = window.contentView, let frameView = content.superview,
+                  let hit = content.hitTest(frameView.convert(point, from: nil)) else { return false }
+            return hit.isDescendant(of: table)
+        }
+
         override func viewDidChangeEffectiveAppearance() {
             super.viewDidChangeEffectiveAppearance()
             update()
         }
+
+        /// The layers that mark chosen rows, not the one under the pointer.
+        var selectionLayers: [CALayer] { layer?.sublayers?.filter { $0 !== hoverMark } ?? [] }
 
         func update() {
             guard let table, let layer else { return }
@@ -199,6 +297,7 @@ struct SoftSelection: NSViewRepresentable {
                 color = NSColor.labelColor.withAlphaComponent(0.08).cgColor
             }
             // The table's selection, and any row view it marks as selected, since SwiftUI can set either first.
+            updateHover(forced: true)
             var rows = table.selectedRowIndexes
             table.enumerateAvailableRowViews { view, row in
                 if view.isSelected { rows.insert(row) }
@@ -222,14 +321,14 @@ struct SoftSelection: NSViewRepresentable {
             Cost.measure(.softSelection) {
                 CATransaction.begin()
                 CATransaction.setDisableActions(true)
-                layer.sublayers?.forEach { $0.removeFromSuperlayer() }
+                selectionLayers.forEach { $0.removeFromSuperlayer() }
                 for frame in frames {
                     let mark = CALayer()
                     mark.frame = frame
                     mark.backgroundColor = color
                     mark.cornerRadius = 8
                     mark.cornerCurve = .continuous
-                    layer.addSublayer(mark)
+                    layer.insertSublayer(mark, at: 0)
                 }
                 CATransaction.commit()
             }

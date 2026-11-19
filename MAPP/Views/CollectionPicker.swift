@@ -75,6 +75,7 @@ struct CollectionPickerSheet: View {
                 .accessibilityIdentifier("CollectionPickerOption.\(collection.id.rawValue)")
             }
             .listStyle(.bordered(alternatesRowBackgrounds: true))
+            .softSelection(rows: collections.map(\.id)) { selected }
             .focused($focus, equals: .list)
             // Return and a double-click both act on the row, as they do in any list.
             .contextMenu(forSelectionType: ItemID.self) { _ in } primaryAction: { ids in

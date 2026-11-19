@@ -80,7 +80,7 @@ struct FavoriteButton: View {
         // An item in the bin keeps its tags, so it neither decides the toggle nor takes the change.
         let active = ItemActionContext(library: library, ids: ids, keepsPlace: true).items.filter { $0.state == .active }
         let allFavorites = !active.isEmpty && active.allSatisfy(\.isFavorite)
-        Button(allFavorites ? "Remove from Favorites" : "Add to Favorites", systemImage: allFavorites ? "star.slash" : "star") {
+        Button(allFavorites ? "Remove from Favorites" : "Add to Favorites", systemImage: allFavorites ? "heart.slash" : "heart") {
             library.setFavorite(ids, !allFavorites, undoManager: undoManager)
         }
         .disabled(active.isEmpty)

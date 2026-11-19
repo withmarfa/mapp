@@ -37,6 +37,7 @@ struct SettingsPageList: View {
         }
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
+        .softSelection(rows: SettingsPage.groups.flatMap { $0 }.map(\.rawValue)) { browser.settingsPage }
         .navigationTitle("Settings")
         .accessibilityIdentifier("SettingsPageList")
     }

@@ -119,7 +119,7 @@ struct ItemList: View, Equatable {
         }
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
-        .softSelection(rows: ids) { browser.selection }
+        .softSelection(rows: ids, hovers: true) { browser.selection }
         .remembersScroll(in: browser.listMemory)
         .selectsAll { browser.selection = Set(ids) }
         // While the toolbar re-places its items, the list is briefly measured narrower than its column can be.

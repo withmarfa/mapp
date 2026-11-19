@@ -333,6 +333,7 @@ private struct IndexTable: View {
             .width(min: 100, ideal: 140, max: 200)
         }
         .alternatingRowBackgrounds(.disabled)
+        .softSelection(rows: sorted.map(\.id), hovers: true, selection: { selection })
         .onChange(of: rows, initial: true) { sorted = rows.sorted(using: sortOrder) }
         .onChange(of: sortOrder) { sorted = rows.sorted(using: sortOrder) }
         .contextMenu(forSelectionType: IndexRow.ID.self) { ids in

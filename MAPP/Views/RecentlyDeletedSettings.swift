@@ -27,6 +27,7 @@ struct RecentlyDeletedSettings: View {
                         }
                     }
                     .scrollContentBackground(.hidden)
+                    .softSelection(rows: items.map(\.id), hovers: true) { selection }
                     .frame(minHeight: 320)
                     .padding(.horizontal, 18)
                 }
