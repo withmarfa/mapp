@@ -36,6 +36,13 @@ struct PlaceDefaultsTests {
 
     // MARK: Kept and restored
 
+    @Test func aWindowModelUnderTestKeepsItsDefaultViewsApart() {
+        let first = Browser()
+        first.updatePlaceDefault(.recents) { $0.layout = .timeline }
+        #expect(PlaceDefaults.stored(in: first.defaults).default(for: .recents)?.layout == .timeline)
+        #expect(PlaceDefaults.stored(in: Browser().defaults).default(for: .recents) == nil)
+    }
+
     @Test func aPlaceOpensAsThePersonLeftIt() {
         let defaults = ViewPanelTests.defaults()
         let library = Self.library()

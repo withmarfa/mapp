@@ -899,8 +899,16 @@ final class Browser {
     /// (`Browser+SavedViews`).
     var densityRevision = 0
 
-    /// Where this Mac's settings for views are kept. A test gives its own.
-    @ObservationIgnored var defaults: UserDefaults = .standard
+    /// Where this Mac's settings for views are kept. Under the unit tests each window model keeps them apart, so what
+    /// one test leaves in a place's default view never reaches another's.
+    @ObservationIgnored var defaults: UserDefaults = Browser.initialDefaults
+
+    private static var initialDefaults: UserDefaults {
+        #if DEBUG
+        if TestHost.isRequested, let suite = UserDefaults(suiteName: "MAPP.Browser.\(UUID().uuidString)") { return suite }
+        #endif
+        return .standard
+    }
     /// What `isDefaultViewChanged` last worked out, and the stored data it worked it out from (`Browser+PlaceDefaults`).
     @ObservationIgnored var changedMemo: (place: SidebarItem, inputs: [Data?], changed: Bool)?
     @ObservationIgnored var isApplyingLayout = false
