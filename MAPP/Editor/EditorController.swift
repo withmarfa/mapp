@@ -440,6 +440,7 @@ final class EditorController: NSObject {
     }
 
     private func hide() {
+        quickLook = nil
         loading = nil
         opening = nil
         cancelRequests()
