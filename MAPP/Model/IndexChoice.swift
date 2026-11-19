@@ -7,8 +7,8 @@ import Observation
 final class IndexChoice {
     var chosen: SidebarItem?
 
-    /// Clears the choice when its container is no longer among `rows`: deleted, gone on a sync, or left out by the tab or
-    /// the search. A choice among them stays.
+    /// Clears the choice when its container is no longer among `rows`, the page's every row: deleted, or gone on a sync.
+    /// A container the tab or the search leaves out of the table stays chosen.
     func keep(within rows: [IndexRow]) {
         guard let chosen, !rows.contains(where: { $0.id == chosen }) else { return }
         self.chosen = nil

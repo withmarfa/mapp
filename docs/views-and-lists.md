@@ -1,6 +1,6 @@
 # Views and lists
 
-Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built in v0.0.45. The table's margin, whole-cell hover and add to an empty cell, the palettes' bar, rows and material setting, and the selection and hover greys and the favorite's heart as described below, are built, not yet released. See [Looks](looks.md).
+Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built in v0.0.45. The table's margin, whole-cell hover and add to an empty cell, the palettes' bar, rows and material setting, and the selection and hover greys and the favorite's heart as described below, are built, not yet released, as is Collections and Sources as a table with tabs. See [Looks](looks.md).
 
 Where it lives: `Browser`, `ItemViewMode`, `ViewLayouts`, `SidebarLayout`, `IndexPlace`, `IndexTab`, `IndexSort`, `IndexPreferences` and `IndexChoice` under `MAPP/Model/`, with `IndexRow`, `IndexRows`, `CardContents`, `ItemTableLayout`, `ItemTimelineLayout`, `ItemPlacement`, `EventSpan` and `CalendarLayout` under `MAPP/Model/Items/`; `ItemList`, `ItemRow`, `ItemGallery`, `GalleryCard`, `ItemBoard`, `ItemTable`, `ItemTableCell`, `SoftSelection`, `ChipLine`, `ItemTimeline`, `ItemCalendar`, `SidebarIndex`, `IndexPage`, `IndexInspector`, `IndexViewOptions`, `CalendarToolbarItems`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
 
