@@ -6,14 +6,12 @@ Where it lives: not built yet.
 
 This page lists what has been agreed for MAPP and is not in the app yet, so the next build starts from one list. What was turned down is in [Rejected designs](rejected-designs.md).
 
-## The sidebar
+## Settings > Sidebar
 
-- The sidebar has one tab by default, with no tab bar. Once a person adds a second tab, tabs show at the top: the chosen tab shows its name, and a plus button adds one.
-- A person customizes the sidebar from a Control-click on it (Customize Sidebar), which is built first, and in Settings > Sidebar. There is no button for it in the sidebar.
-- While the sidebar is being customized, each row and section has a handle at its trailing edge, so the rows keep their places and the handles never crowd the marks. Each section has a menu: Show, Rename, Move Up, Move Down, Move to Tab and Hide Section. Add Shortcut and Add Section appear, and Done ends it.
-- Any section can hold views, collections and sources.
-- A view's mark is its symbol in its own color, with no tile. A person chooses the color from the view's context menu, a row of color dots, or in Settings > Sidebar. The color is kept on this Mac.
-- A new library's shortcuts are New and Search. No shortcut makes an item of a type the person made.
+Customizing the sidebar in place is built (see [Views and lists](views-and-lists.md)). What is left is its page in Settings.
+
+- Settings > Sidebar customizes the same layout: the tabs, each tab's sections, and the views with their colors.
+- A person chooses a view's color there as well as from the view's context menu. The color is kept on this Mac.
 
 ## Items as an index
 
