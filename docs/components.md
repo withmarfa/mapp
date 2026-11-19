@@ -1,6 +1,6 @@
 # Components
 
-Status: Built, not yet released. The one button style and the keycaps below are drawn by one type each wherever MAPP draws a button or a shortcut itself.
+Status: Built, not yet released. The one button style and the keycaps below are drawn by one type each in the sheets, quick add, the value panels, the banners and the palettes. The last two Buttons lines say what is not on it yet.
 
 Where it lives: `MappButtonStyle`, `MappButtonRole`, `MappButtonSize`, `FieldLabel`, `KeyCap` and `ShortcutKeys`, under `MAPP/Views/`.
 
@@ -15,6 +15,7 @@ The design system's Button component holds the exact fills and measures; `MappBu
 - A menu among buttons is an outlined button with a chevron, the same height as the buttons beside it.
 - A sheet puts a destructive action alone at the leading edge, and Cancel and the primary action at the trailing edge. A text field has its label above it, such as Name. The button reads Delete, not Delete Collection.
 - The toolbar's glass buttons, the system's menus, alerts and text fields, and a Settings page's own controls stay the system's.
+- Not yet on the style: the empty states' Open Settings and Connect buttons, the sign-in, connecting and disconnecting views, the file pages' Open and zoom buttons, and the buttons the item page's web editor draws itself.
 
 ## Keycaps
 
