@@ -170,14 +170,16 @@ struct PageCornerTests {
 
     // MARK: The page
 
-    @Test func focusHidesTheHeaderTheEditorShows() throws {
+    @Test func focusHidesOnlyTheTitleAndPropertiesOfTheHeaderTheEditorShows() throws {
         let note = library.add("A note\n")
         let details = DetailsPresentation()
         let plain = try #require(ItemPageHeader.header(of: note.id, in: library, drafts: details))
-        #expect(!plain.hidden)
+        #expect(!plain.focused)
         details.toggleFocus(on: note.id)
         let focused = try #require(ItemPageHeader.header(of: note.id, in: library, drafts: details))
-        #expect(focused.hidden)
+        #expect(focused.focused)
+        #expect(!focused.hidden, "the footer and the kind are the deleted item's switch, not Focus's")
+        #expect(focused.kind == plain.kind)
     }
 
     @Test func focusNamesTheTitleInTheToolbarFromTheStart() {
@@ -190,5 +192,32 @@ struct PageCornerTests {
         #expect(tools().isFocused)
         #expect(tools().hasHeaderAway)
         #expect(tools().scrolledTitle == note.title)
+    }
+
+    @Test func focusPutsTheTypeUnderTheTitleInTheToolbar() {
+        let note = library.add("A note\n")
+        let details = DetailsPresentation()
+        let tools = { ItemToolbarActions(library: self.library, browser: nil, items: [note], editor: nil, details: details) }
+        #expect(tools().scrolledSubtitle == nil)
+        details.toggleFocus(on: note.id)
+        #expect(tools().scrolledSubtitle == library.catalogue.label(for: note.type))
+    }
+
+    @Test func aPdfInFocusNamesItsPagesOnceTheyAreCounted() {
+        let id = ItemID.mint()
+        library.items.append(Item(
+            id: id, type: TypeID("core.file"), title: "Quote.pdf", titleRule: .property("title"), content: .file(.pdf, byteCount: 10),
+            version: ItemVersion(1), created: .now, modified: .now))
+        let file = library.item(id)!
+        let details = DetailsPresentation()
+        let tools = { ItemToolbarActions(library: self.library, browser: nil, items: [file], editor: nil, details: details) }
+        details.toggleFocus(on: id)
+        #expect(tools().scrolledSubtitle == library.catalogue.label(for: file.type), "until the preview has read the file")
+        details.filePages(4, of: id)
+        #expect(tools().scrolledSubtitle == "PDF, 4 pages")
+        details.filePages(1, of: id)
+        #expect(tools().scrolledSubtitle == "PDF, 1 page")
+        details.pageShows(ItemID.mint())
+        #expect(details.pages(of: id) == nil, "another item's page never inherits the count")
     }
 }

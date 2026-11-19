@@ -43,6 +43,9 @@ final class DetailsPresentation {
     private(set) var focusedItem: ItemID?
     /// The item whose formats card (Aa) is open, named for the same reason.
     private(set) var formatsItem: ItemID?
+    /// How many pages the PDF on the page has, once its preview has read the file. It names the item for the same
+    /// reason, and Focus puts it under the title in the toolbar.
+    private(set) var pageCount: (item: ItemID, pages: Int)?
     /// The items the window's Change Type panel is asked for.
     var typeChange: TypeChangeRequest?
     /// The items and type the window asks the values for that the type needs.
@@ -120,11 +123,23 @@ final class DetailsPresentation {
 
     func closeFormats() { formatsItem = nil }
 
+    /// Says how many pages `item`'s file has, or that it has none known. Saying so for one item never changes another's.
+    func filePages(_ pages: Int?, of item: ItemID) {
+        if let pages {
+            pageCount = (item, pages)
+        } else if pageCount?.item == item {
+            pageCount = nil
+        }
+    }
+
+    func pages(of item: ItemID) -> Int? { pageCount?.item == item ? pageCount?.pages : nil }
+
     /// The page now shows `item`, or nothing. Focus and the formats card belong to the item they were chosen on, so
     /// moving to another item, or leaving the page, puts both away.
     func pageShows(_ item: ItemID?) {
         if focusedItem != item { focusedItem = nil }
         if formatsItem != item { formatsItem = nil }
+        if pageCount?.item != item { pageCount = nil }
     }
 
     /// `item`'s page has gone, as when the item was deleted or the window turned to something else. Another item's
@@ -132,6 +147,7 @@ final class DetailsPresentation {
     func pageLeft(_ item: ItemID) {
         if focusedItem == item { focusedItem = nil }
         if formatsItem == item { formatsItem = nil }
+        if pageCount?.item == item { pageCount = nil }
     }
 
     /// Escape on the page: the formats card closes first, then Focus on a second press. False when neither was
