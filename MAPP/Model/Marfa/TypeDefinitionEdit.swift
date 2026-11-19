@@ -70,6 +70,19 @@ nonisolated enum TypeDefinitionEdit {
     ) async throws {
         let listed = try await read()
         guard let own = listed.first(where: { $0.value1.id == plan.type.rawValue }) else { throw TypeSchemaFailure.changedOnServer }
+        if declaredAbove(plan.edit.key, from: own, in: listed) { throw TypeSchemaFailure.changedOnServer }
         try await replace(update(own, for: plan))
+    }
+
+    /// Whether a type above `own`, as the server lists them now, declares `key`: then the field is inherited, and a
+    /// change to the child's own declaration would not reach it, whatever the catalogue held when the page was shown.
+    static func declaredAbove(_ key: String, from own: Listed, in listed: [Listed]) -> Bool {
+        var seen: Set<String> = [own.value1.id]
+        var next = own.value1.parent
+        while let id = next, seen.insert(id).inserted, let parent = listed.first(where: { $0.value1.id == id }) {
+            if parent.value1.fields.additionalProperties[key] != nil { return true }
+            next = parent.value1.parent
+        }
+        return false
     }
 }

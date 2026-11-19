@@ -138,8 +138,15 @@ private func catalogue() -> Catalogue {
     @Test func aBlankOrRepeatedChoiceIsRefused() {
         #expect(throws: FieldEditRefusal.blankChoice) { try info.plan(.setChoices(key: "genre", choices: ["fiction", " "]), in: catalogue()) }
         #expect(throws: FieldEditRefusal.repeatedChoice("fiction")) {
-            try info.plan(.setChoices(key: "genre", choices: ["fiction", "history", "fiction"]), in: catalogue())
+            try info.plan(.setChoices(key: "genre", choices: ["fiction", "history", " fiction "]), in: catalogue())
         }
+    }
+
+    @Test func aWordTheFieldOffersGoesBackAsTheServerHoldsIt() throws {
+        let stage = ItemTypeInfo.Field(key: "stage", label: "Stage", kind: .choice([" Draft", "Done", "Done"]), declaredBy: TypeID("user.stage"))
+        let type = ItemTypeInfo(id: TypeID("user.stage"), label: "Stage", fields: [stage], titleField: "title", bodyField: nil, parent: nil)
+        let plan = try type.plan(.setChoices(key: "stage", choices: [" Draft", "Done", "Done", " Final "]), in: catalogue())
+        #expect(plan.edit == .setChoices(key: "stage", choices: [" Draft", "Done", "Done", "Final"]))
     }
 
     @Test func onlyAChoiceFieldTakesChoices() {
@@ -303,6 +310,22 @@ private func catalogue() -> Catalogue {
         let edit = try plan(.rename(key: "genre", label: "Kind"))
         await #expect(throws: TypeSchemaFailure.changedOnServer) {
             try await TypeDefinitionEdit.run(edit, read: { [renamed] }, replace: { _ in replaced += 1 })
+        }
+        #expect(replaced == 0)
+    }
+
+    @Test func aFieldATypeAboveDeclaresOnTheServerRefusesTheChange() async throws {
+        var replaced = 0
+        let parent = Components.Schemas.TypeDefinition(
+            id: media.rawValue, label: "Media", plural: "Media", description: "Media", parent: nil,
+            compatibleWith: [], roles: [],
+            fields: .init(additionalProperties: ["genre": Definition(_type: .string, label: "Genre")]),
+            tables: .init(additionalProperties: [:]), version: 1,
+            displayHints: .init(titleField: "title"), linkField: nil)
+        let above = TypeDefinitionEdit.Listed(value1: parent, value2: .init(provenance: .init(origin: .user), ownRoles: []))
+        let edit = try plan(.remove(key: "genre"))
+        await #expect(throws: TypeSchemaFailure.changedOnServer) {
+            try await TypeDefinitionEdit.run(edit, read: { [listed(), above] }, replace: { _ in replaced += 1 })
         }
         #expect(replaced == 0)
     }

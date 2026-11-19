@@ -21,7 +21,7 @@ enum FieldMenuPresenter {
         case .unpin: String(localized: "Unpin from Under the Title")
         case .moveUp: String(localized: "Move Up")
         case .moveDown: String(localized: "Move Down")
-        case .hide: String(localized: "Hide on \(typeLabel) Pages")
+        case .hide: typeLabel.isEmpty ? String(localized: "Hide on the Type’s Pages") : String(localized: "Hide on \(typeLabel) Pages")
         }
     }
 

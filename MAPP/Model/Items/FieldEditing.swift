@@ -138,12 +138,16 @@ nonisolated extension ItemTypeInfo {
             guard !clash else { throw .labelInUse(name) }
             return FieldEditPlan(type: id, edit: .rename(key: field.key, label: name), shown: field)
         case .setChoices(_, let choices):
-            guard case .choice = field.kind else { throw .notAChoiceField }
-            let words = choices.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            guard case .choice(let offered) = field.kind else { throw .notAChoiceField }
+            // A word the field already offers goes back exactly as the server holds it, even padded or repeated,
+            // since changing it would rename it and items keep the old word. Only a new word is trimmed and checked.
+            let words = choices.map { offered.contains($0) ? $0 : $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             guard !words.isEmpty else { throw .noChoices }
-            guard !words.contains(where: \.isEmpty) else { throw .blankChoice }
-            var seen: Set<String> = []
-            for word in words where !seen.insert(word).inserted { throw .repeatedChoice(word) }
+            var seen = Set(choices.filter(offered.contains))
+            for (typed, word) in zip(choices, words) where !offered.contains(typed) {
+                guard !word.isEmpty else { throw .blankChoice }
+                guard seen.insert(word).inserted else { throw .repeatedChoice(word) }
+            }
             return FieldEditPlan(type: id, edit: .setChoices(key: field.key, choices: words), shown: field)
         case .remove:
             guard field.key != titleKey, field.key != bodyKey, field.key != linkField else { throw .holdsPageContent }
