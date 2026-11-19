@@ -38,6 +38,11 @@ final class DetailsPresentation {
     /// item's page from the editor, a web page from its web view. It names the item, not a flag, so a page that is
     /// still reporting for the item before cannot show that item's title for the next.
     private(set) var itemWithHeaderAway: ItemID?
+    /// The item the window has in Focus: its title is in the toolbar and its properties are hidden. It names the item,
+    /// so another item's page is never in Focus, and `pageShows(_:)` forgets it when the page moves on.
+    private(set) var focusedItem: ItemID?
+    /// The item whose formats card (Aa) is open, named for the same reason.
+    private(set) var formatsItem: ItemID?
     /// The items the window's Change Type panel is asked for.
     var typeChange: TypeChangeRequest?
     /// The items and type the window asks the values for that the type needs.
@@ -98,6 +103,52 @@ final class DetailsPresentation {
 
     func isHeaderAway(of item: ItemID) -> Bool { itemWithHeaderAway == item }
 
+    func isFocused(on item: ItemID?) -> Bool { item != nil && focusedItem == item }
+
+    func isFormatsOpen(on item: ItemID?) -> Bool { item != nil && formatsItem == item }
+
+    /// Turns Focus on for `item`, or off if it is on. Customize Layout arranges the header Focus hides, so it has Focus
+    /// to itself.
+    func toggleFocus(on item: ItemID) {
+        guard !isCustomizingLayout else { return }
+        focusedItem = focusedItem == item ? nil : item
+    }
+
+    func toggleFormats(on item: ItemID) {
+        formatsItem = formatsItem == item ? nil : item
+    }
+
+    func closeFormats() { formatsItem = nil }
+
+    /// The page now shows `item`, or nothing. Focus and the formats card belong to the item they were chosen on, so
+    /// moving to another item, or leaving the page, puts both away.
+    func pageShows(_ item: ItemID?) {
+        if focusedItem != item { focusedItem = nil }
+        if formatsItem != item { formatsItem = nil }
+    }
+
+    /// `item`'s page has gone, as when the item was deleted or the window turned to something else. Another item's
+    /// Focus is left alone, since a page going away can be told after the next one has arrived.
+    func pageLeft(_ item: ItemID) {
+        if focusedItem == item { focusedItem = nil }
+        if formatsItem == item { formatsItem = nil }
+    }
+
+    /// Escape on the page: the formats card closes first, then Focus on a second press. False when neither was
+    /// showing, so the key is the caller's.
+    @discardableResult
+    func escapeFromPage() -> Bool {
+        if formatsItem != nil {
+            formatsItem = nil
+            return true
+        }
+        if focusedItem != nil {
+            focusedItem = nil
+            return true
+        }
+        return false
+    }
+
     /// Every window's presentation, so a quit can reach the drafts each holds.
     private static let open = NSHashTable<DetailsPresentation>.weakObjects()
 
@@ -147,6 +198,8 @@ final class DetailsPresentation {
     /// Shows the sidebar, which takes the layout, and remembers to close it again if it was closed.
     func beginLayout() {
         guard !isCustomizingLayout else { return }
+        focusedItem = nil
+        formatsItem = nil
         closesSidebarAtEnd = !isPresented
         isCustomizingLayout = true
         isPresented = true

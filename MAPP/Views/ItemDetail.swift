@@ -19,9 +19,11 @@ struct ItemDetail: View {
         } else if let id = browser.selection.first, let item = library.item(id) {
             if library.pageLayout(of: item) != .text {
                 FileItemPage(item: item, drafts: details, open: { [editor] in editor.onOpenItem($0) }, onResolved: { browser.fileFetched(id, at: $0) }, backsToolbar: backsToolbar)
+                    .itemCorner(item, editor: nil, details: details)
                     .onAppear { editor.close() }
             } else {
                 ItemPage(item: item, editor: editor, headerDrafts: details, backsToolbar: backsToolbar)
+                    .itemCorner(item, editor: editor, details: details)
                     .onAppear(perform: grantFocusRequest)
                     .onChange(of: browser.focusRequest, grantFocusRequest)
             }

@@ -21,10 +21,15 @@ struct ItemCommandContext {
     let browser: Browser?
     /// The Reader and Original switch of the page in front, when it has an article.
     let pageLook: PageLookSwitch?
+    /// Whether an item's page is what the window shows, which Focus and the formats card belong to.
+    let showsPage: Bool
+    /// The window's presentation, which holds Focus and the formats card.
+    let details: DetailsPresentation?
 
     init(
         library: (any ItemLibrary)?, ids: Set<ItemID>, hasBrowser: Bool, pageItem: ItemID?, pageIsEditable: Bool = true,
-        showsSource: Bool = false, fileURL: URL? = nil, browser: Browser? = nil, pageLook: PageLookSwitch? = nil
+        showsSource: Bool = false, fileURL: URL? = nil, browser: Browser? = nil, pageLook: PageLookSwitch? = nil,
+        showsPage: Bool = true, details: DetailsPresentation? = nil
     ) {
         self.library = library
         self.ids = ids
@@ -35,6 +40,8 @@ struct ItemCommandContext {
         self.fileURL = fileURL
         self.browser = browser
         self.pageLook = pageLook
+        self.showsPage = showsPage
+        self.details = details
     }
 
     /// The context of a window: its selection, its browser if it has one, and the editor it hands to its menus.
@@ -49,7 +56,8 @@ struct ItemCommandContext {
             pageItem: Self.pageItem(showsPage: browser?.showsPage ?? true, editorHasItem: editor?.hasItem == true, pageItemID: editor?.pageItemID),
             pageIsEditable: editor?.isEditable ?? false, showsSource: editor?.caret.sourceMode ?? false,
             fileURL: single.flatMap { browser?.fileURL(of: $0) } ?? fileURL, browser: browser,
-            pageLook: browser?.showsPage != false ? details?.pageLook : nil)
+            pageLook: browser?.showsPage != false ? details?.pageLook : nil,
+            showsPage: browser?.showsPage ?? true, details: details)
     }
 
     /// The item whose page is in front: the editor's, only while the page is what the window shows and the editor
@@ -70,6 +78,9 @@ struct ItemCommandContext {
     /// The visible item when it can be written to.
     var editableItem: Item? { visibleItem.flatMap { $0.isWritable && pageIsEditable ? $0 : nil } }
 
+    /// The one item whose page the window shows, which Focus is on: any kind of item, a file included.
+    var focusItem: Item? { showsPage ? item : nil }
+
     var originalAddress: URL? { item.flatMap { library?.originalAddress(of: $0) } }
 
     var browserTarget: BrowserTarget? { item.flatMap { item in library?.browserTarget(of: item, fetchedFile: fileURL) } }
@@ -79,14 +90,14 @@ struct ItemCommandContext {
 /// once here: its title, symbol, shortcut, when it applies and what it does. A menu shows every one of them and
 /// dims the ones that do not apply, so the two menus never differ in what they offer or when.
 enum ItemCommand: CaseIterable {
-    case open, openAsModal, openAsFullPage, quickLook, openInNewWindow, openOriginal, openInBrowser, addAttachment, toggleSource, toggleReader, print, exportPDF
+    case open, openAsModal, openAsFullPage, quickLook, openInNewWindow, openOriginal, openInBrowser, addAttachment, toggleSource, toggleReader, toggleFormats, toggleFocus, print, exportPDF
 
     /// The menu the menu bar puts it in, which is where ⌘K lists it: Add Attachment under Edit, the two ways of
     /// showing the page under View, and the rest under File.
     var paletteGroup: PaletteSections.CommandGroup {
         switch self {
         case .addAttachment: .edit
-        case .toggleSource, .toggleReader: .view
+        case .toggleSource, .toggleReader, .toggleFormats, .toggleFocus: .view
         case .open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow, .openOriginal, .openInBrowser, .print, .exportPDF: .file
         }
     }
@@ -103,6 +114,8 @@ enum ItemCommand: CaseIterable {
         case .addAttachment: "Add Attachment…"
         case .toggleSource: context.showsSource ? "Show Formatted Text" : "Show Markdown Source"
         case .toggleReader: context.pageLook?.mode == .original ? "Show Reader" : "Show Original"
+        case .toggleFormats: context.details?.isFormatsOpen(on: context.visibleItem?.id) == true ? "Hide Formats" : "Show Formats"
+        case .toggleFocus: context.details?.isFocused(on: context.focusItem?.id) == true ? "Leave Focus" : "Focus"
         case .print: "Print…"
         case .exportPDF: "Export as PDF…"
         }
@@ -119,6 +132,8 @@ enum ItemCommand: CaseIterable {
         case .addAttachment: "paperclip"
         case .toggleSource: "doc.plaintext"
         case .toggleReader: "text.page"
+        case .toggleFormats: "textformat"
+        case .toggleFocus: "arrow.up.left.and.arrow.down.right"
         case .print: "printer"
         case .exportPDF: "doc.richtext"
         }
@@ -130,7 +145,9 @@ enum ItemCommand: CaseIterable {
         case .openInNewWindow: KeyboardShortcut("o")
         case .addAttachment: KeyboardShortcut("a", modifiers: [.command, .shift])
         case .print: KeyboardShortcut("p")
-        case .open, .openAsModal, .openAsFullPage, .quickLook, .openOriginal, .openInBrowser, .toggleSource, .toggleReader, .exportPDF: nil
+        // Not ⌃⌘F, which is the system's Full Screen.
+        case .toggleFocus: KeyboardShortcut("f", modifiers: [.command, .shift])
+        case .open, .openAsModal, .openAsFullPage, .quickLook, .openOriginal, .openInBrowser, .toggleSource, .toggleReader, .toggleFormats, .exportPDF: nil
         }
     }
 
@@ -146,6 +163,8 @@ enum ItemCommand: CaseIterable {
         case .addAttachment: context.editableItem != nil
         case .toggleSource, .print, .exportPDF: context.visibleItem != nil
         case .toggleReader: context.pageLook != nil
+        case .toggleFormats: context.visibleItem != nil && context.details != nil
+        case .toggleFocus: context.focusItem != nil && context.details?.isCustomizingLayout == false
         }
     }
 
@@ -164,6 +183,8 @@ enum ItemCommand: CaseIterable {
         case .addAttachment: editor?.isChoosingImages = true
         case .toggleSource: editor.map { $0.setSourceMode(!$0.caret.sourceMode) }
         case .toggleReader: context.pageLook.map { $0.choose($0.mode == .reader ? .original : .reader) }
+        case .toggleFormats: context.visibleItem.map { context.details?.toggleFormats(on: $0.id) }
+        case .toggleFocus: context.focusItem.map { context.details?.toggleFocus(on: $0.id) }
         case .print: editor?.printItem()
         case .exportPDF: editor?.exportPDF()
         }

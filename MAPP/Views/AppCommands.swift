@@ -88,6 +88,8 @@ struct AppCommands: Commands {
             Divider()
             command(.toggleSource)
             command(.toggleReader)
+            command(.toggleFormats)
+            command(.toggleFocus)
             Divider()
             if let place = browser?.indexPlace {
                 IndexViewOptions(place: place, browser: browser)

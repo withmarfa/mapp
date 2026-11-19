@@ -4,9 +4,10 @@ import SwiftUI
 /// layout of its own (`WindowToolbarLayout`), since the system reshuffles a saved layout when one identifier moves between
 /// split views. Nothing else in a window may declare a plain `toolbar`, which turns customization off for the whole window.
 ///
-/// The defaults run Save as View while a place that is not a view has something to keep, Search and View Options, the
-/// Reader and Original switch on a page with an article, View As, Share and More, and Details at the far right. In the
-/// list Search and View Options are the list column's (`ListToolbar`). Format and `ExtraToolbarItems` start in the tray.
+/// The defaults run Save as View while a place that is not a view has something to keep, Search and View Options, View
+/// As, Share and More, and Details at the far right. In the list Search and View Options are the list column's
+/// (`ListToolbar`). `ExtraToolbarItems` start in the tray. Format and the Reader and Original switch are in the page's
+/// corner (`ItemCorner`), not here.
 struct WindowToolbar: CustomizableToolbarContent {
     @CurrentLibrary private var library
     @AppStorage(InterfaceKey.showsScrolledTitle) private var showsScrolledTitle = true
@@ -46,8 +47,8 @@ struct WindowToolbar: CustomizableToolbarContent {
             }
             .sharedBackgroundVisibility(.hidden)
             .customizationBehavior(.disabled)
-            .hidden(!showsScrolledTitle || !tools.hasScrollingHeader || browser?.showsCollection == true)
-        } else if opensFromCollection, showsScrolledTitle, tools.hasHeaderAway {
+            .hidden((!showsScrolledTitle && !tools.isFocused) || !tools.hasScrollingHeader || browser?.showsCollection == true)
+        } else if opensFromCollection, showsScrolledTitle || tools.isFocused, tools.hasHeaderAway {
             ToolbarItem(id: "scrolledTitle", placement: .navigation) {
                 ScrolledItemTitle(title: tools.scrolledTitle)
             }
@@ -64,26 +65,16 @@ struct WindowToolbar: CustomizableToolbarContent {
         // While a view is edited the toolbar keeps to what edits it: its layout is chosen in the panel, and Share and
         // More act on items, not on the view.
         let editsView = browser?.showsViewPanel == true
-        let hidesPageLook = details.pageLook == nil || browser?.showsCollection == true || !showsItem
         let showsViewTools = browser != nil && !hasListColumn && !opensFromCollection
         let showsViewMode = browser != nil && showsItem && !editsView
         let showsActions = showsItem && !editsView
         let showsDetails = !tools.showsInspector
-        let showsAfterViewTools = !hidesPageLook || showsViewMode || showsActions || showsDetails
-        let showsAfterPageLook = showsViewMode || showsActions || showsDetails
         let showsAfterViewMode = showsActions || showsDetails
+        let showsAfterViewTools = showsViewMode || showsAfterViewMode
         if let browser, !hasListColumn {
             ViewToolbarItems(browser: browser, layout: .item, isHidden: opensFromCollection)
             if showsViewTools && showsAfterViewTools { ToolbarSpacer(.fixed).customizationBehavior(.disabled) }
         }
-        ToolbarItem(id: "pageLook") { SourceViewPicker(details: details) }
-            .hidden(hidesPageLook)
-        if !hidesPageLook && showsAfterPageLook { ToolbarSpacer(.fixed).customizationBehavior(.disabled) }
-        ToolbarItem(id: "format") {
-            if let editor { FormatMenu(editor: editor, item: tools.editableItem) }
-        }
-            .defaultCustomization(.hidden)
-            .hidden(browser?.showsCollection == true || !showsItem)
         if let browser {
             ToolbarItem(id: "viewMode") { ViewModeMenu(browser: browser) }
                 .hidden(!showsViewMode)
@@ -339,6 +330,18 @@ struct ItemToolbarActions {
         return item
     }
 
+    /// The one item the window's page shows, of any kind.
+    private var shownItem: Item? {
+        guard browser?.showsPage != false, (browser?.selection.count ?? items.count) == 1, items.count == 1 else { return nil }
+        return items.first
+    }
+
+    /// The item on the page while it is in Focus, which puts its title in the toolbar from the start, whatever kind
+    /// of page it is.
+    private var focusedItem: Item? { shownItem.flatMap { details.isFocused(on: $0.id) ? $0 : nil } }
+
+    var isFocused: Bool { focusedItem != nil }
+
     /// The one item the window's page shows, when it is one whose page scrolls a header away: an item's, or a web
     /// page's.
     private var itemWithScrollingHeader: Item? {
@@ -347,15 +350,16 @@ struct ItemToolbarActions {
         return item
     }
 
-    var hasScrollingHeader: Bool { itemWithScrollingHeader != nil }
+    var hasScrollingHeader: Bool { itemWithScrollingHeader != nil || isFocused }
 
     /// Whether that item's page has scrolled its header away, whatever the title says: an item with no title still
     /// brings its toolbar item, with no text.
-    var hasHeaderAway: Bool { itemWithScrollingHeader.map { details.isHeaderAway(of: $0.id) } == true }
+    var hasHeaderAway: Bool { isFocused || itemWithScrollingHeader.map { details.isHeaderAway(of: $0.id) } == true }
 
     /// The title the toolbar shows: the item's once its page has scrolled the header away, and nothing before. A
     /// item's is the text it would be written with, as its header shows it; any other page's is the name it shows.
     var scrolledTitle: String {
+        if let item = focusedItem { return library.pageLayout(of: item) == .text ? item.title : item.displayTitle }
         guard let item = itemWithScrollingHeader, details.isHeaderAway(of: item.id) else { return "" }
         return library.pageLayout(of: item) == .text ? item.title : item.displayTitle
     }
@@ -416,35 +420,6 @@ private struct UndoManagerReader<Content: View>: View {
     @ViewBuilder let content: (UndoManager?) -> Content
 
     var body: some View { content(undoManager) }
-}
-
-/// Text styles and emphasis, as Notes offers them under Aa.
-private struct FormatMenu: View {
-    let editor: EditorController
-    let item: Item?
-
-    var body: some View {
-        Menu("Format", systemImage: "textformat") {
-            ForEach([Format.title, .heading, .subheading, .body], id: \.self, content: toggle)
-            Divider()
-            ForEach([Format.bold, .italic, .strikethrough, .code], id: \.self, content: toggle)
-            Divider()
-            ForEach([Format.bulletList, .orderedList, .checklist], id: \.self, content: toggle)
-            Button("Table", systemImage: "tablecells") { editor.apply(.table) }
-                // A table is inserted beside another table, never inside one.
-                .disabled(!editor.canApply(.table))
-        }
-        .menuIndicator(.hidden)
-        .help("Format")
-        .accessibilityIdentifier("FormatToolbar")
-        .disabled(item == nil)
-    }
-
-    private func toggle(_ format: Format) -> some View {
-        Toggle(isOn: Binding { format.isActive(in: editor.caret) } set: { _ in editor.apply(format) }) {
-            Text(format.title)
-        }.disabled(!editor.canApply(format))
-    }
 }
 
 /// What else can be done to the item shown, as Notes keeps it under its More button.

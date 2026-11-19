@@ -340,6 +340,7 @@ struct MainView: View {
             editor.onEscape = { [browser, details, library] in
                 if details.isEditingView { browser.escapeViewPanel(in: library) }
                 else if details.isCustomizingLayout { details.endLayout() }
+                else if details.escapeFromPage() { return }
                 else if browser.isModalPresented { browser.closeModal() }
                 else { browser.focusRequest = .list }
             }

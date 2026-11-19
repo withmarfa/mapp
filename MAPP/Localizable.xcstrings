@@ -19,6 +19,9 @@
     "Add and Open" : {
 
     },
+    "Aa" : {
+
+    },
     "Add Shortcut" : {
 
     },
@@ -49,6 +52,12 @@
     "Files you add show here." : {
 
     },
+    "Focus" : {
+
+    },
+    "Formats" : {
+
+    },
     "Go To" : {
 
     },
@@ -56,6 +65,12 @@
 
     },
     "Green" : {
+
+    },
+    "Heading" : {
+
+    },
+    "Hide Formats" : {
 
     },
     "Hide Month" : {
@@ -95,6 +110,9 @@
 
     },
     "Keys you make show here." : {
+
+    },
+    "Leave Focus" : {
 
     },
     "Move to Section" : {
@@ -175,6 +193,9 @@
     "Shortcuts" : {
 
     },
+    "Show Formats" : {
+
+    },
     "Show Section" : {
 
     },
@@ -182,6 +203,9 @@
 
     },
     "Sources show where items came from." : {
+
+    },
+    "Subheading" : {
 
     },
     "Tab" : {
