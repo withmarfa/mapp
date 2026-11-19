@@ -173,8 +173,8 @@ nonisolated struct PaletteAction: Identifiable, Equatable, Sendable {
         }
         if isActive {
             actions.append(isFavorite
-                ? PaletteAction(.removeFromFavorites, String(localized: "Remove from Favorites"), "heart.slash")
-                : PaletteAction(.addToFavorites, String(localized: "Add to Favorites"), "heart"))
+                ? PaletteAction(.removeFromFavorites, String(localized: "Remove from Favorites"), "star.slash")
+                : PaletteAction(.addToFavorites, String(localized: "Add to Favorites"), "star"))
         }
         if !isFile {
             actions.append(PaletteAction(.versionHistory, String(localized: "Version History…"), "clock.arrow.circlepath", keys: ["⌥", "⌘", "Y"]))

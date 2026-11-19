@@ -76,7 +76,7 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
         case .inbox: "tray"
         case .recents: "clock"
         case .all: "square.grid.2x2"
-        case .favorites: "heart"
+        case .favorites: "star"
         case .sources: "antenna.radiowaves.left.and.right"
         case .collections, .collection: "square.stack"
         case .source: "antenna.radiowaves.left.and.right"
@@ -108,7 +108,7 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
         switch self {
         case .inbox: .blue
         case .recents: .gray
-        case .favorites: .pink
+        case .favorites: .yellow
         case .view: .gray
         default: nil
         }

@@ -173,7 +173,7 @@ struct SidebarSettingsTests {
         layout.setColor(.orange, of: .view(ItemID("v-Reading")))
         let views = plan(library(), layout).views
         #expect(views.map(\.title) == builtIns(library()) + ["Open work", "Reading"])
-        #expect(views.map(\.tone) == [.blue, .gray, .pink, .gray, .orange])
+        #expect(views.map(\.tone) == [.blue, .gray, .yellow, .gray, .orange])
         #expect(views.allSatisfy { $0.isShown && $0.isEnabled })
     }
 

@@ -131,14 +131,14 @@ private nonisolated struct GalleryShape: InsettableShape {
     }
 }
 
-/// A favorite's heart on the picture's corner, the one mark a card puts on its picture.
+/// A favorite's star on the picture's corner, the one mark a card puts on its picture.
 private struct FavoriteBadge: View {
     let unit: CGFloat
 
     var body: some View {
-        Image(systemName: "heart.fill")
+        Image(systemName: "star.fill")
             .font(.system(size: 10 * unit))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.yellow)
             .padding(5 * unit)
             .background(.regularMaterial, in: .circle)
             .accessibilityHidden(true)
@@ -207,7 +207,7 @@ private struct GalleryThumbnail: View {
             switch CardFace.fallback(preview: cards.preview, isFile: item.isFile, text: item.preview) {
             case .fileIcon:
                 if case .file(let type) = facts.kind { FileGlyph(type: type) }
-            case .text: OpeningLines(text: item.preview, unit: cards.size == .large ? 12.0 / 11 : 1, clearsHeart: item.isFavorite)
+            case .text: OpeningLines(text: item.preview, unit: cards.size == .large ? 12.0 / 11 : 1, clearsStar: item.isFavorite)
             case .picture, .placeholder: QuietMark(icon: facts.icon)
             }
         }
@@ -233,15 +233,15 @@ private struct GalleryRing: View {
 private struct OpeningLines: View {
     let text: String
     let unit: CGFloat
-    /// Whether the favorite's heart sits on the corner, so the first line stops short of it.
-    let clearsHeart: Bool
+    /// Whether the favorite's star sits on the corner, so the first line stops short of it.
+    let clearsStar: Bool
 
     var body: some View {
         Text(OpeningText.attributed(from: text))
             .font(.system(size: 11 * unit))
             .foregroundStyle(.secondary)
             .lineSpacing(2 * unit)
-            .padding(.trailing, clearsHeart ? 20 * unit : 0)
+            .padding(.trailing, clearsStar ? 20 * unit : 0)
             .padding(12 * unit)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .mask {
