@@ -11,6 +11,8 @@ struct SidebarIndex: View {
     @State private var choice = IndexChoice()
     @State private var editing: SourceEditRequest?
     @State private var deleting: IndexRow?
+    /// The title of the collection last asked about, kept while the alert goes away so its title never empties.
+    @State private var deletingTitle = ""
     @AppStorage private var tab: IndexTab
 
     init(browser: Browser, details: DetailsPresentation, order: ItemOrder) {
@@ -26,7 +28,7 @@ struct SidebarIndex: View {
         let rows = model.rows(for: place)
         IndexContent(
             place: place, rows: rows, isBuilt: model.isBuilt(for: place), browser: browser, tab: tabBinding, choice: choice,
-            edit: place == .sources ? { editing = $0 } : nil, delete: place == .collections ? { deleting = $0 } : nil,
+            edit: place == .sources ? { editing = $0 } : nil, delete: place == .collections ? { ask($0) } : nil,
             newCollection: place == .collections ? { browser.openQuickAdd(in: library) } : nil
         ) { row in
             browser.show(row.place, in: library, order: order)
@@ -44,9 +46,9 @@ struct SidebarIndex: View {
         // with it, and a place built again starts with nothing chosen.
         .onChange(of: rows) { choice.keep(within: rows) }
         // The names and counts are the server's, so they are asked again whenever the items change while the page is
-        // open, and when the page opens.
+        // open, and when the page opens. A collection's source is named from the same answer.
         .task(id: SourceRefresh(place: place, library: ObjectIdentifier(library), membership: library.membershipRevision)) {
-            if place == .sources { await library.refreshSources() }
+            await library.refreshSources()
         }
         .sheet(item: $editing) { request in
             switch request.mode {
@@ -55,7 +57,7 @@ struct SidebarIndex: View {
             }
         }
         .alert(
-            DeletionWords.collectionTitle(deleting?.title ?? ""), isPresented: Binding { deleting != nil } set: { if !$0 { deleting = nil } },
+            DeletionWords.collectionTitle(deletingTitle), isPresented: Binding { deleting != nil } set: { if !$0 { deleting = nil } },
             presenting: deleting
         ) { row in
             Button("Delete", role: .destructive) { delete(row) }
@@ -74,10 +76,17 @@ struct SidebarIndex: View {
         Binding { place.tabs.contains(tab) ? tab : .all } set: { tab = $0 }
     }
 
+    /// Asks before deleting a collection, unless it is read-only.
+    private func ask(_ row: IndexRow) {
+        guard row.canDelete else { return }
+        deletingTitle = row.title
+        deleting = row
+    }
+
     /// Removes the collection and no member: a collection's members hold their own edges to it, and those stay, so
     /// Undo, or Recently Deleted, brings the collection back with its members.
     private func delete(_ row: IndexRow) {
-        guard case .collection(let id) = row.place else { return }
+        guard row.canDelete, case .collection(let id) = row.place else { return }
         library.deleteAfterSaving([id], undoManager: undoManager, asking: details, naming: row.title)
     }
 
