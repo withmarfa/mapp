@@ -27,8 +27,9 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
         self.address = address
     }
 
-    func server(key: String) -> Server {
-        Server(url: address, key: key)
+    /// Throws only for an address holding a user or password, which `init(address:)` already refuses.
+    func server(key: String) throws -> Server {
+        try Server(url: address, key: key)
     }
 }
 

@@ -17,6 +17,14 @@ struct MarfaConnectionTests {
         #expect(throws: MarfaConnection.Problem.notAServer) { try MarfaConnection(address: text) }
     }
 
+    @Test(arguments: ["https://user@marfa.example", "https://user:secret@marfa.example", "http://:secret@marfa.example:8210/api"])
+    @MainActor func anAddressWithAUserOrPasswordIsRefusedInPlainWordsBeforeAnyServerIsMade(_ text: String) throws {
+        #expect(throws: MarfaConnection.Problem.notAServer) { try MarfaConnection(address: text) }
+        let notice = try #require(MarfaSettingsModel.notice(for: .notAServer))
+        #expect(!(notice.title + notice.message).localizedCaseInsensitiveContains("userinfo"))
+        #expect(notice.message == "That doesn’t look like a Marfa server. Use an address that starts with http:// or https://.")
+    }
+
     @Test func eachServerKeepsItsOwnCopyInTheAppsStorage() throws {
         let root = URL.temporaryDirectory.appending(path: "Stores", directoryHint: .isDirectory)
         let location = MarfaStoreLocation(root: root)
