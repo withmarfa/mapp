@@ -901,6 +901,8 @@ final class Browser {
 
     /// Where this Mac's settings for views are kept. A test gives its own.
     @ObservationIgnored var defaults: UserDefaults = .standard
+    /// What `isDefaultViewChanged` last worked out, and the stored data it worked it out from (`Browser+PlaceDefaults`).
+    @ObservationIgnored var changedMemo: (place: SidebarItem, inputs: [Data?], changed: Bool)?
     @ObservationIgnored var isApplyingLayout = false
 
     /// The order and grouping each view opened with (`Browser+SavedViews`).

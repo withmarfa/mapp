@@ -28,7 +28,7 @@ struct SavedViewCommand {
                 })
             }
         }
-        if browser.isDefaultViewChanged {
+        if browser.offersResetView {
             commands.append(SavedViewCommand(title: String(localized: "Reset View"), systemImage: "arrow.uturn.backward") {
                 browser.resetView(in: library)
             })
@@ -60,7 +60,7 @@ struct SavedViewMenu: View {
     let browser: Browser?
     let library: (any ItemLibrary)?
     @StoredOrder private var order
-    // Read by `isDefaultViewChanged`, so a change of the default view draws the menu again.
+    // Read by `offersResetView`, so a change of the default view draws the menu again.
     @AppStorage(PlaceDefaults.key) private var storedDefaults = Data()
     @AppStorage(PlaceDensities.key) private var storedDensities = Data()
     @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
@@ -85,7 +85,7 @@ struct SavedViewMenu: View {
         Button("Reset View", systemImage: "arrow.uturn.backward") {
             if let browser, let library { browser.resetView(in: library) }
         }
-        .disabled(browser?.isDefaultViewChanged != true)
+        .disabled(browser?.offersResetView != true)
         Button("Duplicate View", systemImage: "plus.square.on.square") {
             if let browser, let library, let shown { Task { await browser.duplicateView(shown.id, in: library, order: order) } }
         }
@@ -176,6 +176,8 @@ private struct SavedViewDialogs: ViewModifier {
             }
             // A place's default view is read once the catalogue is, since a condition on a field is kept only while a type declares it.
             .onChange(of: library.isLoaded) { browser.followPlaceDefault(in: library) }
+            // Entries of what no longer exists are forgotten once the copy reads whole, which can come after it is loaded.
+            .onChange(of: library.syncReport.fill?.state) { browser.prunePlaceDefaults(in: library) }
             // Each change of the place's order, grouping or filters is one step of Undo and, in a saved view, a write.
             .onChange(of: browser.liveChoices, initial: true) { browser.choicesChanged() }
             .onChange(of: library.reachesServer, initial: true) { browser.reachabilityChanged(in: library) }

@@ -24,7 +24,7 @@ extension Browser {
         } else {
             var layout = ItemTableColumnLayouts.layout(for: item, in: stored.wrappedValue)
             layout[visibility: column.id] = shown ? .visible : .hidden
-            stored.wrappedValue = ItemTableColumnLayouts.storing(layout, for: item, in: stored.wrappedValue)
+            stored.wrappedValue = ItemTableColumnLayouts.storing(layout, for: item, in: stored.wrappedValue, setAsideIn: defaults)
         }
     }
 
@@ -32,7 +32,8 @@ extension Browser {
         if let id = columnsViewID {
             changeViewSettings(id) { $0.columns.reset() }
         } else {
-            stored.wrappedValue = ItemTableColumnLayouts.storing(TableColumnCustomization(), for: item, in: stored.wrappedValue)
+            stored.wrappedValue = ItemTableColumnLayouts.storing(
+                TableColumnCustomization(), for: item, in: stored.wrappedValue, setAsideIn: defaults)
         }
     }
 }

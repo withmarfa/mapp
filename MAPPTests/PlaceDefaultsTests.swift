@@ -257,11 +257,122 @@ struct PlaceDefaultsTests {
     }
 
     @Test func aFieldThisVersionDoesNotKnowNeverVoidsTheRest() throws {
-        let text = #"{"layout":"table","grouping":7,"sort":"x","future":true}"#
+        let text = #"{"layout":"table","grouping":"by-magic","future":true}"#
         let value = try JSONDecoder().decode(PlaceDefault.self, from: Data(text.utf8))
         #expect(value.layout == .table)
-        #expect(value.sort.isEmpty)
+        // A word for a grouping this version lacks is the place's own grouping, never "no grouping".
         #expect(value.grouping == nil)
+    }
+
+    @Test func aFieldThatIsThereAndCannotBeReadFailsTheEntry() {
+        for text in [#"{"filters":"x"}"#, #"{"sort":"x"}"#, #"{"grouping":7}"#, #"{"layout":3}"#] {
+            #expect(throws: (any Error).self) { try JSONDecoder().decode(PlaceDefault.self, from: Data(text.utf8)) }
+        }
+    }
+
+    @Test func oneUnreadableEntryIsSetAsideAndTheOthersKeepWorking() throws {
+        let defaults = ViewPanelTests.defaults()
+        let bad = #"{"filters":"not a table","layout":"table"}"#
+        let good = try String(decoding: JSONEncoder().encode(PlaceDefault(layout: .board)), as: UTF8.self)
+        let object: [String: Any] = [
+            Self.tasks.storageKey: try JSONSerialization.jsonObject(with: Data(bad.utf8)),
+            SidebarItem.allItems.storageKey: try JSONSerialization.jsonObject(with: Data(good.utf8)),
+        ]
+        defaults.set(try JSONSerialization.data(withJSONObject: object), forKey: PlaceDefaults.key)
+        #expect(PlaceDefaults.stored(in: defaults).default(for: .allItems)?.layout == .board)
+        #expect(PlaceDefaults.stored(in: defaults).default(for: Self.tasks) == nil)
+
+        Self.store(PlaceDefault(layout: .table), for: .recents, in: defaults)
+        let aside = try #require(defaults.array(forKey: PlaceDefaults.setAsideKey) as? [Data])
+        #expect(aside.count == 1)
+        let kept = try #require(JSONSerialization.jsonObject(with: aside[0]) as? [String: Any])
+        #expect(Array(kept.keys) == [Self.tasks.storageKey])
+        #expect((kept[Self.tasks.storageKey] as? [String: Any])?["filters"] as? String == "not a table")
+        #expect(PlaceDefaults.stored(in: defaults).default(for: .allItems)?.layout == .board)
+        #expect(PlaceDefaults.stored(in: defaults).default(for: .recents)?.layout == .table)
+    }
+
+    // MARK: Column layouts that cannot be read
+
+    @Test func resetViewLeavesUnreadableColumnLayoutsAsTheyWere() {
+        let defaults = ViewPanelTests.defaults()
+        let garbage = Data("not json".utf8)
+        defaults.set(garbage, forKey: ItemTableColumnLayouts.key)
+        let library = Self.library()
+        let browser = Self.window(defaults, library: library)
+        browser.viewMode = .table
+        browser.resetView(in: library)
+        #expect(defaults.data(forKey: ItemTableColumnLayouts.key) == garbage)
+        #expect(ItemTableColumnLayouts.removing(Self.tasks, in: garbage) == garbage)
+    }
+
+    @Test func storingAColumnLayoutKeepsUnreadableStoredLayoutsAside() {
+        let defaults = ViewPanelTests.defaults()
+        let garbage = Data("not json".utf8)
+        var layout = TableColumnCustomization<ItemTableRow>()
+        layout[visibility: "created"] = .visible
+        let stored = ItemTableColumnLayouts.storing(layout, for: Self.tasks, in: garbage, setAsideIn: defaults)
+        #expect(defaults.array(forKey: ItemTableColumnLayouts.setAsideKey) as? [Data] == [garbage])
+        #expect(ItemTableColumnLayouts.layout(for: Self.tasks, in: stored)[visibility: "created"] == .visible)
+        // Nothing stored yet, or readable layouts, set nothing aside.
+        _ = ItemTableColumnLayouts.storing(layout, for: .allItems, in: stored, setAsideIn: defaults)
+        _ = ItemTableColumnLayouts.storing(layout, for: .allItems, in: Data(), setAsideIn: defaults)
+        #expect((defaults.array(forKey: ItemTableColumnLayouts.setAsideKey) as? [Data])?.count == 1)
+    }
+
+    // MARK: Pruning
+
+    @Test func entriesOfWhatNoLongerExistsAreForgottenOnlyOnceTheCopyIsWhole() {
+        let defaults = ViewPanelTests.defaults()
+        let library = Self.library()
+        let gone = SidebarItem.collection(ItemID("gone"))
+        let lost = SidebarItem.itemType("test.gone")
+        for place in [Self.tasks, gone, lost, .allItems] { Self.store(PlaceDefault(layout: .table), for: place, in: defaults) }
+        let browser = Self.window(defaults, library: library)
+
+        // A copy that is not known to be whole says nothing about what is missing.
+        library.syncReport.fill = LibraryFill(state: .filling)
+        browser.prunePlaceDefaults(in: library)
+        #expect(PlaceDefaults.stored(in: defaults).places.count == 4)
+        library.syncReport.fill = nil
+        browser.prunePlaceDefaults(in: library)
+        #expect(PlaceDefaults.stored(in: defaults).places.count == 4)
+
+        library.syncReport.fill = LibraryFill(state: .complete)
+        browser.prunePlaceDefaults(in: library)
+        let stored = PlaceDefaults.stored(in: defaults)
+        #expect(stored.default(for: gone) == nil)
+        #expect(stored.default(for: lost) == nil)
+        #expect(stored.default(for: Self.tasks) != nil)
+        #expect(stored.default(for: .allItems) != nil)
+    }
+
+    // MARK: Reset View beside New View's panel
+
+    @Test func resetViewIsNotOfferedWhileNewViewsPanelIsOpen() {
+        let defaults = ViewPanelTests.defaults()
+        let library = Self.library()
+        let browser = Self.window(defaults, library: library)
+        browser.setFilter(Self.status, values: ["todo"])
+        browser.choicesChanged()
+        #expect(browser.offersResetView)
+        browser.openNewViewPanel(in: library)
+        #expect(browser.isDefaultViewChanged)
+        #expect(!browser.offersResetView)
+        browser.escapeViewPanel(in: library)
+        #expect(browser.offersResetView)
+    }
+
+    @Test func theChangedStateFollowsTheStoredDataWithoutBeingToldOfAWrite() {
+        let defaults = ViewPanelTests.defaults()
+        let browser = Self.window(defaults, library: Self.library())
+        #expect(!browser.isDefaultViewChanged)
+        Self.store(PlaceDefault(layout: .table), for: Self.tasks, in: defaults)
+        #expect(browser.isDefaultViewChanged)
+        PlaceDefaults.update(in: defaults) { $0.set(nil, for: Self.tasks) }
+        #expect(!browser.isDefaultViewChanged)
+        PlaceDensities.update(in: defaults) { $0.set(.compact, for: Self.tasks) }
+        #expect(browser.isDefaultViewChanged)
     }
 }
 

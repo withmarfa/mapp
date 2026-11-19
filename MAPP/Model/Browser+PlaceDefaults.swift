@@ -53,6 +53,26 @@ extension Browser {
         updatePlaceDefault(place) { $0.compactBoard = isCompact }
     }
 
+    // MARK: Pruning
+
+    /// Forgets the entries of collections, types and favorites that no longer exist. The library says a thing is gone
+    /// only once its copy has been read whole and is current: a type or an item missing while the copy fills, refreshes or
+    /// is another server's says nothing, so then every entry stays. Items, and the types of the catalogue, outlive being
+    /// in Recently Deleted, so an entry stays for those.
+    func prunePlaceDefaults(in library: any ItemLibrary) {
+        guard library.isLoaded, library.syncReport.phase == .current, library.syncReport.fill?.state == .complete else { return }
+        let types = library.catalogue.itemTypes
+        let gone = PlaceDefaults.stored(in: defaults).keptPlaces.filter { place in
+            switch place {
+            case .collection(let id), .favoriteItem(let id): library.item(id) == nil
+            case .itemType(let type): !types.isEmpty && types[TypeID(type)] == nil
+            default: false
+            }
+        }
+        guard !gone.isEmpty else { return }
+        PlaceDefaults.update(in: defaults) { stored in gone.forEach { stored.set(nil, for: $0) } }
+    }
+
     // MARK: Opening
 
     /// Opens the place as its default view was left: the choices, the layout and the Mac's settings for each layout. The
@@ -61,6 +81,7 @@ extension Browser {
     /// with nothing kept opens as it is, which is how a window that has held another's change forgets it.
     func followPlaceDefault(in library: any ItemLibrary) {
         guard hasDefaultView, library.isLoaded else { return }
+        prunePlaceDefaults(in: library)
         let place = item
         let stored = PlaceDefaults.stored(in: defaults).default(for: place) ?? PlaceDefault()
         let options = stored.options(replacing: tableOptions[place], in: place, catalogue: library.catalogue)
@@ -78,17 +99,25 @@ extension Browser {
     // MARK: Resetting
 
     /// Whether the open place's default view has been changed: something is kept that the place would not show by itself,
-    /// or its density or columns are the person's own. This reads the defaults each time, so a view that asks also
-    /// watches their keys (`PlaceDefaults.key`, `PlaceDensities.key`, `ItemTableColumnLayouts.key`).
+    /// or its density or columns are the person's own. A view that asks also watches the three keys (`PlaceDefaults.key`,
+    /// `PlaceDensities.key`, `ItemTableColumnLayouts.key`), so it asks again when one changes. The stored data is decoded
+    /// only when it differs from what the answer was last worked out from, so a menu that is drawn again decodes nothing.
     var isDefaultViewChanged: Bool {
         guard hasDefaultView else { return false }
         let place = item
-        if PlaceDefaults.stored(in: defaults).default(for: place)?.isChanged(naturalLayout: Self.naturalLayout(of: place)) == true {
-            return true
-        }
-        if PlaceDensities.stored(in: defaults).density(for: place) != nil { return true }
-        return ItemTableColumnLayouts.isChanged(for: place, in: defaults.data(forKey: ItemTableColumnLayouts.key) ?? Data())
+        let inputs = [PlaceDefaults.key, PlaceDensities.key, ItemTableColumnLayouts.key].map { defaults.data(forKey: $0) }
+        if let known = changedMemo, known.place == place, known.inputs == inputs { return known.changed }
+        let stored = PlaceDefaults.stored(in: defaults).default(for: place)
+        let changed = stored?.isChanged(naturalLayout: Self.naturalLayout(of: place)) == true
+            || PlaceDensities.stored(in: defaults).density(for: place) != nil
+            || ItemTableColumnLayouts.isChanged(for: place, in: inputs[2] ?? Data())
+        changedMemo = (place, inputs, changed)
+        return changed
     }
+
+    /// Whether Reset View can be offered: the default view is changed, and no new view's panel is open, which shapes a
+    /// view that does not exist yet and keeps nothing of the place until it ends.
+    var offersResetView: Bool { viewPanel?.isNew != true && isDefaultViewChanged }
 
     /// Puts the open place back to what it shows by itself: no filters, sort or grouping of the person's, its own
     /// layout, columns, density and cards. One step of Undo brings the person's choices back.
@@ -99,7 +128,8 @@ extension Browser {
         PlaceDefaults.update(in: defaults) { $0.set(nil, for: place) }
         PlaceDensities.update(in: defaults) { $0.set(nil, for: place) }
         densityRevision += 1
-        defaults.set(ItemTableColumnLayouts.removing(place, in: defaults.data(forKey: ItemTableColumnLayouts.key) ?? Data()), forKey: ItemTableColumnLayouts.key)
+        defaults.set(ItemTableColumnLayouts.removing(place, in: defaults.data(forKey: ItemTableColumnLayouts.key) ?? Data()),
+                     forKey: ItemTableColumnLayouts.key)
         tableOptions[place] = nil
         timelineFields[place] = nil
         compactBoards[place] = nil

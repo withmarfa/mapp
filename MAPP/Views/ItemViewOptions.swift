@@ -65,7 +65,7 @@ struct ViewModeMenu: View {
 struct ViewOptionsMenu: View {
     @CurrentLibrary private var library
     @Environment(\.controlActiveState) private var activeState
-    // Read by `isDefaultViewChanged`, so a change of the default view draws the menu again.
+    // Read by `offersResetView`, so a change of the default view draws the menu again.
     @AppStorage(PlaceDefaults.key) private var storedDefaults = Data()
     @AppStorage(PlaceDensities.key) private var storedDensities = Data()
     @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
@@ -111,7 +111,7 @@ struct DefaultViewOptions: View {
     let browser: Browser
 
     var body: some View {
-        let resets = browser.isDefaultViewChanged
+        let resets = browser.offersResetView
         let saves = browser.offersViewOptions && SavedViews.hasChoicesToKeep(browser, in: library)
         if resets || saves {
             Divider()

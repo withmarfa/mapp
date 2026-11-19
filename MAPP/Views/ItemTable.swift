@@ -225,7 +225,8 @@ struct ItemTable: View {
                 ?? .init()
         } set: { next in
             guard let id = viewID else {
-                storedColumns = ItemTableColumnLayouts.storing(next, for: browser.item, in: storedColumns)
+                storedColumns = ItemTableColumnLayouts.storing(
+                    next, for: browser.item, in: storedColumns, setAsideIn: browser.defaults)
                 return
             }
             var widths = next
@@ -271,30 +272,45 @@ private final class TablePlaceTrace {
 
 /// Each place's columns as the person arranged them (shown or hidden, in their order, at their widths), kept
 /// together in the defaults under one key.
+///
+/// Stored data that cannot be read is never written over: a change that would replace it moves it aside under a key of its
+/// own first (`setAsideKey`), and a Reset View leaves it as it is.
 enum ItemTableColumnLayouts {
     static let key = "itemTableColumns"
+    /// Each entry is stored data that could not be read, in the order it was found.
+    static let setAsideKey = "itemTableColumnsSetAside"
 
     static func key(for place: SidebarItem) -> String { place.storageKey }
 
     static func layout(for place: SidebarItem, in stored: Data) -> TableColumnCustomization<ItemTableRow> {
-        layouts(in: stored)[key(for: place)] ?? .init()
+        layouts(in: stored)?[key(for: place)] ?? .init()
     }
 
     /// Whether the person arranged the place's columns: an entry with nothing in it is the table's own arrangement.
     static func isChanged(for place: SidebarItem, in stored: Data) -> Bool {
-        layouts(in: stored)[key(for: place)].map { $0 != .init() } ?? false
+        layouts(in: stored)?[key(for: place)].map { $0 != .init() } ?? false
     }
 
-    /// The stored layouts without the place's, so its table starts again from its own columns.
+    /// The stored layouts without the place's, so its table starts again from its own columns. Data that cannot be read
+    /// holds no layout of the place to remove, so it comes back as it was.
     static func removing(_ place: SidebarItem, in stored: Data) -> Data {
-        var layouts = layouts(in: stored)
+        guard var layouts = layouts(in: stored), layouts[key(for: place)] != nil else { return stored }
         layouts[key(for: place)] = nil
         return (try? JSONEncoder().encode(layouts)) ?? stored
     }
 
-    static func storing(_ layout: TableColumnCustomization<ItemTableRow>, for place: SidebarItem, in stored: Data) -> Data {
+    /// The stored layouts with the place's changed. Data that cannot be read is kept aside in `defaults` first, since the
+    /// layouts then start again from this one.
+    static func storing(
+        _ layout: TableColumnCustomization<ItemTableRow>, for place: SidebarItem, in stored: Data,
+        setAsideIn defaults: UserDefaults = .standard
+    ) -> Data {
         var layouts = layouts(in: stored)
-        layouts[key(for: place)] = layout
+        if layouts == nil {
+            defaults.set((defaults.array(forKey: setAsideKey) as? [Data] ?? []) + [stored], forKey: setAsideKey)
+            layouts = [:]
+        }
+        layouts?[key(for: place)] = layout
         return (try? JSONEncoder().encode(layouts)) ?? stored
     }
 
@@ -304,8 +320,10 @@ enum ItemTableColumnLayouts {
         columns.filter { $0.content == .title || layout.shows($0) }
     }
 
-    private static func layouts(in stored: Data) -> [String: TableColumnCustomization<ItemTableRow>] {
-        (try? JSONDecoder().decode([String: TableColumnCustomization<ItemTableRow>].self, from: stored)) ?? [:]
+    /// The stored layouts: none where nothing is stored, and nil where what is stored cannot be read.
+    private static func layouts(in stored: Data) -> [String: TableColumnCustomization<ItemTableRow>]? {
+        if stored.isEmpty { return [:] }
+        return try? JSONDecoder().decode([String: TableColumnCustomization<ItemTableRow>].self, from: stored)
     }
 }
 

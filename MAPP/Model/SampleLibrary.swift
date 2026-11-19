@@ -27,11 +27,12 @@ nonisolated enum SampleLibrary {
     static var launchLayout: ItemViewMode? { argument(after: "-MAPPLayout").flatMap(ItemViewMode.init(rawValue:)) }
 
     /// Forgets what an earlier run chose and the defaults kept, so a sample launch opens as a first launch does: the
-    /// order, page, list and interface settings, and each table's columns and each saved view's layout. Without the
-    /// last two a column hidden in one session stayed hidden in every later one, whatever the place's look says.
+    /// order, page, list and interface settings, each place's default view, each table's columns and each saved view's
+    /// layout. Without these a column hidden or a layout chosen in one session stayed in every later one, whatever
+    /// `-MAPPLayout` or the place's look says.
     @MainActor static func forgetStoredChoices(in defaults: UserDefaults) {
         let keys = OrderKey.all + PageKey.all + ListKey.all + InterfaceKey.all
-            + [PlaceDensities.key, ItemTableColumnLayouts.key, ViewLayouts.key]
+            + [PlaceDensities.key, PlaceDefaults.key, ItemTableColumnLayouts.key, ViewLayouts.key]
         for key in keys { defaults.removeObject(forKey: key) }
     }
 

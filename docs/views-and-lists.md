@@ -101,15 +101,11 @@ A type's list, and the other places that are not views, can become one with Save
 Every place opens in a default view. A person can change the default view, but can't rename or delete it. A saved view has none: its choices are its own, as above. The indexes of collections and sources keep their table as they did (`IndexPreferences`).
 
 - **What it keeps.** The filters, the sort, the grouping, the layout and the layout's Mac settings: the timeline's date field, the board's compact cards, the gallery's cards, the calendar's Week or Month, the density and the table's columns. A place with no change keeps nothing, and choosing the layout a place opens in is not a change.
-- **Where it is kept.** On this Mac, never in Marfa, so every window and every launch opens a place as it was left. [Settings storage](settings-storage.md) says where.
+- **Where it is kept.** On this Mac, never in Marfa, so every window and every launch opens a place as it was left. [Settings storage](settings-storage.md) says where. An entry that cannot be read is kept aside, and the other places' entries go on working.
 - **Two windows on one place.** Both write the one entry, so the last change wins. A window keeps what it shows until it opens the place again, and then shows the other window's change.
-- **What has gone stale.** A place whose type or collection no longer exists is ignored. A condition, sort or grouping on a field that no type of the place declares any more is dropped and the rest is kept. A layout the place no longer offers is not taken, and the place opens in its own.
-- **Save as View…** is the last item of View Options and a View menu command. It shows only when there is something to keep, and opens New View's panel filled in with what the window shows. While that panel is open the default view keeps nothing, and Escape puts the place back as it was.
-- **Reset View** sits above Save as View… once a default view is changed. It is also a View menu command and a palette command. It puts back the place's own layout, columns, density and cards, and one Undo brings the choices back. A saved view keeps Revert View.
-
-## Toolbar
-
-The toolbar holds the same buttons on every screen: Search, View Options, View As, Share, More and the right sidebar, in that order. A screen hides a button that does not apply, and none leaves one out, so the person's customized layout is kept. No screen adds its own controls to the toolbar, and Save as View… is not in it. The page holds at most one main action, such as New Collection. Every toolbar action is also a menu command. New Item, Format, the calendar's controls and Reader or Original are still declared in the toolbar until the corner takes them (see [Agreed designs](agreed-designs.md)).
+- **What has gone stale.** An entry for a type, collection or favorite that no longer exists is forgotten, but only once the server's copy has been read whole and is current, so a copy that is still filling or another server's never forgets one. A condition, sort or grouping on a field that no type of the place declares any more is dropped and the rest is kept. A layout the place no longer offers is not taken, and the place opens in its own.
+- **Save as View…** is the last item of View Options and a View menu command, and it is no longer in the toolbar. It shows only when there is something to keep, and opens New View's panel filled in with what the window shows. While that panel is open the default view keeps nothing, and Escape puts the place back as it was.
+- **Reset View** sits above Save as View… once a default view is changed, and is not offered while New View's panel is open. It is also a View menu command and a palette command. It puts back the place's own layout, columns, density and cards, and one Undo brings the choices back. A saved view keeps Revert View.
 
 ## Edit View
 

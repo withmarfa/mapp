@@ -13,18 +13,20 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
     }
 
     /// Where the table groups: by a column, or not at all. Nil is the place's own grouping.
-    enum Grouping: Codable, Equatable, Sendable {
+    enum Grouping: Encodable, Equatable, Sendable {
         case none
         case column(String)
 
         private static let columnPrefix = "column:"
 
-        init(from decoder: any Decoder) throws {
-            let word = try decoder.singleValueContainer().decode(String.self)
-            if word.hasPrefix(Self.columnPrefix) {
+        /// The stored word, or nil for one this version does not know, which leaves the place's own grouping.
+        init?(word: String) {
+            if word == "none" {
+                self = .none
+            } else if word.hasPrefix(Self.columnPrefix) {
                 self = .column(String(word.dropFirst(Self.columnPrefix.count)))
             } else {
-                self = .none
+                return nil
             }
         }
 
@@ -51,18 +53,20 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
 
     init() {}
 
-    /// A field this version does not know, or one a later version adds, never voids the rest.
+    /// A field this version does not know is left out. A field that is there and cannot be read fails the entry, which
+    /// `PlaceDefaults` keeps aside, so it is never taken for a choice and written back as one. A grouping word this version
+    /// does not know is the place's own grouping.
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        layout = try? container.decodeIfPresent(ItemViewMode.self, forKey: .layout)
-        sort = (try? container.decodeIfPresent([SortKey].self, forKey: .sort)) ?? []
-        grouping = try? container.decodeIfPresent(Grouping.self, forKey: .grouping)
-        filters = (try? container.decodeIfPresent([String: [String]].self, forKey: .filters)) ?? [:]
-        negated = (try? container.decodeIfPresent([String].self, forKey: .negated)) ?? []
-        timelineField = try? container.decodeIfPresent(String.self, forKey: .timelineField)
-        compactBoard = (try? container.decodeIfPresent(Bool.self, forKey: .compactBoard)) ?? false
-        cards = (try? container.decodeIfPresent(ViewCards.self, forKey: .cards)) ?? ViewCards()
-        calendarScale = try? container.decodeIfPresent(CalendarScale.self, forKey: .calendarScale)
+        layout = try container.decodeIfPresent(ItemViewMode.self, forKey: .layout)
+        sort = try container.decodeIfPresent([SortKey].self, forKey: .sort) ?? []
+        grouping = try container.decodeIfPresent(String.self, forKey: .grouping).flatMap(Grouping.init(word:))
+        filters = try container.decodeIfPresent([String: [String]].self, forKey: .filters) ?? [:]
+        negated = try container.decodeIfPresent([String].self, forKey: .negated) ?? []
+        timelineField = try container.decodeIfPresent(String.self, forKey: .timelineField)
+        compactBoard = try container.decodeIfPresent(Bool.self, forKey: .compactBoard) ?? false
+        cards = try container.decodeIfPresent(ViewCards.self, forKey: .cards) ?? ViewCards()
+        calendarScale = try container.decodeIfPresent(CalendarScale.self, forKey: .calendarScale)
     }
 
     var isEmpty: Bool { self == PlaceDefault() }
@@ -133,7 +137,8 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
 /// never written to Marfa, since no record of Marfa models a place's default. A place's default cannot be renamed or
 /// deleted; Reset View empties it.
 ///
-/// Stored text that cannot be read is moved aside under a key of its own, kept and never removed.
+/// Stored text that cannot be read, or one entry that cannot, is moved aside under a key of its own, kept and never
+/// removed; the other places' entries go on working.
 nonisolated struct PlaceDefaults: Equatable, Sendable {
     static let key = "placeDefaults"
     /// Each entry is stored data that could not be read, in the order it was found.
@@ -153,32 +158,56 @@ nonisolated struct PlaceDefaults: Equatable, Sendable {
         places[place.storageKey] = value.flatMap { $0.isEmpty ? nil : $0 }
     }
 
+    /// The places that have an entry. A key that names no place this version knows is left out, so it is never judged.
+    var keptPlaces: [SidebarItem] {
+        places.keys.compactMap { try? JSONDecoder().decode(SidebarItem.self, from: Data($0.utf8)) }
+    }
+
     // MARK: Keeping
 
-    private static func encode(_ places: [String: PlaceDefault]) -> Data? {
+    private static func encode(_ value: some Encodable) throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
-        return try? encoder.encode(places)
+        return try encoder.encode(value)
+    }
+
+    /// The stored defaults, and the stored data that could not be read: the whole of it where it is not an object of
+    /// places, otherwise an object of the entries that could not be read, so one bad entry leaves the other places' alone.
+    private static func read(_ data: Data) -> (readable: PlaceDefaults, unreadable: Data?) {
+        guard let entries = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else { return (PlaceDefaults(), data) }
+        var readable: [String: PlaceDefault] = [:]
+        var unreadable: [String: Any] = [:]
+        for (place, entry) in entries {
+            guard JSONSerialization.isValidJSONObject(entry),
+                  let raw = try? JSONSerialization.data(withJSONObject: entry),
+                  let value = try? JSONDecoder().decode(PlaceDefault.self, from: raw)
+            else {
+                unreadable[place] = entry
+                continue
+            }
+            readable[place] = value
+        }
+        let aside = unreadable.isEmpty ? nil : try? JSONSerialization.data(withJSONObject: unreadable, options: .sortedKeys)
+        return (PlaceDefaults(readable), aside)
     }
 
     /// The stored defaults; data that cannot be read is no defaults, never a failure.
     static func stored(in defaults: UserDefaults = .standard) -> PlaceDefaults {
-        guard let data = defaults.data(forKey: key), let places = try? JSONDecoder().decode([String: PlaceDefault].self, from: data) else {
-            return PlaceDefaults()
-        }
-        return PlaceDefaults(places)
+        defaults.data(forKey: key).map { read($0).readable } ?? PlaceDefaults()
     }
 
     /// Changes the stored defaults. What this write would replace and cannot read is kept aside first.
     static func update(in defaults: UserDefaults = .standard, _ change: (inout PlaceDefaults) -> Void) {
-        if let saved = defaults.data(forKey: key), (try? JSONDecoder().decode([String: PlaceDefault].self, from: saved)) == nil {
-            defaults.set((defaults.array(forKey: setAsideKey) as? [Data] ?? []) + [saved], forKey: setAsideKey)
+        var value = PlaceDefaults()
+        if let saved = defaults.data(forKey: key) {
+            let (readable, unreadable) = read(saved)
+            value = readable
+            if let unreadable { defaults.set((defaults.array(forKey: setAsideKey) as? [Data] ?? []) + [unreadable], forKey: setAsideKey) }
         }
-        var value = stored(in: defaults)
         change(&value)
         if value.places.isEmpty {
             defaults.removeObject(forKey: key)
-        } else if let data = encode(value.places) {
+        } else if let data = try? encode(value.places) {
             defaults.set(data, forKey: key)
         }
     }
