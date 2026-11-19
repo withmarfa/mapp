@@ -26,9 +26,12 @@ What is agreed and not built yet is in [Agreed designs](agreed-designs.md). This
 | Property block | MAPP | The rows under the pins on an item page. | [Item page](item-page.md) |
 | Right sidebar | MAPP | The panel beside the page that lists every property, links and history sections (`ItemInspector`). | [Item page](item-page.md) |
 | Saved view | Marfa and MAPP | A `system.view` item that holds a title, query, sort and group. MAPP adds the layout, columns, cards and density on the Mac. | [Views and lists](views-and-lists.md) |
+| Section | MAPP | A heading over rows in the sidebar: Library, Views, Types or one the person made. It sits in one tab and can hold views, collections and sources (`SidebarGroup`). | [Views and lists](views-and-lists.md) |
+| Shortcut | MAPP | A sidebar row that acts or goes somewhere, such as New or Search, and never takes the selection (`SidebarShortcut`). | [Views and lists](views-and-lists.md) |
 | Slot | MAPP | One fixed place in a look, such as Title or Date. The look's own places (date, secondary, facts) and the row's are built. | [Looks](looks.md) |
 | Source | Marfa | Where an item came from, such as a connector or an app. Marfa holds its name and mark. | [Marfa and MAPP](marfa-and-mapp.md) |
 | Status group | Marfa | One of four fixed groups (not started, in progress, completed, canceled) that every type's status words belong to (`StatusGroup`). | [Value components](value-components.md) |
+| Tab | MAPP | A named set of the sidebar's sections. The sidebar shows a tab bar only with more than one (`SidebarTab`). | [Views and lists](views-and-lists.md) |
 | Tone | MAPP | The color a type's mark and chip take, chosen by the type's icon (`TypeTone`). Marfa holds no color. | [Value components](value-components.md) |
 | Type | Marfa | What an item is, with its fields, parent, status words and icon. | [Marfa and MAPP](marfa-and-mapp.md) |
 | Type mark | MAPP | A type's icon in its tone on a pale rounded square (`TypeMark`). | [Value components](value-components.md) |

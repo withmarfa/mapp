@@ -88,7 +88,18 @@ Built, not yet released.
 
 ## Sidebar
 
-The sidebar has three groups of places, under New and Search: Library (Items, Sources and Collections), Views (Inbox, Recents, Favorites and the saved views) and Types. A person hides or moves a place in Settings > Sidebar, and the arrangement is kept for each server (`sidebarLayouts`).
+Status: the sidebar customized in place is built, not yet released. Settings > Sidebar is built as it was: it switches places on or off and reorders them within Library, Views and Types, and knows nothing of tabs, sections or colors. Its redesign is agreed and not built ([Agreed designs](agreed-designs.md)).
+
+The sidebar is a list of sections. A new library has four, in one tab: the shortcuts New and Search, Library (Items, Sources and Collections), Views (Inbox, Recents, Favorites and the saved views) and Types. The arrangement is kept for each server (`sidebarLayouts`).
+
+- **Tabs.** There is one tab, Home, and no tab bar. Once a person has a second tab, tabs show at the top: each is its symbol, the chosen one also shows its name, and a plus button adds one. A tab's context menu renames or removes it. Removing a tab moves its sections to the end of the first tab, so none is lost. Each window keeps its own chosen tab.
+- **Customize Sidebar** is in the context menu of the sidebar and of each row and heading, and has no button in the sidebar. While a window customizes, the foot shows Done in place of the instance, rows and headings have a handle at the trailing edge, and the rows drag to reorder. Customizing is one window's state: the layout is shared by every window, and Done ends it only in the window where it was pressed.
+- **A section's menu** (at its heading while customizing) has Show (which rows the section lists), Rename, Move Up, Move Down, Move to Tab (including a new tab) and Hide Section. A section's handle drags it onto another section of the tab. Hiding a built-in section keeps it, and Add Section brings it back; hiding a section of the person's own removes it. Add Section also adds a new section, alone or holding a collection or a source.
+- **Rows.** A section of Library, Views or the person's own can hold views, collections and sources. A row whose view, collection or source is gone, or has not synced yet, is left out and the section stays; the layout still holds it, so the row returns with it. A section that holds only its own places keeps the order of the sidebar's blocks (the Library's three, then Inbox, Recents and Favorites, then the saved views); once a row is dragged or moved into it, the section is one list in the person's order. Removing a section the person made frees the collections and sources in it to be added again. A row's context menu has Move to Section and Hide from Sidebar. The Types section lists top-level types while customizing.
+- **Shortcuts** are rows that act or go somewhere and never take the selection: New, Search, Settings, a place to go to, or a kind of item to create. A new library has New and Search; no shortcut makes an item of a type the person made. Add Shortcut adds one to the tab, and a shortcut's context menu removes it.
+- **A view's mark** is its symbol in its own color, with no tile: Inbox is blue, Favorites pink and the other views gray until the person chooses a color from the view's context menu. The choice is kept on this Mac.
+
+Opening and closing sections, and parent types in the sidebar, are not built.
 
 ## Command palette
 

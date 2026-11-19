@@ -16,7 +16,7 @@ A setting has one scope. Pick the narrowest scope that matches what the person w
 | A type | One value keyed by type identifier. | `pagePlacements` (pins, shown rows, property order, sidebar sections, where Linked From goes), `includedSubtypes`. |
 | A saved view | One value keyed by the view's item identifier. | `viewLayouts`: a `ViewMacSettings` with the layout, columns, whether the board hides empty groups, the gallery's cards, the calendar's Week or Month choice, the list's density and the table's widths. A place's own calendar choice lasts only as long as its window. |
 | A place | A key built from the place. | `itemTableColumns` (the table's columns for each place), `placeDensities` (the density of a place that is not a saved view), `indexTab.<place>` and `indexSort.<place>` (an index page's tab and the order of its table). |
-| A server | One value keyed by server address. | `sidebarLayouts`, and `typeLooks`: for each server, the looks chosen for its types. |
+| A server | One value keyed by server address. | `sidebarLayouts`: for each server, the hidden places, their order, the tabs, the sections of each tab with their shortcuts, where a place sits when it was moved to another section, and the color of each view's mark; and `typeLooks`: the looks chosen for its types. |
 | A window | Scene storage, or memory only. | The layout in `SceneStorage("browser")`, `detailsPresented` and `sidebarHidden`. |
 
 Column widths are `interfaceDefaultWidth.<column>`, and the right sidebar's width and open sections are `inspectorWidth` and the `inspector*Open` keys.

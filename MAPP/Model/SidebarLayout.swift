@@ -15,6 +15,10 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
     case type(String)
     /// One saved view's row, by its item ID.
     case view(ItemID)
+    /// One collection's row, by its item ID, which a section the person made holds.
+    case collection(ItemID)
+    /// One source's row, by its code, which a section the person made holds.
+    case source(String)
 
     /// The places in the Library group, under New and Search, in their default order.
     static let destinations: [SidebarPlace] = [.all, .sources, .collections]
@@ -36,6 +40,33 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
         case .views: "views"
         case .type(let id): "type:" + id
         case .view(let id): "view:" + id.rawValue
+        case .collection(let id): "collection:" + id.rawValue
+        case .source(let code): "source:" + code
+        }
+    }
+
+    /// The place a key names, or nil for a key that names none.
+    init?(key: String) {
+        switch key {
+        case "inbox": self = .inbox
+        case "recents": self = .recents
+        case "all": self = .all
+        case "favorites": self = .favorites
+        case "sources": self = .sources
+        case "collections": self = .collections
+        case "types": self = .types
+        case "views": self = .views
+        default:
+            guard let colon = key.firstIndex(of: ":") else { return nil }
+            let value = String(key[key.index(after: colon)...])
+            guard !value.isEmpty else { return nil }
+            switch key[..<colon] {
+            case "type": self = .type(value)
+            case "view": self = .view(ItemID(value))
+            case "collection": self = .collection(ItemID(value))
+            case "source": self = .source(value)
+            default: return nil
+            }
         }
     }
 
@@ -47,7 +78,8 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
         case .all: "square.grid.2x2"
         case .favorites: "heart"
         case .sources: "antenna.radiowaves.left.and.right"
-        case .collections: "square.stack"
+        case .collections, .collection: "square.stack"
+        case .source: "antenna.radiowaves.left.and.right"
         case .types: "rectangle.3.group"
         case .views, .view: Self.viewSymbol
         case .type: nil
@@ -64,25 +96,60 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
         case .sources: .sources
         case .collections: .collections
         case .view(let id): .view(id)
+        case .collection(let id): .collection(id)
+        case .source(let code): .source(code)
         case .types, .views, .type: nil
+        }
+    }
+
+    /// A view's mark takes the color the person chose for it, or this one: the built-in views have their own, and a
+    /// saved view is gray. Nil for a place that is not a view.
+    var defaultTone: TypeTone? {
+        switch self {
+        case .inbox: .blue
+        case .recents: .gray
+        case .favorites: .pink
+        case .view: .gray
+        default: nil
         }
     }
 
     /// Whether the row carries a count. Recents always holds the same number, so it says nothing, and the indexes and
     /// a saved view list what the copy holds on their own.
-    var showsCount: Bool { self == .all || self == .inbox || self == .favorites }
+    var showsCount: Bool {
+        switch self {
+        case .all, .inbox, .favorites, .collection, .source: true
+        default: false
+        }
+    }
 }
 
-/// What one library's person chose for the sidebar: the places hidden, the sections collapsed, and the order of the rest. A place the layout
-/// does not mention, such as a type the catalogue has just gained, is shown, after the ones that have a position.
+/// What one library's person chose for the sidebar: the places hidden, the types folded shut, the order of the rest,
+/// and the tabs and sections they arranged (`SidebarTabs.swift`). A place the layout does not mention, such as a type the
+/// catalogue has just gained, is shown, after the ones that have a position. Everything about tabs, sections and colors
+/// is optional, so a layout stored before they existed reads as one tab with the sections the sidebar always had.
 nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
     private(set) var hidden: Set<String> = []
     /// The keys of the places the person has placed, in order. Places of different groups share the list, because a
-    /// group only ever reads the keys of its own.
+    /// group only ever reads the keys of its own. Keys stay for a collection, a source or a view that is deleted or
+    /// missing from a sync, so its row returns to its place with it.
     private(set) var order: [String] = []
 
-    /// The keys of the sections the person has collapsed, which the sidebar shows with only their headers.
+    /// The keys of the type rows the person has folded shut.
     private(set) var collapsed: Set<String> = []
+
+    /// The tabs in order; nil until the person adds one, which reads as the one tab, Home.
+    var tabs: [SidebarTab]?
+    /// Every section of every tab, in order, hidden ones included; nil until the person changes one, which reads as
+    /// the sections the sidebar always had, in Home.
+    var groups: [SidebarGroup]?
+    /// Where a place sits when the person put it in a section, by the place's key and the section's identifier. A
+    /// collection or a source has no section of its own, so it shows only where it is put. Keys stay for a collection,
+    /// a source or a view that is deleted or missing from a sync, so its row returns with it; only removing the section
+    /// they name drops them (`hideGroup`).
+    var homes: [String: String]?
+    /// The color the person chose for a view's mark, by the place's key and the tone's name.
+    var colors: [String: String]?
 
     init() {}
 
@@ -91,6 +158,10 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
         hidden = try values.decodeIfPresent(Set<String>.self, forKey: .hidden) ?? []
         order = try values.decodeIfPresent([String].self, forKey: .order) ?? []
         collapsed = try values.decodeIfPresent(Set<String>.self, forKey: .collapsed) ?? []
+        tabs = try values.decodeIfPresent([SidebarTab].self, forKey: .tabs)
+        groups = try values.decodeIfPresent([SidebarGroup].self, forKey: .groups)
+        homes = try values.decodeIfPresent([String: String].self, forKey: .homes)
+        colors = try values.decodeIfPresent([String: String].self, forKey: .colors)
     }
 
     func isHidden(_ place: SidebarPlace) -> Bool { hidden.contains(place.key) }
@@ -105,12 +176,37 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
         if isHidden { hidden.insert(place.key) } else { hidden.remove(place.key) }
     }
 
-    /// Whether any type's row is hidden, at any level.
-    var hidesTypes: Bool { hidden.contains { $0.hasPrefix(Self.typePrefix) } }
+    /// Puts a place in a section, last, and shows it.
+    mutating func put(_ place: SidebarPlace, in group: String) {
+        guard allGroups.contains(where: { $0.id == group && $0.holdsPlaces }) else { return }
+        tabs = allTabs
+        groups = allGroups
+        homes = (homes ?? [:]).merging([place.key: group]) { _, new in new }
+        hidden.remove(place.key)
+        order.removeAll { $0 == place.key }
+        order.append(place.key)
+    }
 
-    /// Shows every type again, leaving the other places as they were.
-    mutating func showAllTypes() {
-        hidden = hidden.filter { !$0.hasPrefix(Self.typePrefix) }
+    /// Takes a place out of the sidebar. A place with a section of its own is hidden there, where Show brings it back;
+    /// a collection or a source, which has none, is no longer put anywhere.
+    mutating func take(_ place: SidebarPlace) {
+        switch place {
+        case .collection, .source: homes?.removeValue(forKey: place.key)
+        default: setHidden(place, true)
+        }
+    }
+
+    /// A drag of a section's rows in place: moves as `move(_:shown:by:fromOffsets:toOffset:)` does, then records every
+    /// place of the section as put there, so the section reads as the one list the person arranged and a row can cross
+    /// from one of its blocks to another (`SidebarGroupPlan`).
+    mutating func moveInSection(
+        _ group: String, places: [SidebarPlace], shown: [SidebarPlace], fromOffsets source: IndexSet, toOffset destination: Int
+    ) {
+        guard allGroups.contains(where: { $0.id == group && $0.holdsPlaces }) else { return }
+        move(places, shown: shown, by: \.key, fromOffsets: source, toOffset: destination)
+        tabs = allTabs
+        groups = allGroups
+        homes = (homes ?? [:]).merging(places.map { ($0.key, group) }) { _, new in new }
     }
 
     /// `places` with the ones in `shown` moved as a list showing only those would move them. The hidden ones keep
@@ -128,8 +224,6 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
         let keys = ordered(places, by: key).map(key).map { shownKeys.contains($0) ? next.next()! : $0 }
         order = order.filter { !keys.contains($0) } + keys
     }
-
-    private static let typePrefix = SidebarPlace.type("").key
 
     /// `places` as the person ordered them; the ones never placed follow, in the order given.
     func ordered<Place>(_ places: [Place], by key: (Place) -> String) -> [Place] {
@@ -169,6 +263,10 @@ struct SidebarPlan {
     /// The saved views, in the person's order, hidden ones included. Views the person never placed follow by title.
     let views: [LibraryView]
     let layout: SidebarLayout
+    /// The tabs, in order.
+    let tabs: [SidebarTab]
+    /// Every section of every tab, in order, hidden ones included, with the places each holds.
+    let groups: [SidebarGroupPlan]
 
     init(_ library: any ItemLibrary, layout: SidebarLayout) {
         let started = ContinuousClock.now
@@ -179,27 +277,18 @@ struct SidebarPlan {
         views = layout.ordered(library.views, by: { SidebarPlace.view($0.id).key })
         types = layout.ordered(library.typeTree, by: { SidebarPlace.type($0.id).key })
         self.library = (library.views.isEmpty ? [] : [.views]) + (types.isEmpty ? [] : [.types])
+        tabs = layout.allTabs
+        let showsTypes = !layout.isHidden(.types) && types.contains { !layout.isHidden(.type($0.id)) }
+        groups = SidebarGroupPlan.plans(in: library, layout: layout, views: views, showsTypes: showsTypes)
+    }
+
+    /// The sections of a tab that are shown, in order. A person's own or built-in section with nothing in it stays
+    /// out unless `customizing`, which keeps every one so something can be put in it.
+    func groups(in tab: String, customizing: Bool) -> [SidebarGroupPlan] {
+        groups.filter { layout.tabID(of: $0.group) == tab && !$0.group.isHidden && (customizing || !$0.isEmpty) }
     }
 
     func isShown(_ place: SidebarPlace) -> Bool { !layout.isHidden(place) }
-
-    var shownDestinations: [SidebarPlace] { destinations.filter(isShown) }
-    /// The Library group shows while any of its places is switched on, so its heading never stands over nothing.
-    var showsLibrary: Bool { !shownDestinations.isEmpty }
-    var shownBuiltInViews: [SidebarPlace] { builtInViews.filter(isShown) }
-    /// The blocks of `library` that show. The saved views are absent once every one of them is hidden, as they are
-    /// when there are none.
-    var shownLibrary: [SidebarPlace] { library.filter { isShown($0) && ($0 != .views || !shownViews.isEmpty) } }
-    var shownViews: [LibraryView] { views.filter { isShown(.view($0.id)) } }
-
-    /// The saved views the Views block lists after the built-in ones, in the person's order.
-    var shownSavedViews: [LibraryView] { shownLibrary.contains(.views) ? shownViews : [] }
-
-    /// The Views block shows while any built-in view or saved view is switched on.
-    var showsViews: Bool { !shownBuiltInViews.isEmpty || !shownSavedViews.isEmpty }
-
-    /// The Types block shows where the library has types and Show Types is on.
-    var showsTypes: Bool { shownLibrary.contains(.types) }
 
     /// The type rows not hidden, at every level; hiding a row hides what is under it.
     var shownTypes: [TypeNode] { Self.shown(types, by: self) }
