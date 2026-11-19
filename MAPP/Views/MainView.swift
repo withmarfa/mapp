@@ -238,7 +238,7 @@ struct MainView: View {
                             .filterChips(browser)
                             .viewCorner(browser)
                         } else {
-// The page has no title of the window's own to show beside Back, which is the arrow alone.
+                            // The page has no title of the window's own to show beside Back, which is the arrow alone.
                             fullPage.toolbar(removing: .title)
                         }
                     }
