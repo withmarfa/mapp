@@ -4571,6 +4571,111 @@
     },
     "Zoom Out" : {
 
+    },
+    "Marfa’s own types can’t be changed. Add the field to a type of your own instead." : {
+
+    },
+    "This field belongs to a type above this one, so it can only be changed there." : {
+
+    },
+    "This type no longer has that field." : {
+
+    },
+    "A field needs a name." : {
+
+    },
+    "A field’s name can be 100 characters at most." : {
+
+    },
+    "This type already has a field named “%@”." : {
+
+    },
+    "This field doesn’t offer choices." : {
+
+    },
+    "A choice field needs at least one choice." : {
+
+    },
+    "A choice needs a name." : {
+
+    },
+    "“%@” is in the list twice." : {
+
+    },
+    "The page shows this field as the item’s title, its text or its link to the source, so it can’t be removed." : {
+
+    },
+    "MAPP can’t reach the server. Changing a field changes the type for every item, so it needs the server. Try again once it’s back." : {
+
+    },
+    "This connection can’t change a type. Ask whoever runs the server to allow it, or sign in again and approve it." : {
+
+    },
+    "This type has changed on the server since MAPP last read it, so nothing was changed. Look at the field again and try once more." : {
+
+    },
+    "This library doesn’t keep changes to types." : {
+
+    },
+    "Inherited from %@" : {
+
+    },
+    "Part of a type Marfa provides" : {
+
+    },
+    "Edit Value" : {
+
+    },
+    "Rename Field…" : {
+
+    },
+    "Edit Choices…" : {
+
+    },
+    "Remove Field…" : {
+
+    },
+    "Pin Under the Title" : {
+
+    },
+    "Unpin from Under the Title" : {
+
+    },
+    "Hide on the Type’s Pages" : {
+
+    },
+    "This changes “%@” on every %@, in every app." : {
+
+    },
+    "These are the choices “%@” offers on every %@, in every app." : {
+
+    },
+    "Remove “%@” from every %@?" : {
+
+    },
+    "The field leaves every %@, in every app. Items keep the values they hold, and an app can still read them, but this type can’t be given a field with this name again." : {
+
+    },
+    "Remove Field" : {
+
+    },
+    "Couldn’t Remove the Field" : {
+
+    },
+    "Rename Field" : {
+
+    },
+    "Edit Choices" : {
+
+    },
+    "Remove Choice" : {
+
+    },
+    "Add Choice" : {
+
+    },
+    "Items that already hold a choice you take out keep it." : {
+
     }
   },
   "version" : "1.1"

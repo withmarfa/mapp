@@ -42,6 +42,8 @@ final class DetailsPresentation {
     var typeChange: TypeChangeRequest?
     /// The items and type the window asks the values for that the type needs.
     var typeValues: TypeValuesRequest?
+    /// The change to a field of a type the window's sheet asks the person's words for.
+    var fieldEdit: FieldEditRequest?
     /// Version History, while the window shows it in place of its page.
     private(set) var history: VersionHistoryMode?
     /// Whether the window's right sidebar is arranging the page's layout (Customize Layout) in place of the inspector.

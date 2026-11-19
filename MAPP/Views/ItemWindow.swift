@@ -63,6 +63,7 @@ struct ItemWindow: View {
         .focusedSceneValue(\.detailsPresentation, details)
         .environment(details)
         .modifier(TypeChangePanel(details: details))
+        .modifier(FieldEditSheets(details: details))
         .sheet(item: Binding { details.typeValues } set: { details.typeValues = $0 }) { TypeValuesSheet(request: $0) }
         .sheet(item: Binding { details.collectionPick } set: { details.collectionPick = $0 }) { CollectionPickerSheet(request: $0) }
         .sheet(item: Binding { details.tagRequest } set: { details.tagRequest = $0 }) { TagSheet(request: $0) }
