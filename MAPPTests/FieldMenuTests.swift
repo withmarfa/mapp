@@ -83,7 +83,6 @@ private func enabled(_ command: FieldMenu.Command, in menu: FieldMenu) -> Bool? 
 
     @Test func aRowThatIsNoFieldOffersPlacementOnly() {
         let menu = menu("#tags")
-        #expect(menu.fieldKey == nil)
         #expect(menu.lockText == nil)
         #expect(commands(menu) == [[.pin, .moveUp, .moveDown, .hide]])
     }
@@ -113,7 +112,42 @@ private func enabled(_ command: FieldMenu.Command, in menu: FieldMenu) -> Bool? 
     }
 
     @Test func aFieldTheTypeLacksOffersNoChange() {
-        #expect(menu("vanished").fieldKey == nil)
+        let menu = menu("vanished")
+        #expect(menu.lockText == nil)
+        #expect(!menu.sections.joined().contains { [.rename, .editChoices, .remove].contains($0.command) })
+    }
+
+    @Test func renameIsOfferedWhereTwoFieldsShareALabelSoTheClashCanBeFixed() {
+        var twin = catalogue()
+        let before = twin.itemTypes[entry]!
+        twin.itemTypes[entry] = ItemTypeInfo(
+            id: entry, label: before.label,
+            fields: before.fields.map { $0.key == "shelf" ? ItemTypeInfo.Field(key: "shelf", label: "Genre", kind: .text, declaredBy: entry) : $0 },
+            titleField: before.titleField, bodyField: before.bodyField, parent: media, linkField: before.linkField)
+        let both = ["shelf", "genre"].map {
+            FieldMenu(
+                row: $0, type: twin.itemTypes[entry], layout: defaultLayout(), catalogue: twin, editsValue: false, reachesServer: true)
+        }
+        #expect(both.allSatisfy { enabled(.rename, in: $0) == true })
+        #expect(throws: FieldEditRefusal.labelInUse("Genre")) {
+            try twin.itemTypes[entry]!.plan(.rename(key: "genre", label: "Genre"), in: twin).edit
+        }
+    }
+
+    @Test func aFieldAChildRedeclaresIsLockedInTheMenuToo() {
+        var redeclared = catalogue()
+        let before = redeclared.itemTypes[entry]!
+        redeclared.itemTypes[entry] = ItemTypeInfo(
+            id: entry, label: before.label,
+            fields: before.fields.map {
+                $0.key == "rating" ? ItemTypeInfo.Field(key: "rating", label: "Rating", kind: .choice(["good"]), declaredBy: entry) : $0
+            },
+            titleField: before.titleField, bodyField: before.bodyField, parent: media, linkField: before.linkField)
+        let menu = FieldMenu(
+            row: "rating", type: redeclared.itemTypes[entry], layout: defaultLayout(), catalogue: redeclared, editsValue: false,
+            reachesServer: true)
+        #expect(menu.lockText?.contains("Media") == true)
+        #expect(commands(menu) == [[.pin, .moveUp, .moveDown, .hide]])
     }
 }
 

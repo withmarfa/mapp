@@ -4629,7 +4629,7 @@
     "Unpin from Under the Title" : {
 
     },
-    "Hide on the Type’s Pages" : {
+    "Hide on %@ Pages" : {
 
     },
     "This changes “%@” on every %@, in every app." : {

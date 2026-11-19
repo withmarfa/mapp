@@ -16,16 +16,11 @@ struct FieldEditRequest: Identifiable {
 /// Renames a field or edits a choice field's choices, for every item of the type. The sheet keeps what was typed where
 /// the change is refused, and says why in place; it closes only when the server has taken the change.
 struct FieldEditSheet: View {
-    private struct Word: Identifiable {
-        let id = UUID()
-        var text: String
-    }
-
     @CurrentLibrary private var library
     @Environment(\.dismiss) private var dismiss
     let request: FieldEditRequest
     @State private var label: String
-    @State private var words: [Word]
+    @State private var draft: ChoiceDraft
     @State private var problem: String?
     @State private var isSaving = false
 
@@ -33,9 +28,9 @@ struct FieldEditSheet: View {
         self.request = request
         _label = State(initialValue: request.field?.label ?? "")
         if case .choice(let choices)? = request.field?.kind {
-            _words = State(initialValue: choices.map { Word(text: $0) })
+            _draft = State(initialValue: ChoiceDraft(existing: choices))
         } else {
-            _words = State(initialValue: [])
+            _draft = State(initialValue: ChoiceDraft(existing: []))
         }
     }
 
@@ -83,25 +78,30 @@ struct FieldEditSheet: View {
     private var choiceList: some View {
         VStack(alignment: .leading, spacing: 6) {
             List {
-                ForEach($words) { $word in
+                ForEach($draft.rows) { $row in
                     HStack {
-                        TextField("Choice", text: $word.text)
-                            .labelsHidden()
-                            .textFieldStyle(.plain)
-                            .onChange(of: word.text) { problem = nil }
+                        // A word the field already offers is not retyped: items holding it would keep the old word.
+                        if row.isNew {
+                            TextField("Choice", text: $row.text)
+                                .labelsHidden()
+                                .textFieldStyle(.plain)
+                                .onChange(of: row.text) { problem = nil }
+                        } else {
+                            Text(row.text).frame(maxWidth: .infinity, alignment: .leading)
+                        }
                         Button("Remove Choice", systemImage: "minus.circle") {
-                            words.removeAll { $0.id == word.id }
+                            draft.remove(row.id)
                             problem = nil
                         }
                         .labelStyle(.iconOnly)
                         .buttonStyle(.borderless)
                     }
                 }
-                .onMove { words.move(fromOffsets: $0, toOffset: $1) }
+                .onMove { draft.rows.move(fromOffsets: $0, toOffset: $1) }
             }
             .frame(height: 180)
             Button("Add Choice", systemImage: "plus") {
-                words.append(Word(text: ""))
+                draft.add()
                 problem = nil
             }
             Text("Items that already hold a choice you take out keep it.")
@@ -125,11 +125,11 @@ struct FieldEditSheet: View {
         guard !isSaving, request.field != nil else { return }
         let edit: FieldEdit = switch request.kind {
         case .rename: .rename(key: request.key, label: label)
-        case .choices: .setChoices(key: request.key, choices: words.map(\.text))
+        case .choices: .setChoices(key: request.key, choices: draft.choices)
         }
         let plan: FieldEditPlan
         do {
-            plan = try request.type.plan(edit)
+            plan = try request.type.plan(edit, in: library.catalogue)
         } catch {
             problem = error.message
             return

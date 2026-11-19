@@ -28,24 +28,56 @@ private func catalogue() -> Catalogue {
 @Suite struct FieldLockTests {
     @Test func aFieldTheTypeDeclaresItselfIsTheOwnersToChange() throws {
         let info = try #require(catalogue().itemTypes[entry])
-        #expect(info.lock(of: try #require(info.fields.first { $0.key == "genre" })) == nil)
+        #expect(info.lock(of: try #require(info.fields.first { $0.key == "genre" }), in: catalogue()) == nil)
     }
 
     @Test func anInheritedFieldShowsTheTypeItComesFrom() throws {
         let info = try #require(catalogue().itemTypes[entry])
-        #expect(info.lock(of: try #require(info.fields.first { $0.key == "rating" })) == .inherited(from: media))
+        #expect(info.lock(of: try #require(info.fields.first { $0.key == "rating" }), in: catalogue()) == .inherited(from: media))
     }
 
     @Test func aFieldComesFromTheNearestTypeAlongTheChain() throws {
         let info = try #require(catalogue().itemTypes[review])
-        #expect(info.lock(of: try #require(info.fields.first { $0.key == "genre" })) == .inherited(from: entry))
-        #expect(info.lock(of: try #require(info.fields.first { $0.key == "rating" })) == .inherited(from: media))
-        #expect(info.lock(of: try #require(info.fields.first { $0.key == "reviewer" })) == nil)
+        #expect(info.lock(of: try #require(info.fields.first { $0.key == "genre" }), in: catalogue()) == .inherited(from: entry))
+        #expect(info.lock(of: try #require(info.fields.first { $0.key == "rating" }), in: catalogue()) == .inherited(from: media))
+        #expect(info.lock(of: try #require(info.fields.first { $0.key == "reviewer" }), in: catalogue()) == nil)
+    }
+
+    @Test func aFieldAChildRedeclaresIsLockedToo() throws {
+        // Marfa names only the nearest type that declares a field, so the child's own redeclaration of `rating`
+        // (required, narrowed choices) shows the child as the declarer.
+        let narrowed = ItemTypeInfo.Field(key: "rating", label: "Rating", kind: .choice(["good"]), declaredBy: entry)
+        var redeclared = catalogue()
+        let before = try #require(redeclared.itemTypes[entry])
+        redeclared.itemTypes[entry] = ItemTypeInfo(
+            id: entry, label: before.label, fields: before.fields.map { $0.key == "rating" ? narrowed : $0 },
+            titleField: before.titleField, bodyField: before.bodyField, parent: media, linkField: before.linkField)
+        let info = try #require(redeclared.itemTypes[entry])
+        let field = try #require(info.fields.first { $0.key == "rating" })
+        #expect(field.declaredBy == entry)
+        #expect(info.lock(of: field, in: redeclared) == .inherited(from: media))
+        #expect(throws: FieldEditRefusal.locked(.inherited(from: media))) { try info.plan(.remove(key: "rating"), in: redeclared) }
+        #expect(throws: FieldEditRefusal.locked(.inherited(from: media))) {
+            try info.plan(.setChoices(key: "rating", choices: ["good", "bad"]), in: redeclared)
+        }
+    }
+
+    @Test func aStatusFieldAChildRedeclaresIsLockedAndNamesTheNearestAncestorThatDeclaresIt() throws {
+        let words = [StatusWord(value: "open", group: .notStarted), StatusWord(value: "done", group: .completed)]
+        let own = { (declaredBy: TypeID) in ItemTypeInfo.Field(key: "state", label: "State", kind: .status(words), declaredBy: declaredBy) }
+        let top = ItemTypeInfo(id: media, label: "Media", fields: [own(media)], titleField: nil, bodyField: nil, parent: nil)
+        let middle = ItemTypeInfo(id: entry, label: "Entry", fields: [own(entry)], titleField: nil, bodyField: nil, parent: media)
+        let bottom = ItemTypeInfo(id: review, label: "Review", fields: [own(review)], titleField: nil, bodyField: nil, parent: entry)
+        let chain = Catalogue(itemTypes: [top, middle, bottom])
+        let field = try #require(bottom.fields.first)
+        #expect(bottom.lock(of: field, in: chain) == .inherited(from: entry))
+        #expect(throws: FieldEditRefusal.locked(.inherited(from: entry))) { try bottom.plan(.remove(key: "state"), in: chain) }
+        #expect(middle.lock(of: try #require(middle.fields.first), in: chain) == .inherited(from: media))
     }
 
     @Test func everyFieldOfAShippedTypeIsLocked() throws {
         let info = try #require(catalogue().itemTypes[media])
-        #expect(info.fields.allSatisfy { info.lock(of: $0) == .shipped })
+        #expect(info.fields.allSatisfy { info.lock(of: $0, in: catalogue()) == .shipped })
         #expect(info.fields.count == 1)
     }
 
@@ -59,75 +91,104 @@ private func catalogue() -> Catalogue {
     private let info = catalogue().itemTypes[entry]!
 
     @Test func renamingKeepsTheKeyAndTrimsTheName() throws {
-        let plan = try info.plan(.rename(key: "shelf", label: "  Where it sits \n"))
+        let plan = try info.plan(.rename(key: "shelf", label: "  Where it sits \n"), in: catalogue())
         #expect(plan.edit == .rename(key: "shelf", label: "Where it sits"))
         #expect(plan.shown.label == "Shelf")
     }
 
     @Test func aBlankNameIsRefused() {
-        #expect(throws: FieldEditRefusal.blankLabel) { try info.plan(.rename(key: "shelf", label: "")) }
-        #expect(throws: FieldEditRefusal.blankLabel) { try info.plan(.rename(key: "shelf", label: "   \n ")) }
+        #expect(throws: FieldEditRefusal.blankLabel) { try info.plan(.rename(key: "shelf", label: ""), in: catalogue()) }
+        #expect(throws: FieldEditRefusal.blankLabel) { try info.plan(.rename(key: "shelf", label: "   \n "), in: catalogue()) }
     }
 
     @Test func aNameAnotherFieldHasIsRefusedWhateverItsCase() {
-        #expect(throws: FieldEditRefusal.labelInUse("genre")) { try info.plan(.rename(key: "shelf", label: "genre")) }
+        #expect(throws: FieldEditRefusal.labelInUse("genre")) { try info.plan(.rename(key: "shelf", label: "genre"), in: catalogue()) }
         // The inherited field's name counts too.
-        #expect(throws: FieldEditRefusal.labelInUse("Rating")) { try info.plan(.rename(key: "shelf", label: "Rating")) }
+        #expect(throws: FieldEditRefusal.labelInUse("Rating")) { try info.plan(.rename(key: "shelf", label: "Rating"), in: catalogue()) }
     }
 
     @Test func aFieldMayTakeANewSpellingOfItsOwnName() throws {
-        #expect(try info.plan(.rename(key: "shelf", label: "SHELF")).edit == .rename(key: "shelf", label: "SHELF"))
+        #expect(try info.plan(.rename(key: "shelf", label: "SHELF"), in: catalogue()).edit == .rename(key: "shelf", label: "SHELF"))
     }
 
     @Test func aNameOverAHundredCharactersIsRefused() {
-        #expect(throws: FieldEditRefusal.labelTooLong) { try info.plan(.rename(key: "shelf", label: String(repeating: "a", count: 101))) }
+        #expect(throws: FieldEditRefusal.labelTooLong) { try info.plan(.rename(key: "shelf", label: String(repeating: "a", count: 101)), in: catalogue()) }
     }
 
     @Test func aLockedFieldIsRefusedBeforeAnythingIsSent() {
-        #expect(throws: FieldEditRefusal.locked(.inherited(from: media))) { try info.plan(.rename(key: "rating", label: "Mark")) }
-        #expect(throws: FieldEditRefusal.locked(.inherited(from: media))) { try info.plan(.remove(key: "rating")) }
+        #expect(throws: FieldEditRefusal.locked(.inherited(from: media))) { try info.plan(.rename(key: "rating", label: "Mark"), in: catalogue()) }
+        #expect(throws: FieldEditRefusal.locked(.inherited(from: media))) { try info.plan(.remove(key: "rating"), in: catalogue()) }
         let shipped = catalogue().itemTypes[media]!
-        #expect(throws: FieldEditRefusal.locked(.shipped)) { try shipped.plan(.rename(key: "rating", label: "Mark")) }
+        #expect(throws: FieldEditRefusal.locked(.shipped)) { try shipped.plan(.rename(key: "rating", label: "Mark"), in: catalogue()) }
     }
 
     @Test func aFieldTheTypeLacksIsRefused() {
-        #expect(throws: FieldEditRefusal.unknownField) { try info.plan(.remove(key: "gone")) }
+        #expect(throws: FieldEditRefusal.unknownField) { try info.plan(.remove(key: "gone"), in: catalogue()) }
     }
 
     @Test func choicesKeepTheirOrderAndNameWhatIsTakenAway() throws {
-        let plan = try info.plan(.setChoices(key: "genre", choices: ["poetry", " fiction ", "memoir"]))
+        let plan = try info.plan(.setChoices(key: "genre", choices: ["poetry", " fiction ", "memoir"]), in: catalogue())
         #expect(plan.edit == .setChoices(key: "genre", choices: ["poetry", "fiction", "memoir"]))
-        #expect(plan.removedChoices == ["history"])
     }
 
     @Test func theLastChoiceCannotBeRemoved() {
-        #expect(throws: FieldEditRefusal.noChoices) { try info.plan(.setChoices(key: "genre", choices: [])) }
+        #expect(throws: FieldEditRefusal.noChoices) { try info.plan(.setChoices(key: "genre", choices: []), in: catalogue()) }
     }
 
     @Test func aBlankOrRepeatedChoiceIsRefused() {
-        #expect(throws: FieldEditRefusal.blankChoice) { try info.plan(.setChoices(key: "genre", choices: ["fiction", " "])) }
+        #expect(throws: FieldEditRefusal.blankChoice) { try info.plan(.setChoices(key: "genre", choices: ["fiction", " "]), in: catalogue()) }
         #expect(throws: FieldEditRefusal.repeatedChoice("fiction")) {
-            try info.plan(.setChoices(key: "genre", choices: ["fiction", "history", "fiction"]))
+            try info.plan(.setChoices(key: "genre", choices: ["fiction", "history", "fiction"]), in: catalogue())
         }
     }
 
     @Test func onlyAChoiceFieldTakesChoices() {
-        #expect(throws: FieldEditRefusal.notAChoiceField) { try info.plan(.setChoices(key: "shelf", choices: ["a"])) }
+        #expect(throws: FieldEditRefusal.notAChoiceField) { try info.plan(.setChoices(key: "shelf", choices: ["a"]), in: catalogue()) }
     }
 
     @Test func theTitleTheTextAndTheSourceLinkCannotBeRemoved() {
-        #expect(throws: FieldEditRefusal.holdsPageContent) { try info.plan(.remove(key: "notes")) }
-        #expect(throws: FieldEditRefusal.holdsPageContent) { try info.plan(.remove(key: "isbn")) }
+        #expect(throws: FieldEditRefusal.holdsPageContent) { try info.plan(.remove(key: "notes"), in: catalogue()) }
+        #expect(throws: FieldEditRefusal.holdsPageContent) { try info.plan(.remove(key: "isbn"), in: catalogue()) }
     }
 
     @Test func anOrdinaryFieldCanBeRemoved() throws {
-        #expect(try info.plan(.remove(key: "shelf")).edit == .remove(key: "shelf"))
+        #expect(try info.plan(.remove(key: "shelf"), in: catalogue()).edit == .remove(key: "shelf"))
+    }
+}
+
+@Suite struct ChoiceDraftTests {
+    @Test func theWordsAFieldOffersAreNotTypedOverAndTheOnesAddedAre() {
+        var draft = ChoiceDraft(existing: ["fiction", "history"])
+        #expect(draft.rows.map(\.isNew) == [false, false])
+        draft.add()
+        #expect(draft.rows.map(\.isNew) == [false, false, true])
+        #expect(draft.choices == ["fiction", "history", ""])
+    }
+
+    @Test func anExistingWordCanBeTakenOutOrMovedAndNewOnesFollow() throws {
+        var draft = ChoiceDraft(existing: ["fiction", "history", "memoir"])
+        draft.remove(try #require(draft.rows.first { $0.text == "history" }).id)
+        draft.rows.reverse()
+        draft.add()
+        draft.rows[draft.rows.count - 1].text = "poetry"
+        #expect(draft.choices == ["memoir", "fiction", "poetry"])
+    }
+
+    @Test func aWordThatReplacesAnotherInTheSameStepIsATakingOutAndAnAddingNeverARename() throws {
+        let info = try #require(catalogue().itemTypes[entry])
+        var draft = ChoiceDraft(existing: ["fiction", "history"])
+        draft.remove(try #require(draft.rows.first { $0.text == "history" }).id)
+        draft.add()
+        draft.rows[draft.rows.count - 1].text = "story"
+        let plan = try info.plan(.setChoices(key: "genre", choices: draft.choices), in: catalogue())
+        #expect(plan.edit == .setChoices(key: "genre", choices: ["fiction", "story"]))
+        #expect(draft.rows.filter(\.isNew).map(\.text) == ["story"], "only the added word was typed")
     }
 }
 
 @Suite struct CatalogueFieldEditTests {
     @Test func aRenameShowsInTheTypeAndEveryTypeBelowItThatInheritsTheField() throws {
-        let plan = try #require(catalogue().itemTypes[entry]).plan(.rename(key: "genre", label: "Kind"))
+        let plan = try #require(catalogue().itemTypes[entry]).plan(.rename(key: "genre", label: "Kind"), in: catalogue())
         let changed = catalogue().applying(plan)
         #expect(changed.itemTypes[entry]?.fields.first { $0.key == "genre" }?.label == "Kind")
         #expect(changed.itemTypes[review]?.fields.first { $0.key == "genre" }?.label == "Kind")
@@ -138,14 +199,14 @@ private func catalogue() -> Catalogue {
     }
 
     @Test func aChoiceEditChangesOnlyThatFieldsChoices() throws {
-        let plan = try #require(catalogue().itemTypes[entry]).plan(.setChoices(key: "genre", choices: ["poetry", "fiction"]))
+        let plan = try #require(catalogue().itemTypes[entry]).plan(.setChoices(key: "genre", choices: ["poetry", "fiction"]), in: catalogue())
         let changed = catalogue().applying(plan)
         #expect(changed.itemTypes[review]?.fields.first { $0.key == "genre" }?.kind == .choice(["poetry", "fiction"]))
         #expect(changed.itemTypes[entry]?.fields.first { $0.key == "rating" }?.kind == .choice(["good", "bad"]))
     }
 
     @Test func aRemovalTakesTheFieldFromTheTypeAndItsSubtypesOnly() throws {
-        let plan = try #require(catalogue().itemTypes[entry]).plan(.remove(key: "shelf"))
+        let plan = try #require(catalogue().itemTypes[entry]).plan(.remove(key: "shelf"), in: catalogue())
         let changed = catalogue().applying(plan)
         #expect(changed.itemTypes[entry]?.fields.map(\.key) == ["rating", "genre", "notes", "isbn"])
         #expect(changed.itemTypes[review]?.fields.map(\.key) == ["rating", "genre", "notes", "isbn", "reviewer"])
@@ -153,7 +214,7 @@ private func catalogue() -> Catalogue {
     }
 
     @Test func theChangeKeepsTheRestOfTheTypeAndTheFieldLabelsCatalogue() throws {
-        let plan = try #require(catalogue().itemTypes[entry]).plan(.rename(key: "shelf", label: "Place"))
+        let plan = try #require(catalogue().itemTypes[entry]).plan(.rename(key: "shelf", label: "Place"), in: catalogue())
         let changed = catalogue().applying(plan)
         #expect(changed.itemTypes[entry]?.parent == media)
         #expect(changed.itemTypes[entry]?.linkField == "isbn")
@@ -182,7 +243,7 @@ private func catalogue() -> Catalogue {
     }
 
     private func plan(_ edit: FieldEdit) throws -> FieldEditPlan {
-        try #require(catalogue().itemTypes[entry]).plan(edit)
+        try #require(catalogue().itemTypes[entry]).plan(edit, in: catalogue())
     }
 
     @Test func aRenameChangesOnlyThatFieldsLabelAndSendsEverythingElseBack() throws {
@@ -282,7 +343,7 @@ private struct FakeTypeSchemas: TypeSchemaSource {
     }
 
     private func rename(_ library: MarfaLibrary) throws -> FieldEditPlan {
-        try #require(library.catalogue.itemTypes[entry]).plan(.rename(key: "shelf", label: "Place"))
+        try #require(library.catalogue.itemTypes[entry]).plan(.rename(key: "shelf", label: "Place"), in: library.catalogue)
     }
 
     @Test func aServerRefusalLeavesTheCatalogueAsItWas() async throws {
@@ -320,7 +381,7 @@ private struct FakeTypeSchemas: TypeSchemaSource {
         let caughtUp = catalogue().applying(plan)
         source.send(.catalogue(caughtUp))
         // Another app renames it again.
-        let plan2 = try #require(caughtUp.itemTypes[entry]).plan(.rename(key: "shelf", label: "Spot"))
+        let plan2 = try #require(caughtUp.itemTypes[entry]).plan(.rename(key: "shelf", label: "Spot"), in: caughtUp)
         source.send(.catalogue(caughtUp.applying(plan2)))
         #expect(await eventually { library.catalogue.label(ofField: "shelf", for: entry) == "Spot" })
     }

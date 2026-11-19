@@ -107,6 +107,16 @@ struct CommandValuePanelTests {
         #expect(world.library.item(world.first.id)?.tags.contains("mine") == true)
     }
 
+    @Test func anItemThatCannotTakeTagsDoesNotEmptyTheTagsTheOthersHold() {
+        let world = world()
+        var kept = note("Kept by a connector")
+        kept.readOnly = true
+        world.library.items.append(kept)
+        world.library.addTag("shared", to: [world.first.id, world.second.id], undoManager: nil)
+        let model = model(.tags, over: [world.first.id, world.second.id, kept.id], in: world.library)
+        #expect(model.heldTokens == ["shared"], "the item the panel cannot change is left out of what every item must hold")
+    }
+
     @Test func aTagRefusedForTheTextTypedKeepsItAndTellsWhy() {
         let world = world()
         let model = model(.tags, over: [world.first.id], in: world.library)

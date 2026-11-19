@@ -198,8 +198,9 @@ final class ValueEditModel {
     var heldTokens: [String] {
         switch kind {
         case .tags:
-            // With several items, only the tags every one holds: a tag that some lack is not held by the selection.
-            let held = request.targets.compactMap(library.item).map { Set(library.tags(of: $0)) }
+            // With several items, only the tags every one that can take tags holds: a tag that some lack is not held by
+            // the selection.
+            let held = request.targets.compactMap(library.item).filter(\.canEditTags).map { Set(library.tags(of: $0)) }
             guard let first = held.first else { return [] }
             return held.dropFirst().reduce(first) { $0.intersection($1) }.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
         case .words: return heldWords

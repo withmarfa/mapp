@@ -11,7 +11,7 @@ enum FieldMenuPresenter {
         @objc func fire(_ sender: NSMenuItem) { run() }
     }
 
-    static func title(of command: FieldMenu.Command) -> String {
+    static func title(of command: FieldMenu.Command, typeLabel: String) -> String {
         switch command {
         case .editValue: String(localized: "Edit Value")
         case .rename: String(localized: "Rename Field…")
@@ -21,7 +21,7 @@ enum FieldMenuPresenter {
         case .unpin: String(localized: "Unpin from Under the Title")
         case .moveUp: String(localized: "Move Up")
         case .moveDown: String(localized: "Move Down")
-        case .hide: String(localized: "Hide on the Type’s Pages")
+        case .hide: String(localized: "Hide on \(typeLabel) Pages")
         }
     }
 
@@ -39,8 +39,11 @@ enum FieldMenuPresenter {
         }
     }
 
-    /// The menu and what keeps it working. `choose` runs once, with the command, after the menu closes on a choice.
-    static func build(_ menu: FieldMenu, choose: @escaping (FieldMenu.Command) -> Void) -> (menu: NSMenu, keeping: AnyObject) {
+    /// The menu and what keeps it working. `typeLabel` names the type whose pages a hide affects. `choose` runs once, with
+    /// the command, after the menu closes on a choice.
+    static func build(
+        _ menu: FieldMenu, typeLabel: String, choose: @escaping (FieldMenu.Command) -> Void
+    ) -> (menu: NSMenu, keeping: AnyObject) {
         let result = NSMenu()
         result.autoenablesItems = false
         var keep: [Choice] = []
@@ -56,10 +59,16 @@ enum FieldMenuPresenter {
             for entry in section {
                 let chosen = Choice { choose(entry.command) }
                 keep.append(chosen)
-                let item = NSMenuItem(title: title(of: entry.command), action: #selector(Choice.fire(_:)), keyEquivalent: "")
+                let words = title(of: entry.command, typeLabel: typeLabel)
+                let item = NSMenuItem(title: words, action: #selector(Choice.fire(_:)), keyEquivalent: "")
                 item.target = chosen
                 item.isEnabled = entry.isEnabled
                 if let name = symbol(of: entry.command) { item.image = NSImage(systemSymbolName: name, accessibilityDescription: nil) }
+                // A menu item has no destructive role of its own, so the removal is drawn red as the alert's button is.
+                if entry.command == .remove, entry.isEnabled {
+                    item.attributedTitle = NSAttributedString(string: words, attributes: [.foregroundColor: NSColor.systemRed])
+                    item.image = item.image?.withSymbolConfiguration(.init(paletteColors: [.systemRed]))
+                }
                 result.addItem(item)
             }
         }

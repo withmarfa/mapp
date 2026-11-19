@@ -230,7 +230,7 @@ struct ItemPageHeader: ViewModifier {
         let menu = FieldMenu(
             row: row, type: type, layout: layout, catalogue: catalogue, editsValue: editsValue, reachesServer: library.reachesServer)
         guard !menu.sections.isEmpty || menu.lockText != nil else { return }
-        let (popup, keeping) = FieldMenuPresenter.build(menu) { [weak editor] command in
+        let (popup, keeping) = FieldMenuPresenter.build(menu, typeLabel: type?.label ?? "") { [weak editor] command in
             guard let editor, editor.isShowing(id) else { return }
             switch command {
             case .editValue:
@@ -239,7 +239,7 @@ struct ItemPageHeader: ViewModifier {
                 guard let type else { return }
                 drafts.fieldEdit = FieldEditRequest(kind: command == .rename ? .rename : .choices, type: type, key: row)
             case .remove:
-                guard let type, let plan = try? type.plan(.remove(key: row)) else { return }
+                guard let type, let plan = try? type.plan(.remove(key: row), in: catalogue) else { return }
                 FieldRemoval.confirm(plan, typeLabel: type.label, on: NSApp.keyWindow) {
                     Task {
                         if let failure = await library.editField(plan) {

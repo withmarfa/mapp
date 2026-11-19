@@ -20,9 +20,15 @@ nonisolated extension TypeID {
 }
 
 nonisolated extension ItemTypeInfo {
-    /// Whether a person can change `field` on this type, or what stops them. Only a field the type declares itself,
-    /// on a type of the owner's, is theirs to change.
-    func lock(of field: Field) -> FieldLock? {
+    /// Whether a person can change `field` on this type, or what stops them. Only a field no type above this one
+    /// declares, on a type of the owner's, is theirs to change. Marfa names only the nearest type that declares a
+    /// field, so a type that redeclares its parent's field (to require it, or narrow its choices) is still locked: a
+    /// change here would be sent without the redeclaration and the field would come back from the parent.
+    func lock(of field: Field, in catalogue: Catalogue) -> FieldLock? {
+        let source = catalogue.ancestors(of: id).first { ancestor in
+            catalogue.itemTypes[ancestor]?.fields.contains { $0.key == field.key && $0.declaredBy == ancestor } == true
+        }
+        if let source { return .inherited(from: source) }
         if field.declaredBy != id { return .inherited(from: field.declaredBy) }
         return id.isShipped ? .shipped : nil
     }
@@ -94,15 +100,35 @@ nonisolated struct FieldEditPlan: Hashable, Sendable {
     let type: TypeID
     let edit: FieldEdit
     let shown: ItemTypeInfo.Field
-    /// The choices the edit takes away, which items may still hold.
-    var removedChoices: [String] = []
+}
+
+/// The list of choices a person edits: the words the field already offers, which can be taken out and put in another
+/// order (the sheet moves `rows`) but never retyped, and the words they add. A choice is not renamed, since an item holding the old word keeps
+/// it and the plan cannot tell a rename from taking one word out and adding another.
+nonisolated struct ChoiceDraft: Sendable {
+    struct Row: Identifiable, Sendable {
+        let id = UUID()
+        var text: String
+        /// Whether the row is one the person added, the only kind whose text they can type.
+        let isNew: Bool
+    }
+
+    var rows: [Row]
+
+    init(existing: [String]) { rows = existing.map { Row(text: $0, isNew: false) } }
+
+    mutating func add() { rows.append(Row(text: "", isNew: true)) }
+
+    mutating func remove(_ id: UUID) { rows.removeAll { $0.id == id } }
+
+    var choices: [String] { rows.map(\.text) }
 }
 
 nonisolated extension ItemTypeInfo {
     /// The plan for `edit` on this type, or why it cannot be made. Nothing is sent before the plan holds.
-    func plan(_ edit: FieldEdit) throws(FieldEditRefusal) -> FieldEditPlan {
+    func plan(_ edit: FieldEdit, in catalogue: Catalogue) throws(FieldEditRefusal) -> FieldEditPlan {
         guard let field = fields.first(where: { $0.key == edit.key }) else { throw .unknownField }
-        if let lock = lock(of: field) { throw .locked(lock) }
+        if let lock = lock(of: field, in: catalogue) { throw .locked(lock) }
         switch edit {
         case .rename(_, let label):
             let name = label.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -112,15 +138,13 @@ nonisolated extension ItemTypeInfo {
             guard !clash else { throw .labelInUse(name) }
             return FieldEditPlan(type: id, edit: .rename(key: field.key, label: name), shown: field)
         case .setChoices(_, let choices):
-            guard case .choice(let old) = field.kind else { throw .notAChoiceField }
+            guard case .choice = field.kind else { throw .notAChoiceField }
             let words = choices.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             guard !words.isEmpty else { throw .noChoices }
             guard !words.contains(where: \.isEmpty) else { throw .blankChoice }
             var seen: Set<String> = []
             for word in words where !seen.insert(word).inserted { throw .repeatedChoice(word) }
-            return FieldEditPlan(
-                type: id, edit: .setChoices(key: field.key, choices: words), shown: field,
-                removedChoices: old.filter { !seen.contains($0) })
+            return FieldEditPlan(type: id, edit: .setChoices(key: field.key, choices: words), shown: field)
         case .remove:
             guard field.key != titleKey, field.key != bodyKey, field.key != linkField else { throw .holdsPageContent }
             return FieldEditPlan(type: id, edit: edit, shown: field)
@@ -214,7 +238,7 @@ nonisolated extension Catalogue {
     /// The catalogue once the server has taken `plan`: the declaring type and every type below it show the change.
     func applying(_ plan: FieldEditPlan) -> Catalogue {
         var changed = self
-        for id in [plan.type] + descendants(of: plan.type).sorted(by: { $0.rawValue < $1.rawValue }) {
+        for id in [plan.type] + descendants(of: plan.type) {
             if let info = itemTypes[id] { changed.itemTypes[id] = info.applying(plan) }
         }
         return changed

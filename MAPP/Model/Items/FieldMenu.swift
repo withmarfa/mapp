@@ -19,8 +19,6 @@ nonisolated struct FieldMenu: Equatable, Sendable {
         let isEnabled: Bool
     }
 
-    /// The key of the type's field the row shows, or nil for a row that is not one (tags, the parent, the location).
-    let fieldKey: String?
     /// Why the field cannot be changed, in words, where it cannot.
     let lockText: String?
     /// The entries in groups, each group set apart from the next.
@@ -28,13 +26,12 @@ nonisolated struct FieldMenu: Equatable, Sendable {
 
     init(row: String, type: ItemTypeInfo?, layout: PageLayout?, catalogue: Catalogue, editsValue: Bool, reachesServer: Bool) {
         let field = type?.fields.first { $0.key == row }
-        fieldKey = field?.key
 
         var lockText: String?
         var own: [Entry] = []
         var remove: [Entry] = []
         if let type, let field {
-            if let lock = type.lock(of: field) {
+            if let lock = type.lock(of: field, in: catalogue) {
                 switch lock {
                 case .inherited(let source):
                     let label = catalogue.itemTypes[source]?.label ?? source.rawValue
@@ -43,8 +40,9 @@ nonisolated struct FieldMenu: Equatable, Sendable {
                     lockText = String(localized: "Part of a type Marfa provides")
                 }
             } else {
-                func offered(_ edit: FieldEdit) -> Bool { reachesServer && (try? type.plan(edit)) != nil }
-                own.append(Entry(command: .rename, isEnabled: offered(.rename(key: field.key, label: field.label))))
+                // A clash of names is for the sheet to say when it is submitted, not a reason to hide the way to fix one.
+                func offered(_ edit: FieldEdit) -> Bool { reachesServer && (try? type.plan(edit, in: catalogue)) != nil }
+                own.append(Entry(command: .rename, isEnabled: reachesServer))
                 if case .choice(let choices) = field.kind {
                     own.append(Entry(command: .editChoices, isEnabled: offered(.setChoices(key: field.key, choices: choices))))
                 }
