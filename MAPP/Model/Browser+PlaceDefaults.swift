@@ -135,6 +135,8 @@ extension Browser {
         placeCards[place] = nil
         placeCalendarScales[place] = nil
         observedChoices[place] = ViewChoices(options: ItemTableOptions(), timelineDate: nil)
+        // The row of a place with no filter left is not kept open, which only a filter the person put in would have done.
+        filterRowChoice[place] = nil
         let natural = Self.naturalLayout
         if viewMode != natural, availableViewModes(in: library).contains(natural) { set(layout: natural) }
         registerResetUndo(restoring: before)

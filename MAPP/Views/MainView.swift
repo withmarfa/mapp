@@ -127,7 +127,6 @@ struct MainView: View {
                 } else {
                     ItemList(browser: browser, order: order, pane: $pane).equatable()
                         .filterChips(browser)
-                        .filteredEmptyState(browser)
                 }
             }
             // The page list is about as wide as the sidebar; each keeps its own width. The split view reads the ideal
@@ -239,7 +238,8 @@ struct MainView: View {
                             .filterChips(browser)
                             .viewCorner(browser)
                         } else {
-                            fullPage
+// The page has no title of the window's own to show beside Back, which is the arrow alone.
+                            fullPage.toolbar(removing: .title)
                         }
                     }
                     .toastOverlay()

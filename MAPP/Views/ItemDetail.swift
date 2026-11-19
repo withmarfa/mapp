@@ -28,9 +28,15 @@ struct ItemDetail: View {
                     .onChange(of: browser.focusRequest, grantFocusRequest)
             }
         } else {
-            UnselectedItemContent(hasItems: !browser.items(in: library).isEmpty)
-                // The page no longer shows the item it had, so that item is left.
-                .onAppear { editor.close() }
+            Group {
+                if browser.filteredItems(in: library).isEmpty {
+                    ListEmptyState(browser: browser)
+                } else {
+                    EmptyState("No Item Selected")
+                }
+            }
+            // The page no longer shows the item it had, so that item is left.
+            .onAppear { editor.close() }
         }
     }
 
@@ -42,30 +48,6 @@ struct ItemDetail: View {
         browser.focusCaret = nil
         editor.focus(browser.selection.first, onTitle: request == .title, caret: caret)
     }
-}
-
-/// What the page says when no item is chosen: a short title, as the other empty views say, and nothing at all while
-/// the place holds nothing to choose, since the list says that.
-private struct UnselectedItemContent: View {
-    let hasItems: Bool
-
-    var body: some View {
-        if hasItems {
-            EmptyState("No Item Selected")
-        } else {
-            Color.clear
-        }
-    }
-}
-
-#Preview("Items with no selection") {
-    UnselectedItemContent(hasItems: true)
-        .frame(width: 600, height: 500)
-}
-
-#Preview("Empty item collection") {
-    UnselectedItemContent(hasItems: false)
-        .frame(width: 600, height: 500)
 }
 
 /// One item as a formatted page, with the item's header drawn by the page above the text. The same editor shows

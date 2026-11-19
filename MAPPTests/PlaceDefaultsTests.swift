@@ -135,6 +135,18 @@ struct PlaceDefaultsTests {
         #expect(Self.window(defaults, library: library).tableOptions[Self.tasks]?.isFiltering != true)
     }
 
+    @Test func resetViewLeavesNoEmptyFilterRowOpen() {
+        let defaults = ViewPanelTests.defaults()
+        let library = Self.library()
+        let browser = Self.window(defaults, library: library)
+        browser.setFilter(Self.status, values: ["todo"])
+        browser.choicesChanged()
+        #expect(browser.showsFilterRow)
+
+        browser.resetView(in: library)
+        #expect(!browser.showsFilterRow)
+    }
+
     @Test func choosingThePlacesOwnLayoutIsNoChange() {
         let defaults = ViewPanelTests.defaults()
         let library = Self.library()

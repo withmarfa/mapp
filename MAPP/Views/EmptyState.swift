@@ -54,3 +54,20 @@ struct PlaceEmptyState: View {
         }
     }
 }
+
+/// What the window's content says when the list beside it holds nothing and there is no page to show: the filters that
+/// hide everything, a search with no match, or the place's own words. The list column stays blank, as the page would be.
+struct ListEmptyState: View {
+    @CurrentLibrary private var library
+    let browser: Browser
+
+    var body: some View {
+        if browser.filtersHideEverything(in: library) {
+            FilteredEmptyState(browser: browser)
+        } else if browser.isSearching {
+            SearchEmptyState(browser: browser)
+        } else {
+            PlaceEmptyState(browser: browser)
+        }
+    }
+}

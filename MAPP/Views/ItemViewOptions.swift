@@ -89,7 +89,7 @@ struct ViewOptionsMenu: View {
                 Button("Edit View") { browser.openViewPanel(in: library) }
                     .accessibilityIdentifier("EditViewMenuItem")
             }
-            DefaultViewOptions(browser: browser)
+            DefaultViewOptions(browser: browser, resets: browser.offersResetView)
         } label: {
             HStack(spacing: 3) {
                 Image(systemName: "slider.horizontal.3")
@@ -109,9 +109,11 @@ struct ViewOptionsMenu: View {
 struct DefaultViewOptions: View {
     @CurrentLibrary private var library
     let browser: Browser
+    /// Whether Reset View shows. The caller works it out, since it watches the stored choices this reads and an unchanged
+    /// menu does not run this body again when they change.
+    let resets: Bool
 
     var body: some View {
-        let resets = browser.offersResetView
         let saves = browser.offersViewOptions && SavedViews.hasChoicesToKeep(browser, in: library)
         if resets || saves {
             Divider()

@@ -87,7 +87,6 @@ struct ItemList: View, Equatable {
         } primaryAction: { ids in
             browser.open(ids)
         }
-        .overlay { emptyState(isEmpty: ids.isEmpty) }
         .navigationTitle(title)
         .navigationSubtitle(subtitle(count: ids.count))
         // The search field takes the title's place while it is out.
@@ -127,16 +126,6 @@ struct ItemList: View, Equatable {
         .accessibilityLabel(title)
         .focused(pane, equals: .list)
         .takesKeyboardOnClick { browser.focusRequest = .list }
-    }
-
-    @ViewBuilder private func emptyState(isEmpty: Bool) -> some View {
-        if isEmpty {
-            if browser.isSearching {
-                SearchEmptyState(browser: browser)
-            } else {
-                PlaceEmptyState(browser: browser)
-            }
-        }
     }
 
     private func subtitle(count: Int) -> Text {
