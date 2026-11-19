@@ -200,6 +200,7 @@ struct MainView: View {
                                 }
                             }
                             .filterChips(browser)
+                            .viewCorner(browser)
                         } else {
                             itemPage
                         }

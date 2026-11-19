@@ -37,6 +37,9 @@
     "Green" : {
 
     },
+    "Hide Month" : {
+
+    },
     "Hide Section" : {
 
     },
@@ -147,6 +150,12 @@
     },
     "Calendar" : {
       "extractionState" : "manual"
+    },
+    "Calendar by Month" : {
+
+    },
+    "Calendar by Week" : {
+
     },
     "Change Calendar" : {
       "extractionState" : "manual"
@@ -336,9 +345,6 @@
     "Previous Week" : {
       "extractionState" : "manual"
     },
-    "Scale" : {
-      "extractionState" : "manual"
-    },
     "Search for a Place" : {
       "extractionState" : "manual"
     },
@@ -355,9 +361,6 @@
       "extractionState" : "manual"
     },
     "Show Month" : {
-      "extractionState" : "manual"
-    },
-    "Show Week" : {
       "extractionState" : "manual"
     },
     "The location couldn’t be saved." : {
@@ -1735,6 +1738,9 @@
     "Card Density" : {
       "extractionState" : "manual"
     },
+    "Card Size" : {
+
+    },
     "Cards" : {
       "extractionState" : "manual"
     },
@@ -2663,6 +2669,9 @@
     "Large" : {
       "extractionState" : "manual"
     },
+    "Large Cards" : {
+
+    },
     "Last Week" : {
 
     },
@@ -2920,6 +2929,9 @@
     },
     "Medium" : {
       "extractionState" : "manual"
+    },
+    "Medium Cards" : {
+
     },
     "More" : {
 
@@ -3843,6 +3855,9 @@
     },
     "Small" : {
       "extractionState" : "manual"
+    },
+    "Small Cards" : {
+
     },
     "Solid" : {
 

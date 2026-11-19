@@ -46,16 +46,19 @@ struct ViewOptionCommandTests {
         next.action()
         let expected = try #require(Calendar.current.date(byAdding: .weekOfYear, value: 1, to: clock))
         #expect(browser.calendarDay == expected, "a week on from the clock's, not from the wall clock")
-        let today = try #require(ViewOptionCommand.commands(for: browser, in: library, storedColumns: .constant(Data())).first { $0.title == "Go to Today" })
+        let today = try #require(ViewOptionCommand.commands(for: browser, in: library, storedColumns: .constant(Data())).first { $0.title == "Today" })
         today.action()
         #expect(browser.calendarDay == nil)
     }
 
-    @Test func theListTheGalleryAndSettingsOfferNoViewOptionCommands() {
+    @Test func theGalleryOffersTheOtherCardSizes() {
         let library = FakeItemLibrary(items: [Self.task("A", status: "todo")])
-        for mode in [ItemViewMode.list, .gallery] {
-            #expect(Self.titles(Self.browser(mode, in: library), library).isEmpty, "\(mode)")
-        }
+        #expect(Self.titles(Self.browser(.gallery, in: library), library) == ["Small Cards", "Large Cards"])
+    }
+
+    @Test func theListAndSettingsOfferNoViewOptionCommands() {
+        let library = FakeItemLibrary(items: [Self.task("A", status: "todo")])
+        #expect(Self.titles(Self.browser(.list, in: library), library).isEmpty)
         let settings = Self.browser(.board, in: library)
         settings.showSettings()
         #expect(Self.titles(settings, library).isEmpty)

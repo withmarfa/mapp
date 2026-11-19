@@ -110,7 +110,7 @@ struct CurrentViewOptions: View {
         switch browser?.viewMode {
         case .table: if let browser { ItemTableViewOptions(browser: browser) }
         case .board: if let browser { ItemBoardOptions(browser: browser) }
-        case .timeline: if let browser { ItemTimelineOptions(browser: browser) }
+        case .timeline: if let browser { ItemTimelineOptions(browser: browser, bindsKeys: bindsKeys) }
         case .calendar:
             if let browser {
                 ItemCalendarOptions(browser: browser, bindsKeys: bindsKeys)
@@ -119,6 +119,10 @@ struct CurrentViewOptions: View {
             }
         // A collection keeps the order Marfa gives its members, so the app's order does not apply there.
         case .list, .gallery, nil:
+            if let browser, browser.viewMode == .gallery {
+                GalleryCardSizeOptions(browser: browser)
+                Divider()
+            }
             // A saved view has its own sort and group, which the list and the gallery take as the table does.
             if let browser, browser.isViewPlace {
                 ItemTableViewOptions(browser: browser, columns: false)
@@ -166,10 +170,14 @@ struct ItemBoardOptions: View {
 struct ItemTimelineOptions: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
+    var bindsKeys = false
 
     var body: some View {
         let fields = browser.timelineFieldChoices(in: library)
         let field = ItemTimelineLayout.selectedField(browser.timelineFields[browser.item], fields: fields)
+        Button("Today", systemImage: "calendar.circle") { browser.requestTimelineToday() }
+            .keyboardShortcut(bindsKeys ? CalendarShortcut.today : nil)
+        Divider()
         Picker("Date Field", systemImage: "calendar", selection: Binding { field ?? "" } set: {
             browser.setTimelineField($0.isEmpty ? nil : $0, in: library)
         }) {

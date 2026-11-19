@@ -718,7 +718,7 @@ struct CommandPalette: View {
 
         if library.isLoaded {
             for command in ViewOptionCommand.commands(for: browser, in: library, storedColumns: $storedColumns) {
-                add(command.title, command.systemImage, in: command.group, action: command.action)
+                add(command.title, command.systemImage, command.shortcut, in: command.group, action: command.action)
             }
             for command in SavedViewCommand.commands(for: browser, in: library, order: order) {
                 add(command.title, command.systemImage, in: .view, action: command.action)
