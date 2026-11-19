@@ -134,7 +134,7 @@ struct ItemList: View, Equatable {
             if browser.isSearching {
                 SearchEmptyState(browser: browser)
             } else {
-                EmptyState(browser.item == .files ? "No Files" : "No Items")
+                PlaceEmptyState(browser: browser)
             }
         }
     }

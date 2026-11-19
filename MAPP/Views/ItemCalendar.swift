@@ -68,7 +68,7 @@ struct ItemCalendar: View {
                 if browser.isSearching {
                     SearchEmptyState(browser: browser)
                 } else {
-                    EmptyState("No Items")
+                    PlaceEmptyState(browser: browser)
                 }
             }
         }

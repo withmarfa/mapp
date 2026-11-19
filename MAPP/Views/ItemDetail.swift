@@ -13,7 +13,7 @@ struct ItemDetail: View {
     var body: some View {
         if browser.selection.count > 1 {
             EmptyState(title: Text("^[\(browser.selection.count) item](inflect: true) selected"),
-                       detail: Text("Choose a single item to read or edit it."), actions: { EmptyView() })
+                       detail: Text("Choose one item to read or edit it."), actions: { EmptyView() })
                 .accessibilityIdentifier("MultipleSelectionPrompt")
                 .onAppear { editor.close() }
         } else if let id = browser.selection.first, let item = library.item(id) {

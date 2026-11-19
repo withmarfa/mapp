@@ -38,7 +38,7 @@ struct ItemBoard: View {
                 board(browser.hidesEmptyGroups ? lanes.filter { !$0.items.isEmpty } : lanes, key: field.key, grouped: grouped, contents: contents)
             } else if items.isEmpty {
                 if browser.isSearching { SearchEmptyState(browser: browser) }
-                else { EmptyState("No Items") }
+                else { PlaceEmptyState(browser: browser) }
             }
         }
         .searchStatus(browser)

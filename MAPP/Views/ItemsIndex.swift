@@ -92,11 +92,13 @@ struct ItemsIndex: View {
         if searching {
             SearchEmptyState(browser: browser)
         } else if allCount == 0 {
-            EmptyState("No Items Yet", detail: "Items you make and apps send show here.")
-        } else if tab == .fromApps {
-            EmptyState("No Items From Apps", detail: "Items that apps send appear here.")
+            EmptyState("No Items", detail: "Items you make or apps send show here.")
         } else {
-            EmptyState("No Items Of Yours", detail: "Items you make appear here.")
+            switch tab {
+            case .yours: EmptyState("No Items Of Yours", detail: "Items you make show here.")
+            case .fromApps: EmptyState("No Items From Apps", detail: "Items that apps send show here.")
+            case .all, .apps, .keys: EmptyState("No Items")
+            }
         }
     }
 

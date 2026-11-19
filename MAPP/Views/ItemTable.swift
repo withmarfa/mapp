@@ -45,7 +45,7 @@ struct ItemTable: View {
                     if browser.isSearching {
                         SearchEmptyState(browser: browser)
                     } else {
-                        EmptyState("No Items")
+                        PlaceEmptyState(browser: browser)
                     }
                 } else if rows.isEmpty {
                     EmptyState(title: Text("No Matching Items"), detail: Text("No items match the filters.")) {
