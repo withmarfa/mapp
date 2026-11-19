@@ -15,15 +15,6 @@ This page lists what has been agreed for MAPP and is not in the app yet, so the 
 - A view's mark is its symbol in its own color, with no tile. A person chooses the color from the view's context menu, a row of color dots, or in Settings > Sidebar. The color is kept on this Mac.
 - A new library's shortcuts are New and Search. No shortcut makes an item of a type the person made.
 
-## Collections and Sources
-
-- Collections and Sources are one kind of page, an index of containers, drawn as a table.
-- Collections has the tabs All, Yours (the library tier) and From Apps (the feed tier). Sources has All, Apps (signed in) and Keys.
-- A collection's icon is gray. A type's icon in a table is in the type's color, with no tile.
-- The chosen container shows in the right sidebar, with no buttons there. The table takes the window's width when the right sidebar is closed.
-- Deleting a collection asks with Apple's alert, then shows the toast with Undo (the toast is built: [Components](components.md)).
-- Search and View Options are in the toolbar, as on every screen. New Collection is on the page, at the trailing edge of the tabs.
-
 ## Items as an index
 
 - Items is an index page like Collections and Sources: a table with no list column. Views and types keep the list column.

@@ -2,7 +2,7 @@
 
 Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built in v0.0.45. The table's margin, whole-cell hover and add to an empty cell, the palettes' bar, rows and material setting, and the selection and hover greys and the favorite's heart as described below, are built, not yet released. See [Looks](looks.md).
 
-Where it lives: `Browser`, `ItemViewMode`, `ViewLayouts` and `SidebarLayout` under `MAPP/Model/`, with `CardContents`, `ItemTableLayout`, `ItemTimelineLayout`, `ItemPlacement`, `EventSpan` and `CalendarLayout` under `MAPP/Model/Items/`; `ItemList`, `ItemRow`, `ItemGallery`, `GalleryCard`, `ItemBoard`, `ItemTable`, `ItemTableCell`, `SoftSelection`, `ChipLine`, `ItemTimeline`, `ItemCalendar`, `CalendarToolbarItems`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
+Where it lives: `Browser`, `ItemViewMode`, `ViewLayouts`, `SidebarLayout`, `IndexPlace`, `IndexTab`, `IndexSort`, `IndexPreferences` and `IndexChoice` under `MAPP/Model/`, with `IndexRow`, `IndexRows`, `CardContents`, `ItemTableLayout`, `ItemTimelineLayout`, `ItemPlacement`, `EventSpan` and `CalendarLayout` under `MAPP/Model/Items/`; `ItemList`, `ItemRow`, `ItemGallery`, `GalleryCard`, `ItemBoard`, `ItemTable`, `ItemTableCell`, `SoftSelection`, `ChipLine`, `ItemTimeline`, `ItemCalendar`, `SidebarIndex`, `IndexPage`, `IndexInspector`, `IndexViewOptions`, `CalendarToolbarItems`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
 
 A view shows a set of items in a layout. This page explains the layouts, what a saved view is, and the controls that change what a list shows.
 
@@ -73,6 +73,18 @@ Filters live in one row above the list (`FilterRow` and `FilterChipsBar`) as squ
 There is no filter button in the list's toolbar, which holds Search and View Options. View Options opens with Show Filters or Hide Filters, then Sort by, Group by and Edit View. When filters apply, its button shows the count and is tinted while the window is active; in an inactive window it dims with the other toolbar buttons. The View menu has Show or Hide Filters, Add Filter and Clear Filters.
 
 View Options also holds Include Subtypes, which lets a type's list show the items of its subtypes. The choice is stored for each type as `includedSubtypes`.
+
+## Collections and Sources
+
+Built, not yet released.
+
+- Collections and Sources are one kind of page, an index of containers, drawn as a table (`IndexPage`). Its columns are Name (Source on Sources), Contains (Writes on Sources), Items and Latest Item. A column's header sorts the table, and the sort is kept for each page on this Mac (`indexSort.<place>`). Collections start by name and Sources by how many items they hold.
+- Collections has the tabs All, Yours (the library tier) and From Apps (the feed tier). Sources has All, Apps (signed in) and Keys. A source is an app when its code starts with `oauth:` and a key otherwise (`SourceCode`). Each tab shows how many rows it holds, the tab chosen is kept for each page on this Mac (`indexTab.<place>`), and a tab with nothing in it says so.
+- A collection's icon is gray. A type's icon in a table is in the type's color, with no tile, and a type with no icon has the neutral color and mark.
+- The chosen container shows in the right sidebar (`IndexInspector`), with no buttons there: its latest items, the types in it, and its details. The table takes the window's width when the right sidebar is closed. The choice is held in `IndexChoice`, not in a view's state, so choosing a row runs no other row's body, and it clears when the container is deleted or goes on a sync.
+- A double click, Return or Open in the row's menu opens the container. A collection's menu and the Delete key delete it; a source's menu renames it or chooses its mark.
+- Deleting a collection asks with Apple's alert, then moves it to Recently Deleted and shows the toast with Undo ([Components](components.md)). Its items are kept: they hold their own place in the collection, so Undo brings it back with them.
+- Search and View Options are in the toolbar, as on every screen. View Options sorts the table. New Collection is on the page, at the trailing edge of the tabs.
 
 ## Sidebar
 
