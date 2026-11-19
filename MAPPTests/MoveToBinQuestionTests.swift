@@ -48,10 +48,8 @@ import Testing
         #expect(await library.moreItemsTaken(with: selection) == 3)
         #expect(source.previewsAsked.withLock { $0.map(Set.init) } == [selection], "one read, naming exactly the selection")
         #expect(source.writes.isEmpty, "reading changes nothing")
-        let message = DeletionWords.moveMessage(alsoTaking: 3)
-        #expect(message.hasPrefix("Moving them also moves at least 3 more items that go with them."))
-        #expect(message.hasSuffix("You can bring everything back from Recently Deleted."))
-        #expect(DeletionWords.moveMessage(alsoTaking: 1).hasPrefix("Moving them also moves at least 1 more item that goes with them."))
+        #expect(DeletionWords.moveMessage(alsoTaking: 3) == "3 more items linked to them may also move to Recently Deleted.")
+        #expect(DeletionWords.moveMessage(alsoTaking: 1) == "1 more item linked to them may also move to Recently Deleted.")
     }
 
     @Test func aPreviewThatNamesNothingMoreSaysNothingMore() async throws {
@@ -97,20 +95,51 @@ import Testing
         #expect(source.writes.count == count, "one queued delete for each item, nothing else")
     }
 
-    @Test func undoingTheDeleteOfAnArchivedItemRestoresThenArchivesItAgain() async throws {
-        let (library, source) = try await loaded([Self.note("a", state: .archived), Self.note("b")])
-        let undo = StepCountingUndoManager()
-        undo.groupsByEvent = false
-        undo.beginUndoGrouping()
-        library.delete([ItemID("a"), ItemID("b")], undoManager: undo)
-        undo.endUndoGrouping()
-        #expect(source.writes.contains(.transition(ItemID("a"), .trashed)))
+    @Test func aPreviewThatNeverAnswersAsksTheQuestionWithinTheDeadlineWithoutACount() async throws {
+        let items = ids(3)
+        let (library, source) = try await loaded(items)
+        source.moreTaken.withLock { $0 = 4 }
+        source.holdsPreviews.withLock { $0 = true }
+        let details = DetailsPresentation()
+        let selection = Set(items.map(\.id))
+        await details.askToMove(selection, of: selection, in: library, undoManager: nil, within: .milliseconds(100))
+        #expect(details.deletion?.ids == selection)
+        #expect(details.deletion?.alsoTaking == nil)
+        #expect(DetailsPresentation.previewDeadline == .milliseconds(1500))
+    }
 
-        source.clearWrites()
-        undo.undo()
-        let a = source.writes.filter { if case .transition(ItemID("a"), _) = $0 { true } else { false } }
-        #expect(a == [.transition(ItemID("a"), .active), .transition(ItemID("a"), .archived)], "the server leaves the bin only to active")
-        let b = source.writes.filter { if case .transition(ItemID("b"), _) = $0 { true } else { false } }
-        #expect(b == [.transition(ItemID("b"), .active)])
+    @Test func aLateAnswerForAnEarlierDeleteNeverReopensIt() async throws {
+        let items = ids(4)
+        let (library, source) = try await loaded(items)
+        source.moreTaken.withLock { $0 = 2 }
+        let details = DetailsPresentation()
+        let first = Set(items[0...1].map(\.id)), second = Set(items[2...3].map(\.id))
+        source.holdsPreviews.withLock { $0 = true }
+        let slow = Task { await details.askToMove(first, of: first, in: library, undoManager: nil, within: .seconds(60)) }
+        try #require(await eventually { source.previewsAsked.withLock { $0.count } == 1 })
+        source.holdsPreviews.withLock { $0 = false }
+        await details.askToMove(second, of: second, in: library, undoManager: nil, within: .seconds(60))
+        #expect(details.deletion?.ids == second)
+        #expect(details.deletion?.alsoTaking == 2)
+        details.deletion = nil
+        source.releasePreviews()
+        await slow.value
+        #expect(details.deletion == nil, "the earlier question's late answer shows nothing")
+    }
+
+    @Test func theServerIsAskedByTheSizeOfTheWholeSelectionNotOfWhatMoves() async throws {
+        let items = ids(21)
+        let (library, source) = try await loaded(items)
+        source.moreTaken.withLock { $0 = 1 }
+        let details = DetailsPresentation()
+        let all = Set(items.map(\.id)), moving = Set(items[0...1].map(\.id))
+        await details.askToMove(moving, of: all, in: library, undoManager: nil)
+        #expect(source.previewsAsked.withLock { $0 }.isEmpty, "21 chosen is never read, even where only 2 move")
+        #expect(details.deletion?.alsoTaking == nil)
+
+        let twenty = Set(items[0...19].map(\.id))
+        await details.askToMove(moving, of: twenty, in: library, undoManager: nil)
+        #expect(source.previewsAsked.withLock { $0.map(Set.init) } == [moving], "the ids that move are sent")
+        #expect(details.deletion?.alsoTaking == 1)
     }
 }

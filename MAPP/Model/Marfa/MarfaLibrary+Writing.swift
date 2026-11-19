@@ -390,14 +390,12 @@ extension MarfaLibrary {
         setStates(changes, name: name, undoManager: undoManager)
     }
 
-    /// The server reads what moving `ids` takes only for 2 to 20 items and only online; asking it never moves anything.
+    /// The server reads what moving `ids` takes only for 2 to `DeletionWords.previewLimit` items and only online; asking
+    /// it never moves anything.
     func moreItemsTaken(with ids: Set<ItemID>) async -> Int? {
-        guard reachesServer, (2...Self.previewLimitOfBin).contains(ids.count) else { return nil }
+        guard reachesServer, (2...DeletionWords.previewLimit).contains(ids.count) else { return nil }
         return await source.moreItemsTaken(with: ids.sorted { $0.rawValue < $1.rawValue })
     }
-
-    /// The most items the server previews a move of at once.
-    static let previewLimitOfBin = 20
 
     /// The copy holds the bin, so an item binned here or elsewhere is restored like any other.
     func recover(_ ids: Set<ItemID>, undoManager: UndoManager?) {
@@ -411,10 +409,7 @@ extension MarfaLibrary {
         guard !changes.isEmpty else { return }
         for (id, change) in changes {
             if change.from == .trashed {
-                // The server takes an item out of Recently Deleted only to active, so an archived item is restored
-                // and then archived again, as two steps of this one change.
-                submit(.transition(id, .active), failing: String(localized: "Can’t Recover"))
-                if change.to != .active { submit(.transition(id, change.to), failing: String(localized: "Can’t Recover")) }
+                submit(.transition(id, change.to), failing: String(localized: "Can’t Recover"))
             } else {
                 submit(.transition(id, change.to), failing: String(localized: "Couldn’t Make This Change"))
             }

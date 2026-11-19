@@ -123,9 +123,9 @@ extension ItemLibrary {
         EditorController.flushAll(leaving: false) { [self] kept in
             guard kept else { return }
             Browser.delete(ids, in: self, undoManager: undoManager, toasts: details?.toasts, naming: title, asking: details.map { details in
-                { ids in
-                    // The question is asked at once when the preview can't be read, and a preview never changes what moves.
-                    Task { details.deletion = DeleteRequest(ids: ids, alsoTaking: await self.moreItemsTaken(with: ids), undoManager: undoManager) }
+                { moving in
+                    // `ids` is the whole selection, which decides whether the server is asked at all.
+                    Task { await details.askToMove(moving, of: ids, in: self, undoManager: undoManager) }
                 }
             })
         }
