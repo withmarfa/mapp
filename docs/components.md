@@ -29,6 +29,7 @@ The design system's Button and Toast components hold the exact fills and measure
 - It leaves on its own after 5 seconds, since the design system gives no time. It waits while the pointer is over it, then starts its time again. It leaves at once when Undo or the close button is used. VoiceOver announces it.
 - Undo runs the undo the action registered with the window's undo manager, once. If another change was made since, Undo does nothing, so it never takes back something else. Edit > Undo still works after the toast has gone, and a failed undo is reported as it is without the toast.
 - Items moved to Recently Deleted show it, by every route: the row and item actions, the palette, the Delete key, the menu command, the board and the gallery. One item says "Moved to Recently Deleted"; several say how many. Deleting a collection will use it (Agreed designs).
+- Left to build: the design boards (F11, L5) name the item in the message ("Moved “Kitchen quotes” to Recently Deleted") and add a View button. The built toast has neither yet, and has no other message than the move to Recently Deleted.
 - A question before something that can't be undone is Apple's own alert, as today. MAPP draws none of its own.
 
 ## Related pages
