@@ -117,16 +117,21 @@ struct QuickAddPanel: View {
     private func typePicker(_ draft: QuickAdd.Draft) -> some View {
         let shown = QuickAdd.typeIDs(of: SidebarPlan(library, layout: libraries.sidebarLayout).shownTypes)
         let (first, rest) = QuickAdd.kindMenu(QuickAdd.types(in: library), shown: shown, chosen: draft.typeID)
-        return Picker("Kind", selection: Binding { draft.typeID } set: { choose($0) }) {
-            ForEach(first) { type in kindLabel(type).tag(type.id.rawValue) }
-            if !rest.isEmpty {
-                Divider()
-                ForEach(rest) { type in kindLabel(type).tag(type.id.rawValue) }
+        let chosen = (first + rest).first { $0.id.rawValue == draft.typeID }
+        return Menu {
+            Picker("Kind", selection: Binding { draft.typeID } set: { choose($0) }) {
+                ForEach(first) { type in kindLabel(type).tag(type.id.rawValue) }
+                if !rest.isEmpty {
+                    Divider()
+                    ForEach(rest) { type in kindLabel(type).tag(type.id.rawValue) }
+                }
             }
+            .pickerStyle(.inline)
+            .labelsHidden()
+        } label: {
+            if let chosen { kindLabel(chosen) } else { Text("Kind") }
         }
-        .pickerStyle(.menu)
-        .labelsHidden()
-        .fixedSize()
+        .mappMenu()
         .help("Kind of Item")
         .accessibilityLabel("Kind of Item")
         .accessibilityIdentifier("QuickAddType")
@@ -489,23 +494,21 @@ struct QuickAddPanel: View {
             moreMenu(draft, isFile: isFile)
             Spacer(minLength: 12)
             Button("Cancel") { putAway() }
+                .mappButton(.secondary)
                 .accessibilityIdentifier("QuickAddCancel")
             Button {
                 save()
             } label: {
                 HStack(spacing: 6) {
                     Text("Add \(label)")
-                    Text(verbatim: "⌘↩")
-                        .opacity(0.7)
-                        .accessibilityHidden(true)
+                    ShortcutKeys("⌘↩", onAccent: true)
                 }
             }
-            .buttonStyle(.borderedProminent)
+            .mappButton(.primary)
             .keyboardShortcut(.return, modifiers: .command)
             .disabled(!QuickAdd.canSave(draft, in: library) || quickAdd.isSaving || !quickAdd.unfinishedLists.isEmpty)
             .accessibilityIdentifier("QuickAddAdd")
         }
-        .controlSize(.large)
     }
 
     /// The plus beside the kind: attaches a file (or chooses a file item's file), puts the item under a parent, or
@@ -541,8 +544,7 @@ struct QuickAddPanel: View {
         }
         .menuStyle(.button)
         .menuIndicator(.hidden)
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.circle)
+        .mappButton(.secondary, icon: true)
         .fixedSize()
         .popover(isPresented: parentPopover(isOpen: { quickAdd.draft?.parentID == nil }), arrowEdge: .top) { parentList(draft) }
         .help("Add File or Property")

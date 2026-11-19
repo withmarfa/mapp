@@ -18,11 +18,14 @@ struct WebLinkSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(request.removable ? "Edit Link" : "Link").interfaceFont(.title2.bold())
-            TextField("Web Address", text: $address)
-                .textFieldStyle(.roundedBorder)
-                .focused($isFieldFocused)
-                .onSubmit(add)
-                .accessibilityIdentifier("WebLinkField")
+            VStack(alignment: .leading, spacing: 4) {
+                FieldLabel("Web Address")
+                TextField("Web Address", text: $address)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($isFieldFocused)
+                    .onSubmit(add)
+                    .accessibilityIdentifier("WebLinkField")
+            }
             if refused {
                 Text("Enter a web, email, or phone address.")
                     .interfaceFont(.callout).foregroundStyle(.red)
@@ -30,13 +33,16 @@ struct WebLinkSheet: View {
             HStack {
                 if request.removable {
                     Button("Remove Link", action: editor.removeWebLink)
+                        .mappButton(.destructive)
                         .accessibilityIdentifier("WebLinkRemove")
                 }
                 Spacer()
                 Button("Cancel", role: .cancel) { editor.cancelWebLink() }
                     .keyboardShortcut(.cancelAction)
+                    .mappButton(.secondary)
                 Button(request.removable ? "Done" : "Add", action: add)
                     .keyboardShortcut(.defaultAction)
+                    .mappButton(.primary)
                     .disabled(address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .accessibilityIdentifier("WebLinkAdd")
             }

@@ -76,11 +76,13 @@ struct TypeIconPicker: View {
             }
             HStack {
                 Button("Use Default") { choose(nil) }
+                    .mappButton(.secondary)
                     .disabled(!model.canChoose)
                     .accessibilityIdentifier("TypeIconUseDefault")
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
+                    .mappButton(.secondary)
                     .disabled(!model.canCancel)
             }
         }

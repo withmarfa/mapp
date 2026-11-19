@@ -70,8 +70,10 @@ struct TagSheet: View {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
+                    .mappButton(.secondary)
                 Button("Add") { refusal = add(text) }
                     .keyboardShortcut(.defaultAction)
+                    .mappButton(.primary)
                     .disabled(ItemTag.normalized(text).isEmpty)
                     .accessibilityIdentifier("TagSheetAdd")
             }

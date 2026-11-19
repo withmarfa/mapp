@@ -20,9 +20,10 @@ struct SidebarTypePicker: View {
             .frame(maxHeight: 360)
             HStack {
                 Button("Show All") { libraries.updateSidebarLayout { $0.showAllTypes() } }
+                    .mappButton(.secondary)
                     .disabled(!libraries.sidebarLayout.hidesTypes)
                 Spacer()
-                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction)
+                Button("Done") { dismiss() }.keyboardShortcut(.defaultAction).mappButton(.primary)
             }
         }
         .padding(16)
