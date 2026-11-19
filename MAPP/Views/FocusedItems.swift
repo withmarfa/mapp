@@ -42,6 +42,8 @@ final class DetailsPresentation {
     var typeChange: TypeChangeRequest?
     /// The items and type the window asks the values for that the type needs.
     var typeValues: TypeValuesRequest?
+    /// The change to a field of a type the window's sheet asks the person's words for.
+    var fieldEdit: FieldEditRequest?
     /// Version History, while the window shows it in place of its page.
     private(set) var history: VersionHistoryMode?
     /// Whether the window's right sidebar is arranging the page's layout (Customize Layout) in place of the inspector.
@@ -64,9 +66,9 @@ final class DetailsPresentation {
     private(set) var isEditingView = false
     /// Whether closing the view panel closes the sidebar, because opening it opened the sidebar.
     @ObservationIgnored private var closesSidebarAtViewEnd = false
-    /// The items the window's Add to Collection sheet is open for.
+    /// The items the window's Add to Collection panel is asked for.
     var collectionPick: CollectionPickRequest?
-    /// The items the window's Add Tag sheet is open for.
+    /// The items the window's Add Tag panel is asked for.
     var tagRequest: TagRequest?
     /// The items the window asks the person to confirm moving to Recently Deleted.
     var deletion: DeleteRequest?
@@ -231,8 +233,7 @@ struct TypeValuesRequest: Identifiable {
     let undoManager: UndoManager?
 }
 
-/// The items the Add to Collection sheet files, with the undo manager of the window it was asked for in, since the
-/// sheet has its own.
+/// The items the Add to Collection panel files, with the undo manager of the window it was asked for in.
 struct CollectionPickRequest: Identifiable {
     let id = UUID()
     let ids: Set<ItemID>

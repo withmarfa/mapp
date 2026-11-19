@@ -364,6 +364,16 @@ final class EditorController: NSObject {
         Task { ValueEditPresenter.shared.present(request, anchor: container, rect: rect) }
     }
 
+    /// Pops `menu` up with its top edge on the bottom of `rect`, in the container's coordinates. `keeping` holds the menu's
+    /// targets, which an item holds weakly, until the person has chosen.
+    func popUp(_ menu: NSMenu, under rect: CGRect, keeping: AnyObject) {
+        // As with an editor, the page's click is still being handled.
+        Task {
+            let point = NSPoint(x: rect.minX, y: container.isFlipped ? rect.maxY : rect.minY)
+            withExtendedLifetime(keeping) { _ = menu.popUp(positioning: nil, at: point, in: container) }
+        }
+    }
+
     /// A rect in the page's window, which starts below whatever covers the web view's top, in the container's
     /// coordinates.
     private func containerRect(_ rect: CGRect, viewportHeight: Double) -> CGRect {
@@ -657,6 +667,8 @@ final class EditorController: NSObject {
             onHeaderEvent(.menu(menu, item, containerRect(rect, viewportHeight: viewportHeight)))
         case .editValue(let item, let row, let rect, let viewportHeight):
             onHeaderEvent(.edit(row: row, item, containerRect(rect, viewportHeight: viewportHeight)))
+        case .fieldMenu(let item, let row, let editsValue, let rect, let viewportHeight):
+            onHeaderEvent(.fieldMenu(row: row, editsValue: editsValue, item, containerRect(rect, viewportHeight: viewportHeight)))
         case .valueMoved(let item, let row, let rect, let viewportHeight):
             // The value's editor follows it, which is the presenter's to say whether there is one open for it.
             ValueEditPresenter.shared.valueMoved(item: item, row: row, to: containerRect(rect, viewportHeight: viewportHeight))

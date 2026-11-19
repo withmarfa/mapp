@@ -53,6 +53,8 @@ import Observation
     @ObservationIgnored let history: (any ItemHistorySource)?
     /// Keeps the owner's choice of a type's icon on the server. Nil where there is no server to ask.
     @ObservationIgnored let typeIcons: (any TypeIconSource)?
+    /// Keeps changes to a type's fields on the server. Nil where there is no server to ask.
+    @ObservationIgnored let typeSchemas: (any TypeSchemaSource)?
     /// Reads the server's own settings, for the bin's retention; nil where there is no server to ask, as in the sample.
     @ObservationIgnored let config: (any InstanceConfigSource)?
     /// Reads and changes the names, marks and counts of sources, which only the server holds. Nil where there is no
@@ -62,7 +64,10 @@ import Observation
     /// with another icon than it had when the person chose, since the copy takes a schema change only when its stream
     /// reopens. `before` is the icon the copy showed then.
     @ObservationIgnored private var chosenIcons: [TypeID: (icon: String?, before: String?)] = [:]
-    /// The catalogue the working copy last reported, without the chosen icons.
+    /// The changes to fields the server took, until the working copy's own catalogue shows the type other than it was
+    /// when the server took them, for the same reason as the icons. `before` is the type the copy showed then.
+    @ObservationIgnored private var chosenFields: [(plan: FieldEditPlan, before: ItemTypeInfo?)] = []
+    /// The catalogue the working copy last reported, without the chosen icons and fields.
     @ObservationIgnored private var readCatalogue = Catalogue(itemTypes: [])
     @ObservationIgnored private var records: [ItemID: ItemRecord] = [:]
     @ObservationIgnored private(set) var index = MarfaItemIndex()
@@ -229,7 +234,7 @@ import Observation
 
     init(
         source: any ItemSource, notices: Notices, history: (any ItemHistorySource)? = nil,
-        typeIcons: (any TypeIconSource)? = nil, config: (any InstanceConfigSource)? = nil,
+        typeIcons: (any TypeIconSource)? = nil, typeSchemas: (any TypeSchemaSource)? = nil, config: (any InstanceConfigSource)? = nil,
         sourceNames: (any SourceNameSource)? = nil,
         now: @escaping () -> Date = Date.init,
         cameOnline: @escaping () -> Void = {}) {
@@ -237,6 +242,7 @@ import Observation
         counts = ItemCounts { ids, query in try await source.counts(of: ids, query) }
         self.history = history
         self.typeIcons = typeIcons
+        self.typeSchemas = typeSchemas
         self.config = config
         self.sourceNames = sourceNames
         self.notices = notices
@@ -342,11 +348,26 @@ import Observation
         }
     }
 
+    func editField(_ plan: FieldEditPlan) async -> TypeSchemaFailure? {
+        guard let typeSchemas else { return .unsupported }
+        do {
+            try await typeSchemas.apply(plan)
+            chosenFields.append((plan, readCatalogue.itemTypes[plan.type]))
+            catalogue = catalogue.applying(plan)
+            reindex()
+            return nil
+        } catch {
+            return error
+        }
+    }
+
     /// The catalogue the copy read, with the icons the person has chosen since. A choice ends once the copy shows the
     /// type with a different icon than it did at the choice, whether the chosen one or one another app set.
     private func holdingChosenIcons(_ read: Catalogue) -> Catalogue {
         readCatalogue = read
         var held = read
+        chosenFields.removeAll { $0.before != read.itemTypes[$0.plan.type] }
+        for choice in chosenFields { held = held.applying(choice.plan) }
         for (type, choice) in chosenIcons {
             if read.itemTypes[type]?.icon != choice.before {
                 chosenIcons[type] = nil

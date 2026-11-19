@@ -18,6 +18,8 @@ import Observation
     /// Makes the keeper of the owner's type icons for a connection, or nil where there is no server to ask, as in the
     /// sample.
     typealias IconKeeper = @Sendable (MarfaConnection, any SignIns) -> (any TypeIconSource)?
+    /// Makes the keeper of changes to a type's fields for a connection, or nil where there is no server to ask.
+    typealias SchemaKeeper = @Sendable (MarfaConnection, any SignIns) -> (any TypeSchemaSource)?
     typealias SourceNamer = @Sendable (MarfaConnection, any SignIns) -> (any SourceNameSource)?
     /// Makes the reader and writer of the server's own settings for a connection, or nil where there is no server to
     /// ask, as in the sample.
@@ -120,6 +122,7 @@ import Observation
     private let historian: Historian
     private let configurer: Configurer
     private let iconKeeper: IconKeeper
+    private let schemaKeeper: SchemaKeeper
     private let sourceNamer: SourceNamer
 
     /// The address connected to, kept while its copy cannot be opened, so Settings can offer a sign-in for it.
@@ -166,6 +169,7 @@ import Observation
         historian: @escaping Historian = { MarfaServerCalls(connection: $0, signIns: $1) },
         configurer: @escaping Configurer = { MarfaServerCalls(connection: $0, signIns: $1) },
         iconKeeper: @escaping IconKeeper = { MarfaServerCalls(connection: $0, signIns: $1) },
+        schemaKeeper: @escaping SchemaKeeper = { MarfaServerCalls(connection: $0, signIns: $1) },
         sourceNamer: @escaping SourceNamer = { MarfaServerCalls(connection: $0, signIns: $1) }
     ) {
         self.defaults = defaults
@@ -177,6 +181,7 @@ import Observation
         self.historian = historian
         self.configurer = configurer
         self.iconKeeper = iconKeeper
+        self.schemaKeeper = schemaKeeper
         self.sourceNamer = sourceNamer
         instanceNames = defaults.dictionary(forKey: Self.namesKey) as? [String: String] ?? [:]
     }
@@ -549,6 +554,7 @@ import Observation
         detach()
         let library = MarfaLibrary(
             source: source, notices: notices, history: historian(connection, signIns), typeIcons: iconKeeper(connection, signIns),
+            typeSchemas: schemaKeeper(connection, signIns),
             config: configurer(connection, signIns), sourceNames: sourceNamer(connection, signIns),
             // Each return to the server may find it renamed. A library the host has left may still be told once more.
             cameOnline: { [weak self] in

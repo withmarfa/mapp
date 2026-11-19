@@ -2,7 +2,7 @@
 
 Status: Built in v0.0.44. Each kind of value below is drawn by one component wherever the app shows it, except where "Not yet built" says otherwise. A board card and a table cell reading the type's look draw its values through the same family, built in v0.0.45.
 
-Where it lives: `PageChip`, `PagePerson`, `PersonCircle`, `StatusMark`, `ChipLine`, `ChipLooks`, `TypeMark`, `TypeTone` and `OptionTone` under `MAPP/Views/Looks/`, `StatusSymbol` under `MAPP/Model/Items/`, and `editor/src/header.ts` for the page's web header.
+Where it lives: `ValueEditKind`, `ValueEditModel`, `CommandValuePanels` and `FieldMenu` for editing, `PageChip`, `PagePerson`, `PersonCircle`, `StatusMark`, `ChipLine`, `ChipLooks`, `TypeMark`, `TypeTone` and `OptionTone` under `MAPP/Views/Looks/`, `StatusSymbol` under `MAPP/Model/Items/`, and `editor/src/header.ts` for the page's web header.
 
 A value component is one drawing for one kind of value. The same component appears on the page, in the right sidebar, in a row, a card and a table cell, and in the panel that edits the value, so a status looks like a status everywhere.
 
@@ -62,7 +62,8 @@ A value is edited in a panel that opens under it, its leading edge on the value'
 - A value that takes one choice (status, priority, parent, type) closes on a pick and has no Not Set row. A value that takes several (tags, people) stays open.
 - A date has its shortcuts, a calendar that MAPP draws with the day as a circle, a Time row that stays empty until set, and Not Set.
 - The panel is glass by default. A Solid choice in Appearance makes it the window's own color.
-- Change Type is a panel like status. See [Item page](item-page.md).
+- Change Type, Add Tag and Add to Collection are panels like these (`CommandValuePanels`). From the page they open under the value. From a command (the menu, the toolbar and the palette) there is no value on screen, so the panel opens centered near the top of the window and is for the whole selection. A collection's panel lists the collections the items are not all in, and the chips are the ones every item is in. A tag or collection chosen is filed for every item at once, and one Undo takes it back. Never a sheet.
+- Statuses end with Edit Statuses, and a field's menu has Edit the type in Settings. Both wait for Settings > Types. See [Agreed designs](agreed-designs.md).
 
 ## Built in v0.0.44
 

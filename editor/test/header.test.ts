@@ -454,6 +454,32 @@ test('a value the item does not have yet reads Empty and opens its editor', () =
   expect(posted[0]).toMatchObject({ item: 'ticket', row: 'due' })
 })
 
+test('a label opens the field menu, and only a value that is not a link opens the editor', () => {
+  header.set({
+    ...ticket,
+    properties: [
+      { id: 'due', label: 'Due', symbol: 'calendar', kind: 'empty', editable: true },
+      {
+        id: 'source',
+        label: 'Source',
+        symbol: 'link',
+        kind: 'text',
+        text: 'Mail',
+        editable: false,
+      },
+    ],
+  })
+  const labels = root.querySelectorAll<HTMLElement>('.item-prop-label')
+  labels[0]!.click()
+  labels[1]!.click()
+  expect(posted.map((message) => message.type)).toEqual(['fieldMenu', 'fieldMenu'])
+  expect(posted[0]!).toMatchObject({ item: 'ticket', row: 'due', editsValue: false })
+  expect(posted[1]!).toMatchObject({ row: 'source', editsValue: false })
+  const values = root.querySelectorAll<HTMLElement>('.item-prop-value')
+  expect(values[0]!.getAttribute('role')).toBe('button')
+  expect(values[1]!.getAttribute('role'), 'a value nothing edits is no button').toBeNull()
+})
+
 test('the app is told where the value its editor is open under has moved to, once for each move', () => {
   header.set({
     ...ticket,
@@ -1088,7 +1114,7 @@ test('a row dropped last among those shown stays above the rows folded away', ()
   ])
 })
 
-test('a dragged key opens no editor, and a press that does not move still does', () => {
+test('a dragged key opens no menu, and a press that does not move still does', () => {
   const { key, drag, drop } = draggable()
   drag(50)
   drop()
@@ -1100,7 +1126,7 @@ test('a dragged key opens no editor, and a press that does not move still does',
   press.drag(16)
   press.drop()
   press.key.click()
-  expect(posted.map((message) => message.type)).toEqual(['editValue'])
+  expect(posted.map((message) => message.type)).toEqual(['fieldMenu'])
 })
 
 test('Escape puts a dragged row back', () => {
@@ -1115,7 +1141,7 @@ test('Escape puts a dragged row back', () => {
 
 const tick = () => new Promise((resolve) => setTimeout(resolve))
 
-test('the click from letting go after Escape ended a drag opens no editor, and a later press still does', async () => {
+test('the click from letting go after Escape ended a drag opens no menu, and a later press still does', async () => {
   const { key, drag } = draggable()
   drag(50)
   window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
@@ -1131,7 +1157,7 @@ test('the click from letting go after Escape ended a drag opens no editor, and a
   expect(
     posted.map((message) => message.type),
     'the next press',
-  ).toEqual(['editValue'])
+  ).toEqual(['fieldMenu'])
 })
 
 test('a drop swallows its own click however late it comes, and nothing after it', async () => {
@@ -1147,7 +1173,7 @@ test('a drop swallows its own click however late it comes, and nothing after it'
   expect(
     posted.map((message) => message.type),
     'a second click',
-  ).toEqual(['editValue'])
+  ).toEqual(['fieldMenu'])
 })
 
 test('a press that starts after a cancelled drag is not swallowed', () => {
@@ -1157,5 +1183,5 @@ test('a press that starts after a cancelled drag is not swallowed', () => {
   key.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, button: 0, clientY: 15 }))
   window.dispatchEvent(new MouseEvent('pointerup'))
   key.click()
-  expect(posted.map((message) => message.type)).toEqual(['editValue'])
+  expect(posted.map((message) => message.type)).toEqual(['fieldMenu'])
 })

@@ -231,7 +231,9 @@ nonisolated struct PropertyRow: Identifiable, Hashable, Sendable {
             guard target.isOpenable, !target.isDeleted, let id = target.itemID else { return nil }
             return Target(title: target.title, item: id, icon: icon(id), kind: isPerson(id) ? .person : .link)
         }
-        return targets.isEmpty ? nil : PropertyRow(id: relationship.field, label: relationship.label, value: .items(targets))
+        // The collections are the one link a page edits in place: its menu offers the panel that adds and removes them.
+        let edits = relationship.field == MarfaMapping.collectionEdge && relationship.isEditable
+        return targets.isEmpty ? nil : PropertyRow(id: relationship.field, label: relationship.label, value: .items(targets), editable: edits)
     }
 
     private static func parentRow(_ relationships: [ItemRelationship], _ field: String) -> PropertyRow {

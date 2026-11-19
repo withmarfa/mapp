@@ -17,15 +17,15 @@ struct ValueEditRequest {
     var calendar = Calendar.current
     /// Opens the item the parent row names, for the parent's panel.
     var open: (ItemID) -> Void = { _ in }
-    /// The items a type panel changes where the window has several chosen, which `item` cannot name. Empty otherwise.
+    /// The items a panel changes where the window has several chosen, which `item` cannot name. Empty otherwise.
     var items: Set<ItemID> = []
     /// Asks for the values a type needs that the items lack, for the type panel. The panel takes none itself.
     var needsValues: (TypeID) -> Void = { _ in }
     /// Opens the panel at the middle of `rect`, where the value has no place of its own to open under.
     var isCentered = false
 
-    /// The items a type panel changes.
-    var typeTargets: Set<ItemID> { items.isEmpty ? item.map { [$0] } ?? [] : items }
+    /// The items the panel changes: those chosen where there are several, else the one it is for.
+    var targets: Set<ItemID> { items.isEmpty ? item.map { [$0] } ?? [] : items }
 
     /// One editor at a time is open; this says which value it is for.
     var target: String { (item?.rawValue ?? "new") + "#" + kind.rowID }
@@ -169,7 +169,9 @@ final class ValueEditModel {
     /// Whether the item can still take the edit. An editor for an item that cannot closes itself, except a Location
     /// panel, which an item that cannot be edited still opens to show its point.
     var isEditable: Bool {
-        if kind == .type { return library.offersTypeChange(for: request.typeTargets) }
+        if kind == .type { return library.offersTypeChange(for: request.targets) }
+        if kind == .collections { return !library.collectionMembers(request.targets).isEmpty }
+        if kind == .tags, !request.items.isEmpty { return request.items.contains { library.item($0)?.canEditTags == true } }
         guard let id = request.item else { return true }
         guard let item = library.item(id) else { return false }
         if case .location(let spec) = kind { return item.isEditable || spec.hasPoint(item) }
@@ -195,9 +197,14 @@ final class ValueEditModel {
     /// The tags or the words the panel holds, which its search field shows as chips.
     var heldTokens: [String] {
         switch kind {
-        case .tags: request.item.flatMap(library.item).map(library.tags(of:)) ?? []
-        case .words: heldWords
-        default: []
+        case .tags:
+            // With several items, only the tags every one that can take tags holds: a tag that some lack is not held by
+            // the selection.
+            let held = request.targets.compactMap(library.item).filter(\.canEditTags).map { Set(library.tags(of: $0)) }
+            guard let first = held.first else { return [] }
+            return held.dropFirst().reduce(first) { $0.intersection($1) }.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        case .words: return heldWords
+        default: return []
         }
     }
 
@@ -214,7 +221,7 @@ final class ValueEditModel {
 
     var hasSearch: Bool {
         switch kind {
-        case .people, .tags, .words, .parent, .status, .choice, .type: true
+        case .people, .tags, .collections, .words, .parent, .status, .choice, .type: true
         case .date, .text, .number, .location: false
         }
     }
@@ -222,7 +229,7 @@ final class ValueEditModel {
     /// Whether the panel adds to what the value holds, which then shows one chip for each thing held.
     var holdsMany: Bool {
         switch kind {
-        case .people, .tags, .words: true
+        case .people, .tags, .collections, .words: true
         default: false
         }
     }
@@ -231,6 +238,7 @@ final class ValueEditModel {
     var searchPrompt: LocalizedStringKey {
         switch kind {
         case .tags: "Add or Find a Tag"
+        case .collections: "Find a Collection"
         case .words: "Add or Find a Word"
         case .parent: "Find an Item"
         case .type: "Find a Type"
@@ -248,14 +256,16 @@ final class ValueEditModel {
         let value: PropertyValue?
         let revision: Int
         let day: Date?
-        let parent: [String]
+        /// What else the rows read that the library's revision does not say: the parent, or the collections held.
+        let held: [String]
     }
 
     var rows: [ValueListRow] {
         let key = RowsKey(
             query: query, value: value, revision: library.contentRevision,
             day: isDate ? request.calendar.startOfDay(for: library.now()) : nil,
-            parent: kind == .parent ? parentTarget.map { [$0.id, $0.displayTitle] } ?? [] : [])
+            held: kind == .parent ? parentTarget.map { [$0.id, $0.displayTitle] } ?? []
+                : kind == .collections ? heldCollections.map(\.id.rawValue) : [])
         if let rowsCache, rowsCache.key == key { return rowsCache.rows }
         rowsBuilt += 1
         let built = buildRows()
@@ -276,6 +286,7 @@ final class ValueEditModel {
         case .date: quickRows
         case .people(_, let shape): peopleRows(shape)
         case .tags: tagRows
+        case .collections: collectionRows
         case .words: wordRows
         case .parent: parentRows
         case .text, .number, .location: []
@@ -306,7 +317,7 @@ final class ValueEditModel {
     }
 
     private var typeRows: [ValueListRow] {
-        let options = library.typeChangeOptions(for: request.typeTargets).map {
+        let options = library.typeChangeOptions(for: request.targets).map {
             ValueListRow(id: Self.typePrefix + $0.id.rawValue, role: .option, title: $0.label, mark: .type(icon: $0.icon))
         }
         return narrowed(options)
@@ -358,6 +369,29 @@ final class ValueEditModel {
             rows.append(ValueListRow(id: "create", role: .create, title: String(localized: "Create “\(typed)”"), detail: "↩", mark: .symbol("plus")))
         }
         return rows
+    }
+
+    /// The collections every item the panel is for is in, which it shows as chips.
+    private var heldCollections: [Item] {
+        let members = library.collectionMembers(request.targets).compactMap(library.item)
+        guard let first = members.first else { return [] }
+        let common = members.dropFirst().reduce(Set(first.collectionIDs)) { $0.intersection($1.collectionIDs) }
+        return library.collections.filter { common.contains($0.id) }
+    }
+
+    static let collectionPrefix = "collection:"
+
+    private var collectionRows: [ValueListRow] {
+        let held = Set(heldCollections.map(\.id))
+        let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return library.collections
+            .filter { !held.contains($0.id) && (typed.isEmpty || $0.displayTitle.localizedStandardContains(typed)) }
+            .prefix(Self.parentLimit)
+            .map {
+                ValueListRow(
+                    id: Self.collectionPrefix + $0.id.rawValue, role: .option, title: $0.displayTitle,
+                    mark: .type(icon: library.catalogue.icon(for: $0.type)))
+            }
     }
 
     private var wordRows: [ValueListRow] {
@@ -500,6 +534,7 @@ final class ValueEditModel {
             if notice == nil { close() }
         case .people(_, let shape): activatePerson(id, shape)
         case .tags: activateTag(id)
+        case .collections: activateCollection(id)
         case .words: activateWord(id)
         case .parent: activateParent(id)
         case .type: activateType(id)
@@ -513,7 +548,7 @@ final class ValueEditModel {
     private func activateType(_ id: String) {
         guard id.hasPrefix(Self.typePrefix) else { return }
         let type = TypeID(String(id.dropFirst(Self.typePrefix.count)))
-        let targets = request.typeTargets
+        let targets = request.targets
         guard library.typeChangePlan(targets, to: type).missing.isEmpty else {
             request.needsValues(type)
             close()
@@ -567,12 +602,22 @@ final class ValueEditModel {
     }
 
     private func activateTag(_ id: String) {
-        guard let item = request.item else { return }
+        guard !request.targets.isEmpty else { return }
         let tag = id == "create" ? ItemTag.normalized(query) : String(id.dropFirst("tag:".count))
-        if let refusal = library.addTag(tag, to: [item], undoManager: request.undoManager) {
+        if let refusal = library.addTag(tag, to: request.targets, undoManager: request.undoManager) {
             notice = refusal.message
         } else {
             notice = nil
+            query = ""
+            highlight = nil
+        }
+    }
+
+    /// Files every item the panel is for in the collection. The library tells the person which items it left alone.
+    private func activateCollection(_ id: String) {
+        guard id.hasPrefix(Self.collectionPrefix) else { return }
+        let collection = ItemID(String(id.dropFirst(Self.collectionPrefix.count)))
+        if library.addToCollection(request.targets, collection, undoManager: request.undoManager) {
             query = ""
             highlight = nil
         }
@@ -650,6 +695,10 @@ final class ValueEditModel {
         switch kind {
         case .tags:
             return heldTokens.map { ValueChip(id: "tag:" + $0, title: $0, mark: .tag) }
+        case .collections:
+            return heldCollections.map {
+                ValueChip(id: Self.collectionPrefix + $0.id.rawValue, title: $0.displayTitle, mark: .type(icon: library.catalogue.icon(for: $0.type)))
+            }
         case .words:
             return heldTokens.map { ValueChip(id: "word:" + $0, title: $0, mark: .tag) }
         case .people(_, let shape):
@@ -667,7 +716,7 @@ final class ValueEditModel {
             guard let current = parentTarget else { return [] }
             return [ValueChip(id: "parent:" + current.id, title: current.displayTitle)]
         case .type:
-            let types = Set(request.typeTargets.compactMap { library.item($0)?.type })
+            let types = Set(request.targets.compactMap { library.item($0)?.type })
             guard types.count == 1, let type = types.first else { return [] }
             return [ValueChip(id: Self.typePrefix + type.rawValue, title: library.catalogue.label(for: type), mark: .type(icon: library.catalogue.icon(for: type)), isRemovable: false)]
         case .date, .text, .number, .location:
@@ -682,6 +731,9 @@ final class ValueEditModel {
         switch kind {
         case .tags, .words: removeToken(chip.title)
         case .people: activate(chip.id)
+        case .collections:
+            guard chip.id.hasPrefix(Self.collectionPrefix) else { return }
+            library.removeFromCollection(request.targets, ItemID(String(chip.id.dropFirst(Self.collectionPrefix.count))), undoManager: request.undoManager)
         case .status, .choice: commit(nil)
         case .parent:
             guard !isSaving, let item = request.item else { return }
@@ -703,7 +755,7 @@ final class ValueEditModel {
         guard isEditable else { return }
         switch kind {
         case .tags:
-            if let item = request.item { library.removeTag(token, from: [item], undoManager: request.undoManager) }
+            if !request.targets.isEmpty { library.removeTag(token, from: request.targets, undoManager: request.undoManager) }
         case .words:
             commitWords(heldWords.filter { $0 != token })
         default:

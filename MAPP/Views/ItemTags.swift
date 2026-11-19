@@ -1,116 +1,13 @@
 import SwiftUI
 
-/// The items the Add Tag sheet tags, with the undo manager of the window it was asked for in, since the sheet has
-/// its own.
+/// The items the Add Tag panel tags, with the undo manager of the window it was asked for in.
 struct TagRequest: Identifiable {
     let id = UUID()
     let ids: Set<ItemID>
     let undoManager: UndoManager?
 }
 
-/// The field that takes a tag. It offers the tags already in the library as suggestions, and on Return gives the
-/// text to `onAdd`. Where the library refuses the text, the field says why and keeps what was typed.
-struct TagEntryField: View {
-    @CurrentLibrary private var library
-    @Binding var text: String
-    /// The tags the item or items already hold, which are not suggested again.
-    let held: [String]
-    let identifier: String
-    /// Why the last text was refused, which the caller clears when the text changes, and the field shows.
-    @Binding var refusal: ItemTag.Refusal?
-    let onAdd: (String) -> ItemTag.Refusal?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            field
-            if let refusal {
-                Text(refusal.message)
-                    .interfaceFont(.caption)
-                    .foregroundStyle(.red)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("\(identifier)Refusal")
-            }
-        }
-    }
-
-    private var field: some View {
-        TextField("Add Tag", text: $text, prompt: Text("Add Tag"))
-            .labelsHidden()
-            .textInputSuggestions {
-                ForEach(library.tagSuggestions(matching: text, excluding: held).prefix(8), id: \.self) { tag in
-                    Text(tag).textInputCompletion(tag)
-                }
-            }
-            .onSubmit(submit)
-            .onChange(of: text) { refusal = nil }
-            .textFieldStyle(.roundedBorder)
-            .accessibilityIdentifier(identifier)
-    }
-
-    private func submit() {
-        refusal = onAdd(text)
-        if refusal == nil { text = "" }
-    }
-}
-
-/// Adds tags to the items a window asked for.
-struct TagSheet: View {
-    @CurrentLibrary private var library
-    @Environment(\.dismiss) private var dismiss
-    let request: TagRequest
-    @State private var text = ""
-    @State private var refusal: ItemTag.Refusal?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Add Tag").interfaceFont(.title2.bold())
-            Text(subtitle).foregroundStyle(.secondary)
-            TagEntryField(text: $text, held: held, identifier: "TagSheetField", refusal: $refusal, onAdd: add)
-            HStack {
-                Spacer()
-                Button("Cancel", role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                    .mappButton(.secondary)
-                Button("Add") { refusal = add(text) }
-                    .keyboardShortcut(.defaultAction)
-                    .mappButton(.primary)
-                    .disabled(ItemTag.normalized(text).isEmpty)
-                    .accessibilityIdentifier("TagSheetAdd")
-            }
-        }
-        .padding(20)
-        .frame(width: 360)
-        // Items that are deleted elsewhere, or can no longer be changed, leave nothing to tag.
-        .onChange(of: canTag) { if !canTag { dismiss() } }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("TagSheet")
-    }
-
-    private var items: [Item] { request.ids.compactMap { library.item($0) }.filter(\.canEditTags) }
-
-    private var canTag: Bool { !items.isEmpty }
-
-    /// The tags every one of the items holds, which are not suggested again.
-    private var held: [String] {
-        items.dropFirst().reduce(items.first?.tags ?? []) { $0.intersection($1.tags) }.sorted()
-    }
-
-    private var subtitle: String {
-        if items.count == 1, let item = items.first {
-            String(localized: "Add a tag to “\(item.displayTitle)”.")
-        } else {
-            String(localized: "Add a tag to \(items.count) items.")
-        }
-    }
-
-    private func add(_ text: String) -> ItemTag.Refusal? {
-        let refusal = library.addTag(text, to: request.ids, undoManager: request.undoManager)
-        if refusal == nil { dismiss() }
-        return refusal
-    }
-}
-
-/// Opens the Add Tag sheet for the items, in the window whose presentation it is given.
+/// Asks for the Add Tag panel for the items, in the window whose presentation it is given.
 struct AddTagButton: View {
     @CurrentLibrary private var library
     let ids: Set<ItemID>

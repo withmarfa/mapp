@@ -948,8 +948,9 @@ export class ItemHeader {
     return entry
   }
 
-  /** Makes an editable row ask for its editor. The label always does, so a value that is itself a link keeps its click;
-   *  the value does too where it holds no link. The editor opens under the value either way. */
+  /** Makes a row's label ask for the field's menu, which the app opens under it, and an editable row's value ask for
+   *  its editor, which opens under the value. A value that is itself a link keeps its click, so for that row the menu
+   *  also offers the editor (`editsValue`). */
   private editor(
     entry: HTMLElement,
     term: HTMLElement,
@@ -957,10 +958,7 @@ export class ItemHeader {
     row: HeaderRow,
     model: HeaderModel,
   ) {
-    if (!row.editable) return
-    entry.classList.add('editable')
-    const open = () => this.openEditor(value, row.id)
-    const reach = (node: HTMLElement) => {
+    const reach = (node: HTMLElement, open: () => void) => {
       node.tabIndex = 0
       node.setAttribute('role', 'button')
       node.addEventListener('click', open)
@@ -970,10 +968,14 @@ export class ItemHeader {
         open()
       })
     }
-    reach(term)
+    const holdsLink = !!value.querySelector('a, button')
+    reach(term, () => this.openFieldMenu(term, row.id, !!row.editable && holdsLink))
     term.setAttribute('aria-label', row.label)
-    if (!value.querySelector('a, button')) {
-      reach(value)
+    term.setAttribute('aria-haspopup', 'menu')
+    if (!row.editable) return
+    entry.classList.add('editable')
+    if (!holdsLink) {
+      reach(value, () => this.openEditor(value, row.id))
       value.setAttribute('aria-label', `${row.label}: ${this.wholeValue(row, model)}`)
     }
   }
@@ -1103,6 +1105,20 @@ export class ItemHeader {
       .map((property) => property.id)
       .filter((id) => !kept.has(id))
     postToHost({ type: 'moveRow', item: this.model.item, row, order: [...shown, ...folded] })
+  }
+
+  /** Asks the app for the menu of a row's or a pin's field, under its label. */
+  private openFieldMenu(term: HTMLElement, row: string, editsValue: boolean) {
+    if (!this.model) return
+    const rect = term.getBoundingClientRect()
+    postToHost({
+      type: 'fieldMenu',
+      item: this.model.item,
+      row,
+      editsValue,
+      rect: [rect.left, rect.top, rect.width, rect.height],
+      viewportHeight: window.innerHeight,
+    })
   }
 
   /** Asks the app for the editor of a row's or a pin's value, with the value's frame as a menu's is. */

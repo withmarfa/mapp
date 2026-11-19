@@ -28,7 +28,7 @@ Agreed, not built:
 
 ## Selection and hover
 
-- A chosen row, card or table row is gray at 8% of the label color, and a row under the pointer is gray at 4.7%. Neither is ever blue. The list, the item table, the timeline, the index pages' tables, Settings' page list, Recently Deleted's list, Version History's list and the Add to Collection sheet's list take the 8%, and the sidebar's pending New View row does too; the list, both tables, the timeline and Recently Deleted's list take the 4.7% as well.
+- A chosen row, card or table row is gray at 8% of the label color, and a row under the pointer is gray at 4.7%. Neither is ever blue. The list, the item table, the timeline, the index pages' tables, Settings' page list, Recently Deleted's list, and Version History's list take the 8%, and the sidebar's pending New View row does too; the list, both tables, the timeline and Recently Deleted's list take the 4.7% as well.
 - `SoftSelection` draws both as layers beneath the table's row views, and the 4.7% follows the pointer from the table's own mouse events, so that mark runs no row's body. A row that is chosen, or that the table will not select, such as a heading, gets no hover mark.
 - A table cell that changes or adds a value keeps its own tint across the whole cell, which shows over the row's.
 - A chosen gallery card and a chosen board card keep a soft 3-point ring in that gray, touching the card, with no fill and no plate behind it.

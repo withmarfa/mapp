@@ -807,7 +807,7 @@ body[data-text='none'] #editor {
 }
 
 .item-prop:not(:only-child) > .item-prop-label:hover::before,
-.editable > .item-prop-label[role='button']:hover::before,
+.item-prop > .item-prop-label[role='button']:hover::before,
 .item-prop.dragged > .item-prop-label::before {
   background: var(--label-quinary);
 }
@@ -872,11 +872,17 @@ body[data-text='none'] #editor {
   min-width: 0;
 }
 
-/* A value the app edits in a panel under it: the label and, where it holds no link, the value both open it. The value
+/* A value the app edits in a panel under it, which the value opens where it holds no link; the label opens the field's menu. The value
    darkens under the pointer so it reads as something to click, and the same fill marks it for the keyboard, with no ring
    round it: the app's panel holds the focus while it is open. */
+.item-prop-label[role='button'],
+.item-pin-key[role='button'],
 .editable > [role='button'] {
   border-radius: 6px;
+}
+
+.item-pin-key[role='button']:hover {
+  background: var(--label-quinary);
 }
 
 /* The fill runs past the value on both sides, and the value stays on the column's edge. */
@@ -891,6 +897,7 @@ body[data-text='none'] #editor {
   background: var(--label-quinary);
 }
 
+.item-pin-key[role='button']:focus-visible,
 .editable > [role='button']:focus-visible {
   outline: none;
   background: var(--label-quinary);

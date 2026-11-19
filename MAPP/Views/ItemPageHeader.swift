@@ -150,34 +150,10 @@ struct ItemPageHeader: ViewModifier {
                 }
                 editor.presentEditor(Self.request(.parent, of: id, in: library, undoManager: undoManager, editor: editor), under: rect)
             case .edit(let row, let id, let rect):
-                guard editor.isShowing(id), let item = library.item(id) else { return }
-                let kind: ValueEditKind?
-                switch row {
-                case PagePlacement.tags:
-                    kind = item.canEditTags ? .tags : nil
-                case PagePlacement.parent:
-                    kind = item.isEditable ? .parent : nil
-                case PagePlacement.type:
-                    kind = library.offersTypeChange(for: [id]) ? .type : nil
-                case ItemLocation.rowID:
-                    // A Location with no point and no way to set one has nothing to open.
-                    let location = ItemLocation.of(library.catalogue.itemTypes[item.type])
-                    kind = location.flatMap { item.isEditable || $0.hasPoint(item) ? ValueEditKind.location($0) : nil }
-                default:
-                    let field = library.catalogue.itemTypes[item.type]?.fields.first { $0.key == row }
-                    // A yes or no is a toggle, not a panel.
-                    if let field, field.kind == .boolean, item.isEditable {
-                        library.setItemProperty(id, key: row, value: .bool(!InspectorFields.isYes(item.value(of: row))), undoManager: undoManager)
-                        return
-                    }
-                    kind = field.flatMap(ValueEditKind.init(field:))
-                }
-                guard let kind else { return }
-                var request = Self.request(kind, of: id, in: library, undoManager: undoManager, editor: editor)
-                request.needsValues = { [weak drafts] type in
-                    drafts?.typeValues = TypeValuesRequest(ids: [id], type: type, undoManager: undoManager)
-                }
-                editor.presentEditor(request, under: rect)
+                Self.openValue(of: row, in: id, under: rect, library: library, drafts: drafts, undoManager: undoManager, editor: editor)
+            case .fieldMenu(let row, let editsValue, let id, let rect):
+                Self.openFieldMenu(
+                    row: row, editsValue: editsValue, of: id, under: rect, library: library, drafts: drafts, undoManager: undoManager, editor: editor)
             case .toggleLayout:
                 drafts.toggleLayout()
             case .showLinked:
@@ -199,6 +175,86 @@ struct ItemPageHeader: ViewModifier {
                 }
             }
         }
+    }
+
+    /// Opens the panel for one of the item's values under `rect`, or toggles a yes or no, which has no panel.
+    private static func openValue(
+        of row: String, in id: ItemID, under rect: CGRect, library: any ItemLibrary, drafts: DetailsPresentation,
+        undoManager: UndoManager?, editor: EditorController
+    ) {
+        guard editor.isShowing(id), let item = library.item(id) else { return }
+        let kind: ValueEditKind?
+        switch row {
+        case PagePlacement.tags:
+            kind = item.canEditTags ? .tags : nil
+        case PagePlacement.parent:
+            kind = item.isEditable ? .parent : nil
+        case PagePlacement.type:
+            kind = library.offersTypeChange(for: [id]) ? .type : nil
+        case MarfaMapping.collectionEdge:
+            kind = library.canJoinCollection(item) ? .collections : nil
+        case ItemLocation.rowID:
+            // A Location with no point and no way to set one has nothing to open.
+            let location = ItemLocation.of(library.catalogue.itemTypes[item.type])
+            kind = location.flatMap { item.isEditable || $0.hasPoint(item) ? ValueEditKind.location($0) : nil }
+        default:
+            let field = library.catalogue.itemTypes[item.type]?.fields.first { $0.key == row }
+            // A yes or no is a toggle, not a panel.
+            if let field, field.kind == .boolean, item.isEditable {
+                library.setItemProperty(id, key: row, value: .bool(!InspectorFields.isYes(item.value(of: row))), undoManager: undoManager)
+                return
+            }
+            kind = field.flatMap(ValueEditKind.init(field:))
+        }
+        guard let kind else { return }
+        var request = Self.request(kind, of: id, in: library, undoManager: undoManager, editor: editor)
+        request.needsValues = { [weak drafts] type in
+            drafts?.typeValues = TypeValuesRequest(ids: [id], type: type, undoManager: undoManager)
+        }
+        editor.presentEditor(request, under: rect)
+    }
+
+    /// Opens the menu a field's name asks for, under the name, and carries out what the person chooses. The Mac's own
+    /// placement is stored at once; a change to the type goes through the library, which refuses it in words.
+    private static func openFieldMenu(
+        row: String, editsValue: Bool, of id: ItemID, under rect: CGRect, library: any ItemLibrary, drafts: DetailsPresentation,
+        undoManager: UndoManager?, editor: EditorController
+    ) {
+        guard editor.isShowing(id), let item = library.item(id) else { return }
+        let catalogue = library.catalogue
+        let type = catalogue.itemTypes[item.type]
+        let rows = PageLayout.rows(
+            of: item, type: type, hidden: library.hiddenPropertyKeys(of: item), relationships: library.relationships(for: item.id),
+            catalogue: catalogue, showsCoordinates: ShowsCoordinates.stored())
+        let layout = PageLayout(rows: rows, placement: PagePlacements.stored().placement(of: item.type, in: catalogue))
+        let menu = FieldMenu(
+            row: row, type: type, layout: layout, catalogue: catalogue, editsValue: editsValue, reachesServer: library.reachesServer)
+        guard !menu.sections.isEmpty || menu.lockText != nil else { return }
+        let (popup, keeping) = FieldMenuPresenter.build(menu, typeLabel: type?.label ?? "") { [weak editor] command in
+            guard let editor, editor.isShowing(id) else { return }
+            switch command {
+            case .editValue:
+                openValue(of: row, in: id, under: rect, library: library, drafts: drafts, undoManager: undoManager, editor: editor)
+            case .rename, .editChoices:
+                guard let type else { return }
+                drafts.fieldEdit = FieldEditRequest(kind: command == .rename ? .rename : .choices, type: type, key: row)
+            case .remove:
+                guard let type, let plan = try? type.plan(.remove(key: row), in: catalogue) else { return }
+                FieldRemoval.confirm(plan, typeLabel: type.label, on: NSApp.keyWindow) {
+                    Task {
+                        if let failure = await library.editField(plan) {
+                            library.notices.tell(String(localized: "Couldn’t Remove the Field"), failure.message)
+                        }
+                    }
+                }
+            case .pin, .unpin, .moveUp, .moveDown, .hide:
+                PagePlacements.update { placements in
+                    let layout = PageLayout(rows: rows, placement: placements.placement(of: item.type, in: catalogue))
+                    if let moved = layout.after(command, row: row) { placements.apply(moved, of: item.type, in: catalogue) }
+                }
+            }
+        }
+        editor.popUp(popup, under: rect, keeping: keeping)
     }
 
     /// The editor for one of the item's values, which writes as the property row in the inspector does: through the

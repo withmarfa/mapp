@@ -59,6 +59,16 @@ export type EditorMessage =
       rect: [number, number, number, number]
       viewportHeight: number
     }
+  /** A row's or a pin's label was pressed: the app opens the field's menu under it. `editsValue` is set where the value
+   *  holds a link of its own, so the menu is the only way to its editor. */
+  | {
+      type: 'fieldMenu'
+      item: string
+      row: string
+      editsValue: boolean
+      rect: [number, number, number, number]
+      viewportHeight: number
+    }
   /** The value an editor was asked for has moved on the page, to this frame. */
   | {
       type: 'valueMoved'

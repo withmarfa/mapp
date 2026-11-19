@@ -223,6 +223,9 @@ enum PageHeaderEvent {
     case menu(PageHeaderMenu, ItemID, CGRect)
     /// A row's or a pin's value asks for its editor under it, in the editor's container: the row's identifier.
     case edit(row: String, ItemID, CGRect)
+    /// A row's or a pin's label was pressed, for its field menu under the label in the editor's container: the row's
+    /// identifier, and whether the value's own editor is reachable only from the menu.
+    case fieldMenu(row: String, editsValue: Bool, ItemID, CGRect)
     /// Hide from Page was chosen in the menu over a row of the property block, or Linked From: the row's
     /// identifier (`PagePlacement`) and the item the header was showing.
     case hideFromPage(row: String, ItemID)

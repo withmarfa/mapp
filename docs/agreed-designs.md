@@ -72,10 +72,12 @@ Customizing the sidebar in place is built (see [Views and lists](views-and-lists
 
 ## Editing in place
 
-- Add Tag and Add to Collection use the value panel under the value, as every other value does, not a sheet.
-- A status's value panel ends with Edit Statuses, which opens the type in Settings > Types.
-- A field's name on the page opens its menu: Rename Field, Edit Choices, Pin Under the Title, Move Up, Move Down, Hide on the type's pages, Edit the type in Settings, and Remove Field.
-- A person edits only what Marfa allows: the words and fields a type adds itself. Inherited ones show a lock and the type they come from. A core type can't be changed, so a person adds words on a type of their own.
+What is not built yet. The built part is in [Value components](value-components.md) and [Item page](item-page.md).
+
+- A status's value panel ends with Edit Statuses, which opens the type in Settings > Types. Settings > Types does not exist yet.
+- A field's menu has Edit the type in Settings, which opens the same page, and waits for it too.
+- Renaming a choice word is left out. A rename that carried the values to the new word is not in Marfa's contract, so the items that hold the old word would keep a word the type no longer lists. Choices can be added, reordered and taken out; a taken-out choice stays on the items that hold it.
+- An empty In Collection row for an item in no collection. Add to Collection from the menu, the toolbar and the palette reaches it, and the page's own row appears once the item is in one.
 
 ## Pages
 
