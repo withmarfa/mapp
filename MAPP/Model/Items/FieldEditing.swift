@@ -89,8 +89,7 @@ nonisolated enum FieldEditRefusal: Error, Hashable, Sendable {
 }
 
 /// One change to one field, checked against the type as the page shows it. `shown` is the field as it stood then,
-/// which the server's own definition must still match when the change is sent: a type another app changed in the
-/// meantime is never overwritten.
+/// which the server's own definition must still match when the change is sent.
 nonisolated struct FieldEditPlan: Hashable, Sendable {
     let type: TypeID
     let edit: FieldEdit

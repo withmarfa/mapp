@@ -101,12 +101,11 @@ Change Type is a panel like status (`CommandValuePanels`), opened from the page'
 A field's name on the page opens its menu (`FieldMenu`, drawn by `FieldMenuPresenter`): Rename Field, Edit Choices, Pin Under the Title, Move Up, Move Down, Hide on the Type's Pages and Remove Field, with Edit Value first where only the menu reaches the value, as for a link. The web header sends the row and the name's rectangle, and the app opens the menu under it.
 
 - **Mac's own.** Pin, Move Up, Move Down and Hide are the item type's placement on this Mac (`PagePlacements`). They write nothing to Marfa, and a lock does not stop them.
-- **Marfa's.** Rename Field, Edit Choices and Remove Field change the type for every item in every app (`FieldEditing`, `TypeDefinitionEdit`). They need the server and are never queued. A type changed by another app since the page read it is not overwritten: MAPP reads the type again, and refuses the change if the field no longer matches what the page showed.
+- **Marfa's.** Rename Field, Edit Choices and Remove Field change the type for every item in every app (`FieldEditing`, `TypeDefinitionEdit`). They need the server and are never queued. MAPP reads the type again just before it sends the change, and refuses it if the field no longer matches what the page showed. The server takes no version with a change, so another app's change that lands between that read and the write is overwritten.
 - **What a person may change.** A field the type declares itself. An inherited field shows a lock and the type it comes from, and a type Marfa provides (`core`, `system`, `marfa`) is locked whole. The title, text and source-link fields can be renamed but not removed.
 - **Rename** changes the field's label only, to a name no other field has, of 100 characters at most. A key is never renamed, because Marfa carries no values to a new name.
 - **Edit Choices** adds, orders and takes out choices. Items that hold a choice taken out keep it. The last choice can't be taken out.
-- **Remove Field** asks first (an alert) and says the items keep their values, which an app can still read, but the type can't be given a field with this name again.
-
+- **Remove Field** asks first (an alert) and says the items keep their values, which an app can still read.
 
 ## Spacing
 
