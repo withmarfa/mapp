@@ -133,13 +133,12 @@ private nonisolated struct GalleryShape: InsettableShape {
 
 /// A favorite's heart on the picture's corner, the one mark a card puts on its picture.
 private struct FavoriteBadge: View {
-    @Environment(\.colorScheme) private var scheme
     let unit: CGFloat
 
     var body: some View {
         Image(systemName: "heart.fill")
             .font(.system(size: 10 * unit))
-            .foregroundStyle(FavoriteMark.color(for: scheme))
+            .foregroundStyle(.secondary)
             .padding(5 * unit)
             .background(.regularMaterial, in: .circle)
             .accessibilityHidden(true)
