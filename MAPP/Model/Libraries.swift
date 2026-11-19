@@ -202,7 +202,7 @@ import os
             }
             guard SampleLibrary.isRequested, !SampleLibrary.startsUnconfigured else {
                 // The unit tests, previews and `-MAPPSampleUnconfigured` start with no server, as a first launch does.
-                let host = MarfaHost(defaults: defaults, signIns: MemorySignIns(), location: location(root: root))
+                let host = MarfaHost(defaults: defaults, signIns: ScriptedSignIns(), location: location(root: root))
                 return Libraries(host: host, defaults: defaults)
             }
             // A debug build can be pointed at a test server by hand, in place of the sample. The key stays in memory
@@ -211,13 +211,13 @@ import os
             if let address = environment["MAPP_TEST_MARFA_URL"], let connection = try? MarfaConnection(address: address),
                 let key = environment["MAPP_TEST_MARFA_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty
             {
-                let host = MarfaHost(defaults: defaults, signIns: MemorySignIns([connection.address: key]), location: location(root: root))
+                let host = MarfaHost(defaults: defaults, signIns: ScriptedSignIns([connection.address: key]), location: location(root: root))
                 host.presetTestServer(connection)
                 return Libraries(host: host, defaults: defaults)
             }
             let sample = SampleLibrary.connection
             let host = MarfaHost(
-                defaults: defaults, signIns: MemorySignIns([sample.address: "sample"]), location: location(root: root),
+                defaults: defaults, signIns: ScriptedSignIns([sample.address: "sample"]), location: location(root: root),
                 opener: { connection, _, _ in SampleLibrary.open(connection) },
                 describer: { _ in SampleLibrary.name },
                 historian: { _, _ in nil }, configurer: { _, _ in nil })

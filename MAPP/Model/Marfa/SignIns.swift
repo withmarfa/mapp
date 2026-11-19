@@ -6,7 +6,8 @@ import os
 
 /// The sign-ins the app keeps, one for each server, and the steps that make and end one. The package's
 /// `Authorization` is the only implementation that ships (`SystemSignIns`); tests and the sample use
-/// `MemorySignIns`, since the package offers no stand-in for its sign-in or its Keychain.
+/// `ScriptedSignIns`, which keeps the sign-in in the package's `MemoryKeychain` and scripts only the browser and
+/// code answers, which the package has no stand-in for.
 nonisolated protocol SignIns: Sendable {
     /// The server to make calls to with the sign-in kept for `connection`: nil where none is kept or it has ended,
     /// and a throw where one is kept and cannot be read, which is neither of those.

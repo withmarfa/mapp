@@ -18,7 +18,7 @@ enum ItemPreviewFixtures {
         defaults.removePersistentDomain(forName: name)
         return Libraries(
             host: MarfaHost(
-                defaults: defaults, signIns: MemorySignIns(),
+                defaults: defaults, signIns: ScriptedSignIns(),
                 location: MarfaStoreLocation(root: URL.temporaryDirectory.appending(path: name))),
             defaults: defaults)
     }
