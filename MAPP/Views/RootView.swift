@@ -25,8 +25,6 @@ struct RootView: View {
                 workspace
             }
         }
-        // Settings reads the library too, so it is given to both.
-        .environment(\.library, libraries.current)
         .focusedSceneValue(\.browser, browser)
         .registersMainWindow(browser, with: settingsRequest)
         // The table, gallery and board draw each type's chosen look, which the browser holds for them to read, seeded in `init`.
@@ -51,6 +49,10 @@ struct RootView: View {
         case .marfa:
             if let library = libraries.current {
                 MainView(browser: browser)
+                    // The library is given to the branch that shows it, as the item window does, and not to the whole
+                    // window: a view built for it keeps it until SwiftUI removes the view, and the window never has a
+                    // main view with none. Settings, shown inside the main view, reads it from here.
+                    .environment(\.library, library)
                     // A different library is a different set of items, and the window starts afresh with it.
                     .id(ObjectIdentifier(library))
             }

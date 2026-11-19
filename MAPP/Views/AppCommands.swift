@@ -129,18 +129,20 @@ struct AppCommands: Commands {
             .disabled(details == nil || (browser?.showsSidebarIndex != true && focused?.ids.count != 1))
             Divider()
             // The toolbar's View Options and its filters, for the view in front.
-            Group {
-                if library != nil, let browser {
-                    // A table, board or timeline with an item page open has no view options to offer.
-                    if browser.offersViewOptions, !browser.showsSidebarIndex {
+            if let library, let browser {
+                // A table, board or timeline with an item page open has no view options to offer.
+                if browser.offersViewOptions, !browser.showsSidebarIndex {
+                    // The library is given inside the branch that shows it, so the menu's views never read it while it is
+                    // gone: SwiftUI can update a view of a branch it is about to drop, which then still has its old one.
+                    Group {
                         FilterCommands(browser: browser)
                         CurrentViewOptions(browser: browser, bindsKeys: true)
                     }
-                } else {
-                    CurrentViewOptions(browser: nil)
+                    .environment(\.library, library)
                 }
+            } else {
+                CurrentViewOptions(browser: nil)
             }
-            .environment(\.library, library)
             Divider()
             PageWidthOptions()
             Divider()
