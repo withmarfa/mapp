@@ -29,7 +29,7 @@ struct CommandPaletteTests {
         let page = try await EditorTests.Page()
         let note = page.library.add("Body")
         let browser = Browser()
-        browser.show(.allItems, in: page.library, order: ItemOrder())
+        browser.show(.recents, in: page.library, order: ItemOrder())
         browser.selection = [note.id]
         browser.palette = .commands
 
