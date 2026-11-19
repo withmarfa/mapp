@@ -245,7 +245,8 @@ struct MainView: View {
             ZStack {
                 if browser.isModalPresented {
                     ItemModal(browser: browser, editor: editor, details: details)
-                        .transition(.opacity)
+                        // Gone at once on close: a fading card would still host the editor the page beside the list takes.
+                        .transition(.asymmetric(insertion: .opacity, removal: .identity))
                 }
             }
             .animation(.easeOut(duration: 0.15), value: browser.isModalPresented)
@@ -407,10 +408,7 @@ struct MainView: View {
     private func grantFocusRequest() {
         switch browser.focusRequest {
         case .search:
-            if browser.usesCollection { browser.isCollectionItemPresented = false }
-            browser.closeModal(returningFocus: false)
-            browser.isSearchExpanded = true
-            browser.searchFocusRequests += 1
+            browser.showSearchField()
         case .sidebar, .list:
             editor.releaseFocus()
             // Asked for as the place changes, the list that takes the keyboard is not yet in the window.

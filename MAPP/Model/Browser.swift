@@ -625,11 +625,21 @@ final class Browser {
         selection = ids
     }
 
+    /// Whether the selection follows the items the window's layout holds as they change: a layout that spans the window
+    /// has no list to do it, and nor has a full page opened from the list, which takes the list's place.
+    var followsCollection: Bool { usesCollection || isCollectionItemPresented }
+
+    /// Keeps the selection true as the items the window holds change (`collectionItemIDs`), while it follows them.
+    func collectionItemsChanged(from old: [ItemID], to new: [ItemID]) {
+        guard followsCollection else { return }
+        keepSelection(from: old, to: new)
+    }
+
     /// The items the layout that spans the window holds, which its selection follows as they change (`keepSelection`):
     /// the table's in the order it shows them, then those its filters hide, and the gallery's, the board's and the
-    /// timeline's in the list's order. The table's come from its own content, so a move between its places sorts no list.
+    /// timeline's in the list's order, which is also the order of a full page opened from the list. The table's come from its own content, so a move between its places sorts no list.
     func collectionItemIDs(in library: any ItemLibrary, order: ItemOrder) -> [ItemID] {
-        guard usesCollection else { return [] }
+        guard followsCollection else { return [] }
         guard viewMode == .table else {
             let shown = sections(in: library, order: order, now: library.now()).flatMap { $0.items.map(\.id) }
             guard tableOptions[item]?.isFiltering == true else { return shown }

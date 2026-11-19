@@ -42,6 +42,15 @@ extension Browser {
         focusRequest = nil
     }
 
+    /// Brings the list's search out as a field, which takes the keyboard. An open item, full page or modal, gives way to
+    /// it in every layout, since the search belongs to the list.
+    func showSearchField() {
+        isCollectionItemPresented = false
+        closeModal(returningFocus: false)
+        isSearchExpanded = true
+        searchFocusRequests += 1
+    }
+
     /// Puts the modal away, and gives the keyboard back to the layout behind it unless something else is taking it.
     func closeModal(returningFocus: Bool = true) {
         guard modalItem != nil else { return }
@@ -68,12 +77,13 @@ extension Browser {
         return ListNeighbors(of: id, in: orderBehind(in: library, order: order))
     }
 
-    /// Moves the modal to the item before or after it, and the selection with it. Nothing happens at either end.
+    /// Moves the modal to the item before or after it, and the selection with it, which adds no step to Back: stepping
+    /// through a list is not a trail to walk back. Nothing happens at either end.
     func moveModal(_ step: ModalStep, in library: any ItemLibrary, order: ItemOrder) {
         let neighbors = modalNeighbors(in: library, order: order)
         guard let target = step == .previous ? neighbors.previous : neighbors.next else { return }
         // First, so the selection that follows is the modal's item and does not end it.
         modalItem = target
-        selection = [target]
+        selectAutomatically([target])
     }
 }

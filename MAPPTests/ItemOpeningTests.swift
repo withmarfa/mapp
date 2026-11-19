@@ -142,6 +142,52 @@ struct ItemOpeningTests {
         #expect(neighbors.previous == nil && neighbors.next == nil)
     }
 
+    @Test func steppingThroughTheListBehindTheModalAddsNoStepToBack() {
+        let (browser, library, _) = browser()
+        let order = browser.orderBehind(in: library, order: ItemOrder())
+        browser.selection = [order[0]]
+        browser.open([order[1]], as: .modal)
+        #expect(browser.history.entries.map(\.id) == [order[0], order[1]], "opening adds one step")
+        browser.moveModal(.next, in: library, order: ItemOrder())
+        browser.moveModal(.previous, in: library, order: ItemOrder())
+        browser.moveModal(.previous, in: library, order: ItemOrder())
+        #expect(browser.selection == [order[0]] && browser.modalItem == order[0])
+        #expect(browser.history.entries.map(\.id) == [order[0], order[1]])
+    }
+
+    // MARK: Search and the selection under a full page
+
+    @Test(arguments: ItemViewMode.allCases)
+    func searchPutsAFullPageAndTheModalAwayInEveryLayout(_ mode: ItemViewMode) {
+        for way in [ItemOpening.fullPage, .modal] {
+            let (browser, _, ids) = browser(mode)
+            browser.open([ids[0]], as: way)
+            browser.showSearchField()
+            #expect(!browser.isCollectionItemPresented && !browser.isModalPresented)
+            #expect(browser.isSearchExpanded && browser.searchFocusRequests == 1)
+        }
+    }
+
+    @Test func theSelectionFollowsTheListWhenItsFullPageIsOpenFromTheList() {
+        let (browser, library, _) = browser()
+        let order = browser.orderBehind(in: library, order: ItemOrder())
+        browser.open([order[1]], as: .fullPage)
+        let before = browser.collectionItemIDs(in: library, order: ItemOrder())
+        #expect(before == order)
+        library.items.removeAll { $0.id == order[1] }
+        browser.collectionItemsChanged(from: before, to: browser.collectionItemIDs(in: library, order: ItemOrder()))
+        #expect(browser.selection == [order[2]], "the next item in the list's own order")
+    }
+
+    @Test func theListKeepsItsOwnSelectionWhenNoFullPageIsOpen() {
+        let (browser, library, _) = browser()
+        let order = browser.orderBehind(in: library, order: ItemOrder())
+        browser.selection = [order[1]]
+        library.items.removeAll { $0.id == order[1] }
+        browser.collectionItemsChanged(from: order, to: [])
+        #expect(browser.selection == [order[1]])
+    }
+
     // MARK: The row menu
 
     @Test func theRowMenuHasOneOrderWhereverItIsOpened() {

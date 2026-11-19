@@ -15,6 +15,16 @@ struct ItemModal: View {
     private static let toolbarHeight: CGFloat = 52
     private static let sidebarWidth: CGFloat = 300
     private static let corner: CGFloat = 22
+    /// The page's width, which the right sidebar adds to rather than takes from, as far as the window leaves room.
+    private static let pageWidth: CGFloat = 1000
+    private static let sideMargin: CGFloat = 110
+    private static let verticalMargin: CGFloat = 60
+
+    private func cardWidth(in window: CGFloat) -> CGFloat {
+        let wanted = Self.pageWidth + (details.isPresented ? Self.sidebarWidth : 0)
+        // Where the window is too narrow for the page, the card keeps a margin of its own.
+        return max(0, min(wanted, window - 2 * Self.sideMargin))
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -26,9 +36,8 @@ struct ItemModal: View {
                     .onTapGesture { browser.closeModal() }
                     .accessibilityHidden(true)
                 card
-                    .padding(.horizontal, min(110, proxy.size.width * 0.08))
-                    .padding(.top, 44)
-                    .padding(.bottom, 36)
+                    .frame(width: cardWidth(in: proxy.size.width))
+                    .padding(.vertical, Self.verticalMargin)
             }
         }
         .accessibilityElement(children: .contain)
@@ -104,10 +113,16 @@ struct ItemModal: View {
                     tools.shareLink
                     tools.moreMenu
                 }
-                capsule {
-                    Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
-                        .help(details.isPresented ? "Hide Details" : "Show Details")
-                        .accessibilityIdentifier("DetailsToggle")
+                // Done stands in for Details while Customize Layout has the right sidebar, as in the window.
+                if details.isCustomizingLayout {
+                    LayoutDoneButton(details: details, editor: editor)
+                } else {
+                    capsule(isOn: details.isPresented) {
+                        Button("Details", systemImage: "sidebar.right") { details.isPresented.toggle() }
+                            .symbolVariant(details.isPresented ? .fill : .none)
+                            .help(details.isPresented ? "Hide Details" : "Show Details")
+                            .accessibilityIdentifier("DetailsToggle")
+                    }
                 }
                 capsule {
                     Button("Close", systemImage: "xmark") { browser.closeModal() }
@@ -120,13 +135,15 @@ struct ItemModal: View {
         }
     }
 
-    private func capsule<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+    /// A capsule of glass holding buttons, filled with the accent color while the one it holds is on.
+    private func capsule<Content: View>(isOn: Bool = false, @ViewBuilder _ content: () -> Content) -> some View {
         HStack(spacing: 2) { content() }
             .buttonStyle(.borderless)
             .labelStyle(.iconOnly)
+            .foregroundStyle(isOn ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
             .padding(.horizontal, 6)
             .frame(height: 32)
-            .glassEffect(.regular, in: .capsule)
+            .glassEffect(isOn ? .regular.tint(.accentColor) : .regular, in: .capsule)
     }
 
     /// Closes the modal and opens the item in a window of its own, once what was typed is saved.
