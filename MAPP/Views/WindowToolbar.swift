@@ -185,6 +185,7 @@ private struct FormatToggle: View {
 enum WindowToolbarLayout {
     static let list = "main"
     static let index = "index"
+    static let items = "items"
 
     static func collection(_ mode: ItemViewMode) -> String { "collection.\(mode)" }
 }
@@ -236,6 +237,7 @@ struct ScrolledItemTitle: View {
 /// column. It contributes nothing while the inspector is closed, because the system keeps a closed inspector's toolbar
 /// and would show a second Details beside the page's.
 struct InspectorToolbar: CustomizableToolbarContent {
+    @CurrentLibrary private var library
     let details: DetailsPresentation
     let editor: EditorController?
     var browser: Browser?
@@ -245,6 +247,22 @@ struct InspectorToolbar: CustomizableToolbarContent {
             if let browser, details.isEditingView, let panel = browser.viewPanel {
                 ViewPanelToolbar(browser: browser, panel: panel, editor: editor)
             } else {
+                // The Items index shows the chosen item in this sidebar, so what acts on it sits above it, as Open comes first.
+                if let browser, browser.showsItemsIndex {
+                    let items = browser.selectedItems(in: library)
+                    let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: nil, details: details)
+                    ToolbarItem(id: "inspectorOpen") {
+                        Button("Open") { browser.openSelection() }
+                            .disabled(browser.selection.count != 1)
+                            .help("Open")
+                            .accessibilityIdentifier("OpenItemToolbar")
+                    }
+                    .customizationBehavior(.disabled)
+                    ToolbarItem(id: "inspectorShare") { tools.shareLink.disabled(items.isEmpty) }
+                        .customizationBehavior(.disabled)
+                    ToolbarItem(id: "inspectorMore") { tools.moreMenu.disabled(items.isEmpty) }
+                        .customizationBehavior(.disabled)
+                }
                 ToolbarItem(id: "inspectorDetails") {
                     DetailsToggle(details: details, editor: editor)
                 }

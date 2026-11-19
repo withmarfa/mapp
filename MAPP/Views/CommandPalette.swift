@@ -563,7 +563,8 @@ struct CommandPalette: View {
                     browser.setStacksSubtypes(!isOn, in: library)
                 }
             }
-            let ordersList = browser.viewMode == .list || browser.viewMode == .gallery
+            // An index orders by its own columns (`ViewOptionCommand.indexCommands`), not by the list's sort.
+            let ordersList = !browser.showsSidebarIndex && (browser.viewMode == .list || browser.viewMode == .gallery)
             if ordersList && browser.isSearching && !browser.ordersByRelevance {
                 add(String(localized: "Sort by Relevance"), "arrow.up.arrow.down", in: .sortAndGroup) { browser.orderSearch(byRelevance: true) }
             }
@@ -756,7 +757,7 @@ struct CommandPalette: View {
     private var places: [Entry] {
         browser.paletteIndex(in: library).places.map { place in
             Entry(id: "place:\(place.item)", title: place.title ?? library.name(of: place.item), detail: String(localized: "Show"), icon: place.icon) {
-                browser.choose(place.item, in: library, order: order)
+                browser.show(place.item, in: library, order: order)
                 browser.focusRequest = .list
             }
         }

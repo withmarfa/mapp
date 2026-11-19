@@ -59,6 +59,9 @@ final class IndexRowsModel {
             IndexRows.collections(
                 library.collections, membersOf: { library.items(in: .collection($0.id)) }, catalogue: library.catalogue,
                 directory: library.sources)
+        case .items:
+            // Items are rows of their own kind, which `ItemIndexModel` keeps.
+            []
         }
     }
 }

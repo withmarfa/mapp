@@ -60,7 +60,7 @@ private extension IndexColumn {
     func plainTitle(in place: IndexPlace) -> String {
         switch self {
         case .name: place == .sources ? String(localized: "Source") : String(localized: "Name")
-        case .types: String(localized: "Writes")
+        case .types: place == .items ? String(localized: "Type") : String(localized: "Writes")
         case .source: String(localized: "Source")
         case .count: String(localized: "Items")
         case .latest: place == .sources ? String(localized: "Latest") : String(localized: "Updated")

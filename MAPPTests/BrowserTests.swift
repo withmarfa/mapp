@@ -9,6 +9,7 @@ struct BrowserTests {
         let (library, _, newer, _) = makeFakeLibrary()
         let browser = Browser()
         browser.adopt(library)
+        browser.sidebarItem = .recents
         browser.selection = [newer.id]
         browser.viewMode = mode
         browser.open(browser.selection, as: .fullPage)
@@ -80,6 +81,7 @@ struct BrowserTests {
         let (library, older, _, _) = makeFakeLibrary()
         let item = try #require(library.item(older.id))
         let browser = Browser()
+        browser.sidebarItem = .recents
         browser.focusRequest = .page
         browser.reveal(item, in: library, order: ItemOrder())
         #expect(browser.selection == [item.id])
@@ -228,12 +230,12 @@ struct BrowserTests {
     // MARK: Showing and making
 
     @Test func showingAnItemClearsTheSearchAndSelectsItsTopRow() {
-        let (library, _, newer, favorite) = makeFakeLibrary()
+        let (library, _, newer, _) = makeFakeLibrary()
         let browser = Browser()
         browser.searchText = "Older"
         browser.show(.allItems, in: library, order: ItemOrder())
         #expect(browser.searchText.isEmpty)
-        #expect(browser.selection == [favorite.id])
+        #expect(browser.selection.isEmpty, "Items is an index, which chooses nothing until the person does")
         browser.show(.inbox, in: library, order: ItemOrder())
         #expect(browser.selection == [newer.id])
     }
@@ -322,12 +324,12 @@ struct BrowserTests {
     }
 
     @Test func aRestoredWindowDropsWhatNoLongerExists() {
-        let (library, _, _, favorite) = makeFakeLibrary()
+        let (library, _, _, _) = makeFakeLibrary()
         let snapshot = Browser.Snapshot(place: .collection(.mint()), selection: [.mint()])
         let browser = Browser()
         browser.restore(snapshot, in: library, order: ItemOrder())
         #expect(browser.item == .allItems)
-        #expect(browser.selection == [favorite.id])
+        #expect(browser.selection.isEmpty, "Items is an index, which chooses nothing until the person does")
     }
 
     @Test func snapshotsSurviveEncodingAsIdentifiers() throws {
@@ -346,11 +348,11 @@ struct BrowserTests {
         nil,
     ])
     func aWindowKeptByPathBeforeIdentifiersOrNotAtAllOpensAtItsDefault(saved: Data?) {
-        let (library, _, _, favorite) = makeFakeLibrary()
+        let (library, _, _, _) = makeFakeLibrary()
         let browser = Browser()
         browser.restore(from: saved, in: library, order: ItemOrder())
         #expect(browser.item == .allItems)
-        #expect(browser.selection == [favorite.id])
+        #expect(browser.selection.isEmpty, "Items is an index, which chooses nothing until the person does")
     }
 
     @Test func aDraggedItemCarriesOnlyItsIdentifierAsAString() throws {

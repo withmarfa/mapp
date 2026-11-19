@@ -111,6 +111,9 @@ struct SidebarIndex: View {
             return String(localized: "\(rows.count) sources") + ", " + String(localized: "\(items) items")
         case .collections:
             return String(localized: "\(rows.count) collections")
+        case .items:
+            // Items has a page of its own (`ItemsIndex`).
+            return ""
         }
     }
 }
@@ -171,6 +174,8 @@ private struct IndexContent: View {
             } else {
                 EmptyState("No Collections", detail: "Collections you make appear here.")
             }
+        case .items:
+            EmptyView()
         }
     }
 }
