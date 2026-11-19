@@ -218,7 +218,7 @@ struct MakingAnItemTests {
 
     private static let otherPlaces: [SidebarItem] = [
         .inbox, .favorites, .recents, .allItems, .files, .collections, .sources, .source("x"), .view(ItemID("v")),
-        .collection(ItemID("c")), .favoriteItem(ItemID("f")), .recentlyDeleted,
+        .collection(ItemID("c")), .favoriteItem(ItemID("f")),
     ]
 
     @Test func everyOtherEmptyPlaceHasNoButton() {
