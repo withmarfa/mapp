@@ -6,6 +6,10 @@ nonisolated enum PageCornerButton: Hashable, Sendable {
     case formats
     /// Reader or Original, one segmented control.
     case look
+    /// A PDF's page as "2 of 4", with arrows.
+    case pages
+    /// An image's or a PDF's size, with its menu.
+    case zoom
     case focus
 }
 
@@ -13,12 +17,18 @@ nonisolated enum PageCornerButton: Hashable, Sendable {
 nonisolated enum PageCorner {
     /// The buttons for a page of `layout`. `hasReader` is whether a web page has a Reader view to switch to; a page
     /// without one has no switch. Aa is only where the page is the editor, since a page that is not text has no
-    /// formats, and every page has Focus.
-    static func buttons(layout: ItemPageLayout, hasReader: Bool) -> [PageCornerButton] {
+    /// formats. `file` is the kind of file the page has ready to view: an image has its size, a PDF its page and its
+    /// size, and a file that is still arriving, failed to load or is neither has neither. Every page has Focus.
+    static func buttons(layout: ItemPageLayout, hasReader: Bool, file: FileViewKind? = nil) -> [PageCornerButton] {
         switch layout {
         case .text: [.formats, .focus]
         case .webPage: hasReader ? [.look, .focus] : [.focus]
-        case .file: [.focus]
+        case .file:
+            switch file {
+            case .image: [.zoom, .focus]
+            case .pdf: [.pages, .zoom, .focus]
+            case nil: [.focus]
+            }
         }
     }
 

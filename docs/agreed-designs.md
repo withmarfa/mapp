@@ -16,10 +16,6 @@ This page lists what has been agreed for MAPP and is not in the app yet, so the 
 
 - The toolbar holds the same buttons on every screen: Search, View Options, View As, Share, More and the right sidebar. A screen hides a button that does not apply. No screen adds its own controls to the toolbar.
 - The page holds at most one main action, such as New Collection.
-- The bottom-right corner is built (`WindowCorner`, [Views and lists](views-and-lists.md#the-bottom-right-corner)), with the Calendar's, the Timeline's and the Gallery's controls in it. The page's corner (Focus, Aa on a text page, Reader or Original) is built ([Item page](item-page.md#the-pages-corner)); the file pages' controls below go into the same component.
-- What each screen's corner holds:
-  - **Image:** one zoom control, 100% with a menu that holds Fit and sizes. Clicking 100% lets a person type a size.
-  - **PDF:** the page as "2 of 4" with arrows, the same zoom control, and Focus. Focus is built; the page control and the zoom are not.
 
 ## Menus and empty states
 

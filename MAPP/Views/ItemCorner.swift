@@ -17,7 +17,8 @@ struct ItemCorner: View {
 
     var body: some View {
         let layout = library.pageLayout(of: item)
-        let buttons = PageCorner.buttons(layout: layout, hasReader: details.pageLook?.item == item.id)
+        let fileView = details.fileViewing(of: item.id)
+        let buttons = PageCorner.buttons(layout: layout, hasReader: details.pageLook?.item == item.id, file: fileView?.kind)
         let formatsEditor = buttons.contains(.formats) ? editor : nil
         let isCardOpen = formatsEditor != nil && details.isFormatsOpen(on: item.id)
         let isFocused = details.isFocused(on: item.id)
@@ -42,6 +43,11 @@ struct ItemCorner: View {
                     .fixedSize()
                     .help("Reader or Original")
                     .accessibilityIdentifier("SourceViewMode")
+                case .pages:
+                    if let fileView { FilePagesControl(viewing: fileView) }
+                case .zoom:
+                    // Another file's control starts afresh, with no size half typed.
+                    if let fileView { FileZoomControl(viewing: fileView).id(ObjectIdentifier(fileView)) }
                 case .focus:
                     Button(isFocused ? "Leave Focus" : "Focus", systemImage: "arrow.up.left.and.arrow.down.right") {
                         details.toggleFocus(on: item.id)

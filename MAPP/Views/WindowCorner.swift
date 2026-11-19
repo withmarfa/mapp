@@ -126,7 +126,7 @@ private struct CornerSegmentStyle: ButtonStyle {
             configuration.label
                 .font(.system(size: 13 * scale, weight: .medium))
                 .foregroundStyle(isEnabled ? .primary : .tertiary)
-                .frame(width: 34 * scale)
+                .frame(minWidth: 34 * scale)
                 .frame(maxHeight: .infinity)
                 .background(.primary.opacity(configuration.isPressed ? 0.16 : isHovered ? 0.1 : 0), in: .capsule)
                 .padding(.vertical, 3)

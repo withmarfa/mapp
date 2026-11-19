@@ -44,10 +44,10 @@ enum ItemFileResolution: Equatable {
 struct ItemFileView: View {
     @CurrentLibrary private var library
     let id: ItemID
+    /// The window the file's size and page are offered to once it is ready (`FileItemContent`).
+    var details: DetailsPresentation?
     /// Told where the file is once it is, and nil when it is not, so a window can offer to share it.
     var onResolved: (URL?) -> Void = { _ in }
-    /// Told how many pages a PDF has once it is read, and nil when the file has none to count.
-    var onPages: (Int?) -> Void = { _ in }
 
     @State private var loader = ItemFileLoader()
 
@@ -62,7 +62,7 @@ struct ItemFileView: View {
                 ProgressView("Getting File…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .ready(let url):
-                FileItemContent(url: url, title: item?.name ?? url.lastPathComponent, contentType: item?.fileType, onPages: onPages)
+                FileItemContent(url: url, title: item?.name ?? url.lastPathComponent, contentType: item?.fileType, item: id, details: details)
             case .unavailable:
                 ContentUnavailableView("File Unavailable", systemImage: "doc.badge.ellipsis")
             case .failed:
@@ -102,7 +102,7 @@ struct FileItemPage: View {
                 item: item, document: document, runsScripts: runsScripts, drafts: drafts, open: open, onResolved: onResolved,
                 backsToolbar: backsToolbar)
         } else {
-            ItemFileView(id: item.id, onResolved: onResolved, onPages: { [id = item.id] in drafts.filePages($0, of: id) })
+            ItemFileView(id: item.id, details: drafts, onResolved: onResolved)
         }
     }
 }

@@ -603,16 +603,25 @@ struct CommandPalette: View {
                 add(String(localized: "Export Looks…"), "square.and.arrow.up", in: .looks) { LooksFiles.export(from: libraries) }
                 add(String(localized: "Import Looks…"), "square.and.arrow.down", in: .looks) { LooksFiles.importLooks(into: libraries) }
             }
-            // The palette holds the keyboard itself, so the page counts as focused where it was when the palette opened.
-            let zoom = TextZoom.acting(pageFocused: returnFocus == .page)
-            let size = UserDefaults.standard.object(forKey: zoom.key) as? Int ?? zoom.defaultSize
-            if zoom.size(after: .bigger, from: size) != nil {
-                add(String(localized: "Make Text Bigger"), "textformat.size.larger", "⌘+", in: .textSize) { zoom.apply(.bigger) }
+            // An image's or a PDF's page holds ⌘+, ⌘− and ⌘0 for the file, so the text sizes are not offered then
+            // (`FileViewCommand`).
+            if let fileView = browser.showsPage ? details?.fileViewing(of: browser.selection.count == 1 ? browser.selection.first : nil) : nil {
+                for command in FileViewCommand.offered(for: fileView.kind) where command.isEnabled(on: fileView) {
+                    let shortcut = command.shortcut.map { Self.symbols($0.modifiers) + String($0.key.character).uppercased() }
+                    add(String(localized: command.title), command.systemImage, shortcut, in: .view) { command.perform(on: fileView) }
+                }
+            } else {
+                // The palette holds the keyboard itself, so the page counts as focused where it was when the palette opened.
+                let zoom = TextZoom.acting(pageFocused: returnFocus == .page)
+                let size = UserDefaults.standard.object(forKey: zoom.key) as? Int ?? zoom.defaultSize
+                if zoom.size(after: .bigger, from: size) != nil {
+                    add(String(localized: "Make Text Bigger"), "textformat.size.larger", "⌘+", in: .textSize) { zoom.apply(.bigger) }
+                }
+                if zoom.size(after: .smaller, from: size) != nil {
+                    add(String(localized: "Make Text Smaller"), "textformat.size.smaller", "⌘-", in: .textSize) { zoom.apply(.smaller) }
+                }
+                add(String(localized: "Actual Size"), "textformat.size", "⌘0", in: .textSize) { zoom.apply(.actual) }
             }
-            if zoom.size(after: .smaller, from: size) != nil {
-                add(String(localized: "Make Text Smaller"), "textformat.size.smaller", "⌘-", in: .textSize) { zoom.apply(.smaller) }
-            }
-            add(String(localized: "Actual Size"), "textformat.size", "⌘0", in: .textSize) { zoom.apply(.actual) }
             entries.append(Entry(id: "command:newItem", title: String(localized: "New Item"), icon: .symbol("plus"), shortcut: "⌘N",
                                  takesFocus: true) {
                 browser.openQuickAdd(remembered: lastType, in: library)

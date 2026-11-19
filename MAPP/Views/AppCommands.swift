@@ -121,7 +121,11 @@ struct AppCommands: Commands {
             Divider()
             PageWidthOptions()
             Divider()
-            TextZoomCommands(pageFocused: pageKeepsHistoryKeys)
+            if let fileView {
+                FileViewCommands(viewing: fileView)
+            } else {
+                TextZoomCommands(pageFocused: pageKeepsHistoryKeys)
+            }
             Divider()
             // ⌘[ and ⌘], as in Safari and the Finder.
             // The page uses the same keys to outdent and indent a list item and to move between table cells, so
@@ -162,6 +166,12 @@ extension AppCommands {
             command: command,
             context: ItemCommandContext(library: library, ids: focused?.ids ?? [], browser: browser, editor: editor, details: details),
             editor: editor, bindsShortcut: true)
+    }
+
+    /// The image or PDF the window's page shows and has ready, whose size and page the View menu then commands.
+    private var fileView: FileViewing? {
+        guard browser?.showsPage != false, let shown = focused?.ids, shown.count == 1 else { return nil }
+        return details?.fileViewing(of: shown.first)
     }
 
     /// The page keeps Command-[ and Command-] while it has the keyboard (outdent and indent a list item, move between table cells), so Back and Forward give those keys up then.

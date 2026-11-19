@@ -13,9 +13,10 @@ struct FileItemContent: View {
     /// What the item's library says the file is. A Marfa file is kept under its hash with no extension, so the
     /// name says nothing there; a type the library does not know leaves it to the name.
     var contentType: UTType?
-    /// Told how many pages a PDF has once it is read, and nil when the file has none to count.
-    var onPages: (Int?) -> Void = { _ in }
-    @State private var zoom = 1.0
+    /// The item and window the page offers an image's or a PDF's size and page to, for the corner and the menus. A
+    /// page shown with neither offers nothing.
+    var item: ItemID?
+    var details: DetailsPresentation?
     @State private var textPreview: PlainTextFile.Preview?
     @State private var previewURL: URL?
 
@@ -59,70 +60,163 @@ struct FileItemContent: View {
             HStack {
                 Text(title).interfaceFont(.headline).lineLimit(1)
                 Spacer()
-                if type.conforms(to: .image) {
-                    Button("Zoom Out", systemImage: "minus.magnifyingglass") { zoom = max(0.25, zoom - 0.25) }
-                        .labelStyle(.iconOnly)
-                        .help("Zoom Out")
-                        .mappButton(.secondary, icon: true)
-                    Button("Zoom In", systemImage: "plus.magnifyingglass") { zoom = min(4, zoom + 0.25) }
-                        .labelStyle(.iconOnly)
-                        .help("Zoom In")
-                        .mappButton(.secondary, icon: true)
-                    Button("Fit") { zoom = 1 }
-                        .mappButton(.secondary)
-                }
                 Button("Open", systemImage: "arrow.up.forward.app") { NSWorkspace.shared.open(url) }
                     .mappButton(.secondary)
             }
             .padding()
-            if type.conforms(to: .pdf) {
-                FilePDFPreview(url: url, onPages: onPages)
-            } else if type.conforms(to: .image) {
-                FileImageView(url: url, title: title, zoom: zoom)
-            } else {
+            switch FileViewKind.of(type) {
+            case .pdf:
+                FilePDFPreview(url: url, item: item, details: details)
+            case .image:
+                FileImageView(url: url, title: title, item: item, details: details)
+            case nil:
                 FileQuickLookView(url: url, title: title, type: type)
             }
         }
-        .id(url)
+        // The item is part of the identity: two items can hold the same bytes, and each has its own size and page.
+        .id("\(url.absoluteString)|\(item?.rawValue ?? "")")
+    }
+}
+
+/// Offers a file's controls to its window once the file is ready, and withdraws them when its page goes.
+private struct OfferedFileView: ViewModifier {
+    let viewing: FileViewing
+    let item: ItemID?
+    let details: DetailsPresentation?
+    let isReady: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: isReady, initial: true) {
+                guard let item, let details else { return }
+                if isReady { details.offerFileView(viewing, for: item) } else { details.withdrawFileView(viewing) }
+            }
+            .onDisappear { details?.withdrawFileView(viewing) }
     }
 }
 
 /// Reads the document once for its file, rather than each time the preview's body runs.
 private struct FilePDFPreview: View {
     let url: URL
-    let onPages: (Int?) -> Void
+    let item: ItemID?
+    let details: DetailsPresentation?
     @State private var loaded: (url: URL, document: PDFDocument?)?
+    @State private var viewing = FileViewing(kind: .pdf)
 
     var body: some View {
+        let document = loaded?.url == url ? loaded?.document : nil
         Group {
             if let loaded, loaded.url == url {
-                if let document = loaded.document {
-                    FilePDFView(document: document)
+                if let document {
+                    FilePDFView(document: document, viewing: viewing)
                 } else {
                     ContentUnavailableView("Can’t Preview This PDF", systemImage: "doc", description: Text("The file may be damaged or unavailable. Try opening it in another app."))
                 }
             }
         }
+        .modifier(OfferedFileView(viewing: viewing, item: item, details: details, isReady: document != nil))
+        // A document with no pages, as a locked one has, has nothing to page through or zoom.
         .task(id: url) {
             let document = PDFDocument(url: url)
-            loaded = (url, document)
-            onPages(document?.pageCount)
+            loaded = (url, document.flatMap { $0.pageCount > 0 ? $0 : nil })
         }
-        .onDisappear { onPages(nil) }
     }
 }
 
 private struct FilePDFView: NSViewRepresentable {
     let document: PDFDocument
+    let viewing: FileViewing
+
+    func makeCoordinator() -> Coordinator { Coordinator(viewing: viewing) }
+
     func makeNSView(context: Context) -> PDFView {
         let view = PDFView()
         view.autoScales = true
         view.displayMode = .singlePageContinuous
+        view.minScaleFactor = FileZoom.range.lowerBound
+        view.maxScaleFactor = FileZoom.range.upperBound
         view.document = document
+        context.coordinator.attach(to: view)
         return view
     }
+
     func updateNSView(_ view: PDFView, context: Context) {
-        if view.document !== document { view.document = document }
+        if view.document !== document {
+            view.document = document
+            context.coordinator.attach(to: view)
+        }
+        switch viewing.zoom {
+        case .fit:
+            if !view.autoScales { view.autoScales = true }
+        case .scale(let scale):
+            if view.autoScales || abs(view.scaleFactor - scale) > 0.0005 {
+                view.autoScales = false
+                view.scaleFactor = scale
+            }
+        }
+    }
+
+    static func dismantleNSView(_ view: PDFView, coordinator: Coordinator) {
+        coordinator.detach()
+    }
+
+    /// Carries the PDF view's page and size to the file's controls, and the controls' page to the view.
+    final class Coordinator {
+        let viewing: FileViewing
+        private weak var view: PDFView?
+        private var observers: [any NSObjectProtocol] = []
+
+        init(viewing: FileViewing) {
+            self.viewing = viewing
+        }
+
+        func attach(to view: PDFView) {
+            detach()
+            self.view = view
+            let center = NotificationCenter.default
+            observers = [
+                center.addObserver(forName: .PDFViewPageChanged, object: view, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.pageChanged() }
+                },
+                center.addObserver(forName: .PDFViewScaleChanged, object: view, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.scaleChanged() }
+                },
+            ]
+            viewing.showPage = { [weak self] number in
+                guard let view = self?.view, let page = view.document?.page(at: number - 1) else { return }
+                view.go(to: page)
+            }
+            viewing.reportPages(count: view.document?.pageCount ?? 0, current: currentPage(in: view))
+            scaleChanged()
+        }
+
+        func detach() {
+            for observer in observers { NotificationCenter.default.removeObserver(observer) }
+            observers = []
+            viewing.showPage = nil
+        }
+
+        private func currentPage(in view: PDFView) -> Int {
+            guard let document = view.document, let page = view.currentPage else { return 1 }
+            return document.index(for: page) + 1
+        }
+
+        // Both are read a turn later: the view posts them while SwiftUI is still updating it.
+        private func pageChanged() {
+            Task { @MainActor [weak self] in
+                guard let self, let view else { return }
+                viewing.reportPages(count: view.document?.pageCount ?? 0, current: currentPage(in: view))
+            }
+        }
+
+        /// What Fit gives while the view fits itself; a size the view took on its own, as from a pinch, becomes the
+        /// chosen one.
+        private func scaleChanged() {
+            Task { @MainActor [weak self] in
+                guard let self, let view else { return }
+                if view.autoScales { viewing.reportFit(view.scaleFactor) } else { viewing.adopt(scale: view.scaleFactor) }
+            }
+        }
     }
 }
 
@@ -130,37 +224,71 @@ private struct FilePDFView: NSViewRepresentable {
 private struct FileImageView: View {
     let url: URL
     let title: String
-    let zoom: Double
-    @State private var decoded: (url: URL, image: NSImage?)?
+    let item: ItemID?
+    let details: DetailsPresentation?
+    @State private var decoded: (url: URL, image: DecodedImage?)?
+    @State private var viewing = FileViewing(kind: .image)
+
+    /// The picture, and how large the file says it is: the bitmap is held to 3,000 pixels a side, and a size is a
+    /// fraction of the file's own.
+    nonisolated struct DecodedImage: Sendable {
+        let image: CGImage
+        let pixelSize: CGSize
+    }
 
     var body: some View {
+        let image = decoded?.url == url ? decoded?.image : nil
         GeometryReader { geometry in
             if let decoded, decoded.url == url {
                 if let image = decoded.image {
-                    ScrollView([.horizontal, .vertical]) {
-                        Image(nsImage: image).resizable().scaledToFit()
-                            .frame(width: max(1, geometry.size.width) * zoom, height: max(1, geometry.size.height) * zoom)
-                            .accessibilityLabel(title)
-                    }
+                    picture(image, in: geometry.size)
                 } else {
                     ContentUnavailableView("Can’t Preview This Image", systemImage: "photo", description: Text("Open the file in another app to view it."))
                 }
             }
         }
+        .modifier(OfferedFileView(viewing: viewing, item: item, details: details, isReady: image != nil))
         .task(id: url) {
             let image = await Self.decode(url)
             guard !Task.isCancelled else { return }
-            decoded = (url, image.map { NSImage(cgImage: $0, size: .zero) })
+            decoded = (url, image)
         }
     }
 
-    @concurrent private static func decode(_ url: URL) async -> CGImage? {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
-        return CGImageSourceCreateThumbnailAtIndex(source, 0, [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceThumbnailMaxPixelSize: 3000,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-        ] as CFDictionary)
+    private func picture(_ decoded: DecodedImage, in pane: CGSize) -> some View {
+        let fit = FileZoom.fitScale(content: decoded.pixelSize, in: pane) ?? 1
+        let scale = viewing.zoom.scale(fit: fit)
+        // Fitted, the picture is never a rounding error larger than the pane, which would show scroll bars.
+        let width = decoded.pixelSize.width * scale
+        let height = decoded.pixelSize.height * scale
+        let isFitted = viewing.zoom == .fit
+        return ScrollView([.horizontal, .vertical]) {
+            Image(decorative: decoded.image, scale: 1).resizable()
+                .frame(width: isFitted ? min(width, pane.width) : width, height: isFitted ? min(height, pane.height) : height)
+                .accessibilityLabel(title)
+                // A picture smaller than the pane sits in its middle.
+                .frame(minWidth: pane.width, minHeight: pane.height)
+        }
+        .onChange(of: fit, initial: true) { viewing.reportFit(fit) }
+    }
+
+    @concurrent private static func decode(_ url: URL) async -> DecodedImage? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                  kCGImageSourceCreateThumbnailFromImageAlways: true,
+                  kCGImageSourceThumbnailMaxPixelSize: 3000,
+                  kCGImageSourceCreateThumbnailWithTransform: true,
+              ] as CFDictionary)
+        else { return nil }
+        let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any]
+        let size: CGSize
+        if let width = properties?[kCGImagePropertyPixelWidth] as? Double, let height = properties?[kCGImagePropertyPixelHeight] as? Double,
+           width >= 1, height >= 1 {
+            size = FileZoom.orientedSize(width: width, height: height, orientation: properties?[kCGImagePropertyOrientation] as? Int ?? 1)
+        } else {
+            size = CGSize(width: image.width, height: image.height)
+        }
+        return DecodedImage(image: image, pixelSize: size)
     }
 }
 
