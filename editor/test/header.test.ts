@@ -10,6 +10,7 @@ let header: ItemHeader
 const ticket: HeaderModel = {
   item: 'ticket',
   hidden: false,
+  focused: false,
   title: 'Review the findings',
   draft: null,
   titleRejected: false,
@@ -100,6 +101,32 @@ test('the header shows the item it is given, and nothing before', () => {
   expect(root.hidden).toBe(true)
   header.set(null)
   expect(root.hidden).toBe(true)
+})
+
+test('Focus hides the header and keeps the footer and the kind, where a deleted item hides both', () => {
+  const reading: HeaderModel = {
+    ...ticket,
+    kind: 'reading',
+    linked: [{ item: 'source', title: 'Source', symbol: 'doc', type: 'Note', date: '' }],
+  }
+  header.set(reading)
+  expect(document.body.dataset.header).toBe('reading')
+  expect(root.hidden).toBe(false)
+  expect(footer.hidden).toBe(false)
+
+  header.set({ ...reading, focused: true })
+  expect(root.hidden).toBe(true)
+  expect(footer.hidden).toBe(false)
+  expect(document.body.dataset.header).toBe('reading')
+  expect(header.isHidden).toBe(true)
+
+  header.set({ ...reading, focused: false })
+  expect(root.hidden).toBe(false)
+
+  header.set({ ...reading, hidden: true })
+  expect(root.hidden).toBe(true)
+  expect(footer.hidden).toBe(true)
+  expect(document.body.dataset.header).toBe('general')
 })
 
 test('a status in a row with no value is drawn empty, and a status pin carries its symbol in its tint', () => {
