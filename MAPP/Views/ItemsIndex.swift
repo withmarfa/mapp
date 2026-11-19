@@ -306,5 +306,6 @@ private struct ItemsNameCell: View {
                 .accessibilityHidden(true)
             Text(verbatim: title).lineLimit(1)
         }
+        .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
     }
 }

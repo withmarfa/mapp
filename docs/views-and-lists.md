@@ -124,6 +124,8 @@ View Options also holds Include Subtypes, which lets a type's list show the item
 
 Built, not yet released. Items, Collections and Sources are index pages: a table under tabs, with no list, gallery or other layout. Views and types keep the list column and their layouts. Tabs and a New button on the page appear only on these three pages: a view or a type is split by the sidebar, its filters and saved views, and New is the sidebar's New and Command-N.
 
+The three index tables look as the item table does: rows 36 points high with the text centered, no line between the column headings, and one line under them that runs from where the first column's cells start to where the last one's end, as the rows' separators do, including under an icon. The headings look the same whether or not the window is the key one.
+
 ### Items
 
 - Items (`ItemsIndex`, its rows worked out by `ItemIndexModel`) has the tabs All, Yours (the library tier) and From Apps (the feed tier), each with its count, and the tab chosen is kept for the page on this Mac (`indexTab.items`). New Item is on the page at the trailing edge of the tabs and opens quick add.

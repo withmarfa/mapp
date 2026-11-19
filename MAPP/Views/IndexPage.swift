@@ -126,6 +126,7 @@ private struct IndexNameCell: View {
                 .accessibilityHidden(true)
             Text(verbatim: row.title).lineLimit(1)
         }
+        .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
     }
 }
 
