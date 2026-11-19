@@ -63,9 +63,19 @@ nonisolated enum SourceCode {
     static func isApp(_ code: String) -> Bool { code.hasPrefix(appPrefix) }
 }
 
-/// A column of an index table.
+/// A column of an index table. `latest` is a source's latest item and a collection's own update.
 nonisolated enum IndexColumn: String, CaseIterable, Sendable {
-    case name, types, count, latest
+    case name, types, source, count, latest
+}
+
+nonisolated extension IndexPlace {
+    /// The columns of the page's table, in order: a collection says where it came from, and a source what it writes.
+    var columns: [IndexColumn] {
+        switch self {
+        case .sources: [.name, .types, .count, .latest]
+        case .collections: [.name, .source, .count, .latest]
+        }
+    }
 }
 
 /// The order of an index table, kept as text such as `count.desc` so a default can hold it.
@@ -98,6 +108,7 @@ nonisolated struct IndexSort: RawRepresentable, Hashable, Sendable {
         let ascending = first.order == .forward
         if path == \IndexRow.title { self.init(column: .name, ascending: ascending) }
         else if path == \IndexRow.types { self.init(column: .types, ascending: ascending) }
+        else if path == \IndexRow.sourceName { self.init(column: .source, ascending: ascending) }
         else if path == \IndexRow.count { self.init(column: .count, ascending: ascending) }
         else if path == \IndexRow.latestOrOldest { self.init(column: .latest, ascending: ascending) }
         else { return nil }
@@ -109,6 +120,7 @@ nonisolated struct IndexSort: RawRepresentable, Hashable, Sendable {
         return switch column {
         case .name: [KeyPathComparator(\IndexRow.title, comparator: .localizedStandard, order: order)]
         case .types: [KeyPathComparator(\IndexRow.types, comparator: .localizedStandard, order: order)]
+        case .source: [KeyPathComparator(\IndexRow.sourceName, comparator: .localizedStandard, order: order)]
         case .count: [KeyPathComparator(\IndexRow.count, order: order)]
         case .latest: [KeyPathComparator(\IndexRow.latestOrOldest, order: order)]
         }
@@ -128,7 +140,7 @@ nonisolated enum IndexPreferences {
     }
 
     static func sort(for place: IndexPlace, in defaults: UserDefaults = .standard) -> IndexSort {
-        defaults.string(forKey: place.sortKey).flatMap(IndexSort.init) ?? place.defaultSort
+        defaults.string(forKey: place.sortKey).flatMap(IndexSort.init).flatMap { place.columns.contains($0.column) ? $0 : nil } ?? place.defaultSort
     }
 
     static func set(_ sort: IndexSort, for place: IndexPlace, in defaults: UserDefaults = .standard) {

@@ -14,7 +14,7 @@ struct IndexViewOptions: View {
     var body: some View {
         Group {
             Section("Sort By") {
-                ForEach(IndexColumn.allCases, id: \.self) { column in
+                ForEach(place.columns, id: \.self) { column in
                     Toggle(column.title(in: place), isOn: Binding { sort.column == column } set: { _ in sort.column = column })
                         .accessibilityIdentifier("IndexSortBy\(column.rawValue.capitalized)")
                 }
@@ -47,7 +47,7 @@ extension ViewOptionCommand {
     /// The index page's sorts not already chosen, for the command palette.
     static func indexCommands(for place: IndexPlace) -> [ViewOptionCommand] {
         let current = IndexPreferences.sort(for: place)
-        return IndexColumn.allCases.filter { $0 != current.column }.map { column in
+        return place.columns.filter { $0 != current.column }.map { column in
             ViewOptionCommand(title: String(localized: "Sort by \(column.plainTitle(in: place))"), systemImage: "arrow.up.arrow.down") {
                 IndexPreferences.set(IndexSort(column: column, ascending: current.ascending), for: place)
             }
@@ -60,9 +60,10 @@ private extension IndexColumn {
     func plainTitle(in place: IndexPlace) -> String {
         switch self {
         case .name: place == .sources ? String(localized: "Source") : String(localized: "Name")
-        case .types: place == .sources ? String(localized: "Writes") : String(localized: "Contains")
+        case .types: String(localized: "Writes")
+        case .source: String(localized: "Source")
         case .count: String(localized: "Items")
-        case .latest: String(localized: "Latest Item")
+        case .latest: place == .sources ? String(localized: "Latest") : String(localized: "Updated")
         }
     }
 }

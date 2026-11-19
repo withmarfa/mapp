@@ -31,7 +31,7 @@ private struct IndexInspectorContent: View {
     private var items: [Item] { library.items(in: row.place) }
 
     var body: some View {
-        let latest = items.sorted { $0.modified > $1.modified }.prefix(Self.latestShown)
+        let latest = IndexRows.newest(items, limit: Self.latestShown)
         ScrollView {
             VStack(alignment: .leading, spacing: InspectorMetrics.sectionGap) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -92,7 +92,7 @@ private struct IndexInspectorContent: View {
         } else if case .collection(let id) = row.place, let collection = library.item(id) {
             detail("Created", collection.created.formatted(date: .abbreviated, time: .omitted))
             detail("Updated", collection.modified.formatted(date: .abbreviated, time: .omitted))
-            detail("Kept In", collection.tier == .feed ? String(localized: "From Apps") : String(localized: "Yours"))
+            if !row.sourceName.isEmpty { detail("Source", row.sourceName) }
         }
     }
 

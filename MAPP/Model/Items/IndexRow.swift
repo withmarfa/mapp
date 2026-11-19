@@ -18,19 +18,27 @@ nonisolated struct IndexRow: Identifiable, Hashable, Sendable {
     /// The types of its items, as a line of text.
     let types: String
     let count: Int
-    /// When its most recently changed item changed; nil where it has none.
+    /// A source's latest item's change, nil where it has none; a collection's own change (its Updated), which it always has.
     let latest: Date?
     /// Its items by type, the most numerous first.
     let breakdown: [TypeShare]
     /// The tier a collection is kept in; nil for a source.
     var tier: Tier?
+    /// The name of the source that wrote a collection; empty for a source's row and for a collection no source wrote.
+    var sourceName = ""
+    /// Whether a collection can be changed: a read-only one cannot be deleted.
+    var readOnly = false
 
     var id: SidebarItem { place }
     /// The code of a source's row; nil for a collection's.
     var sourceCode: String? {
         if case .source(let code) = place { code } else { nil }
     }
-    /// For sorting by the latest item: a row with none sorts as the oldest.
+    /// Whether the person can delete the row: a collection that is not read-only.
+    var canDelete: Bool {
+        if case .collection = place { !readOnly } else { false }
+    }
+    /// For sorting by the date column: a row with none sorts as the oldest.
     var latestOrOldest: Date { latest ?? .distantPast }
 }
 
@@ -71,16 +79,34 @@ nonisolated enum IndexRows {
         }
     }
 
-    /// `collections` in the order given, each with its members' types and the tier it is kept in.
-    static func collections(_ collections: [Item], membersOf: (Item) -> [Item], catalogue: Catalogue) -> [IndexRow] {
+    /// `collections` in the order given, each with its members' types, the tier it is kept in, the source that wrote
+    /// it as `directory` names it, and when it last changed.
+    static func collections(
+        _ collections: [Item], membersOf: (Item) -> [Item], catalogue: Catalogue, directory: SourceDirectory = SourceDirectory()
+    ) -> [IndexRow] {
         collections.map { collection in
             let members = membersOf(collection)
             let breakdown = breakdown(of: members, catalogue: catalogue)
             return IndexRow(
                 place: .collection(collection.id), title: collection.displayTitle,
                 icon: .type(catalogue.icon(for: collection.type)), types: summary(of: breakdown),
-                count: members.count, latest: members.map(\.modified).max(), breakdown: breakdown, tier: collection.tier)
+                count: members.count, latest: collection.modified, breakdown: breakdown, tier: collection.tier,
+                sourceName: collection.source.flatMap { $0.isEmpty ? nil : directory.name($0) } ?? "", readOnly: collection.readOnly)
         }
+    }
+
+    /// The `limit` most recently changed of `items`, newest first, found in one pass.
+    static func newest(_ items: [Item], limit: Int) -> [Item] {
+        guard limit > 0 else { return [] }
+        var kept: [Item] = []
+        kept.reserveCapacity(limit + 1)
+        for item in items {
+            guard kept.count < limit || item.modified > kept[kept.count - 1].modified else { continue }
+            let index = kept.firstIndex { item.modified > $0.modified } ?? kept.count
+            kept.insert(item, at: index)
+            if kept.count > limit { kept.removeLast() }
+        }
+        return kept
     }
 
     /// The items by type, most first and then by label, each counted once.

@@ -21,13 +21,15 @@ extension IndexTab {
 }
 
 extension IndexColumn {
-    /// The column's heading. The types column says what the rows hold: a source writes types, a collection contains them.
+    /// The column's heading: a source writes types and its latest item is when it last wrote, and a collection's date is
+    /// its own update.
     func title(in place: IndexPlace) -> LocalizedStringKey {
         switch self {
         case .name: place == .sources ? "Source" : "Name"
-        case .types: place == .sources ? "Writes" : "Contains"
+        case .types: "Writes"
+        case .source: "Source"
         case .count: "Items"
-        case .latest: "Latest Item"
+        case .latest: place == .sources ? "Latest" : "Updated"
         }
     }
 }
@@ -114,7 +116,7 @@ private struct IndexNameCell: View {
     }
 }
 
-/// The types a container holds or a source writes: each type's icon in the type's color, with no tile, and its name.
+/// The types a source writes: each type's icon in the type's color, with no tile, and its name.
 /// A type with no icon takes the neutral color and mark. Three are named and the rest counted.
 private struct IndexTypesCell: View {
     @Environment(\.colorScheme) private var scheme
@@ -155,8 +157,9 @@ struct IndexLatest: View {
 }
 
 /// The rows as a table, as wide as the page. Its cells are views of plain values, so a change of the chosen row
-/// finds each unchanged and runs none of their bodies, and the order is kept here, made only when the rows or the sort
-/// change.
+/// finds each unchanged and runs none of their bodies. The order is worked out from the rows and the sort each time
+/// this body runs, so the table never draws the rows of another tab or one that has gone; the chosen row is read only
+/// by the table's own closures, so choosing one does not run this body.
 private struct IndexTable: View {
     let place: IndexPlace
     let rows: [IndexRow]
@@ -165,7 +168,6 @@ private struct IndexTable: View {
     let edit: ((SourceEditRequest) -> Void)?
     let delete: ((IndexRow) -> Void)?
     @AppStorage private var sort: IndexSort
-    @State private var ordered: [IndexRow] = []
 
     init(
         place: IndexPlace, rows: [IndexRow], choice: IndexChoice, open: @escaping (IndexRow) -> Void,
@@ -180,8 +182,15 @@ private struct IndexTable: View {
         _sort = AppStorage(wrappedValue: place.defaultSort, place.sortKey)
     }
 
+    /// The table's second column: what a source writes, or the source that wrote a collection.
+    private var secondColumn: IndexColumn { place.columns[1] }
+    private var secondKey: KeyPath<IndexRow, String> { place == .sources ? \.types : \.sourceName }
+
+    /// The kept sort, or the page's own while what is kept is of a column the page lacks.
+    private var shownSort: IndexSort { place.columns.contains(sort.column) ? sort : place.defaultSort }
+
     private var sortOrder: Binding<[KeyPathComparator<IndexRow>]> {
-        Binding { sort.comparators } set: { if let next = IndexSort(comparators: $0) { sort = next } }
+        Binding { shownSort.comparators } set: { if let next = IndexSort(comparators: $0) { sort = next } }
     }
 
     private var selection: Binding<IndexRow.ID?> {
@@ -189,13 +198,18 @@ private struct IndexTable: View {
     }
 
     var body: some View {
+        let ordered = shownSort.sorted(rows)
         Table(ordered, selection: selection, sortOrder: sortOrder) {
             TableColumn(IndexColumn.name.title(in: place), value: \.title, comparator: .localizedStandard) { row in
                 IndexNameCell(row: row)
             }
             .width(min: 140, ideal: 240)
-            TableColumn(IndexColumn.types.title(in: place), value: \.types, comparator: .localizedStandard) { row in
-                IndexTypesCell(shares: row.breakdown)
+            TableColumn(secondColumn.title(in: place), value: secondKey, comparator: .localizedStandard) { row in
+                if place == .sources {
+                    IndexTypesCell(shares: row.breakdown)
+                } else {
+                    Text(verbatim: row.sourceName).foregroundStyle(.secondary).lineLimit(1)
+                }
             }
             .width(min: 140, ideal: 280)
             TableColumn(IndexColumn.count.title(in: place), value: \.count) { row in
@@ -210,33 +224,25 @@ private struct IndexTable: View {
         }
         .alternatingRowBackgrounds(.disabled)
         .softSelection(rows: ordered.map(\.id), hovers: true, selection: { choice.chosen })
-        .onChange(of: rows, initial: true) { ordered = sort.sorted(rows) }
-        .onChange(of: sort) { ordered = sort.sorted(rows) }
         .contextMenu(forSelectionType: IndexRow.ID.self) { ids in
-            if let row = rows.first(where: { ids.contains($0.id) }), ids.count == 1 {
+            if let row = ordered.first(where: { ids.contains($0.id) }), ids.count == 1 {
                 Button("Open") { open(row) }
                 if let edit, let code = row.sourceCode {
                     Button("Rename…") { edit(SourceEditRequest(code: code, mode: .name)) }
                     Button("Choose Mark…") { edit(SourceEditRequest(code: code, mode: .mark)) }
                 }
-                if let delete, row.place.isCollection {
+                if let delete, row.canDelete {
                     Divider()
                     Button("Delete…", role: .destructive) { delete(row) }
                 }
             }
         } primaryAction: { ids in
-            if let row = rows.first(where: { ids.contains($0.id) }) { open(row) }
+            if let row = ordered.first(where: { ids.contains($0.id) }) { open(row) }
         }
         .onDeleteCommand {
-            if let delete, let row = choice.row(in: rows), row.place.isCollection { delete(row) }
+            if let delete, let row = choice.row(in: ordered), row.canDelete { delete(row) }
         }
         .contentMargins(.horizontal, IndexMetrics.side, for: .scrollContent)
         .accessibilityIdentifier("IndexTable")
-    }
-}
-
-private extension SidebarItem {
-    var isCollection: Bool {
-        if case .collection = self { true } else { false }
     }
 }

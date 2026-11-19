@@ -57,7 +57,8 @@ final class IndexRowsModel {
             IndexRows.sources(of: library.items(in: .allItems), catalogue: library.catalogue, directory: library.sources)
         case .collections:
             IndexRows.collections(
-                library.collections, membersOf: { library.items(in: .collection($0.id)) }, catalogue: library.catalogue)
+                library.collections, membersOf: { library.items(in: .collection($0.id)) }, catalogue: library.catalogue,
+                directory: library.sources)
         }
     }
 }

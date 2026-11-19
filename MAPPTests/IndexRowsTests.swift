@@ -64,18 +64,51 @@ struct IndexRowsTests {
         let row = try #require(rows.first)
         #expect(row.place == .collection(collection.id))
         #expect(row.count == 2)
-        #expect(row.latest == base + 7 * 60)
         #expect(row.breakdown.count == 2)
         #expect(row.tier == .library)
     }
 
-    @Test func anEmptyCollectionHasNoLatestItemAndSortsAsTheOldest() throws {
-        let rows = IndexRows.collections([item("Empty", type: "test.collection")], membersOf: { _ in [] }, catalogue: catalogue)
+    @Test func aCollectionsDateIsItsOwnChangeAndNotItsLatestMembers() throws {
+        let collection = item("Garden", type: "test.collection", minutes: 100)
+        let members = [item("a", minutes: 300)]
+        let row = try #require(IndexRows.collections([collection], membersOf: { _ in members }, catalogue: catalogue).first)
+        #expect(row.latest == base + 100 * 60)
+    }
+
+    @Test func anEmptyCollectionHasItsOwnDateAndNoTypes() throws {
+        let rows = IndexRows.collections([item("Empty", type: "test.collection", minutes: 4)], membersOf: { _ in [] }, catalogue: catalogue)
         let row = try #require(rows.first)
         #expect(row.count == 0)
-        #expect(row.latest == nil)
-        #expect(row.latestOrOldest == .distantPast)
+        #expect(row.latest == base + 4 * 60)
         #expect(row.breakdown.isEmpty)
+    }
+
+    @Test func aCollectionNamesTheSourceThatWroteItAsTheServerNamesIt() throws {
+        let named = item("Named", type: "test.collection", source: "readwise")
+        let unnamed = item("Unnamed", type: "test.collection", source: "x-code")
+        let none = item("None", type: "test.collection")
+        let blank = item("Blank", type: "test.collection", source: "")
+        let directory = SourceDirectory(infos: ["readwise": readwise])
+        let rows = IndexRows.collections([named, unnamed, none, blank], membersOf: { _ in [] }, catalogue: catalogue, directory: directory)
+        #expect(rows.map(\.sourceName) == ["Readwise", "x-code", "", ""])
+    }
+
+    @Test func onlyACollectionThatIsNotReadOnlyCanBeDeleted() throws {
+        var locked = item("Locked", type: "test.collection")
+        locked.readOnly = true
+        let open = item("Open", type: "test.collection")
+        let rows = IndexRows.collections([locked, open], membersOf: { _ in [] }, catalogue: catalogue)
+        #expect(rows.map(\.canDelete) == [false, true])
+        #expect(IndexRows.sources(of: [item("a", source: "rss")], catalogue: catalogue).allSatisfy { !$0.canDelete })
+    }
+
+    @Test func theLatestItemsAreTheNewestFoundInOnePass() {
+        let items = (0..<30).map { item("n\($0)", minutes: Double(($0 * 7) % 30)) }
+        let newest = IndexRows.newest(items, limit: 4)
+        #expect(newest.map(\.modified) == items.map(\.modified).sorted(by: >).prefix(4).map { $0 })
+        #expect(IndexRows.newest(Array(items.prefix(2)), limit: 4).count == 2)
+        #expect(IndexRows.newest(items, limit: 0).isEmpty)
+        #expect(IndexRows.newest([], limit: 4).isEmpty)
     }
 
     @Test func sourcesAndTheirCountsComeFromOneGrouping() {
@@ -170,6 +203,22 @@ struct IndexPreferencesTests {
         }
         #expect(IndexPlace.sources.defaultSort == IndexSort(column: .count, ascending: false))
         #expect(IndexPlace.collections.defaultSort == IndexSort(column: .name, ascending: true))
+    }
+
+    @Test func eachPageHasItsOwnColumns() {
+        #expect(IndexPlace.collections.columns == [.name, .source, .count, .latest])
+        #expect(IndexPlace.sources.columns == [.name, .types, .count, .latest])
+        for place in IndexPlace.allCases { #expect(place.columns.contains(place.defaultSort.column)) }
+    }
+
+    @Test func aKeptSortOfAColumnThePageLacksFallsBack() {
+        let defaults = defaults()
+        defaults.set("types.asc", forKey: IndexPlace.collections.sortKey)
+        #expect(IndexPreferences.sort(for: .collections, in: defaults) == IndexPlace.collections.defaultSort)
+        defaults.set("source.desc", forKey: IndexPlace.collections.sortKey)
+        #expect(IndexPreferences.sort(for: .collections, in: defaults) == IndexSort(column: .source, ascending: false))
+        defaults.set("source.desc", forKey: IndexPlace.sources.sortKey)
+        #expect(IndexPreferences.sort(for: .sources, in: defaults) == IndexPlace.sources.defaultSort)
     }
 
     @Test func eachPageKeepsItsOwnTabAndSort() {
