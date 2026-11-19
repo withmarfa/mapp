@@ -98,7 +98,7 @@ A type's list, and the other places that are not views, can become one with Save
 
 ## Default views
 
-Every place opens in a default view. A person can change the default view, but can't rename or delete it. A saved view has none: its choices are its own, as above. The indexes of collections and sources keep their table as they did (`IndexPreferences`).
+Every place opens in a default view. A person can change the default view, but can't rename or delete it. A saved view has none: its choices are its own, as above. The three indexes, Items, Collections and Sources, have no default view: each keeps its own tab and sort (`IndexPreferences`) and has no layout to choose.
 
 - **What it keeps.** The filters, the sort, the grouping, the layout and the layout's Mac settings: the timeline's date field, the board's compact cards, the gallery's cards, the calendar's Week or Month, the density and the table's columns. A place with no change keeps nothing, and choosing the layout a place opens in is not a change.
 - **Where it is kept.** On this Mac, never in Marfa, so every window and every launch opens a place as it was left. [Settings storage](settings-storage.md) says where. An entry that cannot be read is kept aside, and the other places' entries go on working.

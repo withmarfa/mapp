@@ -78,11 +78,11 @@ struct PlaceDefaultsTests {
         #expect(Self.window(defaults, library: library, place: .recents).tableOptions[.recents]?.isFiltering != true)
     }
 
-    @Test func aSavedViewAndTheIndexesHaveNoDefaultView() {
+    @Test func aSavedViewAndTheThreeIndexesHaveNoDefaultView() {
         #expect(!Browser.hasDefaultView(.view(ItemID("v"))))
         #expect(!Browser.hasDefaultView(.sources))
         #expect(!Browser.hasDefaultView(.collections))
-        #expect(Browser.hasDefaultView(.allItems))
+        #expect(!Browser.hasDefaultView(.allItems))
         #expect(Browser.hasDefaultView(.collection(ItemID("c"))))
     }
 
@@ -121,7 +121,7 @@ struct PlaceDefaultsTests {
 
         browser.resetView(in: library)
         #expect(browser.tableOptions[browser.item]?.isFiltering != true)
-        #expect(browser.viewMode == Browser.naturalLayout(of: browser.item))
+        #expect(browser.viewMode == Browser.naturalLayout)
         #expect(browser.density == nil)
         #expect(!browser.isDefaultViewChanged)
         #expect(PlaceDefaults.stored(in: defaults).default(for: Self.tasks) == nil)
@@ -134,7 +134,7 @@ struct PlaceDefaultsTests {
         let browser = Self.window(defaults, library: library)
         browser.viewMode = .table
         #expect(browser.isDefaultViewChanged)
-        browser.viewMode = Browser.naturalLayout(of: browser.item)
+        browser.viewMode = Browser.naturalLayout
         #expect(!browser.isDefaultViewChanged)
     }
 
@@ -250,10 +250,10 @@ struct PlaceDefaultsTests {
         let defaults = ViewPanelTests.defaults()
         let garbage = Data("not json".utf8)
         defaults.set(garbage, forKey: PlaceDefaults.key)
-        #expect(PlaceDefaults.stored(in: defaults).default(for: .allItems) == nil)
-        Self.store(PlaceDefault(layout: .table), for: .allItems, in: defaults)
+        #expect(PlaceDefaults.stored(in: defaults).default(for: .favorites) == nil)
+        Self.store(PlaceDefault(layout: .table), for: .favorites, in: defaults)
         #expect(defaults.array(forKey: PlaceDefaults.setAsideKey) as? [Data] == [garbage])
-        #expect(PlaceDefaults.stored(in: defaults).default(for: .allItems)?.layout == .table)
+        #expect(PlaceDefaults.stored(in: defaults).default(for: .favorites)?.layout == .table)
     }
 
     @Test func aFieldThisVersionDoesNotKnowNeverVoidsTheRest() throws {
@@ -276,10 +276,10 @@ struct PlaceDefaultsTests {
         let good = try String(decoding: JSONEncoder().encode(PlaceDefault(layout: .board)), as: UTF8.self)
         let object: [String: Any] = [
             Self.tasks.storageKey: try JSONSerialization.jsonObject(with: Data(bad.utf8)),
-            SidebarItem.allItems.storageKey: try JSONSerialization.jsonObject(with: Data(good.utf8)),
+            SidebarItem.favorites.storageKey: try JSONSerialization.jsonObject(with: Data(good.utf8)),
         ]
         defaults.set(try JSONSerialization.data(withJSONObject: object), forKey: PlaceDefaults.key)
-        #expect(PlaceDefaults.stored(in: defaults).default(for: .allItems)?.layout == .board)
+        #expect(PlaceDefaults.stored(in: defaults).default(for: .favorites)?.layout == .board)
         #expect(PlaceDefaults.stored(in: defaults).default(for: Self.tasks) == nil)
 
         Self.store(PlaceDefault(layout: .table), for: .recents, in: defaults)
@@ -288,7 +288,7 @@ struct PlaceDefaultsTests {
         let kept = try #require(JSONSerialization.jsonObject(with: aside[0]) as? [String: Any])
         #expect(Array(kept.keys) == [Self.tasks.storageKey])
         #expect((kept[Self.tasks.storageKey] as? [String: Any])?["filters"] as? String == "not a table")
-        #expect(PlaceDefaults.stored(in: defaults).default(for: .allItems)?.layout == .board)
+        #expect(PlaceDefaults.stored(in: defaults).default(for: .favorites)?.layout == .board)
         #expect(PlaceDefaults.stored(in: defaults).default(for: .recents)?.layout == .table)
     }
 
@@ -315,8 +315,8 @@ struct PlaceDefaultsTests {
         #expect(defaults.array(forKey: ItemTableColumnLayouts.setAsideKey) as? [Data] == [garbage])
         #expect(ItemTableColumnLayouts.layout(for: Self.tasks, in: stored)[visibility: "created"] == .visible)
         // Nothing stored yet, or readable layouts, set nothing aside.
-        _ = ItemTableColumnLayouts.storing(layout, for: .allItems, in: stored, setAsideIn: defaults)
-        _ = ItemTableColumnLayouts.storing(layout, for: .allItems, in: Data(), setAsideIn: defaults)
+        _ = ItemTableColumnLayouts.storing(layout, for: .favorites, in: stored, setAsideIn: defaults)
+        _ = ItemTableColumnLayouts.storing(layout, for: .favorites, in: Data(), setAsideIn: defaults)
         #expect((defaults.array(forKey: ItemTableColumnLayouts.setAsideKey) as? [Data])?.count == 1)
     }
 
@@ -327,7 +327,7 @@ struct PlaceDefaultsTests {
         let library = Self.library()
         let gone = SidebarItem.collection(ItemID("gone"))
         let lost = SidebarItem.itemType("test.gone")
-        for place in [Self.tasks, gone, lost, .allItems] { Self.store(PlaceDefault(layout: .table), for: place, in: defaults) }
+        for place in [Self.tasks, gone, lost, .favorites] { Self.store(PlaceDefault(layout: .table), for: place, in: defaults) }
         let browser = Self.window(defaults, library: library)
 
         // A copy that is not known to be whole says nothing about what is missing.
@@ -344,7 +344,7 @@ struct PlaceDefaultsTests {
         #expect(stored.default(for: gone) == nil)
         #expect(stored.default(for: lost) == nil)
         #expect(stored.default(for: Self.tasks) != nil)
-        #expect(stored.default(for: .allItems) != nil)
+        #expect(stored.default(for: .favorites) != nil)
     }
 
     // MARK: Reset View beside New View's panel

@@ -8,10 +8,11 @@ import Foundation
 /// opens the place again, which reads the entry again, and so picks up the other window's change then.
 extension Browser {
     /// Whether a place has a default view: every place a person can arrange, which is any but a saved view, whose choices
-    /// are its own, and the indexes of collections and sources, whose table is arranged by `IndexPreferences`.
+    /// are its own, and the three indexes (Items, Collections and Sources), whose tab and sort are kept by
+    /// `IndexPreferences` and which have no layout to choose.
     nonisolated static func hasDefaultView(_ place: SidebarItem) -> Bool {
         switch place {
-        case .view, .collections, .sources: false
+        case .view, .collections, .sources, .allItems: false
         default: true
         }
     }
@@ -19,10 +20,8 @@ extension Browser {
     /// Whether the open place has a default view the window can change.
     var hasDefaultView: Bool { !showsSettings && Self.hasDefaultView(item) }
 
-    /// The layout a place opens in until the person chooses one: Items spans the window, any other place lists.
-    nonisolated static func naturalLayout(of place: SidebarItem) -> ItemViewMode {
-        place == .allItems ? .gallery : .list
-    }
+    /// The layout a place opens in until the person chooses one.
+    nonisolated static let naturalLayout = ItemViewMode.list
 
     // MARK: Keeping
 
@@ -108,7 +107,7 @@ extension Browser {
         let inputs = [PlaceDefaults.key, PlaceDensities.key, ItemTableColumnLayouts.key].map { defaults.data(forKey: $0) }
         if let known = changedMemo, known.place == place, known.inputs == inputs { return known.changed }
         let stored = PlaceDefaults.stored(in: defaults).default(for: place)
-        let changed = stored?.isChanged(naturalLayout: Self.naturalLayout(of: place)) == true
+        let changed = stored?.isChanged(naturalLayout: Self.naturalLayout) == true
             || PlaceDensities.stored(in: defaults).density(for: place) != nil
             || ItemTableColumnLayouts.isChanged(for: place, in: inputs[2] ?? Data())
         changedMemo = (place, inputs, changed)
@@ -136,7 +135,7 @@ extension Browser {
         placeCards[place] = nil
         placeCalendarScales[place] = nil
         observedChoices[place] = ViewChoices(options: ItemTableOptions(), timelineDate: nil)
-        let natural = Self.naturalLayout(of: place)
+        let natural = Self.naturalLayout
         if viewMode != natural, availableViewModes(in: library).contains(natural) { set(layout: natural) }
         registerResetUndo(restoring: before)
     }
