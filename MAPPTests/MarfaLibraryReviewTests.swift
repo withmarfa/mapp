@@ -286,7 +286,7 @@ extension LiveMarfaTests {
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
             let address = try #require(URL(string: try LiveMarfa.address()))
             let other = try await WorkingCopy.open(
-                store: root.appending(path: "other.sqlite"), server: Server(url: address, key: try LiveMarfa.key()))
+                store: root.appending(path: "other.sqlite"), server: try Server(url: address, key: try LiveMarfa.key()))
             _ = try await other.hydrate(types: ["core.*"], tier: .library)
             let row = try #require(try await other.items.get(id.rawValue))
             _ = try await other.items.update(id.rawValue, Edit(properties: ["body": .string(text)], baseVersion: row.version))

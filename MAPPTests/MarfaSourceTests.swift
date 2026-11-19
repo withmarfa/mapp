@@ -1067,7 +1067,7 @@ extension LiveMarfaTests {
                 let address = try #require(URL(string: try LiveMarfa.address()))
                 let key = try LiveMarfa.key()
                 let other = try await WorkingCopy.open(
-                    store: otherRoot.appending(path: "other.sqlite"), server: Server(url: address, key: key))
+                    store: otherRoot.appending(path: "other.sqlite"), server: try Server(url: address, key: key))
                 _ = try await other.hydrate(types: ["core.*"], tier: .library)
                 let row = try #require(try await other.items.get(id.rawValue))
                 _ = try await other.items.update(id.rawValue, Edit(properties: ["description": .string("From another device")], baseVersion: row.version))
@@ -1131,7 +1131,7 @@ extension LiveMarfaTests {
             let otherRoot = scratch()
             defer { try? FileManager.default.removeItem(at: otherRoot) }
             try FileManager.default.createDirectory(at: otherRoot, withIntermediateDirectories: true)
-            let other = try await WorkingCopy.open(store: otherRoot.appending(path: "other.sqlite"), server: connection.server(key: key))
+            let other = try await WorkingCopy.open(store: otherRoot.appending(path: "other.sqlite"), server: try connection.server(key: key))
             _ = try await other.hydrate(types: ["core.*"], tier: .library)
             let row = try #require(try await other.items.get(a.rawValue))
             _ = try await other.items.update(a.rawValue, Edit(properties: ["body": .string("Another device")], baseVersion: row.version))
@@ -1139,7 +1139,7 @@ extension LiveMarfaTests {
             await other.close()
 
             // The app's own store, edited from the version it holds, drained, and closed before it forgot the answer.
-            let raw = try await WorkingCopy.open(store: location.store(for: connection), server: connection.server(key: key))
+            let raw = try await WorkingCopy.open(store: location.store(for: connection), server: try connection.server(key: key))
             _ = try await raw.items.update(a.rawValue, Edit(properties: ["body": .string("This device")], baseVersion: version.rawValue))
             let report = try await raw.queue.drain()
             let sibling = report.verdicts.compactMap { answer -> String? in
