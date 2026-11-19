@@ -88,9 +88,6 @@ extension View {
     /// (`EditorController.onEscape`).
     func escapesFromPage(_ details: DetailsPresentation) -> some View {
         onKeyPress(.escape) { details.escapeFromPage() ? .handled : .ignored }
-            // A list or the page holds the keyboard in AppKit, which never offers the key to SwiftUI's key handling
-            // but sends the cancel command up the window.
-            .onExitCommand { details.escapeFromPage() }
     }
 
     /// Puts the corner of an item's page over it, ending where the right sidebar begins.
