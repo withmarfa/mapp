@@ -724,7 +724,7 @@ final class Browser {
     /// asks to erase them for good, and only where the library can; otherwise the person is told why not.
     static func delete(
         _ ids: Set<ItemID>, in library: any ItemLibrary, undoManager: UndoManager?, toasts: ToastPresenter? = nil,
-        asking confirm: ((Set<ItemID>) -> Void)? = nil
+        naming title: String? = nil, asking confirm: ((Set<ItemID>) -> Void)? = nil
     ) {
         let binned = Set(ids.filter { library.item($0)?.state == .trashed })
         // Told here, before anything asks the person to confirm items that would be left alone.
@@ -735,7 +735,7 @@ final class Browser {
             if moving.count > 1, let confirm {
                 confirm(moving)
             } else {
-                moveToRecentlyDeleted(moving, in: library, undoManager: undoManager, toasts: toasts)
+                moveToRecentlyDeleted(moving, in: library, undoManager: undoManager, toasts: toasts, naming: title)
             }
         } else if !binned.isEmpty, ids.subtracting(binned).isEmpty {
             if library.reachesServer { library.itemsToPurge = binned } else { library.tellCannotPurge() }
@@ -746,12 +746,13 @@ final class Browser {
     /// The toast's Undo is bound to the step (`StepUndo`), not to its name: any step registered, undone or redone
     /// after it takes the toast away. It is offered only where no undo group was open before the move, since the move
     /// would then share that group and `undo()` would take back the other steps in it too. A manager that does not
-    /// group by event has none open, so the move gets a group of its own, closed at once.
+    /// group by event has none open, so the move gets a group of its own, closed at once. A `title` names the one item
+    /// moved, for an item the library may no longer return once moved.
     static func moveToRecentlyDeleted(
-        _ ids: Set<ItemID>, in library: any ItemLibrary, undoManager: UndoManager?, toasts: ToastPresenter?
+        _ ids: Set<ItemID>, in library: any ItemLibrary, undoManager: UndoManager?, toasts: ToastPresenter?, naming title: String? = nil
     ) {
         let moving = library.deletePlan(ids).moving
-        let name = moving.count == 1 ? moving.first.flatMap { library.item($0)?.name } : nil
+        let name = moving.count == 1 ? title ?? moving.first.flatMap { library.item($0)?.name } : nil
         let startsGroup = undoManager?.groupingLevel == 0
         let opensGroup = startsGroup && undoManager?.groupsByEvent == false
         if opensGroup { undoManager?.beginUndoGrouping() }

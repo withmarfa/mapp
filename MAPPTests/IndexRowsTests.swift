@@ -48,18 +48,8 @@ struct IndexRowsTests {
         #expect(shares.reduce(0) { $0 + $1.count } == items.count)
     }
 
-    @Test func manyTypesCollapseIntoOneOtherShareThatKeepsTheTotal() {
-        let shares = (1...6).map { TypeShare(type: TypeID("t.\($0)"), label: "T\($0)", count: 10 - $0) }
-        let collapsed = IndexRows.collapsing(shares, limit: 4)
-        #expect(collapsed.count == 4)
-        #expect(collapsed.prefix(3).map(\.label) == ["T1", "T2", "T3"])
-        #expect(collapsed.last?.type == nil)
-        #expect(collapsed.reduce(0) { $0 + $1.count } == shares.reduce(0) { $0 + $1.count })
-        #expect(IndexRows.collapsing(Array(shares.prefix(4)), limit: 4) == Array(shares.prefix(4)))
-    }
-
     @Test func theTypeLineNamesThreeAndCountsTheRest() {
-        let shares = (1...5).map { TypeShare(type: TypeID("t.\($0)"), label: "T\($0)", count: 1) }
+        let shares = (1...5).map { TypeShare(type: TypeID("t.\($0)"), label: "T\($0)", icon: nil, count: 1) }
         let line = IndexRows.summary(of: shares)
         #expect(line.contains("T1") && line.contains("T3"))
         #expect(!line.contains("T4"))
@@ -76,7 +66,7 @@ struct IndexRowsTests {
         #expect(row.count == 2)
         #expect(row.latest == base + 7 * 60)
         #expect(row.breakdown.count == 2)
-        #expect(row.secondary == catalogue.label(for: collection.type))
+        #expect(row.tier == .library)
     }
 
     @Test func anEmptyCollectionHasNoLatestItemAndSortsAsTheOldest() throws {
@@ -86,33 +76,6 @@ struct IndexRowsTests {
         #expect(row.latest == nil)
         #expect(row.latestOrOldest == .distantPast)
         #expect(row.breakdown.isEmpty)
-    }
-
-    private func rows(withTypes counts: [(String, Int)]) -> [IndexRow] {
-        let shares = counts.map { TypeShare(type: TypeID($0.0), label: $0.0, count: $0.1) }
-        return [
-            IndexRow(
-                place: .source("a"), title: "a", icon: .symbol("x"), secondary: "", types: "", count: counts.reduce(0) { $0 + $1.1 },
-                latest: nil, breakdown: shares)
-        ]
-    }
-
-    @Test func aTypeKeepsItsColorSlotWhateverTheCountsDo() {
-        let before = IndexSlots(rows: rows(withTypes: [("t.b", 5), ("t.a", 3), ("t.c", 1)]))
-        let after = IndexSlots(rows: rows(withTypes: [("t.c", 9), ("t.b", 5), ("t.a", 3)]))
-        for id in ["t.a", "t.b", "t.c"] { #expect(before.slot(for: TypeID(id)) == after.slot(for: TypeID(id))) }
-        #expect(before.slot(for: TypeID("t.a")) == 0)
-        #expect(before.slot(for: TypeID("t.c")) == 2)
-    }
-
-    @Test func noTwoOfManyTypesShareASlotAndTheLeastCommonHaveNone() {
-        let counts = (1...12).map { ("t.\(String(format: "%02d", $0))", 100 - $0) }
-        let slots = IndexSlots(rows: rows(withTypes: counts))
-        let given = counts.compactMap { slots.slot(for: TypeID($0.0)) }
-        #expect(given.count == IndexSlots.count)
-        #expect(Set(given).count == given.count)
-        #expect(slots.slot(for: TypeID("t.12")) == nil)
-        #expect(slots.slot(for: nil) == nil)
     }
 
     @Test func sourcesAndTheirCountsComeFromOneGrouping() {
@@ -199,37 +162,43 @@ struct IndexPreferencesTests {
         return defaults
     }
 
-    @Test func aNewPageIsAListAndNarrow() {
+    @Test func aNewPageShowsAllAndItsDefaultOrder() {
         let defaults = defaults()
         for place in IndexPlace.allCases {
-            #expect(IndexPreferences.layout(for: place, in: defaults) == .list)
-            #expect(IndexPreferences.width(for: place, in: defaults) == .narrow)
+            #expect(IndexPreferences.tab(for: place, in: defaults) == .all)
+            #expect(IndexPreferences.sort(for: place, in: defaults) == place.defaultSort)
         }
+        #expect(IndexPlace.sources.defaultSort == IndexSort(column: .count, ascending: false))
+        #expect(IndexPlace.collections.defaultSort == IndexSort(column: .name, ascending: true))
     }
 
-    @Test func eachPageKeepsItsOwnChoices() {
+    @Test func eachPageKeepsItsOwnTabAndSort() {
         let defaults = defaults()
-        IndexPreferences.set(.table, for: .sources, in: defaults)
-        IndexPreferences.set(.wide, for: .sources, in: defaults)
-        IndexPreferences.set(.cards, for: .collections, in: defaults)
-        #expect(IndexPreferences.layout(for: .sources, in: defaults) == .table)
-        #expect(IndexPreferences.width(for: .sources, in: defaults) == .wide)
-        #expect(IndexPreferences.layout(for: .collections, in: defaults) == .cards)
-        #expect(IndexPreferences.width(for: .collections, in: defaults) == .narrow)
+        IndexPreferences.set(.keys, for: .sources, in: defaults)
+        IndexPreferences.set(.fromApps, for: .collections, in: defaults)
+        IndexPreferences.set(IndexSort(column: .latest, ascending: false), for: .sources, in: defaults)
+        #expect(IndexPreferences.tab(for: .sources, in: defaults) == .keys)
+        #expect(IndexPreferences.tab(for: .collections, in: defaults) == .fromApps)
+        #expect(IndexPreferences.sort(for: .sources, in: defaults) == IndexSort(column: .latest, ascending: false))
+        #expect(IndexPreferences.sort(for: .collections, in: defaults) == IndexPlace.collections.defaultSort)
     }
 
-    @Test func anUnreadableStoredValueFallsBackToTheDefault() {
+    @Test func anUnreadableOrForeignStoredValueFallsBack() {
         let defaults = defaults()
-        defaults.set("kanban", forKey: IndexPlace.sources.layoutKey)
-        defaults.set(3, forKey: IndexPlace.sources.widthKey)
-        #expect(IndexPreferences.layout(for: .sources, in: defaults) == .list)
-        #expect(IndexPreferences.width(for: .sources, in: defaults) == .narrow)
+        defaults.set("kanban", forKey: IndexPlace.sources.tabKey)
+        defaults.set("sideways", forKey: IndexPlace.sources.sortKey)
+        #expect(IndexPreferences.tab(for: .sources, in: defaults) == .all)
+        #expect(IndexPreferences.sort(for: .sources, in: defaults) == IndexPlace.sources.defaultSort)
+        // A tab of the other page is not one of this page's.
+        defaults.set("yours", forKey: IndexPlace.sources.tabKey)
+        #expect(IndexPreferences.tab(for: .sources, in: defaults) == .all)
+        defaults.set("name.up", forKey: IndexPlace.collections.sortKey)
+        #expect(IndexPreferences.sort(for: .collections, in: defaults) == IndexPlace.collections.defaultSort)
     }
 
-    @Test func theWidthsAreNarrowStandardAndTheWholeWindow() {
-        #expect(IndexWidth.narrow.points == 720)
-        #expect(IndexWidth.standard.points == 1000)
-        #expect(IndexWidth.wide.points == nil)
+    @Test func theTabsAreAllThenTheTwoKindsOfThePage() {
+        #expect(IndexPlace.collections.tabs == [.all, .yours, .fromApps])
+        #expect(IndexPlace.sources.tabs == [.all, .apps, .keys])
     }
 
     @Test func onlyTheTwoIndexesAreIndexPages() {

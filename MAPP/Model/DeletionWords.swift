@@ -20,6 +20,26 @@ nonisolated enum DeletionWords {
         return AttributedString(localized: "^[Moved \(count) item](inflect: true) to Recently Deleted").text
     }
 
+    /// What the toast says after the item `title` moved to Recently Deleted.
+    static func movedMessage(titled title: String) -> String {
+        String(localized: "Moved “\(title)” to Recently Deleted")
+    }
+
+    /// The title of the question before a collection is deleted.
+    static func collectionTitle(_ title: String) -> String {
+        String(localized: "Delete the collection “\(title)”?")
+    }
+
+    /// What deleting a collection does: it goes for every app, and the items in it stay.
+    static func collectionMessage(keeping count: Int) -> String {
+        let what = String(localized: "The collection is deleted for every app connected to your Marfa server.")
+        switch count {
+        case 0: return what
+        case 1: return what + " " + String(localized: "Its 1 item is kept.")
+        default: return what + " " + String(localized: "Its \(count) items are kept.")
+        }
+    }
+
     /// The title asking to erase `count` items already in Recently Deleted.
     static func purgeTitle(count: Int) -> String {
         AttributedString(localized: "^[Delete \(count) item](inflect: true) immediately?").text
