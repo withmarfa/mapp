@@ -58,6 +58,30 @@
     "Couldn’t Sign In" : {
 
     },
+    "Switched Servers, but MAPP May Still Be Approved on the Previous One" : {
+
+    },
+    "MAPP May Still Be Approved" : {
+
+    },
+    "MAPP forgot the previous server’s sign-in on this Mac, but couldn’t confirm that the previous server ended the approval." : {
+
+    },
+    "MAPP dropped a sign-in it didn’t use, but couldn’t confirm that the server ended its approval." : {
+
+    },
+    "To end it, run “marfa apps list” and then “marfa apps revoke” with MAPP’s entry on a computer signed in as the owner." : {
+
+    },
+    "MAPP couldn’t make or open the copy of your library on this Mac. Check that MAPP can change its own files, then try again." : {
+
+    },
+    "Couldn’t Finish Signing In" : {
+
+    },
+    "MAPP couldn’t finish signing in. Check your connection and try again, or sign in with a code." : {
+
+    },
     "Customize Sidebar…" : {
 
     },
@@ -271,10 +295,10 @@
     "That address isn’t a Marfa server MAPP can sign in to. Check the address, then try again." : {
 
     },
-    "The approval didn’t come from this server, so MAPP didn’t use it and nothing changed. Try signing in again." : {
+    "MAPP couldn’t verify the approval. Try signing in again." : {
 
     },
-    "The Earlier Approval Is Still on the Server" : {
+    "MAPP’s Earlier Approval May Still Stand" : {
 
     },
     "The editor ran into a problem, so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again." : {
@@ -399,7 +423,7 @@
     "The collection is deleted for every app connected to your Marfa server." : {
 
     },
-    "You are signed in, but the server still lists MAPP’s earlier approval. To end it, open Connected apps from Home on the server, choose the older MAPP and select Disconnect." : {
+    "MAPP couldn’t confirm that the server ended MAPP’s earlier approval. To end it, run “marfa apps list” and then “marfa apps revoke” with the older MAPP entry on a computer signed in as the owner." : {
 
     },
     "Your items are still loading." : {
@@ -2322,7 +2346,7 @@
     "Disconnect…" : {
 
     },
-    "Disconnected, but MAPP Is Still Approved" : {
+    "Disconnected, but MAPP May Still Be Approved" : {
       "extractionState" : "manual"
     },
     "Disconnected, but Not Everything Was Removed" : {
@@ -3020,7 +3044,7 @@
     "MAPP closed the library before it could keep your change. Make the change again." : {
       "extractionState" : "manual"
     },
-    "MAPP couldn’t finish signing in. Check the address and your connection, then try again, or use a code if the browser won’t open." : {
+    "MAPP couldn’t reach that address, so nothing changed. Check the address and your connection, then try again." : {
       "extractionState" : "manual"
     },
     "MAPP couldn’t get the file from the server. Check your connection, then try again." : {
@@ -3041,7 +3065,7 @@
     "MAPP doesn’t have permission for “%@”. Ask whoever runs the server to allow it, then make the change again." : {
       "extractionState" : "manual"
     },
-    "MAPP forgot its sign-in on this Mac, but couldn’t reach the server to end it there. To end it, open Connected apps from Home on the server, choose MAPP and select Disconnect." : {
+    "MAPP forgot its sign-in on this Mac, but couldn’t confirm that the server ended the approval." : {
       "extractionState" : "manual"
     },
     "MAPP is still saving what you last typed. Try again in a moment." : {
@@ -4960,7 +4984,7 @@
     "Yesterday" : {
 
     },
-    "You are signed in again, but the copy of your library on this Mac can’t be opened." : {
+    "MAPP kept the new sign-in, but the copy of your library on this Mac can’t be opened." : {
       "extractionState" : "manual"
     },
     "You can bring them back from Recently Deleted." : {

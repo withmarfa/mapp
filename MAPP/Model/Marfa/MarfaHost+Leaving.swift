@@ -99,9 +99,10 @@ extension MarfaHost {
                 kept = reason
             }
         }
-        if let kept { return .copyKept(kept, signIn: signIn) }
-        if signIn != nil || copy != nil { return .notRemoved(signIn: signIn, copy: copy) }
-        return outcome == .notConfirmed ? .notRevoked : nil
+        let approvalStands = outcome == .notConfirmed
+        if let kept { return .copyKept(kept, signIn: signIn, approvalStands: approvalStands) }
+        if signIn != nil || copy != nil { return .notRemoved(signIn: signIn, copy: copy, approvalStands: approvalStands) }
+        return approvalStands ? .notRevoked : nil
     }
 
     var discarded: [String: Agreed] {

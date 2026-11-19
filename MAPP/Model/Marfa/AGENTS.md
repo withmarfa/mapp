@@ -6,25 +6,25 @@
 
 - `MarfaSource` is the `ItemSource` over the copy. Views draw from the copy offline; a row count it cannot answer needs the server. Writes go to the copy's queue at once. `MarfaLibrary` changes nothing itself; every write goes to the source.
 - Only `MarfaEngine` changes the source's contents. `MarfaSync` consumes `WorkingCopy.updates()`, waits for the engine's reads, sends queued writes and fetches kept files. The package owns retries, fill progress, connection state and the last sync time; a new one refreshes table row counts. Each transition to `.needsHydration`, including one from `.offline`, hydrates the copy. A fault stops hydration, offering Refresh.
-- The copy is the record. The engine holds the raw rows and edges, `MarfaHub` what readers were told, and `MarfaLibrary.records` the main actor's observable copy, the source of `MarfaItemIndex`.
-- Do not use the package's `LiveQuery`: the engine reads what the copy names as changed since its cursor (`readChanged`), on one ordered stream. An update says only what kind of read is wanted; the first of a stream is read from the cursor. Views read through `ItemLibrary`, never the package.
+- The copy is the record. The engine holds the raw rows and edges, `MarfaHub` what readers were told, and `MarfaLibrary.records` the main actor's copy, the source of `MarfaItemIndex`.
+- Do not use the package's `LiveQuery`: the engine reads what the copy names as changed since its cursor (`readChanged`), on one ordered stream. An update says only what kind of read is wanted; the first of a stream is read from the cursor.
 - Names and previews come from `items.displays` in batches. A failed call leaves an item its earlier name; a new item shows a placeholder. A publish asks its own items, then the earlier unnamed if that worked; a failure is told once until a success.
 - A type's search follows Include Subtypes (`SearchScope.typeWithSubtypes`, one type through `SearchFilters.types`); `MarfaSource.search` is one call, so more than ten types is refused, shown as "Can’t Search".
 - The engine keeps every `system.*` row out of items, Recents, counts, search and the bin (`MarfaMapping.isLibraryItem`).
 - Properties, bodies and answers cross the package as values, not JSON text. The package owns its types.
-- Tests step into the engine, `MarfaSync` and `PictureCache` only through their `hooks`, counting through `TestTally` (Debug only). Add no test setter or override to a shipping type.
+- Tests step into the engine, `MarfaSync` and `PictureCache` only through their `hooks` (`TestTally`, Debug only); add no test setter or override to a shipping type.
 - `MarfaHost` owns the connection: the address in defaults, the sign-in in the Keychain, made on the server's own page. Each address has its own copy (`MarfaStoreLocation`). The library, the one subscriber to the source's states and reports, tells the host by callback.
-- Plain http to another machine is told once a run (`Server.plainHTTPOrigin`). `Server` uses `URLSession`, so App Transport Security applies, with no `Info.plist` exception.
+- Plain http to another machine is told once a run (`Server.plainHTTPOrigin`); App Transport Security applies, with no `Info.plist` exception.
 
 ## Never lose a person's write
 
-- A write that reaches a closed source or is refused before queueing is in no queue: what the person typed goes back through `Notices.notKept` (`MarfaLibrary.unqueuedText`).
+- A write that reaches a closed source or is refused before queueing is in no queue: the typed text goes back through `Notices.notKept` (`MarfaLibrary.unqueuedText`).
 - Leaving a copy (disconnecting or switching) reads its queue in the step closing it. While writes wait, the person keeps or discards it; a discard names exactly the writes shown, so one that lands after keeps it.
 - A copy is removed only by `WorkingCopy.remove(store:confirming:)` against a fresh `unsentWrites(in:)`, all shown to the person (`MarfaHost.removeStore`); an unreadable one stays. A copy another version made opens with `ifRefused: .replace`, replaced only with none unsent, else refused (`MarfaError.wrongSchema`) with its count; leaving lists its writes (`MarfaHost.unsentChanges(in:)`). One for another server (`MarfaError.wrongServer`) is told with its unsent count (`Words.otherServer`). Pass no `fileBudget` to `open`.
 - Disconnecting forgets the address and marks a discarded copy before it closes or anything waits (`markBeforeLeaving`); a refused close restores both; a switch marks the old copy first; the folder goes only when empty.
-- An ended sign-in (`signedOut`, `credential_ended`) parks the queue until Settings signs in again, which hands the editors over, then gives the open copy the sign-in with `WorkingCopy.use(_:)`; library and queue stay unless the store could not open again (`SourceUseFailure.closed`); a reader copy is told `inUse`. Another instance lands in `Words.otherServer`. A canceled sign-in changes nothing. A switch that finds more writes after its sign-in keeps the approval for the answer (`pendingSignIn`, in the defaults); a failed answer, a dropped question or a launch ends it.
+- An ended sign-in (`signedOut`, `credential_ended`) parks the queue until Settings signs in again, which hands the editors over, then gives the open copy the sign-in with `WorkingCopy.use(_:)`; library and queue stay unless the store could not open again (`SourceUseFailure.closed`); a reader copy is told `inUse`. A canceled sign-in changes nothing. A switch that finds more writes after its sign-in keeps the approval for the answer (`pendingSignIn`, in the defaults); a failed answer, a dropped question or a launch ends it.
 - An error the package classifies (`isOffline`, `isTransient`, `isKeyRefusal`) is never a fault: the package reports it through the connection and retries. A canceled call is not shown. Any other error (`invalid`, `unknownType`, `validation`, the rest) shows the library unavailable, told once, with Refresh. A stop is told once per connection change, a drain failure until a success; the library stays stopped. One hydration runs whatever the progress says.
-- `SignIns` keeps the sign-in (`SystemSignIns` over the package's `Authorization`; `ScriptedSignIns` in tests), asking for item and `edge.*` scopes. A sign-in answers `SignedIn`, a sign-out `SignOutOutcome`: only `.notConfirmed` tells the approval stands. It can wait a minute, so Disconnect shows it works.
+- `SignIns` keeps the sign-in (`SystemSignIns` over the package's `Authorization`; `ScriptedSignIns` in tests), asking for item and `edge.*` scopes. A sign-in answers `SignedIn`, a sign-out `SignOutOutcome`: only `.notConfirmed` is told, as the `marfa apps` steps that end the approval. Sign-out can wait for a renewal before asking the server to end the approval. Read a typed address with `MarfaConnection(typed:)` and compare with `sameServer(as:)`; a new address is probed (`Prober`) before signing in.
 - The copy drains its queue itself when the server is back; the sync drains once more when the connection returns to following, never on a timer. The engine takes answers only with `Queue.takeAnswered()`, which clears the answered writes and lists a refused write that carried content, a blocked one and a dead one with their verdict, each told once.
 - Never clear the queue to recover from `copyExpired`: hydrate again, which keeps it.
 - A refused write that carried content stays listed until the person discards it; discarding it (if it carried text) or Undo Change on it is confirmed.
@@ -60,7 +60,7 @@
 
 ## Wording
 
-- `SyncWording.swift` words the model's states and counts. Show a `MarfaHost.Problem` as what happened and what to do, never the error or its text (`Words.message(for:)`; a sign-in ending is a payload-free `SignInOutcome`), with only the contract's actions (`MarfaProblems`).
+- `SyncWording.swift` words the model's states and counts. Tell a `MarfaHost.Problem` as what happened and what to do, never an error's text (`Words.message(for:)`, `SignInOutcome`), with only the contract's actions (`MarfaProblems`).
 
 ## Code Review Rules
 

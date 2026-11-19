@@ -237,10 +237,11 @@ extension EditorTests {
         #expect(try await page.editor.webView.evaluateJavaScript("window.asked") as? Int == 1)
         let messages = library.notices.waiting.map(\.message)
         #expect(messages.count == 1, "\(messages)")
+        let message = try #require(messages.first)
         for raw in ["the flush broke", "TypeError", "Error", "internal", "“"] {
-            #expect(!messages[0].contains(raw), "“\(messages[0])” shows “\(raw)”")
+            #expect(!message.contains(raw), "“\(message)” shows “\(raw)”")
         }
-        #expect(messages[0].hasSuffix("To go ahead without it, try again."))
+        #expect(message.hasSuffix("To go ahead without it, try again."))
         #expect(library.notices.waiting.first?.title == "Couldn’t Save “Note”")
         // Time for anything the page's error listener posts to arrive, which nothing signals when it does not.
         try await Task.sleep(for: .milliseconds(200))

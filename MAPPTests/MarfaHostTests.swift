@@ -496,7 +496,7 @@ import Testing
         (SignInError.denied, SignInOutcome.denied),
         (.expired, .expired),
         (.refused(code: "invalid_grant", message: "No."), .refused),
-        (.unavailable(message: "offline"), .unreachable),
+        (.unavailable(message: "offline"), .couldNotFinish),
         (.unreadable(message: "locked"), .notMarfa),
         (.heldElsewhere, .inUse),
     ])

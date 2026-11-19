@@ -9,12 +9,42 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
         case notAServer
     }
 
-    /// Scheme and host in lower case, no trailing slash and no port the scheme already means (443 for https, 80 for
-    /// http), so one server is one address however it was typed, and the package, which names a server by its origin
-    /// the same way, keeps one sign-in for it.
+    /// Scheme and host in lower case and no trailing slash. An address read as it was saved keeps a port the scheme
+    /// already means, since the copy and the discard marks are named by that exact text; one the person types drops
+    /// it (`init(typed:)`). Compare connections with `sameServer(as:)`, never `==`, where the question is whether two
+    /// addresses are one server.
     let address: URL
 
+    /// An address as it was saved, which names its copy by the text it was kept as.
     init(address text: String) throws(Problem) {
+        try self.init(text, dropsDefaultPort: false)
+    }
+
+    /// An address the person typed: it leaves out a port the scheme already means (443 for https, 80 for http), so
+    /// one server is one address however it was typed, and the package, which names a server by its origin the same
+    /// way, keeps one sign-in for it.
+    init(typed text: String) throws(Problem) {
+        try self.init(text, dropsDefaultPort: true)
+    }
+
+    /// Whether `other` names the same server: the same address once a port the scheme already means is left out.
+    func sameServer(as other: MarfaConnection) -> Bool {
+        Self.origin(address) == Self.origin(other.address)
+    }
+
+    private static func origin(_ address: URL) -> URL {
+        guard var components = URLComponents(url: address, resolvingAgainstBaseURL: false) else { return address }
+        dropDefaultPort(&components)
+        return components.url ?? address
+    }
+
+    private static func dropDefaultPort(_ components: inout URLComponents) {
+        if (components.scheme == "https" && components.port == 443) || (components.scheme == "http" && components.port == 80) {
+            components.port = nil
+        }
+    }
+
+    private init(_ text: String, dropsDefaultPort: Bool) throws(Problem) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard var components = URLComponents(string: trimmed),
             let scheme = components.scheme?.lowercased(), ["http", "https"].contains(scheme),
@@ -24,7 +54,7 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
         else { throw .notAServer }
         components.scheme = scheme
         components.host = host.lowercased()
-        if (scheme == "https" && components.port == 443) || (scheme == "http" && components.port == 80) { components.port = nil }
+        if dropsDefaultPort { Self.dropDefaultPort(&components) }
         while components.path.hasSuffix("/") { components.path.removeLast() }
         guard let address = components.url else { throw .notAServer }
         self.address = address

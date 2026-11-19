@@ -21,8 +21,8 @@ nonisolated protocol SignIns: Sendable {
     func startCodeSignIn(to connection: MarfaConnection) async throws -> CodeSignIn
 
     /// Forgets the sign-in on this Mac and revokes it at the server. Only `.notConfirmed` leaves an approval that may
-    /// stand there until the owner ends it. A server that does not answer holds this for up to a minute, since the
-    /// package waits for a renewal in flight.
+    /// stand there until the owner ends it. Sign-out can wait for a renewal before asking the server to end the
+    /// approval.
     func signOut(of connection: MarfaConnection) async throws -> SignOutOutcome
 }
 
@@ -42,9 +42,26 @@ nonisolated struct CodeSignIn: Sendable {
 
 /// What a finished sign-in left behind that the person may need to act on.
 nonisolated struct SignedIn: Hashable, Sendable {
-    /// The server still holds the approval this sign-in replaced, which only its owner can end there.
+    /// MAPP could not confirm that the server ended the approval this sign-in replaced, which only its owner can end
+    /// there.
     var replacedApprovalStands = false
+
+    init(replacedApprovalStands: Bool = false) {
+        self.replacedApprovalStands = replacedApprovalStands
+    }
+
+    /// What `grant` says of the approval it replaced. Both of `SystemSignIns`' sign-ins make theirs here.
+    init(_ grant: some ReplacedGrant) {
+        replacedApprovalStands = grant.replacedGrantStands
+    }
 }
+
+/// What a finished sign-in says of the approval it replaced: the package's `Credential`, or a stand-in for one.
+nonisolated protocol ReplacedGrant: Sendable {
+    var replacedGrantStands: Bool { get }
+}
+
+extension Credential: ReplacedGrant {}
 
 /// Why a sign-in did not finish, in the terms the app words, whichever sign-in it was. No case carries a word the
 /// package, the system or the server said: those are logged and never shown.
@@ -57,8 +74,10 @@ nonisolated enum SignInOutcome: Hashable, Sendable {
     case expired
     /// The server refused the sign-in.
     case refused
-    /// The server could not be reached, or the browser could not open.
+    /// The server could not be reached.
     case unreachable
+    /// The sign-in did not finish and the package could not say why: the server or the browser did not answer.
+    case couldNotFinish
     /// The address answered, but not as a Marfa server MAPP can sign in to.
     case notMarfa
     /// The approval that came back was not for this sign-in or not from this server, so it was not used.
@@ -83,7 +102,7 @@ nonisolated enum SignInOutcome: Hashable, Sendable {
             case .canceled: self = .canceled
             case .denied: self = .denied
             case .expired: self = .expired
-            case .unavailable: self = .unreachable
+            case .unavailable: self = .couldNotFinish
             case .heldElsewhere: self = .inUse
             case .refused: self = .refused
             case .stateMismatch, .issuerMismatch: self = .notVerified
@@ -107,6 +126,26 @@ nonisolated enum SignInOutcome: Hashable, Sendable {
         }
         let outcome = self
         if outcome != .canceled { Telemetry.logger(.library).error("A sign-in did not finish (\(String(describing: outcome))): \(detail)") }
+    }
+
+    /// Why reading the server's root, before any sign-in began, did not show a Marfa server: it could not be reached,
+    /// or something else answered.
+    init(probe error: any Error) {
+        let detail = String(describing: error)
+        if error is CancellationError {
+            self = .canceled
+        } else if let error = error as? MarfaError {
+            switch error {
+            case .unnamed(let status, _, _): self = status >= 500 ? .unreachable : .notMarfa
+            default: self = error.isTransient ? .unreachable : .notMarfa
+            }
+        } else if error is URLError {
+            self = .unreachable
+        } else {
+            self = .notMarfa
+        }
+        let outcome = self
+        if outcome != .canceled { Telemetry.logger(.library).error("The address did not answer as a Marfa server (\(String(describing: outcome))): \(detail)") }
     }
 }
 
@@ -135,15 +174,33 @@ nonisolated struct SystemSignIns: SignIns {
     /// The window the browser's pages are shown over.
     let anchor: @MainActor @Sendable () -> NSWindow?
 
+    /// A device sign-in as the package gives it, so a test can stand in for the server.
+    struct DeviceGrant: Sendable {
+        let code: String
+        let address: URL
+        let completeAddress: URL?
+        let expiresAt: Date
+        let credential: @Sendable () async throws -> any ReplacedGrant
+    }
+
+    /// Stand-ins for the two package calls that talk to a server; nil uses the package's. A test gives them to reach
+    /// the mapping from what the package returns to what MAPP tells.
+    private let browserGrant: (@MainActor @Sendable (MarfaConnection, NSWindow) async throws -> any ReplacedGrant)?
+    private let deviceGrant: (@Sendable (MarfaConnection) async throws -> DeviceGrant)?
+
     init(
         bundleIdentifier: String = Bundle.main.bundleIdentifier ?? "com.withmarfa.mapp",
         anchor: @escaping @MainActor @Sendable () -> NSWindow? = {
             NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.windows.first { $0.isVisible }
-        }
+        },
+        browserGrant: (@MainActor @Sendable (MarfaConnection, NSWindow) async throws -> any ReplacedGrant)? = nil,
+        deviceGrant: (@Sendable (MarfaConnection) async throws -> DeviceGrant)? = nil
     ) {
         service = bundleIdentifier + ".marfa-sign-in"
         scheme = bundleIdentifier
         self.anchor = anchor
+        self.browserGrant = browserGrant
+        self.deviceGrant = deviceGrant
     }
 
     func authorization(for connection: MarfaConnection) throws -> Authorization {
@@ -163,15 +220,23 @@ nonisolated struct SystemSignIns: SignIns {
 
     @MainActor func signInWithBrowser(to connection: MarfaConnection) async throws -> SignedIn {
         guard let window = anchor() else { throw NoSignInWindow() }
-        return SignedIn(replacedApprovalStands: try await authorization(for: connection).signIn(presentingFrom: window).replacedGrantStands)
+        if let browserGrant { return SignedIn(try await browserGrant(connection, window)) }
+        return SignedIn(try await authorization(for: connection).signIn(presentingFrom: window))
     }
 
     func startCodeSignIn(to connection: MarfaConnection) async throws -> CodeSignIn {
-        let device = try await authorization(for: connection).startDeviceSignIn()
+        let device: DeviceGrant
+        if let deviceGrant {
+            device = try await deviceGrant(connection)
+        } else {
+            let started = try await authorization(for: connection).startDeviceSignIn()
+            device = DeviceGrant(
+                code: started.userCode, address: started.verificationURL, completeAddress: started.verificationURLComplete,
+                expiresAt: started.expiresAt, credential: { try await started.credential() })
+        }
         return CodeSignIn(
-            code: device.userCode, address: device.verificationURL, completeAddress: device.verificationURLComplete,
-            expiresAt: device.expiresAt,
-            finish: { SignedIn(replacedApprovalStands: try await device.credential().replacedGrantStands) })
+            code: device.code, address: device.address, completeAddress: device.completeAddress, expiresAt: device.expiresAt,
+            finish: { SignedIn(try await device.credential()) })
     }
 
     func signOut(of connection: MarfaConnection) async throws -> SignOutOutcome {

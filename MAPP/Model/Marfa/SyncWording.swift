@@ -217,14 +217,52 @@ nonisolated enum Words {
         String(localized: "MAPP couldn’t read this library’s sign-in from the Keychain. Unlock the Keychain and quit and reopen MAPP, or sign in again in Settings.")
     }
 
-    /// A sign-in that replaced another on the same server, where the server still holds the older approval, which
-    /// only its owner can end.
+    /// How the owner ends an approval the server may still hold: only they can, on a computer signed in to the server.
+    private static var endApproval: String {
+        String(localized: "To end it, run “marfa apps list” and then “marfa apps revoke” with MAPP’s entry on a computer signed in as the owner.")
+    }
+
+    /// A sign-in that replaced another on the same server, where MAPP could not confirm the older approval ended.
     static var replacedApprovalTitle: String {
-        String(localized: "The Earlier Approval Is Still on the Server")
+        String(localized: "MAPP’s Earlier Approval May Still Stand")
     }
 
     static var replacedApproval: String {
-        String(localized: "You are signed in, but the server still lists MAPP’s earlier approval. To end it, open Connected apps from Home on the server, choose the older MAPP and select Disconnect.")
+        String(localized: "MAPP couldn’t confirm that the server ended MAPP’s earlier approval. To end it, run “marfa apps list” and then “marfa apps revoke” with the older MAPP entry on a computer signed in as the owner.")
+    }
+
+    /// A sign-in MAPP dropped, or forgot on this Mac, whose approval it could not confirm the server ended.
+    enum ForgottenApproval {
+        /// The sign-in of the server the person left.
+        case left
+        /// The sign-in of the server the person switched away from.
+        case previous
+        /// A sign-in made for a step that did not go on, such as a switch that was abandoned.
+        case abandoned
+    }
+
+    static func approvalMayStandTitle(_ which: ForgottenApproval) -> String {
+        switch which {
+        case .left: String(localized: "Disconnected, but MAPP May Still Be Approved")
+        case .previous: String(localized: "Switched Servers, but MAPP May Still Be Approved on the Previous One")
+        case .abandoned: String(localized: "MAPP May Still Be Approved")
+        }
+    }
+
+    static func approvalMayStand(_ which: ForgottenApproval) -> String {
+        switch which {
+        case .left:
+            String(localized: "MAPP forgot its sign-in on this Mac, but couldn’t confirm that the server ended the approval.") + " " + endApproval
+        case .previous:
+            String(localized: "MAPP forgot the previous server’s sign-in on this Mac, but couldn’t confirm that the previous server ended the approval.") + " " + endApproval
+        case .abandoned:
+            String(localized: "MAPP dropped a sign-in it didn’t use, but couldn’t confirm that the server ended its approval.") + " " + endApproval
+        }
+    }
+
+    /// The copy could not be opened or made, for a reason the package did not name.
+    static var copyCouldNotBeOpened: String {
+        String(localized: "MAPP couldn’t make or open the copy of your library on this Mac. Check that MAPP can change its own files, then try again.")
     }
 
     /// A server whose release is older than the oldest this build works with. Asking again cannot clear it, so

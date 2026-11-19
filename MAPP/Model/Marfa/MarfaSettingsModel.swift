@@ -177,8 +177,8 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     }
 
     private func isConnected(to address: String) -> Bool {
-        guard let target = try? MarfaConnection(address: address) else { return false }
-        return host.connection == target
+        guard let target = try? MarfaConnection(typed: address), let current = host.connection else { return false }
+        return current.sameServer(as: target)
     }
 
     /// A disconnect with nothing waiting is confirmed once, since it ends the sign-in. With changes waiting, the
@@ -249,7 +249,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
                 Notice(
                     title: String(localized: "Can’t Open the Library"),
                     message: sentences(
-                        String(localized: "You are signed in again, but the copy of your library on this Mac can’t be opened."), message))
+                        String(localized: "MAPP kept the new sign-in, but the copy of your library on this Mac can’t be opened."), message))
             default:
                 Notice(
                     title: String(localized: "Can’t Open the Library"),
@@ -262,24 +262,24 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         case .signIn(let outcome):
             signInNotice(outcome)
         case .notRevoked:
-            Notice(
-                title: String(localized: "Disconnected, but MAPP Is Still Approved"),
-                message: String(localized: "MAPP forgot its sign-in on this Mac, but couldn’t reach the server to end it there. To end it, open Connected apps from Home on the server, choose MAPP and select Disconnect."))
-        case .notRemoved(let signIn, let copy):
+            approvalNotice(reached == .switched ? .previous : .left)
+        case .notRemoved(let signIn, let copy, let approvalStands):
             switch reached {
             case .left:
-                Notice(title: String(localized: "Disconnected, but Not Everything Was Removed"), message: removalMessage(signIn: signIn, copy: copy))
+                Notice(
+                    title: String(localized: "Disconnected, but Not Everything Was Removed"),
+                    message: withApproval(removalMessage(signIn: signIn, copy: copy), approvalStands, .left))
             case .switched:
                 Notice(
                     title: String(localized: "Switched Servers, but Not Everything Was Removed"),
-                    message: previousRemovalMessage(signIn: signIn, copy: copy))
+                    message: withApproval(previousRemovalMessage(signIn: signIn, copy: copy), approvalStands, .previous))
             case .notOpened, .signedInAgain:
                 Notice(
                     title: String(localized: "Can’t Open the Library"),
                     message: String(localized: "A copy of this library that you discarded is still on this Mac and can’t be removed. Check that MAPP can change its own files, then try again."))
             }
-        case .copyKept(let kept, let signIn):
-            keptNotice(kept, signIn: signIn, reached: reached)
+        case .copyKept(let kept, let signIn, let approvalStands):
+            keptNotice(kept, signIn: signIn, approvalStands: approvalStands, reached: reached)
         case .cannotDiscard(let folder):
             Notice(title: String(localized: "Can’t Discard This Copy"), message: Words.cannotDiscard(folder: folder))
         case .notConnected:
@@ -309,7 +309,11 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         case .unreachable:
             Notice(
                 title: String(localized: "Can’t Reach the Server"),
-                message: String(localized: "MAPP couldn’t finish signing in. Check the address and your connection, then try again, or use a code if the browser won’t open."))
+                message: String(localized: "MAPP couldn’t reach that address, so nothing changed. Check the address and your connection, then try again."))
+        case .couldNotFinish:
+            Notice(
+                title: String(localized: "Couldn’t Finish Signing In"),
+                message: String(localized: "MAPP couldn’t finish signing in. Check your connection and try again, or sign in with a code."))
         case .notMarfa:
             Notice(
                 title: String(localized: "Check the Address"),
@@ -317,7 +321,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         case .notVerified:
             Notice(
                 title: String(localized: "Couldn’t Confirm the Sign-In"),
-                message: String(localized: "The approval didn’t come from this server, so MAPP didn’t use it and nothing changed. Try signing in again."))
+                message: String(localized: "MAPP couldn’t verify the approval. Try signing in again."))
         case .inUse:
             Notice(
                 title: String(localized: "The Sign-In Is in Use"),
@@ -338,7 +342,11 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     }
 
     /// A copy the person discarded that the package would not remove, which still holds every change in it.
-    private static func keptNotice(_ kept: MarfaHost.CopyKept, signIn: String?, reached: Reached) -> Notice {
+    private static func approvalNotice(_ which: Words.ForgottenApproval) -> Notice {
+        Notice(title: Words.approvalMayStandTitle(which), message: Words.approvalMayStand(which))
+    }
+
+    private static func keptNotice(_ kept: MarfaHost.CopyKept, signIn: String?, approvalStands: Bool, reached: Reached) -> Notice {
         let previous = reached == .switched
         let body: String
         switch kept {
@@ -354,7 +362,8 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
             body = String(localized: "The copy in the folder “\(folder)” isn’t one MAPP made, so MAPP left it. Move the folder to the Trash if you don’t need it.")
         }
         let note = signIn == nil ? nil : String(localized: "The sign-in is still in your Keychain. Remove it in Keychain Access.")
-        let message = note.map { sentences(body, $0) } ?? body
+        let told = note.map { sentences(body, $0) } ?? body
+        let message = withApproval(told, approvalStands, reached == .switched ? .previous : .left)
         switch reached {
         case .left:
             return Notice(title: String(localized: "Disconnected, but the Copy Was Kept"), message: message)
@@ -363,6 +372,11 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
         case .notOpened, .signedInAgain:
             return Notice(title: String(localized: "Can’t Open the Library"), message: message)
         }
+    }
+
+    /// `message`, with how to end the approval where the sign-out could not confirm the server did.
+    private static func withApproval(_ message: String, _ stands: Bool, _ which: Words.ForgottenApproval) -> String {
+        stands ? sentences(message, Words.approvalMayStand(which)) : message
     }
 
     private static func sentences(_ first: String, _ detail: String) -> String {
