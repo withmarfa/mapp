@@ -132,7 +132,7 @@ struct DefaultViewOptions: View {
 
 /// What can be set about the view a window shows: the order of the list and the gallery, the table's sort,
 /// grouping and columns, the board's lanes and cards, and the timeline's dates. Each choice belongs to the place
-/// and is kept for the window, except the list's order, which is the app's.
+/// and is kept in its default view on this Mac, except the list's order, which is the app's.
 struct CurrentViewOptions: View {
     /// Nil while no window is in front, when the list's order is still the app's to change.
     let browser: Browser?
