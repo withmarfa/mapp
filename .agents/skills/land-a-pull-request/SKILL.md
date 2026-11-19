@@ -9,12 +9,12 @@ A session merges its own pull request once the review its risk calls for is done
 
 ## Merge
 
-`Checks` is the one required check, and it reports on a draft too. A draft runs no Swift job, so its green says nothing about the tests, and a run that the next event cancels can report green as well. Auto-merge is off here, and `--auto` would merge on that green anyway.
+`Checks` is the one required check, and it reports on a draft too. A draft runs no Swift job, so its green says nothing about the tests. Set auto-merge only once the ready run has started, so it waits for that run's `Checks` rather than merging on the draft's green.
 
-1. Run the tests yourself while the pull request is a draft.
+1. Run the tests that cover the change yourself while the pull request is a draft.
 2. Mark it ready with no push in flight: `gh pr ready <number>`.
-3. Read the job list until the ready run's `Checks` has passed on the head commit, with `Unit tests` among its jobs where the change runs it.
-4. Merge: `gh pr merge <number> --squash --delete-branch`.
+3. Once the ready run's `Checks` shows as pending on the head commit, set auto-merge: `gh pr merge <number> --auto --squash --delete-branch`. Then go on with other work; do not wait for CI.
+4. If the run fails, fix forward on the branch; auto-merge stays set and merges on the next green run.
 
 A branch does not need to be up to date with `main` to merge. Update it only for a conflict or for something on `main` it needs, never only to be current.
 
