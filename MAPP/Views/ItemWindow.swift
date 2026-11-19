@@ -99,6 +99,7 @@ struct ItemWindow: View {
             if let item, let editor {
                 ItemPage(item: item, editor: editor, headerDrafts: details, backsToolbar: false)
                     .itemCorner(item, editor: editor, details: details)
+                    .escapesFromPage(details)
                     .navigationTitle(item.displayTitle)
                     .toolbar(removing: .title)
                     .focusedSceneValue(\.editor, editor)
@@ -109,6 +110,7 @@ struct ItemWindow: View {
             } else if let item {
                 FileItemPage(item: item, drafts: details, open: { id = $0 }, onResolved: { fileURL = $0 }, backsToolbar: false)
                     .itemCorner(item, editor: nil, details: details)
+                    .escapesFromPage(details)
                     .navigationTitle(item.displayTitle)
                     .focusedSceneValue(\.focusedItems, FocusedItems(ids: [item.id], undoManager: undoManager))
                     .toolbar(id: "note") {

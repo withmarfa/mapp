@@ -33,10 +33,13 @@ struct ItemCorner: View {
                         .accessibilityLabel("Formats")
                         .accessibilityIdentifier("PageFormats")
                 case .look:
-                    CornerSegmentedControl(
-                        selection: Binding { details.pageLook?.mode ?? .standard } set: { details.pageLook?.choose($0) },
-                        options: [(SourceViewMode.reader, LocalizedStringKey("Reader")), (SourceViewMode.original, LocalizedStringKey("Original"))]
-                    )
+                    Picker("Reader or Original", selection: Binding { details.pageLook?.mode ?? .standard } set: { details.pageLook?.choose($0) }) {
+                        Text("Reader").tag(SourceViewMode.reader)
+                        Text("Original").tag(SourceViewMode.original)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
                     .help("Reader or Original")
                     .accessibilityIdentifier("SourceViewMode")
                 case .focus:
@@ -53,14 +56,6 @@ struct ItemCorner: View {
         } card: {
             if let formatsEditor {
                 FormatsCard(editor: formatsEditor, item: item.id)
-            }
-        }
-        // The page takes Escape itself while it has the keyboard (`EditorController.onEscape`); anywhere else this does.
-        .background {
-            if isCardOpen || isFocused {
-                Button("Leave Focus") { details.escapeFromPage() }
-                    .keyboardShortcut(editor?.isFocused == true ? nil : .cancelAction)
-                    .hidden()
             }
         }
         .onChange(of: item.id, initial: true) { details.pageShows(item.id) }
@@ -83,6 +78,14 @@ private struct ItemCornerModifier: ViewModifier {
 }
 
 extension View {
+    /// Escape closes the formats card, then leaves Focus, while the keyboard is in this view. It passes the key on when
+    /// neither is showing. Put it on the workspace or the page, never on a view that holds the command palette, quick
+    /// add or a sheet, which keep Escape for themselves. The editor's page takes Escape itself
+    /// (`EditorController.onEscape`).
+    func escapesFromPage(_ details: DetailsPresentation) -> some View {
+        onKeyPress(.escape) { details.escapeFromPage() ? .handled : .ignored }
+    }
+
     /// Puts the corner of an item's page over it, ending where the right sidebar begins.
     func itemCorner(_ item: Item, editor: EditorController?, details: DetailsPresentation) -> some View {
         modifier(ItemCornerModifier(item: item, editor: editor, details: details))
@@ -223,36 +226,5 @@ extension Format {
         case .heading, .subheading: .semibold
         default: .regular
         }
-    }
-}
-
-/// Two choices in one glass capsule, the chosen one on a gray pill, such as Reader or Original. It is the corner's own
-/// segmented control, drawn like its buttons.
-struct CornerSegmentedControl<Value: Hashable>: View {
-    @Binding var selection: Value
-    let options: [(value: Value, title: LocalizedStringKey)]
-    @Environment(\.interfaceTextSize) private var textSize
-
-    var body: some View {
-        let scale = InterfaceStyle.scale(for: textSize)
-        HStack(spacing: 0) {
-            ForEach(options.indices, id: \.self) { index in
-                let option = options[index]
-                let isOn = option.value == selection
-                Button { selection = option.value } label: {
-                    Text(option.title)
-                        .font(.system(size: 13 * scale, weight: isOn ? .medium : .regular))
-                        .padding(.horizontal, 12)
-                        .frame(maxHeight: .infinity)
-                        .background(.primary.opacity(isOn ? 0.14 : 0), in: .capsule)
-                        .contentShape(.capsule)
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(isOn ? .isSelected : [])
-            }
-        }
-        .padding(3)
-        .frame(height: CornerMetrics.height * scale)
-        .glassEffect(.regular, in: .capsule)
     }
 }
