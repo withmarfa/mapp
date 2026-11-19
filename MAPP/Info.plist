@@ -39,6 +39,16 @@
 				<string>public.data</string>
 			</array>
 		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER).sidebar-section</string>
+			<key>UTTypeDescription</key>
+			<string>MAPP Sidebar Section</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

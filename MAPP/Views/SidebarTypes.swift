@@ -1,33 +1,68 @@
 import SwiftUI
 
-/// The Types block: its heading with Edit on hover, and the library's types as one list of rows that fold their
-/// subtypes open, at most `SidebarPlan.shownTypeCount` types until Show More.
-struct SidebarTypesSection: View, Equatable {
+/// The types section: the library's types as one list of rows that fold their subtypes open, at most
+/// `SidebarPlan.shownTypeCount` types until Show More. While the sidebar is being customized it lists the top-level
+/// types alone, each with a handle, and they drag to reorder; the section's menu shows or hides them.
+struct SidebarTypesSection: View {
     @CurrentLibrary private var library
+    @Environment(Libraries.self) private var libraries
     @AppStorage(SidebarTypeRow.subtypeIconsKey) private var showsSubtypeIcons = false
-    @State private var editsTypes = false
     /// Every shown row, folded open as the person left them.
     let rows: [SidebarPlan.TypeRow]
+    let plan: SidebarPlan
     let showsAll: Bool
+    let customizing: Bool
     let folding: SidebarFolding
     let browser: Browser
     @Binding var choosingIcon: TypeIconRequest?
-
-    static func == (a: Self, b: Self) -> Bool { a.rows == b.rows && a.showsAll == b.showsAll }
+    let header: SidebarGroupHeader
 
     var body: some View {
         let _ = Cost.record(.sidebarBody, since: .now)
+        Section {
+            if customizing {
+                customizingRows
+            } else {
+                typeRows
+            }
+        } header: {
+            header
+        }
+        .accessibilityIdentifier("SidebarTypes")
+    }
+
+    @ViewBuilder private var typeRows: some View {
         let limited = SidebarPlan.limited(rows, showsAll: showsAll)
         let rows = limited.rows
         let steps = SidebarTypeRow.steps(for: rows, subtypeIcons: showsSubtypeIcons)
         let widest = rows.filter(\.isExpandable).map(\.node.count).max() ?? 0
-        Section {
-            ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                typeRow(row, widestFoldingCount: widest, steps: steps[index])
+        ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+            typeRow(row, widestFoldingCount: widest, steps: steps[index])
+        }
+        if limited.hasMore { showMoreRow }
+    }
+
+    /// The top-level types, in the person's order, each draggable.
+    private var customizingRows: some View {
+        let shown = plan.shownTypes
+        return ForEach(shown) { node in
+            HStack {
+                SidebarLabel(title: node.label, icon: .type(node.icon))
+                Spacer(minLength: 8)
+                SidebarHandle()
             }
-            if limited.hasMore { showMoreRow }
-        } header: {
-            TypesHeading(editsTypes: $editsTypes)
+            .selectionDisabled()
+            .contextMenu {
+                SidebarHideButtons(place: .type(node.id))
+                Divider()
+                SidebarCustomizeButton(browser: browser)
+            }
+            .accessibilityIdentifier("SidebarType-\(node.id)")
+        }
+        .onMove { source, destination in
+            libraries.updateSidebarLayout {
+                $0.move(plan.types, shown: shown, by: { SidebarPlace.type($0.id).key }, fromOffsets: source, toOffset: destination)
+            }
         }
     }
 
@@ -126,30 +161,5 @@ struct SidebarFolding {
         case nil: return .ignored
         }
         return .handled
-    }
-}
-
-/// The Types heading. Edit shows only while the pointer is over the heading, or its picker is open, as the control
-/// of a sidebar's section heading does.
-struct TypesHeading: View {
-    @Binding var editsTypes: Bool
-    @State private var isHovering = false
-
-    var body: some View {
-        HStack {
-            Text("Types")
-            Spacer()
-            Button("Edit") { editsTypes = true }
-                .buttonStyle(.plain)
-                .opacity(isHovering || editsTypes ? 1 : 0)
-                .popover(isPresented: $editsTypes) {
-                    SidebarTypePicker()
-                }
-                .accessibilityIdentifier("EditSidebarTypes")
-        }
-        .padding(.trailing, 12)
-        .contentShape(.rect)
-        .onHover { isHovering = $0 }
-        .accessibilityIdentifier("SidebarTypes")
     }
 }

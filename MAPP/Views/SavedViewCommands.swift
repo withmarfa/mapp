@@ -94,13 +94,14 @@ struct SavedViewMenu: View {
 /// The Views heading, with New View, which shows only while the pointer is over the heading, as the control of a
 /// sidebar's section heading does.
 struct ViewsHeading: View {
+    let title: String
     let browser: Browser
     @CurrentLibrary private var library
     @State private var isHovering = false
 
     var body: some View {
         HStack {
-            Text("Views")
+            Text(title)
             Spacer()
             Button("New View", systemImage: "plus") { browser.openNewViewPanel(in: library) }
                 .labelStyle(.iconOnly)

@@ -1,10 +1,13 @@
 import SwiftUI
 
 /// A sidebar row's mark and name, laid out as the system lays out its own sidebar labels. A place's mark is a
-/// symbol in the system's grey; a type's is its colored `TypeMark`. Without a mark it is the name alone.
+/// symbol in the system's grey, or in its `tone` where it has one, as a view's does with no tile; a type's is its
+/// colored `TypeMark`. Without a mark it is the name alone.
 struct SidebarLabel: View {
+    @Environment(\.colorScheme) private var scheme
     let title: String
     let icon: RowIcon?
+    var tone: TypeTone?
 
     var body: some View {
         if let icon {
@@ -12,7 +15,9 @@ struct SidebarLabel: View {
                 name
             } icon: {
                 switch icon {
-                case .symbol(let symbol): Image(systemName: symbol).interfaceFont(.body).foregroundStyle(.secondary)
+                case .symbol(let symbol):
+                    Image(systemName: symbol).interfaceFont(.body)
+                        .foregroundStyle(tone.map { AnyShapeStyle($0.color(for: scheme)) } ?? AnyShapeStyle(.secondary))
                 case .type(let id): TypeMark(icon: id, size: .side)
                 }
             }
