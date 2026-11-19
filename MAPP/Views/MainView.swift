@@ -127,7 +127,6 @@ struct MainView: View {
                 } else {
                     ItemList(browser: browser, order: order, pane: $pane).equatable()
                         .filterChips(browser)
-                        .filteredEmptyState(browser)
                 }
             }
             // The page list is about as wide as the sidebar; each keeps its own width. The split view reads the ideal
@@ -151,10 +150,10 @@ struct MainView: View {
         }
     }
 
-    private func windowToolbar(hasListColumn: Bool = false) -> WindowToolbar {
+    private func windowToolbar(hasListColumn: Bool = false, holdsViewTools: Bool = false) -> WindowToolbar {
         WindowToolbar(
             browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details,
-            hasListColumn: hasListColumn)
+            hasListColumn: hasListColumn, holdsViewTools: holdsViewTools)
     }
 
     /// Only the three-column split has a list column to measure.
@@ -196,7 +195,7 @@ struct MainView: View {
                     ItemsIndex(browser: browser, pane: $pane)
                         .toastOverlay()
                         .modifier(itemInspector(WindowToolbarLayout.items))
-                        .toolbar(id: WindowToolbarLayout.items) { windowToolbar() }
+                        .toolbar(id: WindowToolbarLayout.items) { windowToolbar(holdsViewTools: true) }
                 }
             } else if shownPresentation == .index {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
@@ -204,7 +203,7 @@ struct MainView: View {
                 } detail: {
                     SidebarIndex(browser: browser, details: details, order: order)
                         .toastOverlay()
-                        .toolbar(id: WindowToolbarLayout.index) { windowToolbar() }
+                        .toolbar(id: WindowToolbarLayout.index) { windowToolbar(holdsViewTools: true) }
                 }
             } else if shownPresentation == .collection {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
@@ -229,7 +228,8 @@ struct MainView: View {
                             .filterChips(browser)
                             .viewCorner(browser)
                         } else {
-                            itemPage
+                            // The page has no title of the window's own to show beside Back, which is the arrow alone.
+                            itemPage.toolbar(removing: .title)
                         }
                     }
                     .toastOverlay()

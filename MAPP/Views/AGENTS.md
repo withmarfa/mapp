@@ -19,6 +19,7 @@ Windows, panes, toolbars, commands and Settings. How things are drawn is in `doc
 
 - A person customizes the toolbar in the system's tray. Every toolbar in a customizable window is `toolbar(id:)`: one plain `toolbar` turns customization off for the whole window.
 - Each split view the main window mounts has its own identifier (`WindowToolbarLayout`), because the system reshuffles a layout that one identifier carries between split views. All of that split view's columns use it.
+- An index page (Items, Collections, Sources) declares Search and View Options in its own content, under its split view's identifier, so they sit over the page and not over the right sidebar; `WindowToolbar(holdsViewTools:)` leaves them out. Only the right sidebar's own buttons are over the sidebar.
 - Replacing a toolbar under its open tray crashes, so `MainView` holds the split view while the tray is open.
 - A `ToolbarSpacer` that is only hidden still leaves its gap, so each fixed spacer is declared only while the groups on both sides of it show, with `customizationBehavior(.disabled)`: one standard gap between groups in every state.
 - Within a split view, every state declares the same items and hides what does not apply: an item left out is dropped from the saved layout. Only an item with `customizationBehavior(.disabled)` may come and go.

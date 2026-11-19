@@ -17,10 +17,10 @@ struct PlaceCommands: Commands {
                 group(menu.places.filter { !SidebarPlace.builtInViews.contains($0.place) }, menu: menu, in: library)
                 Divider()
                 group(menu.places.filter { SidebarPlace.builtInViews.contains($0.place) }, menu: menu, in: library)
-                Section {
+                Section("Views") {
                     group(menu.views, menu: menu, in: library)
                 }
-                Section {
+                Section("Types") {
                     group(menu.types, menu: menu, in: library)
                     if !menu.moreTypes.isEmpty {
                         Menu("All Types") { group(menu.moreTypes, menu: menu, in: library) }
@@ -32,7 +32,10 @@ struct PlaceCommands: Commands {
 
     private func group(_ entries: [GoMenu.Entry], menu: GoMenu, in library: any ItemLibrary) -> some View {
         ForEach(entries) { entry in
-            Button { go(entry, menu: menu, in: library) } label: { label(entry) }
+            // A toggle, for the check mark the menu puts beside the place the window shows.
+            Toggle(isOn: Binding { browser?.item == entry.item && browser?.showsSettings != true } set: { _ in go(entry, menu: menu, in: library) }) {
+                label(entry)
+            }
             .disabled(browser == nil || !library.isLoaded)
         }
     }

@@ -68,7 +68,6 @@ struct QuickAddPanel: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
-            Spacer(minLength: 0)
             // Files that are chips of their own are a text item's attachments, or a file item's extra files.
             chipRow(draft, files: !isFile || holdsFiles ? draft.files : [])
             Divider()
@@ -77,7 +76,6 @@ struct QuickAddPanel: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
         }
-        .frame(minHeight: 300)
         .floatingPanelSurface(width: 620)
         .overlay {
             if isDropTargeted {
@@ -186,7 +184,7 @@ struct QuickAddPanel: View {
             .interfaceFont(.body)
             .frame(maxWidth: .infinity, alignment: .leading)
             .hidden()
-            .frame(minHeight: 120, maxHeight: 320, alignment: .top)
+            .frame(minHeight: 36, maxHeight: 320, alignment: .top)
             .overlay {
                 ZStack(alignment: .topLeading) {
                     // The text view pads each line by its line fragment padding; moving it out by that much lines its text up with the title's.
