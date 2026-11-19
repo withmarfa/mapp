@@ -723,7 +723,7 @@ final class Browser {
     /// command that also moves other items must not do it. Only a selection made entirely of items already there
     /// asks to erase them for good, and only where the library can; otherwise the person is told why not.
     static func delete(
-        _ ids: Set<ItemID>, in library: any ItemLibrary, undoManager: UndoManager?,
+        _ ids: Set<ItemID>, in library: any ItemLibrary, undoManager: UndoManager?, toasts: ToastPresenter? = nil,
         asking confirm: ((Set<ItemID>) -> Void)? = nil
     ) {
         let binned = Set(ids.filter { library.item($0)?.state == .trashed })
@@ -735,11 +735,30 @@ final class Browser {
             if moving.count > 1, let confirm {
                 confirm(moving)
             } else {
-                library.delete(moving, undoManager: undoManager)
+                moveToRecentlyDeleted(moving, in: library, undoManager: undoManager, toasts: toasts)
             }
         } else if !binned.isEmpty, ids.subtracting(binned).isEmpty {
             if library.reachesServer { library.itemsToPurge = binned } else { library.tellCannotPurge() }
         }
+    }
+
+    /// Moves `ids` to Recently Deleted, then says so in the window's toast with an Undo that takes back that one step.
+    /// The step is the undo manager's latest, so Undo does nothing once another change has been registered after it.
+    static func moveToRecentlyDeleted(
+        _ ids: Set<ItemID>, in library: any ItemLibrary, undoManager: UndoManager?, toasts: ToastPresenter?
+    ) {
+        let moved = library.deletePlan(ids).moving.count
+        library.delete(ids, undoManager: undoManager)
+        guard moved > 0, let toasts else { return }
+        var undo: (@MainActor () -> Void)?
+        if let undoManager, undoManager.canUndo {
+            let step = undoManager.undoActionName
+            undo = { [weak undoManager] in
+                guard let undoManager, undoManager.canUndo, undoManager.undoActionName == step else { return }
+                undoManager.undo()
+            }
+        }
+        toasts.show(DeletionWords.movedMessage(count: moved), symbol: "trash", undo: undo)
     }
 
     /// A place that is gone can no longer be shown, so the window moves to where `placeFallback(in:)` says.

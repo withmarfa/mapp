@@ -70,6 +70,8 @@ final class DetailsPresentation {
     var tagRequest: TagRequest?
     /// The items the window asks the person to confirm moving to Recently Deleted.
     var deletion: DeleteRequest?
+    /// The window's toast, which lives here with the rest of what the window presents, above its split view.
+    let toasts = ToastPresenter()
     /// The groups of links the person has shown in full. They stay shown while the window lives, whichever item it
     /// shows meanwhile.
     private(set) var expandedLinks: Set<LinkGroup> = []
