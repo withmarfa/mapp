@@ -58,6 +58,9 @@ final class EditorController: NSObject {
     /// The embedded file the context menu is opening over, which it offers to show, and to open where the page
     /// was told it may be.
     @ObservationIgnored var menuEmbed: (item: ItemID, reference: EmbedReference, opens: Bool)?
+    /// What Quick Look is showing for an embedded file of the item on the page, which the window's view presents
+    /// (`ItemDetail`); nil when it shows nothing.
+    var quickLook: QuickLookRequest?
     /// The row of the property block, or Linked From, the context menu is opening over, which it offers to hide
     /// from the page.
     @ObservationIgnored var menuRow: (item: ItemID, row: String)?
@@ -692,6 +695,8 @@ final class EditorController: NSObject {
             insertImages(PastedImages.sources(on: .general))
         case .openEmbed(let item, let reference):
             openEmbed(reference, in: item)
+        case .quickLookEmbed(let item, let reference):
+            quickLookEmbed(reference, in: item)
         case .openItemLink(let item, let link):
             Task { await openItemLink(link, from: item) }
         case .embedMenu(let embed):

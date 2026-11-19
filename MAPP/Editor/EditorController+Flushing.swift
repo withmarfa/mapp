@@ -187,6 +187,7 @@ extension EditorController {
     /// while SwiftUI still holds the editor for a moment.
     func windowWent() {
         windowIsGone = true
+        quickLook = nil
         requestedItemID = nil
         cancelRequests()
         titleDrafts = nil

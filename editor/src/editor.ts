@@ -21,6 +21,7 @@ import {
   type LinkRef,
 } from './bridge'
 import type { HeaderLabels } from './header'
+import { quickLookAction } from './file-actions'
 import { ItemLinkStatus } from './links'
 import { WebPictures, webAddress, type PictureWords } from './pictures'
 
@@ -36,6 +37,8 @@ export function isPreviewDiagnostic(error: Error): boolean {
  *  the header's and the Link to Item command's are MAPP's. */
 export interface AppWords extends PictureWords {
   linkToItem?: string
+  /** The name of Quick Look on a file's card, with `%@` where the file's name goes. */
+  quickLookNamed?: string
 }
 export type AppLabels = Partial<EditorLabels & HeaderLabels> & AppWords
 const headerLabelKeys: readonly (keyof HeaderLabels)[] = [
@@ -58,6 +61,7 @@ export function splitLabels(all: AppLabels): {
 } {
   const {
     linkToItem,
+    quickLookNamed,
     loadAction,
     loadingNamed,
     picturesOff,
@@ -78,6 +82,7 @@ export function splitLabels(all: AppLabels): {
     header,
     words: {
       linkToItem,
+      quickLookNamed,
       loadAction,
       loadingNamed,
       picturesOff,
@@ -300,13 +305,24 @@ export class ItemEditor {
                 message: file.unavailable,
               }
             described.set(JSON.stringify(embed), file)
-            if (file.kind === 'file') return { kind: 'file', label: file.name }
+            // A card shows Open and Quick Look as icons in its corner. Quick Look is the app's to carry out, and it
+            // answers a reference it no longer holds with a notice.
+            const actions = [
+              quickLookAction(file.name, words.quickLookNamed, (reference, context) =>
+                postToHost({
+                  type: 'quickLookEmbed',
+                  embed: request(reference, context.documentId),
+                }),
+              ),
+            ]
+            if (file.kind === 'file') return { kind: 'file', label: file.name, actions }
             // A card with Open, because WebKit does not paint local PDFs in Inkkit's sandboxed frame. Keep the
             // frame sandbox; do not loosen it to show PDFs.
             if (file.kind === 'pdf')
               return {
                 kind: 'file',
                 label: `${file.name}: ${labels.filePDFPreview ?? 'Open to view this PDF'}`,
+                actions,
               }
             return {
               kind: file.kind,
