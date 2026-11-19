@@ -615,7 +615,7 @@ struct QuickAddTests {
         #expect(browser.quickAdd.isPresented)
     }
 
-    @Test func theKindIsTheOneChosenThenTheLastUsedThenThePlacesThenAnItem() {
+    @Test func theKindIsTheOneChosenThenTheTypesPlaceThenTheLastUsedThenANote() {
         let library = FakeItemLibrary(now: start)
         func kind(remembered: String? = nil, place: SidebarItem = .allItems, chosen: String? = nil) -> String? {
             let browser = Browser()
@@ -625,7 +625,8 @@ struct QuickAddTests {
         }
         #expect(kind() == "core.note")
         #expect(kind(place: .itemType("core.task")) == "core.task")
-        #expect(kind(remembered: "test.project", place: .itemType("core.task")) == "test.project")
+        #expect(kind(remembered: "test.project", place: .itemType("core.task")) == "core.task")
+        #expect(kind(remembered: "test.project") == "test.project")
         #expect(kind(remembered: "test.project", chosen: "core.task") == "core.task")
         #expect(kind(remembered: "no.such") == "core.note")
     }

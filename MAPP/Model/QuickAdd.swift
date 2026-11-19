@@ -87,6 +87,9 @@ final class QuickAdd {
         /// How many characters of the body come before the caret, so the page can put it back there.
         var caret: Int?
         var properties: [String: PropertyValue] = [:]
+        /// The values the kind gave the draft before anything was typed (`QuickAdd.prefill`), which are not the
+        /// person's work: they leave with the kind that gave them, and alone they are not worth keeping.
+        var prefilled: [String: PropertyValue] = [:]
         var parentID: ItemID?
         /// The chips the person added, in the order they were added, whether or not they hold a value yet. A
         /// required field is always shown, so it is not listed here.
@@ -94,10 +97,15 @@ final class QuickAdd {
         /// For a file, the file; for any other kind, the files attached to the item once it is made.
         var files: [File] = []
 
+        /// The values the person set or changed: every one but a value the kind gave and nobody touched.
+        var typedProperties: [String: PropertyValue] {
+            properties.filter { $0.value != .null && prefilled[$0.key] != $0.value }
+        }
+
         /// Whether the person put anything in it worth keeping: text, a file, a parent, a value or a chip they added.
         var hasContent: Bool {
             !NameText.trimmed(title).isEmpty || !isBlank(body) || !files.isEmpty || parentID != nil
-                || properties.values.contains { $0 != .null } || !chips.isEmpty
+                || !typedProperties.isEmpty || !chips.isEmpty
         }
 
         /// What the clipboard is given when the draft cannot be added: the title, then the body, then the values and
@@ -105,15 +113,16 @@ final class QuickAdd {
         func text(in library: (any ItemLibrary)?) -> String? {
             var details: [String] = []
             if let library {
+                let typed = typedProperties
                 for field in QuickAdd.fields(of: typeID, in: library.catalogue) {
-                    guard let value = properties[field.key], value != .null else { continue }
+                    guard let value = typed[field.key] else { continue }
                     details.append("\(field.label): \(QuickAdd.valueText(value, in: field))")
                 }
                 if let parentID {
                     details.append("\(String(localized: "Parent")): \(library.item(parentID)?.displayTitle ?? String(localized: "Item not found"))")
                 }
             } else {
-                for (key, value) in properties.sorted(by: { $0.key < $1.key }) where value != .null {
+                for (key, value) in typedProperties.sorted(by: { $0.key < $1.key }) {
                     details.append("\(key): \(ItemValueText.string(value))")
                 }
                 if let parentID { details.append("\(String(localized: "Parent")): \(parentID.rawValue)") }
@@ -301,6 +310,42 @@ final class QuickAdd {
         }
     }
 
+    /// What a new item of the kind holds before anything is typed. Marfa's types declare no defaults, so this is only
+    /// what a declaration says: the status field takes the first word the type puts in the not-started group, the
+    /// word a board's move into that group writes. A type with no such word, or no status field, gives nothing, and
+    /// no other field is filled.
+    static func prefill(of typeID: String, in catalogue: Catalogue) -> [String: PropertyValue] {
+        guard let field = fields(of: typeID, in: catalogue).first(where: \.isStatus),
+              case .status(let words) = field.kind,
+              let word = words.first(where: { $0.group == .notStarted })
+        else { return [:] }
+        return [field.key: .string(word.value)]
+    }
+
+    /// The required fields of the kind that quick add cannot set, since they are an object or a list of words, which
+    /// only the item's own value panel edits. The panel says so; the library refuses the item without them and tells
+    /// the person, so Add is never held back here.
+    static func unsettableRequired(of typeID: String, in catalogue: Catalogue) -> [ItemTypeInfo.Field] {
+        guard !isFile(typeID, in: catalogue), let info = catalogue.itemTypes[TypeID(typeID)] else { return [] }
+        return info.fields.filter { $0.required && $0.kind.isOutsideForms && $0.key != info.titleKey && $0.key != info.bodyKey }
+    }
+
+    /// The kind quick add opens in: the one asked for, else the one a type's own place holds, else the last used, then a
+    /// note, then any. A kind not in `offered` (a type since deleted, or one nobody can make) is passed over.
+    /// A type's place is its list, the Collections index (a collection) and Files.
+    static func startingType(
+        asked: String?, place: SidebarItem, remembered: String?, offered: [String], in catalogue: Catalogue
+    ) -> String? {
+        func choice(_ id: String?) -> String? { id.flatMap { offered.contains($0) ? $0 : nil } }
+        let held: String? = switch place {
+        case .itemType(let id): id
+        case .collections: offered.first { catalogue.isCollection(TypeID($0)) }
+        case .files: TypeID.file.rawValue
+        default: nil
+        }
+        return choice(asked) ?? choice(held) ?? choice(remembered) ?? choice("core.note") ?? offered.first
+    }
+
     /// The chips the panel shows for a draft: the kind's required fields first, then what the person added in the
     /// order added, then any value or parent the draft holds that was not added by hand. A field the kind does
     /// not have is never shown.
@@ -398,25 +443,21 @@ final class QuickAdd {
 
 extension Browser {
     /// Shows quick add, with `typeID` chosen where one is given. A draft put away comes back as it was left;
-    /// otherwise the kind is `remembered`, the last one added, then the place's own type (a collection type in the
-    /// Collections index), then a note.
+    /// otherwise the kind is the place's own type (`QuickAdd.startingType`), then `remembered`, the last one added, then
+    /// a note.
     func openQuickAdd(typeID: String? = nil, remembered: String? = nil, in library: any ItemLibrary) {
         let interval = Telemetry.begin(.navigation, "quickAdd.open")
         defer { interval.end() }
         leaveSettings()
         palette = nil
         let types = QuickAdd.types(in: library).map(\.id.rawValue)
-        func offered(_ id: String?) -> String? { id.flatMap { types.contains($0) ? $0 : nil } }
         if quickAdd.draft == nil {
-            var placeType: String?
-            if case .itemType(let id) = item { placeType = id }
-            // The Collections index offers a new collection first.
-            if item == .collections { placeType = types.first { library.catalogue.isCollection(TypeID($0)) } }
-            guard let kind = offered(typeID) ?? offered(remembered) ?? offered(placeType) ?? offered("core.note") ?? types.first
+            guard let kind = QuickAdd.startingType(
+                asked: typeID, place: item, remembered: remembered, offered: types, in: library.catalogue)
             else { return }
             quickAdd.draft = QuickAdd.Draft(typeID: kind)
             chooseQuickAddType(kind, in: library)
-        } else if let typeID = offered(typeID) {
+        } else if let typeID, types.contains(typeID) {
             chooseQuickAddType(typeID, in: library)
         }
         quickAdd.isPresented = true
@@ -438,7 +479,11 @@ extension Browser {
         guard var draft = quickAdd.draft else { return }
         draft.typeID = typeID
         let keys = Set(QuickAdd.fields(of: typeID, in: library.catalogue).map(\.key))
+        // What the last kind gave goes with it, unless the person changed it; then the new kind gives its own.
+        for (key, value) in draft.prefilled where draft.properties[key] == value { draft.properties[key] = nil }
         draft.properties = draft.properties.filter { keys.contains($0.key) }
+        draft.prefilled = QuickAdd.prefill(of: typeID, in: library.catalogue).filter { draft.properties[$0.key] == nil }
+        draft.properties.merge(draft.prefilled) { current, _ in current }
         if let parent = draft.parentID, !library.creationParentCandidates(typeID: typeID).contains(where: { $0.id == parent }) {
             draft.parentID = nil
         }
@@ -479,7 +524,7 @@ extension Browser {
     }
 
     /// Adds the draft as an item of its kind, with its properties and under its place, in one create. Then the
-    /// panel closes and the window opens the item, adds it to the collection being shown, and attaches the draft's
+    /// panel closes and the window opens the item the way Settings says (`ItemOpening`), adds it to the collection being shown, and attaches the draft's
     /// files to it (`finishNewItem`). Where the library cannot make it, everything stays as typed and the library tells
     /// the person why. The core is asked about the parent first: a second Add does nothing
     /// meanwhile, a window that closes meanwhile hands the whole draft over, and a draft changed meanwhile stays as
@@ -487,7 +532,7 @@ extension Browser {
     /// file no longer where it was is taken out of the draft and named, and nothing is added until the person has seen
     /// that. Nothing empty is ever written.
     @discardableResult
-    func saveQuickAdd(in library: any ItemLibrary, undoManager: UndoManager?) async -> ItemID? {
+    func saveQuickAdd(in library: any ItemLibrary, undoManager: UndoManager?, defaults: UserDefaults = .standard) async -> ItemID? {
         guard let draft = quickAdd.draft, !quickAdd.isSaving, QuickAdd.canSave(draft, in: library), quickAdd.unfinishedLists.isEmpty
         else { return nil }
         let missing = draft.files.filter { !$0.isOnDisk }
@@ -558,7 +603,8 @@ extension Browser {
         if case .collection(let id) = item { collection = id }
         newItem = NewItem(
             id: id, typeID: draft.typeID, library: library, caret: keepsText ? draft.pageCaret : nil, isFile: isFile,
-            attachments: isFile ? [] : draft.files, embedsInText: keepsText, collection: collection, undoManager: undoManager)
+            attachments: isFile ? [] : draft.files, embedsInText: keepsText, collection: collection,
+            opening: ItemOpening.stored(in: defaults), undoManager: undoManager)
         finishNewItem(in: library)
         return id
     }

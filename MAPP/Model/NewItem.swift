@@ -16,8 +16,8 @@ enum PageCaret: Equatable {
     }
 }
 
-/// An item quick add made, which the window opens once its library holds it. A Marfa library holds an item only
-/// when its source says so, which may take a moment, so the window waits for it.
+/// An item quick add made, which the window opens, the way Settings says, once its library holds it. A Marfa library
+/// holds an item only when its source says so, which may take a moment, so the window waits for it.
 struct NewItem {
     let id: ItemID
     let typeID: String
@@ -33,6 +33,8 @@ struct NewItem {
     var embedsInText = false
     /// The collection whose place the item was added in, which it joins once the library holds it.
     var collection: ItemID?
+    /// How the item opens, as Settings said when it was added.
+    var opening = ItemOpening.standard
     /// The window's, so the item's joining the collection is undone there.
     weak var undoManager: UndoManager?
 }
@@ -73,7 +75,6 @@ extension Browser {
             Task { await attachFiles(of: entry, in: library) }
         }
         leaveSettings()
-        isCollectionItemPresented = usesCollection
         searchText = ""
         isSearchExpanded = false
         // The edge is queued, so the collection's list may not hold the item yet; it soon will.
@@ -82,8 +83,12 @@ extension Browser {
             sidebarItem = entry.isFile ? .files : .itemType(entry.typeID)
         }
         selection = [entry.id]
-        if entry.isFile {
+        open([entry.id], as: entry.opening)
+        if entry.opening == .newWindow {
+            // The window of its own takes no caret from here, so the list keeps the keyboard.
             focusRequest = .list
+        } else if entry.isFile {
+            // A file has no text to put a caret in; the modal and the full page take the keyboard themselves.
         } else if let caret = entry.caret {
             focusCaret = caret
             focusRequest = .page

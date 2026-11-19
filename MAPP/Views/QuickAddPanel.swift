@@ -2,10 +2,10 @@ import MarfaIcons
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// ⌘N, the toolbar's New Item and the palette's New commands: a panel near the top of the window for making one
+/// ⌘N, the sidebar's New, Items' New Item and the palette's New commands: a panel near the top of the window for making one
 /// item. What it holds comes first (a title and text, a file, or a title alone); above the footer, chips show the
 /// details the person added, its properties and parent, and the files to attach to it. The footer chooses the
-/// kind of item and, from the plus menu, adds a file or a detail. ⌘Return adds it and opens it. Escape, Cancel or a click outside puts it away, keeping what was typed and given for the window; an empty panel also goes when the window stops being in front.
+/// kind of item and, from the plus menu, adds a file or a detail. ⌘Return adds it and opens it the way Settings > Lists > Open Items In says. Escape, Cancel or a click outside puts it away, keeping what was typed and given for the window; an empty panel also goes when the window stops being in front.
 struct QuickAddPanel: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
@@ -52,6 +52,13 @@ struct QuickAddPanel: View {
                         .interfaceFont(.callout)
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("QuickAddFilesNotKept")
+                }
+                let unsettable = QuickAdd.unsettableRequired(of: draft.typeID, in: catalogue)
+                if !unsettable.isEmpty {
+                    Text("Quick add can’t set \(unsettable.map(\.label).formatted(.list(type: .and))), which this kind of item needs.")
+                        .interfaceFont(.callout)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("QuickAddUnsettable")
                 }
                 if let list = quickAdd.unfinishedLists.first {
                     Text("\(list.label) has an entry that isn’t finished. Finish it, or cancel it, to add the item.")
@@ -488,8 +495,7 @@ struct QuickAddPanel: View {
     // MARK: Place and adding
 
     private func bottomBar(_ draft: QuickAdd.Draft, isFile: Bool) -> some View {
-        let label = QuickAdd.types(in: library).first { $0.id.rawValue == draft.typeID }?.label ?? ""
-        return HStack(spacing: 8) {
+        HStack(spacing: 8) {
             typePicker(draft)
             moreMenu(draft, isFile: isFile)
             Spacer(minLength: 12)
@@ -500,7 +506,7 @@ struct QuickAddPanel: View {
                 save()
             } label: {
                 HStack(spacing: 6) {
-                    Text("Add \(label)")
+                    Text("Add and Open")
                     ShortcutKeys("⌘↩", onAccent: true)
                         .accessibilityHidden(true)
                 }
