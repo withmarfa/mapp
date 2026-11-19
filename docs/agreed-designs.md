@@ -39,14 +39,10 @@ This page lists what has been agreed for MAPP and is not in the app yet, so the 
 
 - The toolbar holds the same buttons on every screen: Search, View Options, View As, Share, More and the right sidebar. A screen hides a button that does not apply. No screen adds its own controls to the toolbar.
 - The page holds at most one main action, such as New Collection.
-- The bottom-right corner is built (`WindowCorner`, [Views and lists](views-and-lists.md#the-bottom-right-corner)), with the Calendar's, the Timeline's and the Gallery's controls in it. The note's Aa and Focus and the file pages' controls below go into the same component.
-- **Focus** is the last button in the corner on every item's page, documents and web pages included. It moves the title into the toolbar and hides the properties, so the text gets the room. The sidebar, the list and the toolbar's buttons stay. The button again, or Escape, leaves it.
+- The bottom-right corner is built (`WindowCorner`, [Views and lists](views-and-lists.md#the-bottom-right-corner)), with the Calendar's, the Timeline's and the Gallery's controls in it. The page's corner (Focus, a note's Aa, Reader or Original) is built ([Item page](item-page.md#the-pages-corner)); the file pages' controls below go into the same component.
 - What each screen's corner holds:
-  - **Note:** Aa, which opens the formats: the text style (Title, Heading, Subheading, Body) as a row; bold, italic, strikethrough, highlight, code and link; bulleted, numbered and checklist; quote, code block and table; then Standard or Full Width beside smaller, actual and larger text. Format leaves the toolbar; the Format menu stays. Then Focus.
   - **Image:** one zoom control, 100% with a menu that holds Fit and sizes. Clicking 100% lets a person type a size.
-  - **PDF:** the page as "2 of 4" with arrows, the same zoom control, and Focus.
-  - **A web page or newsletter with a Reader view:** Reader or Original, as one glass segmented control. The switch leaves the toolbar. A web page with no Reader view has no switch.
-  - **Any other item's page:** Focus alone.
+  - **PDF:** the page as "2 of 4" with arrows, the same zoom control, and Focus. Focus is built; the page control and the zoom are not.
 
 ## Menus and empty states
 
@@ -80,7 +76,6 @@ What is not built yet. The built part is in [Value components](value-components.
 - A cover picture on an item's page, and how Marfa would hold the choice of cover. It is parked.
 - How the corner's controls are drawn on pages for each kind of item, such as a newsletter at its own width.
 - A full-screen view beside Focus. Not now.
-- A symbol of Focus's own. The boards use the system's full-screen arrows for now.
 
 ## Related pages
 
