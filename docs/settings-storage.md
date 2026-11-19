@@ -31,7 +31,7 @@ The rules that apply to every setting are in the `AGENTS.md` files: [that nothin
 
 ## The Settings window
 
-Settings is a place in the sidebar, not a separate window. It shows its pages in the list column (`SettingsPage`) and the chosen page in the detail column. The pages are Appearance, Lists, Editor and Sidebar; then Library, This Marfa and Recently Deleted; then About.
+Settings is a place in the sidebar, not a separate window. It shows its pages in the list column (`SettingsPage`) and the chosen page in the detail column. The pages are Appearance, Lists, Editor and Sidebar ([Settings > Sidebar](views-and-lists.md#settings--sidebar)); then Library, This Marfa and Recently Deleted; then About.
 
 The sidebar, list and Settings columns each have a default width a person can change in Settings (`ColumnWidth`): 230, 330 and 280 points, each within a range the column allows. The measurements of a page's rows and boxes are in [Views and lists](views-and-lists.md).
 
