@@ -1,55 +1,30 @@
 import SwiftUI
 
-/// What an index page can be set to: how it shows its rows and how wide it runs. The toolbar's View Options menu and
-/// the View menu offer the same choices; only the View menu binds keys.
+/// What an index page can be set to: the column its table is ordered by and the direction. The toolbar's View Options
+/// menu and the View menu offer the same choices.
 struct IndexViewOptions: View {
     let place: IndexPlace
-    var bindsKeys = false
-    @AppStorage private var layout: IndexLayout
-    @AppStorage private var width: IndexWidth
+    @AppStorage private var sort: IndexSort
 
-    init(place: IndexPlace, bindsKeys: Bool = false) {
+    init(place: IndexPlace) {
         self.place = place
-        self.bindsKeys = bindsKeys
-        _layout = AppStorage(wrappedValue: .default, place.layoutKey)
-        _width = AppStorage(wrappedValue: .default, place.widthKey)
+        _sort = AppStorage(wrappedValue: place.defaultSort, place.sortKey)
     }
 
     var body: some View {
         Group {
-            Section("Show As") {
-                ForEach(Array(IndexLayout.allCases.enumerated()), id: \.element) { offset, choice in
-                    Toggle(choice.title, systemImage: choice.symbol, isOn: Binding { layout == choice } set: { _ in layout = choice })
-                        .keyboardShortcut(bindsKeys ? KeyboardShortcut(KeyEquivalent(Character("\(offset + 1)")), modifiers: .command) : nil)
-                        .accessibilityIdentifier("IndexShowAs\(choice.rawValue.capitalized)")
+            Section("Sort By") {
+                ForEach(IndexColumn.allCases, id: \.self) { column in
+                    Toggle(column.title(in: place), isOn: Binding { sort.column == column } set: { _ in sort.column = column })
+                        .accessibilityIdentifier("IndexSortBy\(column.rawValue.capitalized)")
                 }
             }
-            Section("Width") {
-                ForEach(IndexWidth.allCases) { choice in
-                    Toggle(choice.title, isOn: Binding { width == choice } set: { _ in width = choice })
-                        .accessibilityIdentifier("IndexWidth\(choice.rawValue.capitalized)")
-                }
+            Section("Order") {
+                Toggle("Ascending", isOn: Binding { sort.ascending } set: { _ in sort.ascending = true })
+                    .accessibilityIdentifier("IndexSortAscending")
+                Toggle("Descending", isOn: Binding { !sort.ascending } set: { _ in sort.ascending = false })
+                    .accessibilityIdentifier("IndexSortDescending")
             }
-        }
-    }
-}
-
-extension IndexLayout {
-    var title: LocalizedStringKey {
-        switch self {
-        case .list: "List"
-        case .cards: "Cards"
-        case .table: "Table"
-        }
-    }
-}
-
-extension IndexWidth {
-    var title: LocalizedStringKey {
-        switch self {
-        case .narrow: "Narrow"
-        case .standard: "Standard"
-        case .wide: "Wide"
         }
     }
 }
@@ -69,38 +44,25 @@ struct IndexViewOptionsMenu: View {
 }
 
 extension ViewOptionCommand {
-    /// The index page's choices not already made, for the command palette.
+    /// The index page's sorts not already chosen, for the command palette.
     static func indexCommands(for place: IndexPlace) -> [ViewOptionCommand] {
-        let layout = IndexPreferences.layout(for: place)
-        let width = IndexPreferences.width(for: place)
-        let layouts = IndexLayout.allCases.filter { $0 != layout }.map { choice in
-            ViewOptionCommand(title: choice.commandTitle, systemImage: choice.symbol) { IndexPreferences.set(choice, for: place) }
-        }
-        let widths = IndexWidth.allCases.filter { $0 != width }.map { choice in
-            ViewOptionCommand(title: choice.commandTitle, systemImage: "arrow.left.and.right") {
-                IndexPreferences.set(choice, for: place)
+        let current = IndexPreferences.sort(for: place)
+        return IndexColumn.allCases.filter { $0 != current.column }.map { column in
+            ViewOptionCommand(title: String(localized: "Sort by \(column.plainTitle(in: place))"), systemImage: "arrow.up.arrow.down") {
+                IndexPreferences.set(IndexSort(column: column, ascending: current.ascending), for: place)
             }
         }
-        return layouts + widths
     }
 }
 
-private extension IndexLayout {
-    var commandTitle: String {
+private extension IndexColumn {
+    /// The column's name as a plain string, for a command's title.
+    func plainTitle(in place: IndexPlace) -> String {
         switch self {
-        case .list: String(localized: "View as List")
-        case .cards: String(localized: "View as Cards")
-        case .table: String(localized: "View as Table")
-        }
-    }
-}
-
-private extension IndexWidth {
-    var commandTitle: String {
-        switch self {
-        case .narrow: String(localized: "Width: Narrow")
-        case .standard: String(localized: "Width: Standard")
-        case .wide: String(localized: "Width: Wide")
+        case .name: place == .sources ? String(localized: "Source") : String(localized: "Name")
+        case .types: place == .sources ? String(localized: "Writes") : String(localized: "Contains")
+        case .count: String(localized: "Items")
+        case .latest: String(localized: "Latest Item")
         }
     }
 }

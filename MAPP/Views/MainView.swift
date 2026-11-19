@@ -175,7 +175,7 @@ struct MainView: View {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
                     sidebarColumn
                 } detail: {
-                    SidebarIndex(browser: browser, order: order)
+                    SidebarIndex(browser: browser, details: details, order: order)
                         .toastOverlay()
                         .toolbar(id: WindowToolbarLayout.index) { windowToolbar() }
                 }
