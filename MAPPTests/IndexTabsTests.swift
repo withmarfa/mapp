@@ -131,6 +131,8 @@ import Testing
         #expect(members.count == 3)
         let toasts = ToastPresenter()
         let undo = StepCountingUndoManager()
+        // A test has no run loop to close an event's group, so the delete gets a group of its own.
+        undo.groupsByEvent = false
         Browser.delete([holiday], in: library, undoManager: undo, toasts: toasts, naming: "Holiday")
 
         #expect(source.writes == [.transition(holiday, .trashed)], "the collection is written, and no member")

@@ -20,11 +20,6 @@ nonisolated enum DeletionWords {
         return AttributedString(localized: "^[Moved \(count) item](inflect: true) to Recently Deleted").text
     }
 
-    /// What the toast says after the item `title` moved to Recently Deleted.
-    static func movedMessage(titled title: String) -> String {
-        String(localized: "Moved “\(title)” to Recently Deleted")
-    }
-
     /// The title of the question before a collection is deleted.
     static func collectionTitle(_ title: String) -> String {
         String(localized: "Delete the collection “\(title)”?")
