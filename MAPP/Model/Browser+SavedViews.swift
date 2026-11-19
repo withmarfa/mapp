@@ -146,6 +146,7 @@ extension Browser {
 
     /// Moves the calendar by whole weeks or months, or back to the one that holds today with `steps` nil.
     func moveCalendar(by steps: Int?, now: Date, calendar: Calendar = .current) {
+        calendarMoves += 1
         guard let steps else {
             calendarDay = nil
             return

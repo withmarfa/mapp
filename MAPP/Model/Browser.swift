@@ -851,6 +851,8 @@ final class Browser {
     var placeCalendarScales: [SidebarItem: CalendarScale] = [:]
     /// A day in the week or month the calendar shows, or nil for the one that holds today. Kept for the window.
     var calendarDay: Date?
+    /// Counts the moves of the calendar by its buttons, menu or keys, so the month card can follow one that leaves the day as it was.
+    var calendarMoves = 0
     /// Whether the calendar's month card is open above the corner's buttons. It closes when the layout changes.
     var showsCalendarMonth = false
     /// Counts the asks to scroll the timeline to today (`requestTimelineToday`).

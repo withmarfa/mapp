@@ -10,3 +10,13 @@ nonisolated enum CalendarCorner {
     /// Whether Week or Month is one button with a menu rather than a segmented control, for content `width` points wide.
     static func foldsScale(forWidth width: CGFloat) -> Bool { width < foldsBelow }
 }
+
+nonisolated extension ItemViewMode {
+    /// Whether the layout has buttons in the corner, which sit over its content.
+    var hasCorner: Bool {
+        switch self {
+        case .calendar, .timeline, .gallery: true
+        case .list, .table, .board: false
+        }
+    }
+}

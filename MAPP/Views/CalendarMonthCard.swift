@@ -1,8 +1,9 @@
 import SwiftUI
 
 /// The month the corner's month button opens above its buttons: a small grid with the week the calendar shows marked in
-/// gray and today in red. Choosing a day goes to its week and closes the card. Its arrows change the month the card
-/// shows and leave the calendar where it is.
+/// gray, nothing marked while the calendar shows a month, and today in red. Choosing a day goes to its week or month and
+/// closes the card. Its arrows change the month the card shows and leave the calendar where it is, until the calendar
+/// itself moves, when the card follows it.
 struct CalendarMonthCard: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
@@ -15,19 +16,20 @@ struct CalendarMonthCard: View {
         let current = browser.calendarDay ?? now
         let anchor = shown ?? current
         let month = CalendarMonth.make(entries: [], around: anchor, calendar: calendar, now: now)
-        let marked = CalendarLayout.interval(of: .week, containing: current, calendar: calendar)
+        let marked = browser.calendarScale == .week ? CalendarLayout.interval(of: .week, containing: current, calendar: calendar) : nil
         VStack(spacing: 6) {
             HStack {
                 Text(month.interval.start, format: .dateTime.month(.wide).year())
                     .interfaceFont(.headline)
                     .accessibilityAddTraits(.isHeader)
                 Spacer(minLength: 0)
-                Button("Previous Month", systemImage: "chevron.left") { move(anchor, by: -1, calendar) }
+                Button { move(anchor, by: -1, calendar) } label: { arrow("chevron.left") }
+                    .accessibilityLabel("Previous Month")
                     .accessibilityIdentifier("CalendarMonthPrevious")
-                Button("Next Month", systemImage: "chevron.right") { move(anchor, by: 1, calendar) }
+                Button { move(anchor, by: 1, calendar) } label: { arrow("chevron.right") }
+                    .accessibilityLabel("Next Month")
                     .accessibilityIdentifier("CalendarMonthNext")
             }
-            .labelStyle(.iconOnly)
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
             if let first = month.weeks.first {
@@ -49,7 +51,7 @@ struct CalendarMonthCard: View {
                     }
                 }
                 .background {
-                    if let start = week.first?.date, marked.contains(start) {
+                    if let start = week.first?.date, marked?.contains(start) == true {
                         Capsule().fill(.primary.opacity(0.1))
                     }
                 }
@@ -57,6 +59,15 @@ struct CalendarMonthCard: View {
         }
         .padding(14)
         .accessibilityIdentifier("CalendarMonthCard")
+        .onChange(of: browser.calendarDay) { shown = nil }
+        .onChange(of: browser.calendarMoves) { shown = nil }
+    }
+
+    private func arrow(_ name: String) -> some View {
+        Image(systemName: name)
+            .font(.system(size: 12, weight: .semibold))
+            .frame(width: 24, height: 24)
+            .contentShape(.rect)
     }
 
     @ViewBuilder private func dayButton(_ day: CalendarMonth.Day, calendar: Calendar) -> some View {

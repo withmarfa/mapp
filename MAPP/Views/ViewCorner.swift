@@ -14,7 +14,6 @@ struct ViewCorner: View {
             WindowCorner {
                 Button("Today") { browser.requestTimelineToday() }
                     .buttonStyle(CornerButtonStyle())
-                    .help("Go to Today")
                     .accessibilityIdentifier("TimelineToday")
             }
         case .gallery:
@@ -59,9 +58,11 @@ private struct ViewCornerModifier: ViewModifier {
     @Bindable var browser: Browser
     /// Wide until measured, so the corner is never drawn folded for a frame.
     @State private var width: CGFloat = .infinity
+    @Environment(\.interfaceTextSize) private var textSize
 
     func body(content: Content) -> some View {
         content
+            .contentMargins(.bottom, browser.viewMode.hasCorner ? CornerMetrics.clearance(scale: InterfaceStyle.scale(for: textSize)) : 0, for: .scrollContent)
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
             .overlay { ViewCorner(browser: browser, width: width) }
     }

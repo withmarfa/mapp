@@ -175,7 +175,7 @@ struct ItemTimelineOptions: View {
     var body: some View {
         let fields = browser.timelineFieldChoices(in: library)
         let field = ItemTimelineLayout.selectedField(browser.timelineFields[browser.item], fields: fields)
-        Button("Today", systemImage: "calendar") { browser.requestTimelineToday() }
+        Button("Today", systemImage: "calendar.circle") { browser.requestTimelineToday() }
             .keyboardShortcut(bindsKeys ? CalendarShortcut.today : nil)
         Divider()
         Picker("Date Field", systemImage: "calendar", selection: Binding { field ?? "" } set: {

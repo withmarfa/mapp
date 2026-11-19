@@ -120,7 +120,7 @@ struct ViewOptionCommand {
         let scale = browser.calendarScale
         let unit = scale == .week ? String(localized: "Week") : String(localized: "Month")
         var commands = [
-            ViewOptionCommand(title: String(localized: "Go to Today"), systemImage: "calendar", shortcut: "⌘T") {
+            ViewOptionCommand(title: String(localized: "Today"), systemImage: "calendar.circle", shortcut: "⌘T") {
                 browser.moveCalendar(by: nil, now: library.now())
             },
             ViewOptionCommand(title: String(localized: "Previous \(unit)"), systemImage: "chevron.left", shortcut: "⌥⌘←") {
@@ -141,7 +141,7 @@ struct ViewOptionCommand {
         }
         commands.append(ViewOptionCommand(
             title: browser.showsCalendarMonth ? String(localized: "Hide Month") : String(localized: "Show Month"),
-            systemImage: "calendar.day.timeline.left", shortcut: "⇧⌘D"
+            systemImage: "calendar", shortcut: "⇧⌘D"
         ) { browser.toggleCalendarMonth() })
         return commands
     }
@@ -156,7 +156,7 @@ struct ViewOptionCommand {
         let place = browser.item
         let fields = browser.timelineFieldChoices(in: library)
         let field = ItemTimelineLayout.selectedField(browser.timelineFields[place], fields: fields)
-        var commands = [ViewOptionCommand(title: String(localized: "Go to Today"), systemImage: "calendar", shortcut: "⌘T") {
+        var commands = [ViewOptionCommand(title: String(localized: "Today"), systemImage: "calendar.circle", shortcut: "⌘T") {
             browser.requestTimelineToday()
         }]
         commands += fields.filter { $0.key != field }.map { field in

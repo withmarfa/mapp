@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import MAPP
 
@@ -68,6 +69,19 @@ struct CornerTests {
         #expect(CalendarCorner.foldsScale(forWidth: CalendarCorner.foldsBelow - 1))
         #expect(!CalendarCorner.foldsScale(forWidth: CalendarCorner.foldsBelow))
         #expect(!CalendarCorner.foldsScale(forWidth: .infinity))
+    }
+
+    @Test func onlyTheLayoutsWithButtonsInTheCornerLeaveRoomForThem() {
+        #expect(ItemViewMode.allCases.filter(\.hasCorner) == [.gallery, .timeline, .calendar])
+        #expect(CornerMetrics.clearance(scale: 1) == CornerMetrics.height + 2 * WindowCorner<EmptyView, EmptyView>.inset)
+    }
+
+    @Test func theMonthCardFollowsEveryMoveOfTheCalendar() {
+        let browser = Browser()
+        let now = Self.date("2026-11-04")
+        browser.moveCalendar(by: nil, now: now, calendar: Self.calendar)
+        browser.moveCalendar(by: 1, now: now, calendar: Self.calendar)
+        #expect(browser.calendarMoves == 2)
     }
 
     // MARK: The timeline and the gallery

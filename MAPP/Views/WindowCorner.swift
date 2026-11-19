@@ -86,6 +86,10 @@ private struct CornerButtonLabel<Label: View>: View {
 enum CornerMetrics {
     /// The height of a button at the default interface text size.
     static let height: CGFloat = 32
+
+    /// How far a scroll view's content ends above its foot, so its last line scrolls clear of the buttons: the buttons'
+    /// height with the gap around them (`WindowCorner.inset`) above and below.
+    static func clearance(scale: CGFloat) -> CGFloat { height * scale + WindowCorner<EmptyView, EmptyView>.inset * 2 }
 }
 
 /// Two or more related icon buttons in one glass capsule with no divider, such as back and forward. Each segment fills

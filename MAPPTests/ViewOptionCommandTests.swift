@@ -46,7 +46,7 @@ struct ViewOptionCommandTests {
         next.action()
         let expected = try #require(Calendar.current.date(byAdding: .weekOfYear, value: 1, to: clock))
         #expect(browser.calendarDay == expected, "a week on from the clock's, not from the wall clock")
-        let today = try #require(ViewOptionCommand.commands(for: browser, in: library, storedColumns: .constant(Data())).first { $0.title == "Go to Today" })
+        let today = try #require(ViewOptionCommand.commands(for: browser, in: library, storedColumns: .constant(Data())).first { $0.title == "Today" })
         today.action()
         #expect(browser.calendarDay == nil)
     }

@@ -14,7 +14,6 @@ struct CalendarCornerView: View {
         WindowCorner(isCardOpen: browser.showsCalendarMonth) {
             Button("Today") { browser.moveCalendar(by: nil, now: library.now()) }
                 .buttonStyle(CornerButtonStyle())
-                .help("Go to Today")
                 .accessibilityIdentifier("CalendarToday")
             CornerButtonGroup {
                 Button("Previous", systemImage: "chevron.left") { browser.moveCalendar(by: -1, now: library.now()) }
@@ -26,7 +25,7 @@ struct CalendarCornerView: View {
             }
             .labelStyle(.iconOnly)
             scalePicker(scale)
-            Button("Show Month", systemImage: "calendar") { browser.toggleCalendarMonth() }
+            Button(browser.showsCalendarMonth ? "Hide Month" : "Show Month", systemImage: "calendar") { browser.toggleCalendarMonth() }
                 .labelStyle(.iconOnly)
                 .buttonStyle(CornerButtonStyle(isOn: browser.showsCalendarMonth))
                 .help(browser.showsCalendarMonth ? "Hide Month" : "Show Month")
@@ -72,7 +71,7 @@ struct ItemCalendarOptions: View {
 
     var body: some View {
         let scale = browser.calendarScale
-        Button("Today", systemImage: "calendar") { browser.moveCalendar(by: nil, now: library.now()) }
+        Button("Today", systemImage: "calendar.circle") { browser.moveCalendar(by: nil, now: library.now()) }
             .keyboardShortcut(bindsKeys ? CalendarShortcut.today : nil)
         Button(scale == .week ? "Previous Week" : "Previous Month", systemImage: "chevron.left") {
             browser.moveCalendar(by: -1, now: library.now())
@@ -86,7 +85,7 @@ struct ItemCalendarOptions: View {
             .keyboardShortcut(bindsKeys ? CalendarShortcut.week : nil)
         Toggle("Month", isOn: Binding { scale == .month } set: { _ in browser.changeCalendarScale(.month) })
             .keyboardShortcut(bindsKeys ? CalendarShortcut.month : nil)
-        Button(browser.showsCalendarMonth ? "Hide Month" : "Show Month", systemImage: "calendar.day.timeline.left") {
+        Button(browser.showsCalendarMonth ? "Hide Month" : "Show Month", systemImage: "calendar") {
             browser.toggleCalendarMonth()
         }
         .keyboardShortcut(bindsKeys ? CalendarShortcut.showMonth : nil)
