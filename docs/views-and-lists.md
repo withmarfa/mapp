@@ -163,7 +163,7 @@ Status: the sidebar customized in place and Settings > Sidebar are built, not ye
 The sidebar is a list of sections. A new library has four, in one tab: the shortcuts New and Search, Library (Items, Sources and Collections), Views (Inbox, Recents, Favorites and the saved views) and Types. The arrangement is kept for each server (`sidebarLayouts`).
 
 - **Tabs.** There is one tab, Home, and no tab bar. Once a person has a second tab, tabs show at the top: each is its symbol, the chosen one also shows its name, and a plus button adds one. A tab's context menu renames or removes it. Removing a tab moves its sections to the end of the first tab, so none is lost. Each window keeps its own chosen tab.
-- **Customize Sidebar** is in the context menu of the sidebar and of each row and heading, and has no button in the sidebar. While a window customizes, the foot shows Done in place of the instance, rows and headings have a handle at the trailing edge, and the rows drag to reorder. Customizing is one window's state: the layout is shared by every window, and Done ends it only in the window where it was pressed.
+- **Customize Sidebar** is in the context menu of the sidebar and of each row and heading, and in the View menu, and has no button in the sidebar. While a window customizes, the foot shows Done in place of the instance, rows and headings have a handle at the trailing edge, and the rows drag to reorder. Customizing is one window's state: the layout is shared by every window, and Done ends it only in the window where it was pressed.
 - **A section's menu** (at its heading while customizing) has Show (which rows the section lists), Rename, Move Up, Move Down, Move to Tab (including a new tab) and Hide Section. A section's handle drags it onto another section of the tab. Hiding a built-in section keeps it, and Add Section brings it back; hiding a section of the person's own removes it. Add Section also adds a new section, alone or holding a collection or a source.
 - **Rows.** A section of Library, Views or the person's own can hold views, collections and sources. A row whose view, collection or source is gone, or has not synced yet, is left out and the section stays; the layout still holds it, so the row returns with it. A section that holds only its own places keeps the order of the sidebar's blocks (the Library's three, then Inbox, Recents and Favorites, then the saved views); once a row is dragged or moved into it, the section is one list in the person's order. Removing a section the person made frees the collections and sources in it to be added again. A row's context menu has Move to Section and Hide from Sidebar. The Types section lists top-level types while customizing.
 - **Shortcuts** are rows that act or go somewhere and never take the selection: New, Search, Settings, a place to go to, or a kind of item to create. A new library has New and Search; no shortcut makes an item of a type the person made. Add Shortcut adds one to the tab, and a shortcut's context menu removes it.
@@ -179,6 +179,23 @@ Settings > Sidebar (`SidebarSettings`) customizes the layout the sidebar reads, 
 - **Subtype icons.** When the library has types, a small card holds Show Icons on Subtypes, which the Types section reads.
 
 Opening and closing sections, and parent types in the sidebar, are not built.
+
+## Menus
+
+Built, not yet released.
+
+The menu bar holds every command the toolbar, the corner and the row menus offer, so each can be reached from the keyboard and from a window with the toolbar hidden. A command that only arranges the sidebar (a row's Choose Icon… or Move to Section) stays in the sidebar's own menus, and Customize Sidebar… in the View menu opens them. Each command is also in the command palette, under the menu it belongs to.
+
+- **Go** lists the places (Items, Sources, Collections, then Inbox, Recents and Favorites), then the saved views, then the types the sidebar lists before Show More, in the sidebar's order and under its names, and All Types, a submenu, for the rest. A subtype is named after its parent (Tickets > Bugs), since a menu has no indentation. A view or type hidden in the sidebar is left out, and the places stay. A section with nothing in it, such as the saved views of a library that has none, is left out with its divider (`MenuSeparators`). A view deleted, or a type removed, while the menu is open opens Items. The places keep their keys; a view or a type has none.
+- **View** holds Customize Sidebar… (Finish Customizing Sidebar while it is on) and Finish Editing View, which are the sidebar's Done and the Edit View panel's Done. Recently Deleted is not in it.
+- **File** holds, on the Sources page, Rename Source… and Choose Source Mark… for the chosen source, and on the Collections page Delete Collection… for the chosen collection, as the row's menu does.
+- **Help**, after the system's search field, holds MAPP Help, Keyboard Shortcuts, What's New in MAPP, Marfa Documentation and Report a Problem…. They open in the browser, so there is nothing to handle without a network, except Keyboard Shortcuts, which opens a small window.
+  - MAPP Help opens this project's README on GitHub (`https://github.com/withmarfa/mapp#readme`), until the app has a help book of its own.
+  - Keyboard Shortcuts lists the keys of the menu bar, grouped by menu. It is read from the menu bar, so it cannot fall out of step with the menus.
+  - What's New in MAPP opens the project's releases, and Marfa Documentation opens `https://docs.marfa.so`.
+  - Report a Problem… opens a new issue with the app's version and the macOS version in its body, and nothing about the person, their library or their server.
+  - The addresses are in one place, `AppLinks`.
+- **Recently Deleted** is a page of Settings only, not a place in the sidebar or the menus. A link to a deleted item opens Settings > Recently Deleted, and a window saved while it was a place opens on Items. A stored sidebar layout that names it is read as before, and the entry is ignored.
 
 ## Command palette
 

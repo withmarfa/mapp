@@ -11,14 +11,6 @@ This page lists what has been agreed for MAPP and is not in the app yet, so the 
 - The toolbar holds the same buttons on every screen: Search, View Options, View As, Share, More and the right sidebar. A screen hides a button that does not apply. No screen adds its own controls to the toolbar.
 - The page holds at most one main action, such as New Collection.
 
-## Menus and empty states
-
-- The menu bar holds every command the toolbar, the corner and the row menus offer.
-- Go lists the places (Items, Sources, Collections, Inbox, Recents, Favorites), then the saved views and the types, as the sidebar holds them, with All Types for the rest.
-- Recently Deleted leaves the View menu.
-- Help holds MAPP Help, Keyboard Shortcuts, What's New in MAPP, Marfa Documentation and Report a Problem…, after the system's search field.
-- Recently Deleted is a page in Settings only, not a sidebar place.
-
 ## Editing in place
 
 What is not built yet. The built part is in [Value components](value-components.md) and [Item page](item-page.md).
