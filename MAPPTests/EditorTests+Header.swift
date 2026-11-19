@@ -220,8 +220,8 @@ extension EditorTests {
         let paragraphs = Array(repeating: "A paragraph for the scrolling check.", count: 60).joined(separator: "\n\n") + "\n"
         try await page.load(paragraphs)
         page.editor.setHeader(Self.header("First item"))
-        try await page.run("window.scrollTo(0, 240)")
-        let scrolled = try await page.editor.webView.evaluateJavaScript("window.scrollY") as? Double
+        // The header's layout can still move the page as it settles, so scroll until the position holds.
+        let scrolled = try await settle(page.editor, "window.scrollTo(0, 240), window.scrollY", as: Double.self) { $0 == 240 }
         #expect(scrolled == 240)
 
         for index in 0..<3 {

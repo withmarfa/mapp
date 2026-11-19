@@ -203,13 +203,14 @@ extension EditorTests {
         let note = page.library.add("A sheet: ![[Budget.csv]]\n")
         page.library.bindEmbed("![[Budget.csv]]", in: note.id, file: sheet)
         page.editor.load(note)
-        _ = try await settle(page.editor, "!!document.querySelector('.inkkit-file')", as: Bool.self) { $0 == true }
-        let name = try await page.editor.webView.evaluateJavaScript("document.querySelector('.inkkit-file-actions button')?.getAttribute('aria-label')") as? String
-        #expect(name == "Quick Look Budget.csv", "the card's first action is Quick Look, named for the file")
+        // The card's actions arrive after the card itself, so wait for both before reading their order.
+        let labels = try await settle(page.editor, "[...document.querySelectorAll('.inkkit-file-actions button')].map(b => b.getAttribute('aria-label'))", as: [String].self) { ($0?.count ?? 0) >= 2 }
+        #expect(labels?.first == "Quick Look Budget.csv", "the card's first action is Quick Look, named for the file")
+        let quickLook = ".inkkit-file-actions button[aria-label^='Quick Look']"
         #expect(page.editor.quickLook == nil)
         // The test page tells of a script error of its own as a card loads; Quick Look must add none.
         let told = page.library.notices.told
-        try await page.run("document.querySelector('.inkkit-file-actions button').click()")
+        try await page.run("document.querySelector(\"\(quickLook)\").click()")
         try await page.wait { page.editor.quickLook != nil }
         #expect(page.editor.quickLook?.current?.lastPathComponent == "Budget.csv")
         #expect(page.library.notices.told == told, "showing the file tells the person nothing")
