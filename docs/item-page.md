@@ -1,8 +1,8 @@
 # Item page
 
-Status: Built in v0.0.43. Opening an item as a modal or a full page is built, not yet released.
+Status: Built in v0.0.43. Opening an item as a modal or a full page, and the page's corner (Focus, a note's Aa, Reader or Original), are built, not yet released.
 
-Where it lives: `ItemPageHeader`, `PagePinsView` and `PageChip` for the header; `PropertyRow`, `PagePlacements`, `PageLayout` and `PagePins` for what the page shows; `ItemInspector` for the right sidebar; `ItemLayoutPanel` for arranging; `ValueEditing/` for editing a value; `FieldMenu`, `FieldMenuPresenter` and `FieldEditSheet` for a field's menu; `VersionHistoryWorkspace` for history. The web part of the header is `editor/src/header.ts`.
+Where it lives: `ItemPageHeader`, `PagePinsView` and `PageChip` for the header; `PropertyRow`, `PagePlacements`, `PageLayout` and `PagePins` for what the page shows; `ItemInspector` for the right sidebar; `ItemLayoutPanel` for arranging; `ValueEditing/` for editing a value; `FieldMenu`, `FieldMenuPresenter` and `FieldEditSheet` for a field's menu; `VersionHistoryWorkspace` for history; `PageCorner`, `ItemCorner` and `FormatsCard` for the corner. The web part of the header is `editor/src/header.ts`.
 
 The item page shows one item: its title, its pinned properties, its text and its property block. It is the same for every type, and each type decides only which properties go where.
 
@@ -74,7 +74,26 @@ The choices are stored as `pagePlacements`. See [Settings storage](settings-stor
 
 ## Saved web pages
 
-A page for a saved web page shows its description under the title (`ReadingHeader`). The Reader and Original switch sits in the window's toolbar for a page with an article, never on the page. The byline above its title is agreed and not built; see Header.
+A page for a saved web page shows its description under the title (`ReadingHeader`). The Reader and Original switch sits in the page's corner for a page with an article ([The page's corner](#the-pages-corner)), never in the toolbar. The byline above its title is agreed and not built; see Header.
+
+## The page's corner
+
+Built, not yet released.
+
+The page's corner is the window's bottom-right corner (`WindowCorner`, [Views and lists](views-and-lists.md#the-bottom-right-corner)) on an item's page. It sits over the page and ends where the right sidebar begins. Its buttons are in `PageCorner.buttons`, and `ItemCorner` draws them.
+
+- **Focus** is the last button on every item's page: a note, a task, an event, a document, a file and a web page. A list or a collection's browser has none. It moves the title into the toolbar, where it shows as the scrolled title does, and hides the properties and the rest of the header, so the text gets the room. The sidebar, the list, the right sidebar and the toolbar's buttons stay. The button is gray while Focus is on. The button again, Escape, or View > Leave Focus (⇧⌘F, also in the palette) leaves it. ⌃⌘F is the system's Full Screen, so Focus does not take it.
+- **Focus belongs to one window and one item.** Choosing another item puts the page back in its normal look, and so does the item's page going away, as when the item is deleted. Customize Layout arranges the header Focus hides, so starting it ends Focus, and Focus waits until it is done.
+- **A note's Aa** is a glass button before Focus. It opens the formats card above the buttons, solid, as wide as 340 points or the column allows. The card holds the text style (Title, Heading, Subheading, Body) as a row with the current one on a gray pill; bold, italic, strikethrough, highlight, code and link joined in one capsule; bulleted, numbered and checklist; quote, code block and table; a line; then Standard or Full Width beside smaller, actual and larger text. Each button runs the command the Format menu or the View menu runs, with no code of its own. A format the caret cannot take, and every format on a page that cannot be written, is dimmed. Aa shows only where the page is the editor. The Format toolbar item is gone; Bold, Italic and the two lists stay in the toolbar's tray, and the Format menu stays. View > Show Formats is the menu command.
+- **Escape** closes the formats card first, and leaves Focus on a second press. The card closes by itself when the item changes.
+- **A web page or newsletter with a Reader view** has Reader or Original as one glass segmented control before Focus. The switch is not in the toolbar. A web page with no Reader view has no switch.
+- **Any other item's page** has Focus alone.
+
+Focus hides the whole header, so the Linked From block that a type places on the page is hidden with it.
+
+Agreed, not built: Image's zoom control, and PDF's page control with the same zoom, each before Focus ([Agreed designs](agreed-designs.md)).
+
+Open: a symbol of Focus's own. The corner uses the system's full-screen arrows for now.
 
 ## Version History
 

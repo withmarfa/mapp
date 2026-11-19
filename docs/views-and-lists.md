@@ -37,7 +37,7 @@ The window's bottom-right corner (`WindowCorner`) holds how a person views the s
 - **Calendar:** Today, back and forward, Week or Month (the system's segmented control) and a month button. The month opens above the buttons with today in red and, while the calendar shows a week, that week marked in gray (a month marks nothing, since the whole month is on screen); its arrows change the month the card shows without moving the calendar until the calendar moves, when the card follows it, and choosing a day shows that day's week (or month, in a month) and closes the card. The button reads Show Month, and Hide Month while the card is open, as the View menu does. Under 860 points of content width (`CalendarCorner.foldsBelow`), which the right sidebar counts against, Week or Month folds into one button with a menu. The View menu has Today (⌘T), Previous and Next Week or Month (⌥⌘←, ⌥⌘→), Week (⌥⌘1), Month (⌥⌘2) and Show Month (⇧⌘D).
 - **Timeline:** Today scrolls to today's agenda, which is the top of the timeline. The View menu has Today (⌘T).
 - **Gallery:** the card size by name (Small, Medium or Large) as one button with a menu. It is the size Edit View's Cards section holds, so either changes the other. The View menu has Small Cards, Medium Cards and Large Cards.
-- The note's Aa and Focus, and the file pages' controls, use this component and are not built yet ([Agreed designs](agreed-designs.md)).
+- **An item's page:** Focus, a note's Aa and a web page's Reader or Original ([Item page](item-page.md#the-pages-corner)). The image and PDF controls use this component and are not built yet ([Agreed designs](agreed-designs.md)).
 
 Agreed, not built:
 
