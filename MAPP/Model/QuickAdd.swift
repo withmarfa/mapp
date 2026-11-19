@@ -261,7 +261,7 @@ final class QuickAdd {
 
     // MARK: What is remembered
 
-    /// The defaults key for the kind last added, which a new draft starts with.
+    /// The defaults key for the kind last added, which a new draft starts with where its place holds no type.
     static let lastTypeKey = "quickAddLastType"
 
     /// The sidebar's types in its order, groups opened.

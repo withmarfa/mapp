@@ -15,7 +15,7 @@ nonisolated struct SidebarTab: Codable, Equatable, Hashable, Identifiable, Senda
 
 /// A shortcut: a row of the sidebar that does something or goes somewhere, instead of being a place.
 nonisolated enum SidebarShortcut: Hashable, Sendable {
-    /// Opens New Item, in the kind used last.
+    /// Opens New Item, in the type the place holds, else the kind used last.
     case new
     case search
     case settings
