@@ -6,11 +6,6 @@ Where it lives: not built yet.
 
 This page lists what has been agreed for MAPP and is not in the app yet, so the next build starts from one list. What was turned down is in [Rejected designs](rejected-designs.md).
 
-## The toolbar and the bottom-right corner
-
-- The toolbar holds the same buttons on every screen: Search, View Options, View As, Share, More and the right sidebar. A screen hides a button that does not apply. No screen adds its own controls to the toolbar.
-- The page holds at most one main action, such as New Collection.
-
 ## Editing in place
 
 What is not built yet. The built part is in [Value components](value-components.md) and [Item page](item-page.md).
