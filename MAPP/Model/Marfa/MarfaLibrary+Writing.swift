@@ -390,6 +390,13 @@ extension MarfaLibrary {
         setStates(changes, name: name, undoManager: undoManager)
     }
 
+    /// The server reads what moving `ids` takes only for 2 to `DeletionWords.previewLimit` items and only online; asking
+    /// it never moves anything.
+    func moreItemsTaken(with ids: Set<ItemID>) async -> Int? {
+        guard reachesServer, (2...DeletionWords.previewLimit).contains(ids.count) else { return nil }
+        return await source.moreItemsTaken(with: ids.sorted { $0.rawValue < $1.rawValue })
+    }
+
     /// The copy holds the bin, so an item binned here or elsewhere is restored like any other.
     func recover(_ ids: Set<ItemID>, undoManager: UndoManager?) {
         var changes: [ItemID: (from: ItemState, to: ItemState)] = [:]

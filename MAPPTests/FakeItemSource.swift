@@ -138,6 +138,27 @@ nonisolated final class FakeItemSource: ItemSource {
         held.withLock { $0[id] = ItemBody(id: id, text: text, version: ItemVersion(version)) }
     }
 
+    /// What `moreItemsTaken` answers; nil is a preview the server could not read. `previewsAsked` lists each ask.
+    let moreTaken = Mutex<Int?>(nil)
+    let previewsAsked = Mutex<[[ItemID]]>([])
+
+    /// While on, a preview waits until `releasePreviews()`; one never released never answers.
+    let holdsPreviews = Mutex<Bool>(false)
+    private let heldPreviews = Mutex<[CheckedContinuation<Void, Never>]>([])
+
+    func releasePreviews() {
+        let held = heldPreviews.withLock { waiting in defer { waiting = [] }; return waiting }
+        for continuation in held { continuation.resume() }
+    }
+
+    func moreItemsTaken(with ids: [ItemID]) async -> Int? {
+        previewsAsked.withLock { $0.append(ids) }
+        if holdsPreviews.withLock({ $0 }) {
+            await withCheckedContinuation { continuation in heldPreviews.withLock { $0.append(continuation) } }
+        }
+        return moreTaken.withLock { $0 }
+    }
+
     func clearWrites() {
         written.withLock { $0 = [] }
     }

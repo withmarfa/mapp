@@ -8,6 +8,20 @@ nonisolated enum DeletionWords {
         AttributedString(localized: "^[Move \(count) item](inflect: true) to Recently Deleted?").text
     }
 
+    /// The most items the server is asked to preview a move of at once; the question reads nothing for a larger selection.
+    static let previewLimit = 20
+
+    /// What the question says before moving several items. The server's count is a snapshot of links that may change
+    /// before the deletes run, and may include an item that can't be recovered, so with a count it says only what may
+    /// also move and promises no recovery. Where that couldn't be read, or nothing goes with them, it says that they
+    /// can be brought back.
+    static func moveMessage(alsoTaking count: Int?) -> String {
+        guard let count, count > 0 else { return String(localized: "You can bring them back from Recently Deleted.") }
+        return count == 1
+            ? String(localized: "1 more item linked to them may also move to Recently Deleted.")
+            : String(localized: "\(count) more items linked to them may also move to Recently Deleted.")
+    }
+
     /// What the toast says after `count` items moved to Recently Deleted. One item is named by `title` where it has
     /// one.
     static func movedMessage(count: Int, title: String? = nil) -> String {

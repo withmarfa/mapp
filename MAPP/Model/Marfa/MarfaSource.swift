@@ -157,6 +157,16 @@ nonisolated final class MarfaSource: ItemSource {
         try await counting.counts(of: ids, query)
     }
 
+    func moreItemsTaken(with ids: [ItemID]) async -> Int? {
+        let copy = copy
+        do {
+            let preview = try await MarfaEngine.asking { try await copy.items.previewTrash(ids: ids.map(\.rawValue)) }
+            return max(Int(clamping: preview.count) - Set(ids).count, 0)
+        } catch {
+            return nil
+        }
+    }
+
     /// Hydrates a new copy or catches up a held one, then sends what waits in the queue. Call it once the
     /// first paint is shown; the package refills a copy whose place the server let go, as after a long sleep.
     /// Writes go to the queue at once meanwhile; a refresh or a drain that fails is tried again later on its own.

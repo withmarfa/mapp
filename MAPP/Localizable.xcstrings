@@ -634,6 +634,9 @@
     "%@, remove" : {
 
     },
+    "%lld more items linked to them may also move to Recently Deleted." : {
+      "extractionState" : "manual"
+    },
     "%lld" : {
 
     },
@@ -1390,6 +1393,9 @@
     },
     "+%lld more" : {
 
+    },
+    "1 more item linked to them may also move to Recently Deleted." : {
+      "extractionState" : "manual"
     },
     "1 picture from another website isn’t loaded." : {
 

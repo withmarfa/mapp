@@ -516,6 +516,8 @@ final class FakeItemLibrary: ItemLibrary {
         change(changing) { $0.tags.remove(tag) }
     }
 
+    func moreItemsTaken(with ids: Set<ItemID>) async -> Int? { nil }
+
     func delete(_ ids: Set<ItemID>, undoManager: UndoManager?) {
         let plan = deletePlan(ids)
         tellSkipped(plan.skips, didChange: !plan.moving.isEmpty, failing: "Can’t Delete")

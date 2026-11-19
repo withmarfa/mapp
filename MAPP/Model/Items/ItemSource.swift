@@ -114,6 +114,11 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
     /// cannot answer at all, such as a copy that cannot be sure and a server out of reach: the count then shows nothing.
     func counts(of ids: [ItemID], _ query: CountQuery) async throws -> [ItemID: ItemCountAnswer]
 
+    /// How many more items than `ids`, one to 20, moving them to Recently Deleted also takes, as the server reads it
+    /// now; nil where it can't be read for any reason. Reads only: nothing moves, and the move itself is each item's
+    /// queued delete.
+    func moreItemsTaken(with ids: [ItemID]) async -> Int?
+
     // MARK: Views, written to the server at once and never queued
 
     /// Each throws `ViewWriteFailure`. A write that failed for want of the server is sent again with the same
@@ -169,6 +174,8 @@ nonisolated extension ItemSource {
     func use(_ server: Server) async throws -> SourceRole { .writer }
 
     func counts(of ids: [ItemID], _ query: CountQuery) async throws -> [ItemID: ItemCountAnswer] { throw ItemCountUnavailable() }
+
+    func moreItemsTaken(with ids: [ItemID]) async -> Int? { nil }
 
     var downloadedFiles: (any DownloadedFiles)? { nil }
 

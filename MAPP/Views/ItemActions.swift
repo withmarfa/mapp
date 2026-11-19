@@ -123,7 +123,10 @@ extension ItemLibrary {
         EditorController.flushAll(leaving: false) { [self] kept in
             guard kept else { return }
             Browser.delete(ids, in: self, undoManager: undoManager, toasts: details?.toasts, naming: title, asking: details.map { details in
-                { details.deletion = DeleteRequest(ids: $0, undoManager: undoManager) }
+                { moving in
+                    // `ids` is the whole selection, which decides whether the server is asked at all.
+                    Task { await details.askToMove(moving, of: ids, in: self, undoManager: undoManager) }
+                }
             })
         }
     }
