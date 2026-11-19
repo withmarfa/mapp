@@ -48,7 +48,7 @@ import Testing
     @Test func theGalleryKeepsItsSortUntilRelevanceIsPickedThere() {
         let (library, strongOld, weakNew) = makeLibrary()
         let browser = Browser()
-        browser.show(.allItems, in: library, order: ranked)
+        browser.show(.itemType("core.note"), in: library, order: ranked)
         browser.viewMode = .gallery
         browser.searchText = "search"
         #expect(!browser.ordersByRelevance)
@@ -60,7 +60,7 @@ import Testing
     @Test func theTableKeepsItsSortUntilRelevanceIsPickedAndColumnSortingStillWorks() {
         let (library, strongOld, weakNew) = makeLibrary()
         let browser = Browser()
-        browser.show(.allItems, in: library, order: ranked)
+        browser.show(.itemType("core.note"), in: library, order: ranked)
         browser.viewMode = .table
         browser.searchText = "search"
         func rows() -> [ItemID] { browser.tableContent(in: library).rows.map(\.item.id) }
@@ -71,13 +71,13 @@ import Testing
 
         // A column sort the person picks replaces relevance, in either direction.
         browser.orderSearch(byRelevance: false)
-        browser.tableOptions[.allItems, default: .init()].sort = [ItemTableComparator(column: .edited, order: .reverse)]
+        browser.tableOptions[.itemType("core.note"), default: .init()].sort = [ItemTableComparator(column: .edited, order: .reverse)]
         #expect(rows() == [weakNew.id, strongOld.id])
-        browser.tableOptions[.allItems, default: .init()].sort = [ItemTableComparator(column: .edited, order: .forward)]
+        browser.tableOptions[.itemType("core.note"), default: .init()].sort = [ItemTableComparator(column: .edited, order: .forward)]
         #expect(rows() == [strongOld.id, weakNew.id])
 
         // Relevance sets the stored sort aside without erasing it.
-        browser.tableOptions[.allItems, default: .init()].sort = [ItemTableComparator(column: .edited, order: .reverse)]
+        browser.tableOptions[.itemType("core.note"), default: .init()].sort = [ItemTableComparator(column: .edited, order: .reverse)]
         browser.orderSearch(byRelevance: true)
         #expect(rows() == [strongOld.id, weakNew.id])
         browser.orderSearch(byRelevance: false)
