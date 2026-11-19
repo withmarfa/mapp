@@ -270,6 +270,29 @@ struct CalendarLayoutTests {
         #expect(days.filter(\.isInMonth).count == 30)
     }
 
+    @Test func theMonthCardMarksOnlyTheWeekTheCalendarShows() throws {
+        let calendar = Self.calendar(firstWeekday: 2)
+        let month = Self.month([], around: "2026-11-19", calendar)
+        func firstDay(of span: DateInterval) throws -> Int {
+            let row = try #require(month.row(startingIn: span))
+            return calendar.component(.day, from: month.weeks[row][0].date)
+        }
+        let week = CalendarLayout.interval(of: .week, containing: Self.date("2026-11-19T12:00:00", calendar), calendar: calendar)
+        #expect(try firstDay(of: week) == 16)
+        // A span ends where the next week begins, and that week is not in it.
+        let before = DateInterval(start: Self.date("2026-11-09T00:00:00", calendar), end: week.start)
+        #expect(try firstDay(of: before) == 9)
+    }
+
+    @Test func aBlockGivesItsTitleTwoLinesBeforeTheTime() {
+        // An hour: two lines and the time. Three quarters: two lines and no time. Half: one line, no time.
+        #expect(CalendarLayout.blockLabel(height: 58, width: 80, scale: 1) == (2, true))
+        #expect(CalendarLayout.blockLabel(height: 43, width: 80, scale: 1) == (2, false))
+        #expect(CalendarLayout.blockLabel(height: 28, width: 80, scale: 1) == (1, false))
+        // A block too narrow for the time drops it first.
+        #expect(CalendarLayout.blockLabel(height: 58, width: 24, scale: 1) == (2, false))
+    }
+
     @Test func aTitleBreaksAtWordsAndNeverInsideOne() {
         func lines(_ title: String, _ count: Int, _ width: CGFloat) -> [String] {
             CalendarLayout.titleLines(title, lines: count, fitting: width) { CGFloat($0.count) * 6 }

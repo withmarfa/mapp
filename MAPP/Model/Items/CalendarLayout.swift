@@ -99,6 +99,16 @@ nonisolated enum CalendarLayout {
         entry.start < nextDay(day, calendar: calendar) && entry.end > day
     }
 
+    /// What a week's block shows for the room it has: the title first, on up to two lines, and the time only where
+    /// room is left for it, on a line of its own wide enough to read. A block with room for one line gets one.
+    static func blockLabel(height: CGFloat, width: CGFloat, scale: CGFloat) -> (titleLines: Int, showsTime: Bool) {
+        let line = 14 * scale
+        let room = height - 6 * scale
+        let titleLines = max(1, min(2, Int(room / line)))
+        let timeFits = room - CGFloat(titleLines) * line >= 12 * scale && width >= 34 * scale
+        return (titleLines, timeFits)
+    }
+
     /// A title broken at word boundaries into at most `lines` lines, for a block too narrow for it on one. Each line but
     /// the last takes the words that fit `width` by `measure`, and the last takes every word left, for the view to end
     /// with an ellipsis. A word wider than the line stands alone and is cut by its own ellipsis, never split mid-word.
@@ -259,6 +269,12 @@ nonisolated struct CalendarMonth: Equatable, Sendable {
     let weeks: [[Day]]
     /// How many items have time in the month itself.
     let itemCount: Int
+
+    /// The row of the week that `span` holds the start of, or nil where no row does. A span ends where the next week
+    /// begins, so the end itself belongs to the next row, which is not marked.
+    func row(startingIn span: DateInterval) -> Int? {
+        weeks.firstIndex { week in week.first.map { $0.date >= span.start && $0.date < span.end } ?? false }
+    }
 
     static func make(entries: [CalendarEntry], around anchor: Date, calendar: Calendar, now: Date) -> CalendarMonth {
         let month = CalendarLayout.interval(of: .month, containing: anchor, calendar: calendar)

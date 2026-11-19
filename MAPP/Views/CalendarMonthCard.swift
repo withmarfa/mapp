@@ -17,6 +17,7 @@ struct CalendarMonthCard: View {
         let anchor = shown ?? current
         let month = CalendarMonth.make(entries: [], around: anchor, calendar: calendar, now: now)
         let marked = browser.calendarScale == .week ? CalendarLayout.interval(of: .week, containing: current, calendar: calendar) : nil
+        let markedRow = marked.flatMap { month.row(startingIn: $0) }
         VStack(spacing: 6) {
             HStack {
                 Text(month.interval.start, format: .dateTime.month(.wide).year())
@@ -51,7 +52,7 @@ struct CalendarMonthCard: View {
                     }
                 }
                 .background {
-                    if let start = week.first?.date, marked?.contains(start) == true {
+                    if index == markedRow {
                         Capsule().fill(.primary.opacity(0.1))
                     }
                 }
