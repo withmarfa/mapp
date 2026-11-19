@@ -383,7 +383,7 @@ private struct Pages {
 
 /// The row at the foot of a table, or of a group, that shows the next page. It reads as a quiet row, as Notion's
 /// does, and is a button, so the keyboard and VoiceOver can reach it.
-private struct ItemTableLoadMore: View {
+struct ItemTableLoadMore: View {
     let remaining: Int
     let action: () -> Void
 

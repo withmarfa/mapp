@@ -109,7 +109,7 @@ struct SidebarIndex: View {
         case .sources:
             let items = rows.reduce(0) { $0 + $1.count }
             return String(localized: "\(rows.count) sources") + ", " + String(localized: "\(items) items")
-        case .collections:
+        default:
             return String(localized: "\(rows.count) collections")
         }
     }
@@ -165,7 +165,7 @@ private struct IndexContent: View {
         switch place {
         case .sources:
             EmptyState("No Sources", detail: "Sources appear here when items identify where they came from.")
-        case .collections:
+        default:
             if library.catalogue.collectionTypes.isEmpty {
                 EmptyState("No Collections", detail: "This library has no collection type.")
             } else {

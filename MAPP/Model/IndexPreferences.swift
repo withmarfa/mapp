@@ -1,8 +1,9 @@
 import Foundation
 
-/// An index page: a page that lists places rather than items. Each remembers its own tab and sort on this Mac.
+/// An index page: a table under tabs. Sources and Collections list the places that hold items, and Items lists the items.
+/// Each remembers its own tab and sort on this Mac.
 nonisolated enum IndexPlace: String, CaseIterable, Sendable {
-    case sources, collections
+    case sources, collections, items
 
     var tabKey: String { "indexTab.\(rawValue)" }
     var sortKey: String { "indexSort.\(rawValue)" }
@@ -11,15 +12,17 @@ nonisolated enum IndexPlace: String, CaseIterable, Sendable {
     var tabs: [IndexTab] {
         switch self {
         case .sources: [.all, .apps, .keys]
-        case .collections: [.all, .yours, .fromApps]
+        case .collections, .items: [.all, .yours, .fromApps]
         }
     }
 
-    /// How the page's rows are ordered until the person chooses: collections by name, sources by what they wrote.
+    /// How the page's rows are ordered until the person chooses: collections by name, sources by what they wrote, items
+    /// by when they changed, the latest first.
     var defaultSort: IndexSort {
         switch self {
         case .sources: IndexSort(column: .count, ascending: false)
         case .collections: IndexSort(column: .name, ascending: true)
+        case .items: IndexSort(column: .latest, ascending: false)
         }
     }
 
@@ -27,6 +30,7 @@ nonisolated enum IndexPlace: String, CaseIterable, Sendable {
         switch item {
         case .sources: self = .sources
         case .collections: self = .collections
+        case .allItems: self = .items
         default: return nil
         }
     }
@@ -63,7 +67,8 @@ nonisolated enum SourceCode {
     static func isApp(_ code: String) -> Bool { code.hasPrefix(appPrefix) }
 }
 
-/// A column of an index table. `latest` is a source's latest item and a collection's own update.
+/// A column of an index table. `latest` is a source's latest item, and a collection's or an item's own update; `types` is
+/// what a source writes and an item's type.
 nonisolated enum IndexColumn: String, CaseIterable, Sendable {
     case name, types, source, count, latest
 }
@@ -74,6 +79,7 @@ nonisolated extension IndexPlace {
         switch self {
         case .sources: [.name, .types, .count, .latest]
         case .collections: [.name, .source, .count, .latest]
+        case .items: [.name, .types, .source, .latest]
         }
     }
 }
@@ -99,6 +105,37 @@ nonisolated struct IndexSort: RawRepresentable, Hashable, Sendable {
     /// The rows in this order, equal rows by name, so the order never shifts between two refreshes.
     func sorted(_ rows: [IndexRow]) -> [IndexRow] {
         rows.sorted(using: comparators + [KeyPathComparator(\IndexRow.title, comparator: .localizedStandard)])
+    }
+
+    /// The sort an item table's header asks for, from its comparators' first.
+    init?(comparators: [KeyPathComparator<ItemIndexRow>]) {
+        guard let first = comparators.first else { return nil }
+        let path: AnyKeyPath = first.keyPath
+        let ascending = first.order == .forward
+        if path == \ItemIndexRow.title { self.init(column: .name, ascending: ascending) }
+        else if path == \ItemIndexRow.typeLabel { self.init(column: .types, ascending: ascending) }
+        else if path == \ItemIndexRow.sourceName { self.init(column: .source, ascending: ascending) }
+        else if path == \ItemIndexRow.modified { self.init(column: .latest, ascending: ascending) }
+        else { return nil }
+    }
+
+    /// The items in this order, equal items by name and then by identifier, so the order never shifts between two refreshes.
+    func sorted(_ rows: [ItemIndexRow]) -> [ItemIndexRow] {
+        rows.sorted(using: itemComparators + [
+            KeyPathComparator(\ItemIndexRow.title, comparator: .localizedStandard),
+            KeyPathComparator(\ItemIndexRow.id.rawValue),
+        ])
+    }
+
+    /// The comparators an item table shows its header arrow for. A column the Items page lacks orders by name.
+    var itemComparators: [KeyPathComparator<ItemIndexRow>] {
+        let order: SortOrder = ascending ? .forward : .reverse
+        return switch column {
+        case .types: [KeyPathComparator(\ItemIndexRow.typeLabel, comparator: .localizedStandard, order: order)]
+        case .source: [KeyPathComparator(\ItemIndexRow.sourceName, comparator: .localizedStandard, order: order)]
+        case .latest: [KeyPathComparator(\ItemIndexRow.modified, order: order)]
+        case .name, .count: [KeyPathComparator(\ItemIndexRow.title, comparator: .localizedStandard, order: order)]
+        }
     }
 
     /// The sort a table's header asks for, from its comparators' first.

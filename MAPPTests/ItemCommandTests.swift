@@ -38,6 +38,7 @@ struct ItemCommandTests {
     @Test func settingsShowingLeavesNoPageForTheCommandsToAct() {
         let note = library.add("A note\n")
         let browser = Browser()
+        browser.sidebarItem = .recents
         browser.showSettings()
         let page = ItemCommandContext.pageItem(showsPage: browser.showsPage, editorHasItem: true, pageItemID: note.id)
         #expect(page == nil)

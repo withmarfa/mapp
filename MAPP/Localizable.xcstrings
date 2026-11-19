@@ -175,6 +175,15 @@
     "Density" : {
 
     },
+    "Items that apps send appear here." : {
+
+    },
+    "Items you make and apps send show here." : {
+
+    },
+    "Items you make appear here." : {
+
+    },
     "Its %lld items are kept." : {
 
     },
@@ -203,6 +212,15 @@
 
     },
     "No Collections Of Yours" : {
+
+    },
+    "No Items From Apps" : {
+
+    },
+    "No Items Of Yours" : {
+
+    },
+    "No Items Yet" : {
 
     },
     "No Keys" : {
@@ -3054,6 +3072,9 @@
     },
     "No Items" : {
       "extractionState" : "manual"
+    },
+    "No items" : {
+
     },
     "No items match the filters." : {
 

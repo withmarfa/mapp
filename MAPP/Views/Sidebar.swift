@@ -220,7 +220,7 @@ private struct SidebarList: View {
             if item == browser.sidebarItem {
                 browser.leaveSettings()
             } else {
-                browser.choose(item, in: library, order: order)
+                browser.show(item, in: library, order: order)
             }
         }
     }

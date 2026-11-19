@@ -22,7 +22,7 @@ struct PlaceCommands: Commands {
         ForEach(places, id: \.key) { place in
             if let item = place.item, let symbol = place.symbol {
                 Button(library.name(of: item), systemImage: symbol) {
-                    browser?.choose(item, in: library, order: order)
+                    browser?.show(item, in: library, order: order)
                 }
                 .disabled(browser == nil || !library.isLoaded)
             }

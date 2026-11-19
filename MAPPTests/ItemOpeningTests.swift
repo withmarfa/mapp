@@ -15,6 +15,8 @@ struct ItemOpeningTests {
         let (library, _, _, _) = BrowserTests().makeFakeLibrary()
         let browser = Browser()
         browser.adopt(library)
+        // Recents lists every item with a layout of its own, which All Items, an index, does not.
+        browser.sidebarItem = .recents
         browser.viewMode = mode
         return (browser, library, library.items.map(\.id))
     }

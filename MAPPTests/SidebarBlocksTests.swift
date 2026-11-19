@@ -154,15 +154,15 @@ struct SidebarBlocksTests {
         return browser
     }
 
-    @Test func choosingItemsMovesAWindowOnTheListToTheGalleryAndLeavesAnotherLayoutBe() {
+    @Test func choosingItemsShowsTheIndexAndLeavesEveryWindowsLayoutBe() {
         let library = FakeItemLibrary(items: [FakeItemLibrary.note("One", modified: .now)])
-        let onList = browser(.recents, mode: .list)
-        onList.choose(.allItems, in: library, order: ItemOrder())
-        #expect(onList.item == .allItems)
-        #expect(onList.viewMode == .gallery)
-        let onTable = browser(.recents, mode: .table)
-        onTable.choose(.allItems, in: library, order: ItemOrder())
-        #expect(onTable.viewMode == .table)
+        for mode in [ItemViewMode.list, .table] {
+            let window = browser(.recents, mode: mode)
+            window.show(.allItems, in: library, order: ItemOrder())
+            #expect(window.item == .allItems && window.showsItemsIndex)
+            #expect(window.viewMode == mode, "Items has no layout, so none is changed for it")
+            #expect(window.selection.isEmpty, "an index chooses nothing until the person does")
+        }
     }
 
     // MARK: Places

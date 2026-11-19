@@ -214,7 +214,7 @@ struct SidebarShortcutsSection: View, Equatable {
         case .search: browser.palette = .search
         case .settings: browser.showSettings()
         case .go:
-            if let item = data.item { browser.choose(item, in: library, order: order) }
+            if let item = data.item { browser.show(item, in: library, order: order) }
         }
     }
 

@@ -36,6 +36,7 @@ struct ItemViewModeTests {
         let (library, _, _, _) = BrowserTests().makeFakeLibrary()
         let browser = Browser()
         browser.adopt(library)
+        browser.sidebarItem = .recents
         browser.viewMode = .board
         browser.fallBackToListIfUnavailable(in: library)
         #expect(browser.viewMode == .list)

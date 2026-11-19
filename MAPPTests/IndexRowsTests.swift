@@ -247,13 +247,15 @@ struct IndexPreferencesTests {
 
     @Test func theTabsAreAllThenTheTwoKindsOfThePage() {
         #expect(IndexPlace.collections.tabs == [.all, .yours, .fromApps])
+        #expect(IndexPlace.items.tabs == [.all, .yours, .fromApps])
         #expect(IndexPlace.sources.tabs == [.all, .apps, .keys])
     }
 
-    @Test func onlyTheTwoIndexesAreIndexPages() {
+    @Test func onlyTheThreeIndexesAreIndexPages() {
         #expect(IndexPlace(.sources) == .sources)
         #expect(IndexPlace(.collections) == .collections)
-        #expect(IndexPlace(.allItems) == nil)
+        #expect(IndexPlace(.allItems) == .items)
+        #expect(IndexPlace(.inbox) == nil)
         #expect(IndexPlace(.source("rss")) == nil)
     }
 }

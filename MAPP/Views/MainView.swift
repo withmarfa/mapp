@@ -51,6 +51,7 @@ struct MainView: View {
     private var workspacePresentation: WorkspacePresentation {
         if browser.showsSettings { return .settings }
         if details.history != nil { return .history }
+        if browser.showsItemsIndex { return .items }
         if browser.showsSidebarIndex { return .index }
         return usesCollectionLayout ? .collection : .list
     }
@@ -183,6 +184,15 @@ struct MainView: View {
             if let history = details.history, shownPresentation == .history {
                 VersionHistoryWorkspace(mode: history, details: details)
                     .toastOverlay()
+            } else if shownPresentation == .items {
+                NavigationSplitView(columnVisibility: galleryColumnVisibility) {
+                    sidebarColumn
+                } detail: {
+                    ItemsIndex(browser: browser, pane: $pane)
+                        .toastOverlay()
+                        .modifier(itemInspector(WindowToolbarLayout.items))
+                        .toolbar(id: WindowToolbarLayout.items) { windowToolbar() }
+                }
             } else if shownPresentation == .index {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
                     sidebarColumn
@@ -425,7 +435,7 @@ struct MainView: View {
 }
 
 private enum WorkspacePresentation: Hashable {
-    case list, collection, settings, index, history
+    case list, collection, settings, index, items, history
 }
 
 /// Applied to a detail column, before its toolbar, never to the split view: an inspector on the split view makes every

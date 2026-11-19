@@ -76,7 +76,7 @@ import Testing
         }
         #expect(IndexSort(rawValue: "count") == nil)
         #expect(IndexSort(rawValue: "weight.asc") == nil)
-        #expect(IndexSort(comparators: []) == nil)
+        #expect(IndexSort(comparators: [KeyPathComparator<IndexRow>]()) == nil)
     }
 
     @Test func equalRowsKeepTheOrderOfTheirNames() {

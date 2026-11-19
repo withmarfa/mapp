@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The measures of an index page, on a 4 point grid.
-private enum IndexMetrics {
+enum IndexMetrics {
     static let top: CGFloat = 12
     static let side: CGFloat = 16
     static let icon: CGFloat = 16
@@ -26,7 +26,7 @@ extension IndexColumn {
     func title(in place: IndexPlace) -> LocalizedStringKey {
         switch self {
         case .name: place == .sources ? "Source" : "Name"
-        case .types: "Writes"
+        case .types: place == .items ? "Type" : "Writes"
         case .source: "Source"
         case .count: "Items"
         case .latest: place == .sources ? "Latest" : "Updated"
@@ -56,20 +56,13 @@ struct IndexPage: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 4) {
-                ForEach(tabs, id: \.tab) { entry in
-                    IndexTabButton(tab: entry.tab, count: entry.count, isSelected: tab == entry.tab) { tab = entry.tab }
-                }
-                Spacer(minLength: 12)
+            IndexTabBar(tabs: tabs, tab: $tab) {
                 if let newCollection {
                     Button("New Collection", systemImage: "plus", action: newCollection)
                         .mappButton(.secondary)
                         .accessibilityIdentifier("NewCollection")
                 }
             }
-            .padding(.horizontal, IndexMetrics.side)
-            .padding(.top, IndexMetrics.top)
-            .padding(.bottom, 8)
             if rows.isEmpty {
                 emptyTab
             } else {
@@ -77,6 +70,26 @@ struct IndexPage: View {
             }
         }
         .accessibilityIdentifier("IndexPage")
+    }
+}
+
+/// The tabs of an index page, each with how many rows it holds, and at the trailing edge the page's own button.
+struct IndexTabBar<Trailing: View>: View {
+    let tabs: [(tab: IndexTab, count: Int)]
+    @Binding var tab: IndexTab
+    @ViewBuilder let trailing: Trailing
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(tabs, id: \.tab) { entry in
+                IndexTabButton(tab: entry.tab, count: entry.count, isSelected: tab == entry.tab) { tab = entry.tab }
+            }
+            Spacer(minLength: 12)
+            trailing
+        }
+        .padding(.horizontal, IndexMetrics.side)
+        .padding(.top, IndexMetrics.top)
+        .padding(.bottom, 8)
     }
 }
 

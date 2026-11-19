@@ -33,7 +33,7 @@ struct WindowRestorationTests {
         let notes = items(1_000)
         let library = FakeItemLibrary(items: notes)
         let saved = Browser()
-        saved.show(.allItems, in: library, order: ItemOrder())
+        saved.show(.recents, in: library, order: ItemOrder())
         saved.selection = Set(notes.map(\.id))
         let restored = Browser()
         restored.restore(saved.snapshot(), in: library, order: ItemOrder())
@@ -53,6 +53,7 @@ struct WindowBringBackTests {
     @Test func anItemOpenFromTheGalleryComesBackOpen() throws {
         let (library, _, newer, _) = BrowserTests().makeFakeLibrary()
         let saved = Browser()
+        saved.sidebarItem = .recents
         saved.viewMode = .gallery
         saved.selection = [newer.id]
         saved.open(saved.selection, as: .fullPage)
@@ -65,6 +66,7 @@ struct WindowBringBackTests {
     @Test func aGridThatWasShowingComesBackShowingItself() throws {
         let (library, _, newer, _) = BrowserTests().makeFakeLibrary()
         let saved = Browser()
+        saved.sidebarItem = .recents
         saved.viewMode = .table
         saved.selection = [newer.id]
         #expect(try restored(saved, in: library).showsCollection)
@@ -73,6 +75,7 @@ struct WindowBringBackTests {
     @Test func anOpenItemThatIsGoneIsNotOpened() throws {
         let (library, _, newer, _) = BrowserTests().makeFakeLibrary()
         let saved = Browser()
+        saved.sidebarItem = .recents
         saved.viewMode = .gallery
         saved.selection = [newer.id]
         saved.open(saved.selection, as: .fullPage)

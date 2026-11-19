@@ -25,12 +25,13 @@ struct ViewToolbarItems: CustomizableToolbarContent {
             prompt: String(localized: "Search"),
             layout: layout,
             focusRequests: browser.searchFocusRequests,
-            onDown: { if !browser.showsSidebarIndex { browser.focusRequest = .list } }
+            // Items' rows are items, so Down goes into its table; the other indexes list places, which a search filters.
+            onDown: { if !browser.showsSidebarIndex || browser.showsItemsIndex { browser.focusRequest = .list } }
         )
         .hidden(isHidden)
         ToolbarItem(id: "viewOptions") {
             if let place = browser.indexPlace {
-                IndexViewOptionsMenu(place: place)
+                IndexViewOptionsMenu(place: place, browser: browser)
             } else {
                 ViewOptionsMenu(browser: browser)
             }

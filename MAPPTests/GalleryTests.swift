@@ -33,6 +33,7 @@ struct GalleryTests {
     @Test func galleryRestoresAsACollectionAndKeepsItsSelection() throws {
         let (library, _, newer, _) = BrowserTests().makeFakeLibrary()
         let saved = Browser()
+        saved.sidebarItem = .recents
         saved.viewMode = .gallery
         saved.selection = [newer.id]
         let data = try JSONEncoder().encode(saved.snapshot())
@@ -46,7 +47,7 @@ struct GalleryTests {
         let (library, _, _, _) = BrowserTests().makeFakeLibrary()
         let browser = Browser()
         browser.viewMode = .gallery
-        browser.show(.allItems, in: library, order: ItemOrder())
+        browser.show(.recents, in: library, order: ItemOrder())
         browser.open(browser.selection, as: .fullPage)
         #expect(!browser.showsCollection)
         let id = await browser.quickAdded("New", in: library)
@@ -57,7 +58,7 @@ struct GalleryTests {
         browser.open(browser.selection, as: .fullPage)
         browser.show(.inbox, in: library, order: ItemOrder())
         #expect(browser.showsCollection)
-        browser.show(.allItems, in: library, order: ItemOrder())
+        browser.show(.recents, in: library, order: ItemOrder())
         #expect(browser.showsCollection)
     }
 
