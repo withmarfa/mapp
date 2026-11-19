@@ -53,7 +53,6 @@ import Testing
         #expect(SearchScope.narrows(.view(ItemID("v"))))
         #expect(!SearchScope.narrows(.allItems))
         #expect(!SearchScope.narrows(.recents))
-        #expect(!SearchScope.narrows(.recentlyDeleted))
         #expect(!SearchScope.narrows(.favoriteItem(ItemID("f"))))
     }
 }

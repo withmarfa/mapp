@@ -162,7 +162,6 @@ final class FakeItemLibrary: ItemLibrary {
             case .collection(let id): item.state == .active && item.collectionIDs.contains(id)
             case .files: item.state == .active && item.isFile
             case .view(let id): item.state == .active && viewMembers[id]?.contains(item.id) == true
-            case .recentlyDeleted: item.state == .trashed
             }
         }
     }
@@ -187,6 +186,8 @@ final class FakeItemLibrary: ItemLibrary {
         })
     }
 
+    var deletedItems: [Item] { items.filter { $0.state == .trashed } }
+    var deletedCount: Int { deletedItems.count }
     func count(in place: SidebarItem) -> Int { items(in: place).count }
     func name(of place: SidebarItem) -> String {
         switch place {

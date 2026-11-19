@@ -235,7 +235,7 @@ extension LiveMarfaTests {
             func end() async {
                 await source.flush()
                 // Conflicted copies the tests caused, found by their tag and the token in their title.
-                for item in library.items(in: .allItems) + library.items(in: .recentlyDeleted)
+                for item in library.items(in: .allItems) + library.deletedItems
                 where item.tags.contains(MarfaProblems.conflictedCopyTag) && item.title.hasPrefix("MAPPTEST review") {
                     made.add(item.id)
                 }

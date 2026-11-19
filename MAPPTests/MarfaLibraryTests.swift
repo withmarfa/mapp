@@ -165,8 +165,8 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         // Only `in-collection` edges make members: the items filed under Alpha are its children, not its contents.
         #expect(library.items(in: .collection(F.p1)).isEmpty)
         #expect(ids(library.items(in: .files)) == [F.f1])
-        #expect(ids(library.items(in: .recentlyDeleted)) == [F.n3])
-        for place in [SidebarItem.inbox, .allItems, .favorites, .itemType("aic.ticket"), .itemType("aic.ticket.task"), .collection(F.p1), .files, .recentlyDeleted] {
+        #expect(ids(library.deletedItems) == [F.n3])
+        for place in [SidebarItem.inbox, .allItems, .favorites, .itemType("aic.ticket"), .itemType("aic.ticket.task"), .collection(F.p1), .files] {
             #expect(library.count(in: place) == library.items(in: place).count, "\(place)")
         }
         // Newest first, as the source paints them.
@@ -530,8 +530,8 @@ private func observes(_ read: () -> Void) -> LiveMarfa.Flag {
         var binned = try #require(library.item(F.n1))
         binned.state = .trashed
         source.send(.upserted([binned]))
-        #expect(await eventually { library.items(in: .recentlyDeleted).contains { $0.id == F.n1 } })
-        #expect(library.count(in: .recentlyDeleted) == 2)
+        #expect(await eventually { library.deletedItems.contains { $0.id == F.n1 } })
+        #expect(library.deletedCount == 2)
         source.clearWrites()
         undo.undo()
         #expect(source.writes == [.transition(F.n1, .active)])

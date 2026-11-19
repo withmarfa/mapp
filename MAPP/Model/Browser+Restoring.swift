@@ -61,7 +61,7 @@ extension Browser {
         case .itemType(let type):
             library.itemTypeCounts.contains { $0.id.rawValue == type } ? snapshot.place : .allItems
         case .view(let id): library.views.contains { $0.id == id } ? snapshot.place : .allItems
-        case .inbox, .recents, .allItems, .favorites, .files, .sources, .source, .collections, .recentlyDeleted: snapshot.place
+        case .inbox, .recents, .allItems, .favorites, .files, .sources, .source, .collections: snapshot.place
         }
         let ids = Set(snapshot.selection)
         selectAutomatically(Set(items(in: library).map(\.id).filter(ids.contains)))
@@ -73,5 +73,21 @@ extension Browser {
             isCollectionItemPresented = true
         }
         if let offset = snapshot.scrollOffset, offset > 0 { listMemory.restore(to: CGFloat(offset)) }
+    }
+}
+
+extension Browser.Snapshot {
+    /// A place the app no longer has, such as Recently Deleted, which is a page of Settings now, reads as Items, with
+    /// the rest of the snapshot kept.
+    init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        guard values.contains(.place) else {
+            throw DecodingError.keyNotFound(CodingKeys.place, .init(codingPath: decoder.codingPath, debugDescription: "A snapshot names its place."))
+        }
+        place = (try? values.decode(SidebarItem.self, forKey: .place)) ?? .allItems
+        selection = try values.decode([ItemID].self, forKey: .selection)
+        viewMode = try values.decodeIfPresent(ItemViewMode.self, forKey: .viewMode) ?? .list
+        opensItem = try values.decodeIfPresent(Bool.self, forKey: .opensItem)
+        scrollOffset = try values.decodeIfPresent(Double.self, forKey: .scrollOffset)
     }
 }

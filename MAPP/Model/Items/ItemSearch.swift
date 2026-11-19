@@ -91,13 +91,13 @@ nonisolated enum SearchScope: Hashable, Sendable {
     case typeWithSubtypes(TypeID)
 
     /// Whether searching `place` alone finds anything different from searching everywhere: the places that stand
-    /// for a query. Recents is a count of the latest edits, Recently Deleted is outside every search, the indexes
+    /// for a query. Recents is a count of the latest edits, the indexes
     /// list no items, and one favorite is a single item, so none of them can be searched alone; All Items is
     /// everywhere.
     static func narrows(_ place: SidebarItem) -> Bool {
         switch place {
         case .inbox, .favorites, .itemType, .collection, .source, .files, .view: true
-        case .allItems, .recents, .recentlyDeleted, .sources, .collections, .favoriteItem: false
+        case .allItems, .recents, .sources, .collections, .favoriteItem: false
         }
     }
 }

@@ -302,9 +302,14 @@ final class Browser {
     /// while they are showing, not an item page opened from them, which hides their controls.
     var offersViewOptions: Bool { !isCollectionItemPresented }
 
-    /// The place that lists an item no place on screen does: a deleted item is listed by Recently Deleted alone.
-    func place(listing item: Item) -> SidebarItem {
-        item.state == .trashed ? .recentlyDeleted : .allItems
+    /// Shows the place that lists an item no place on screen does: All Items, or for a deleted item Settings >
+    /// Recently Deleted, the only list that holds it.
+    private func showListing(_ item: Item, in library: any ItemLibrary, order: ItemOrder) {
+        if item.state == .trashed {
+            showSettings(.recentlyDeleted)
+        } else {
+            show(.allItems, in: library, order: order)
+        }
     }
 
     func reveal(_ item: Item, in library: any ItemLibrary, order: ItemOrder) {
@@ -312,7 +317,8 @@ final class Browser {
         let staysInModal = isModalPresented
         leaveSettings()
         if !items(in: library).contains(where: { $0.id == item.id }) {
-            show(place(listing: item), in: library, order: order)
+            showListing(item, in: library, order: order)
+            guard !showsSettings else { return }
         }
         selection = [item.id]
         if self.item == .allItems { revealOnItems(item) }
@@ -323,7 +329,7 @@ final class Browser {
 
     /// Shows the item a link in the page names, as choosing it in the list does: the window's place, search, undo
     /// and the rest of its state are left as they are unless the item is not in the list, which then shows the place
-    /// that lists it (`place(listing:)`). The keyboard stays with the page, as it does when a link is followed anywhere.
+    /// that lists it (`showListing`). The keyboard stays with the page, as it does when a link is followed anywhere.
     func open(linked item: Item, in library: any ItemLibrary, order: ItemOrder) {
         reveal(item, in: library, order: order)
         if !followsCollection, !showsItemsIndex { focusRequest = .page }

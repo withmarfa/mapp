@@ -20,9 +20,9 @@ struct RecentlyDeletedActions: View {
                 .disabled(selection.isEmpty || !library.reachesServer)
             Menu("More", systemImage: "ellipsis") {
                 Button("Empty Recently Deleted…", role: .destructive) {
-                    library.itemsToPurge = Set(library.items(in: .recentlyDeleted).map(\.id))
+                    library.itemsToPurge = Set(library.deletedItems.map(\.id))
                 }
-                .disabled(library.count(in: .recentlyDeleted) == 0 || !library.reachesServer)
+                .disabled(library.deletedCount == 0 || !library.reachesServer)
             }
             .labelStyle(.iconOnly)
             .menuIndicator(.hidden)

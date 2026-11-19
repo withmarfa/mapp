@@ -40,7 +40,6 @@ extension Browser {
         var places: [PaletteIndex.Place] = (SidebarPlace.destinations + SidebarPlace.builtInViews).compactMap { place in
             place.item.flatMap { item in place.symbol.map { PaletteIndex.Place(item: item, icon: .symbol($0), title: nil) } }
         }
-        places.append(.init(item: .recentlyDeleted, icon: .symbol("trash"), title: nil))
         places += library.sourceCounts.map {
             .init(item: .source($0.code), icon: SourceTile.icon(for: library.sources.info($0.code)), title: $0.name)
         }

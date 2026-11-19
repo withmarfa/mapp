@@ -114,21 +114,13 @@ import Testing
 
     // MARK: Opening
 
-    @Test func aDeletedItemIsListedByRecentlyDeletedAndAnyOtherByAllItems() {
-        let browser = Browser()
-        let live = FakeItemLibrary.note("Live", modified: .now)
-        let binned = FakeItemLibrary.note("Binned", modified: .now, state: .trashed)
-        #expect(browser.place(listing: live) == .allItems)
-        #expect(browser.place(listing: binned) == .recentlyDeleted)
-    }
-
-    @Test func revealingADeletedItemShowsItInRecentlyDeleted() throws {
+    @Test func revealingADeletedItemOpensSettingsRecentlyDeleted() throws {
         let live = FakeItemLibrary.note("Live", modified: .now)
         let binned = FakeItemLibrary.note("Binned", modified: .now, state: .trashed)
         let library = FakeItemLibrary(items: [live, binned])
         let browser = Browser()
         browser.reveal(binned, in: library, order: ItemOrder())
-        #expect(browser.item == .recentlyDeleted)
-        #expect(browser.selection == [binned.id])
+        #expect(browser.showsSettings)
+        #expect(browser.settingsPage == .recentlyDeleted)
     }
 }

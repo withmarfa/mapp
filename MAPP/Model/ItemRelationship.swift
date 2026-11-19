@@ -4,7 +4,7 @@ nonisolated struct ItemRelationshipTarget: Identifiable, Sendable {
     let title: String
     let itemID: ItemID?
     let resolution: ReferenceResolution
-    /// The item is in Recently Deleted. It still opens, there.
+    /// The item is in Recently Deleted, which Settings lists.
     var isDeleted = false
     var id: String { itemID?.rawValue ?? title }
     /// The title to show, as `Item.displayTitle`.

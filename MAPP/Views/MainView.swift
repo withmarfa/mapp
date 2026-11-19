@@ -247,11 +247,6 @@ struct MainView: View {
     private var presentedWindow: some View {
         workspace
         .escapesFromPage(details)
-        .safeAreaBar(edge: .bottom, spacing: 0) {
-            if !browser.showsSettings, browser.item == .recentlyDeleted {
-                RecentlyDeletedActions(chosen: browser.selectedItems(in: library))
-            }
-        }
         .overlay {
             ZStack {
                 if browser.isModalPresented {

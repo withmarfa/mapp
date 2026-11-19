@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The Recently Deleted page of Settings: what the library holds in its bin, with the same Restore, Delete Permanently
-/// and Empty commands as the Recently Deleted place, which `RecentlyDeletedActions` supplies.
+/// The Recently Deleted page of Settings, the only place that lists what the library holds in its bin: Restore, Delete
+/// Permanently and Empty, which `RecentlyDeletedActions` supplies.
 struct RecentlyDeletedSettings: View {
     @Environment(\.library) private var library
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
@@ -9,7 +9,7 @@ struct RecentlyDeletedSettings: View {
 
     var body: some View {
         if let library {
-            let items = library.items(in: .recentlyDeleted)
+            let items = library.deletedItems
             VStack(alignment: .leading, spacing: 0) {
                 if items.isEmpty {
                     Text("Nothing is in Recently Deleted.")

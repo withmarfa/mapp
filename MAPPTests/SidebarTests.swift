@@ -191,7 +191,7 @@ struct SidebarTests {
         let plan = SidebarPlan(library, layout: SidebarLayout())
         #expect(plan.library == [.types])
         #expect(!plan.types.contains { $0.type.map(library.catalogue.isFileType) == true })
-        #expect(library.count(in: .recentlyDeleted) == 1)
+        #expect(library.deletedCount == 1)
     }
 
     @Test func anEmptyLibraryHasNoSectionsBelowTheTop() async throws {

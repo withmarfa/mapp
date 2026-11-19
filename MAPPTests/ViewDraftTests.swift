@@ -65,7 +65,7 @@ struct ViewDraftTests {
     }
 
     @Test func placesNoViewCanStandForOfferNone() {
-        for place: SidebarItem in [.recents, .recentlyDeleted, .sources, .collections, .favoriteItem(ItemID("a"))] {
+        for place: SidebarItem in [.recents, .sources, .collections, .favoriteItem(ItemID("a"))] {
             #expect(ViewDraft.query(for: place, catalogue: Self.catalogue, views: []) == nil)
             #expect(Self.draft(Self.window(place)) == nil)
         }

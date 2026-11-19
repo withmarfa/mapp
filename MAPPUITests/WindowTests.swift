@@ -118,25 +118,15 @@ final class WindowTests: XCTestCase {
         XCTAssertEqual(count(of: "Items"), before)
     }
 
-    func testRecentlyDeletedFromTheViewMenuRestoresAnItem() {
+    func testRecentlyDeletedIsASettingsPageAndNotAMenuItem() {
         app.menuBars.menuBarItems["View"].click()
-        let recentlyDeleted = app.menuBars.menuItems["Recently Deleted"].firstMatch
-        XCTAssertTrue(recentlyDeleted.waitForExistence(timeout: 3))
-        recentlyDeleted.click()
-        let deleted = row(titled: "Old packing list")
-        XCTAssertTrue(deleted.waitForExistence(timeout: 3))
-        XCTAssertTrue(row(titled: "Draft agenda").exists)
-        XCTAssertFalse(window.descendants(matching: .any).matching(identifier: "SettingsPageList").element(boundBy: 0).exists)
-        deleted.click()
-        let restore = window.buttons["Restore"]
-        XCTAssertTrue(restore.waitForExistence(timeout: 3))
-        XCTAssertTrue(restore.isEnabled)
-        restore.click()
-        XCTAssertTrue(deleted.waitForNonExistence(timeout: 2))
-        XCTAssertTrue(row(titled: "Draft agenda").exists, "only the one restored leaves")
-        sidebarItem("Items").click()
-        app.typeKey("1", modifierFlags: .command)
-        XCTAssertTrue(row(titled: "Old packing list").waitForExistence(timeout: 2))
+        XCTAssertFalse(app.menuBars.menuItems["Recently Deleted"].firstMatch.exists, "Recently Deleted is a Settings page only")
+        app.typeKey(.escape, modifierFlags: [])
+        app.typeKey(",", modifierFlags: .command)
+        let page = window.descendants(matching: .any).matching(identifier: "SettingsPage-recentlyDeleted").firstMatch
+        XCTAssertTrue(page.waitForExistence(timeout: 3))
+        page.click()
+        XCTAssertTrue(window.staticTexts["Old packing list"].waitForExistence(timeout: 3))
     }
 
     /// The list's search, a field only once its button beside View Options is clicked.
