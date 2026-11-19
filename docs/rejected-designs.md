@@ -52,7 +52,7 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 
 ## Buttons and messages
 
-- **Capsule buttons, black buttons and the Mac's push buttons.** Every button MAPP draws is a rounded rectangle; see [Agreed designs](agreed-designs.md).
+- **Capsule buttons, black buttons and the Mac's push buttons.** Every button MAPP draws is a rounded rectangle; see [Components](components.md).
 - **A large 36-point button size.** There are two sizes, 22 and 28 points.
 - **A blue focus ring.** Keyboard focus is a gray ring.
 - **A solid red destructive button.** It is a pale red fill with red text.
@@ -125,6 +125,7 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 
 - [Agreed designs](agreed-designs.md)
 - [Looks](looks.md)
+- [Components](components.md)
 - [Value components](value-components.md)
 - [Item page](item-page.md)
 - [Views and lists](views-and-lists.md)
