@@ -6,13 +6,6 @@ Where it lives: not built yet.
 
 This page lists what has been agreed for MAPP and is not in the app yet, so the next build starts from one list. What was turned down is in [Rejected designs](rejected-designs.md).
 
-## Items as an index
-
-- Items is an index page like Collections and Sources: a table with no list column. Views and types keep the list column.
-- Items has the tabs All, Yours (the library tier) and From Apps (the feed tier), and New Item on the page at the trailing edge of the tabs.
-- The chosen item shows in the right sidebar, with Open.
-- Tabs and a New button on the page appear only on the three index pages: Items, Collections and Sources. A view or a type is split by the sidebar, its filters and saved views, and New is the sidebar's New and Command-N.
-
 ## Making an item
 
 - New Item on Items, the sidebar's New and Command-N open quick add, as built, in the type last used.
@@ -44,7 +37,7 @@ This page lists what has been agreed for MAPP and is not in the app yet, so the 
 - Go lists the places (Items, Sources, Collections, Inbox, Recents, Favorites), then the saved views and the types, as the sidebar holds them, with All Types for the rest.
 - Recently Deleted leaves the View menu.
 - Help holds MAPP Help, Keyboard Shortcuts, What's New in MAPP, Marfa Documentation and Report a Problem…, after the system's search field.
-- An empty state has a title, one line under it of fewer than 40 characters, and a button only when there is something to do there. Items has none, since New Item is already on the page. A type has New and its name, such as New Project. Favorites and Inbox have no button.
+- An empty state has a title, one line under it of fewer than 40 characters, and a button only when there is something to do there. A type has New and its name, such as New Project. Favorites and Inbox have no button.
 - Recently Deleted is a page in Settings only, not a sidebar place.
 
 ## Editing in place

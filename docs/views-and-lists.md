@@ -1,8 +1,8 @@
 # Views and lists
 
-Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built in v0.0.45. The table's margin, whole-cell hover and add to an empty cell, the palettes' bar, rows and material setting, and the selection and hover greys and the favorite's heart as described below, are built, not yet released, as is Collections and Sources as a table with tabs, the sidebar customized in place and Settings > Sidebar, and opening an item as a modal, a full page or a window with one row menu for every layout. See [Looks](looks.md).
+Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built in v0.0.45. The table's margin, whole-cell hover and add to an empty cell, the palettes' bar, rows and material setting, and the selection and hover greys and the favorite's heart as described below, are built, not yet released, as are Items, Collections and Sources as index pages with tabs and a table, the sidebar customized in place and Settings > Sidebar, and opening an item as a modal, a full page or a window with one row menu for every layout. See [Looks](looks.md).
 
-Where it lives: `Browser`, `ItemViewMode`, `ItemOpening`, `ListNeighbors`, `RowMenuEntry`, `ViewLayouts`, `SidebarLayout`, `IndexPlace`, `IndexTab`, `IndexSort`, `IndexPreferences` and `IndexChoice` under `MAPP/Model/`, with `IndexRow`, `IndexRows`, `CardContents`, `ItemTableLayout`, `ItemTimelineLayout`, `ItemPlacement`, `EventSpan`, `CalendarLayout` and `CalendarCorner` under `MAPP/Model/Items/`; `ItemList`, `ItemRow`, `ItemRowMenu`, `ItemModal`, `ItemGallery`, `GalleryCard`, `ItemBoard`, `ItemTable`, `ItemTableCell`, `SoftSelection`, `ChipLine`, `ItemTimeline`, `ItemCalendar`, `SidebarIndex`, `SidebarSettings`, `SidebarSettingsPlan`, `SidebarColorPicker`, `IndexPage`, `IndexInspector`, `IndexViewOptions`, `WindowCorner`, `ViewCorner`, `CalendarCornerView`, `CalendarMonthCard`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
+Where it lives: `Browser`, `ItemViewMode`, `ItemOpening`, `ListNeighbors`, `RowMenuEntry`, `ViewLayouts`, `SidebarLayout`, `IndexPlace`, `IndexTab`, `IndexSort`, `IndexPreferences`, `IndexChoice` and `ItemIndexModel` under `MAPP/Model/`, with `IndexRow`, `IndexRows`, `ItemIndexRow`, `CardContents`, `ItemTableLayout`, `ItemTimelineLayout`, `ItemPlacement`, `EventSpan`, `CalendarLayout` and `CalendarCorner` under `MAPP/Model/Items/`; `ItemList`, `ItemRow`, `ItemRowMenu`, `ItemModal`, `ItemGallery`, `GalleryCard`, `ItemBoard`, `ItemTable`, `ItemTableCell`, `SoftSelection`, `ChipLine`, `ItemTimeline`, `ItemCalendar`, `SidebarIndex`, `SidebarSettings`, `SidebarSettingsPlan`, `SidebarColorPicker`, `IndexPage`, `ItemsIndex`, `IndexInspector`, `IndexViewOptions`, `WindowCorner`, `ViewCorner`, `CalendarCornerView`, `CalendarMonthCard`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
 
 A view shows a set of items in a layout. This page explains the layouts, what a saved view is, and the controls that change what a list shows.
 
@@ -102,9 +102,19 @@ There is no filter button in the list's toolbar, which holds Search and View Opt
 
 View Options also holds Include Subtypes, which lets a type's list show the items of its subtypes. The choice is stored for each type as `includedSubtypes`.
 
-## Collections and Sources
+## Index pages
 
-Built, not yet released.
+Built, not yet released. Items, Collections and Sources are index pages: a table under tabs, with no list, gallery or other layout. Views and types keep the list column and their layouts. Tabs and a New button on the page appear only on these three pages: a view or a type is split by the sidebar, its filters and saved views, and New is the sidebar's New and Command-N.
+
+### Items
+
+- Items (`ItemsIndex`, its rows worked out by `ItemIndexModel`) has the tabs All, Yours (the library tier) and From Apps (the feed tier), each with its count, and the tab chosen is kept for the page on this Mac (`indexTab.items`). New Item is on the page at the trailing edge of the tabs and opens quick add.
+- The table has the columns Name (with the type's icon in its color), Type, Source and Updated. A column's header sorts it and the sort is kept (`indexSort.items`); Items starts with the latest change first. A window has no View As for Items, so a layout kept for Items by an earlier version is ignored.
+- The chosen item shows in the right sidebar with Open at its top, and Return, a double click and Open in the row's menu open it as Open Items In says ([Opening an item](#opening-an-item)). The item leaves the choice when it is deleted or goes on a sync, never pointing at an item that is gone; one that moves to the other tier stays chosen.
+- Search and View Options are in the toolbar. With nothing in the library the page says "No Items" with "Items you make and apps send show here." and no button, since New Item stays on the page. A tab with nothing in it says so in one short line.
+- A library may hold tens of thousands of items, so the rows are worked out once for the items and the sort, off the main thread above 2,000 items, and a change of tab reads one list of rows. The table draws 200 rows at a time. The page's body never reads the choice, so choosing a row runs no other row's body.
+
+### Collections and Sources
 
 - Collections and Sources are one kind of page, an index of containers, drawn as a table (`IndexPage`). Collections has the columns Name, Source (the source that wrote it, left empty when none did), Items and Updated (when the collection itself last changed). Sources has Source, Writes (the types it writes), Items and Latest (its latest item's change). A column's header sorts the table, and the sort is kept for each page on this Mac (`indexSort.<place>`). Collections start by name and Sources by how many items they hold.
 - Collections has the tabs All, Yours (the library tier) and From Apps (the feed tier). Sources has All, Apps (signed in) and Keys. A source is an app when its code starts with `oauth:` and a key otherwise (`SourceCode`). Each tab shows how many rows it holds, the tab chosen is kept for each page on this Mac (`indexTab.<place>`), and a tab with nothing in it says so.
