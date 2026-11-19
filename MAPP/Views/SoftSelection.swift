@@ -8,7 +8,7 @@ extension View {
     /// of selection, however it is made. The selection is read by the marks alone, so a change of selection does not
     /// run the body of the view that holds the list, which would have the list look at every row again. With
     /// `hovers`, the row under the pointer gets a fainter mark of its own, drawn and followed by the same layer view
-    /// from the table's mouse events, so a hover runs no row's body.
+    /// from the table's mouse events, so that mark runs no row's body.
     func softSelection(rows: some Hashable, hovers: Bool = false, selection: @escaping () -> some Hashable) -> some View {
         background(SoftSelectionReader(rows: rows.hashValue, hovers: hovers, selection: selection))
     }
