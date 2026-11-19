@@ -128,7 +128,7 @@ nonisolated final class MarfaSource: ItemSource {
         switch error {
         case .wrongSchema(_, _, let unsent, let message): SourceFailure(kind: .otherVersion(unsent: unsent), message: message)
         case .readingHandle, .storeBusy: SourceFailure(kind: .inUse, message: Words.inUse)
-        default: SourceFailure(kind: .failed, message: error.message)
+        default: SourceFailure(kind: .failed, message: Words.message(for: error))
         }
     }
 
