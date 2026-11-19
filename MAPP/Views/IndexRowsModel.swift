@@ -55,13 +55,11 @@ final class IndexRowsModel {
         switch place {
         case .sources:
             IndexRows.sources(of: library.items(in: .allItems), catalogue: library.catalogue, directory: library.sources)
-        case .collections:
+        default:
+            // Items has rows of its own kind, which `ItemIndexModel` keeps, and no place of this page.
             IndexRows.collections(
                 library.collections, membersOf: { library.items(in: .collection($0.id)) }, catalogue: library.catalogue,
                 directory: library.sources)
-        case .items:
-            // Items are rows of their own kind, which `ItemIndexModel` keeps.
-            []
         }
     }
 }

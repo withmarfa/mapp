@@ -244,4 +244,119 @@ import Testing
         model.follow(library, sort: IndexPlace.items.defaultSort)
         #expect(model.tabs?.count(for: .fromApps) == 1)
     }
+
+    // MARK: Chosen rows, full pages and search
+
+    @Test func severalChosenRowsKeepThoseThatRemain() {
+        let (a, b, c) = (note("a"), note("b"), note("c"))
+        let library = FakeItemLibrary(items: [a, b, c], now: base)
+        let browser = browserOnItems(library)
+        browser.selection = [a.id, b.id, c.id]
+        library.items[1].state = .trashed
+        browser.keepItemChoice(in: library)
+        #expect(browser.selection == [a.id, c.id], "only the item that went leaves the choice")
+    }
+
+    @Test func anItemDeletedWhileOpenAsAFullPageFromItemsGivesWayToTheNextRow() async throws {
+        let items = [note("a", minutes: 3), note("b", minutes: 2), note("c", minutes: 1)]
+        let library = FakeItemLibrary(items: items, now: base)
+        let browser = browserOnItems(library)
+        browser.itemIndex.follow(library, sort: IndexPlace.items.defaultSort)
+        browser.selection = [items[1].id]
+        #expect(browser.open([items[1].id], as: .fullPage))
+        let before = browser.collectionItemIDs(in: library, order: ItemOrder())
+        #expect(before == items.map(\.id), "Items follows the rows of its table, not another place's list")
+        library.items[1].state = .trashed
+        #expect(await eventually { browser.itemIndex.tabs?.all.count == 2 })
+        browser.collectionItemsChanged(from: before, to: browser.collectionItemIDs(in: library, order: ItemOrder()))
+        #expect(browser.selection == [items[2].id])
+        #expect(browser.isCollectionItemPresented)
+    }
+
+    @Test func aFullPageFromItemsKeepsAnItemThatMovesToTheOtherTier() {
+        let items = [note("a", minutes: 2), note("b", minutes: 1)]
+        let library = FakeItemLibrary(items: items, now: base)
+        let browser = browserOnItems(library)
+        IndexPreferences.set(.yours, for: .items, in: browser.defaults)
+        browser.itemIndex.follow(library, sort: IndexPlace.items.defaultSort)
+        browser.selection = [items[0].id]
+        browser.open([items[0].id], as: .fullPage)
+        let before = browser.collectionItemIDs(in: library, order: ItemOrder())
+        library.items[0].tier = .feed
+        browser.collectionItemsChanged(from: before, to: browser.collectionItemIDs(in: library, order: ItemOrder()))
+        #expect(browser.selection == [items[0].id])
+    }
+
+    @Test func aSearchOnItemsKeepsTheLibrarysOrderUntilAColumnIsChosen() {
+        let (strongOld, weakNew) = (note("Search ranking", minutes: -9_000), note("A search aside", minutes: -1))
+        let library = FakeItemLibrary(items: [strongOld, weakNew], now: base)
+        let browser = browserOnItems(library)
+        browser.searchText = "search"
+        #expect(browser.ordersByRelevance)
+        #expect(browser.itemIndexRows(in: library).map(\.id) == [strongOld.id, weakNew.id], "the library's own order")
+        browser.orderSearch(byRelevance: false)
+        #expect(browser.itemIndexRows(in: library).map(\.id) == [weakNew.id, strongOld.id], "the page's sort, the latest first")
+        browser.orderSearch(byRelevance: true)
+        #expect(browser.itemIndexRows(in: library).map(\.id) == [strongOld.id, weakNew.id])
+    }
+
+    @Test func revealingAnItemUnderTheOtherTabSwitchesToAllAndAsksForTheRow() {
+        let mine = note("mine"), theirs = note("theirs", tier: .feed)
+        let library = FakeItemLibrary(items: [mine, theirs], now: base)
+        let browser = browserOnItems(library)
+        IndexPreferences.set(.yours, for: .items, in: browser.defaults)
+        browser.reveal(theirs, in: library, order: ItemOrder())
+        #expect(IndexPreferences.tab(for: .items, in: browser.defaults) == .all)
+        #expect(browser.selection == [theirs.id] && browser.itemToScrollTo == theirs.id)
+        #expect(browser.showsItemsIndex, "a reveal on Items shows the row, not a page")
+        IndexPreferences.set(.fromApps, for: .items, in: browser.defaults)
+        browser.reveal(theirs, in: library, order: ItemOrder())
+        #expect(IndexPreferences.tab(for: .items, in: browser.defaults) == .fromApps, "a tab that lists it stays")
+    }
+
+    // MARK: Keeping the rows
+
+    @Test func aDeletedItemLeavesTheRowsAtOnceNotWhenTheyAreWorkedOutAgain() async {
+        let items = (0..<(ItemIndexModel.inlineLimit + 1)).map { note("n\($0)", minutes: Double($0)) }
+        let library = FakeItemLibrary(items: items, now: base)
+        let model = ItemIndexModel(settling: .seconds(60))
+        model.follow(library, sort: IndexPlace.items.defaultSort)
+        #expect(await eventually { model.tabs?.all.count == items.count })
+        library.items[5].state = .trashed
+        #expect(await eventually(within: .seconds(10)) { model.tabs?.all.count == items.count - 1 })
+        #expect(model.tabs?.all.contains { $0.id == items[5].id } == false)
+        #expect(model.tabs?.yours.count == items.count - 1)
+    }
+
+    @Test func leavingItemsKeepsTheRowsAndComingBackShowsThemLessWhatWentMeanwhile() async {
+        let items = [note("a", minutes: 3), note("b", minutes: 2), note("c", minutes: 1)]
+        let library = FakeItemLibrary(items: items, now: base)
+        let model = ItemIndexModel()
+        model.follow(library, sort: IndexPlace.items.defaultSort)
+        #expect(model.tabs?.all.count == 3)
+        model.stop()
+        #expect(model.tabs?.all.count == 3, "the rows stay while the page is away")
+        library.items[1].state = .trashed
+        model.follow(library, sort: IndexPlace.items.defaultSort)
+        #expect(model.tabs?.all.map(\.title) == ["a", "c"], "shown at once, without the item deleted meanwhile")
+        let other = FakeItemLibrary(items: [note("x")], now: base)
+        model.reset()
+        model.follow(other, sort: IndexPlace.items.defaultSort)
+        #expect(model.tabs?.all.map(\.title) == ["x"], "another library never shows these rows")
+    }
+
+    @Test func theChosenRowKeepsItsPlaceWhileItIsEditedUntilAnotherIsChosen() async {
+        let items = [note("a", minutes: 3), note("b", minutes: 2), note("c", minutes: 1)]
+        let library = FakeItemLibrary(items: items, now: base)
+        let model = ItemIndexModel()
+        model.follow(library, sort: IndexPlace.items.defaultSort)
+        model.pin(items[2].id)
+        library.items[2].modified = base + 3_600
+        #expect(await eventually { model.tabs?.all.first { $0.id == items[2].id }?.modified == base + 3_600 })
+        #expect(model.tabs?.all.map(\.title) == ["a", "b", "c"], "the row edited stays last under a sort by the latest change")
+        model.pin(items[0].id)
+        library.items[0].modified = base + 100
+        #expect(await eventually { model.tabs?.all.first { $0.id == items[0].id }?.modified == base + 100 })
+        #expect(model.tabs?.all.map(\.title) == ["a", "c", "b"], "the row left behind goes to its place at the next change")
+    }
 }

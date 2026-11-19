@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// Items as an index: every item of the library under the tabs All, Yours (the library tier) and From Apps (the feed
@@ -5,8 +6,9 @@ import SwiftUI
 /// (`ItemInspectorHost`), and opening one follows Settings > Lists > Open Items In (`Browser.open`).
 ///
 /// A library may hold tens of thousands of items, so the page works none of them out itself: the rows of each tab are
-/// the window's `ItemIndexModel`'s, worked out once, and a change of tab reads one of them. The table draws a page of
-/// them at a time. This body never reads the selection, so choosing a row runs no other row's body.
+/// the window's `ItemIndexModel`'s, worked out once and kept while the page is away, and a change of tab reads one of
+/// them. The table draws a page of them at a time. This body never reads the selection, so choosing a row runs no other
+/// row's body.
 struct ItemsIndex: View {
     @CurrentLibrary private var library
     @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
@@ -37,6 +39,10 @@ struct ItemsIndex: View {
         let tabs = searching ? browser.searchedItemTabs(in: library) : model.tabs
         content(tabs: tabs, searching: searching)
             .searchStatus(browser)
+            .toolbar(removing: browser.isSearchExpanded ? .title : nil)
+            .onChange(of: browser.isSearchExpanded) {
+                if !browser.isSearchExpanded { browser.focusRequest = .list }
+            }
             .task(id: Following(library: ObjectIdentifier(library), sort: sort)) { model.follow(library, sort: sort) }
             // The names of the sources a row shows are the server's, so they are asked again when the items change.
             .task(id: SourceRefresh(library: ObjectIdentifier(library), membership: library.membershipRevision)) {
@@ -52,7 +58,8 @@ struct ItemsIndex: View {
 
     @ViewBuilder
     private func content(tabs: ItemIndexTabs?, searching: Bool) -> some View {
-        if let tabs {
+        // A library that has not loaded lists nothing, which says nothing about it.
+        if let tabs, library.isLoaded || !tabs.all.isEmpty {
             let shown = tabs.rows(for: tab)
             VStack(spacing: 0) {
                 IndexTabBar(
@@ -69,11 +76,13 @@ struct ItemsIndex: View {
                 } else {
                     ItemsTable(browser: browser, rows: shown, sort: sortBinding, pane: pane)
                         // A change of tab, of search or of sort starts the table at its first page.
-                        .id(Paging(tab: tab, search: searching ? browser.searchText : "", sort: sort))
+                        .id(Paging(tab: tab, search: searching ? browser.searchText : "", sort: sort, byRelevance: browser.ordersByRelevance))
                 }
             }
         } else {
-            Color.clear
+            ProgressView("Loading…")
+                .controlSize(.small)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -83,13 +92,11 @@ struct ItemsIndex: View {
         if searching {
             SearchEmptyState(browser: browser)
         } else if allCount == 0 {
-            EmptyState("No Items", detail: "Items you make and apps send show here.")
+            EmptyState("No Items Yet", detail: "Items you make and apps send show here.")
+        } else if tab == .fromApps {
+            EmptyState("No Items From Apps", detail: "Items that apps send appear here.")
         } else {
-            switch tab {
-            case .yours: EmptyState("No Items Of Yours", detail: "Items you make appear here.")
-            case .fromApps: EmptyState("No Items From Apps", detail: "Items that apps send appear here.")
-            case .all, .apps, .keys: EmptyState("No Items")
-            }
+            EmptyState("No Items Of Yours", detail: "Items you make appear here.")
         }
     }
 
@@ -120,6 +127,7 @@ struct ItemsIndex: View {
         let tab: IndexTab
         let search: String
         let sort: IndexSort
+        let byRelevance: Bool
     }
 }
 
@@ -139,18 +147,20 @@ private struct ItemsTable: View {
     /// How many rows each page adds.
     private static let pageSize = TablePageSize.twoHundred.rawValue
 
+    /// The header's arrow: none while a search lists its results by relevance, until the person clicks a column.
     private var sortOrder: Binding<[KeyPathComparator<ItemIndexRow>]> {
-        Binding { sort.itemComparators } set: { if let next = IndexSort(comparators: $0) { sort = next } }
+        Binding {
+            browser.ordersByRelevance ? [] : sort.itemComparators
+        } set: { comparators in
+            guard let next = IndexSort(comparators: comparators) else { return }
+            sort = next
+            browser.orderSearch(byRelevance: false)
+        }
     }
 
-    /// The chosen item, when exactly one is chosen.
-    private var selection: Binding<ItemID?> {
-        Binding {
-            browser.selection.count == 1 ? browser.selection.first : nil
-        } set: { id in
-            let next: Set<ItemID> = id.map { [$0] } ?? []
-            if browser.selection != next { browser.selection = next }
-        }
+    /// The rows chosen: one shows in the right sidebar, several are acted on together by the menu and the keys.
+    private var selection: Binding<Set<ItemID>> {
+        Binding { browser.selection } set: { if browser.selection != $0 { browser.selection = $0 } }
     }
 
     var body: some View {
@@ -208,26 +218,72 @@ private struct ItemsTable: View {
     }
 }
 
-/// Loads the pages that hold the chosen item, so one reached by Back, a link or a restored window is drawn and marked.
-/// A view of its own, since it reads the selection, which the table's body must not.
+/// Looks after the chosen row: loads the pages that hold it, so one reached by Back, a link or a restored window is
+/// drawn and marked, scrolls to one a reveal asked for, and has the model keep it where it is while the rows are worked
+/// out again. A view of its own, since it reads the selection, which the table's body must not.
 private struct RevealChoice: View {
     let browser: Browser
     let rows: [ItemIndexRow]
     @Binding var pages: Int
+    /// The row to bring into view, and which request it answers.
+    @State private var scroll: (row: Int, request: Int)?
+    @State private var requests = 0
 
     var body: some View {
         Color.clear
             .frame(width: 0, height: 0)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
-            .onChange(of: browser.selection, initial: true) { reveal() }
+            .onChange(of: browser.selection, initial: true) {
+                browser.itemIndex.pin(browser.selection.count == 1 ? browser.selection.first : nil)
+                reveal()
+            }
+            // The tab a reveal switches to, and a search's rows, arrive after the request.
+            .onChange(of: browser.itemToScrollTo, initial: true) { reveal() }
+            .onChange(of: rows.count) { reveal() }
+            .background { RowScroller(row: scroll?.row, request: scroll?.request ?? 0) }
     }
 
     private func reveal() {
-        guard browser.selection.count == 1, let id = browser.selection.first,
-              let index = rows.firstIndex(where: { $0.id == id }) else { return }
+        guard browser.selection.count == 1, let id = browser.selection.first else {
+            browser.itemToScrollTo = nil
+            return
+        }
+        guard let index = rows.firstIndex(where: { $0.id == id }) else { return }
         let needed = index / TablePageSize.twoHundred.rawValue + 1
         if needed > pages { pages = needed }
+        guard browser.itemToScrollTo == id else { return }
+        browser.itemToScrollTo = nil
+        requests += 1
+        scroll = (index, requests)
+    }
+}
+
+/// Brings a row of the table behind it into view when asked, waiting for the table to hold it, which a page just
+/// loaded does a moment after.
+private struct RowScroller: NSViewRepresentable {
+    let row: Int?
+    let request: Int
+
+    func makeNSView(context: Context) -> Probe { Probe() }
+
+    func updateNSView(_ probe: Probe, context: Context) {
+        guard let row, probe.answered != request else { return }
+        probe.answered = request
+        Task { @MainActor [weak probe] in
+            for _ in 0..<20 {
+                if let table = probe?.nearestTable(), table.numberOfRows > row {
+                    table.scrollRowToVisible(row)
+                    return
+                }
+                try? await Task.sleep(for: .milliseconds(50))
+            }
+        }
+    }
+
+    final class Probe: NSView {
+        var answered = 0
+        override func hitTest(_ point: NSPoint) -> NSView? { nil }
     }
 }
 

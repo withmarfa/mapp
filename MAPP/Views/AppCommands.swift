@@ -90,7 +90,7 @@ struct AppCommands: Commands {
             command(.toggleReader)
             Divider()
             if let place = browser?.indexPlace {
-                IndexViewOptions(place: place)
+                IndexViewOptions(place: place, browser: browser)
             } else {
                 ItemViewOptions(browser: browser, modes: browser.flatMap { browser in library.map { browser.availableViewModes(in: $0) } } ?? ItemViewMode.allCases, bindsKeys: true)
             }

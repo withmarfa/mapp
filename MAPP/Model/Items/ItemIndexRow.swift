@@ -35,6 +35,24 @@ nonisolated struct ItemIndexTabs: Sendable {
     }
 
     func count(for tab: IndexTab) -> Int { rows(for: tab).count }
+
+    /// The tabs with only the rows `isKept` takes, in the order they were.
+    func keeping(where isKept: (ItemIndexRow) -> Bool) -> ItemIndexTabs {
+        ItemIndexTabs(all: all.filter(isKept), yours: yours.filter(isKept), fromApps: fromApps.filter(isKept))
+    }
+
+    /// These tabs with the row of `id` at the place it held in `earlier`, in each tab that held it then and holds it now.
+    func holding(_ id: ItemID, as earlier: ItemIndexTabs) -> ItemIndexTabs {
+        func held(_ rows: [ItemIndexRow], _ before: [ItemIndexRow]) -> [ItemIndexRow] {
+            guard let was = before.firstIndex(where: { $0.id == id }), let now = rows.firstIndex(where: { $0.id == id }),
+                  was != now else { return rows }
+            var moved = rows
+            moved.insert(moved.remove(at: now), at: min(was, moved.count))
+            return moved
+        }
+        return ItemIndexTabs(
+            all: held(all, earlier.all), yours: held(yours, earlier.yours), fromApps: held(fromApps, earlier.fromApps))
+    }
 }
 
 nonisolated extension IndexTab {
@@ -69,11 +87,13 @@ nonisolated enum ItemIndexRows {
     }
 
     /// The rows of each tab in the order of `sort`.
-    static func arranged(_ rows: [ItemIndexRow], by sort: IndexSort) -> ItemIndexTabs {
-        let ordered = sort.sorted(rows)
-        return ItemIndexTabs(
-            all: ordered, yours: ordered.filter { IndexTab.yours.includes(tier: $0.tier) },
-            fromApps: ordered.filter { IndexTab.fromApps.includes(tier: $0.tier) })
+    static func arranged(_ rows: [ItemIndexRow], by sort: IndexSort) -> ItemIndexTabs { split(sort.sorted(rows)) }
+
+    /// The rows of each tab in the order given, which a search's relevance is.
+    static func split(_ rows: [ItemIndexRow]) -> ItemIndexTabs {
+        ItemIndexTabs(
+            all: rows, yours: rows.filter { IndexTab.yours.includes(tier: $0.tier) },
+            fromApps: rows.filter { IndexTab.fromApps.includes(tier: $0.tier) })
     }
 
     /// The tabs for `items`, as the index page lists them.

@@ -29,6 +29,8 @@ final class Browser {
     @ObservationIgnored let listMemory = ColumnMemory()
     /// The rows of the Items index under each tab, kept by the window so they survive an item's full page (`ItemIndexModel`).
     @ObservationIgnored let itemIndex = ItemIndexModel()
+    /// The item whose row Items scrolls into view once it shows it, asked for by a reveal (`revealOnItems`).
+    var itemToScrollTo: ItemID?
     var selection: Set<ItemID> = [] {
         didSet {
             // The modal shows the one item it was opened on, so any other selection, whoever made it, is the end of it.
@@ -279,10 +281,10 @@ final class Browser {
 
     var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
-    /// Whether the search lists its results as the library ranked them rather than by a sort. The list starts on
+    /// Whether the search lists its results as the library ranked them rather than by a sort. The list and Items start on
     /// relevance; the gallery and the table start on their own sorts and use relevance only once it is picked there.
     var ordersByRelevance: Bool {
-        isSearching && (relevanceChoice ?? (viewMode == .list))
+        isSearching && (relevanceChoice ?? (viewMode == .list || item == .allItems))
     }
 
     /// Picks relevance or one of the sorts for the search under way. Outside a search there is nothing to pick.
@@ -312,8 +314,9 @@ final class Browser {
             show(place(listing: item), in: library, order: order)
         }
         selection = [item.id]
+        if self.item == .allItems { revealOnItems(item) }
         if staysInModal { open([item.id], as: .modal) }
-        else if usesCollection { open([item.id], as: .fullPage) }
+        else if followsCollection { open([item.id], as: .fullPage) }
         else { focusRequest = .list }
     }
 
@@ -322,7 +325,7 @@ final class Browser {
     /// that lists it (`place(listing:)`). The keyboard stays with the page, as it does when a link is followed anywhere.
     func open(linked item: Item, in library: any ItemLibrary, order: ItemOrder) {
         reveal(item, in: library, order: order)
-        if !usesCollection { focusRequest = .page }
+        if !followsCollection, !showsItemsIndex { focusRequest = .page }
     }
 
     /// Whether an earlier item the window showed can still be shown again.
@@ -350,6 +353,7 @@ final class Browser {
         }
         if !items(in: library).contains(where: { $0.id == entry.id }) { sidebarItem = .allItems }
         selection = [entry.id]
+        if self.item == .allItems, let held = library.item(entry.id) { revealOnItems(held) }
         history.move(to: index)
         focusRequest = .list
     }
@@ -641,9 +645,13 @@ final class Browser {
 
     /// The items the layout that spans the window holds, which its selection follows as they change (`keepSelection`):
     /// the table's in the order it shows them, then those its filters hide, and the gallery's, the board's and the
-    /// timeline's in the list's order, which is also the order of a full page opened from the list. The table's come from its own content, so a move between its places sorts no list.
+    /// timeline's in the list's order, which is also the order of a full page opened from the list. The table's come from
+    /// its own content, so a move between its places sorts no list. Items' are its table's (`itemIndexIDs`).
     func collectionItemIDs(in library: any ItemLibrary, order: ItemOrder) -> [ItemID] {
-        guard followsCollection, !showsSidebarIndex else { return [] }
+        guard followsCollection else { return [] }
+        // Items has no layout: a full page opened from it follows the rows of its table.
+        if item == .allItems { return itemIndexIDs(in: library) }
+        guard !showsSidebarIndex else { return [] }
         guard viewMode == .table else {
             let shown = sections(in: library, order: order, now: library.now()).flatMap { $0.items.map(\.id) }
             guard tableOptions[item]?.isFiltering == true else { return shown }
@@ -700,6 +708,7 @@ final class Browser {
         libraryID = id
         pagingState = nil
         itemIndex.reset()
+        itemToScrollTo = nil
         tableMemo = nil
         sectionsMemo = nil
         viewModesMemo = nil

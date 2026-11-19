@@ -68,8 +68,12 @@ struct ItemInspectorHost: View {
                     onHeading: { editor?.revealHeading(at: $0) }
                 )
                 .id(id)
+            } else if let browser, browser.showsItemsIndex, browser.selection.count > 1 {
+                // Items has no page beside the sidebar to say how many rows are chosen.
+                EmptyState(title: Text("^[\(browser.selection.count) item](inflect: true) selected"), detail: nil, actions: { EmptyView() })
             } else {
-                // The page beside it already says that nothing is selected.
+                // Where a page sits beside the sidebar it says that nothing, or many, are selected; Items and the other
+                // indexes have none, and their table shows that nothing is chosen.
                 Color.clear
             }
         }
