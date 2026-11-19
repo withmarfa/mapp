@@ -113,6 +113,7 @@ import Testing
         try await host.connect(address: "http://first.test:8210", key: "old")
         let source = try #require(bench.servers.last)
         source.useFailure.withLock { $0 = MarfaError.closed(message: "The copy closed.") }
+        source.useCloses.withLock { $0 = true }
         await expect(.unavailable(message: "The copy closed.")) { () throws(MarfaHost.Problem) in
             try await host.signInAgain(via: host.scripted("new"))
         }
@@ -152,5 +153,102 @@ import Testing
         #expect(host.source === bench.servers.last)
         #expect(bench.servers.opened.count == 1)
         #expect(try bench.signIns.key(for: first.address) == "new")
+    }
+
+    /// Edits that cannot be handed over refuse the sign-in before anything is asked or changed, as the old path did.
+    @Test func editsThatCannotBeHandedOverRefuseSignInAgainAndChangeNothing() async throws {
+        let bench = try HostBench()
+        let host = bench.host()
+        try await host.connect(address: "http://first.test:8210", key: "old")
+        let source = try #require(bench.servers.last)
+        let library = try #require(host.library)
+        host.handOverEdits = { false }
+        let calls = bench.signIns.calls
+        await expect(.unavailable(message: "Finish editing the current item before changing libraries.")) { () throws(MarfaHost.Problem) in
+            try await host.signInAgain(via: host.scripted("new"))
+        }
+        #expect(bench.signIns.calls == calls, "no sign-in was started")
+        #expect(try bench.signIns.key(for: first.address) == "old")
+        #expect(source.calls.isEmpty)
+        #expect(host.library === library)
+        #expect(host.source === source)
+    }
+
+    /// Writes begun while the sign-in was made are handed over before the copy is touched.
+    @Test func editsBegunDuringTheSignInKeepTheLibraryAndTheCopyUntouched() async throws {
+        let bench = try HostBench()
+        let host = bench.host()
+        try await host.connect(address: "http://first.test:8210", key: "old")
+        let source = try #require(bench.servers.last)
+        let library = try #require(host.library)
+        let asked = Mutex(0)
+        host.handOverEdits = { asked.withLock { $0 += 1; return $0 == 1 } }
+        await expect(.unavailable(message: "Finish editing the current item before changing libraries.")) { () throws(MarfaHost.Problem) in
+            try await host.signInAgain(via: host.scripted("new"))
+        }
+        #expect(source.calls.isEmpty, "the copy was never given the sign-in")
+        #expect(host.library === library)
+        #expect(host.source === source)
+    }
+
+    /// Only a store that could not be opened again closes the copy; every other refusal leaves the library as it was.
+    @Test(arguments: [
+        MarfaError.noServer(message: "No server."),
+        MarfaError.wrongServer(expected: "a", got: "b", message: "Another server."),
+        MarfaError.closed(message: "Closed."),
+        MarfaError.storeBusy(message: "Busy."),
+    ])
+    func aRefusalThatLeavesTheCopyOpenLeavesTheLibraryOpen(_ error: MarfaError) async throws {
+        let bench = try HostBench()
+        let host = bench.host()
+        try await host.connect(address: "http://first.test:8210", key: "old")
+        let source = try #require(bench.servers.last)
+        let library = try #require(host.library)
+        source.useFailure.withLock { $0 = error }
+        do {
+            try await host.signInAgain(via: host.scripted("new"))
+            if case .noServer = error {} else { Issue.record("expected a refusal") }
+        } catch {
+            #expect(error != .notSignedIn)
+        }
+        #expect(source.calls == ["use"], "the copy is not closed")
+        #expect(host.library === library)
+        #expect(host.source === source)
+    }
+
+    @Test func aSignInTheKeychainNoLongerHoldsLeavesTheLibraryOpenAndTellsThePerson() async throws {
+        let bench = try HostBench()
+        let host = bench.host()
+        try await host.connect(address: "http://first.test:8210", key: "old")
+        let source = try #require(bench.servers.last)
+        let library = try #require(host.library)
+        source.useFailure.withLock { $0 = SignInError.notSignedIn }
+        await expect(.notSignedIn) { () throws(MarfaHost.Problem) in
+            try await host.signInAgain(via: host.scripted("new"))
+        }
+        #expect(source.calls == ["use"])
+        #expect(host.library === library)
+        #expect(host.source === source)
+    }
+
+    /// Another opener took the writer role while the store opened again, so the copy is a reader: told as an
+    /// opening would, with the copy and its queue left in the store.
+    @Test func aCopyThatCameBackAReaderIsToldInUseAndItsQueueStays() async throws {
+        let bench = try HostBench()
+        let host = bench.host()
+        try await host.connect(address: "http://first.test:8210", key: "old")
+        let source = try #require(bench.servers.last)
+        source.report.set(SyncReport(waiting: 2, queueRead: true))
+        source.useRole.withLock { $0 = .reader }
+        await expect(.inUse) { () throws(MarfaHost.Problem) in
+            try await host.signInAgain(via: host.scripted("new"))
+        }
+        #expect(host.state == .inUse)
+        #expect(host.library == nil)
+        #expect(host.source == nil)
+        #expect(source.calls == ["use", "close"])
+        #expect(bench.hasCopy(first), "the queue stays in the store")
+        #expect(host.connection == first)
+        #expect(bench.savedAddress == "http://first.test:8210")
     }
 }

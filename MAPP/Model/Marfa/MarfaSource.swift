@@ -479,8 +479,24 @@ nonisolated final class MarfaSource: ItemSource {
         return outcome
     }
 
-    func use(_ server: Server) async throws {
-        try await copy.use(server)
+    /// A copy that could not be given the sign-in is told closed or open by asking it, since only the package knows
+    /// whether its store opened again.
+    func use(_ server: Server) async throws -> SourceRole {
+        do {
+            try await copy.use(server)
+        } catch {
+            let closed: Bool
+            do {
+                _ = try await copy.status()
+                closed = false
+            } catch MarfaError.closed {
+                closed = true
+            } catch {
+                closed = false
+            }
+            throw SourceUseFailure(cause: error, closed: closed)
+        }
+        return copy.handle == .writer ? .writer : .reader
     }
 
     /// Nothing submitted after this is taken, and a flush still waiting returns.

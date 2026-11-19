@@ -121,11 +121,17 @@ nonisolated final class FakeMarfaSource: MAPP.ItemSource {
     /// Run as the copy is given a sign-in, to stand for the copy's calls waiting while it changes.
     let onUse = Mutex<(@Sendable () async -> Void)?>(nil)
 
-    func use(_ server: Server) async throws {
+    /// Whether a failure to give the sign-in closed the copy, as the package does where its store cannot open again.
+    let useCloses = Mutex(false)
+    /// The role the copy holds once given the sign-in.
+    let useRole = Mutex(SourceRole.writer)
+
+    func use(_ server: Server) async throws -> SourceRole {
         record("use")
         await onUse.withLock { $0 }?()
-        if let failure = useFailure.withLock({ $0 }) { throw failure }
+        if let failure = useFailure.withLock({ $0 }) { throw SourceUseFailure(cause: failure, closed: useCloses.withLock { $0 }) }
         gave.withLock { $0.append(server.key) }
+        return useRole.withLock { $0 }
     }
 }
 

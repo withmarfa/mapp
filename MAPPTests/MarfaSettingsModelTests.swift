@@ -224,6 +224,7 @@ import Testing
         await connect(model)
         let source = try #require(bench.servers.last)
         source.useFailure.withLock { $0 = SourceFailure(kind: .failed, message: "The store is damaged.") }
+        source.useCloses.withLock { $0 = true }
         _ = model.host.scripted("key-2")
         await model.signInAgain()
         #expect(model.notice?.title == "Can’t Open the Library")

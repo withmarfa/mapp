@@ -341,6 +341,8 @@ import Observation
         try begin()
         defer { isBusy = false }
         await dropPendingSignIn()
+        // Nothing the sign-in or the copy's change can do may close the library over edits still being typed.
+        if source != nil { try await handOver() }
         try await signIn(to: connection, via: method)
         guard let source else { return try await open(connection) }
         let server: Server?
@@ -350,22 +352,40 @@ import Observation
             throw .unavailable(message: Words.signInUnreadable)
         }
         guard let server else { throw .notSignedIn }
+        // The sign-in can take minutes, and writes may have been made meanwhile.
+        try await handOver()
+        let role: SourceRole
         do {
-            try await source.use(server)
-        } catch MarfaError.noServer {
-            // A copy with no server has no sign-in to replace.
-        } catch SignInError.notSignedIn {
-            throw .notSignedIn
-        } catch {
-            // The package changes nothing for the other refusals but one: where the store could not be opened again
-            // the copy is closed, so the library is closed with it and the person is told.
-            if let error = error as? MarfaError, case .wrongServer = error {
-                throw .unavailable(message: Self.message(error))
+            role = try await source.use(server)
+        } catch let failure as SourceUseFailure {
+            if failure.closed {
+                // The package closed the copy where its store could not be opened again, so the library is closed
+                // with it and the person is told. Its queue stays in the store.
+                detach()
+                standing = .unavailable(message: Self.message(failure.cause))
+                await source.close()
+                throw .unavailable(message: Self.message(failure.cause))
             }
-            detach()
-            standing = .unavailable(message: Self.message(error))
-            await source.close()
+            if let error = failure.cause as? MarfaError, case .noServer = error { return }
+            if let error = failure.cause as? SignInError, case .notSignedIn = error { throw .notSignedIn }
+            // Every other refusal changed nothing: the library stays as it was.
+            throw .unavailable(message: Self.message(failure.cause))
+        } catch {
             throw .unavailable(message: Self.message(error))
+        }
+        if role == .reader {
+            // Another opener took the writer role while the store opened again; a reader's writes would all be
+            // refused. As opening one is told: the copy and its queue stay in the store.
+            detach()
+            standing = .inUse
+            await source.close()
+            throw .inUse
+        }
+    }
+
+    private func handOver() async throws(Problem) {
+        guard await handOverEdits() else {
+            throw .unavailable(message: String(localized: "Finish editing the current item before changing libraries."))
         }
     }
 
