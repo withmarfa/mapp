@@ -3454,6 +3454,9 @@
     "PDF" : {
       "extractionState" : "manual"
     },
+    "PDF, ^[%lld page](inflect: true)" : {
+
+    },
     "Pending" : {
       "extractionState" : "manual"
     },

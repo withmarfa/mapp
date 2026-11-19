@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// A window's toolbar, which a person can change with Customize Toolbar. Each split view the main window mounts keeps a
 /// layout of its own (`WindowToolbarLayout`), since the system reshuffles a saved layout when one identifier moves between
@@ -43,14 +44,14 @@ struct WindowToolbar: CustomizableToolbarContent {
         // appear for the next. Any other page keeps no header to scroll, so its item is hidden.
         if hasListColumn || browser == nil {
             ToolbarItem(id: "scrolledTitle") {
-                ScrolledItemTitle(title: tools.scrolledTitle)
+                ScrolledItemTitle(title: tools.scrolledTitle, subtitle: tools.scrolledSubtitle)
             }
             .sharedBackgroundVisibility(.hidden)
             .customizationBehavior(.disabled)
             .hidden((!showsScrolledTitle && !tools.isFocused) || !tools.hasScrollingHeader || browser?.showsCollection == true)
         } else if opensFromCollection, showsScrolledTitle || tools.isFocused, tools.hasHeaderAway {
             ToolbarItem(id: "scrolledTitle", placement: .navigation) {
-                ScrolledItemTitle(title: tools.scrolledTitle)
+                ScrolledItemTitle(title: tools.scrolledTitle, subtitle: tools.scrolledSubtitle)
             }
             .sharedBackgroundVisibility(.hidden)
             .customizationBehavior(.disabled)
@@ -206,20 +207,29 @@ struct ToolbarTrayWatch: ViewModifier {
 /// The title of the item on the page, in the toolbar once the page's header has scrolled away.
 struct ScrolledItemTitle: View {
     let title: String
+    /// A second, quieter line, as the page's Focus gives under the title.
+    var subtitle: String?
 
     /// The most room a title takes, so a long one never crowds the buttons beside it.
     static let widest: CGFloat = 300
 
     var body: some View {
-        Text(title)
-            .interfaceFont(.headline).lineLimit(1).truncationMode(.tail)
-            .frame(maxWidth: Self.widest, alignment: .leading)
-            // The toolbar sizes an item from what it reports, and the title would otherwise report whatever width it
-            // was last offered: a stale or still-growing one while the item is placed shows as "14…". Fixed, it always
-            // reports the width its own text needs, up to `widest`, which a long title then ends in an ellipsis at.
-            .fixedSize(horizontal: true, vertical: false)
-            .accessibilityIdentifier("ScrolledItemTitle")
-            .accessibilityHidden(title.isEmpty)
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .interfaceFont(.headline).lineLimit(1).truncationMode(.tail)
+                .accessibilityIdentifier("ScrolledItemTitle")
+                .accessibilityHidden(title.isEmpty)
+            if let subtitle {
+                Text(subtitle)
+                    .interfaceFont(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+                    .accessibilityIdentifier("ScrolledItemSubtitle")
+            }
+        }
+        .frame(maxWidth: Self.widest, alignment: .leading)
+        // The toolbar sizes an item from what it reports, and the title would otherwise report whatever width it
+        // was last offered: a stale or still-growing one while the item is placed shows as "14…". Fixed, it always
+        // reports the width its own text needs, up to `widest`, which a long title then ends in an ellipsis at.
+        .fixedSize(horizontal: true, vertical: false)
     }
 }
 
@@ -362,6 +372,17 @@ struct ItemToolbarActions {
         if let item = focusedItem { return library.pageLayout(of: item) == .text ? item.title : item.displayTitle }
         guard let item = itemWithScrollingHeader, details.isHeaderAway(of: item.id) else { return "" }
         return library.pageLayout(of: item) == .text ? item.title : item.displayTitle
+    }
+
+    /// The line under the title in Focus: the item's type, or for a PDF whose pages have been counted, its type and its
+    /// page count. Nothing outside Focus, where the scrolled title stands alone.
+    var scrolledSubtitle: String? {
+        guard let item = focusedItem else { return nil }
+        if case .file(let type, _) = item.content, type.conforms(to: .pdf), let pages = details.pages(of: item.id) {
+            // Only an attributed string carries out the plural markup.
+            return String(AttributedString(localized: "PDF, ^[\(pages) page](inflect: true)").characters)
+        }
+        return library.catalogue.label(for: item.type)
     }
 
     /// Formatting acts only on the writable item currently visible in the editor.

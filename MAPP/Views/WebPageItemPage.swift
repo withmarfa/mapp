@@ -176,6 +176,13 @@ struct WebPageItemPage: View {
             offerLook()
         }
         .onChange(of: headerHeight) { feedAway() }
+        // A header taken out by Focus reports no height of its own, so its last one is forgotten here: otherwise the
+        // page would still count it as scrolled away, and the toolbar's title would stay on once the header is back.
+        .onChange(of: drafts.isFocused(on: item.id)) { _, focused in
+            guard focused else { return }
+            headerHeight = 0
+            feedAway()
+        }
         // Only a shown page scrolls, so a header is never left away over an error or a page on its way.
         .onChange(of: isShowingPage) { _, showing in
             guard !showing else { return }

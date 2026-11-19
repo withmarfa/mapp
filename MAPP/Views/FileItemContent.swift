@@ -13,6 +13,8 @@ struct FileItemContent: View {
     /// What the item's library says the file is. A Marfa file is kept under its hash with no extension, so the
     /// name says nothing there; a type the library does not know leaves it to the name.
     var contentType: UTType?
+    /// Told how many pages a PDF has once it is read, and nil when the file has none to count.
+    var onPages: (Int?) -> Void = { _ in }
     @State private var zoom = 1.0
     @State private var textPreview: PlainTextFile.Preview?
     @State private var previewURL: URL?
@@ -74,7 +76,7 @@ struct FileItemContent: View {
             }
             .padding()
             if type.conforms(to: .pdf) {
-                FilePDFPreview(url: url)
+                FilePDFPreview(url: url, onPages: onPages)
             } else if type.conforms(to: .image) {
                 FileImageView(url: url, title: title, zoom: zoom)
             } else {
@@ -88,6 +90,7 @@ struct FileItemContent: View {
 /// Reads the document once for its file, rather than each time the preview's body runs.
 private struct FilePDFPreview: View {
     let url: URL
+    let onPages: (Int?) -> Void
     @State private var loaded: (url: URL, document: PDFDocument?)?
 
     var body: some View {
@@ -100,7 +103,12 @@ private struct FilePDFPreview: View {
                 }
             }
         }
-        .task(id: url) { loaded = (url, PDFDocument(url: url)) }
+        .task(id: url) {
+            let document = PDFDocument(url: url)
+            loaded = (url, document)
+            onPages(document?.pageCount)
+        }
+        .onDisappear { onPages(nil) }
     }
 }
 
