@@ -6,12 +6,6 @@ Where it lives: not built yet.
 
 This page lists what has been agreed for MAPP and is not in the app yet, so the next build starts from one list. What was turned down is in [Rejected designs](rejected-designs.md).
 
-## Making an item
-
-- New Item on Items, the sidebar's New and Command-N open quick add, as built, in the type last used.
-- New in a type's list opens quick add holding that type, its status and the fields it asks for.
-- Quick add's main button is Add and Open: the new item opens the way Settings > Lists > Open Items In says, with the insertion point in its text.
-
 ## Views
 
 - Every place opens in a default view. A person can change the default view, but can't rename or delete it.
@@ -37,7 +31,6 @@ This page lists what has been agreed for MAPP and is not in the app yet, so the 
 - Go lists the places (Items, Sources, Collections, Inbox, Recents, Favorites), then the saved views and the types, as the sidebar holds them, with All Types for the rest.
 - Recently Deleted leaves the View menu.
 - Help holds MAPP Help, Keyboard Shortcuts, What's New in MAPP, Marfa Documentation and Report a Problem…, after the system's search field.
-- An empty state has a title, one line under it of fewer than 40 characters, and a button only when there is something to do there. A type has New and its name, such as New Project. Favorites and Inbox have no button.
 - Recently Deleted is a page in Settings only, not a sidebar place.
 
 ## Editing in place
