@@ -50,8 +50,8 @@ nonisolated struct SidebarGroupPlan: Identifiable, Equatable {
 
     /// The places as the person ordered them. A section that holds only its default places keeps the sidebar's own
     /// blocks in order, whatever `order` says: the library's indexes, then Inbox, Recents and Favorites, then the saved
-    /// views, each block in the person's order within it. Settings > Sidebar moves the blocks as separate lists, so
-    /// `order` can name the saved views before Inbox, and a layout from before sections existed must read as it did.
+    /// views, each block in the person's order within it. A layout stored when Settings moved the blocks as separate lists
+    /// can name the saved views before Inbox in `order`, and it must read as it did.
     /// Once something has been put in the section by hand (`SidebarLayout.put`, or dragging its rows in place), the
     /// section is one list in the person's order.
     private static func ordered(_ places: [SidebarPlace], in group: String, layout: SidebarLayout) -> [SidebarPlace] {
