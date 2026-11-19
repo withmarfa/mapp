@@ -159,10 +159,15 @@ final class DetailsPresentation {
         if offeredFile?.item == item { offeredFile = nil }
     }
 
-    /// Escape on the page: the formats card closes first, then Focus on a second press. False when neither was
-    /// showing, so the key is the caller's.
+    /// Escape on the page: an open size field closes first, then the formats card, then Focus on a second press. False
+    /// when none was showing, so the key is the caller's. The field closes here whether or not it holds the keyboard,
+    /// so Escape never stays stuck behind a field that never took focus.
     @discardableResult
     func escapeFromPage() -> Bool {
+        if let viewing = offeredFile?.viewing, viewing.isEditingSize {
+            viewing.isEditingSize = false
+            return true
+        }
         if formatsItem != nil {
             formatsItem = nil
             return true

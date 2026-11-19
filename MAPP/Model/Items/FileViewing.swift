@@ -44,15 +44,21 @@ nonisolated enum FileZoom: Equatable, Sendable {
         return up ? steps.first { percent(of: $0) > shown } : steps.last { percent(of: $0) < shown }
     }
 
-    /// The size a typed answer means, such as "150" or "150 %", held to the range, or nil where it is not a size.
-    /// Zero and sizes past the range are not refused: they take the nearest end, which the control then shows.
-    static func parse(_ text: String) -> Double? {
+    /// The size a typed answer means, such as "150", "150 %" or "1,000", held to the range, or nil where it is not a
+    /// size. The locale says which mark groups thousands, which is dropped, and which is the decimal point, which is
+    /// read as one; a point is also read as one where the locale does not use it for grouping. Zero and sizes past the
+    /// range are not refused: they take the nearest end, which the control then shows.
+    static func parse(_ text: String, locale: Locale = .current) -> Double? {
         var digits = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if digits.hasSuffix("%") {
             digits.removeLast()
-            digits = digits.trimmingCharacters(in: .whitespaces)
         }
-        digits = digits.replacingOccurrences(of: ",", with: ".")
+        // Spaces, including the narrow and no-break ones some locales group with, never belong to the number.
+        digits = String(digits.filter { !$0.isWhitespace })
+        let group = locale.groupingSeparator.map { String($0.filter { !$0.isWhitespace }) } ?? ","
+        let decimal = locale.decimalSeparator ?? "."
+        if !group.isEmpty, group != decimal { digits = digits.replacingOccurrences(of: group, with: "") }
+        if decimal != "." { digits = digits.replacingOccurrences(of: decimal, with: ".") }
         let isNumber = !digits.isEmpty
             && digits.allSatisfy { $0.isASCII && ($0.isNumber || $0 == ".") }
             && digits.filter { $0 == "." }.count <= 1
@@ -72,6 +78,12 @@ nonisolated enum FileZoom: Equatable, Sendable {
     static func fitScale(content: CGSize, in pane: CGSize) -> Double? {
         guard content.width > 0, content.height > 0, pane.width > 0, pane.height > 0 else { return nil }
         return min(pane.width / content.width, pane.height / content.height)
+    }
+
+    /// What Fit gives an image: it never enlarges a picture past its own size, as Preview does, and the control never
+    /// shows a size the range refuses.
+    static func imageFit(content: CGSize, in pane: CGSize) -> Double? {
+        fitScale(content: content, in: pane).map { clamped(min($0, 1)) }
     }
 
     /// A size as the control and the menu write it, such as "100%".
@@ -120,8 +132,8 @@ final class FileViewing {
     private(set) var pages: FilePages?
     /// Whether the size field is open, which the corner reads so Escape closes the field and nothing else.
     var isEditingSize = false
-    /// Scrolls the PDF to a page, from 1. The PDF's view sets it.
-    @ObservationIgnored var showPage: ((Int) -> Void)?
+    /// Scrolls the PDF to a page, from 1, and returns the page the view then shows. The PDF's view sets it.
+    @ObservationIgnored var showPage: ((Int) -> Int)?
 
     init(kind: FileViewKind) {
         self.kind = kind
@@ -181,7 +193,7 @@ final class FileViewing {
         guard let pages else { return }
         let target = pages.current + step
         guard (1...pages.count).contains(target) else { return }
-        self.pages = FilePages(count: pages.count, current: target)
-        showPage?(target)
+        // The label says the page the view reached, which is not always the one asked for.
+        reportPages(count: pages.count, current: showPage?(target) ?? pages.current)
     }
 }

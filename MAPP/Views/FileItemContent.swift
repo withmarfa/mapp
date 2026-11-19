@@ -145,15 +145,7 @@ private struct FilePDFView: NSViewRepresentable {
             view.document = document
             context.coordinator.attach(to: view)
         }
-        switch viewing.zoom {
-        case .fit:
-            if !view.autoScales { view.autoScales = true }
-        case .scale(let scale):
-            if view.autoScales || abs(view.scaleFactor - scale) > 0.0005 {
-                view.autoScales = false
-                view.scaleFactor = scale
-            }
-        }
+        context.coordinator.apply(viewing.zoom, to: view)
     }
 
     static func dismantleNSView(_ view: PDFView, coordinator: Coordinator) {
@@ -165,14 +157,33 @@ private struct FilePDFView: NSViewRepresentable {
         let viewing: FileViewing
         private weak var view: PDFView?
         private var observers: [any NSObjectProtocol] = []
+        /// The size last given to the view, or taken from it. The view is written only when the chosen size differs from
+        /// this, so an update that runs between a pinch and its being read never writes the old size back.
+        private var appliedZoom: FileZoom?
 
         init(viewing: FileViewing) {
             self.viewing = viewing
         }
 
+        /// Gives the view the chosen size, once for each change of it.
+        func apply(_ zoom: FileZoom, to view: PDFView) {
+            guard appliedZoom != zoom else { return }
+            appliedZoom = zoom
+            switch zoom {
+            case .fit:
+                if !view.autoScales { view.autoScales = true }
+            case .scale(let scale):
+                if view.autoScales || abs(view.scaleFactor - scale) > 0.0005 {
+                    view.autoScales = false
+                    view.scaleFactor = scale
+                }
+            }
+        }
+
         func attach(to view: PDFView) {
             detach()
             self.view = view
+            appliedZoom = nil
             let center = NotificationCenter.default
             observers = [
                 center.addObserver(forName: .PDFViewPageChanged, object: view, queue: .main) { [weak self] _ in
@@ -183,10 +194,12 @@ private struct FilePDFView: NSViewRepresentable {
                 },
             ]
             viewing.showPage = { [weak self] number in
-                guard let view = self?.view, let page = view.document?.page(at: number - 1) else { return }
-                view.go(to: page)
+                guard let self, let shown = self.view, let page = shown.document?.page(at: number - 1) else { return number }
+                shown.go(to: page)
+                return currentPage(in: shown)
             }
-            viewing.reportPages(count: view.document?.pageCount ?? 0, current: currentPage(in: view))
+            // Attaching happens while SwiftUI makes or updates the view, so what it reports is read a turn later.
+            pageChanged()
             scaleChanged()
         }
 
@@ -201,7 +214,7 @@ private struct FilePDFView: NSViewRepresentable {
             return document.index(for: page) + 1
         }
 
-        // Both are read a turn later: the view posts them while SwiftUI is still updating it.
+        // Read a turn later: the view posts them while SwiftUI is still updating it.
         private func pageChanged() {
             Task { @MainActor [weak self] in
                 guard let self, let view else { return }
@@ -214,7 +227,13 @@ private struct FilePDFView: NSViewRepresentable {
         private func scaleChanged() {
             Task { @MainActor [weak self] in
                 guard let self, let view else { return }
-                if view.autoScales { viewing.reportFit(view.scaleFactor) } else { viewing.adopt(scale: view.scaleFactor) }
+                if view.autoScales {
+                    viewing.reportFit(FileZoom.clamped(view.scaleFactor))
+                } else {
+                    viewing.adopt(scale: view.scaleFactor)
+                    // A size the view took on its own is now the chosen one, so it is not written back.
+                    appliedZoom = viewing.zoom
+                }
             }
         }
     }
@@ -256,12 +275,13 @@ private struct FileImageView: View {
     }
 
     private func picture(_ decoded: DecodedImage, in pane: CGSize) -> some View {
-        let fit = FileZoom.fitScale(content: decoded.pixelSize, in: pane) ?? 1
+        let fit = FileZoom.imageFit(content: decoded.pixelSize, in: pane) ?? 1
         let scale = viewing.zoom.scale(fit: fit)
-        // Fitted, the picture is never a rounding error larger than the pane, which would show scroll bars.
+        // Fitted, the picture is never a rounding error larger than the pane, which would show scroll bars. A picture
+        // too large for Fit's smallest size overflows its pane and scrolls.
         let width = decoded.pixelSize.width * scale
         let height = decoded.pixelSize.height * scale
-        let isFitted = viewing.zoom == .fit
+        let isFitted = viewing.zoom == .fit && fit > FileZoom.range.lowerBound
         return ScrollView([.horizontal, .vertical]) {
             Image(decorative: decoded.image, scale: 1).resizable()
                 .frame(width: isFitted ? min(width, pane.width) : width, height: isFitted ? min(height, pane.height) : height)

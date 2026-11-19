@@ -33,10 +33,21 @@ struct FileViewingTests {
     @Test func aTypedSizeIsAPercentageHeldToTheRange() {
         #expect(FileZoom.parse("150") == 1.5)
         #expect(FileZoom.parse(" 75 % ") == 0.75)
-        #expect(FileZoom.parse("33,5") == 0.335)
+        #expect(FileZoom.parse("33,5", locale: Locale(identifier: "de_DE")) == 0.335)
+        #expect(FileZoom.parse("33.5", locale: Locale(identifier: "en_GB")) == 0.335)
         #expect(FileZoom.parse("0") == 0.1)
         #expect(FileZoom.parse("5000") == 4)
         #expect(FileZoom.parse("9") == 0.1)
+    }
+
+    @Test func groupingSeparatorsAreDroppedAsTheLocaleWritesThem() {
+        #expect(FileZoom.parse("1,000", locale: Locale(identifier: "en_GB")) == 4, "a thousand percent, held to the range")
+        #expect(FileZoom.parse("1,000", locale: Locale(identifier: "de_DE")) == 0.1, "one point zero, read as 1%, held to the range")
+        #expect(FileZoom.parse("1.000", locale: Locale(identifier: "de_DE")) == 4)
+        #expect(FileZoom.parse("1\u{202F}000", locale: Locale(identifier: "fr_FR")) == 4)
+        #expect(FileZoom.parse("1,5", locale: Locale(identifier: "fr_FR")) == 0.1)
+        #expect(FileZoom.parse("1,0,0", locale: Locale(identifier: "en_GB")) == 1)
+        #expect(FileZoom.parse("1.0.0", locale: Locale(identifier: "en_GB")) == nil)
     }
 
     @Test func somethingThatIsNotASizeIsRefused() {
@@ -50,6 +61,14 @@ struct FileViewingTests {
         #expect(FileZoom.fitScale(content: CGSize(width: 100, height: 100), in: CGSize(width: 800, height: 400)) == 4)
         #expect(FileZoom.fitScale(content: CGSize(width: 100, height: 100), in: .zero) == nil)
         #expect(FileZoom.fitScale(content: .zero, in: CGSize(width: 10, height: 10)) == nil)
+    }
+
+    @Test func anImageIsNeverFittedPastItsOwnSizeNorOutsideTheRange() {
+        let pane = CGSize(width: 800, height: 800)
+        #expect(FileZoom.imageFit(content: CGSize(width: 40, height: 40), in: pane) == 1, "a small picture stays at 100%")
+        #expect(FileZoom.imageFit(content: CGSize(width: 4000, height: 2000), in: pane) == 0.2)
+        #expect(FileZoom.imageFit(content: CGSize(width: 40000, height: 40000), in: pane) == 0.1, "held to the range's end")
+        #expect(FileZoom.imageFit(content: .zero, in: pane) == nil)
     }
 
     @Test func aPhotoTakenOnItsSideSwapsItsSides() {
@@ -114,7 +133,7 @@ struct FileViewingTests {
     @Test func nextAndPreviousMoveOnePageAndTellTheView() {
         let viewing = FileViewing(kind: .pdf)
         var shown: [Int] = []
-        viewing.showPage = { shown.append($0) }
+        viewing.showPage = { shown.append($0); return $0 }
         viewing.goToNextPage()
         #expect(shown.isEmpty, "a file without pages has nowhere to go")
 
@@ -128,6 +147,17 @@ struct FileViewingTests {
         #expect(viewing.pages?.label == "3 of 3")
         viewing.goToPreviousPage()
         #expect(shown == [2, 3, 2])
+    }
+
+    @Test func theLabelReadsThePageTheViewReachedNotTheOneAskedFor() {
+        let viewing = FileViewing(kind: .pdf)
+        viewing.reportPages(count: 5, current: 1)
+        viewing.showPage = { _ in 1 }
+        viewing.goToNextPage()
+        #expect(viewing.pages?.label == "1 of 5", "the view stayed where it was")
+        viewing.showPage = { $0 + 1 }
+        viewing.goToNextPage()
+        #expect(viewing.pages?.label == "3 of 5")
     }
 
     @Test func scrollingMovesThePageTheLabelReads() {
@@ -191,6 +221,20 @@ struct FileViewingTests {
         #expect(details.fileViewing(of: item) === viewing, "another file's page going away leaves it")
         details.withdrawFileView(viewing)
         #expect(details.fileViewing(of: item) == nil)
+    }
+
+    @Test func escapeClosesAnOpenSizeFieldFirstWhetherOrNotItHoldsTheKeyboard() {
+        let details = DetailsPresentation()
+        let item = ItemID.mint()
+        let viewing = FileViewing(kind: .image)
+        details.offerFileView(viewing, for: item)
+        details.toggleFocus(on: item)
+        viewing.isEditingSize = true
+        #expect(details.escapeFromPage())
+        #expect(!viewing.isEditingSize)
+        #expect(details.isFocused(on: item), "Focus waits for a second press")
+        #expect(details.escapeFromPage())
+        #expect(!details.escapeFromPage(), "nothing left, so the key is the caller's")
     }
 
     @Test func movingToAnotherItemDropsTheFilesControls() {
