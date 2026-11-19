@@ -214,29 +214,34 @@ private struct IndexTable: View {
         let ordered = shownSort.sorted(rows)
         Table(ordered, selection: selection, sortOrder: sortOrder) {
             TableColumn(IndexColumn.name.title(in: place), value: \.title, comparator: .localizedStandard) { row in
-                IndexNameCell(row: row)
+                IndexNameCell(row: row).tableCellRoom()
             }
             .width(min: 140, ideal: 240)
             TableColumn(secondColumn.title(in: place), value: secondKey, comparator: .localizedStandard) { row in
-                if place == .sources {
-                    IndexTypesCell(shares: row.breakdown)
-                } else {
-                    Text(verbatim: row.sourceName).foregroundStyle(.secondary).lineLimit(1)
+                Group {
+                    if place == .sources {
+                        IndexTypesCell(shares: row.breakdown)
+                    } else {
+                        Text(verbatim: row.sourceName).foregroundStyle(.secondary).lineLimit(1)
+                    }
                 }
+                .tableCellRoom()
             }
             .width(min: 140, ideal: 280)
             TableColumn(IndexColumn.count.title(in: place), value: \.count) { row in
-                Text(row.count, format: .number).monospacedDigit()
+                Text(row.count, format: .number).monospacedDigit().tableCellRoom(alignment: .trailing)
             }
             .width(min: 60, ideal: 80, max: 120)
             .alignment(.numeric)
             TableColumn(IndexColumn.latest.title(in: place), value: \.latestOrOldest) { row in
-                IndexLatest(date: row.latest).foregroundStyle(.secondary)
+                IndexLatest(date: row.latest).foregroundStyle(.secondary).tableCellRoom()
             }
             .width(min: 100, ideal: 140, max: 200)
         }
+        .tableStyle(.inset)
         .alternatingRowBackgrounds(.disabled)
         .softSelection(rows: ordered.map(\.id), hovers: true, selection: { choice.chosen })
+        .quietTableHeader()
         .contextMenu(forSelectionType: IndexRow.ID.self) { ids in
             if let row = ordered.first(where: { ids.contains($0.id) }), ids.count == 1 {
                 Button("Open") { open(row) }
