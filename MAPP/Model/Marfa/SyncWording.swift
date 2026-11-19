@@ -1,4 +1,5 @@
 import Foundation
+import Marfa
 
 /// What the window says of how the library stands with its server, in the app's words. The model gives states
 /// and counts; this turns them into sentences, with no view in it, so each is tested as state in, words out.
@@ -214,6 +215,19 @@ nonisolated enum Words {
     /// The Keychain would not give the sign-in, which is not the same as there being none or the server ending it.
     static var signInUnreadable: String {
         String(localized: "MAPP couldn’t read this library’s sign-in from the Keychain. Unlock the Keychain and quit and reopen MAPP, or sign in again in Settings.")
+    }
+
+    /// A server whose release is older than the oldest this build works with. Asking again cannot clear it, so
+    /// the words say to update the server, never what the server said.
+    static func serverTooOld(served: String, oldest: String) -> String {
+        String(localized: "This server runs Marfa \(served). Update the server to Marfa \(oldest) or later to use this app.")
+    }
+
+    /// What to show a person of an error the package raised: the words above for one the app words itself,
+    /// the package's own for the rest.
+    static func message(for error: MarfaError) -> String {
+        if case .serverTooOld(let served, let oldest, _) = error { return serverTooOld(served: served, oldest: oldest) }
+        return error.message
     }
 
     /// The address now reaches another Marfa server than the one this copy was made for, so nothing in the copy is
