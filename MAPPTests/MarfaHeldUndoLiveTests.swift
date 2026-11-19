@@ -98,7 +98,7 @@ extension LiveMarfaTests {
             let connection = try MarfaConnection(address: try LiveMarfa.address())
             let location = MarfaStoreLocation(root: root)
             try FileManager.default.createDirectory(at: location.directory(for: connection), withIntermediateDirectories: true)
-            let copy = try await WorkingCopy.open(store: location.store(for: connection), server: connection.server(key: try LiveMarfa.key()))
+            let copy = try await WorkingCopy.open(store: location.store(for: connection), server: try connection.server(key: try LiveMarfa.key()))
             let gate = GatedRefresh(copy: copy)
             let source = MarfaSource(copy: copy, connection: connection, refreshing: gate)
             source.events.yield(.paint)
@@ -205,7 +205,7 @@ extension LiveMarfaTests {
                 try FileManager.default.createDirectory(at: otherRoot, withIntermediateDirectories: true)
                 let address = try #require(URL(string: try LiveMarfa.address()))
                 let second = try await WorkingCopy.open(
-                    store: otherRoot.appending(path: "other.sqlite"), server: Server(url: address, key: try LiveMarfa.key()))
+                    store: otherRoot.appending(path: "other.sqlite"), server: try Server(url: address, key: try LiveMarfa.key()))
                 let newer = "Newer text from another device."
                 do {
                     _ = try await second.hydrate(types: ["core.*"], tier: .library, edgeTypes: [MarfaMapping.parentEdge])

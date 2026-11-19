@@ -130,6 +130,29 @@ struct MarfaSyncFailureTests {
         await source.close()
     }
 
+    /// The package reports a server too old as a stopped follow, or as a copy whose first fill met it: each is shown
+    /// in the app's words, with none of the server's text, and the sidebar stops saying it is syncing.
+    @Test(arguments: [false, true])
+    func aServerTooOldIsToldInTheAppsWordsAndNotTheServersText(duringTheFirstFill: Bool) async throws {
+        let raw = "Copy streams require exactly edges=all&copy=1"
+        let tooOld = MarfaError.serverTooOld(served: "0.0.77", oldest: "0.0.78", message: raw)
+        let (fake, source, _, log) = try await open(failing: [])
+        fake.sendUpdate(update(duringTheFirstFill ? .needsHydration(tooOld) : .stopped(tooOld)))
+        let words = "This server runs Marfa 0.0.77. Update the server to Marfa 0.0.78 or later to use this app."
+        #expect(Words.message(for: tooOld) == words)
+        let state = try #require(await log.wait { unavailable($0) == 1 })
+        let told = state.changes.compactMap { change -> String? in
+            if case .unavailable(let failure) = change { failure.message } else { nil }
+        }
+        #expect(told == [words])
+        #expect(await waitForConnection(source) { $0 == .unavailable(message: words) })
+        let foot = try #require(SyncFootLine(state: source.connectionState, report: source.syncReport, lastSynced: nil, now: Date()))
+        #expect(foot.kind == .failed, "the sidebar kept syncing")
+        #expect(foot.help == words)
+        #expect(ConnectionStatus(source.connectionState).detail?.hasSuffix(words) == true)
+        await source.close()
+    }
+
     /// A key the server ended is the package's `.keyRefused`: shown as that, told once, and waiting for another key.
     @Test func aKeyTheServerEndedIsShownRefusedAndToldOnce() async throws {
         let (fake, source, _, log) = try await open(failing: [])
