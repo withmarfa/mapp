@@ -94,8 +94,10 @@ struct CollectionPickerSheet: View {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
+                    .mappButton(.secondary)
                 Button("Add") { add() }
                     .keyboardShortcut(.defaultAction)
+                    .mappButton(.primary)
                     .disabled(selected.map(holdsAll) ?? true)
                     .accessibilityIdentifier("CollectionPickerConfirm")
             }

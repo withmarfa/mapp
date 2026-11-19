@@ -183,7 +183,7 @@ extension ValueEditModel {
         var widest: CGFloat = 0
         for row in rows where row.role == .option || row.role == .create {
             let mark = row.mark == .none ? 0 : 21 * scale
-            let detail = row.detail.map { text($0) + 8 * scale } ?? 0
+            let detail = row.detail.map { (row.role == .create ? 16 : text($0)) + 8 * scale } ?? 0
             widest = max(widest, mark + text(row.title) + detail + 8 * scale)
         }
         // The search field holds the chips and the room to type after them: one line for what fits, more where it does not.

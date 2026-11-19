@@ -285,8 +285,10 @@ struct ItemRelationshipPicker: View {
             }
             HStack {
                 Button("Clear Selection") { selection = [] }
+                    .mappButton(.secondary)
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
+                    .mappButton(.secondary)
                 Button("Save") {
                     let adding = selection.subtracting(opened).sorted { $0.rawValue < $1.rawValue }
                     let removing = opened.subtracting(selection).sorted { $0.rawValue < $1.rawValue }
@@ -298,6 +300,7 @@ struct ItemRelationshipPicker: View {
                 }
                 .disabled(saving)
                 .keyboardShortcut(.defaultAction)
+                .mappButton(.primary)
                 .accessibilityIdentifier("RelationshipSave")
             }
         }

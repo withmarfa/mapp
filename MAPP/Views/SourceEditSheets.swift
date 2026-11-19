@@ -23,23 +23,29 @@ struct SourceNameSheet: View {
             Text("The name shows in every app that uses your Marfa server.")
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            TextField("Name", text: $model.name)
-                .textFieldStyle(.roundedBorder)
-                .focused($focused)
-                .disabled(!model.canChange)
-                .onSubmit(rename)
-                .accessibilityIdentifier("SourceName")
+            VStack(alignment: .leading, spacing: 4) {
+                FieldLabel("Name")
+                TextField("Name", text: $model.name)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($focused)
+                    .disabled(!model.canChange)
+                    .onSubmit(rename)
+                    .accessibilityIdentifier("SourceName")
+            }
             SourceEditNotice(model: model)
             HStack {
                 Button("Use Default Name") { run { await model.useDefaultName() } }
+                    .mappButton(.secondary)
                     .disabled(!model.canUseDefaultName)
                     .accessibilityIdentifier("SourceUseDefaultName")
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
+                    .mappButton(.secondary)
                     .disabled(!model.canCancel)
                 Button("Rename", action: rename)
                     .keyboardShortcut(.defaultAction)
+                    .mappButton(.primary)
                     .disabled(!model.canRename)
                     .accessibilityIdentifier("SourceRename")
             }
@@ -116,11 +122,13 @@ struct SourceMarkSheet: View {
             SourceEditNotice(model: model)
             HStack {
                 Button("Remove Mark") { choose(nil) }
+                    .mappButton(.secondary)
                     .disabled(!model.canRemoveMark)
                     .accessibilityIdentifier("SourceRemoveMark")
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
+                    .mappButton(.secondary)
                     .disabled(!model.canCancel)
             }
         }

@@ -195,8 +195,7 @@ struct ValueEditContent: View {
                     Button("Use Current Value") { model.useCurrentValue() }
                         .accessibilityIdentifier("ValueEditUseCurrent")
                 }
-                .buttonStyle(.borderless)
-                .font(.system(size: 11 * scale))
+                .mappButton(.secondary, size: .small)
                 .padding(.horizontal, 8 * scale)
                 .padding(.bottom, 2 * scale)
             }
@@ -218,9 +217,13 @@ private struct ValueEditRow: View {
             Text(verbatim: row.title).lineLimit(1).truncationMode(.tail)
             Spacer(minLength: 8 * scale)
             if let detail = row.detail {
-                Text(verbatim: detail)
-                    .layoutPriority(1)
-                    .foregroundStyle(isActive ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.secondary))
+                if row.role == .create {
+                    ShortcutKeys(detail, onAccent: isActive).layoutPriority(1)
+                } else {
+                    Text(verbatim: detail)
+                        .layoutPriority(1)
+                        .foregroundStyle(isActive ? AnyShapeStyle(.white.opacity(0.8)) : AnyShapeStyle(.secondary))
+                }
             }
         }
         .font(.system(size: ValueEditMetrics.textSize * scale))

@@ -352,10 +352,11 @@ struct PicturesCalloutDismissal: Equatable {
     mutating func reopen() { closed = nil }
 }
 
-/// At the top of the page while some of its pictures wait for the person, in the words and the look of the pictures
+/// At the top of the page while some of its pictures wait for the person, in the words and the layout of the pictures
 /// banner at the top of an item's page (`#picture-bar` in the editor), which follows Mail's mailing-list banner: how
-/// many are not loaded, a pill button that loads them, and a small round close button that hides the banner for the
-/// page. Its measures are the item page's, in steps of 4/13 of the interface text size (4 points at 13).
+/// many are not loaded, a button that loads them, and a small round close button that hides the banner for the
+/// page. Its spacing is the item page's, in steps of 4/13 of the interface text size (4 points at 13); its buttons are
+/// MAPP's own.
 struct PicturesWaitingCallout: View {
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
     let count: Int
@@ -384,12 +385,12 @@ struct PicturesWaitingCallout: View {
                 Button(action: load) {
                     if count == 1 { Text("Load Picture") } else { Text("Load Pictures") }
                 }
-                .buttonStyle(PicturePillStyle(size: size))
+                .mappButton(.secondary, size: .small)
                 Button(action: close) {
                     Image(systemName: "xmark")
                         .font(.system(size: size * 9 / 13, weight: .bold))
                 }
-                .buttonStyle(PictureCloseStyle(size: size))
+                .mappButton(.plain, size: .small, icon: true)
                 .help("Close")
                 .accessibilityLabel("Close")
                 .accessibilityIdentifier("PicturesWaitingCalloutClose")
@@ -401,47 +402,6 @@ struct PicturesWaitingCallout: View {
         .background(.quinary, in: RoundedRectangle(cornerRadius: step * 3.5))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("PicturesWaitingCallout")
-    }
-}
-
-/// The pictures banner's buttons, as designed: the measures are points at the default 13 point interface text size,
-/// scaled with it, as the item page's are (`--picture-button-*` in the editor's style sheet). 22 and 30 are off the
-/// 4 point grid by August's choice.
-private enum PictureButtonMetrics {
-    static func height(_ size: CGFloat) -> CGFloat { size * 22 / 13 }
-    static func textSize(_ size: CGFloat) -> CGFloat { size * 12 / 13 }
-}
-
-/// A tinted pill with no border, 22 points high with 12 point medium text, brighter under the pointer.
-private struct PicturePillStyle: ButtonStyle {
-    let size: CGFloat
-    @State private var hovering = false
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: PictureButtonMetrics.textSize(size), weight: .medium))
-            .foregroundStyle(.tint)
-            .padding(.horizontal, size * 12 / 13)
-            .frame(height: PictureButtonMetrics.height(size))
-            .background(.tint.opacity(hovering || configuration.isPressed ? 0.26 : 0.16), in: Capsule())
-            .onHover { hovering = $0 }
-    }
-}
-
-/// A circle as tall as the pill beside it, in a tertiary fill as Mail's close button has, with its symbol in
-/// secondary text, a shade stronger under the pointer.
-private struct PictureCloseStyle: ButtonStyle {
-    let size: CGFloat
-    @State private var hovering = false
-
-    func makeBody(configuration: Configuration) -> some View {
-        let height = PictureButtonMetrics.height(size)
-        configuration.label
-            .foregroundStyle(.secondary)
-            .frame(width: height, height: height)
-            .background(hovering || configuration.isPressed ? AnyShapeStyle(.fill.secondary) : AnyShapeStyle(.fill.tertiary), in: Circle())
-            .contentShape(Circle())
-            .onHover { hovering = $0 }
     }
 }
 

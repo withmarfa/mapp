@@ -118,11 +118,13 @@ struct PaletteRow: View {
                 }
             }
             Spacer(minLength: 8)
-            if let trailing = isSearch ? entry.date : entry.detail ?? entry.shortcut {
+            if let trailing = isSearch ? entry.date : entry.detail {
                 Text(trailing)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .fixedSize()
+            } else if let shortcut = entry.shortcut {
+                ShortcutKeys(shortcut)
             }
         }
         .padding(.horizontal, PaletteMetrics.rowInset)
@@ -148,26 +150,6 @@ struct PaletteRow: View {
     }
 }
 
-/// A key of a shortcut, drawn as MAPP draws key caps outside menus: one glyph in its own small outlined cap, with no
-/// fill, the glyph a touch lighter than secondary text.
-struct KeyCap: View {
-    let key: String
-
-    var body: some View {
-        Text(key)
-            .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(Color.primary.opacity(0.42))
-            .padding(.horizontal, 3)
-            .frame(minWidth: 16)
-            .frame(height: 16)
-            .overlay {
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(0.2), lineWidth: 1)
-            }
-            .accessibilityHidden(true)
-    }
-}
-
 /// Open and Actions as one glass capsule of the bar's height with two segments, as the toolbar groups its buttons:
 /// pointing at a segment fills only that segment.
 struct PaletteFooter: View {
@@ -181,7 +163,8 @@ struct PaletteFooter: View {
             Button(action: onOpen) {
                 HStack(spacing: 6) {
                     Text(openTitle)
-                    KeyCap(key: "↩")
+                    ShortcutKeys("↩")
+                        .accessibilityHidden(true)
                 }
             }
             .accessibilityIdentifier("CommandPaletteOpen")
@@ -189,10 +172,8 @@ struct PaletteFooter: View {
                 Button(action: onActions) {
                     HStack(spacing: 6) {
                         Text("Actions")
-                        HStack(spacing: 2) {
-                            KeyCap(key: "⌘")
-                            KeyCap(key: "K")
-                        }
+                        ShortcutKeys("⌘K")
+                            .accessibilityHidden(true)
                     }
                 }
                 .accessibilityIdentifier("CommandPaletteActions")

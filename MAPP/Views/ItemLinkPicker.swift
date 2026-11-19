@@ -55,6 +55,7 @@ struct ItemLinkPicker: View {
                 Spacer()
                 Button("Cancel", role: .cancel) { editor.cancelLinkRequest() }
                     .keyboardShortcut(.cancelAction)
+                    .mappButton(.secondary)
             }
         }
         .padding(20)

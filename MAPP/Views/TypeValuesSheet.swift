@@ -34,8 +34,10 @@ struct TypeValuesSheet: View {
                 Spacer()
                 Button("Cancel", role: .cancel) { dismiss() }
                     .keyboardShortcut(.cancelAction)
+                    .mappButton(.secondary)
                 Button("Change Type") { change() }
                     .keyboardShortcut(.defaultAction)
+                    .mappButton(.primary)
                     .disabled(!canChange)
                     .accessibilityIdentifier("TypeChangeConfirm")
             }

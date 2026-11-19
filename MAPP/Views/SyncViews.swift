@@ -75,20 +75,24 @@ struct SyncProblemRow: View {
                 HStack {
                     if let original = wording.original {
                         Button("Open Original") { openWindow(value: original) }
+                            .mappButton(.secondary, size: .small)
                     }
                     if let copy = wording.copy {
                         Button("Open Copy") { openWindow(value: copy) }
+                            .mappButton(.secondary, size: .small)
                     }
                 }
             }
             HStack {
                 ForEach(wording.actions) { action in
                     Button(action.title, role: action.isDestructive ? .destructive : nil) { act(action) }
+                        .mappButton(action.isDestructive ? .destructive : .secondary, size: .small)
                         .disabled(isWorking || (action.needsServer && !isOnline))
                         .help(action.needsServer && !isOnline ? Text("This needs the server. Try again when you’re back online.") : Text(""))
                 }
                 if wording.canCopyText {
                     Button("Copy Text", action: copyText)
+                        .mappButton(.secondary, size: .small)
                 }
             }
             if let failed {
@@ -97,7 +101,6 @@ struct SyncProblemRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .controlSize(.small)
         .confirmationDialog(
             confirming?.title ?? "",
             isPresented: Binding { confirming != nil } set: { if !$0 { confirming = nil } },
