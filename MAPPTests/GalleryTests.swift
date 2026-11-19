@@ -50,8 +50,10 @@ struct GalleryTests {
         browser.show(.recents, in: library, order: ItemOrder())
         browser.open(browser.selection, as: .fullPage)
         #expect(!browser.showsCollection)
-        let id = await browser.quickAdded("New", in: library)
-        #expect(!browser.showsCollection, "the new item opens in the page, not behind the grid")
+        let settings = UserDefaults(suiteName: "GalleryTests.\(UUID().uuidString)")!
+        settings.set(ItemOpening.fullPage.rawValue, forKey: ListKey.openItemsIn)
+        let id = await browser.quickAdded("New", in: library, defaults: settings)
+        #expect(!browser.showsCollection, "with Open Items In at Full Page the new item opens in the page, not behind the grid")
         #expect(browser.selection == id.map { [$0] })
         browser.returnToCollection()
         #expect(browser.showsCollection)
@@ -60,6 +62,17 @@ struct GalleryTests {
         #expect(browser.showsCollection)
         browser.show(.recents, in: library, order: ItemOrder())
         #expect(browser.showsCollection)
+    }
+
+    @Test func aNewItemOpensInTheModalOverTheGridWhenSettingsSayModal() async {
+        let (library, _, _, _) = BrowserTests().makeFakeLibrary()
+        let browser = Browser()
+        browser.viewMode = .gallery
+        browser.show(.recents, in: library, order: ItemOrder())
+        let settings = UserDefaults(suiteName: "GalleryTests.\(UUID().uuidString)")!
+        let id = await browser.quickAdded("New", in: library, defaults: settings)
+        #expect(browser.showsCollection, "the grid stays behind the modal")
+        #expect(browser.modalItem == id)
     }
 
     @Test func aCardsFactsFollowItsShape() {

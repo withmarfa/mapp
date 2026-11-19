@@ -6,11 +6,11 @@ import UniformTypeIdentifiers
 extension Browser {
     /// Quick add as a person uses it: open the panel, type, add.
     @discardableResult
-    func quickAdded(_ title: String, typeID: String? = nil, body: String = "", in library: any ItemLibrary) async -> ItemID? {
+    func quickAdded(_ title: String, typeID: String? = nil, body: String = "", in library: any ItemLibrary, defaults: UserDefaults = .standard) async -> ItemID? {
         openQuickAdd(typeID: typeID, in: library)
         quickAdd.draft?.title = title
         quickAdd.draft?.body = body
-        return await saveQuickAdd(in: library, undoManager: nil)
+        return await saveQuickAdd(in: library, undoManager: nil, defaults: defaults)
     }
 }
 
