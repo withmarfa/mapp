@@ -375,10 +375,11 @@ import Observation
         }
         if role == .reader {
             // Another opener took the writer role while the store opened again; a reader's writes would all be
-            // refused. As opening one is told: the copy and its queue stay in the store.
+            // refused. As opening one is told: the copy and its queue stay in the store, read in the step that closes
+            // it and agreed to whole, so nothing in it is discarded.
             detach()
             standing = .inUse
-            await source.close()
+            _ = await source.close(agreeing: nil)
             throw .inUse
         }
     }

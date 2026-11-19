@@ -235,10 +235,14 @@ import Testing
     /// opening would, with the copy and its queue left in the store.
     @Test func aCopyThatCameBackAReaderIsToldInUseAndItsQueueStays() async throws {
         let bench = try HostBench()
-        let host = bench.host()
+        bench.servers.storedWrites.withLock { $0 = 2 }
+        let removals = Mutex(0)
+        let host = bench.host(remover: { _, _ in removals.withLock { $0 += 1 } })
         try await host.connect(address: "http://first.test:8210", key: "old")
         let source = try #require(bench.servers.last)
         source.report.set(SyncReport(waiting: 2, queueRead: true))
+        let held = try await source.storeWrites
+        #expect(held.count == 2)
         source.useRole.withLock { $0 = .reader }
         await expect(.inUse) { () throws(MarfaHost.Problem) in
             try await host.signInAgain(via: host.scripted("new"))
@@ -248,6 +252,8 @@ import Testing
         #expect(host.source == nil)
         #expect(source.calls == ["use", "close"])
         #expect(bench.hasCopy(first), "the queue stays in the store")
+        #expect(try await source.storeWrites == held, "every queued write is still in the store")
+        #expect(removals.withLock { $0 } == 0)
         #expect(host.connection == first)
         #expect(bench.savedAddress == "http://first.test:8210")
     }
