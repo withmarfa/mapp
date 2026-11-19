@@ -15,7 +15,7 @@ The design system's Button and Toast components hold the exact fills and measure
 - A menu among buttons is an outlined button with a chevron, the same height as the buttons beside it.
 - A sheet puts a destructive action alone at the leading edge, and Cancel and the primary action at the trailing edge. A text field has its label above it, such as Name. The button reads Delete, not Delete Collection.
 - The toolbar's glass buttons, the system's menus, alerts and text fields, and a Settings page's own controls stay the system's.
-- Not yet on the style: the empty states' Open Settings and Connect buttons, the sign-in, connecting and disconnecting views, the file pages' Open and zoom buttons, and the buttons the item page's web editor draws itself.
+- Not yet on the style: the empty states' Open Settings and Connect buttons, the sign-in, connecting and disconnecting views, and the buttons the item page's web editor draws itself.
 
 ## Keycaps
 

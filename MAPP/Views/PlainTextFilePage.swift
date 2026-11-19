@@ -33,6 +33,7 @@ struct PlainTextFilePage: View {
                         .accessibilityAddTraits(.isHeader)
                     Spacer(minLength: 0)
                     Button("Open", systemImage: "arrow.up.forward.app", action: openFile)
+                        .mappButton(.secondary)
                 }
                 .padding(.horizontal, inset)
                 .padding(.top, 16)
@@ -53,6 +54,7 @@ struct PlainTextFilePage: View {
                             .accessibilityAddTraits(.isHeader)
                         Spacer(minLength: 0)
                         Button("Open", systemImage: "arrow.up.forward.app", action: openFile)
+                            .mappButton(.secondary)
                     }
                     Text(verbatim: text)
                         .font(.system(size: CGFloat(style.textSize)))
