@@ -352,10 +352,11 @@ struct PicturesCalloutDismissal: Equatable {
     mutating func reopen() { closed = nil }
 }
 
-/// At the top of the page while some of its pictures wait for the person, in the words and the look of the pictures
+/// At the top of the page while some of its pictures wait for the person, in the words and the layout of the pictures
 /// banner at the top of an item's page (`#picture-bar` in the editor), which follows Mail's mailing-list banner: how
 /// many are not loaded, a button that loads them, and a small round close button that hides the banner for the
-/// page. Its measures are the item page's, in steps of 4/13 of the interface text size (4 points at 13).
+/// page. Its spacing is the item page's, in steps of 4/13 of the interface text size (4 points at 13); its buttons are
+/// MAPP's own.
 struct PicturesWaitingCallout: View {
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
     let count: Int
