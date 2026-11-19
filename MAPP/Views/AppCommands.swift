@@ -157,12 +157,12 @@ struct AppCommands: Commands {
                 if browser?.isCollectionItemPresented == true { browser?.returnToCollection() }
                 else if let browser, let library { browser.go(.back, in: library) }
             }
-                .keyboardShortcut(pageKeepsHistoryKeys ? nil : KeyboardShortcut("[", modifiers: .command))
+                .keyboardShortcut(pageKeepsHistoryKeys ? nil : KeyboardShortcut(KeyEquivalent(Character(HistoryKeys.back)), modifiers: .command))
                 .disabled(!canGoBack)
             Button("Forward", systemImage: "chevron.forward") {
                 if let browser, let library { browser.go(.forward, in: library) }
             }
-                .keyboardShortcut(pageKeepsHistoryKeys ? nil : KeyboardShortcut("]", modifiers: .command))
+                .keyboardShortcut(pageKeepsHistoryKeys ? nil : KeyboardShortcut(KeyEquivalent(Character(HistoryKeys.forward)), modifiers: .command))
                 .disabled(!canGoForward)
             Divider()
             // The modal's own moves: through the items behind it, and out.

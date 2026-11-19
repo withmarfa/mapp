@@ -6,13 +6,14 @@ struct HelpCommands: Commands {
     let shortcuts: KeyboardShortcutsModel
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openURL) private var openURL
+    @FocusedValue(\.browser) private var browser
 
     var body: some Commands {
         CommandGroup(replacing: .help) {
             ForEach(HelpItem.allCases, id: \.self) { item in
                 if item.startsGroup { Divider() }
                 Button(item.title, systemImage: item.systemImage) {
-                    item.perform(shortcuts: shortcuts, openWindow: openWindow, openURL: openURL)
+                    item.perform(shortcuts: shortcuts, browser: browser, openWindow: openWindow, openURL: openURL)
                 }
             }
         }
@@ -21,12 +22,12 @@ struct HelpCommands: Commands {
 
 extension HelpItem {
     /// Opens the address in the browser, or the window of shortcuts. The menu bar is read as the person left it, before the
-    /// new window takes the keyboard.
-    func perform(shortcuts: KeyboardShortcutsModel, openWindow: OpenWindowAction, openURL: OpenURLAction) {
+    /// new window takes the keyboard, and only from a window with a browser (`browser`), the one whose menus are whole.
+    func perform(shortcuts: KeyboardShortcutsModel, browser: Browser?, openWindow: OpenWindowAction, openURL: OpenURLAction) {
         if let url {
             openURL(url)
         } else {
-            shortcuts.capture()
+            shortcuts.capture(from: browser)
             openWindow(id: KeyboardShortcutsView.windowID)
         }
     }
@@ -53,7 +54,6 @@ struct KeyboardShortcutsView: View {
             if shortcuts.list.isEmpty { ContentUnavailableView("No Shortcuts", systemImage: "keyboard") }
         }
         .frame(minWidth: 360, idealWidth: 420, minHeight: 320, idealHeight: 560)
-        .onAppear { if shortcuts.list.isEmpty { shortcuts.capture() } }
         .accessibilityIdentifier("KeyboardShortcuts")
     }
 }

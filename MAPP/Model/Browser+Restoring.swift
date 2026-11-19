@@ -77,17 +77,26 @@ extension Browser {
 }
 
 extension Browser.Snapshot {
-    /// A place the app no longer has, such as Recently Deleted, which is a page of Settings now, reads as Items, with
-    /// the rest of the snapshot kept.
+    /// Recently Deleted, once a place of the sidebar and now a page of Settings, reads as Items with the window's
+    /// selection and view kept, and with no scroll offset or open item, which belonged to the old list. Any other place
+    /// this build cannot read fails the decoding, so the window opens at its default.
     init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
-        guard values.contains(.place) else {
-            throw DecodingError.keyNotFound(CodingKeys.place, .init(codingPath: decoder.codingPath, debugDescription: "A snapshot names its place."))
+        let removedPlace: Bool
+        do {
+            place = try values.decode(SidebarItem.self, forKey: .place)
+            removedPlace = false
+        } catch {
+            guard let kinds = try? values.nestedContainer(keyedBy: RemovedPlace.self, forKey: .place),
+                  kinds.contains(.recentlyDeleted) else { throw error }
+            place = .allItems
+            removedPlace = true
         }
-        place = (try? values.decode(SidebarItem.self, forKey: .place)) ?? .allItems
         selection = try values.decode([ItemID].self, forKey: .selection)
         viewMode = try values.decodeIfPresent(ItemViewMode.self, forKey: .viewMode) ?? .list
-        opensItem = try values.decodeIfPresent(Bool.self, forKey: .opensItem)
-        scrollOffset = try values.decodeIfPresent(Double.self, forKey: .scrollOffset)
+        opensItem = removedPlace ? nil : try values.decodeIfPresent(Bool.self, forKey: .opensItem)
+        scrollOffset = removedPlace ? nil : try values.decodeIfPresent(Double.self, forKey: .scrollOffset)
     }
+
+    private enum RemovedPlace: String, CodingKey { case recentlyDeleted }
 }

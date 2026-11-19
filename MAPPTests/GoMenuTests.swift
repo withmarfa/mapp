@@ -42,14 +42,24 @@ struct GoMenuTests {
         #expect(plan.shownTypes.map(\.label) == ["Notes", "Projects", "Tickets", "Entities"])
     }
 
-    @Test func aHiddenTypeAndItsSubtypesAreLeftOut() async throws {
+    @Test func aHiddenTypeAndItsSubtypesAreUnderAllTypes() async throws {
         let library = try await marfaLibrary()
         var layout = SidebarLayout()
         layout.setHidden(.type("aic.ticket"), true)
         layout.setHidden(.type("core.entity"), true)
-        #expect(titles(GoMenu(library: library, layout: layout).types) == ["Notes", "Projects"])
+        let menu = GoMenu(library: library, layout: layout)
+        #expect(titles(menu.types) == ["Notes", "Projects"])
+        #expect(titles(menu.moreTypes) == ["Tickets > Bugs", "Tickets > Tasks", "Entities"])
+    }
+
+    @Test func withTheTypesSectionHiddenAllTypesHoldsEveryType() async throws {
+        let library = try await marfaLibrary()
+        let all = titles(GoMenu(library: library, layout: SidebarLayout()).types)
+        var layout = SidebarLayout()
         layout.setHidden(.types, true)
-        #expect(GoMenu(library: library, layout: layout).types.isEmpty)
+        let menu = GoMenu(library: library, layout: layout)
+        #expect(menu.types.isEmpty)
+        #expect(titles(menu.moreTypes) == all)
     }
 
     @Test func manyTypesStopAtTheSidebarsLimitAndTheRestAreUnderAllTypes() async throws {
@@ -62,6 +72,8 @@ struct GoMenuTests {
         let first = top.prefix(SidebarPlan.shownTypeCount).map(\.label)
         #expect(first.allSatisfy { label in menu.types.contains { $0.title == label || $0.title.hasPrefix(label + " > ") } })
         #expect(menu.moreTypes.count == 4)
+        // Every type is reached once, by the top of the menu or by All Types.
+        #expect(Set((menu.types + menu.moreTypes).map(\.place)).count == menu.types.count + menu.moreTypes.count)
     }
 
     @Test func savedViewsFollowTheSidebarAndHiddenOnesAreLeftOut() {

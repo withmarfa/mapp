@@ -1,8 +1,9 @@
 import Foundation
 
 /// What the Go menu lists, from the library and the person's sidebar layout: the places, then the saved views, then the
-/// types as the sidebar holds them, then every other type under All Types. A view or a type the person hid in the
-/// sidebar is left out; the places stay, so a window with the sidebar hidden reaches them.
+/// types as the sidebar shows them, then every other type under All Types: the ones after Show More, and the ones the
+/// person hid. A saved view the person hid is left out. The menu reaches every type and every place, so a window with
+/// the sidebar hidden reaches them.
 @MainActor
 struct GoMenu: Equatable {
     /// One command of the menu.
@@ -21,7 +22,7 @@ struct GoMenu: Equatable {
     let views: [Entry]
     /// The first `SidebarPlan.shownTypeCount` types with their subtypes, as the sidebar shows them before Show More.
     let types: [Entry]
-    /// The types after those, which the sidebar keeps behind Show More.
+    /// Every other type, subtypes included: those the sidebar keeps behind Show More and those it hides.
     let moreTypes: [Entry]
 
     init(library: any ItemLibrary, layout: SidebarLayout) {
@@ -34,9 +35,9 @@ struct GoMenu: Equatable {
             Entry(place: .view($0.id), item: .view($0.id), title: $0.title, icon: .symbol(SidebarPlace.viewSymbol))
         }
         let nodes = layout.isHidden(.types) ? [] : plan.shownTypes
-        let count = SidebarPlan.shownTypeCount
-        types = nodes.prefix(count).flatMap { Self.entries(of: $0, under: nil) }
-        moreTypes = nodes.dropFirst(count).flatMap { Self.entries(of: $0, under: nil) }
+        types = nodes.prefix(SidebarPlan.shownTypeCount).flatMap { Self.entries(of: $0, under: nil) }
+        let listed = Set(types.map(\.id))
+        moreTypes = plan.types.flatMap { Self.entries(of: $0, under: nil) }.filter { !listed.contains($0.id) }
     }
 
     /// The commands a type row stands for: its own list where it opens one, then each subtype's, named by their path

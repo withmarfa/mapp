@@ -8,9 +8,12 @@ struct SidebarNavigationTests {
 
     @Test func aWindowKeptOnRecentlyDeletedRestoresOnItems() throws {
         // Recently Deleted was a place of the sidebar once; a window saved then names it, and the rest of the window is kept.
-        let json = #"{"place":{"recentlyDeleted":{}},"selection":["note-1"],"viewMode":"gallery"}"#
+        let json = #"{"place":{"recentlyDeleted":{}},"selection":["note-1"],"viewMode":"gallery","opensItem":true,"scrollOffset":420}"#
         let snapshot = try JSONDecoder().decode(Browser.Snapshot.self, from: Data(json.utf8))
         #expect(snapshot.place == .allItems)
+        // The old list's scroll and open item mean nothing on Items.
+        #expect(snapshot.opensItem == nil)
+        #expect(snapshot.scrollOffset == nil)
         let note = FakeItemLibrary.note("Text", modified: date, id: ItemID("note-1"))
         let library = FakeItemLibrary(items: [note], now: date)
         let browser = Browser()
@@ -19,6 +22,11 @@ struct SidebarNavigationTests {
         #expect(browser.viewMode == .gallery)
         #expect(browser.selection == [note.id])
         #expect(!browser.showsSettings)
+    }
+
+    @Test func aSnapshotWithAnyOtherUnreadablePlaceFailsToDecode() {
+        let saved = Data(#"{"place":{"pinned":{}},"selection":[],"opensItem":true,"scrollOffset":10}"#.utf8)
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(Browser.Snapshot.self, from: saved) }
     }
 
     @Test func aStoredSidebarLayoutNamingRecentlyDeletedStillReadsAndPlans() throws {

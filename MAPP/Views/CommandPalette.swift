@@ -784,7 +784,7 @@ struct CommandPalette: View {
         if let shortcuts {
             for item in HelpItem.allCases {
                 add(String(localized: item.title), item.systemImage, in: .help) {
-                    item.perform(shortcuts: shortcuts, openWindow: openWindow, openURL: openURL)
+                    item.perform(shortcuts: shortcuts, browser: browser, openWindow: openWindow, openURL: openURL)
                 }
             }
         }

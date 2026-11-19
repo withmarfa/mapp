@@ -42,12 +42,22 @@ nonisolated struct KeyboardShortcutList: Equatable {
             let title = prefix + item.title
             if let submenu = item.submenu {
                 rows += Self.rows(in: submenu, prefix: title + " > ")
-            } else if let keys = Self.keys(keyEquivalent: item.keyEquivalent, modifiers: item.keyEquivalentModifierMask), !title.isEmpty {
+            } else if let keys = Self.keys(of: item), !title.isEmpty {
                 let row = Row(title: title, keys: keys)
                 if !rows.contains(row) { rows.append(row) }
             }
         }
         return rows
+    }
+
+    /// The key of a menu item. Back and Forward give ⌘[ and ⌘] up while the page has the keyboard, but the keys are still
+    /// theirs, so the list names them whatever had the keyboard when it was read.
+    @MainActor
+    private static func keys(of item: NSMenuItem) -> String? {
+        if let keys = keys(keyEquivalent: item.keyEquivalent, modifiers: item.keyEquivalentModifierMask) { return keys }
+        if HistoryKeys.backTitles.contains(item.title) { return keys(keyEquivalent: HistoryKeys.back, modifiers: .command) }
+        if item.title == HistoryKeys.forwardTitle { return keys(keyEquivalent: HistoryKeys.forward, modifiers: .command) }
+        return nil
     }
 
     /// A key as the menus write it, modifiers first in the system's order, or nil for none.
@@ -69,13 +79,25 @@ nonisolated struct KeyboardShortcutList: Equatable {
     ]
 }
 
-/// What the Keyboard Shortcuts window shows. It is read from the menu bar when the window is asked for, while the window
-/// the person was in is in front, since the menus of a window that has nothing to act on leave commands out.
+/// The keys of Back and Forward, which the View menu gives up while the page has the keyboard (the page uses them to
+/// outdent and indent a list item and to move between table cells).
+nonisolated enum HistoryKeys {
+    static let back = "["
+    static let forward = "]"
+    static let forwardTitle = String(localized: "Forward")
+    /// Back reads Back to Table and the like where an item opened from a view that spans the window.
+    static let backTitles = Set(ItemViewMode.allCases.map { String(localized: $0.backTitle) })
+}
+
+/// What the Keyboard Shortcuts window shows. It is read from the menu bar when a window with a browser asks for it, the
+/// window the person was in, since the menus of a window with nothing to act on leave commands out. Asked from any other
+/// window (the shortcuts window itself, an item's window), it keeps the list it has.
 @MainActor @Observable
 final class KeyboardShortcutsModel {
     private(set) var list = KeyboardShortcutList()
 
-    func capture() {
-        list = KeyboardShortcutList(menuBar: NSApp.mainMenu)
+    func capture(from browser: Browser?, menuBar: NSMenu? = NSApp.mainMenu) {
+        guard browser != nil else { return }
+        list = KeyboardShortcutList(menuBar: menuBar)
     }
 }

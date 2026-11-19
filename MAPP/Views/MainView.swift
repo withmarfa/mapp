@@ -81,6 +81,11 @@ struct MainView: View {
         .onChange(of: appearsActive, initial: true) {
             ColumnWidthRegistry.shared.windowBecame(active: appearsActive, tracker: measuredWidths)
         }
+        // Customizing happens in the sidebar, so a command that starts it brings the sidebar back. Settings keeps the
+        // sidebar column, so customizing there needs nothing more.
+        .onChange(of: browser.customizesSidebar) {
+            if browser.customizesSidebar { isSidebarVisible = true }
+        }
         .onChange(of: browser.showsCollection) {
             if browser.showsCollection { editor.releaseFocus(); editor.flush() }
         }

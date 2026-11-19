@@ -41,4 +41,36 @@ struct KeyboardShortcutListTests {
         #expect(list.sections[1].rows.first?.keys == "⌃T")
         #expect(KeyboardShortcutList(menuBar: nil).isEmpty)
     }
+
+    @Test func backAndForwardAreListedWithTheirKeysWhateverHadTheKeyboard() {
+        // While the page has the keyboard the menu items carry no key, yet the keys are theirs.
+        func bare(_ title: String) -> NSMenuItem { NSMenuItem(title: title, action: nil, keyEquivalent: "") }
+        let menu = NSMenu(title: "View")
+        [bare(String(localized: "Back to Table")), bare(HistoryKeys.forwardTitle), bare("Reader")].forEach(menu.addItem)
+        let top = NSMenuItem(title: "View", action: nil, keyEquivalent: "")
+        top.submenu = menu
+        let bar = NSMenu()
+        bar.addItem(top)
+
+        let rows = KeyboardShortcutList(menuBar: bar).sections.first?.rows
+        #expect(rows?.map(\.keys) == ["⌘[", "⌘]"])
+        #expect(rows?.map(\.title) == [String(localized: "Back to Table"), HistoryKeys.forwardTitle])
+    }
+
+    @Test func aWindowWithNoBrowserLeavesTheCapturedListAlone() {
+        func bar(_ title: String) -> NSMenu {
+            let item = NSMenuItem(title: title, action: nil, keyEquivalent: "n")
+            let menu = NSMenu(title: "File")
+            menu.addItem(item)
+            let top = NSMenuItem(title: "File", action: nil, keyEquivalent: "")
+            top.submenu = menu
+            let bar = NSMenu()
+            bar.addItem(top)
+            return bar
+        }
+        let model = KeyboardShortcutsModel()
+        model.capture(from: Browser(), menuBar: bar("New Item"))
+        model.capture(from: nil, menuBar: bar("Poorer"))
+        #expect(model.list.sections.first?.rows.map(\.title) == ["New Item"])
+    }
 }
