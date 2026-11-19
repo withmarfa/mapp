@@ -133,7 +133,7 @@ final class Browser {
     }
 
     /// Sets the date field the timeline places every item by, or, with nil, lets each item sit on the date its type's
-    /// look names. Nil is no choice, so a place that is not a view keeps nothing and a view writes no day grouping.
+    /// look names. Nil is no choice, so a place that is not a view has only what its default view kept and a view writes no day grouping.
     func setTimelineField(_ key: String?, in library: any ItemLibrary) {
         timelineFields[item] = key
     }
@@ -166,7 +166,8 @@ final class Browser {
         guard !showsSidebarIndex, !showsSettings, !availableViewModes(in: library).contains(viewMode) else { return }
         set(layout: .list)
     }
-    /// How each place's table is grouped, sorted and filtered, as the person left it, for the life of the window.
+    /// How each place's table is grouped, sorted and filtered, as the person left it. A place that is not a saved view
+    /// keeps them in its default view too (`Browser+PlaceDefaults`).
     var tableOptions: [SidebarItem: ItemTableOptions] = [:]
     /// The pages of the table the person has loaded, with what they belong to. Held apart from the table's content,
     /// which a page never makes again, and read as one page once the key has changed (`tablePaging`).
@@ -301,9 +302,14 @@ final class Browser {
     /// while they are showing, not an item page opened from them, which hides their controls.
     var offersViewOptions: Bool { !isCollectionItemPresented }
 
-    /// The place that lists an item no place on screen does: a deleted item is listed by Recently Deleted alone.
-    func place(listing item: Item) -> SidebarItem {
-        item.state == .trashed ? .recentlyDeleted : .allItems
+    /// Shows the place that lists an item no place on screen does: All Items, or for a deleted item Settings >
+    /// Recently Deleted, the only list that holds it.
+    private func showListing(_ item: Item, in library: any ItemLibrary, order: ItemOrder) {
+        if item.state == .trashed {
+            showSettings(.recentlyDeleted)
+        } else {
+            show(.allItems, in: library, order: order)
+        }
     }
 
     func reveal(_ item: Item, in library: any ItemLibrary, order: ItemOrder) {
@@ -311,7 +317,8 @@ final class Browser {
         let staysInModal = isModalPresented
         leaveSettings()
         if !items(in: library).contains(where: { $0.id == item.id }) {
-            show(place(listing: item), in: library, order: order)
+            showListing(item, in: library, order: order)
+            guard !showsSettings else { return }
         }
         selection = [item.id]
         if self.item == .allItems { revealOnItems(item) }
@@ -322,7 +329,7 @@ final class Browser {
 
     /// Shows the item a link in the page names, as choosing it in the list does: the window's place, search, undo
     /// and the rest of its state are left as they are unless the item is not in the list, which then shows the place
-    /// that lists it (`place(listing:)`). The keyboard stays with the page, as it does when a link is followed anywhere.
+    /// that lists it (`showListing`). The keyboard stays with the page, as it does when a link is followed anywhere.
     func open(linked item: Item, in library: any ItemLibrary, order: ItemOrder) {
         reveal(item, in: library, order: order)
         if !followsCollection, !showsItemsIndex { focusRequest = .page }
@@ -880,10 +887,10 @@ final class Browser {
     /// Whether Add Filter… asked for its panel, which the row opens and then clears (`Browser+FilterRow`).
     var isAddFilterRequested = false
 
-    /// What the gallery draws on each card in a place that is not a saved view, kept for this window only, as the
-    /// window keeps that place's other choices (`Browser+SavedViews`).
+    /// What the gallery draws on each card in a place that is not a saved view, as its default view keeps it
+    /// (`Browser+PlaceDefaults`).
     var placeCards: [SidebarItem: ViewCards] = [:]
-    /// The scale of each place's calendar that is not a saved view, for the life of the window (`calendarScale`).
+    /// The scale of each place's calendar that is not a saved view, as its default view keeps it (`calendarScale`).
     var placeCalendarScales: [SidebarItem: CalendarScale] = [:]
     /// A day in the week or month the calendar shows, or nil for the one that holds today. Kept for the window.
     var calendarDay: Date?
@@ -898,8 +905,18 @@ final class Browser {
     /// (`Browser+SavedViews`).
     var densityRevision = 0
 
-    /// Where this Mac's settings for views are kept. A test gives its own.
-    @ObservationIgnored var defaults: UserDefaults = .standard
+    /// Where this Mac's settings for views are kept. Under the unit tests each window model keeps them apart, so what
+    /// one test leaves in a place's default view never reaches another's.
+    @ObservationIgnored var defaults: UserDefaults = Browser.initialDefaults
+
+    private static var initialDefaults: UserDefaults {
+        #if DEBUG
+        if TestHost.isRequested, let suite = UserDefaults(suiteName: "MAPP.Browser.\(UUID().uuidString)") { return suite }
+        #endif
+        return .standard
+    }
+    /// What `isDefaultViewChanged` last worked out, and the stored data it worked it out from (`Browser+PlaceDefaults`).
+    @ObservationIgnored var changedMemo: (place: SidebarItem, inputs: [Data?], changed: Bool)?
     @ObservationIgnored var isApplyingLayout = false
 
     /// The order and grouping each view opened with (`Browser+SavedViews`).

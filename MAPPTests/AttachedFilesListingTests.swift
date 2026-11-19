@@ -60,7 +60,7 @@ import UniformTypeIdentifiers
 
     @Test func aFileWhoseParentIsInTheBinStaysOutWithIt() async throws {
         let (library, _) = try await loaded()
-        #expect(ids(.recentlyDeleted, in: library) == [F.n3])
+        #expect(Set(library.deletedItems.map(\.id)) == [F.n3])
         #expect(!ids(.inbox, in: library).contains(Self.onBinned))
         #expect(!ids(.allItems, in: library).contains(Self.onBinned))
     }

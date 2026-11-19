@@ -49,6 +49,7 @@ enum TestHost {
 struct MAPPApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
     @State private var settingsRequest = SettingsRequest()
+    @State private var shortcuts = KeyboardShortcutsModel()
     @AppStorage(InterfaceKey.toolbarLabelStyle) private var toolbarLabelStyle: ToolbarLabelStyle = .iconOnly
     private var libraries: Libraries { delegate.libraries }
 
@@ -64,22 +65,33 @@ struct MAPPApp: App {
                 .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
                 .environment(libraries)
                 .environment(libraries.host)
+                .environment(shortcuts)
         }
         .defaultSize(width: 1100, height: 720)
         .windowToolbarLabelStyle($toolbarLabelStyle)
         .commands {
             AppCommands(library: libraries.current, host: libraries.host)
-            PlaceCommands(library: libraries.current)
+            PlaceCommands(library: libraries.current, libraries: libraries)
             FindCommands()
             ImportFromDevicesCommands()
             LooksCommands(libraries: libraries)
             FormatCommands()
             ToolbarCommands()
             SettingsCommands(request: settingsRequest)
+            HelpCommands(shortcuts: shortcuts)
             #if DEBUG
             TuningCommands()
             #endif
         }
+
+        Window("Keyboard Shortcuts", id: KeyboardShortcutsView.windowID) {
+            KeyboardShortcutsView()
+                .interfaceTextStyle()
+                .environment(shortcuts)
+        }
+        .windowResizability(.contentMinSize)
+        .restorationBehavior(.disabled)
+        .commandsRemoved()
 
         #if DEBUG
         UtilityWindow(LocalizedStringKey(TuningPanel.title), id: TuningPanel.windowID) {

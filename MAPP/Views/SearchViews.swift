@@ -75,12 +75,9 @@ struct SearchEmptyState: View {
         if results?.isPending == true {
             EmptyView()
         } else if results?.isIncomplete == true {
-            EmptyState(
-                title: Text("Still Looking"),
-                detail: Text("Your items are still loading, so nothing has matched “\(browser.searchText)” yet."),
-                actions: { EmptyView() })
+            EmptyState("Still Looking", detail: "Your items are still loading.")
         } else {
-            EmptyState.search(browser.searchText)
+            EmptyState.search()
         }
     }
 }

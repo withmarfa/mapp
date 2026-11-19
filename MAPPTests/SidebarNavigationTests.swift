@@ -6,15 +6,36 @@ import Testing
 struct SidebarNavigationTests {
     private let date = Date(timeIntervalSinceReferenceDate: 800_000_000)
 
-    @Test func recentlyDeletedRestoresAsAnOrdinaryWorkspace() {
-        let note = FakeItemLibrary.note("Deleted text", modified: date, state: .trashed)
+    @Test func aWindowKeptOnRecentlyDeletedRestoresOnItems() throws {
+        // Recently Deleted was a place of the sidebar once; a window saved then names it, and the rest of the window is kept.
+        let json = #"{"place":{"recentlyDeleted":{}},"selection":["note-1"],"viewMode":"gallery","opensItem":true,"scrollOffset":420}"#
+        let snapshot = try JSONDecoder().decode(Browser.Snapshot.self, from: Data(json.utf8))
+        #expect(snapshot.place == .allItems)
+        // The old list's scroll and open item mean nothing on Items.
+        #expect(snapshot.opensItem == nil)
+        #expect(snapshot.scrollOffset == nil)
+        let note = FakeItemLibrary.note("Text", modified: date, id: ItemID("note-1"))
         let library = FakeItemLibrary(items: [note], now: date)
         let browser = Browser()
-        browser.restore(.init(place: .recentlyDeleted, selection: [note.id], viewMode: .gallery), in: library, order: ItemOrder())
-        #expect(browser.item == .recentlyDeleted)
+        browser.restore(snapshot, in: library, order: ItemOrder())
+        #expect(browser.item == .allItems)
         #expect(browser.viewMode == .gallery)
         #expect(browser.selection == [note.id])
         #expect(!browser.showsSettings)
+    }
+
+    @Test func aSnapshotWithAnyOtherUnreadablePlaceFailsToDecode() {
+        let saved = Data(#"{"place":{"pinned":{}},"selection":[],"opensItem":true,"scrollOffset":10}"#.utf8)
+        #expect(throws: DecodingError.self) { try JSONDecoder().decode(Browser.Snapshot.self, from: saved) }
+    }
+
+    @Test func aStoredSidebarLayoutNamingRecentlyDeletedStillReadsAndPlans() throws {
+        #expect(SidebarPlace(key: "recentlyDeleted") == nil)
+        let json = #"{"hidden":["recentlyDeleted","inbox"],"order":["recentlyDeleted","all"],"collapsed":[]}"#
+        let layout = try JSONDecoder().decode(SidebarLayout.self, from: Data(json.utf8))
+        let plan = SidebarPlan(FakeItemLibrary(items: []), layout: layout)
+        #expect(!plan.isShown(.inbox))
+        #expect(plan.destinations.contains(.all))
     }
 
     @Test func sourceIndexesPreserveExactNamesAndExcludeDeletedItems() async throws {
@@ -78,7 +99,7 @@ struct SidebarNavigationTests {
         #expect(library.items(in: .favoriteItem(favorite.id)).isEmpty)
     }
 
-    @Test func aSnapshotSavedBeforeFavoritesFailsToDecodeSoTheWindowOpensAtItsDefault() {
+    @Test func aSnapshotWithNoPlaceFailsToDecodeSoTheWindowOpensAtItsDefault() {
         let saved = Data(#"{"sidebarItem":{"pinned":{}},"selection":[]}"#.utf8)
         #expect(throws: DecodingError.self) { try JSONDecoder().decode(Browser.Snapshot.self, from: saved) }
     }

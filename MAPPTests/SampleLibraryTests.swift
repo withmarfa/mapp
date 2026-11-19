@@ -110,7 +110,7 @@ import Testing
 
     /// A sample launch starts as a first launch does: a table's columns and a saved view's layout that an earlier run
     /// chose, which the defaults keep between runs, never decide which columns the table opens with.
-    @Test func aSampleLaunchForgetsTheColumnsAnEarlierRunChose() throws {
+    @Test func aSampleLaunchForgetsTheColumnsAndDefaultViewsAnEarlierRunChose() throws {
         let suite = "MAPP.SampleLibraryTests.columns"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defaults.removePersistentDomain(forName: suite)
@@ -120,10 +120,12 @@ import Testing
         let place = SidebarItem.itemType("core.task")
         defaults.set(ItemTableColumnLayouts.storing(layout, for: place, in: Data()), forKey: ItemTableColumnLayouts.key)
         defaults.set(Data("{}".utf8), forKey: ViewLayouts.key)
+        defaults.set(Data("{}".utf8), forKey: PlaceDefaults.key)
 
         SampleLibrary.forgetStoredChoices(in: defaults)
 
         #expect(defaults.object(forKey: ItemTableColumnLayouts.key) == nil)
         #expect(defaults.object(forKey: ViewLayouts.key) == nil)
+        #expect(defaults.object(forKey: PlaceDefaults.key) == nil)
     }
 }

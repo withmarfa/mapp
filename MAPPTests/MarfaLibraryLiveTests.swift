@@ -59,12 +59,11 @@ extension LiveMarfaTests {
                 })
 
                 let types = Set(library.items(in: .allItems).map(\.type))
-                for place in [SidebarItem.inbox, .allItems, .favorites, .files, .recentlyDeleted] + types.map({ SidebarItem.itemType($0.rawValue) }) {
+                for place in [SidebarItem.inbox, .allItems, .favorites, .files] + types.map({ SidebarItem.itemType($0.rawValue) }) {
                     let items = library.items(in: place)
                     #expect(library.count(in: place) == items.count, "\(place)")
                     #expect(!library.name(of: place).isEmpty, "\(place)")
                     switch place {
-                    case .recentlyDeleted: #expect(items.allSatisfy { $0.state == .trashed })
                     case .favorites: #expect(items.allSatisfy { $0.isFavorite && $0.state == .active })
                     case .inbox: #expect(items.allSatisfy { $0.tier == .feed })
                     // A type's place holds only its own items, never its subtypes'.
@@ -270,10 +269,10 @@ extension LiveMarfaTests {
                 step { library.delete([other], undoManager: undo) }
                 #expect(await eventually { library.item(other)?.state == .trashed })
                 await source.flush()
-                #expect(library.items(in: .recentlyDeleted).contains { $0.id == other })
+                #expect(library.deletedItems.contains { $0.id == other })
                 undo.undo()
                 #expect(await eventually { library.item(other)?.state == .active })
-                #expect(!library.items(in: .recentlyDeleted).contains { $0.id == other })
+                #expect(!library.deletedItems.contains { $0.id == other })
                 #expect(library.notices.waiting.last == nil, "\(String(describing: library.notices.waiting.last))")
             }
         }
@@ -297,13 +296,13 @@ extension LiveMarfaTests {
                 library.delete([kept, purged], undoManager: nil)
                 await source.flush()
                 try #require(await eventually {
-                    Set(library.items(in: .recentlyDeleted).map(\.id)).isSuperset(of: [kept, purged])
+                    Set(library.deletedItems.map(\.id)).isSuperset(of: [kept, purged])
                 })
 
                 // Restoring after the delete was sent: the item comes back to its places.
                 library.recover([kept], undoManager: nil)
                 try #require(await eventually { library.item(kept)?.state == .active })
-                #expect(!library.items(in: .recentlyDeleted).contains { $0.id == kept })
+                #expect(!library.deletedItems.contains { $0.id == kept })
                 #expect(library.items(in: .allItems).contains { $0.id == kept })
 
                 // Delete Permanently needs the server and takes the item out of the bin and the copy.

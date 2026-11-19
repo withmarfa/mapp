@@ -13,22 +13,30 @@ struct ItemDetail: View {
     var body: some View {
         if browser.selection.count > 1 {
             EmptyState(title: Text("^[\(browser.selection.count) item](inflect: true) selected"),
-                       detail: Text("Choose a single item to read or edit it."), actions: { EmptyView() })
+                       detail: Text("Choose one item to read or edit it."), actions: { EmptyView() })
                 .accessibilityIdentifier("MultipleSelectionPrompt")
                 .onAppear { editor.close() }
         } else if let id = browser.selection.first, let item = library.item(id) {
             if library.pageLayout(of: item) != .text {
                 FileItemPage(item: item, drafts: details, open: { [editor] in editor.onOpenItem($0) }, onResolved: { browser.fileFetched(id, at: $0) }, backsToolbar: backsToolbar)
+                    .itemCorner(item, editor: nil, details: details)
                     .onAppear { editor.close() }
             } else {
                 ItemPage(item: item, editor: editor, headerDrafts: details, backsToolbar: backsToolbar)
+                    .itemCorner(item, editor: editor, details: details)
                     .onAppear(perform: grantFocusRequest)
                     .onChange(of: browser.focusRequest, grantFocusRequest)
             }
         } else {
-            UnselectedItemContent(hasItems: !browser.items(in: library).isEmpty)
-                // The page no longer shows the item it had, so that item is left.
-                .onAppear { editor.close() }
+            Group {
+                if browser.filteredItems(in: library).isEmpty {
+                    ListEmptyState(browser: browser)
+                } else {
+                    EmptyState("No Item Selected")
+                }
+            }
+            // The page no longer shows the item it had, so that item is left.
+            .onAppear { editor.close() }
         }
     }
 
@@ -40,30 +48,6 @@ struct ItemDetail: View {
         browser.focusCaret = nil
         editor.focus(browser.selection.first, onTitle: request == .title, caret: caret)
     }
-}
-
-/// What the page says when no item is chosen: a short title, as the other empty views say, and nothing at all while
-/// the place holds nothing to choose, since the list says that.
-private struct UnselectedItemContent: View {
-    let hasItems: Bool
-
-    var body: some View {
-        if hasItems {
-            EmptyState("No Item Selected")
-        } else {
-            Color.clear
-        }
-    }
-}
-
-#Preview("Items with no selection") {
-    UnselectedItemContent(hasItems: true)
-        .frame(width: 600, height: 500)
-}
-
-#Preview("Empty item collection") {
-    UnselectedItemContent(hasItems: false)
-        .frame(width: 600, height: 500)
 }
 
 /// One item as a formatted page, with the item's header drawn by the page above the text. The same editor shows

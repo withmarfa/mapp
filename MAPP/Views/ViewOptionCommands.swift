@@ -111,7 +111,7 @@ struct ViewOptionCommand {
             title: compact ? String(localized: "Comfortable Cards") : String(localized: "Compact Cards"),
             systemImage: "rectangle.compress.vertical"
         ) {
-            browser.compactBoards[place] = !compact
+            browser.setCompactBoard(!compact, in: place)
         })
         return commands
     }

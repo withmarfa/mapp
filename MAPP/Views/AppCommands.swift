@@ -10,12 +10,22 @@ struct AppCommands: Commands {
     @FocusedValue(\.focusedItems) private var focused
     @FocusedValue(\.editor) private var editor
     @FocusedValue(\.detailsPresentation) private var details
+    @FocusedValue(\.indexActions) private var indexActions
     @Environment(\.openWindow) private var openWindow
     @StoredOrder private var order
     @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
 
     var body: some Commands {
         SidebarCommands()
+
+        CommandGroup(after: .sidebar) {
+            if browser?.customizesSidebar == true {
+                Button("Finish Customizing Sidebar", systemImage: "checkmark") { browser?.customizesSidebar = false }
+            } else {
+                Button("Customize Sidebar…", systemImage: "sidebar.squares.leading") { browser?.customizesSidebar = true }
+                    .disabled(browser == nil)
+            }
+        }
 
         CommandGroup(replacing: .newItem) {
             Button("New Item", systemImage: "plus") {
@@ -57,6 +67,19 @@ struct AppCommands: Commands {
                     .environment(details)
             }
             VersionHistoryCommands(details: details, library: library, undoManager: focused?.undoManager)
+            // The row menu of the index in front: sources are renamed and marked, collections deleted.
+            if browser?.showsSidebarIndex == true {
+                Divider()
+                if browser?.indexPlace == .sources {
+                    Button("Rename Source…", systemImage: "pencil") { indexActions?.rename?() }
+                        .disabled(indexActions?.rename == nil)
+                    Button("Choose Source Mark…", systemImage: "face.smiling") { indexActions?.chooseMark?() }
+                        .disabled(indexActions?.chooseMark == nil)
+                } else {
+                    Button("Delete Collection…", systemImage: "trash") { indexActions?.delete?() }
+                        .disabled(indexActions?.delete == nil)
+                }
+            }
         }
 
         // Print has ⌘P, as everywhere; the print panel sets the paper.
@@ -81,13 +104,10 @@ struct AppCommands: Commands {
         // own around the toolbar and tab groups, so the menu can open with two in a row. `MenuSeparatorTidy` hides
         // the surplus as the menu opens; write a divider wherever one belongs and leave that to it.
         CommandGroup(before: .sidebar) {
-            Button("Recently Deleted", systemImage: "trash") {
-                if let library { browser?.show(.recentlyDeleted, in: library, order: order) }
-            }
-            .disabled(browser == nil || library == nil)
-            Divider()
             command(.toggleSource)
             command(.toggleReader)
+            command(.toggleFormats)
+            command(.toggleFocus)
             Divider()
             if let place = browser?.indexPlace {
                 IndexViewOptions(place: place, browser: browser)
@@ -96,6 +116,11 @@ struct AppCommands: Commands {
             }
             Divider()
             SavedViewMenu(browser: browser, library: library)
+            // The toolbar's Done for a view's panel.
+            Button("Finish Editing View", systemImage: "checkmark") {
+                if let browser, let library { Task { await browser.finishViewPanel(in: library, order: order) } }
+            }
+            .disabled(browser?.showsViewPanel != true)
             Divider()
             Button(details?.isPresented == true ? "Hide Details" : "Show Details", systemImage: "sidebar.right") {
                 details?.isPresented.toggle()
@@ -119,7 +144,11 @@ struct AppCommands: Commands {
             Divider()
             PageWidthOptions()
             Divider()
-            TextZoomCommands(pageFocused: pageKeepsHistoryKeys)
+            if let fileView {
+                FileViewCommands(viewing: fileView)
+            } else {
+                TextZoomCommands(pageFocused: pageKeepsHistoryKeys)
+            }
             Divider()
             // ⌘[ and ⌘], as in Safari and the Finder.
             // The page uses the same keys to outdent and indent a list item and to move between table cells, so
@@ -128,12 +157,12 @@ struct AppCommands: Commands {
                 if browser?.isCollectionItemPresented == true { browser?.returnToCollection() }
                 else if let browser, let library { browser.go(.back, in: library) }
             }
-                .keyboardShortcut(pageKeepsHistoryKeys ? nil : KeyboardShortcut("[", modifiers: .command))
+                .keyboardShortcut(pageKeepsHistoryKeys ? nil : KeyboardShortcut(KeyEquivalent(Character(HistoryKeys.back)), modifiers: .command))
                 .disabled(!canGoBack)
             Button("Forward", systemImage: "chevron.forward") {
                 if let browser, let library { browser.go(.forward, in: library) }
             }
-                .keyboardShortcut(pageKeepsHistoryKeys ? nil : KeyboardShortcut("]", modifiers: .command))
+                .keyboardShortcut(pageKeepsHistoryKeys ? nil : KeyboardShortcut(KeyEquivalent(Character(HistoryKeys.forward)), modifiers: .command))
                 .disabled(!canGoForward)
             Divider()
             // The modal's own moves: through the items behind it, and out.
@@ -147,9 +176,6 @@ struct AppCommands: Commands {
                 .disabled(browser?.isModalPresented != true)
             Divider()
         }
-
-        // There is no help book yet, and a Help item that only says so is not worth showing.
-        CommandGroup(replacing: .help) {}
     }
 }
 
@@ -160,6 +186,12 @@ extension AppCommands {
             command: command,
             context: ItemCommandContext(library: library, ids: focused?.ids ?? [], browser: browser, editor: editor, details: details),
             editor: editor, bindsShortcut: true)
+    }
+
+    /// The image or PDF the window's page shows and has ready, whose size and page the View menu then commands.
+    private var fileView: FileViewing? {
+        guard browser?.showsPage != false, let shown = focused?.ids, shown.count == 1 else { return nil }
+        return details?.fileViewing(of: shown.first)
     }
 
     /// The page keeps Command-[ and Command-] while it has the keyboard (outdent and indent a list item, move between table cells), so Back and Forward give those keys up then.

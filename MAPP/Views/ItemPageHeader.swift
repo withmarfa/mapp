@@ -75,6 +75,8 @@ struct ItemPageHeader: ViewModifier {
         return PageHeader(
             item: item.id.rawValue,
             hidden: item.state == .trashed,
+            // Focus hides the title and the properties only, and the toolbar then names the item from the start.
+            focused: drafts.isFocused(on: item.id),
             title: item.title,
             draft: draft.isDirty ? draft.text : nil,
             titleRejected: draft.rejected,

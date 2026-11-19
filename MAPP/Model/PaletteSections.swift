@@ -28,7 +28,7 @@ nonisolated enum PaletteSections {
     /// which its menu holds, and the rest. With nothing typed ⌘K lists its commands in these groups, each under the
     /// menu's own name; the View menu is split at its dividers.
     nonisolated enum CommandGroup: Int, CaseIterable, Hashable, Sendable {
-        case settings, file, looks, edit, format, view, sortAndGroup, textSize, go
+        case settings, file, looks, edit, format, view, sortAndGroup, textSize, go, help
         #if DEBUG
         case debug
         #endif
@@ -42,6 +42,7 @@ nonisolated enum PaletteSections {
             case .sortAndGroup: String(localized: "Sort and Group")
             case .textSize: String(localized: "Text Size")
             case .go: String(localized: "Go")
+            case .help: String(localized: "Help")
             case .looks: String(localized: "Looks")
             case .settings: String(localized: "Settings")
             #if DEBUG
@@ -173,8 +174,8 @@ nonisolated struct PaletteAction: Identifiable, Equatable, Sendable {
         }
         if isActive {
             actions.append(isFavorite
-                ? PaletteAction(.removeFromFavorites, String(localized: "Remove from Favorites"), "heart.slash")
-                : PaletteAction(.addToFavorites, String(localized: "Add to Favorites"), "heart"))
+                ? PaletteAction(.removeFromFavorites, String(localized: "Remove from Favorites"), "star.slash")
+                : PaletteAction(.addToFavorites, String(localized: "Add to Favorites"), "star"))
         }
         if !isFile {
             actions.append(PaletteAction(.versionHistory, String(localized: "Version History…"), "clock.arrow.circlepath", keys: ["⌥", "⌘", "Y"]))

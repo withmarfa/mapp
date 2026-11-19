@@ -81,6 +81,11 @@ struct MainView: View {
         .onChange(of: appearsActive, initial: true) {
             ColumnWidthRegistry.shared.windowBecame(active: appearsActive, tracker: measuredWidths)
         }
+        // Customizing happens in the sidebar, so a command that starts it brings the sidebar back. Settings keeps the
+        // sidebar column, so customizing there needs nothing more.
+        .onChange(of: browser.customizesSidebar) {
+            if browser.customizesSidebar { isSidebarVisible = true }
+        }
         .onChange(of: browser.showsCollection) {
             if browser.showsCollection { editor.releaseFocus(); editor.flush() }
         }
@@ -122,7 +127,6 @@ struct MainView: View {
                 } else {
                     ItemList(browser: browser, order: order, pane: $pane).equatable()
                         .filterChips(browser)
-                        .filteredEmptyState(browser)
                 }
             }
             // The page list is about as wide as the sidebar; each keeps its own width. The split view reads the ideal
@@ -149,7 +153,7 @@ struct MainView: View {
     private func windowToolbar(hasListColumn: Bool = false) -> WindowToolbar {
         WindowToolbar(
             browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details,
-            showsCreation: !isSidebarVisible, hasListColumn: hasListColumn)
+            hasListColumn: hasListColumn)
     }
 
     /// Only the three-column split has a list column to measure.
@@ -224,7 +228,8 @@ struct MainView: View {
                             .filterChips(browser)
                             .viewCorner(browser)
                         } else {
-                            itemPage
+                            // The page has no title of the window's own to show beside Back, which is the arrow alone.
+                            itemPage.toolbar(removing: .title)
                         }
                     }
                     .toastOverlay()
@@ -246,11 +251,7 @@ struct MainView: View {
 
     private var presentedWindow: some View {
         workspace
-        .safeAreaBar(edge: .bottom, spacing: 0) {
-            if !browser.showsSettings, browser.item == .recentlyDeleted {
-                RecentlyDeletedActions(chosen: browser.selectedItems(in: library))
-            }
-        }
+        .escapesFromPage(details)
         .overlay {
             ZStack {
                 if browser.isModalPresented {
@@ -340,6 +341,7 @@ struct MainView: View {
             editor.onEscape = { [browser, details, library] in
                 if details.isEditingView { browser.escapeViewPanel(in: library) }
                 else if details.isCustomizingLayout { details.endLayout() }
+                else if details.escapeFromPage() { return }
                 else if browser.isModalPresented { browser.closeModal() }
                 else { browser.focusRequest = .list }
             }

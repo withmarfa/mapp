@@ -63,7 +63,7 @@ struct ItemGallery: View {
                 if browser.isSearching {
                     SearchEmptyState(browser: browser)
                         .accessibilityIdentifier("GalleryEmptySearch")
-                } else { EmptyState(browser.item == .files ? "No Files" : "No Items") }
+                } else { PlaceEmptyState(browser: browser) }
             }
         }
         .filteredEmptyState(browser)

@@ -26,9 +26,9 @@ struct MarfaBinTests {
         _ = try await fake.copy.items.delete(ids["second"]!.rawValue)
         try await Task.sleep(for: .milliseconds(1_100))
         _ = try await fake.copy.items.delete(ids["third"]!.rawValue)
-        try #require(await eventually { library.items(in: .recentlyDeleted).count == 3 })
+        try #require(await eventually { library.deletedItems.count == 3 })
 
-        let binned = library.items(in: .recentlyDeleted)
+        let binned = library.deletedItems
         #expect(ItemSort.dateEdited.sorted(binned).map(\.id) == [ids["third"]!, ids["second"]!, ids["first"]!])
         let row = try #require(try await fake.copy.items.get([ids["second"]!.rawValue], includingBin: true).first)
         #expect(binned.first { $0.id == ids["second"]! }?.trashed == row.trashedDate)

@@ -72,6 +72,7 @@ import Observation
     @ObservationIgnored private var records: [ItemID: ItemRecord] = [:]
     @ObservationIgnored private(set) var index = MarfaItemIndex()
     @ObservationIgnored private var listed: [SidebarItem: Listing] = [:]
+    @ObservationIgnored private var listedDeleted: Listing?
     @ObservationIgnored private var counted: [SidebarItem: (revision: Int, count: Int)] = [:]
     @ObservationIgnored private var searches: [SearchKey: SearchRun] = [:]
     @ObservationIgnored private var searchOrder: [SearchKey] = []
@@ -896,6 +897,23 @@ import Observation
         return listing.items
     }
 
+    var deletedItems: [Item] {
+        let content = contentRevision
+        let membership = membershipRevision
+        if let held = listedDeleted, held.content == content { return held.items }
+        var listing = listedDeleted.flatMap { $0.membership == membership ? $0 : nil }
+            ?? Listing(membership: membership, ids: Self.ordered(index.ids(in: .trashed).compactMap { records[$0]?.item }).map(\.id))
+        listing.content = content
+        listing.items = listing.ids.compactMap { records[$0]?.item }
+        listedDeleted = listing
+        return listing.items
+    }
+
+    var deletedCount: Int {
+        _ = membershipRevision
+        return index.ids(in: .trashed).count
+    }
+
     func count(in place: SidebarItem) -> Int {
         if place == .recents { return min(index.ids(in: .active).count, Self.recentLimit) }
         if case .view = place { return items(in: place).count }
@@ -941,7 +959,6 @@ import Observation
         // The active items filed in the collection through `in-collection`.
         case .collection(let id):
             return Set(index.links(to: id, type: MarfaMapping.collectionEdge).map(\.from)).intersection(index.ids(in: .active))
-        case .recentlyDeleted: return index.ids(in: .trashed)
         }
     }
 
@@ -964,7 +981,6 @@ import Observation
         case .itemType(let type): catalogue.plural(for: TypeID(type))
         case .files: String(localized: "Files")
         case .view(let id): views.first { $0.id == id }?.title ?? ""
-        case .recentlyDeleted: String(localized: "Recently Deleted")
         }
     }
 

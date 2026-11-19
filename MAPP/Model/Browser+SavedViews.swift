@@ -61,7 +61,7 @@ extension Browser {
     }
 
     /// Shows the layout without taking it for a change of the person's, which only the person's own choice is.
-    private func apply(layout: ItemViewMode?, in library: any ItemLibrary) {
+    func apply(layout: ItemViewMode?, in library: any ItemLibrary) {
         guard let layout, layout != viewMode, availableViewModes(in: library).contains(layout) else { return }
         set(layout: layout)
     }
@@ -116,19 +116,19 @@ extension Browser {
         return macSettings(for: id).hidesEmptyGroups
     }
 
-    /// What the gallery draws on each card in the open place: a saved view's choice, else the window's own for the place.
+    /// What the gallery draws on each card in the open place: a saved view's choice, else the place's default view's.
     var cards: ViewCards {
         if case .view(let id) = item { macSettings(for: id).cards } else { placeCards[item] ?? ViewCards() }
     }
 
     /// Whether the calendar shows a week or a month in the open place: a saved view's choice on this Mac, else the
-    /// window's own for the place. A week until chosen.
+    /// place's default view's. A week until chosen.
     var calendarScale: CalendarScale {
         if case .view(let id) = item { macSettings(for: id).calendarScale ?? .week } else { placeCalendarScales[item] ?? .week }
     }
 
-    /// Changes the calendar's scale. A saved view keeps it on this Mac as it is made, and a place's lasts as long as the
-    /// window. Undo takes either back.
+    /// Changes the calendar's scale. A saved view keeps it on this Mac as it is made, and a place keeps it in its default
+    /// view. Undo takes either back.
     func changeCalendarScale(_ scale: CalendarScale) {
         if case .view(let id) = item {
             changeViewSettings(id) { $0.calendarScale = scale }
@@ -138,6 +138,7 @@ extension Browser {
         guard scale != before else { return }
         let place = item
         placeCalendarScales[place] = scale
+        updatePlaceDefault(place) { $0.calendarScale = scale }
         registerUndo(String(localized: "Change Calendar")) { browser in
             guard browser.item == place else { return }
             browser.changeCalendarScale(before)
@@ -192,7 +193,7 @@ extension Browser {
     }
 
     /// Changes what the gallery draws on each card. A saved view's change is kept on this Mac as it is made, and a
-    /// place's lasts as long as the window. Undo takes either back.
+    /// place's in its default view. Undo takes either back.
     func changeCards(_ change: (inout ViewCards) -> Void) {
         if case .view(let id) = item {
             changeViewSettings(id) { change(&$0.cards) }
@@ -207,6 +208,7 @@ extension Browser {
 
     private func setPlaceCards(_ cards: ViewCards, before: ViewCards, in place: SidebarItem) {
         placeCards[place] = cards == ViewCards() ? nil : cards
+        updatePlaceDefault(place) { $0.cards = cards }
         registerUndo(String(localized: "Change Cards")) { browser in
             guard browser.item == place else { return }
             browser.setPlaceCards(before, before: cards, in: place)
@@ -241,7 +243,9 @@ extension Browser {
     func recordLayout(from old: ItemViewMode) {
         guard !isApplyingLayout else { return }
         guard case .view(let id) = item else {
-            registerPlaceLayoutUndo(in: item, from: old, to: viewMode)
+            let layout = viewMode
+            updatePlaceDefault(item) { $0.layout = layout }
+            registerPlaceLayoutUndo(in: item, from: old, to: layout)
             return
         }
         let before = macSettings(for: id)
@@ -252,11 +256,12 @@ extension Browser {
         registerLayoutUndo(of: id, from: old, to: viewMode, mac: before)
     }
 
-    /// A place that is not a view holds its layout only in the window, and Undo puts the earlier one back.
+    /// A place that is not a view keeps its layout in its default view, and Undo puts the earlier one back.
     private func registerPlaceLayoutUndo(in place: SidebarItem, from old: ItemViewMode, to new: ItemViewMode) {
         registerUndo(String(localized: "Change Layout")) { browser in
             guard browser.item == place else { return }
             browser.set(layout: old)
+            browser.updatePlaceDefault(place) { $0.layout = old }
             browser.registerPlaceLayoutUndo(in: place, from: new, to: old)
         }
     }

@@ -106,7 +106,11 @@ struct ItemInspectorHost: View {
             return
         }
         browser.searchText = ""
-        browser.sidebarItem = library.item(id).map(browser.place(listing:)) ?? .allItems
+        if library.item(id)?.state == .trashed {
+            browser.showSettings(.recentlyDeleted)
+            return
+        }
+        browser.sidebarItem = .allItems
         browser.selection = [id]
         browser.focusRequest = .list
     }

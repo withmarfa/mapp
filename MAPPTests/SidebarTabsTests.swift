@@ -367,7 +367,7 @@ struct SidebarTabsTests {
         let view = SidebarPlace.view(ItemID("v-Reading"))
         var layout = SidebarLayout()
         #expect(layout.color(of: view) == .gray)
-        #expect(layout.color(of: .inbox) == .blue && layout.color(of: .favorites) == .pink)
+        #expect(layout.color(of: .inbox) == .blue && layout.color(of: .favorites) == .yellow)
         layout.setColor(.purple, of: view)
         #expect(layout.color(of: view) == .purple)
         let stored = try JSONDecoder().decode(SidebarLayout.self, from: JSONEncoder().encode(layout))

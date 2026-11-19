@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ you make show here." : {
+
+    },
     "A Collection" : {
 
     },
@@ -13,19 +16,61 @@
     "A View" : {
 
     },
+    "Add and Open" : {
+
+    },
+    "Aa" : {
+
+    },
     "Add Shortcut" : {
 
     },
     "Add Tab" : {
 
     },
+    "Apps you sign in show here." : {
+
+    },
+    "All Types" : {
+
+    },
     "Blue" : {
+
+    },
+    "Choose one item to read or edit it." : {
+
+    },
+    "Collections you make show here." : {
+
+    },
+    "Collections that apps make show here." : {
+
+    },
+    "Choose Source Mark…" : {
 
     },
     "Color" : {
 
     },
     "Customize Sidebar…" : {
+
+    },
+    "Files you add show here." : {
+
+    },
+    "Focus" : {
+
+    },
+    "Formats" : {
+
+    },
+    "Delete Collection…" : {
+
+    },
+    "Finish Customizing Sidebar" : {
+
+    },
+    "Finish Editing View" : {
 
     },
     "Go To" : {
@@ -37,6 +82,15 @@
     "Green" : {
 
     },
+    "Heading" : {
+
+    },
+    "Hide Formats" : {
+
+    },
+    "Help" : {
+
+    },
     "Hide Month" : {
 
     },
@@ -46,7 +100,46 @@
     "Home" : {
 
     },
+    "Inbox Is Empty" : {
+
+    },
     "Indigo" : {
+
+    },
+    "Items from your apps wait here." : {
+
+    },
+    "Items you favorite show here." : {
+
+    },
+    "Items you edit show here." : {
+
+    },
+    "Items you add show here." : {
+
+    },
+    "Items you make show here." : {
+
+    },
+    "Items you make or apps send show here." : {
+
+    },
+    "Items that apps send show here." : {
+
+    },
+    "Keys you make show here." : {
+
+    },
+    "Leave Focus" : {
+
+    },
+    "Keyboard Shortcuts" : {
+
+    },
+    "MAPP Help" : {
+
+    },
+    "Marfa Documentation" : {
 
     },
     "Move to Section" : {
@@ -64,7 +157,28 @@
     "New Tab…" : {
 
     },
+    "No Favorites" : {
+
+    },
+    "No Recent Items" : {
+
+    },
+    "No items match this view." : {
+
+    },
     "No sections in this tab." : {
+
+    },
+    "Nothing from this source yet." : {
+
+    },
+    "Nothing here yet." : {
+
+    },
+    "Nothing matches your search." : {
+
+    },
+    "No Shortcuts" : {
 
     },
     "Or Control-click the sidebar and choose Customize Sidebar." : {
@@ -79,6 +193,9 @@
     "Purple" : {
 
     },
+    "Adding will be refused: this kind of item needs %@, which MAPP can’t fill in. Choose another kind." : {
+
+    },
     "Red" : {
 
     },
@@ -91,7 +208,13 @@
     "Rename Section" : {
 
     },
+    "Rename Source…" : {
+
+    },
     "Rename Tab" : {
+
+    },
+    "Report a Problem…" : {
 
     },
     "Saved Views" : {
@@ -106,10 +229,19 @@
     "Shortcuts" : {
 
     },
+    "Show Formats" : {
+
+    },
     "Show Section" : {
 
     },
     "Show %lld" : {
+
+    },
+    "Sources show where items came from." : {
+
+    },
+    "Subheading" : {
 
     },
     "Tab" : {
@@ -119,6 +251,9 @@
 
     },
     "Teal" : {
+
+    },
+    "What’s New in MAPP" : {
 
     },
     "With one tab, the sidebar shows no tab bar." : {
@@ -142,9 +277,6 @@
     "Apps" : {
 
     },
-    "Apps you sign in appear here." : {
-
-    },
     "as Calendar" : {
       "extractionState" : "manual"
     },
@@ -163,9 +295,6 @@
     "Change Density" : {
 
     },
-    "Collections that apps make appear here." : {
-
-    },
     "Delete the collection “%@”?" : {
 
     },
@@ -175,15 +304,6 @@
     "Density" : {
 
     },
-    "Items that apps send appear here." : {
-
-    },
-    "Items you make and apps send show here." : {
-
-    },
-    "Items you make appear here." : {
-
-    },
     "Its %lld items are kept." : {
 
     },
@@ -191,9 +311,6 @@
 
     },
     "Keys" : {
-
-    },
-    "Keys you make appear here." : {
 
     },
     "Kinds" : {
@@ -218,9 +335,6 @@
 
     },
     "No Items Of Yours" : {
-
-    },
-    "No Items Yet" : {
 
     },
     "No Keys" : {
@@ -253,6 +367,9 @@
 
     },
     "The collection is deleted for every app connected to your Marfa server." : {
+
+    },
+    "Your items are still loading." : {
 
     },
     "Yours" : {
@@ -1352,9 +1469,6 @@
     "Add “%@”" : {
 
     },
-    "Add %@" : {
-      "extractionState" : "manual"
-    },
     "Add a filter" : {
 
     },
@@ -1829,9 +1943,6 @@
     "Choose a new type for %lld items." : {
       "extractionState" : "manual"
     },
-    "Choose a single item to read or edit it." : {
-
-    },
     "Choose a value" : {
 
     },
@@ -1907,9 +2018,6 @@
     },
     "Collections" : {
 
-    },
-    "Collections you make appear here." : {
-      "extractionState" : "manual"
     },
     "Column" : {
 
@@ -3172,9 +3280,6 @@
     "Nothing is in Recently Deleted." : {
 
     },
-    "Nothing matches “%@”." : {
-      "extractionState" : "manual"
-    },
     "Nothing on the Page" : {
       "extractionState" : "manual"
     },
@@ -3387,6 +3492,9 @@
     },
     "PDF" : {
       "extractionState" : "manual"
+    },
+    "PDF, ^[%lld page](inflect: true)" : {
+
     },
     "Pending" : {
       "extractionState" : "manual"
@@ -3625,6 +3733,9 @@
       "extractionState" : "manual"
     },
     "Reset Columns" : {
+
+    },
+    "Reset View" : {
 
     },
     "Reset Widths" : {
@@ -3941,9 +4052,6 @@
 
     },
     "Sources" : {
-      "extractionState" : "manual"
-    },
-    "Sources appear here when items identify where they came from." : {
       "extractionState" : "manual"
     },
     "Sources are named on your server, so you can change one once MAPP is connected." : {
@@ -4834,9 +4942,6 @@
     "Your changes were saved as a copy" : {
       "extractionState" : "manual"
     },
-    "Your items are still loading, so nothing has matched “%@” yet." : {
-      "extractionState" : "manual"
-    },
     "Your Marfa server can’t be reached, so the view is as it was. The window keeps your change, and the next change saves it once the server is back." : {
 
     },
@@ -4853,6 +4958,24 @@
       "extractionState" : "manual"
     },
     "Z to A" : {
+
+    },
+    "Next Page" : {
+
+    },
+    "Previous Page" : {
+
+    },
+    "Sizes run from %@ to %@." : {
+
+    },
+    "Type a Size" : {
+
+    },
+    "Zoom" : {
+
+    },
+    "Zoom to Fit" : {
 
     },
     "Zoom In" : {

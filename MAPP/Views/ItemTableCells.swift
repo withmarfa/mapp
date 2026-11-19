@@ -3,6 +3,16 @@ import Marfa
 import MarfaIcons
 import SwiftUI
 
+extension View {
+    /// The room a table's cell keeps around its content, which the item table and the index tables share so their rows
+    /// are one height: the content is at least 22 points, centered, with 3 points above and below it, and with the
+    /// table's own room beyond that a row is 36 points, as the board draws it.
+    func tableCellRoom(alignment: Alignment = .leading) -> some View {
+        frame(maxWidth: .infinity, minHeight: 22, maxHeight: .infinity, alignment: alignment)
+            .padding(.vertical, 3)
+    }
+}
+
 /// One cell of the table. A value a person picks, such as a status or a priority, is a menu that changes it in place;
 /// anything else is shown as it reads, and edited on the item's page or in Details.
 ///
@@ -18,7 +28,6 @@ struct ItemTableCell: View {
     let dateFormat: DateFormat
     /// Which row the pointer is on, shared by the row's cells, so the name's cell can answer to it from any of them.
     let hover: ItemTableHover
-    @Environment(\.colorScheme) private var scheme
     @State private var isHovering = false
     @State private var anchor = ValueEditAnchorBox()
 
@@ -26,16 +35,11 @@ struct ItemTableCell: View {
     /// reaches out by it, so the tint fills the cell to its edges; the content is padded in by the same amount, and the
     /// cell's control is pulled back out, so the content keeps the column's text edge.
     @State private var bleed = CellBleed.zero
-    /// The content's least height. With the 3 points of room the cell keeps above and below it and the table's own room
-    /// beyond that, it makes a row 36 points, as the board draws it.
-    private static let minimumHeight: CGFloat = 22
-
     var body: some View {
         content
             .lineLimit(1)
-            .frame(maxWidth: .infinity, minHeight: Self.minimumHeight, maxHeight: .infinity, alignment: .leading)
             // The same room for every cell, whether or not it offers an edit, so the probe measures the same frame throughout.
-            .padding(.vertical, 3)
+            .tableCellRoom()
             .background { if offersEdit { CellBleedProbe(bleed: $bleed) } }
             // One anchor for a field's cell however it reads, so a panel opened from it outlives the first value written.
             .background {
@@ -171,9 +175,9 @@ struct ItemTableCell: View {
                 .foregroundStyle(row.item.isUntitled ? .secondary : .primary)
                 .truncationMode(.tail)
             if row.item.isFavorite {
-                Image(systemName: "heart.fill")
+                Image(systemName: "star.fill")
                     .imageScale(.small)
-                    .foregroundStyle(FavoriteMark.color(for: scheme))
+                    .foregroundStyle(.yellow)
                     .accessibilityLabel("Favorite")
             }
         }

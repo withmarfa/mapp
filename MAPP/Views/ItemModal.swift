@@ -75,7 +75,7 @@ struct ItemModal: View {
     }
 
     private func escape() {
-        if details.isCustomizingLayout { details.endLayout() } else { browser.closeModal() }
+        if details.isCustomizingLayout { details.endLayout() } else if !details.escapeFromPage() { browser.closeModal() }
     }
 
     // MARK: The toolbar

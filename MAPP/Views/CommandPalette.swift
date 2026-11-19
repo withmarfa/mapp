@@ -9,8 +9,11 @@ import UniformTypeIdentifiers
 struct CommandPalette: View {
     @CurrentLibrary private var library
     @FocusedValue(\.detailsPresentation) private var details
+    @FocusedValue(\.indexActions) private var indexActions
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openURL) private var openURL
+    @Environment(KeyboardShortcutsModel.self) private var shortcuts: KeyboardShortcutsModel?
     @Environment(MarfaHost.self) private var host: MarfaHost?
     @Environment(Libraries.self) private var libraries: Libraries?
     @StoredOrder private var order
@@ -603,16 +606,25 @@ struct CommandPalette: View {
                 add(String(localized: "Export Looks…"), "square.and.arrow.up", in: .looks) { LooksFiles.export(from: libraries) }
                 add(String(localized: "Import Looks…"), "square.and.arrow.down", in: .looks) { LooksFiles.importLooks(into: libraries) }
             }
-            // The palette holds the keyboard itself, so the page counts as focused where it was when the palette opened.
-            let zoom = TextZoom.acting(pageFocused: returnFocus == .page)
-            let size = UserDefaults.standard.object(forKey: zoom.key) as? Int ?? zoom.defaultSize
-            if zoom.size(after: .bigger, from: size) != nil {
-                add(String(localized: "Make Text Bigger"), "textformat.size.larger", "⌘+", in: .textSize) { zoom.apply(.bigger) }
+            // An image's or a PDF's page holds ⌘+, ⌘− and ⌘0 for the file, so the text sizes are not offered then
+            // (`FileViewCommand`).
+            if let fileView = browser.showsPage ? details?.fileViewing(of: browser.selection.count == 1 ? browser.selection.first : nil) : nil {
+                for command in FileViewCommand.offered(for: fileView.kind) where command.isEnabled(on: fileView) {
+                    let shortcut = command.shortcut.map { Self.symbols($0.modifiers) + String($0.key.character).uppercased() }
+                    add(String(localized: command.title), command.systemImage, shortcut, in: .view) { command.perform(on: fileView) }
+                }
+            } else {
+                // The palette holds the keyboard itself, so the page counts as focused where it was when the palette opened.
+                let zoom = TextZoom.acting(pageFocused: returnFocus == .page)
+                let size = UserDefaults.standard.object(forKey: zoom.key) as? Int ?? zoom.defaultSize
+                if zoom.size(after: .bigger, from: size) != nil {
+                    add(String(localized: "Make Text Bigger"), "textformat.size.larger", "⌘+", in: .textSize) { zoom.apply(.bigger) }
+                }
+                if zoom.size(after: .smaller, from: size) != nil {
+                    add(String(localized: "Make Text Smaller"), "textformat.size.smaller", "⌘-", in: .textSize) { zoom.apply(.smaller) }
+                }
+                add(String(localized: "Actual Size"), "textformat.size", "⌘0", in: .textSize) { zoom.apply(.actual) }
             }
-            if zoom.size(after: .smaller, from: size) != nil {
-                add(String(localized: "Make Text Smaller"), "textformat.size.smaller", "⌘-", in: .textSize) { zoom.apply(.smaller) }
-            }
-            add(String(localized: "Actual Size"), "textformat.size", "⌘0", in: .textSize) { zoom.apply(.actual) }
             entries.append(Entry(id: "command:newItem", title: String(localized: "New Item"), icon: .symbol("plus"), shortcut: "⌘N",
                                  takesFocus: true) {
                 browser.openQuickAdd(remembered: lastType, in: library)
@@ -693,7 +705,7 @@ struct CommandPalette: View {
         } else if !everything.isEmpty {
             let allFavorites = !active.isEmpty && active.allSatisfy(\.isFavorite)
             if !active.isEmpty {
-                add(allFavorites ? String(localized: "Remove from Favorites") : String(localized: "Add to Favorites"), allFavorites ? "heart.slash" : "heart", in: .file) {
+                add(allFavorites ? String(localized: "Remove from Favorites") : String(localized: "Add to Favorites"), allFavorites ? "star.slash" : "star", in: .file) {
                     library.setFavorite(ids, !allFavorites, undoManager: undoManager)
                 }
             }
@@ -732,6 +744,27 @@ struct CommandPalette: View {
             for command in SavedViewCommand.commands(for: browser, in: library, order: order) {
                 add(command.title, command.systemImage, in: .view, action: command.action)
             }
+            if browser.showsViewPanel {
+                add(String(localized: "Finish Editing View"), "checkmark", in: .view) {
+                    Task { await browser.finishViewPanel(in: library, order: order) }
+                }
+            }
+            if browser.customizesSidebar {
+                add(String(localized: "Finish Customizing Sidebar"), "checkmark", in: .view) { browser.customizesSidebar = false }
+            } else {
+                add(String(localized: "Customize Sidebar…"), "sidebar.squares.leading", in: .view) { browser.customizesSidebar = true }
+            }
+            if let indexActions {
+                if let rename = indexActions.rename {
+                    add(String(localized: "Rename Source…"), "pencil", in: .file, action: rename)
+                }
+                if let chooseMark = indexActions.chooseMark {
+                    add(String(localized: "Choose Source Mark…"), "face.smiling", in: .file, action: chooseMark)
+                }
+                if let delete = indexActions.delete {
+                    add(String(localized: "Delete Collection…"), "trash", in: .file, action: delete)
+                }
+            }
         }
         if fullWidth {
             add(String(localized: "Standard Width"), "arrow.left.and.right", in: .view) { fullWidth = false }
@@ -747,6 +780,13 @@ struct CommandPalette: View {
             entries.append(Entry(id: "command:" + title, title: title, icon: .symbol(page.symbol), takesFocus: true, group: .settings) {
                 browser.showSettings(page)
             })
+        }
+        if let shortcuts {
+            for item in HelpItem.allCases {
+                add(String(localized: item.title), item.systemImage, in: .help) {
+                    item.perform(shortcuts: shortcuts, browser: browser, openWindow: openWindow, openURL: openURL)
+                }
+            }
         }
         // Whatever else shares a title, such as two table columns of one label, is told apart by its place.
         let distinctIDs = PaletteSections.distinct(entries.map(\.id))

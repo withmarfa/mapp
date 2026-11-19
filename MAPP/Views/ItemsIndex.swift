@@ -92,11 +92,13 @@ struct ItemsIndex: View {
         if searching {
             SearchEmptyState(browser: browser)
         } else if allCount == 0 {
-            EmptyState("No Items Yet", detail: "Items you make and apps send show here.")
-        } else if tab == .fromApps {
-            EmptyState("No Items From Apps", detail: "Items that apps send appear here.")
+            EmptyState("No Items", detail: "Items you make or apps send show here.")
         } else {
-            EmptyState("No Items Of Yours", detail: "Items you make appear here.")
+            switch tab {
+            case .yours: EmptyState("No Items Of Yours", detail: "Items you make show here.")
+            case .fromApps: EmptyState("No Items From Apps", detail: "Items that apps send show here.")
+            case .all, .apps, .keys: EmptyState("No Items")
+            }
         }
     }
 
@@ -168,19 +170,19 @@ private struct ItemsTable: View {
         let remaining = rows.count - shown.count
         Table(of: ItemIndexRow.self, selection: selection, sortOrder: sortOrder) {
             TableColumn(IndexColumn.name.title(in: .items), value: \.title, comparator: .localizedStandard) { row in
-                ItemsNameCell(title: row.title, icon: row.icon)
+                ItemsNameCell(title: row.title, icon: row.icon).tableCellRoom()
             }
             .width(min: 160, ideal: 360)
             TableColumn(IndexColumn.types.title(in: .items), value: \.typeLabel, comparator: .localizedStandard) { row in
-                Text(verbatim: row.typeLabel).foregroundStyle(.secondary).lineLimit(1)
+                Text(verbatim: row.typeLabel).foregroundStyle(.secondary).lineLimit(1).tableCellRoom()
             }
             .width(min: 100, ideal: 160)
             TableColumn(IndexColumn.source.title(in: .items), value: \.sourceName, comparator: .localizedStandard) { row in
-                Text(verbatim: row.sourceName).foregroundStyle(.secondary).lineLimit(1)
+                Text(verbatim: row.sourceName).foregroundStyle(.secondary).lineLimit(1).tableCellRoom()
             }
             .width(min: 100, ideal: 160)
             TableColumn(IndexColumn.latest.title(in: .items), value: \.modified) { row in
-                IndexLatest(date: row.modified).foregroundStyle(.secondary)
+                IndexLatest(date: row.modified).foregroundStyle(.secondary).tableCellRoom()
             }
             .width(min: 100, ideal: 140, max: 200)
         } rows: {
@@ -193,8 +195,10 @@ private struct ItemsTable: View {
                 }
             }
         }
+        .tableStyle(.inset)
         .alternatingRowBackgrounds(.disabled)
         .softSelection(rows: shown.map(\.id), hovers: true, selection: { browser.selection })
+        .quietTableHeader()
         .background { RevealChoice(browser: browser, rows: rows, pages: $pages) }
         .remembersScroll(in: browser.listMemory)
         .focused(pane, equals: .list)
@@ -302,5 +306,6 @@ private struct ItemsNameCell: View {
                 .accessibilityHidden(true)
             Text(verbatim: title).lineLimit(1)
         }
+        .alignmentGuide(.listRowSeparatorLeading) { $0[.leading] }
     }
 }

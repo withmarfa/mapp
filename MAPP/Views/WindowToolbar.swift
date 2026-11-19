@@ -1,13 +1,14 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// A window's toolbar, which a person can change with Customize Toolbar. Each split view the main window mounts keeps a
 /// layout of its own (`WindowToolbarLayout`), since the system reshuffles a saved layout when one identifier moves between
 /// split views. Nothing else in a window may declare a plain `toolbar`, which turns customization off for the whole window.
 ///
-/// The defaults run New Item at the leading side when the sidebar is hidden, then
-/// Save as View while a place that is not a view has something to keep, Search and View Options, the Reader and Original switch on a
-/// page with an article, View As, Share and More, and Details at the far right. In the list Search
-/// and View Options are the list column's (`ListToolbar`). Format and `ExtraToolbarItems` start in the tray.
+/// The defaults run Search and View Options, View As, Share and More, and Details at the far right. Save as View… is in
+/// View Options and the View menu, never here. In the list Search and View Options are the list column's
+/// (`ListToolbar`). `ExtraToolbarItems` start in the tray. Format and the Reader and Original switch are in the page's
+/// corner (`ItemCorner`), not here.
 struct WindowToolbar: CustomizableToolbarContent {
     @CurrentLibrary private var library
     @AppStorage(InterfaceKey.showsScrolledTitle) private var showsScrolledTitle = true
@@ -17,7 +18,6 @@ struct WindowToolbar: CustomizableToolbarContent {
     let editor: EditorController?
     let details: DetailsPresentation
     var fileURL: URL?
-    var showsCreation = false
     /// Whether the list column holds Search and View Options, which otherwise come here.
     var hasListColumn = false
 
@@ -25,10 +25,6 @@ struct WindowToolbar: CustomizableToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details, fileURL: fileURL)
         let showsItem = browser?.showsSidebarIndex != true
         let opensFromCollection = browser?.isCollectionItemPresented == true && !hasListColumn
-        ToolbarItem(id: "newItem") {
-            NewItemButton(browser: browser)
-        }
-        .hidden(!showsCreation)
         // A navigation item that is merely hidden still moves the title in a collection, so these two come and go.
         if let browser, opensFromCollection {
             ToolbarItem(id: "backToCollection", placement: .navigation) {
@@ -48,56 +44,49 @@ struct WindowToolbar: CustomizableToolbarContent {
         // appear for the next. Any other page keeps no header to scroll, so its item is hidden.
         if hasListColumn || browser == nil {
             ToolbarItem(id: "scrolledTitle") {
-                ScrolledItemTitle(title: tools.scrolledTitle)
+                ScrolledItemTitle(title: tools.scrolledTitle, subtitle: tools.scrolledSubtitle)
             }
             .sharedBackgroundVisibility(.hidden)
             .customizationBehavior(.disabled)
-            .hidden(!showsScrolledTitle || !tools.hasScrollingHeader || browser?.showsCollection == true)
-        } else if opensFromCollection, showsScrolledTitle, tools.hasHeaderAway {
+            .hidden((!showsScrolledTitle && !tools.isFocused) || !tools.hasScrollingHeader || browser?.showsCollection == true)
+        } else if opensFromCollection, showsScrolledTitle || tools.isFocused, tools.hasHeaderAway {
             ToolbarItem(id: "scrolledTitle", placement: .navigation) {
-                ScrolledItemTitle(title: tools.scrolledTitle)
+                ScrolledItemTitle(title: tools.scrolledTitle, subtitle: tools.scrolledSubtitle)
             }
             .sharedBackgroundVisibility(.hidden)
             .customizationBehavior(.disabled)
         }
         ToolbarSpacer(.flexible)
-        if let browser {
-            ViewChangeItems(browser: browser)
-        }
-        if let browser, !hasListColumn {
-            ViewToolbarItems(browser: browser, layout: .item, isHidden: opensFromCollection)
-            ToolbarSpacer(.fixed)
-                .hidden(opensFromCollection || !showsItem)
-        }
-        let hidesPageLook = details.pageLook == nil || browser?.showsCollection == true || !showsItem
-        ToolbarItem(id: "pageLook") { SourceViewPicker(details: details) }
-            .hidden(hidesPageLook)
-        ToolbarSpacer(.fixed)
-            .hidden(hidesPageLook)
-        ToolbarItem(id: "format") {
-            if let editor { FormatMenu(editor: editor, item: tools.editableItem) }
-        }
-            .defaultCustomization(.hidden)
-            .hidden(browser?.showsCollection == true || !showsItem)
+        // A hidden spacer still leaves its gap, so the fixed spacers are not hidden: each stands after a group that
+        // shows and before another that does, which keeps one standard gap between groups in every state. They are
+        // locked, so they come and go like the items that are.
         // While a view is edited the toolbar keeps to what edits it: its layout is chosen in the panel, and Share and
         // More act on items, not on the view.
         let editsView = browser?.showsViewPanel == true
+        let showsViewTools = browser != nil && !hasListColumn && !opensFromCollection
+        let showsViewMode = browser != nil && showsItem && !editsView
+        let showsActions = showsItem && !editsView
+        let showsDetails = !tools.showsInspector
+        let showsAfterViewMode = showsActions || showsDetails
+        let showsAfterViewTools = showsViewMode || showsAfterViewMode
+        if let browser, !hasListColumn {
+            ViewToolbarItems(browser: browser, layout: .item, isHidden: opensFromCollection)
+            if showsViewTools && showsAfterViewTools { ToolbarSpacer(.fixed).customizationBehavior(.disabled) }
+        }
         if let browser {
             ToolbarItem(id: "viewMode") { ViewModeMenu(browser: browser) }
-                .hidden(!showsItem || editsView)
-            ToolbarSpacer(.fixed)
-                .hidden(!showsItem || editsView)
+                .hidden(!showsViewMode)
+            if showsViewMode && showsAfterViewMode { ToolbarSpacer(.fixed).customizationBehavior(.disabled) }
         }
         ToolbarItem(id: "share") { tools.shareLink }
-            .hidden(!showsItem || editsView)
+            .hidden(!showsActions)
         ToolbarItem(id: "more") {
             tools.moreMenu.disabled(items.isEmpty)
         }
-        .hidden(!showsItem || editsView)
-        ToolbarSpacer(.fixed)
-            .hidden(tools.showsInspector)
+        .hidden(!showsActions)
+        if showsActions && showsDetails { ToolbarSpacer(.fixed).customizationBehavior(.disabled) }
         ToolbarItem(id: "details") { tools.detailsButton }
-            .hidden(tools.showsInspector)
+            .hidden(!showsDetails)
         ExtraToolbarItems(tools: tools)
     }
 }
@@ -215,20 +204,29 @@ struct ToolbarTrayWatch: ViewModifier {
 /// The title of the item on the page, in the toolbar once the page's header has scrolled away.
 struct ScrolledItemTitle: View {
     let title: String
+    /// A second, quieter line, as the page's Focus gives under the title.
+    var subtitle: String?
 
     /// The most room a title takes, so a long one never crowds the buttons beside it.
     static let widest: CGFloat = 300
 
     var body: some View {
-        Text(title)
-            .interfaceFont(.headline).lineLimit(1).truncationMode(.tail)
-            .frame(maxWidth: Self.widest, alignment: .leading)
-            // The toolbar sizes an item from what it reports, and the title would otherwise report whatever width it
-            // was last offered: a stale or still-growing one while the item is placed shows as "14…". Fixed, it always
-            // reports the width its own text needs, up to `widest`, which a long title then ends in an ellipsis at.
-            .fixedSize(horizontal: true, vertical: false)
-            .accessibilityIdentifier("ScrolledItemTitle")
-            .accessibilityHidden(title.isEmpty)
+        VStack(alignment: .leading, spacing: 0) {
+            Text(title)
+                .interfaceFont(.headline).lineLimit(1).truncationMode(.tail)
+                .accessibilityIdentifier("ScrolledItemTitle")
+                .accessibilityHidden(title.isEmpty)
+            if let subtitle {
+                Text(subtitle)
+                    .interfaceFont(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
+                    .accessibilityIdentifier("ScrolledItemSubtitle")
+            }
+        }
+        .frame(maxWidth: Self.widest, alignment: .leading)
+        // The toolbar sizes an item from what it reports, and the title would otherwise report whatever width it
+        // was last offered: a stale or still-growing one while the item is placed shows as "14…". Fixed, it always
+        // reports the width its own text needs, up to `widest`, which a long title then ends in an ellipsis at.
+        .fixedSize(horizontal: true, vertical: false)
     }
 }
 
@@ -339,6 +337,18 @@ struct ItemToolbarActions {
         return item
     }
 
+    /// The one item the window's page shows, of any kind.
+    private var shownItem: Item? {
+        guard browser?.showsPage != false, (browser?.selection.count ?? items.count) == 1, items.count == 1 else { return nil }
+        return items.first
+    }
+
+    /// The item on the page while it is in Focus, which puts its title in the toolbar from the start, whatever kind
+    /// of page it is.
+    private var focusedItem: Item? { shownItem.flatMap { details.isFocused(on: $0.id) ? $0 : nil } }
+
+    var isFocused: Bool { focusedItem != nil }
+
     /// The one item the window's page shows, when it is one whose page scrolls a header away: an item's, or a web
     /// page's.
     private var itemWithScrollingHeader: Item? {
@@ -347,17 +357,29 @@ struct ItemToolbarActions {
         return item
     }
 
-    var hasScrollingHeader: Bool { itemWithScrollingHeader != nil }
+    var hasScrollingHeader: Bool { itemWithScrollingHeader != nil || isFocused }
 
     /// Whether that item's page has scrolled its header away, whatever the title says: an item with no title still
     /// brings its toolbar item, with no text.
-    var hasHeaderAway: Bool { itemWithScrollingHeader.map { details.isHeaderAway(of: $0.id) } == true }
+    var hasHeaderAway: Bool { isFocused || itemWithScrollingHeader.map { details.isHeaderAway(of: $0.id) } == true }
 
     /// The title the toolbar shows: the item's once its page has scrolled the header away, and nothing before. A
     /// item's is the text it would be written with, as its header shows it; any other page's is the name it shows.
     var scrolledTitle: String {
+        if let item = focusedItem { return library.pageLayout(of: item) == .text ? item.title : item.displayTitle }
         guard let item = itemWithScrollingHeader, details.isHeaderAway(of: item.id) else { return "" }
         return library.pageLayout(of: item) == .text ? item.title : item.displayTitle
+    }
+
+    /// The line under the title in Focus: the item's type, or for a PDF whose pages have been counted, its type and its
+    /// page count. Nothing outside Focus, where the scrolled title stands alone.
+    var scrolledSubtitle: String? {
+        guard let item = focusedItem else { return nil }
+        if case .file(let type, _) = item.content, type.conforms(to: .pdf), let pages = details.pages(of: item.id) {
+            // Only an attributed string carries out the plural markup.
+            return String(AttributedString(localized: "PDF, ^[\(pages) page](inflect: true)").characters)
+        }
+        return library.catalogue.label(for: item.type)
     }
 
     /// Formatting acts only on the writable item currently visible in the editor.
@@ -416,35 +438,6 @@ private struct UndoManagerReader<Content: View>: View {
     @ViewBuilder let content: (UndoManager?) -> Content
 
     var body: some View { content(undoManager) }
-}
-
-/// Text styles and emphasis, as Notes offers them under Aa.
-private struct FormatMenu: View {
-    let editor: EditorController
-    let item: Item?
-
-    var body: some View {
-        Menu("Format", systemImage: "textformat") {
-            ForEach([Format.title, .heading, .subheading, .body], id: \.self, content: toggle)
-            Divider()
-            ForEach([Format.bold, .italic, .strikethrough, .code], id: \.self, content: toggle)
-            Divider()
-            ForEach([Format.bulletList, .orderedList, .checklist], id: \.self, content: toggle)
-            Button("Table", systemImage: "tablecells") { editor.apply(.table) }
-                // A table is inserted beside another table, never inside one.
-                .disabled(!editor.canApply(.table))
-        }
-        .menuIndicator(.hidden)
-        .help("Format")
-        .accessibilityIdentifier("FormatToolbar")
-        .disabled(item == nil)
-    }
-
-    private func toggle(_ format: Format) -> some View {
-        Toggle(isOn: Binding { format.isActive(in: editor.caret) } set: { _ in editor.apply(format) }) {
-            Text(format.title)
-        }.disabled(!editor.canApply(format))
-    }
 }
 
 /// What else can be done to the item shown, as Notes keeps it under its More button.

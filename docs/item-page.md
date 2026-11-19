@@ -1,8 +1,8 @@
 # Item page
 
-Status: Built in v0.0.43. Opening an item as a modal or a full page is built, not yet released.
+Status: Built in v0.0.43. Opening an item as a modal or a full page, and the page's corner (Focus, Aa on a text page, Reader or Original, an image's size, a PDF's page and size), are built, not yet released.
 
-Where it lives: `ItemPageHeader`, `PagePinsView` and `PageChip` for the header; `PropertyRow`, `PagePlacements`, `PageLayout` and `PagePins` for what the page shows; `ItemInspector` for the right sidebar; `ItemLayoutPanel` for arranging; `ValueEditing/` for editing a value; `FieldMenu`, `FieldMenuPresenter` and `FieldEditSheet` for a field's menu; `VersionHistoryWorkspace` for history. The web part of the header is `editor/src/header.ts`.
+Where it lives: `ItemPageHeader`, `PagePinsView` and `PageChip` for the header; `PropertyRow`, `PagePlacements`, `PageLayout` and `PagePins` for what the page shows; `ItemInspector` for the right sidebar; `ItemLayoutPanel` for arranging; `ValueEditing/` for editing a value; `FieldMenu`, `FieldMenuPresenter` and `FieldEditSheet` for a field's menu; `VersionHistoryWorkspace` for history; `PageCorner`, `ItemCorner` and `FormatsCard` for the corner; `FileViewing`, `FilePagesControl`, `FileZoomControl` and `FileViewCommand` for an image's and a PDF's size and page. The web part of the header is `editor/src/header.ts`.
 
 The item page shows one item: its title, its pinned properties, its text and its property block. It is the same for every type, and each type decides only which properties go where.
 
@@ -74,7 +74,29 @@ The choices are stored as `pagePlacements`. See [Settings storage](settings-stor
 
 ## Saved web pages
 
-A page for a saved web page shows its description under the title (`ReadingHeader`). The Reader and Original switch sits in the window's toolbar for a page with an article, never on the page. The byline above its title is agreed and not built; see Header.
+A page for a saved web page shows its description under the title (`ReadingHeader`). The Reader and Original switch sits in the page's corner for a page with an article ([The page's corner](#the-pages-corner)), never in the toolbar. The byline above its title is agreed and not built; see Header.
+
+## The page's corner
+
+Built, not yet released.
+
+The page's corner is the window's bottom-right corner (`WindowCorner`, [Views and lists](views-and-lists.md#the-bottom-right-corner)) on an item's page. It sits over the page and ends where the right sidebar begins. Its buttons are in `PageCorner.buttons`, and `ItemCorner` draws them.
+
+- **Focus** is the last button on every item's page: a note, a task, an event, a document, a file and a web page. A list or a collection's browser has none. It moves the title into the toolbar, where it shows as the scrolled title does with the item's type under it ("Note"; for a PDF whose pages are counted, "PDF, 4 pages"), and hides the title and the properties, so the text gets the room. What follows the text stays: Linked From and a collection's Contents. The sidebar, the list, the right sidebar and the toolbar's buttons stay. The button is gray while Focus is on. The button again, Escape, or View > Leave Focus (⇧⌘F, also in the palette) leaves it. ⌃⌘F is the system's Full Screen, so Focus does not take it.
+- **Focus belongs to one window and one item.** Choosing another item puts the page back in its normal look, and so does the item's page going away, as when the item is deleted. Customize Layout arranges the header Focus hides, so starting it ends Focus, and Focus waits until it is done.
+- **Aa** is a glass button before Focus on every page that is the editor, such as a note, a task or an event. It opens the formats card above the buttons, solid, as wide as 340 points or the column allows. The card holds the text style (Title, Heading, Subheading, Body) as a row with the current one on a gray pill; bold, italic, strikethrough, highlight, code and link joined in one capsule; bulleted, numbered and checklist; quote, code block and table; a line; then Standard or Full Width beside smaller, actual and larger text. Each button runs the command the Format menu or the View menu runs, with no code of its own. A format the caret cannot take, and every format on a page that cannot be written, is dimmed. Aa shows only where the page is the editor. The Format toolbar item is gone; Bold, Italic and the two lists stay in the toolbar's tray, and the Format menu stays. View > Show Formats is the menu command.
+- **Escape** closes the formats card first, and leaves Focus on a second press, whether the keyboard is in the page or in the window's other columns. The command palette, quick add and a sheet keep Escape for themselves. The card closes by itself when the item changes.
+- **A web page or newsletter with a Reader view** has Reader or Original as the system's segmented control, as the Calendar's Week or Month is, before Focus. The switch is not in the toolbar. A web page with no Reader view has no switch.
+- **An image** has one size control before Focus: the size as a percentage, such as "100%", with a chevron that opens a menu. The menu holds Fit, then 50%, 75%, 100%, 150% and 200% with the chosen one ticked, then Zoom In and Zoom Out. Clicking the percentage opens a small field to type a size in: Return applies it, Escape or a click elsewhere cancels it, and a size outside 10% to 400% takes the nearest end (the field's help names the range). Thousands separators follow the system's region, so "1,000" is read as a thousand where the region groups with a comma. Something that is not a number leaves the field open in red. The image opens fitted, and the control then reads the size Fit gives, such as "34%". Fit never enlarges a picture past 100%, so a small picture opens at "100%". 100% is the picture's own pixels as points. The bitmap is held to 3,000 pixels a side, so a larger picture is softer past 50%. The header row's three zoom buttons are gone.
+- **A PDF** has the page as "2 of 4" between up and down chevrons, then the same size control, then Focus. The chevrons are dimmed at the first and last page, and a one-page PDF reads "1 of 1" with both dimmed. The page follows scrolling. Typing a page number is not offered. The size is the PDF view's own: Fit fits the width, held to 10% to 400%, and a pinch becomes the chosen size. The page reads the page the view reached.
+- **A file that is still downloading, fails to load or has no pages** has Focus alone until the file is ready, and so has any file that is neither an image nor a PDF.
+- **The size belongs to one file.** Another item's page opens fitted, and an open size field goes with the item it was opened on.
+- **Menu and palette.** While an image or PDF page shows, View holds Zoom In (⌘+), Zoom Out (⌘−), Actual Size (⌘0) and Zoom to Fit, and for a PDF Next Page and Previous Page, with the same entries in the palette. These keys size the file and the text-size commands (`TextZoomCommands`) are not offered then, so a key sizes the file or the text and never both. Settings > Appearance still holds the interface's base text size. The corner's own menu binds no keys, because the View menu's commands hold them.
+- **Any other item's page** has Focus alone.
+
+Focus hides only the header's title and properties. The page keeps its look (a reading page stays in its reading type) and the footer, so Linked From and a collection's Contents stay, and a collection with nothing in it still shows its contents.
+
+Open: a symbol of Focus's own. The corner uses the system's full-screen arrows for now.
 
 ## Version History
 

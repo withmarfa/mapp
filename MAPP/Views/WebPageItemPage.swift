@@ -69,7 +69,7 @@ struct WebPageItemPage: View {
     let document: ItemID
     let runsScripts: Bool
     /// The window's unsaved drafts, where a refused status is kept for the item, as on the item page. The page also
-    /// gives it the switch between its looks, which the window's toolbar and menus hold.
+    /// gives it the switch between its looks, which the page's corner and the menus hold.
     let drafts: DetailsPresentation
     /// Shows the item a pinned link names.
     let open: (ItemID) -> Void
@@ -111,7 +111,7 @@ struct WebPageItemPage: View {
     /// articles, so the title does not change type when the page arrives.
     private var headerMode: SourceViewMode { shownMode ?? mode }
 
-    /// The look to show on the window's switch, while the page has an article to switch from.
+    /// The look to show on the corner's switch, while the page has an article to switch from.
     private var offeredMode: SourceViewMode? {
         guard case .ready(let loaded) = content, loaded.reader != nil else { return nil }
         return shownMode
@@ -135,8 +135,11 @@ struct WebPageItemPage: View {
                 pageBody(toolbarHeight: geometry.safeAreaInsets.top)
                 ScrollingHeader(scroll: headerScroll) {
                     VStack(spacing: 0) {
-                        WebPageHeader(item: item, inset: inset, drafts: drafts, open: open, reading: headerMode == .reader)
-                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
+                        // Focus leaves only the page: its title is in the toolbar and its properties are hidden.
+                        if !drafts.isFocused(on: item.id) {
+                            WebPageHeader(item: item, inset: inset, drafts: drafts, open: open, reading: headerMode == .reader)
+                                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
+                        }
                         // At the top of the page, clearly further from the header than from the text it belongs to.
                         if let pictures, pictures.waitingCount > 0, !calloutDismissal.isClosed(for: item.id) {
                             PicturesWaitingCallout(
@@ -173,6 +176,13 @@ struct WebPageItemPage: View {
             offerLook()
         }
         .onChange(of: headerHeight) { feedAway() }
+        // A header taken out by Focus reports no height of its own, so its last one is forgotten here: otherwise the
+        // page would still count it as scrolled away, and the toolbar's title would stay on once the header is back.
+        .onChange(of: drafts.isFocused(on: item.id)) { _, focused in
+            guard focused else { return }
+            headerHeight = 0
+            feedAway()
+        }
         // Only a shown page scrolls, so a header is never left away over an error or a page on its way.
         .onChange(of: isShowingPage) { _, showing in
             guard !showing else { return }
@@ -405,26 +415,11 @@ struct PicturesWaitingCallout: View {
     }
 }
 
-/// A page's switch between its looks, as the window's toolbar and menus reach it.
+/// A page's switch between its looks, as the page's corner and the menus reach it.
 struct PageLookSwitch {
     let item: ItemID
     let mode: SourceViewMode
     let choose: (SourceViewMode) -> Void
-}
-
-/// The switch between the reader look and the source's own, remembered for every article; a mail's choice is its own.
-struct SourceViewPicker: View {
-    let details: DetailsPresentation
-
-    var body: some View {
-        Picker("Reader or Original", selection: Binding(get: { details.pageLook?.mode ?? .standard }, set: { details.pageLook?.choose($0) })) {
-            Text("Reader").tag(SourceViewMode.reader)
-            Text("Original").tag(SourceViewMode.original)
-        }
-        .pickerStyle(.segmented)
-        .fixedSize()
-        .accessibilityIdentifier("SourceViewMode")
-    }
 }
 
 /// The page's header, drawn in SwiftUI as the item page's is drawn on the web: the title, then the pins. The same in

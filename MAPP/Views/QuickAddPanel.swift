@@ -2,10 +2,10 @@ import MarfaIcons
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// ⌘N, the toolbar's New Item and the palette's New commands: a panel near the top of the window for making one
+/// ⌘N, the sidebar's New, Items' New Item and the palette's New commands: a panel near the top of the window for making one
 /// item. What it holds comes first (a title and text, a file, or a title alone); above the footer, chips show the
 /// details the person added, its properties and parent, and the files to attach to it. The footer chooses the
-/// kind of item and, from the plus menu, adds a file or a detail. ⌘Return adds it and opens it. Escape, Cancel or a click outside puts it away, keeping what was typed and given for the window; an empty panel also goes when the window stops being in front.
+/// kind of item and, from the plus menu, adds a file or a detail. ⌘Return adds it and opens it the way Settings > Lists > Open Items In says. Escape, Cancel or a click outside puts it away, keeping what was typed and given for the window; an empty panel also goes when the window stops being in front.
 struct QuickAddPanel: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
@@ -53,6 +53,12 @@ struct QuickAddPanel: View {
                         .foregroundStyle(.secondary)
                         .accessibilityIdentifier("QuickAddFilesNotKept")
                 }
+                if let note = QuickAdd.unsettableNote(QuickAdd.unsettableRequired(of: draft.typeID, in: catalogue)) {
+                    Text(note)
+                        .interfaceFont(.callout)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("QuickAddUnsettable")
+                }
                 if let list = quickAdd.unfinishedLists.first {
                     Text("\(list.label) has an entry that isn’t finished. Finish it, or cancel it, to add the item.")
                         .interfaceFont(.callout)
@@ -62,7 +68,6 @@ struct QuickAddPanel: View {
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
-            Spacer(minLength: 0)
             // Files that are chips of their own are a text item's attachments, or a file item's extra files.
             chipRow(draft, files: !isFile || holdsFiles ? draft.files : [])
             Divider()
@@ -71,7 +76,6 @@ struct QuickAddPanel: View {
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
         }
-        .frame(minHeight: 300)
         .floatingPanelSurface(width: 620)
         .overlay {
             if isDropTargeted {
@@ -180,7 +184,7 @@ struct QuickAddPanel: View {
             .interfaceFont(.body)
             .frame(maxWidth: .infinity, alignment: .leading)
             .hidden()
-            .frame(minHeight: 120, maxHeight: 320, alignment: .top)
+            .frame(minHeight: 36, maxHeight: 320, alignment: .top)
             .overlay {
                 ZStack(alignment: .topLeading) {
                     // The text view pads each line by its line fragment padding; moving it out by that much lines its text up with the title's.
@@ -488,8 +492,7 @@ struct QuickAddPanel: View {
     // MARK: Place and adding
 
     private func bottomBar(_ draft: QuickAdd.Draft, isFile: Bool) -> some View {
-        let label = QuickAdd.types(in: library).first { $0.id.rawValue == draft.typeID }?.label ?? ""
-        return HStack(spacing: 8) {
+        HStack(spacing: 8) {
             typePicker(draft)
             moreMenu(draft, isFile: isFile)
             Spacer(minLength: 12)
@@ -500,7 +503,7 @@ struct QuickAddPanel: View {
                 save()
             } label: {
                 HStack(spacing: 6) {
-                    Text("Add \(label)")
+                    Text("Add and Open")
                     ShortcutKeys("⌘↩", onAccent: true)
                         .accessibilityHidden(true)
                 }

@@ -135,8 +135,3 @@ nonisolated enum TypeTone: String, CaseIterable, Sendable {
         }
     }
 }
-
-/// A favorite's heart in the table, in pink. The gallery card draws its own in the secondary color.
-enum FavoriteMark {
-    static func color(for scheme: ColorScheme) -> Color { TypeTone.pink.color(for: scheme) }
-}

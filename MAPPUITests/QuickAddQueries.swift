@@ -2,8 +2,7 @@ import XCTest
 
 extension XCUIElement {
     /// Makes an item through quick add: the sidebar's New row, its kind from the footer's menu, its title, then
-    /// Command-Return, which opens it. The toolbar's New Item button shows only with the sidebar hidden, so the row
-    /// is the one these tests have.
+    /// Command-Return, which opens it.
     func quickAdd(type: String, title: String) {
         descendants(matching: .any)["SidebarNew"].click()
         completeQuickAdd(type: type, title: title)

@@ -43,6 +43,9 @@ protocol ItemLibrary: AnyObject, Observable {
     var membershipRevision: Int { get }
     func item(_ id: ItemID) -> Item?
     func items(in place: SidebarItem) -> [Item]
+    /// What Recently Deleted holds, newest first. It is a page of Settings, not a place, so no window lists it.
+    var deletedItems: [Item] { get }
+    var deletedCount: Int { get }
     /// The items the saved view `view` would list with `query` in place of its own, which a window shows while it
     /// has changed the view's filters and not saved them. It reads the library's own copy, so it works offline, and
     /// writes nothing. Two windows on one view ask for their own queries and never share an answer.

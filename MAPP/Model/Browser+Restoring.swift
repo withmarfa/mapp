@@ -61,7 +61,7 @@ extension Browser {
         case .itemType(let type):
             library.itemTypeCounts.contains { $0.id.rawValue == type } ? snapshot.place : .allItems
         case .view(let id): library.views.contains { $0.id == id } ? snapshot.place : .allItems
-        case .inbox, .recents, .allItems, .favorites, .files, .sources, .source, .collections, .recentlyDeleted: snapshot.place
+        case .inbox, .recents, .allItems, .favorites, .files, .sources, .source, .collections: snapshot.place
         }
         let ids = Set(snapshot.selection)
         selectAutomatically(Set(items(in: library).map(\.id).filter(ids.contains)))
@@ -74,4 +74,29 @@ extension Browser {
         }
         if let offset = snapshot.scrollOffset, offset > 0 { listMemory.restore(to: CGFloat(offset)) }
     }
+}
+
+extension Browser.Snapshot {
+    /// Recently Deleted, once a place of the sidebar and now a page of Settings, reads as Items with the window's
+    /// selection and view kept, and with no scroll offset or open item, which belonged to the old list. Any other place
+    /// this build cannot read fails the decoding, so the window opens at its default.
+    init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        let removedPlace: Bool
+        do {
+            place = try values.decode(SidebarItem.self, forKey: .place)
+            removedPlace = false
+        } catch {
+            guard let kinds = try? values.nestedContainer(keyedBy: RemovedPlace.self, forKey: .place),
+                  kinds.contains(.recentlyDeleted) else { throw error }
+            place = .allItems
+            removedPlace = true
+        }
+        selection = try values.decode([ItemID].self, forKey: .selection)
+        viewMode = try values.decodeIfPresent(ItemViewMode.self, forKey: .viewMode) ?? .list
+        opensItem = removedPlace ? nil : try values.decodeIfPresent(Bool.self, forKey: .opensItem)
+        scrollOffset = removedPlace ? nil : try values.decodeIfPresent(Double.self, forKey: .scrollOffset)
+    }
+
+    private enum RemovedPlace: String, CodingKey { case recentlyDeleted }
 }

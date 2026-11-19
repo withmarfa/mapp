@@ -6,39 +6,10 @@ Where it lives: not built yet.
 
 This page lists what has been agreed for MAPP and is not in the app yet, so the next build starts from one list. What was turned down is in [Rejected designs](rejected-designs.md).
 
-## Making an item
-
-- New Item on Items, the sidebar's New and Command-N open quick add, as built, in the type last used.
-- New in a type's list opens quick add holding that type, its status and the fields it asks for.
-- Quick add's main button is Add and Open: the new item opens the way Settings > Lists > Open Items In says, with the insertion point in its text.
-
-## Views
-
-- Every place opens in a default view. A person can change the default view, but can't rename or delete it.
-- Save as View… makes a second view with a name. It is the last item of View Options, shown only when there is something to keep. It is never in the toolbar. It opens New View's panel, filled in.
-- Once a default view is changed, View Options offers Reset View above Save as View…, which puts it back.
-
 ## The toolbar and the bottom-right corner
 
 - The toolbar holds the same buttons on every screen: Search, View Options, View As, Share, More and the right sidebar. A screen hides a button that does not apply. No screen adds its own controls to the toolbar.
 - The page holds at most one main action, such as New Collection.
-- The bottom-right corner is built (`WindowCorner`, [Views and lists](views-and-lists.md#the-bottom-right-corner)), with the Calendar's, the Timeline's and the Gallery's controls in it. The note's Aa and Focus and the file pages' controls below go into the same component.
-- **Focus** is the last button in the corner on every item's page, documents and web pages included. It moves the title into the toolbar and hides the properties, so the text gets the room. The sidebar, the list and the toolbar's buttons stay. The button again, or Escape, leaves it.
-- What each screen's corner holds:
-  - **Note:** Aa, which opens the formats: the text style (Title, Heading, Subheading, Body) as a row; bold, italic, strikethrough, highlight, code and link; bulleted, numbered and checklist; quote, code block and table; then Standard or Full Width beside smaller, actual and larger text. Format leaves the toolbar; the Format menu stays. Then Focus.
-  - **Image:** one zoom control, 100% with a menu that holds Fit and sizes. Clicking 100% lets a person type a size.
-  - **PDF:** the page as "2 of 4" with arrows, the same zoom control, and Focus.
-  - **A web page or newsletter with a Reader view:** Reader or Original, as one glass segmented control. The switch leaves the toolbar. A web page with no Reader view has no switch.
-  - **Any other item's page:** Focus alone.
-
-## Menus and empty states
-
-- The menu bar holds every command the toolbar, the corner and the row menus offer.
-- Go lists the places (Items, Sources, Collections, Inbox, Recents, Favorites), then the saved views and the types, as the sidebar holds them, with All Types for the rest.
-- Recently Deleted leaves the View menu.
-- Help holds MAPP Help, Keyboard Shortcuts, What's New in MAPP, Marfa Documentation and Report a Problem…, after the system's search field.
-- An empty state has a title, one line under it of fewer than 40 characters, and a button only when there is something to do there. A type has New and its name, such as New Project. Favorites and Inbox have no button.
-- Recently Deleted is a page in Settings only, not a sidebar place.
 
 ## Editing in place
 
@@ -62,7 +33,6 @@ What is not built yet. The built part is in [Value components](value-components.
 - A cover picture on an item's page, and how Marfa would hold the choice of cover. It is parked.
 - How the corner's controls are drawn on pages for each kind of item, such as a newsletter at its own width.
 - A full-screen view beside Focus. Not now.
-- A symbol of Focus's own. The boards use the system's full-screen arrows for now.
 
 ## Related pages
 

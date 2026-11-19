@@ -25,13 +25,12 @@ final class ItemToolbarTests: XCTestCase {
         let more = control("MoreToolbar")
         let share = control("ShareToolbar")
         for element in [viewMode, viewOptions, newItem, details, share, more] { XCTAssertTrue(element.exists) }
-        XCTAssertFalse(control("NewItemToolbar").exists, "the toolbar's New Item shows only with the sidebar hidden")
+        XCTAssertFalse(control("NewItemToolbar").exists, "the toolbar has no New Item")
         XCTAssertFalse(control("BackToolbar").exists)
         XCTAssertFalse(control("ForwardToolbar").exists)
         XCTAssertEqual(count("DetailsToggle"), 1, "The closed inspector adds no second Details")
         XCTAssertEqual(count("MoreToolbar"), 1, "The closed inspector adds no second More")
         XCTAssertEqual(count("ShareToolbar"), 1, "The closed inspector adds no second Share")
-        XCTAssertFalse(control("FormatToolbar").exists, "Format is out of the default toolbar")
         let page = window.itemPageTitle.frame
         XCTAssertLessThan(newItem.frame.maxX, page.minX, "New Item belongs to the sidebar's foot")
         XCTAssertLessThan(newItem.frame.maxX, viewOptions.frame.minX)

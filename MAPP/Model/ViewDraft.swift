@@ -78,7 +78,7 @@ nonisolated enum ViewDraft {
     }
 
     /// The query a place stands for, or nil where a view cannot stand for it: Recents, which is a count of the
-    /// latest edits, Recently Deleted, an index, and a single favorite. A view lists active items, as MAPP's places
+    /// latest edits, an index, and a single favorite. A view lists active items, as MAPP's places
     /// do. A collection's view lists its members, though by the view's own order, since a view cannot sort by an
     /// edge's position.
     static func query(
@@ -102,7 +102,7 @@ nonisolated enum ViewDraft {
         case .collection(let id):
             let member = FilterField.edge(type: MarfaMapping.collectionEdge, direction: .outbound)
             return LibraryViewQuery(states: active, filter: text(of: FilterCondition(field: member, operator: .eq, value: .text(id.rawValue))))
-        case .recents, .recentlyDeleted, .sources, .collections, .favoriteItem: return nil
+        case .recents, .sources, .collections, .favoriteItem: return nil
         }
     }
 
@@ -435,7 +435,7 @@ nonisolated enum ViewDraft {
     }
 
     /// Stands for a column by its identifier: the table finds its own column by the identifier (`ItemTableLayout.sort`).
-    private static func placeholder(_ id: String) -> ItemTableColumn {
+    static func placeholder(_ id: String) -> ItemTableColumn {
         ItemTableColumn(id: id, label: "", content: .title, style: .text)
     }
 

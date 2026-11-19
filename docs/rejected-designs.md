@@ -121,6 +121,10 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 - **A divider under the palette's field.**
 - **Large type marks in Search Items rows.** Its rows use the command palette's small mark.
 
+## Marks
+
+- **A heart for favorites.** Favorites use the star (August, 19 November 2026).
+
 ## Related pages
 
 - [Agreed designs](agreed-designs.md)

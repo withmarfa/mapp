@@ -39,19 +39,3 @@ struct ViewToolbarItems: CustomizableToolbarContent {
         .hidden(isHidden)
     }
 }
-
-/// Opens quick add, to make an item in the place being shown.
-struct NewItemButton: View {
-    @CurrentLibrary private var library
-    @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
-    let browser: Browser?
-
-    var body: some View {
-        Button("New Item", systemImage: "plus") {
-            browser?.openQuickAdd(remembered: lastType, in: library)
-        }
-        .help("New Item")
-        .accessibilityIdentifier("NewItemToolbar")
-        .disabled(browser == nil || !QuickAdd.isAvailable(in: library))
-    }
-}

@@ -71,6 +71,7 @@ extension Browser {
         guard current != before else { return nil }
         observedChoices[place] = current
         registerChoiceUndo(in: place, from: before, to: current)
+        keepPlaceChoices(of: place)
         guard case .view(let id) = place, viewPanel?.isNew != true else { return nil }
         return scheduleWrite(of: id)
     }

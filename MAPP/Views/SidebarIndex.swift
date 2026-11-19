@@ -65,6 +65,7 @@ struct SidebarIndex: View {
         } message: { row in
             Text(DeletionWords.collectionMessage(keeping: row.count))
         }
+        .focusedSceneValue(\.indexActions, actions(in: rows))
         .onDisappear { model.stop() }
         .navigationTitle(library.name(of: browser.item))
         .navigationSubtitle(summary)
@@ -74,6 +75,16 @@ struct SidebarIndex: View {
     /// The tab, whatever is kept, which is read as All when it is not one of the page's tabs.
     private var tabBinding: Binding<IndexTab> {
         Binding { place.tabs.contains(tab) ? tab : .all } set: { tab = $0 }
+    }
+
+    /// What the File menu offers for the chosen row: the same as its row menu.
+    private func actions(in rows: [IndexRow]) -> IndexActions {
+        guard let row = choice.row(in: rows) else { return IndexActions() }
+        let code = place == .sources ? row.sourceCode : nil
+        return IndexActions(
+            rename: code.map { code in { editing = SourceEditRequest(code: code, mode: .name) } },
+            chooseMark: code.map { code in { editing = SourceEditRequest(code: code, mode: .mark) } },
+            delete: place == .collections && row.canDelete ? { ask(row) } : nil)
     }
 
     /// Asks before deleting a collection, unless it is read-only.
@@ -150,13 +161,13 @@ private struct IndexContent: View {
 
     /// What the table says when the chosen tab, or the search, leaves nothing.
     private var emptyTab: EmptyState<EmptyView> {
-        if browser.isSearching { return .search(browser.searchText) }
+        if browser.isSearching { return .search() }
         return switch tab {
         case .all: EmptyState("No Results")
-        case .yours: EmptyState("No Collections Of Yours", detail: "Collections you make appear here.")
-        case .fromApps: EmptyState("No Collections From Apps", detail: "Collections that apps make appear here.")
-        case .apps: EmptyState("No Apps", detail: "Apps you sign in appear here.")
-        case .keys: EmptyState("No Keys", detail: "Keys you make appear here.")
+        case .yours: EmptyState("No Collections Of Yours", detail: "Collections you make show here.")
+        case .fromApps: EmptyState("No Collections From Apps", detail: "Collections that apps make show here.")
+        case .apps: EmptyState("No Apps", detail: "Apps you sign in show here.")
+        case .keys: EmptyState("No Keys", detail: "Keys you make show here.")
         }
     }
 
@@ -164,12 +175,12 @@ private struct IndexContent: View {
     private var empty: some View {
         switch place {
         case .sources:
-            EmptyState("No Sources", detail: "Sources appear here when items identify where they came from.")
+            EmptyState("No Sources", detail: "Sources show where items came from.")
         default:
             if library.catalogue.collectionTypes.isEmpty {
                 EmptyState("No Collections", detail: "This library has no collection type.")
             } else {
-                EmptyState("No Collections", detail: "Collections you make appear here.")
+                EmptyState("No Collections", detail: "Collections you make show here.")
             }
         }
     }
