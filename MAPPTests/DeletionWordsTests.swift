@@ -19,4 +19,12 @@ import Testing
         #expect(DeletionWords.purgeMessage(count: 3)
             == "They’re already in Recently Deleted. Deleting them now erases them permanently, and you can’t undo it.")
     }
+
+    @Test func movedMessageAgreesWithTheCount() {
+        #expect(DeletionWords.movedMessage(count: 1) == "Moved to Recently Deleted")
+        #expect(DeletionWords.movedMessage(count: 1, title: "Kitchen quotes") == "Moved “Kitchen quotes” to Recently Deleted")
+        #expect(DeletionWords.movedMessage(count: 1, title: "  ") == "Moved to Recently Deleted")
+        #expect(DeletionWords.movedMessage(count: 3, title: "Kitchen quotes") == "Moved 3 items to Recently Deleted")
+        #expect(DeletionWords.movedMessage(count: 3) == "Moved 3 items to Recently Deleted")
+    }
 }

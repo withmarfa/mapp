@@ -122,7 +122,7 @@ extension ItemLibrary {
     func deleteAfterSaving(_ ids: Set<ItemID>, undoManager: UndoManager?, asking details: DetailsPresentation?) {
         EditorController.flushAll(leaving: false) { [self] kept in
             guard kept else { return }
-            Browser.delete(ids, in: self, undoManager: undoManager, asking: details.map { details in
+            Browser.delete(ids, in: self, undoManager: undoManager, toasts: details?.toasts, asking: details.map { details in
                 { details.deletion = DeleteRequest(ids: $0, undoManager: undoManager) }
             })
         }

@@ -982,6 +982,9 @@
     "^[Move %lld item](inflect: true) to Recently Deleted?" : {
       "extractionState" : "manual"
     },
+    "^[Moved %lld item](inflect: true) to Recently Deleted" : {
+      "extractionState" : "manual"
+    },
     "+%lld more" : {
 
     },
@@ -1865,6 +1868,9 @@
     "Direction" : {
 
     },
+    "Dismiss" : {
+
+    },
     "Discard" : {
       "extractionState" : "manual"
     },
@@ -2700,6 +2706,12 @@
     },
     "Move to Recently Deleted" : {
       "extractionState" : "manual"
+    },
+    "Moved “%@” to Recently Deleted" : {
+
+    },
+    "Moved to Recently Deleted" : {
+
     },
     "Move Up" : {
 

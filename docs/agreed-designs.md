@@ -6,11 +6,6 @@ Where it lives: not built yet.
 
 This page lists what has been agreed for MAPP and is not in the app yet, so the next build starts from one list. What was turned down is in [Rejected designs](rejected-designs.md).
 
-## Messages
-
-- A toast rises at the bottom of the window, centered over the content, with Undo where an action can be undone. It never appears at the top of the page.
-- A question before something that can't be undone is Apple's own alert, as today.
-
 ## The sidebar
 
 - The sidebar has one tab by default, with no tab bar. Once a person adds a second tab, tabs show at the top: the chosen tab shows its name, and a plus button adds one.
@@ -26,7 +21,7 @@ This page lists what has been agreed for MAPP and is not in the app yet, so the 
 - Collections has the tabs All, Yours (the library tier) and From Apps (the feed tier). Sources has All, Apps (signed in) and Keys.
 - A collection's icon is gray. A type's icon in a table is in the type's color, with no tile.
 - The chosen container shows in the right sidebar, with no buttons there. The table takes the window's width when the right sidebar is closed.
-- Deleting a collection asks with Apple's alert, then shows the toast with Undo.
+- Deleting a collection asks with Apple's alert, then shows the toast with Undo (the toast is built: [Components](components.md)).
 - Search and View Options are in the toolbar, as on every screen. New Collection is on the page, at the trailing edge of the tabs.
 
 ## Items as an index

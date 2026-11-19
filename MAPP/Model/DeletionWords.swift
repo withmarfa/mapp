@@ -8,6 +8,18 @@ nonisolated enum DeletionWords {
         AttributedString(localized: "^[Move \(count) item](inflect: true) to Recently Deleted?").text
     }
 
+    /// What the toast says after `count` items moved to Recently Deleted. One item is named by `title` where it has
+    /// one.
+    static func movedMessage(count: Int, title: String? = nil) -> String {
+        if count == 1 {
+            if let title = title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
+                return String(localized: "Moved “\(title)” to Recently Deleted")
+            }
+            return String(localized: "Moved to Recently Deleted")
+        }
+        return AttributedString(localized: "^[Moved \(count) item](inflect: true) to Recently Deleted").text
+    }
+
     /// The title asking to erase `count` items already in Recently Deleted.
     static func purgeTitle(count: Int) -> String {
         AttributedString(localized: "^[Delete \(count) item](inflect: true) immediately?").text

@@ -123,8 +123,10 @@ struct MainView: View {
         } detail: {
             if shownPresentation == .settings {
                 SettingsPageView(page: browser.settingsPage, browser: browser)
+                    .toastOverlay()
             } else {
                 itemPage
+                    .toastOverlay()
                     .modifier(itemInspector(WindowToolbarLayout.list))
                     .toolbar(id: WindowToolbarLayout.list) { windowToolbar(hasListColumn: true) }
             }
@@ -168,11 +170,13 @@ struct MainView: View {
         Group {
             if let history = details.history, shownPresentation == .history {
                 VersionHistoryWorkspace(mode: history, details: details)
+                    .toastOverlay()
             } else if shownPresentation == .index {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
                     sidebarColumn
                 } detail: {
                     SidebarIndex(browser: browser, order: order)
+                        .toastOverlay()
                         .toolbar(id: WindowToolbarLayout.index) { windowToolbar() }
                 }
             } else if shownPresentation == .collection {
@@ -200,6 +204,7 @@ struct MainView: View {
                             itemPage
                         }
                     }
+                    .toastOverlay()
                     .modifier(itemInspector(WindowToolbarLayout.collection(shownViewMode)))
                     .toolbar(id: WindowToolbarLayout.collection(shownViewMode)) { windowToolbar() }
                 }
