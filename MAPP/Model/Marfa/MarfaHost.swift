@@ -562,7 +562,7 @@ import Observation
                 readName(of: connection)
             })
         self.library = library
-        if let origin = connection.server(key: "").plainHTTPOrigin, Self.toldPlainHTTP.withLock({ $0.insert(origin).inserted }) {
+        if let origin = (try? connection.server(key: ""))?.plainHTTPOrigin, Self.toldPlainHTTP.withLock({ $0.insert(origin).inserted }) {
             notices.tell(Words.plainHTTPTitle, Words.plainHTTP(origin: origin))
         }
         readName(of: connection)
@@ -605,7 +605,7 @@ import Observation
     }
 
     static func message(_ error: any Error) -> String {
-        error.localizedDescription
+        (error as? MarfaError).map(Words.message(for:)) ?? error.localizedDescription
     }
 
     /// The plain http origins the person has been told of in this run, since the package keeps no state.
