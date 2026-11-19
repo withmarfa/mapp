@@ -177,7 +177,7 @@ nonisolated struct ConnectionStatus: Hashable, Sendable {
     }
 
     private func isConnected(to address: String) -> Bool {
-        guard let target = try? MarfaConnection(typed: address), let current = host.connection else { return false }
+        guard let target = try? MarfaConnection(address: address), let current = host.connection else { return false }
         return current.sameServer(as: target)
     }
 

@@ -281,56 +281,51 @@ import Testing
 
     // MARK: One server, two spellings of its default port
 
-    /// A copy kept from `https://host:443` is the copy of `https://host`: its queued writes are there, and no folder moves.
-    @Test func aKeptCopyOfTheSavedPortSpellingIsOpenedByTheOtherSpelling() async throws {
+    /// Typing the spelling with the port while connected without it is Sign In Again: no new copy, no sign-out.
+    @Test func typingTheSpellingWithThePortWhileConnectedWithoutItSignsInAgain() async throws {
         let bench = try HostBench()
-        bench.servers.storedWrites.withLock { $0 = 2 }
-        bench.defaults.set("https://marfa.test:443", forKey: "MarfaAddress")
-        bench.signIns.hold("k", for: host443)
         let host = bench.host()
-        await host.launch()
-        try await host.disconnect(.keepCopy)
-        #expect(bench.hasCopy(host443))
-        bench.servers.storedWrites.withLock { $0 = 0 }
-
-        try await host.connect(address: "https://marfa.test", key: "again")
+        try await host.connect(address: "https://marfa.test", key: "old")
         let source = try #require(bench.servers.last)
-        #expect(source.connection.address.absoluteString == "https://marfa.test:443", "the copy keeps the name it was saved under")
-        #expect(try await source.storeWrites.count == 2, "the kept writes are there")
-        #expect(bench.savedAddress == "https://marfa.test:443")
-        #expect(!bench.hasCopy(try MarfaConnection(address: "https://marfa.test")), "no second copy was made")
+        try await host.changeAddress(to: "https://marfa.test:443", key: "new")
+        #expect(host.source === source)
+        #expect(bench.servers.opened.count == 1)
+        #expect(!bench.signIns.calls.contains { $0.hasPrefix("signOut") }, "\(bench.signIns.calls)")
+        #expect(source.given == ["new"])
+        #expect(host.connection?.address.absoluteString == "https://marfa.test")
+        #expect(!bench.hasCopy(host443), "no copy was made for the other spelling")
     }
 
-    /// A copy the person discarded under `:443`, which could not be removed then, is removed when the address is typed
-    /// without the port, and not opened again with its writes.
-    @Test func aDiscardMarkUnderTheSavedPortSpellingIsHonouredByTheOtherSpelling() async throws {
+    /// A copy kept under one spelling stays as it is, with its writes, when the other spelling is connected: that is its
+    /// own copy, opened empty.
+    @Test func aKeptCopyIsNotReachedByTheOtherSpelling() async throws {
         let bench = try HostBench()
         bench.servers.storedWrites.withLock { $0 = 2 }
-        bench.defaults.set("https://marfa.test:443", forKey: "MarfaAddress")
-        bench.signIns.hold("k", for: host443)
-        let attempts = Mutex(0)
-        let removed = Mutex<[URL]>([])
-        let host = bench.host(remover: { store, agreed in
-            removed.withLock { $0.append(store) }
-            if attempts.withLock({ $0 += 1; return $0 }) == 1 { throw MarfaError.storeBusy(message: "Busy.") }
-            try await MarfaHost.removeStore(store, agreedToLose: agreed)
-        })
-        await host.launch()
-        try #require(bench.servers.last).report.set(SyncReport(waiting: 2, queueRead: true))
-        #expect(await eventually { host.waitingChanges == 2 })
-        let left = await leaving(host)
-        guard case .notRemoved? = left else {
-            Issue.record("\(String(describing: left))")
-            return
-        }
-        #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies")?["https://marfa.test:443"] != nil, "the mark stays")
+        let host = bench.host()
+        try await host.connect(address: "https://marfa.test:443", key: "k")
+        try await host.disconnect(.keepCopy)
+        let keptStore = bench.location.store(for: host443)
+        #expect(try await WorkingCopy.unsentWrites(in: keptStore).writes.count == 2)
         bench.servers.storedWrites.withLock { $0 = 0 }
 
         try await host.connect(address: "https://marfa.test", key: "again")
-        #expect(removed.withLock { $0 }.last == bench.location.store(for: host443), "the mark under the saved spelling was honoured")
-        #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies")?["https://marfa.test:443"] == nil)
         let source = try #require(bench.servers.last)
-        #expect(try await source.storeWrites.count == 0, "the discarded writes did not come back")
+        let other = try MarfaConnection(address: "https://marfa.test")
+        #expect(source.connection == other)
+        #expect(bench.hasCopy(other))
+        #expect(try await source.storeWrites.isEmpty, "the other spelling opened its own copy")
+        #expect(try await WorkingCopy.unsentWrites(in: keptStore).writes.count == 2, "the kept copy and its queue are untouched")
+        #expect(bench.savedAddress == "https://marfa.test")
+    }
+
+    /// A discard mark names the spelling it was made under only.
+    @Test func aDiscardMarkIsNotHonouredUnderTheOtherSpelling() async throws {
+        let bench = try HostBench()
+        let host = bench.host()
+        let other = try MarfaConnection(address: "https://marfa.test")
+        host.markDiscarded(host443, agreed: MarfaHost.Agreed(ids: []))
+        try await host.clearDiscarded(other)
+        #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies")?["https://marfa.test:443"] != nil)
     }
 
     // MARK: Nothing raw after a sign-in
@@ -399,5 +394,31 @@ import Testing
     func noPackageMessageIsToldAsItIs(error: MarfaError) {
         let words = Words.message(for: error)
         #expect(!words.contains(error.message), "\(words)")
+    }
+
+    // MARK: A damaged copy, an unreadable Keychain
+
+    @Test func aDamagedCopyIsToldAsOneAndNotAsAPermissionsProblem() {
+        let stopped = Words.message(for: .storeDamaged(path: "/Users/someone/Marfa/abc/copy.sqlite", reason: "malformed", unsent: 3, setAsideStopped: true, message: "SQLite"))
+        #expect(stopped.contains("damaged") && stopped.contains("/Users/someone/Marfa/abc"))
+        #expect(!stopped.contains("copy.sqlite") && !stopped.contains("SQLite") && !stopped.contains("change its own files"))
+        #expect(stopped.contains("3 changes") && stopped.contains("stopped partway") && stopped.contains("Open the library again to finish it."))
+
+        let whole = Words.message(for: .storeDamaged(path: "/Users/someone/Marfa/abc/copy.sqlite", reason: "malformed", unsent: nil, setAsideStopped: false, message: "SQLite"))
+        #expect(whole.contains("damaged") && whole.contains("couldn’t read whether it holds changes"))
+        #expect(!whole.contains("partway") && !whole.contains("Open the library again"))
+
+        #expect(Words.message(for: .storeDamaged(path: "", reason: "r", unsent: 0, setAsideStopped: false, message: "m")).contains("holds no changes"))
+    }
+
+    @Test func aMissingKeychainIsToldAsAnUnreadableSignIn() {
+        #expect(Words.message(for: .noKeychain(message: "no keychain")) == Words.signInUnreadable)
+    }
+
+    @Test func aReplacedApprovalIsToldHowToFindTheEarlierOne() {
+        let words = Words.replacedApproval(address: "https://marfa.test")
+        #expect(words.contains("Run “marfa apps list” with the command line signed in to https://marfa.test as the owner."))
+        #expect(words.contains("Use the approval date to identify the earlier MAPP approval."))
+        #expect(words.contains("If you can identify it, run “marfa apps revoke <id>” with that entry’s ID."))
     }
 }

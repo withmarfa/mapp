@@ -107,7 +107,7 @@ import Testing
         if stands {
             #expect(told.map(\.title) == ["MAPP’s Earlier Approval May Still Stand"])
             let message = try #require(told.first?.message)
-            #expect(message.contains("marfa apps list") && message.contains("marfa apps revoke <id>"))
+            #expect(message.contains("marfa apps list") && message.contains("marfa apps revoke <id>") && message.contains("approval date"))
             #expect(message.contains("https://marfa.test"), "the server is named by its address: \(message)")
             #expect(!message.contains("older MAPP entry"))
             #expect(!message.contains("Connected apps") && !message.contains("You are signed in") && !message.contains("still lists"))

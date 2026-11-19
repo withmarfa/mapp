@@ -12,26 +12,15 @@ struct MarfaConnectionTests {
         #expect(try MarfaConnection(address: "https://marfa.example/api/").address.absoluteString == "https://marfa.example/api")
     }
 
-    /// The package names a server by its origin, which leaves out a port the scheme already means, so an address the
-    /// person types does too: else one sign-in is two connections.
-    @Test(arguments: [
-        ("https://marfa.example:443", "https://marfa.example"), ("HTTPS://Marfa.Example:443/", "https://marfa.example"),
-        ("http://marfa.example:80", "http://marfa.example"), ("https://marfa.example:443/api", "https://marfa.example/api"),
-        ("https://marfa.example:8443", "https://marfa.example:8443"), ("https://marfa.example:80", "https://marfa.example:80"),
-        ("http://marfa.example:443", "http://marfa.example:443"),
-    ])
-    func aPortTheSchemeAlreadyMeansIsLeftOutOfAnAddressTheCopyTyped(_ typed: String, _ address: String) throws {
-        #expect(try MarfaConnection(typed: typed).address.absoluteString == address)
-        #expect(try MarfaConnection(typed: typed) == MarfaConnection(address: address))
-    }
-
-    /// A saved address names its copy and its discard marks by the text it was saved as, so reading it never changes it.
-    @Test func aSavedAddressKeepsItsPortAndSoItsCopy() throws {
-        let saved = try MarfaConnection(address: "https://marfa.example:443")
-        #expect(saved.address.absoluteString == "https://marfa.example:443")
+    /// An address names its copy and its discard marks as it was entered, so a port the scheme already means is kept.
+    @Test func anAddressKeepsAPortTheSchemeAlreadyMeansAndSoItsOwnCopy() throws {
+        let withPort = try MarfaConnection(address: "HTTPS://Marfa.Example:443/")
+        let without = try MarfaConnection(address: "https://marfa.example")
+        #expect(withPort.address.absoluteString == "https://marfa.example:443")
+        #expect(withPort != without)
         let location = MarfaStoreLocation(root: URL.temporaryDirectory.appending(path: "Stores", directoryHint: .isDirectory))
-        #expect(location.directory(for: saved) != location.directory(for: try MarfaConnection(typed: "https://marfa.example:443")))
-        #expect(location.directory(for: saved) == location.directory(for: try MarfaConnection(address: "HTTPS://marfa.example:443/")))
+        #expect(location.directory(for: withPort) != location.directory(for: without))
+        #expect(location.directory(for: withPort) == location.directory(for: try MarfaConnection(address: "https://marfa.example:443/")))
     }
 
     @Test(arguments: [

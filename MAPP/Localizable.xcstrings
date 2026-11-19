@@ -73,6 +73,24 @@
     "To end it, run “marfa apps list” with the command line signed in to %@ as the owner, find MAPP’s entry, then run “marfa apps revoke <id>”." : {
 
     },
+    "The copy of your library on this Mac is damaged, so MAPP can’t open it." : {
+
+    },
+    "The copy is in the folder “%@”." : {
+
+    },
+    "It holds no changes that haven’t reached the server." : {
+
+    },
+    "MAPP couldn’t read whether it holds changes that haven’t reached the server." : {
+
+    },
+    "MAPP started to set the damaged copy aside and stopped partway. Open the library again to finish it." : {
+
+    },
+    "Run “marfa apps list” with the command line signed in to %@ as the owner. Use the approval date to identify the earlier MAPP approval. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID." : {
+
+    },
     "MAPP couldn’t make or open the copy of your library on this Mac. Check that MAPP can change its own files, then try again." : {
 
     },

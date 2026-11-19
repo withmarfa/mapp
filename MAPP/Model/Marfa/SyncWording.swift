@@ -230,7 +230,7 @@ nonisolated enum Words {
     }
 
     static func replacedApproval(address: String) -> String {
-        String(localized: "MAPP couldn’t confirm that \(address) ended MAPP’s earlier approval.") + " " + endApproval(at: address)
+        String(localized: "MAPP couldn’t confirm that \(address) ended MAPP’s earlier approval.") + " " + String(localized: "Run “marfa apps list” with the command line signed in to \(address) as the owner. Use the approval date to identify the earlier MAPP approval. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID.")
     }
 
     /// A clean-up sign-out that threw before it forgot or revoked anything, so the sign-in and the approval may both stand.
@@ -278,6 +278,23 @@ nonisolated enum Words {
         String(localized: "MAPP couldn’t make or open the copy of your library on this Mac. Check that MAPP can change its own files, then try again.")
     }
 
+    /// The copy's file is damaged. It says where the copy is, what it holds that no server has taken (`unsent` is nil
+    /// where the queue could not be read), and, when setting the damaged copy aside stopped partway, that opening the
+    /// library again finishes it.
+    static func storeDamaged(folder: String?, unsent: UInt64?, setAsideStopped: Bool) -> String {
+        var parts = [String(localized: "The copy of your library on this Mac is damaged, so MAPP can’t open it.")]
+        if let folder { parts.append(String(localized: "The copy is in the folder “\(folder)”.")) }
+        switch unsent {
+        case let count? where count > 0: parts.append(notSent(Int(clamping: count)))
+        case 0?: parts.append(String(localized: "It holds no changes that haven’t reached the server."))
+        default: parts.append(String(localized: "MAPP couldn’t read whether it holds changes that haven’t reached the server."))
+        }
+        if setAsideStopped {
+            parts.append(String(localized: "MAPP started to set the damaged copy aside and stopped partway. Open the library again to finish it."))
+        }
+        return parts.joined(separator: " ")
+    }
+
     /// A server whose release is older than the oldest this build works with. Asking again cannot clear it, so
     /// the words say to update the server, never what the server said.
     static func serverTooOld(served: String, oldest: String) -> String {
@@ -307,11 +324,14 @@ nonisolated enum Words {
     /// What to show a person of an error the package raised, in the app's words: what the package, the system or the
     /// server said goes to the log and is never shown.
     static func message(for error: MarfaError) -> String {
-        if case .serverTooOld(let served, let oldest, _) = error { return serverTooOld(served: served, oldest: oldest) }
         // A string logged without a privacy level is private.
         Telemetry.logger(.library).error("A package step failed: \(String(describing: error))")
+        if case .serverTooOld(let served, let oldest, _) = error { return serverTooOld(served: served, oldest: oldest) }
         switch error {
-        case .store, .storeDamaged, .io, .noKeychain, .closed: return copyCouldNotBeOpened
+        case .storeDamaged(let path, _, let unsent, let setAsideStopped, _):
+            return storeDamaged(folder: path.isEmpty ? nil : URL(fileURLWithPath: path).deletingLastPathComponent().path, unsent: unsent, setAsideStopped: setAsideStopped)
+        case .noKeychain: return signInUnreadable
+        case .store, .io, .closed: return copyCouldNotBeOpened
         case .wrongServer: return differentServer
         case .storageFull: return storageFull
         case .network, .noConnection: return serverUnreachable

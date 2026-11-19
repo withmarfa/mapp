@@ -9,59 +9,12 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
         case notAServer
     }
 
-    /// Scheme and host in lower case and no trailing slash. An address read as it was saved keeps a port the scheme
-    /// already means, since the copy and the discard marks are named by that exact text; one the person types drops
-    /// it (`init(typed:)`). Compare connections with `sameServer(as:)`, never `==`, where the question is whether two
-    /// addresses are one server.
+    /// Scheme and host in lower case and no trailing slash, otherwise the address as it was entered: the copy and the
+    /// discard marks are named by this exact text, so `https://host` and `https://host:443` are two copies. Compare
+    /// connections with `sameServer(as:)`, never `==`, where the question is whether two addresses are one server.
     let address: URL
 
-    /// An address as it was saved, which names its copy by the text it was kept as.
     init(address text: String) throws(Problem) {
-        try self.init(text, dropsDefaultPort: false)
-    }
-
-    /// An address the person typed: it leaves out a port the scheme already means (443 for https, 80 for http), so
-    /// one server is one address however it was typed, and the package, which names a server by its origin the same
-    /// way, keeps one sign-in for it.
-    init(typed text: String) throws(Problem) {
-        try self.init(text, dropsDefaultPort: true)
-    }
-
-    /// Whether `other` names the same server: the same address once a port the scheme already means is left out.
-    func sameServer(as other: MarfaConnection) -> Bool {
-        Self.origin(address) == Self.origin(other.address)
-    }
-
-    /// The same address spelled the other way round about the port its scheme already means: with it where this has
-    /// none, without it where this has it. Nil for any other port. A copy and its discard mark are named by the
-    /// text an address was saved as, so a person who types the other spelling still reaches them.
-    var otherDefaultPortSpelling: MarfaConnection? {
-        guard var components = URLComponents(url: address, resolvingAgainstBaseURL: false),
-            let defaultPort = components.scheme == "https" ? 443 : components.scheme == "http" ? 80 : nil
-        else { return nil }
-        if components.port == nil {
-            components.port = defaultPort
-        } else if components.port == defaultPort {
-            components.port = nil
-        } else {
-            return nil
-        }
-        return components.url.flatMap { try? MarfaConnection(address: $0.absoluteString) }
-    }
-
-    private static func origin(_ address: URL) -> URL {
-        guard var components = URLComponents(url: address, resolvingAgainstBaseURL: false) else { return address }
-        dropDefaultPort(&components)
-        return components.url ?? address
-    }
-
-    private static func dropDefaultPort(_ components: inout URLComponents) {
-        if (components.scheme == "https" && components.port == 443) || (components.scheme == "http" && components.port == 80) {
-            components.port = nil
-        }
-    }
-
-    private init(_ text: String, dropsDefaultPort: Bool) throws(Problem) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard var components = URLComponents(string: trimmed),
             let scheme = components.scheme?.lowercased(), ["http", "https"].contains(scheme),
@@ -71,10 +24,23 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
         else { throw .notAServer }
         components.scheme = scheme
         components.host = host.lowercased()
-        if dropsDefaultPort { Self.dropDefaultPort(&components) }
         while components.path.hasSuffix("/") { components.path.removeLast() }
         guard let address = components.url else { throw .notAServer }
         self.address = address
+    }
+
+    /// Whether `other` names the same server: the same address once a port the scheme already means is left out. The
+    /// package keys the sign-in by this origin, so two spellings share one sign-in but keep two copies.
+    func sameServer(as other: MarfaConnection) -> Bool {
+        Self.origin(address) == Self.origin(other.address)
+    }
+
+    private static func origin(_ address: URL) -> URL {
+        guard var components = URLComponents(url: address, resolvingAgainstBaseURL: false) else { return address }
+        if (components.scheme == "https" && components.port == 443) || (components.scheme == "http" && components.port == 80) {
+            components.port = nil
+        }
+        return components.url ?? address
     }
 
     /// Throws only for an address holding a user or password, which `init(address:)` already refuses.

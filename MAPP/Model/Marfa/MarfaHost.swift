@@ -470,6 +470,8 @@ import os
         remember(connection)
         attach(opened, for: connection)
         forgetName(of: old)
+        // The old sign-in is ended only here: a same-origin address returned above as Sign In Again, so the package's
+        // origin-keyed sign-in is never one the new connection shares.
         if let problem = await finishLeaving(old, agreed: agreed) { throw problem }
     }
 
@@ -504,21 +506,13 @@ import os
         isBusy = true
     }
 
-    /// The address the person typed, spelled as a copy or a discard mark already on this Mac names it. Typing a
-    /// server's address with or without the port its scheme means reaches the same server and the same copy; no folder
-    /// is moved.
+    /// The address the person typed, as entered: each spelling of an address is its own copy.
     private func typed(_ address: String) throws(Problem) -> MarfaConnection {
-        let typed: MarfaConnection
         do {
-            typed = try MarfaConnection(typed: address)
+            return try MarfaConnection(address: address)
         } catch {
             throw .notAServer
         }
-        if hasCopy(typed) { return typed }
-        if let other = typed.otherDefaultPortSpelling, hasCopy(other) || discarded[other.address.absoluteString] != nil {
-            return other
-        }
-        return typed
     }
 
     /// Signs in as the person chose. Nothing is kept unless it finishes.

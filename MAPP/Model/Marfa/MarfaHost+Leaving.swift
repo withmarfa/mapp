@@ -116,14 +116,8 @@ extension MarfaHost {
         defaults.set(marks, forKey: Self.discardedKey)
     }
 
-    /// A copy the person discarded is removed before its address is opened again, or not opened at all. A mark is
-    /// honoured under either spelling of a default port.
+    /// A copy the person discarded is removed before its address is opened again, or not opened at all.
     func clearDiscarded(_ connection: MarfaConnection) async throws(Problem) {
-        try await clearMark(of: connection)
-        if let other = connection.otherDefaultPortSpelling { try await clearMark(of: other) }
-    }
-
-    private func clearMark(of connection: MarfaConnection) async throws(Problem) {
         guard let agreed = discarded[connection.address.absoluteString] else { return }
         switch await removeCopy(connection, agreed: agreed) {
         case .removed:
