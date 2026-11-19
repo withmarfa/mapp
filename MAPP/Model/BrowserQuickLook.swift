@@ -9,9 +9,16 @@ struct QuickLookRequest {
     fileprivate(set) var staged: [QuickLookFile]
 }
 
+extension QuickLookRequest {
+    /// A request for one file that was not copied, so nothing is left to remove.
+    init(showing url: URL) {
+        self.init(urls: [url], current: url, staged: [])
+    }
+}
+
 extension Notification.Name {
-    /// Posted, with the browser as its object, when a window shows Quick Look. The panel is shared by every window,
-    /// so the others give up theirs and remove their copies.
+    /// Posted, with the browser or editor that asked as its object, when a window shows Quick Look. The panel is
+    /// shared by every window, so the others give up theirs and remove their copies.
     static let quickLookTaken = Notification.Name("com.withmarfa.mapp.quickLookTaken")
 }
 

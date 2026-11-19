@@ -1,3 +1,4 @@
+import QuickLook
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -107,6 +108,18 @@ struct ItemPage: View {
         }
         .sheet(item: $editor.webLinkRequest, onDismiss: { editor.focus(item.id) }) { request in
             WebLinkSheet(editor: editor, request: request)
+        }
+        .quickLookPreview(
+            Binding {
+                editor.quickLook?.current
+            } set: { url in
+                if url == nil { editor.dismissQuickLook() } else { editor.quickLook?.current = url }
+            },
+            in: editor.quickLook?.urls ?? []
+        )
+        // The panel is shared by every window, so another window taking it closes this one's request.
+        .onReceive(NotificationCenter.default.publisher(for: .quickLookTaken)) { note in
+            if (note.object as? EditorController) !== editor { editor.dismissQuickLook() }
         }
         .fileImporter(isPresented: $editor.isChoosingImages, allowedContentTypes: [.image], allowsMultipleSelection: true) { result in
             guard case .success(let urls) = result else { return }

@@ -74,8 +74,7 @@ What is not built yet. The built part is in [Value components](value-components.
 
 ## Pages
 
-- A code block and a file in an item show their actions as icons in a corner, under the pointer, with no words. Where a code block's language goes, and how it changes, is open.
-- In the right sidebar, chips sit in the same white box as the rows.
+- Where a code block's language goes, and how it changes, is open. It stays as it is.
 
 ## Settings
 

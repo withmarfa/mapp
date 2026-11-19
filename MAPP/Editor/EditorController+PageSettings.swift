@@ -66,6 +66,7 @@ extension EditorController {
             "formattedEditor": String(localized: "Text"),
             "sourceEditor": String(localized: "Markdown Source"),
             "copyCode": String(localized: "Copy"),
+            "codeWrap": String(localized: "Wrap Code"),
             "codeLanguage": String(localized: "Code Language"),
             "codeLanguageSearch": String(localized: "Search Languages"),
             "codeAuto": String(localized: "Automatic"),
@@ -80,6 +81,8 @@ extension EditorController {
             "tableMoveRow": String(localized: "Row"),
             "tableMoveColumn": String(localized: "Column"),
             "fileOpen": String(localized: "Open"),
+            // The page puts the file's name in place of the placeholder.
+            "quickLookNamed": String(localized: "Quick Look %@"),
             "fileMissing": String(localized: "File Not Found"),
             "fileRetry": String(localized: "Try Again"),
             "comment": String(localized: "Author Comment"),

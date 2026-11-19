@@ -54,6 +54,7 @@ The right sidebar (`ItemInspector`) always lists every property, in sections: De
 - Each kind of link is its own section.
 - Copy in the sidebar is a few words, never several lines of guidance. A button's copy stays tight, such as "Restore Version".
 - Pop-up arrows are gray, not blue.
+- Chips sit in the same white box as the rows: the Tags section's tags and the chips of a property's value draw inside their section's box (`InspectorBox`), never loose on the sidebar's background.
 - Agreed, not built: a place is a name and an arrow with no extra copy, and bento cells may sit among the sections.
 
 ## Customize Layout
@@ -91,6 +92,14 @@ Version History opens as its own workspace (`VersionHistoryWorkspace`): a thread
 - **Tables** in the text are a box with a gray header and lines between the columns, with lighter grips and more room above. Inkkit draws them, and MAPP sets only their spacing, grip color and header through Inkkit's tokens (`editor/src/style.css`). The header's weight is 500 today; the agreed weight is regular.
 - **A caption** under a picture is light gray, and a file's name is a link with a hover state. Agreed, not built.
 - **Every look is a setting with a default.** MAPP gives Inkkit the look it draws with.
+
+## Code blocks and files in the text
+
+A code block and a file in an item draw their actions as icons in a corner of the block, with no words, and the words are the icon's name for VoiceOver and the hover. Inkkit draws them; MAPP chooses which. A code block's actions are Inkkit's own (copy and wrap), and where its language goes is still open.
+
+- A file card's corner holds Quick Look, then Open. Quick Look is an eye, drawn from MAPP's own image (`editor/src/file-actions.ts`) and named for the file, such as "Quick Look Budget.csv".
+- The card asks the app through the `quickLookEmbed` message, with the item and the embed's text exactly as written. The app answers from what Marfa's core bound that text to (`EditorController.quickLookEmbed`) and shows the library's kept copy in the shared Quick Look panel, which one window holds at a time. A reference to another item than the one on the page, or one the library no longer binds to a file, shows nothing and tells the person why. The item's text is never changed.
+- A card that is missing or could not be read has no Quick Look. A PDF's card has it.
 
 ## Change Type
 

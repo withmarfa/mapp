@@ -87,6 +87,8 @@ export type EditorMessage =
   | { type: 'escape' }
   | { type: 'pasteImages' }
   | { type: 'openEmbed'; embed: EmbedRequest }
+  /** Quick Look on an embedded file's card. */
+  | { type: 'quickLookEmbed'; embed: EmbedRequest }
   | { type: 'embedMenu'; embed: EmbedRequest | null; opens: boolean }
   | { type: 'rowMenu'; row: { item: string; row: string } | null }
   /** A row of the property block was dragged: the whole order the page shows after the move, folded rows included. */

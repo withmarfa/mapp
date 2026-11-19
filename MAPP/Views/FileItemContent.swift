@@ -59,10 +59,18 @@ struct FileItemContent: View {
                 Spacer()
                 if type.conforms(to: .image) {
                     Button("Zoom Out", systemImage: "minus.magnifyingglass") { zoom = max(0.25, zoom - 0.25) }
+                        .labelStyle(.iconOnly)
+                        .help("Zoom Out")
+                        .mappButton(.secondary, icon: true)
                     Button("Zoom In", systemImage: "plus.magnifyingglass") { zoom = min(4, zoom + 0.25) }
+                        .labelStyle(.iconOnly)
+                        .help("Zoom In")
+                        .mappButton(.secondary, icon: true)
                     Button("Fit") { zoom = 1 }
+                        .mappButton(.secondary)
                 }
                 Button("Open", systemImage: "arrow.up.forward.app") { NSWorkspace.shared.open(url) }
+                    .mappButton(.secondary)
             }
             .padding()
             if type.conforms(to: .pdf) {

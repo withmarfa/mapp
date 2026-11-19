@@ -193,6 +193,74 @@ extension EditorTests {
         #expect(page.editor.menuEmbed == nil, "a menu elsewhere offers no file")
     }
 
+    // MARK: Quick Look on a file card
+
+    @Test func quickLookOnAFileCardShowsTheFileTheEmbedIsBoundTo() async throws {
+        let root = try TemporaryFolder()
+        let sheet = root.url.appending(path: "Budget.csv")
+        try Data("a,b\n".utf8).write(to: sheet)
+        let page = try await Page()
+        let note = page.library.add("A sheet: ![[Budget.csv]]\n")
+        page.library.bindEmbed("![[Budget.csv]]", in: note.id, file: sheet)
+        page.editor.load(note)
+        _ = try await settle(page.editor, "!!document.querySelector('.inkkit-file')", as: Bool.self) { $0 == true }
+        let name = try await page.editor.webView.evaluateJavaScript("document.querySelector('.inkkit-file-actions button')?.getAttribute('aria-label')") as? String
+        #expect(name == "Quick Look Budget.csv", "the card's first action is Quick Look, named for the file")
+        #expect(page.editor.quickLook == nil)
+        // The test page tells of a script error of its own as a card loads; Quick Look must add none.
+        let told = page.library.notices.told
+        try await page.run("document.querySelector('.inkkit-file-actions button').click()")
+        try await page.wait { page.editor.quickLook != nil }
+        #expect(page.editor.quickLook?.current?.lastPathComponent == "Budget.csv")
+        #expect(page.library.notices.told == told, "showing the file tells the person nothing")
+        #expect(try await page.markdown() == nil, "the item's text is not changed")
+        page.editor.dismissQuickLook()
+        #expect(page.editor.quickLook == nil)
+    }
+
+    @Test func quickLookForAnEmbedTheLibraryNoLongerHoldsShowsNothingAndSaysWhy() async throws {
+        let page = try await Page()
+        let note = page.library.add("![[Gone.csv]]\n")
+        page.library.bindEmbed("![[Gone.csv]]", in: note.id)
+        page.editor.load(note)
+        try await page.wait { page.editor.isReady }
+        page.editor.quickLookEmbed(EmbedReference(text: "![[Gone.csv]]"), in: note.id)
+        try await page.wait { !page.library.notices.waiting.isEmpty }
+        #expect(page.library.notices.waiting.last?.title == String(localized: "Can’t Quick Look"))
+        #expect(page.library.notices.waiting.last?.message == String(localized: "This file isn’t in Marfa."))
+        #expect(page.editor.quickLook == nil)
+    }
+
+    @Test func quickLookForAnotherItemThanTheOneOnThePageDoesNothing() async throws {
+        let root = try TemporaryFolder()
+        let sheet = root.url.appending(path: "Budget.csv")
+        try Data("a,b\n".utf8).write(to: sheet)
+        let page = try await Page()
+        let note = page.library.add("![[Budget.csv]]\n")
+        let other = page.library.add("![[Budget.csv]]\n")
+        page.library.bindEmbed("![[Budget.csv]]", in: other.id, file: sheet)
+        page.editor.load(note)
+        try await page.wait { page.editor.isReady }
+        page.editor.quickLookEmbed(EmbedReference(text: "![[Budget.csv]]"), in: other.id)
+        _ = try await page.editor.webView.evaluateJavaScript("1")
+        #expect(page.editor.quickLook == nil, "a stale page cannot make the app show a file of an item it is not showing")
+        #expect(page.library.notices.told == 0)
+    }
+
+    @Test func theQuickLookMessageNamesTheItemAndTheEmbedAndNothingElseIsTaken() throws {
+        let body: [String: Any] = ["type": "quickLookEmbed", "embed": ["item": "abc", "text": "![[Budget.csv]]"]]
+        guard case .quickLookEmbed(let item, let reference) = try #require(EditorMessage(body: body)) else {
+            Issue.record("Not a Quick Look message")
+            return
+        }
+        #expect(item == ItemID("abc"))
+        #expect(reference == EmbedReference(text: "![[Budget.csv]]"))
+        #expect(EditorMessage(body: ["type": "quickLookEmbed"]) == nil)
+        #expect(EditorMessage(body: ["type": "quickLookEmbed", "embed": ["item": "abc", "text": ""]]) == nil)
+        #expect(EditorMessage(body: ["type": "quickLookEmbed", "embed": ["item": "", "text": "![[a.png]]"]]) == nil)
+        #expect(EditorMessage(body: ["type": "quickLookEmbed", "embed": "![[a.png]]"]) == nil)
+    }
+
     // MARK: Attaching images through any library
 
     /// An editor over a library held in memory, showing `notes[0]` once its page has loaded.

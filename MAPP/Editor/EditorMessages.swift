@@ -73,6 +73,8 @@ nonisolated enum EditorMessage: Sendable {
     case pasteImages
     /// A card for an embedded file was clicked.
     case openEmbed(ItemID, EmbedReference)
+    /// Quick Look was pressed on the card of an embedded file.
+    case quickLookEmbed(ItemID, EmbedReference)
     /// The context menu is opening over an embedded file, or over anything else when nil, with whether the
     /// app said it may be opened.
     case embedMenu((item: ItemID, reference: EmbedReference, opens: Bool)?)
@@ -183,6 +185,9 @@ nonisolated enum EditorMessage: Sendable {
         case "openEmbed":
             guard let (item, reference) = EmbedReference.request(dict["embed"]) else { return nil }
             self = .openEmbed(item, reference)
+        case "quickLookEmbed":
+            guard let (item, reference) = EmbedReference.request(dict["embed"]) else { return nil }
+            self = .quickLookEmbed(item, reference)
         case "embedMenu":
             self = .embedMenu(EmbedReference.request(dict["embed"]).map { ($0.item, $0.reference, dict["opens"] as? Bool ?? false) })
         case "rowMenu":

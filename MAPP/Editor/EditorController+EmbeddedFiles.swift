@@ -1,4 +1,5 @@
 import AppKit
+import OSLog
 import WebKit
 
 /// Images put into the item, and the files it embeds opened or shown.
@@ -187,6 +188,35 @@ extension EditorController {
                 NSWorkspace.shared.open(url)
             }
         }
+    }
+
+    /// Shows a file the item embeds in Quick Look. The page asks about the item it shows and an embed of its text; a
+    /// reference to another item, or one the library no longer binds to a file, shows nothing and tells the person
+    /// why. The file is the library's kept copy, already named after the item with its extension, so Quick Look
+    /// picks a previewer from it as it does for a file item, and nothing is copied or left to remove.
+    func quickLookEmbed(_ reference: EmbedReference, in item: ItemID) {
+        guard item == pageItemID, let library else {
+            Telemetry.logger(.editor).notice("quick look asked for an embed of an item that is not on the page")
+            return
+        }
+        Task {
+            let resolution = await library.openEmbeddedFile(reference, in: item)
+            guard pageItemID == item, !windowIsGone else { return }
+            switch resolution {
+            case .file(let file):
+                quickLook = QuickLookRequest(showing: file.url)
+                NotificationCenter.default.post(name: .quickLookTaken, object: self)
+            case .unavailable(let reason):
+                library.notices.tell(String(localized: "Can’t Quick Look"), reason)
+            case .missing:
+                library.notices.tell(String(localized: "Can’t Quick Look"), String(localized: "This file isn’t in Marfa."))
+            }
+        }
+    }
+
+    /// Closes Quick Look for this editor, as the panel closing or another window taking it does.
+    func dismissQuickLook() {
+        quickLook = nil
     }
 
     /// The embed the context menu opening now is over, heard from the page just before; each menu takes it once.

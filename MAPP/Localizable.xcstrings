@@ -3424,6 +3424,9 @@
     "Quick Look" : {
       "extractionState" : "manual"
     },
+    "Quick Look %@" : {
+
+    },
     "Quiet" : {
       "extractionState" : "manual"
     },
@@ -4318,6 +4321,9 @@
     "This file isn’t an HTML page." : {
 
     },
+    "This file isn’t in Marfa." : {
+
+    },
     "This file isn’t in Marfa yet." : {
       "extractionState" : "manual"
     },
@@ -4730,6 +4736,9 @@
       "extractionState" : "manual"
     },
     "Wide" : {
+
+    },
+    "Wrap Code" : {
 
     },
     "Writes" : {
