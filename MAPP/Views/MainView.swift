@@ -150,10 +150,10 @@ struct MainView: View {
         }
     }
 
-    private func windowToolbar(hasListColumn: Bool = false, holdsViewTools: Bool = false) -> WindowToolbar {
+    private func windowToolbar(hasListColumn: Bool = false) -> WindowToolbar {
         WindowToolbar(
             browser: browser, items: browser.selectedItems(in: library), editor: editor, details: details,
-            hasListColumn: hasListColumn, holdsViewTools: holdsViewTools)
+            hasListColumn: hasListColumn)
     }
 
     /// Only the three-column split has a list column to measure.
@@ -195,7 +195,7 @@ struct MainView: View {
                     ItemsIndex(browser: browser, pane: $pane)
                         .toastOverlay()
                         .modifier(itemInspector(WindowToolbarLayout.items))
-                        .toolbar(id: WindowToolbarLayout.items) { windowToolbar(holdsViewTools: true) }
+                        .toolbar(id: WindowToolbarLayout.items) { windowToolbar() }
                 }
             } else if shownPresentation == .index {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {
@@ -203,7 +203,7 @@ struct MainView: View {
                 } detail: {
                     SidebarIndex(browser: browser, details: details, order: order)
                         .toastOverlay()
-                        .toolbar(id: WindowToolbarLayout.index) { windowToolbar(holdsViewTools: true) }
+                        .toolbar(id: WindowToolbarLayout.index) { windowToolbar() }
                 }
             } else if shownPresentation == .collection {
                 NavigationSplitView(columnVisibility: galleryColumnVisibility) {

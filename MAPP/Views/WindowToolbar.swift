@@ -7,7 +7,7 @@ import UniformTypeIdentifiers
 ///
 /// The defaults run Search and View Options, View As, Share and More, and Details at the far right. Save as View… is in
 /// View Options and the View menu, never here. In the list Search and View Options are the list column's
-/// (`ListToolbar`), and on an index page they are the page's own, over its content (`holdsViewTools`). `ExtraToolbarItems` start in the tray. Format and the Reader and Original switch are in the page's
+/// (`ListToolbar`). `ExtraToolbarItems` start in the tray. Format and the Reader and Original switch are in the page's
 /// corner (`ItemCorner`), not here.
 struct WindowToolbar: CustomizableToolbarContent {
     @CurrentLibrary private var library
@@ -20,9 +20,6 @@ struct WindowToolbar: CustomizableToolbarContent {
     var fileURL: URL?
     /// Whether the list column holds Search and View Options, which otherwise come here.
     var hasListColumn = false
-    /// Whether the page's own toolbar holds Search and View Options, over the page's content rather than over the right
-    /// sidebar, which is where a toolbar declared on the whole detail column places them (the index pages).
-    var holdsViewTools = false
 
     var body: some CustomizableToolbarContent {
         let tools = ItemToolbarActions(library: library, browser: browser, items: items, editor: editor, details: details, fileURL: fileURL)
@@ -66,13 +63,13 @@ struct WindowToolbar: CustomizableToolbarContent {
         // While a view is edited the toolbar keeps to what edits it: its layout is chosen in the panel, and Share and
         // More act on items, not on the view.
         let editsView = browser?.showsViewPanel == true
-        let showsViewTools = browser != nil && !hasListColumn && !holdsViewTools && !opensFromCollection
+        let showsViewTools = browser != nil && !hasListColumn && !opensFromCollection
         let showsViewMode = browser != nil && showsItem && !editsView
         let showsActions = showsItem && !editsView
         let showsDetails = !tools.showsInspector
         let showsAfterViewMode = showsActions || showsDetails
         let showsAfterViewTools = showsViewMode || showsAfterViewMode
-        if let browser, !hasListColumn, !holdsViewTools {
+        if let browser, !hasListColumn {
             ViewToolbarItems(browser: browser, layout: .item, isHidden: opensFromCollection)
             if showsViewTools && showsAfterViewTools { ToolbarSpacer(.fixed).customizationBehavior(.disabled) }
         }

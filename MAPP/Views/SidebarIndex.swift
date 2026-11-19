@@ -33,8 +33,6 @@ struct SidebarIndex: View {
         ) { row in
             browser.show(row.place, in: library, order: order)
         }
-        // Over this page, at the trailing edge of its table, and not over the right sidebar, which keeps its own buttons.
-        .toolbar(id: WindowToolbarLayout.index) { ViewToolbarItems(browser: browser, layout: .item) }
         .inspector(isPresented: Binding { details.isPresented } set: { details.isPresented = $0 }) {
             IndexInspector(choice: choice, rows: rows) { browser.show($0.place, in: library, order: order) }
                 .inspectorColumnWidth(min: 260, ideal: 310, max: 440)

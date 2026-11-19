@@ -39,8 +39,6 @@ struct ItemsIndex: View {
         let tabs = searching ? browser.searchedItemTabs(in: library) : model.tabs
         content(tabs: tabs, searching: searching)
             .searchStatus(browser)
-            // Over this page, at the trailing edge of its table, and not over the right sidebar, which keeps its own buttons.
-            .toolbar(id: WindowToolbarLayout.items) { ViewToolbarItems(browser: browser, layout: .item) }
             .toolbar(removing: browser.isSearchExpanded ? .title : nil)
             .onChange(of: browser.isSearchExpanded) {
                 if !browser.isSearchExpanded { browser.focusRequest = .list }
