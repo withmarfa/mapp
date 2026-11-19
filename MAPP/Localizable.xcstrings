@@ -31,6 +31,9 @@
     "Apps you sign in show here." : {
 
     },
+    "All Types" : {
+
+    },
     "Blue" : {
 
     },
@@ -41,6 +44,9 @@
 
     },
     "Collections that apps make show here." : {
+
+    },
+    "Choose Source Mark…" : {
 
     },
     "Color" : {
@@ -58,6 +64,15 @@
     "Formats" : {
 
     },
+    "Delete Collection…" : {
+
+    },
+    "Finish Customizing Sidebar" : {
+
+    },
+    "Finish Editing View" : {
+
+    },
     "Go To" : {
 
     },
@@ -71,6 +86,9 @@
 
     },
     "Hide Formats" : {
+
+    },
+    "Help" : {
 
     },
     "Hide Month" : {
@@ -115,6 +133,15 @@
     "Leave Focus" : {
 
     },
+    "Keyboard Shortcuts" : {
+
+    },
+    "MAPP Help" : {
+
+    },
+    "Marfa Documentation" : {
+
+    },
     "Move to Section" : {
 
     },
@@ -151,6 +178,9 @@
     "Nothing matches your search." : {
 
     },
+    "No Shortcuts" : {
+
+    },
     "Or Control-click the sidebar and choose Customize Sidebar." : {
 
     },
@@ -178,7 +208,13 @@
     "Rename Section" : {
 
     },
+    "Rename Source…" : {
+
+    },
     "Rename Tab" : {
+
+    },
+    "Report a Problem…" : {
 
     },
     "Saved Views" : {
@@ -215,6 +251,9 @@
 
     },
     "Teal" : {
+
+    },
+    "What’s New in MAPP" : {
 
     },
     "With one tab, the sidebar shows no tab bar." : {

@@ -9,8 +9,11 @@ import UniformTypeIdentifiers
 struct CommandPalette: View {
     @CurrentLibrary private var library
     @FocusedValue(\.detailsPresentation) private var details
+    @FocusedValue(\.indexActions) private var indexActions
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.openURL) private var openURL
+    @Environment(KeyboardShortcutsModel.self) private var shortcuts: KeyboardShortcutsModel?
     @Environment(MarfaHost.self) private var host: MarfaHost?
     @Environment(Libraries.self) private var libraries: Libraries?
     @StoredOrder private var order
@@ -741,6 +744,27 @@ struct CommandPalette: View {
             for command in SavedViewCommand.commands(for: browser, in: library, order: order) {
                 add(command.title, command.systemImage, in: .view, action: command.action)
             }
+            if browser.showsViewPanel {
+                add(String(localized: "Finish Editing View"), "checkmark", in: .view) {
+                    Task { await browser.finishViewPanel(in: library, order: order) }
+                }
+            }
+            if browser.customizesSidebar {
+                add(String(localized: "Finish Customizing Sidebar"), "checkmark", in: .view) { browser.customizesSidebar = false }
+            } else {
+                add(String(localized: "Customize Sidebar…"), "sidebar.squares.leading", in: .view) { browser.customizesSidebar = true }
+            }
+            if let indexActions {
+                if let rename = indexActions.rename {
+                    add(String(localized: "Rename Source…"), "pencil", in: .file, action: rename)
+                }
+                if let chooseMark = indexActions.chooseMark {
+                    add(String(localized: "Choose Source Mark…"), "face.smiling", in: .file, action: chooseMark)
+                }
+                if let delete = indexActions.delete {
+                    add(String(localized: "Delete Collection…"), "trash", in: .file, action: delete)
+                }
+            }
         }
         if fullWidth {
             add(String(localized: "Standard Width"), "arrow.left.and.right", in: .view) { fullWidth = false }
@@ -756,6 +780,13 @@ struct CommandPalette: View {
             entries.append(Entry(id: "command:" + title, title: title, icon: .symbol(page.symbol), takesFocus: true, group: .settings) {
                 browser.showSettings(page)
             })
+        }
+        if let shortcuts {
+            for item in HelpItem.allCases {
+                add(String(localized: item.title), item.systemImage, in: .help) {
+                    item.perform(shortcuts: shortcuts, openWindow: openWindow, openURL: openURL)
+                }
+            }
         }
         // Whatever else shares a title, such as two table columns of one label, is told apart by its place.
         let distinctIDs = PaletteSections.distinct(entries.map(\.id))

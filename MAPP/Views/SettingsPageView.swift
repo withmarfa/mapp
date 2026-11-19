@@ -194,10 +194,6 @@ enum LibraryDescription {
 private struct AboutSettings: View {
     @Environment(Libraries.self) private var libraries
 
-    private static let source = URL(string: "https://github.com/withmarfa/mapp")!
-    private static let license = URL(string: "https://github.com/withmarfa/mapp/blob/main/LICENSE")!
-    private static let docs = URL(string: "https://docs.marfa.so")!
-
     var body: some View {
         VStack(spacing: 0) {
             VStack(spacing: 4) {
@@ -226,9 +222,9 @@ private struct AboutSettings: View {
                     }
                 }
                 Section {
-                    LabeledContent("Source") { Link("github.com/withmarfa/mapp", destination: Self.source) }
-                    LabeledContent("Marfa") { Link("docs.marfa.so", destination: Self.docs) }
-                    LabeledContent("License") { Link("Apache-2.0", destination: Self.license) }
+                    LabeledContent("Source") { Link("github.com/withmarfa/mapp", destination: AppLinks.source) }
+                    LabeledContent("Marfa") { Link("docs.marfa.so", destination: AppLinks.marfaDocumentation) }
+                    LabeledContent("License") { Link("Apache-2.0", destination: AppLinks.license) }
                 }
             }
             .settingsForm()

@@ -65,6 +65,7 @@ struct SidebarIndex: View {
         } message: { row in
             Text(DeletionWords.collectionMessage(keeping: row.count))
         }
+        .focusedSceneValue(\.indexActions, actions(in: rows))
         .onDisappear { model.stop() }
         .navigationTitle(library.name(of: browser.item))
         .navigationSubtitle(summary)
@@ -74,6 +75,16 @@ struct SidebarIndex: View {
     /// The tab, whatever is kept, which is read as All when it is not one of the page's tabs.
     private var tabBinding: Binding<IndexTab> {
         Binding { place.tabs.contains(tab) ? tab : .all } set: { tab = $0 }
+    }
+
+    /// What the File menu offers for the chosen row: the same as its row menu.
+    private func actions(in rows: [IndexRow]) -> IndexActions {
+        guard let row = choice.row(in: rows) else { return IndexActions() }
+        let code = place == .sources ? row.sourceCode : nil
+        return IndexActions(
+            rename: code.map { code in { editing = SourceEditRequest(code: code, mode: .name) } },
+            chooseMark: code.map { code in { editing = SourceEditRequest(code: code, mode: .mark) } },
+            delete: place == .collections && row.canDelete ? { ask(row) } : nil)
     }
 
     /// Asks before deleting a collection, unless it is read-only.

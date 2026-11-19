@@ -10,12 +10,22 @@ struct AppCommands: Commands {
     @FocusedValue(\.focusedItems) private var focused
     @FocusedValue(\.editor) private var editor
     @FocusedValue(\.detailsPresentation) private var details
+    @FocusedValue(\.indexActions) private var indexActions
     @Environment(\.openWindow) private var openWindow
     @StoredOrder private var order
     @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
 
     var body: some Commands {
         SidebarCommands()
+
+        CommandGroup(after: .sidebar) {
+            if browser?.customizesSidebar == true {
+                Button("Finish Customizing Sidebar", systemImage: "checkmark") { browser?.customizesSidebar = false }
+            } else {
+                Button("Customize Sidebar…", systemImage: "sidebar.squares.leading") { browser?.customizesSidebar = true }
+                    .disabled(browser == nil)
+            }
+        }
 
         CommandGroup(replacing: .newItem) {
             Button("New Item", systemImage: "plus") {
@@ -57,6 +67,19 @@ struct AppCommands: Commands {
                     .environment(details)
             }
             VersionHistoryCommands(details: details, library: library, undoManager: focused?.undoManager)
+            // The row menu of the index in front: sources are renamed and marked, collections deleted.
+            if browser?.showsSidebarIndex == true {
+                Divider()
+                if browser?.indexPlace == .sources {
+                    Button("Rename Source…", systemImage: "pencil") { indexActions?.rename?() }
+                        .disabled(indexActions?.rename == nil)
+                    Button("Choose Source Mark…", systemImage: "face.smiling") { indexActions?.chooseMark?() }
+                        .disabled(indexActions?.chooseMark == nil)
+                } else {
+                    Button("Delete Collection…", systemImage: "trash") { indexActions?.delete?() }
+                        .disabled(indexActions?.delete == nil)
+                }
+            }
         }
 
         // Print has ⌘P, as everywhere; the print panel sets the paper.
@@ -81,11 +104,6 @@ struct AppCommands: Commands {
         // own around the toolbar and tab groups, so the menu can open with two in a row. `MenuSeparatorTidy` hides
         // the surplus as the menu opens; write a divider wherever one belongs and leave that to it.
         CommandGroup(before: .sidebar) {
-            Button("Recently Deleted", systemImage: "trash") {
-                if let library { browser?.show(.recentlyDeleted, in: library, order: order) }
-            }
-            .disabled(browser == nil || library == nil)
-            Divider()
             command(.toggleSource)
             command(.toggleReader)
             command(.toggleFormats)
@@ -98,6 +116,11 @@ struct AppCommands: Commands {
             }
             Divider()
             SavedViewMenu(browser: browser, library: library)
+            // The toolbar's Done for a view's panel.
+            Button("Finish Editing View", systemImage: "checkmark") {
+                if let browser, let library { Task { await browser.finishViewPanel(in: library, order: order) } }
+            }
+            .disabled(browser?.showsViewPanel != true)
             Divider()
             Button(details?.isPresented == true ? "Hide Details" : "Show Details", systemImage: "sidebar.right") {
                 details?.isPresented.toggle()
@@ -153,9 +176,6 @@ struct AppCommands: Commands {
                 .disabled(browser?.isModalPresented != true)
             Divider()
         }
-
-        // There is no help book yet, and a Help item that only says so is not worth showing.
-        CommandGroup(replacing: .help) {}
     }
 }
 
