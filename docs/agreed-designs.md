@@ -83,7 +83,7 @@ This page lists what has been agreed for MAPP and is not in the app yet, so the 
 
 ## Editing in place
 
-Built: Add Tag and Add to Collection in the value panel, a field's menu, and the locks. See [Value components](value-components.md) and [Item page](item-page.md). What waits:
+What is not built yet. The built part is in [Value components](value-components.md) and [Item page](item-page.md).
 
 - A status's value panel ends with Edit Statuses, which opens the type in Settings > Types. Settings > Types does not exist yet.
 - A field's menu has Edit the type in Settings, which opens the same page, and waits for it too.
