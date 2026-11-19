@@ -306,7 +306,7 @@ struct MainView: View {
             }
             editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
             editor.onEscape = { [browser, details, library] in
-                if details.isEditingView { browser.escapeViewPanel(in: library) } else if details.isCustomizingLayout { details.endLayout() } else { browser.focusRequest = .list }
+                if details.isEditingView { browser.escapeViewPanel(in: library) } else if details.isCustomizingLayout { details.endLayout() } else if !details.escapeFromPage() { browser.focusRequest = .list }
             }
             editor.onOpenItem = { [browser, library, order] id in
                 if let item = library.item(id) { browser.open(linked: item, in: library, order: order) }

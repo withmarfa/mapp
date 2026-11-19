@@ -3,11 +3,13 @@ import SwiftUI
 /// The window's bottom-right corner, over the content it belongs to and never over the right sidebar, which the content
 /// ends before. It holds how a person views the screen, as glass buttons each on its own; nothing that changes items
 /// goes in it. A screen supplies its buttons and, where a button opens one, a card: the card opens above the buttons at
-/// their width, right-aligned, solid rather than glass, and the buttons stay. With no buttons the corner draws nothing.
+/// their width, or at `cardWidth` where the card is wider than they are, right-aligned, solid rather than glass, and
+/// the buttons stay. With no buttons the corner draws nothing.
 ///
 /// A toast rises from the foot of the same content, so the corner lifts above it while one shows.
 struct WindowCorner<Buttons: View, Card: View>: View {
     var isCardOpen = false
+    var cardWidth: CGFloat?
     @ViewBuilder var buttons: Buttons
     @ViewBuilder var card: Card
 
@@ -26,7 +28,7 @@ struct WindowCorner<Buttons: View, Card: View>: View {
         VStack(alignment: .trailing, spacing: 8) {
             if isCardOpen {
                 card
-                    .frame(width: buttonsWidth > 0 ? buttonsWidth : nil)
+                    .frame(width: cardWidth ?? (buttonsWidth > 0 ? buttonsWidth : nil))
                     .background(.background, in: .rect(cornerRadius: 16, style: .continuous))
                     .overlay { RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5) }
                     .shadow(color: .black.opacity(0.12), radius: 14, y: 8)
@@ -50,7 +52,7 @@ struct WindowCorner<Buttons: View, Card: View>: View {
 extension WindowCorner where Card == EmptyView {
     /// A corner with buttons only.
     init(@ViewBuilder buttons: () -> Buttons) {
-        self.init(isCardOpen: false, buttons: buttons, card: { EmptyView() })
+        self.init(isCardOpen: false, cardWidth: nil, buttons: buttons, card: { EmptyView() })
     }
 }
 

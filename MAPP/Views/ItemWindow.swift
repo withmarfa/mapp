@@ -39,7 +39,9 @@ struct ItemWindow: View {
     static func makeEditor(library: any ItemLibrary, details: DetailsPresentation, showing id: Binding<ItemID?>) -> EditorController {
         let editor = EditorController(library: library)
         editor.titleDrafts = details
-        editor.onEscape = { [details] in details.endLayout() }
+        editor.onEscape = { [details] in
+            if details.isCustomizingLayout { details.endLayout() } else { details.escapeFromPage() }
+        }
         editor.onChange = { [library] id, markdown, read in library.updateBody(of: id, to: markdown, readAt: read) }
         // The keyboard follows the link to the item it opened, as it does in a main window.
         editor.onOpenItem = { [weak editor] linked in
@@ -96,6 +98,7 @@ struct ItemWindow: View {
         Group {
             if let item, let editor {
                 ItemPage(item: item, editor: editor, headerDrafts: details, backsToolbar: false)
+                    .itemCorner(item, editor: editor, details: details)
                     .navigationTitle(item.displayTitle)
                     .toolbar(removing: .title)
                     .focusedSceneValue(\.editor, editor)
@@ -105,6 +108,7 @@ struct ItemWindow: View {
                     }
             } else if let item {
                 FileItemPage(item: item, drafts: details, open: { id = $0 }, onResolved: { fileURL = $0 }, backsToolbar: false)
+                    .itemCorner(item, editor: nil, details: details)
                     .navigationTitle(item.displayTitle)
                     .focusedSceneValue(\.focusedItems, FocusedItems(ids: [item.id], undoManager: undoManager))
                     .toolbar(id: "note") {

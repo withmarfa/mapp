@@ -13,6 +13,9 @@
     "A View" : {
 
     },
+    "Aa" : {
+
+    },
     "Add Shortcut" : {
 
     },
@@ -28,6 +31,12 @@
     "Customize Sidebar…" : {
 
     },
+    "Focus" : {
+
+    },
+    "Formats" : {
+
+    },
     "Go To" : {
 
     },
@@ -35,6 +44,12 @@
 
     },
     "Green" : {
+
+    },
+    "Heading" : {
+
+    },
+    "Hide Formats" : {
 
     },
     "Hide Month" : {
@@ -47,6 +62,9 @@
 
     },
     "Indigo" : {
+
+    },
+    "Leave Focus" : {
 
     },
     "Move to Section" : {
@@ -106,10 +124,16 @@
     "Shortcuts" : {
 
     },
+    "Show Formats" : {
+
+    },
     "Show Section" : {
 
     },
     "Show %lld" : {
+
+    },
+    "Subheading" : {
 
     },
     "Tab" : {

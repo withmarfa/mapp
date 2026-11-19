@@ -74,7 +74,8 @@ struct ItemPageHeader: ViewModifier {
         let showsText = hasText && !(isCollection && library.body(of: item.id)?.text.isEmpty != false)
         return PageHeader(
             item: item.id.rawValue,
-            hidden: item.state == .trashed,
+            // Focus hides the page's header too, and the toolbar then names the item from the start.
+            hidden: item.state == .trashed || drafts.isFocused(on: item.id),
             title: item.title,
             draft: draft.isDirty ? draft.text : nil,
             titleRejected: draft.rejected,
