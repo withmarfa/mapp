@@ -136,7 +136,7 @@ nonisolated enum TypeTone: String, CaseIterable, Sendable {
     }
 }
 
-/// A favorite's mark: the heart in the pink the sidebar's Favorites view takes.
+/// A favorite's mark: the heart, in pink as the design draws every favorite.
 enum FavoriteMark {
     static func color(for scheme: ColorScheme) -> Color { TypeTone.pink.color(for: scheme) }
 }
