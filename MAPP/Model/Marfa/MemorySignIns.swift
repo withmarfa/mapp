@@ -79,7 +79,7 @@ nonisolated final class MemorySignIns: SignIns {
 
     func server(for connection: MarfaConnection) throws -> Server? {
         let key = try key(for: connection.address)
-        return key.map { Server(url: connection.address, key: $0) }
+        return try key.map { try Server(url: connection.address, key: $0) }
     }
 
     @MainActor func signInWithBrowser(to connection: MarfaConnection) async throws {

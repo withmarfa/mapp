@@ -261,8 +261,9 @@ actor MarfaSync {
         #if DEBUG
         hooks.seen.update { $0.stops += 1 }
         #endif
-        hub.set(.unavailable(message: error.message))
-        tellOnce(SourceFailure(kind: .failed, message: error.message))
+        let words = Words.message(for: error)
+        hub.set(.unavailable(message: words))
+        tellOnce(SourceFailure(kind: .failed, message: words))
     }
 
     /// The copy was made for another server: nothing in it is sent there. The writes it holds are counted for the
