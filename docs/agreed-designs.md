@@ -19,16 +19,6 @@ This page lists what has been agreed for MAPP and is not in the app yet, so the 
 - New in a type's list opens quick add holding that type, its status and the fields it asks for.
 - Quick add's main button is Add and Open: the new item opens the way Settings > Lists > Open Items In says, with the insertion point in its text.
 
-## Opening an item
-
-- Return, a double-click and Open open an item the way Settings > Lists > Open Items In says: **Modal** (the default), **Full Page** or **New Window**.
-- A modal is a large page over the screen, which dims behind it. Its toolbar has full page, new window, Share, More and close.
-- A full page takes the window, with a plain Back button at the toolbar's leading edge. The button has no label.
-- An item can always open in a window of its own.
-- The modal's toolbar starts with up and down arrows, which move to the item before or after it in the list behind. The right sidebar opens inside the modal.
-- Every layout opens an item the same way: a table, board, gallery, timeline or calendar. A list with the page beside it keeps the page there.
-- A row's context menu starts with Open, which follows the setting, then the other two ways (Open as Full Page, Open in New Window). Quick Look, Share, Add to Favorites, Tag, Add to Collection and Delete follow.
-
 ## Views
 
 - Every place opens in a default view. A person can change the default view, but can't rename or delete it.
@@ -56,7 +46,6 @@ This page lists what has been agreed for MAPP and is not in the app yet, so the 
 - Help holds MAPP Help, Keyboard Shortcuts, What's New in MAPP, Marfa Documentation and Report a Problem…, after the system's search field.
 - An empty state has a title, one line under it of fewer than 40 characters, and a button only when there is something to do there. Items has none, since New Item is already on the page. A type has New and its name, such as New Project. Favorites and Inbox have no button.
 - Recently Deleted is a page in Settings only, not a sidebar place.
-- The item's modal is solid, as the corner's cards are. The palettes keep the material chosen in Settings > Appearance.
 
 ## Editing in place
 

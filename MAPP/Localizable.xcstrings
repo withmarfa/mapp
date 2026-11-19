@@ -315,6 +315,9 @@
     "“%@” may remove items sooner than the server’s current setting." : {
       "extractionState" : "manual"
     },
+    "Modal" : {
+
+    },
     "Month" : {
       "extractionState" : "manual"
     },
@@ -1857,6 +1860,9 @@
     "Close" : {
 
     },
+    "Close Modal" : {
+
+    },
     "Code" : {
 
     },
@@ -2408,6 +2414,9 @@
       "extractionState" : "manual"
     },
     "From Apps" : {
+
+    },
+    "Full Page" : {
 
     },
     "Full Width" : {
@@ -3007,6 +3016,9 @@
     "Newest First" : {
 
     },
+    "Next Item" : {
+
+    },
     "Next Month" : {
 
     },
@@ -3259,6 +3271,12 @@
     "Open Copy" : {
       "extractionState" : "manual"
     },
+    "Open as Full Page" : {
+
+    },
+    "Open as Modal" : {
+
+    },
     "Open in Browser" : {
 
     },
@@ -3266,6 +3284,9 @@
 
     },
     "Open Item" : {
+
+    },
+    "Open Items In" : {
 
     },
     "Open Original" : {
@@ -3401,6 +3422,9 @@
 
     },
     "Previous 30 Days" : {
+
+    },
+    "Previous Item" : {
 
     },
     "Previous Month" : {

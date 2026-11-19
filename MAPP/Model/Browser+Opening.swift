@@ -10,8 +10,8 @@ extension Browser {
     /// windows take every item chosen (the ask before many is the window opener's).
     /// Whether it opened anything, which a key handler answers with.
     @discardableResult
-    func open(_ ids: Set<ItemID>, as way: ItemOpening? = nil) -> Bool {
-        let way = way ?? ItemOpening.stored()
+    func open(_ ids: Set<ItemID>, as way: ItemOpening? = nil, defaults: UserDefaults = .standard) -> Bool {
+        let way = way ?? ItemOpening.stored(in: defaults)
         guard way.canOpen(ids.count), let id = ids.first else { return false }
         switch way {
         case .newWindow: windowOpener?(ids)

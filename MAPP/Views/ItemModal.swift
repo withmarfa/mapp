@@ -92,7 +92,7 @@ struct ItemModal: View {
                 }
                 capsule {
                     Button(ItemOpening.fullPage.commandTitle, systemImage: ItemOpening.fullPage.symbol) {
-                        id.map { browser.open([$0], as: .fullPage) }
+                        if let id { browser.open([id], as: .fullPage) }
                     }
                     .help(Text(ItemOpening.fullPage.commandTitle))
                     .accessibilityIdentifier("ModalFullPage")
