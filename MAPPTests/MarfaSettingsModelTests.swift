@@ -80,7 +80,7 @@ import Testing
     @Test(arguments: [
         MarfaHost.Problem.notSignedIn, .signIn(.denied), .signIn(.expired), .signIn(.refused), .signIn(.unreachable), .signIn(.couldNotFinish),
         .signIn(.notMarfa), .signIn(.notVerified), .signIn(.inUse), .signIn(.keychain), .signIn(.noWindow), .signIn(.failed),
-        .notRevoked, .notRemoved(signIn: "errSecItemNotFound", copy: nil),
+        .notRevoked(address: "https://marfa.test"), .notRemoved(signIn: "errSecItemNotFound", copy: nil),
         .notRemoved(signIn: nil, copy: "NSCocoaErrorDomain 513"), .notConnected, .busy, .notAServer,
         .otherVersion(unsent: 2), .otherVersion(unsent: nil), .inUse,
         .copyKept(.changed(now: 2), signIn: nil), .copyKept(.unreadable(folder: "/Library/Marfa/ab12"), signIn: "errSecItemNotFound"),
@@ -115,7 +115,7 @@ import Testing
         #expect(try title(.failed) == "Couldn’t Sign In")
         #expect(try title(.keychain) == "Can’t Keep the Sign-In")
         #expect(try title(.inUse) == "The Sign-In Is in Use")
-        let revoke = try #require(MarfaSettingsModel.notice(for: .notRevoked))
+        let revoke = try #require(MarfaSettingsModel.notice(for: .notRevoked(address: "https://marfa.test")))
         #expect(revoke.title == "Disconnected, but MAPP May Still Be Approved")
         #expect(revoke.message.contains("marfa apps list"))
         #expect(revoke.message.contains("marfa apps revoke"))

@@ -107,7 +107,9 @@ import Testing
         if stands {
             #expect(told.map(\.title) == ["MAPP’s Earlier Approval May Still Stand"])
             let message = try #require(told.first?.message)
-            #expect(message.contains("marfa apps list") && message.contains("marfa apps revoke"))
+            #expect(message.contains("marfa apps list") && message.contains("marfa apps revoke <id>"))
+            #expect(message.contains("https://marfa.test"), "the server is named by its address: \(message)")
+            #expect(!message.contains("older MAPP entry"))
             #expect(!message.contains("Connected apps") && !message.contains("You are signed in") && !message.contains("still lists"))
         } else {
             #expect(told.isEmpty)
@@ -127,32 +129,15 @@ import Testing
         #expect(host.notices.waiting.map(\.title) == ["MAPP’s Earlier Approval May Still Stand"])
     }
 
-    // MARK: The adapters over the package
+    // MARK: The package's credential
 
     private struct Grant: ReplacedGrant { let replacedGrantStands: Bool }
 
-    /// What the package's sign-in says of the replaced approval is what the shipping adapter hands on, whichever way
-    /// the person signed in.
+    /// Both shipping sign-ins hand the package's `Credential` to this one conversion in one line, which is checked by
+    /// reading since a `Credential` is made only by a real sign-in; what the person is then told is tested above.
     @Test(arguments: [false, true])
-    func theBrowserAdapterHandsOnWhetherTheReplacedApprovalStands(stands: Bool) async throws {
-        let signIns = SystemSignIns(
-            bundleIdentifier: "com.withmarfa.mapp.tests", anchor: { NSWindow(contentRect: .zero, styleMask: [], backing: .buffered, defer: true) }, browserGrant: { _, _ in Grant(replacedGrantStands: stands) })
-        let signedIn = try await signIns.signInWithBrowser(to: MarfaConnection(address: "https://marfa.test"))
-        #expect(signedIn.replacedApprovalStands == stands)
-    }
-
-    @Test(arguments: [false, true])
-    func theCodeAdapterHandsOnWhetherTheReplacedApprovalStands(stands: Bool) async throws {
-        let signIns = SystemSignIns(
-            bundleIdentifier: "com.withmarfa.mapp.tests",
-            deviceGrant: { _ in
-                SystemSignIns.DeviceGrant(
-                    code: "ABCD-1234", address: URL(string: "https://marfa.test/device")!, completeAddress: nil,
-                    expiresAt: .distantFuture, credential: { Grant(replacedGrantStands: stands) })
-            })
-        let code = try await signIns.startCodeSignIn(to: MarfaConnection(address: "https://marfa.test"))
-        #expect(code.code == "ABCD-1234")
-        #expect(try await code.finish().replacedApprovalStands == stands)
+    func theConversionFromTheCredentialsAnswerKeepsWhetherTheReplacedApprovalStands(stands: Bool) {
+        #expect(SignedIn(Grant(replacedGrantStands: stands)).replacedApprovalStands == stands)
     }
 
     // MARK: Two failures that were told wrongly
@@ -166,20 +151,5 @@ import Testing
         #expect(notice.title == "Couldn’t Finish Signing In")
         #expect(notice.message == "MAPP couldn’t finish signing in. Check your connection and try again, or sign in with a code.")
         #expect(!(notice.title + notice.message).localizedCaseInsensitiveContains("reach"))
-    }
-
-    /// What reading the root of an address answers when it is no Marfa server, or cannot be reached.
-    @Test(arguments: [
-        (MarfaError.unnamed(status: 404, message: "taken as from something in front of the server", server: nil), SignInOutcome.notMarfa),
-        (MarfaError.unnamed(status: 403, message: "", server: nil), .notMarfa),
-        (MarfaError.decoding(message: "the root is not JSON"), .notMarfa),
-        (MarfaError.unnamed(status: 502, message: "", server: nil), .unreachable),
-        (MarfaError.network(message: "offline"), .unreachable),
-        (MarfaError.noConnection(message: "offline"), .unreachable),
-    ])
-    func anAddressThatAnswersNoMarfaRootIsToldAsThatAndAnOfflineOneAsUnreachable(_ error: MarfaError, _ outcome: SignInOutcome) throws {
-        #expect(SignInOutcome(probe: error) == outcome)
-        let notice = try #require(MarfaSettingsModel.notice(for: .signIn(outcome)))
-        #expect(outcome == .notMarfa ? notice.title == "Check the Address" : notice.title == "Can’t Reach the Server")
     }
 }

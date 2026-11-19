@@ -89,15 +89,16 @@ import Testing
         bench.signIns.script(signOut: .success(.notConfirmed))
 
         let told = await leaving(host)
-        guard case .notRemoved(_, let copy?, let approvalStands)? = told else {
+        guard case .notRemoved(_, let copy?, let approvalAt)? = told else {
             Issue.record("\(String(describing: told))")
             return
         }
         #expect(copy != "")
-        #expect(approvalStands)
+        #expect(approvalAt == "http://first.test:8210")
         let toldProblem = try #require(told)
         let notice = try #require(MarfaSettingsModel.notice(for: toldProblem))
         #expect(notice.message.contains("marfa apps revoke"))
+        #expect(notice.message.contains("http://first.test:8210"), "the server is named by its address")
         #expect(notice.title.contains("May Still Be Approved") || notice.message.contains("ended the approval"))
     }
 
@@ -111,11 +112,11 @@ import Testing
         bench.signIns.script(signOut: .success(.notConfirmed))
 
         let told = await leaving(host)
-        guard case .copyKept(_, _, let approvalStands)? = told else {
+        guard case .copyKept(_, _, let approvalAt)? = told else {
             Issue.record("\(String(describing: told))")
             return
         }
-        #expect(approvalStands)
+        #expect(approvalAt == "http://first.test:8210")
     }
 
     @Test func aSignOutTheServerConfirmedAddsNothingToACopyThatCouldNotBeRemoved() async throws {
@@ -128,11 +129,11 @@ import Testing
         bench.signIns.script(signOut: .success(.endedAtServer))
 
         let told = await leaving(host)
-        guard case .notRemoved(_, _, let approvalStands)? = told else {
+        guard case .notRemoved(_, _, let approvalAt)? = told else {
             Issue.record("\(String(describing: told))")
             return
         }
-        #expect(!approvalStands)
+        #expect(approvalAt == nil)
     }
 
     /// After Use a Different Server, the words are about the server left, not the one now open.
@@ -157,17 +158,21 @@ import Testing
         })
         let notice = try #require(MarfaSettingsModel.notice(for: told, reached: .switched))
         #expect(notice.message.contains("previous server"), "\(notice.message)")
-        #expect(notice.message.contains("marfa apps revoke"))
+        #expect(notice.message.contains("http://first.test:8210"), "the previous server is named by its address: \(notice.message)")
+        #expect(!notice.message.contains("second.test"))
+        #expect(notice.message.contains("marfa apps revoke <id>"))
+        #expect(!notice.message.contains("older MAPP entry"))
         #expect(host.connection?.address.absoluteString == "http://second.test:8210")
     }
 
-    @Test(arguments: [MarfaHost.Problem.notRevoked, .copyKept(.changed(now: 2), signIn: nil, approvalStands: true), .notRemoved(signIn: nil, copy: "x", approvalStands: true)])
+    @Test(arguments: [MarfaHost.Problem.notRevoked(address: "https://marfa.test"), .copyKept(.changed(now: 2), signIn: nil, approvalAt: "https://marfa.test"), .notRemoved(signIn: nil, copy: "x", approvalAt: "https://marfa.test")])
     func theApprovalWordsNeverClaimWhatTheServerHoldsOrThatMAPPIsSignedIn(problem: MarfaHost.Problem) throws {
         for reached in [MarfaSettingsModel.Reached.left, .switched] {
             let notice = try #require(MarfaSettingsModel.notice(for: problem, reached: reached))
             let text = notice.title + " " + notice.message
             #expect(text.contains("marfa apps list"))
             #expect(text.contains("marfa apps revoke"))
+            #expect(text.contains("https://marfa.test"))
             #expect(text.contains("couldn’t confirm") || text.contains("May Still"), "\(text)")
             for claim in ["still lists", "Connected apps", "You are signed in", "Is Still Approved"] {
                 #expect(!text.contains(claim), "\(reached): “\(text)” says “\(claim)”")
@@ -199,61 +204,133 @@ import Testing
         #expect(host.notices.waiting.isEmpty)
     }
 
-    // MARK: Reading the root before a sign-in
+    // MARK: An address that is not a Marfa server
 
-    @Test(arguments: [
-        (MarfaError.unnamed(status: 404, message: "", server: nil), SignInOutcome.notMarfa),
-        (MarfaError.decoding(message: "html"), .notMarfa),
-        (MarfaError.network(message: "offline"), .unreachable),
-    ])
-    func anAddressThatIsNotAMarfaServerStartsNoSignIn(error: MarfaError, outcome: SignInOutcome) async throws {
+    /// A reply that is no OAuth error, such as a proxy's page, reaches MAPP as the package's `http_<status>`.
+    @Test(arguments: ["http_404", "http_403", "http_200"])
+    func anAddressThatAnswersWithAPlainStatusStartsNoSignInAndIsToldAsNotMarfa(code: String) async throws {
         let bench = try HostBench()
-        let host = bench.host(prober: { _ in throw error })
+        bench.signIns.script(browser: [.failure(SignInError.refused(code: code, message: "Not Found"))])
+        let host = bench.host()
         let told = await problem { () throws(MarfaHost.Problem) in try await host.connect(address: "https://example.test", via: .browser) }
-        #expect(told == .signIn(outcome))
-        #expect(bench.signIns.calls.isEmpty, "no sign-in began")
+        #expect(told == .signIn(.notMarfa))
         #expect(host.connection == nil)
         #expect(bench.savedAddress == nil)
         #expect(bench.servers.opened.isEmpty)
     }
 
-    @Test func aSwitchToAnAddressThatIsNotAMarfaServerStartsNoSignInAndLeavesTheLibrary() async throws {
+    @Test func aSwitchToAnAddressThatIsNotAMarfaServerLeavesTheLibrary() async throws {
         let bench = try HostBench()
-        let probed = Mutex<[String]>([])
-        let host = bench.host(prober: { connection in
-            probed.withLock { $0.append(connection.address.absoluteString) }
-            if connection.address.host() == "example.test" { throw MarfaError.decoding(message: "html") }
-        })
+        let host = bench.host()
         try await host.connect(address: "http://first.test:8210", key: "k")
-        probed.withLock { $0 = [] }
         let source = try #require(bench.servers.last)
-        let calls = bench.signIns.calls
-        let told = await problem { () throws(MarfaHost.Problem) in try await host.changeAddress(to: "https://example.test", via: host.scripted("x")) }
+        bench.signIns.script(browser: [.failure(SignInError.refused(code: "http_404", message: "Not Found"))])
+        let told = await problem { () throws(MarfaHost.Problem) in try await host.changeAddress(to: "https://example.test", via: .browser) }
         #expect(told == .signIn(.notMarfa))
-        #expect(probed.withLock { $0 } == ["https://example.test"])
-        #expect(bench.signIns.calls == calls)
         #expect(host.source === source)
+        #expect(host.connection?.address.absoluteString == "http://first.test:8210")
     }
 
-    /// Signing in again to the server already open reads no root: it is one the person already trusts.
-    @Test func signingInAgainReadsNoRoot() async throws {
-        let bench = try HostBench()
-        let probed = Mutex(0)
-        let host = bench.host(prober: { _ in probed.withLock { $0 += 1 } })
-        try await host.connect(address: "http://first.test:8210", key: "k")
-        let first = probed.withLock { $0 }
-        try await host.connect(address: "http://first.test:8210", key: "again")
-        #expect(probed.withLock { $0 } == first)
+    @Test(arguments: ["invalid_client", "access_denied_by_policy", "http_"])
+    func aRefusalWithAnOAuthErrorIsToldAsTheServerRefusing(code: String) {
+        #expect(SignInOutcome(SignInError.refused(code: code, message: "No.")) == .refused)
     }
 
-    /// A root that answers as Marfa and then a sign-in the server refuses is still told as refused.
-    @Test func aRefusalAfterAGoodRootReadIsToldAsRefused() async throws {
+    /// A sign-in the server refuses with an OAuth error is told as refused.
+    @Test func anOAuthRefusalIsToldAsRefused() async throws {
         let bench = try HostBench()
         bench.signIns.script(browser: [.failure(SignInError.refused(code: "invalid_client", message: "No."))])
         let host = bench.host()
         let told = await problem { () throws(MarfaHost.Problem) in try await host.connect(address: "http://first.test:8210", via: .browser) }
         #expect(told == .signIn(.refused))
         #expect(bench.signIns.calls == ["browser http://first.test:8210"])
+    }
+
+    // MARK: A clean-up sign-out that throws
+
+    /// The sign-out ran into the Keychain held elsewhere before it forgot or revoked anything: the sign-in may still be
+    /// kept and the approval may stand, so the person is told, never left to find out.
+    @Test func aCleanUpSignOutThatThrowsTellsThatTheSignInAndApprovalMayStand() async throws {
+        let bench = try HostBench()
+        bench.servers.failure.withLock { $0 = SourceFailure(kind: .denied, message: "No.") }
+        bench.signIns.script(signOut: .failure(SignInError.heldElsewhere))
+        let host = bench.host()
+        let told = await problem { () throws(MarfaHost.Problem) in try await host.connect(address: "http://first.test:8210", key: "k") }
+        #expect(told != nil)
+        #expect(host.notices.waiting.map(\.title) == [Words.signOutFailedTitle])
+        let message = try #require(host.notices.waiting.first?.message)
+        #expect(message.contains("http://first.test:8210"))
+        #expect(message.contains("may still be kept") && message.contains("marfa apps revoke <id>"))
+        #expect(!message.contains("heldElsewhere") && !message.contains("Another process"))
+    }
+
+    @Test func anAbandonedSwitchWhoseCleanUpSignOutThrowsTellsTheSame() async throws {
+        let bench = try HostBench()
+        let first = try MarfaConnection(address: "http://first.test:8210")
+        let inner = bench.servers.opener
+        let host = bench.host(opener: { connection, signIns, location in
+            if connection == first { return try await inner(connection, signIns, location) }
+            throw SourceFailure(kind: .denied, message: "No.")
+        })
+        try await host.connect(address: "http://first.test:8210", key: "k")
+        bench.signIns.script(signOut: .failure(SignInError.heldElsewhere))
+        _ = await problem { () throws(MarfaHost.Problem) in try await host.changeAddress(to: "http://second.test:8210", via: host.scripted("k")) }
+        #expect(host.notices.waiting.map(\.title) == [Words.signOutFailedTitle])
+        #expect(host.notices.waiting.first?.message.contains("http://second.test:8210") == true)
+    }
+
+    // MARK: One server, two spellings of its default port
+
+    /// A copy kept from `https://host:443` is the copy of `https://host`: its queued writes are there, and no folder moves.
+    @Test func aKeptCopyOfTheSavedPortSpellingIsOpenedByTheOtherSpelling() async throws {
+        let bench = try HostBench()
+        bench.servers.storedWrites.withLock { $0 = 2 }
+        bench.defaults.set("https://marfa.test:443", forKey: "MarfaAddress")
+        bench.signIns.hold("k", for: host443)
+        let host = bench.host()
+        await host.launch()
+        try await host.disconnect(.keepCopy)
+        #expect(bench.hasCopy(host443))
+        bench.servers.storedWrites.withLock { $0 = 0 }
+
+        try await host.connect(address: "https://marfa.test", key: "again")
+        let source = try #require(bench.servers.last)
+        #expect(source.connection.address.absoluteString == "https://marfa.test:443", "the copy keeps the name it was saved under")
+        #expect(try await source.storeWrites.count == 2, "the kept writes are there")
+        #expect(bench.savedAddress == "https://marfa.test:443")
+        #expect(!bench.hasCopy(try MarfaConnection(address: "https://marfa.test")), "no second copy was made")
+    }
+
+    /// A copy the person discarded under `:443`, which could not be removed then, is removed when the address is typed
+    /// without the port, and not opened again with its writes.
+    @Test func aDiscardMarkUnderTheSavedPortSpellingIsHonouredByTheOtherSpelling() async throws {
+        let bench = try HostBench()
+        bench.servers.storedWrites.withLock { $0 = 2 }
+        bench.defaults.set("https://marfa.test:443", forKey: "MarfaAddress")
+        bench.signIns.hold("k", for: host443)
+        let attempts = Mutex(0)
+        let removed = Mutex<[URL]>([])
+        let host = bench.host(remover: { store, agreed in
+            removed.withLock { $0.append(store) }
+            if attempts.withLock({ $0 += 1; return $0 }) == 1 { throw MarfaError.storeBusy(message: "Busy.") }
+            try await MarfaHost.removeStore(store, agreedToLose: agreed)
+        })
+        await host.launch()
+        try #require(bench.servers.last).report.set(SyncReport(waiting: 2, queueRead: true))
+        #expect(await eventually { host.waitingChanges == 2 })
+        let left = await leaving(host)
+        guard case .notRemoved? = left else {
+            Issue.record("\(String(describing: left))")
+            return
+        }
+        #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies")?["https://marfa.test:443"] != nil, "the mark stays")
+        bench.servers.storedWrites.withLock { $0 = 0 }
+
+        try await host.connect(address: "https://marfa.test", key: "again")
+        #expect(removed.withLock { $0 }.last == bench.location.store(for: host443), "the mark under the saved spelling was honoured")
+        #expect(bench.defaults.dictionary(forKey: "MarfaDiscardedCopies")?["https://marfa.test:443"] == nil)
+        let source = try #require(bench.servers.last)
+        #expect(try await source.storeWrites.count == 0, "the discarded writes did not come back")
     }
 
     // MARK: Nothing raw after a sign-in
@@ -294,5 +371,33 @@ import Testing
         let told = await problem { () throws(MarfaHost.Problem) in try await host.signInAgain(via: host.scripted("new")) }
         #expect(told == .unavailable(message: Words.copyCouldNotBeOpened))
         #expect(host.source === source)
+    }
+
+    /// A package error that carries the system's own words is told in MAPP's, whichever step it stopped.
+    @Test func aStoreErrorFromThePackageIsToldInMAPPsWordsWhenTheCopyIsOpened() async throws {
+        let raw = "SQLite says: disk I/O error at /Users/someone/Library/copy.sqlite"
+        let bench = try HostBench()
+        let host = bench.host(opener: { _, _, _ in throw MarfaError.store(message: raw) })
+        let told = await problem { () throws(MarfaHost.Problem) in try await host.connect(address: "http://first.test:8210", key: "k") }
+        #expect(told == .unavailable(message: Words.copyCouldNotBeOpened))
+        let toldProblem = try #require(told)
+        let notice = try #require(MarfaSettingsModel.notice(for: toldProblem))
+        for fragment in ["SQLite", "/Users", "I/O"] {
+            #expect(!notice.message.contains(fragment), "“\(notice.message)” shows “\(fragment)”")
+        }
+    }
+
+    @Test func aStoreErrorMeetWhileOpeningTheCopyIsToldInMAPPsWords() {
+        let failure = MarfaSource.failure(opening: MarfaError.store(message: "SQLite says: disk I/O error"))
+        #expect(failure.message == Words.copyCouldNotBeOpened)
+    }
+
+    @Test(arguments: [
+        MarfaError.io(message: "No such file /Users/someone/x"), .network(message: "connection refused (os error 61)"),
+        .storageFull(message: "SQLITE_FULL"), .fault(message: "unreachable state 7"),
+    ])
+    func noPackageMessageIsToldAsItIs(error: MarfaError) {
+        let words = Words.message(for: error)
+        #expect(!words.contains(error.message), "\(words)")
     }
 }

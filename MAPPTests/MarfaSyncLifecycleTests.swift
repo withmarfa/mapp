@@ -336,7 +336,7 @@ struct MarfaSyncLifecycleTests {
         await sync.refresh()
         try await Task.sleep(for: .milliseconds(200))
         #expect(unavailable(log.current) == 1)
-        #expect(source.connectionState == .unavailable(message: error.message))
+        #expect(source.connectionState == .unavailable(message: Words.message(for: error)))
         await source.close()
     }
 

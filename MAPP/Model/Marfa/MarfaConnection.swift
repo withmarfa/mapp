@@ -32,6 +32,23 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
         Self.origin(address) == Self.origin(other.address)
     }
 
+    /// The same address spelled the other way round about the port its scheme already means: with it where this has
+    /// none, without it where this has it. Nil for any other port. A copy and its discard mark are named by the
+    /// text an address was saved as, so a person who types the other spelling still reaches them.
+    var otherDefaultPortSpelling: MarfaConnection? {
+        guard var components = URLComponents(url: address, resolvingAgainstBaseURL: false),
+            let defaultPort = components.scheme == "https" ? 443 : components.scheme == "http" ? 80 : nil
+        else { return nil }
+        if components.port == nil {
+            components.port = defaultPort
+        } else if components.port == defaultPort {
+            components.port = nil
+        } else {
+            return nil
+        }
+        return components.url.flatMap { try? MarfaConnection(address: $0.absoluteString) }
+    }
+
     private static func origin(_ address: URL) -> URL {
         guard var components = URLComponents(url: address, resolvingAgainstBaseURL: false) else { return address }
         dropDefaultPort(&components)

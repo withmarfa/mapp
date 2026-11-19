@@ -19,7 +19,7 @@ enum ItemPreviewFixtures {
         return Libraries(
             host: MarfaHost(
                 defaults: defaults, signIns: ScriptedSignIns(),
-                location: MarfaStoreLocation(root: URL.temporaryDirectory.appending(path: name)), prober: { _ in }),
+                location: MarfaStoreLocation(root: URL.temporaryDirectory.appending(path: name))),
             defaults: defaults)
     }
 

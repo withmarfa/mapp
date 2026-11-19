@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import os
 
 /// What the window says of how the library stands with its server, in the app's words. The model gives states
 /// and counts; this turns them into sentences, with no view in it, so each is tested as state in, words out.
@@ -217,9 +218,10 @@ nonisolated enum Words {
         String(localized: "MAPP couldn’t read this library’s sign-in from the Keychain. Unlock the Keychain and quit and reopen MAPP, or sign in again in Settings.")
     }
 
-    /// How the owner ends an approval the server may still hold: only they can, on a computer signed in to the server.
-    private static var endApproval: String {
-        String(localized: "To end it, run “marfa apps list” and then “marfa apps revoke” with MAPP’s entry on a computer signed in as the owner.")
+    /// How the owner ends an approval the server at `address` may still hold: only they can, with the command line
+    /// signed in to that address.
+    private static func endApproval(at address: String) -> String {
+        String(localized: "To end it, run “marfa apps list” with the command line signed in to \(address) as the owner, find MAPP’s entry, then run “marfa apps revoke <id>”.")
     }
 
     /// A sign-in that replaced another on the same server, where MAPP could not confirm the older approval ended.
@@ -227,8 +229,17 @@ nonisolated enum Words {
         String(localized: "MAPP’s Earlier Approval May Still Stand")
     }
 
-    static var replacedApproval: String {
-        String(localized: "MAPP couldn’t confirm that the server ended MAPP’s earlier approval. To end it, run “marfa apps list” and then “marfa apps revoke” with the older MAPP entry on a computer signed in as the owner.")
+    static func replacedApproval(address: String) -> String {
+        String(localized: "MAPP couldn’t confirm that \(address) ended MAPP’s earlier approval.") + " " + endApproval(at: address)
+    }
+
+    /// A clean-up sign-out that threw before it forgot or revoked anything, so the sign-in and the approval may both stand.
+    static var signOutFailedTitle: String {
+        String(localized: "MAPP’s Sign-In May Still Be Kept")
+    }
+
+    static func signOutFailed(address: String) -> String {
+        String(localized: "MAPP couldn’t drop a sign-in it didn’t use, so the sign-in may still be kept on this Mac and the approval may stand at \(address).") + " " + endApproval(at: address)
     }
 
     /// A sign-in MAPP dropped, or forgot on this Mac, whose approval it could not confirm the server ended.
@@ -249,15 +260,17 @@ nonisolated enum Words {
         }
     }
 
-    static func approvalMayStand(_ which: ForgottenApproval) -> String {
-        switch which {
+    /// `address` is the server whose approval may stand: after a switch, the previous one.
+    static func approvalMayStand(_ which: ForgottenApproval, address: String) -> String {
+        let told = switch which {
         case .left:
-            String(localized: "MAPP forgot its sign-in on this Mac, but couldn’t confirm that the server ended the approval.") + " " + endApproval
+            String(localized: "MAPP forgot its sign-in on this Mac, but couldn’t confirm that \(address) ended the approval.")
         case .previous:
-            String(localized: "MAPP forgot the previous server’s sign-in on this Mac, but couldn’t confirm that the previous server ended the approval.") + " " + endApproval
+            String(localized: "MAPP forgot the previous server’s sign-in on this Mac, but couldn’t confirm that \(address) ended the approval.")
         case .abandoned:
-            String(localized: "MAPP dropped a sign-in it didn’t use, but couldn’t confirm that the server ended its approval.") + " " + endApproval
+            String(localized: "MAPP dropped a sign-in it didn’t use, but couldn’t confirm that \(address) ended its approval.")
         }
+        return told + " " + endApproval(at: address)
     }
 
     /// The copy could not be opened or made, for a reason the package did not name.
@@ -271,11 +284,39 @@ nonisolated enum Words {
         String(localized: "This server runs Marfa \(served). Update the server to Marfa \(oldest) or later to use this app.")
     }
 
-    /// What to show a person of an error the package raised: the words above for one the app words itself,
-    /// the package's own for the rest.
+    /// The server or the copy stopped a step for a reason MAPP can't resolve itself.
+    static var syncFailed: String {
+        String(localized: "MAPP ran into a problem it can’t resolve itself. Choose Refresh to try again.")
+    }
+
+    /// There is not enough room on this Mac for the copy.
+    static var storageFull: String {
+        String(localized: "There isn’t enough room on this Mac for the copy of your library. Free some space, then try again.")
+    }
+
+    /// The address reaches another Marfa server than the one the open library was made for, which a new sign-in cannot change.
+    static var differentServer: String {
+        String(localized: "This address reaches a different Marfa server from the one this library was made for, so MAPP left the library as it was.")
+    }
+
+    /// The server could not be reached.
+    static var serverUnreachable: String {
+        String(localized: "MAPP couldn’t reach the server. Check your connection, then try again.")
+    }
+
+    /// What to show a person of an error the package raised, in the app's words: what the package, the system or the
+    /// server said goes to the log and is never shown.
     static func message(for error: MarfaError) -> String {
         if case .serverTooOld(let served, let oldest, _) = error { return serverTooOld(served: served, oldest: oldest) }
-        return error.message
+        // A string logged without a privacy level is private.
+        Telemetry.logger(.library).error("A package step failed: \(String(describing: error))")
+        switch error {
+        case .store, .storeDamaged, .io, .noKeychain, .closed: return copyCouldNotBeOpened
+        case .wrongServer: return differentServer
+        case .storageFull: return storageFull
+        case .network, .noConnection: return serverUnreachable
+        default: return error.isOffline ? serverUnreachable : syncFailed
+        }
     }
 
     /// The address now reaches another Marfa server than the one this copy was made for, so nothing in the copy is

@@ -112,7 +112,8 @@ struct MarfaSyncFailureTests {
         fake.sendUpdate(update(.needsHydration(nil)))
         fake.sendUpdate(update(.needsHydration(refused)))
         _ = try #require(await log.wait { unavailable($0) == 1 })
-        #expect(await waitForConnection(source) { $0 == .unavailable(message: refused.message) })
+        #expect(Words.message(for: refused) == Words.syncFailed, "the server's text is never shown")
+        #expect(await waitForConnection(source) { $0 == .unavailable(message: Words.syncFailed) })
         #expect(await eventually { source.syncReport.phase == .current }, "Refresh is not offered")
         await source.close()
     }

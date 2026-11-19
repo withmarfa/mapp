@@ -64,13 +64,13 @@
     "MAPP May Still Be Approved" : {
 
     },
-    "MAPP forgot the previous server’s sign-in on this Mac, but couldn’t confirm that the previous server ended the approval." : {
+    "MAPP forgot the previous server’s sign-in on this Mac, but couldn’t confirm that %@ ended the approval." : {
 
     },
-    "MAPP dropped a sign-in it didn’t use, but couldn’t confirm that the server ended its approval." : {
+    "MAPP dropped a sign-in it didn’t use, but couldn’t confirm that %@ ended its approval." : {
 
     },
-    "To end it, run “marfa apps list” and then “marfa apps revoke” with MAPP’s entry on a computer signed in as the owner." : {
+    "To end it, run “marfa apps list” with the command line signed in to %@ as the owner, find MAPP’s entry, then run “marfa apps revoke <id>”." : {
 
     },
     "MAPP couldn’t make or open the copy of your library on this Mac. Check that MAPP can change its own files, then try again." : {
@@ -80,6 +80,27 @@
 
     },
     "MAPP couldn’t finish signing in. Check your connection and try again, or sign in with a code." : {
+
+    },
+    "Sign in to the previous server again to see them." : {
+
+    },
+    "MAPP’s Sign-In May Still Be Kept" : {
+
+    },
+    "MAPP couldn’t drop a sign-in it didn’t use, so the sign-in may still be kept on this Mac and the approval may stand at %@." : {
+
+    },
+    "MAPP ran into a problem it can’t resolve itself. Choose Refresh to try again." : {
+
+    },
+    "There isn’t enough room on this Mac for the copy of your library. Free some space, then try again." : {
+
+    },
+    "MAPP couldn’t reach the server. Check your connection, then try again." : {
+
+    },
+    "This address reaches a different Marfa server from the one this library was made for, so MAPP left the library as it was." : {
 
     },
     "Customize Sidebar…" : {
@@ -423,7 +444,7 @@
     "The collection is deleted for every app connected to your Marfa server." : {
 
     },
-    "MAPP couldn’t confirm that the server ended MAPP’s earlier approval. To end it, run “marfa apps list” and then “marfa apps revoke” with the older MAPP entry on a computer signed in as the owner." : {
+    "MAPP couldn’t confirm that %@ ended MAPP’s earlier approval." : {
 
     },
     "Your items are still loading." : {
@@ -3065,7 +3086,7 @@
     "MAPP doesn’t have permission for “%@”. Ask whoever runs the server to allow it, then make the change again." : {
       "extractionState" : "manual"
     },
-    "MAPP forgot its sign-in on this Mac, but couldn’t confirm that the server ended the approval." : {
+    "MAPP forgot its sign-in on this Mac, but couldn’t confirm that %@ ended the approval." : {
       "extractionState" : "manual"
     },
     "MAPP is still saving what you last typed. Try again in a moment." : {

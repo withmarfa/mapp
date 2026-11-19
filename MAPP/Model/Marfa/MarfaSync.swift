@@ -386,8 +386,8 @@ actor MarfaSync {
             return
         }
         Telemetry.syncStoppedUnnamed(during: "refresh")
-        hub.set(.unavailable(message: error.localizedDescription))
-        tellOnce(SourceFailure(kind: .failed, message: error.localizedDescription))
+        hub.set(.unavailable(message: Words.syncFailed))
+        tellOnce(SourceFailure(kind: .failed, message: Words.syncFailed))
     }
 
     // MARK: Attachments

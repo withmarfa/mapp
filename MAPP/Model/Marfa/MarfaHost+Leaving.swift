@@ -83,6 +83,7 @@ extension MarfaHost {
         var copy: String?
         var kept: CopyKept?
         var outcome = SignOutOutcome.endedAtServer
+        let address = connection.address.absoluteString
         do {
             outcome = try await signIns.signOut(of: connection)
         } catch {
@@ -99,10 +100,10 @@ extension MarfaHost {
                 kept = reason
             }
         }
-        let approvalStands = outcome == .notConfirmed
-        if let kept { return .copyKept(kept, signIn: signIn, approvalStands: approvalStands) }
-        if signIn != nil || copy != nil { return .notRemoved(signIn: signIn, copy: copy, approvalStands: approvalStands) }
-        return approvalStands ? .notRevoked : nil
+        let approvalAt = outcome == .notConfirmed ? address : nil
+        if let kept { return .copyKept(kept, signIn: signIn, approvalAt: approvalAt) }
+        if signIn != nil || copy != nil { return .notRemoved(signIn: signIn, copy: copy, approvalAt: approvalAt) }
+        return approvalAt.map { .notRevoked(address: $0) }
     }
 
     var discarded: [String: Agreed] {
@@ -115,8 +116,14 @@ extension MarfaHost {
         defaults.set(marks, forKey: Self.discardedKey)
     }
 
-    /// A copy the person discarded is removed before its address is opened again, or not opened at all.
+    /// A copy the person discarded is removed before its address is opened again, or not opened at all. A mark is
+    /// honoured under either spelling of a default port.
     func clearDiscarded(_ connection: MarfaConnection) async throws(Problem) {
+        try await clearMark(of: connection)
+        if let other = connection.otherDefaultPortSpelling { try await clearMark(of: other) }
+    }
+
+    private func clearMark(of connection: MarfaConnection) async throws(Problem) {
         guard let agreed = discarded[connection.address.absoluteString] else { return }
         switch await removeCopy(connection, agreed: agreed) {
         case .removed:
