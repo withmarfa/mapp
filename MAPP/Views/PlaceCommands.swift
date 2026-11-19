@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The Go menu: the places, the saved views and the types the sidebar lists (`GoMenu`), so a window with the sidebar
 /// hidden reaches them too, and every other type under All Types. New and Search are File and Edit menu commands
-/// already. A view or a type has no key.
+/// already. The menu has no keys.
 struct PlaceCommands: Commands {
     /// Nil while no library is open: before a server is set, or while a server's copy opens.
     let library: (any ItemLibrary)?
