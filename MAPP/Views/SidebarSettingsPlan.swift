@@ -69,11 +69,11 @@ struct SidebarSettingsPlan: Equatable {
             case .library, .custom:
                 rows.filter(\.isShown).map(\.title).joined(separator: ", ")
             case .views: String(localized: "\(rows.count) views")
-            case .types: String(localized: "\(rows.count) types")
+            case .types: String(localized: "\(plan.types.count) types")
             }
             return Section(
                 id: group.id, kind: kind, title: group.group.name, symbol: Self.symbol(of: kind),
-                detail: detail.isEmpty ? String(localized: "Empty") : detail, isShown: !group.group.isHidden, choices: choices)
+                detail: detail.isEmpty ? String(localized: "Empty") : detail, isShown: !layout.hides(group.group), choices: choices)
         }
         tabs = plan.tabs.map { tab in
             Tab(tab: tab, sections: plan.groups.filter { layout.tabID(of: $0.group) == tab.id }.map(section))

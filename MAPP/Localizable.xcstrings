@@ -396,6 +396,10 @@
     "%@ are no longer where they were, so they were taken out of the new item. Add them again, or add the item without them." : {
       "extractionState" : "manual"
     },
+    "%@ > %@" : {
+      "extractionState" : "manual",
+      "generatesSymbol" : false
+    },
     "%@ at %@" : {
       "extractionState" : "manual"
     },

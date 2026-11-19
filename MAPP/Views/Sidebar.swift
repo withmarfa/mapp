@@ -64,7 +64,7 @@ struct SidebarContent {
                 shortcuts: group.group.shortcuts.compactMap { Self.shortcutRow($0, in: library, creatable: creatable) })
         }
         hiddenKinds = customizing
-            ? plan.groups.filter { $0.group.isHidden && [.library, .views, .types].contains($0.group.kind) }.map(\.group.kind)
+            ? plan.groups.filter { layout.hides($0.group) && [.library, .views, .types].contains($0.group.kind) }.map(\.group.kind)
             : []
         choices = customizing ? Self.choices(in: library, plan: plan, layout: layout) : SidebarChoices()
         var hasher = Hasher()
@@ -80,13 +80,24 @@ struct SidebarContent {
     }
 
     /// What a section's Show list offers, shown or not: its places, and for Views the saved views as a whole. Types lists
-    /// the top-level rows.
+    /// the top-level rows, and the subtypes hidden by their own row's Hide from Sidebar, which only Show can bring back.
     static func showChoices(of group: SidebarGroupPlan, in library: any ItemLibrary, plan: SidebarPlan) -> [SidebarShowChoice] {
         let layout = plan.layout
         switch group.group.kind {
         case .shortcuts: return []
         case .types:
-            return plan.types.map { SidebarShowChoice(place: .type($0.id), title: $0.label, isShown: !layout.isHidden(.type($0.id))) }
+            func hiddenSubtypes(of node: TypeNode) -> [SidebarShowChoice] {
+                node.children.flatMap { child in
+                    let own = layout.isHidden(.type(child.id))
+                        ? [SidebarShowChoice(place: .type(child.id), title: String(localized: "\(node.label) > \(child.label)"), isShown: false)]
+                        : []
+                    return own + hiddenSubtypes(of: child)
+                }
+            }
+            return plan.types.flatMap { node in
+                [SidebarShowChoice(place: .type(node.id), title: node.label, isShown: !layout.isHidden(.type(node.id)))]
+                    + hiddenSubtypes(of: node)
+            }
         case .views, .library, .custom:
             let saved = group.group.kind == .views
                 ? [SidebarShowChoice(place: .views, title: String(localized: "Saved Views"), isShown: !layout.isHidden(.views))] : []

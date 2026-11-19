@@ -210,11 +210,18 @@ nonisolated extension SidebarLayout {
         for (slot, group) in zip(slots, inTab) { groups?[slot] = group }
     }
 
+    /// Whether the sidebar hides a section: the section itself is hidden, or, for the types section, an older layout
+    /// hid it as a place (Show Types in an earlier Settings), which `SidebarPlan` reads too.
+    func hides(_ group: SidebarGroup) -> Bool {
+        group.isHidden || (group.kind == .types && isHidden(.types))
+    }
+
     /// Shows a hidden section again where it sits. Add Section brings it back at the end of a tab instead.
     mutating func showGroup(_ id: String) {
-        guard let index = allGroups.firstIndex(where: { $0.id == id }), allGroups[index].isHidden else { return }
+        guard let index = allGroups.firstIndex(where: { $0.id == id }), hides(allGroups[index]) else { return }
         materialize()
         groups?[index].isHidden = false
+        if groups?[index].kind == .types { setHidden(.types, false) }
     }
 
     /// Moves a section to the end of another tab. Nothing happens for a tab that does not exist.
@@ -261,6 +268,7 @@ nonisolated extension SidebarLayout {
         groups?.removeAll { $0.id == group.id }
         group.tab = tab
         group.isHidden = false
+        if group.kind == .types { setHidden(.types, false) }
         groups?.append(group)
         return group.id
     }
@@ -317,6 +325,9 @@ nonisolated extension SidebarLayout {
     /// only its own places reads as the one list the person arranged and a saved view can come before Inbox
     /// (`SidebarGroupPlan`).
     mutating func moveViews(_ views: [SidebarPlace], fromOffsets source: IndexSet, toOffset destination: Int) {
+        // `views` is the order the rows are drawn in, which a stored `order` may not agree with (the saved views before
+        // Inbox), so it is written first and the move is then made on what the person sees.
+        record(views)
         move(views, fromOffsets: source, toOffset: destination)
         let placed = views.compactMap { place in home(of: place).map { (place.key, $0) } }
         materialize()

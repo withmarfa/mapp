@@ -225,6 +225,13 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
         order = order.filter { !keys.contains($0) } + keys
     }
 
+    /// Keeps `places` in the order given as the person's own, whatever order was stored for them.
+    mutating func record(_ places: [SidebarPlace]) {
+        let keys = places.map(\.key)
+        let moving = Set(keys)
+        order = order.filter { !moving.contains($0) } + keys
+    }
+
     /// `places` as the person ordered them; the ones never placed follow, in the order given.
     func ordered<Place>(_ places: [Place], by key: (Place) -> String) -> [Place] {
         let rank = Dictionary(order.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })

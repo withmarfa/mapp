@@ -59,6 +59,75 @@ struct SidebarSettingsTests {
         #expect(plan(library(), layout).tabs[0].sections.allSatisfy { $0.isShown })
     }
 
+    // MARK: The Types section from a layout stored by today's build
+
+    private func marfaLibrary() async throws -> MarfaLibrary {
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source, notices: Notices())
+        source.send(.loaded(SourceSnapshot(items: LibraryFixture.items, catalogue: LibraryFixture.catalogue)))
+        try #require(await eventually { library.isLoaded })
+        return library
+    }
+
+    private func typesSection(_ library: MarfaLibrary, _ layout: SidebarLayout) throws -> SidebarSettingsPlan.Section {
+        try #require(SidebarSettingsPlan(library, layout: layout).tabs[0].sections.first { $0.kind == .types })
+    }
+
+    private func sidebarShowsTypes(_ library: MarfaLibrary, _ layout: SidebarLayout) -> Bool {
+        let plan = SidebarPlan(library, layout: layout)
+        return plan.groups(in: SidebarTab.homeID, customizing: false).contains { $0.group.kind == .types }
+    }
+
+    @Test func typesHiddenByTodaysShowTypesSwitchReadAsOffHereAndShowBringsThemBack() async throws {
+        let library = try await marfaLibrary()
+        var layout = try JSONDecoder().decode(SidebarLayout.self, from: Data(#"{"hidden":["types"],"order":[]}"#.utf8))
+        #expect(!sidebarShowsTypes(library, layout), "the sidebar hides the section")
+        #expect(try !typesSection(library, layout).isShown, "so Settings says it is off")
+
+        layout.showGroup("types")
+        #expect(try typesSection(library, layout).isShown)
+        #expect(sidebarShowsTypes(library, layout))
+        #expect(!layout.isHidden(.types))
+        #expect(try JSONDecoder().decode(SidebarLayout.self, from: JSONEncoder().encode(layout)) == layout)
+    }
+
+    @Test func hidingTheTypesSectionFromSettingsHidesItInTheSidebarAndShowBringsItBack() async throws {
+        let library = try await marfaLibrary()
+        var layout = SidebarLayout()
+        layout.hideGroup("types")
+        #expect(try !typesSection(library, layout).isShown)
+        #expect(!sidebarShowsTypes(library, layout))
+
+        layout.showGroup("types")
+        #expect(try typesSection(library, layout).isShown)
+        #expect(sidebarShowsTypes(library, layout))
+    }
+
+    @Test func addSectionBringsBackTypesHiddenByTodaysShowTypesSwitch() async throws {
+        let library = try await marfaLibrary()
+        var layout = try JSONDecoder().decode(SidebarLayout.self, from: Data(#"{"hidden":["types"],"order":[]}"#.utf8))
+        let content = SidebarContent(library: library, layout: layout, tab: nil, customizing: true)
+        #expect(content.hiddenKinds == [.types], "Add Section offers it")
+        layout.addGroup(.types, toTab: SidebarTab.homeID)
+        #expect(try typesSection(library, layout).isShown)
+        #expect(sidebarShowsTypes(library, layout))
+    }
+
+    @Test func aSubtypeHiddenByItsRowIsOfferedInTheTypesSectionsShowListAndComesBack() async throws {
+        let library = try await marfaLibrary()
+        var layout = try JSONDecoder().decode(SidebarLayout.self, from: Data(#"{"hidden":["type:aic.ticket.bug"],"order":[]}"#.utf8))
+        let bug = SidebarPlace.type("aic.ticket.bug")
+        let offered = try typesSection(library, layout).choices
+        let choice = try #require(offered.first { $0.place == bug })
+        #expect(!choice.isShown && choice.title.hasSuffix("Bugs"))
+        #expect(!offered.contains { $0.place == .type("aic.ticket.task") }, "a shown subtype is not offered twice")
+        #expect(!SidebarPlan(library, layout: layout).shownTypes.flatMap(\.children).map(\.id).contains("aic.ticket.bug"))
+
+        layout.setHidden(choice.place, false)
+        #expect(SidebarPlan(library, layout: layout).shownTypes.flatMap(\.children).map(\.id).contains("aic.ticket.bug"))
+        #expect(try !typesSection(library, layout).choices.contains { $0.place == bug })
+    }
+
     @Test func aSectionOfThePersonsOwnIsRemovedNotHidden() {
         var layout = SidebarLayout()
         let mine = layout.addGroup(.custom, toTab: SidebarTab.homeID, id: "mine")
@@ -140,6 +209,59 @@ struct SidebarSettingsTests {
         let sidebar = SidebarPlan(library(), layout: layout).section(.views)?.shown ?? []
         #expect(sidebar.first == .view(ItemID("v-Reading")), "the sidebar's section reads the same arrangement")
         #expect(Set(sidebar) == Set(places))
+    }
+
+    /// The layout today's build stores after the views and the built-in views were each moved: the saved views come
+    /// before Inbox, Recents and Favorites in `order`, and the sidebar draws the built-in ones first.
+    private func storedWithSavedViewsBeforeInbox() throws -> SidebarLayout {
+        let saved = Data(#"{"hidden":[],"order":["view:v-Reading","view:v-Open work","inbox","recents","favorites"]}"#.utf8)
+        return try JSONDecoder().decode(SidebarLayout.self, from: saved)
+    }
+
+    /// What Settings lists and what the sidebar's Views section shows, which must agree.
+    private func arrangement(_ layout: SidebarLayout) -> (settings: [String], sidebar: [String]) {
+        let library = library()
+        let name = { (place: SidebarPlace) in place.key }
+        return (plan(library, layout).views.map(\.place).map(name), (SidebarPlan(library, layout: layout).section(.views)?.shown ?? []).map(name))
+    }
+
+    private let storedDisplay = ["inbox", "recents", "favorites", "view:v-Reading", "view:v-Open work"]
+
+    @Test func draggingInboxInALayoutStoredBeforeTheRedesignMovesOnlyInbox() throws {
+        var layout = try storedWithSavedViewsBeforeInbox()
+        #expect(arrangement(layout).settings == storedDisplay)
+        layout.moveViews(plan(library(), layout).views.map(\.place), fromOffsets: [0], toOffset: 5)
+        let after = arrangement(layout)
+        #expect(after.settings == ["recents", "favorites", "view:v-Reading", "view:v-Open work", "inbox"])
+        #expect(after.sidebar == after.settings)
+    }
+
+    @Test func moveUpInALayoutStoredBeforeTheRedesignMovesOnlyThatView() throws {
+        for (index, expected) in [
+            (2, ["inbox", "favorites", "recents", "view:v-Reading", "view:v-Open work"]),
+            (3, ["inbox", "recents", "view:v-Reading", "favorites", "view:v-Open work"]),
+            (4, ["inbox", "recents", "favorites", "view:v-Open work", "view:v-Reading"]),
+        ] {
+            var layout = try storedWithSavedViewsBeforeInbox()
+            layout.moveViews(plan(library(), layout).views.map(\.place), fromOffsets: [index], toOffset: index - 1)
+            let after = arrangement(layout)
+            #expect(after.settings == expected, "Move Up on row \(index)")
+            #expect(after.sidebar == expected)
+        }
+    }
+
+    @Test func moveDownInALayoutStoredBeforeTheRedesignMovesOnlyThatView() throws {
+        for (index, expected) in [
+            (0, ["recents", "inbox", "favorites", "view:v-Reading", "view:v-Open work"]),
+            (2, ["inbox", "recents", "view:v-Reading", "favorites", "view:v-Open work"]),
+            (3, ["inbox", "recents", "favorites", "view:v-Open work", "view:v-Reading"]),
+        ] {
+            var layout = try storedWithSavedViewsBeforeInbox()
+            layout.moveViews(plan(library(), layout).views.map(\.place), fromOffsets: [index], toOffset: index + 2)
+            let after = arrangement(layout)
+            #expect(after.settings == expected, "Move Down on row \(index)")
+            #expect(after.sidebar == expected)
+        }
     }
 
     @Test func manySavedViewsStayOneListInOrderWithOneColorEach() {
