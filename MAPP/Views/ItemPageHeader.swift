@@ -191,6 +191,8 @@ struct ItemPageHeader: ViewModifier {
             kind = item.isEditable ? .parent : nil
         case PagePlacement.type:
             kind = library.offersTypeChange(for: [id]) ? .type : nil
+        case MarfaMapping.collectionEdge:
+            kind = library.canJoinCollection(item) ? .collections : nil
         case ItemLocation.rowID:
             // A Location with no point and no way to set one has nothing to open.
             let location = ItemLocation.of(library.catalogue.itemTypes[item.type])

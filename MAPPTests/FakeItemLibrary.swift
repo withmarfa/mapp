@@ -135,7 +135,7 @@ final class FakeItemLibrary: ItemLibrary {
     /// An active collection, of the catalogue's container type.
     static func collection(_ title: String, id: ItemID = .mint(), state: ItemState = .active) -> Item {
         Item(
-            id: id, type: collectionType, title: title, titleRule: .property("title"), state: state,
+            id: id, type: collectionType, title: title, name: title.isEmpty ? nil : title, titleRule: .property("title"), state: state,
             version: ItemVersion(1), created: .distantPast, modified: .distantPast)
     }
 

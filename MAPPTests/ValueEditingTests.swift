@@ -717,4 +717,22 @@ struct ValueEditingTests {
         #expect(rect == CGRect(x: 10, y: 20, width: 30, height: 40) && height == 800)
         #expect(EditorMessage(body: ["type": "editValue", "item": "x", "row": "", "rect": [1, 2, 3, 4], "viewportHeight": 1]) == nil)
     }
+
+    @Test func theFieldMenuMessageCarriesTheRowTheLabelsRectangleAndWhetherTheValueFollowsALink() throws {
+        let body: [String: Any] = [
+            "type": "fieldMenu", "item": "10000000-0000-0000-0000-000000000001", "row": "in-collection", "editsValue": true,
+            "rect": [10, 20, 30, 40], "viewportHeight": 800,
+        ]
+        guard case .fieldMenu(let item, let row, let editsValue, let rect, let height) = try #require(EditorMessage(body: body)) else {
+            Issue.record("Not a fieldMenu message")
+            return
+        }
+        #expect(item == ItemID("10000000-0000-0000-0000-000000000001") && row == "in-collection" && editsValue)
+        #expect(rect == CGRect(x: 10, y: 20, width: 30, height: 40) && height == 800)
+        var plain = body
+        plain["editsValue"] = nil
+        guard case .fieldMenu(_, _, let defaulted, _, _) = try #require(EditorMessage(body: plain)) else { return }
+        #expect(!defaulted, "a page that says nothing offers no value editor")
+        #expect(EditorMessage(body: ["type": "fieldMenu", "item": "x", "row": "", "rect": [1, 2, 3, 4], "viewportHeight": 1]) == nil)
+    }
 }

@@ -29,7 +29,7 @@ nonisolated enum ValueEditMetrics {
         case .people: 216...308
         case .status, .choice: 192...260
         case .type: 200...264
-        case .parent: 200...264
+        case .parent, .collections: 200...264
         case .text, .number: nil
         }
     }

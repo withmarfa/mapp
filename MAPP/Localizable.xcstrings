@@ -1072,12 +1072,6 @@
     "Add a filter" : {
 
     },
-    "Add a tag to “%@”." : {
-
-    },
-    "Add a tag to %lld items." : {
-
-    },
     "Add Attachment…" : {
 
     },
@@ -1532,12 +1526,6 @@
 
     },
     "Choice" : {
-      "extractionState" : "manual"
-    },
-    "Choose a collection for “%@”." : {
-      "extractionState" : "manual"
-    },
-    "Choose a collection for %lld items." : {
       "extractionState" : "manual"
     },
     "Choose a kind of item and give it a title." : {
@@ -2082,9 +2070,6 @@
     "Files Not in the Text" : {
       "extractionState" : "manual"
     },
-    "Filter" : {
-
-    },
     "Filter By" : {
 
     },
@@ -2092,6 +2077,9 @@
       "extractionState" : "manual"
     },
     "Find" : {
+
+    },
+    "Find a Collection" : {
 
     },
     "Find a Type" : {

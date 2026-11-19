@@ -16,6 +16,8 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
     case words(ItemTypeInfo.Field)
     /// The item's own tags, which no field holds.
     case tags
+    /// The collections the item is in, which no field holds: an item is added to one or taken out of it.
+    case collections
     /// The item's parent, which no field holds: a link to another item.
     case parent
     /// The item's type, which no field holds. A person chooses one of the types the item can become.
@@ -43,7 +45,7 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
         case .status(let field), .choice(let field), .date(let field), .people(let field, _), .text(let field), .number(let field),
              .words(let field):
             field
-        case .tags, .parent, .type, .location: nil
+        case .tags, .collections, .parent, .type, .location: nil
         }
     }
 
@@ -51,6 +53,7 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
     var rowID: String {
         switch self {
         case .tags: PagePlacement.tags
+        case .collections: MarfaMapping.collectionEdge
         case .parent: PagePlacement.parent
         case .type: PagePlacement.type
         case .location: ItemLocation.rowID
@@ -76,7 +79,7 @@ nonisolated enum ValueEditKind: Hashable, Sendable {
     var closesOnChoice: Bool {
         switch self {
         case .status, .choice, .parent, .type: true
-        case .date, .people, .tags, .text, .number, .words, .location: false
+        case .date, .people, .tags, .collections, .text, .number, .words, .location: false
         }
     }
 }

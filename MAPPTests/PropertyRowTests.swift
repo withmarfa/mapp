@@ -56,6 +56,16 @@ struct PropertyRowTests {
             isEditable: true, allowsMultiple: true)
     }
 
+    @Test func theCollectionsRowIsTheOneLinkRowThePageEditsInPlace() {
+        let rows = Self.rows(
+            [:], relationships: [
+                Self.relationship(MarfaMapping.collectionEdge, "In Collection", [("Reading", "20000000-0000-0000-0000-000000000001")]),
+                Self.relationship("related", "Related", [("Other", "20000000-0000-0000-0000-000000000002")]),
+            ])
+        #expect(rows.first { $0.id == MarfaMapping.collectionEdge }?.editable == true)
+        #expect(rows.first { $0.id == "related" }?.editable == false)
+    }
+
     // MARK: Kinds
 
     @Test func eachKindIsDrawnByItsKind() {

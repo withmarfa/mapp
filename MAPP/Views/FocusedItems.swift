@@ -66,9 +66,9 @@ final class DetailsPresentation {
     private(set) var isEditingView = false
     /// Whether closing the view panel closes the sidebar, because opening it opened the sidebar.
     @ObservationIgnored private var closesSidebarAtViewEnd = false
-    /// The items the window's Add to Collection sheet is open for.
+    /// The items the window's Add to Collection panel is asked for.
     var collectionPick: CollectionPickRequest?
-    /// The items the window's Add Tag sheet is open for.
+    /// The items the window's Add Tag panel is asked for.
     var tagRequest: TagRequest?
     /// The items the window asks the person to confirm moving to Recently Deleted.
     var deletion: DeleteRequest?
@@ -233,8 +233,7 @@ struct TypeValuesRequest: Identifiable {
     let undoManager: UndoManager?
 }
 
-/// The items the Add to Collection sheet files, with the undo manager of the window it was asked for in, since the
-/// sheet has its own.
+/// The items the Add to Collection panel files, with the undo manager of the window it was asked for in.
 struct CollectionPickRequest: Identifiable {
     let id = UUID()
     let ids: Set<ItemID>

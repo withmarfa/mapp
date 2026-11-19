@@ -229,11 +229,9 @@ struct MainView: View {
             }
         }
         .focusedSceneValue(\.detailsPresentation, details)
-        .modifier(TypeChangePanel(details: details))
+        .modifier(CommandValuePanels(details: details))
         .modifier(FieldEditSheets(details: details))
         .sheet(item: Binding { details.typeValues } set: { details.typeValues = $0 }) { TypeValuesSheet(request: $0) }
-        .sheet(item: Binding { details.collectionPick } set: { details.collectionPick = $0 }) { CollectionPickerSheet(request: $0) }
-        .sheet(item: Binding { details.tagRequest } set: { details.tagRequest = $0 }) { TagSheet(request: $0) }
         .onChange(of: details.isPresentedByPerson) { if restoresWindow { storedDetailsPresented = details.isPresentedByPerson } }
         // Closing the sidebar by hand finishes Customize Layout, which has nowhere else to show.
         .onChange(of: details.isPresented) { if !details.isPresented { details.endLayout() } }
