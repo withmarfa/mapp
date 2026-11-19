@@ -7,6 +7,8 @@ struct ViewOptionCommand {
     let systemImage: String
     /// The menu group ⌘K lists it under: the View menu's, unless it sorts or groups.
     var group = PaletteSections.CommandGroup.view
+    /// The key the View menu binds to it, as the palette prints it.
+    var shortcut: String?
     let action: () -> Void
 
     /// - Parameter storedColumns: Each place's table columns as kept (`ItemTableColumnLayouts`).
@@ -18,7 +20,8 @@ struct ViewOptionCommand {
         case .board: return board(browser, library)
         case .timeline: return timeline(browser, library)
         case .calendar: return calendar(browser, library)
-        case .list, .gallery: return []
+        case .gallery: return gallery(browser)
+        case .list: return []
         }
     }
 
@@ -116,22 +119,47 @@ struct ViewOptionCommand {
     private static func calendar(_ browser: Browser, _ library: any ItemLibrary) -> [ViewOptionCommand] {
         let scale = browser.calendarScale
         let unit = scale == .week ? String(localized: "Week") : String(localized: "Month")
-        return [
-            ViewOptionCommand(title: String(localized: "Go to Today"), systemImage: "calendar") { browser.moveCalendar(by: nil, now: library.now()) },
-            ViewOptionCommand(title: String(localized: "Previous \(unit)"), systemImage: "chevron.left") { browser.moveCalendar(by: -1, now: library.now()) },
-            ViewOptionCommand(title: String(localized: "Next \(unit)"), systemImage: "chevron.right") { browser.moveCalendar(by: 1, now: library.now()) },
-            ViewOptionCommand(
-                title: scale == .week ? String(localized: "Show Month") : String(localized: "Show Week"),
-                systemImage: "calendar"
-            ) { browser.changeCalendarScale(scale == .week ? .month : .week) },
+        var commands = [
+            ViewOptionCommand(title: String(localized: "Go to Today"), systemImage: "calendar", shortcut: "⌘T") {
+                browser.moveCalendar(by: nil, now: library.now())
+            },
+            ViewOptionCommand(title: String(localized: "Previous \(unit)"), systemImage: "chevron.left", shortcut: "⌥⌘←") {
+                browser.moveCalendar(by: -1, now: library.now())
+            },
+            ViewOptionCommand(title: String(localized: "Next \(unit)"), systemImage: "chevron.right", shortcut: "⌥⌘→") {
+                browser.moveCalendar(by: 1, now: library.now())
+            },
         ]
+        if scale == .week {
+            commands.append(ViewOptionCommand(title: String(localized: "Calendar by Month"), systemImage: "calendar", shortcut: "⌥⌘2") {
+                browser.changeCalendarScale(.month)
+            })
+        } else {
+            commands.append(ViewOptionCommand(title: String(localized: "Calendar by Week"), systemImage: "calendar", shortcut: "⌥⌘1") {
+                browser.changeCalendarScale(.week)
+            })
+        }
+        commands.append(ViewOptionCommand(
+            title: browser.showsCalendarMonth ? String(localized: "Hide Month") : String(localized: "Show Month"),
+            systemImage: "calendar.day.timeline.left", shortcut: "⇧⌘D"
+        ) { browser.toggleCalendarMonth() })
+        return commands
+    }
+
+    private static func gallery(_ browser: Browser) -> [ViewOptionCommand] {
+        ViewCards.Size.allCases.filter { $0 != browser.cards.size }.map { size in
+            ViewOptionCommand(title: String(localized: size.cardsTitle), systemImage: "square.grid.2x2") { browser.setCardSize(size) }
+        }
     }
 
     private static func timeline(_ browser: Browser, _ library: any ItemLibrary) -> [ViewOptionCommand] {
         let place = browser.item
         let fields = browser.timelineFieldChoices(in: library)
         let field = ItemTimelineLayout.selectedField(browser.timelineFields[place], fields: fields)
-        var commands = fields.filter { $0.key != field }.map { field in
+        var commands = [ViewOptionCommand(title: String(localized: "Go to Today"), systemImage: "calendar", shortcut: "⌘T") {
+            browser.requestTimelineToday()
+        }]
+        commands += fields.filter { $0.key != field }.map { field in
             ViewOptionCommand(title: String(localized: "Date Field: \(field.label)"), systemImage: "calendar") {
                 browser.setTimelineField(field.key, in: library)
             }

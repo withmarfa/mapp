@@ -24,7 +24,7 @@ struct ViewPanelCards: View {
                 HStack {
                     Text("Size")
                     Spacer(minLength: 0)
-                    Picker("Size", selection: Binding { cards.size } set: { value in browser.changeCards { $0.size = value } }) {
+                    Picker("Size", selection: Binding { cards.size } set: { browser.setCardSize($0) }) {
                         ForEach(ViewCards.Size.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
                     .labelsHidden()

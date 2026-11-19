@@ -11,7 +11,7 @@ Windows, panes, toolbars, commands and Settings. How things are drawn is in `doc
 
 ## Commands and the palette
 
-- Every toolbar action is also a menu command, since a toolbar can be hidden.
+- Every toolbar action and every control in the window's corner (`WindowCorner`, [views-and-lists](../../docs/views-and-lists.md#the-bottom-right-corner)) is also a menu command, since a toolbar can be hidden.
 - The command palette (`CommandPalette.swift`) builds its own list, so add a new command there too.
 - With the gallery or table showing, the editor stays mounted but hidden. Offer an editor command in the palette only when `hasVisibleEditor`.
 

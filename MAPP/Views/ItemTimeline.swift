@@ -81,6 +81,17 @@ struct ItemTimeline: View {
     }
 
     private func timeline(_ groups: [ItemTimelineGroup], contents: [ItemID: RowContent], now: Date) -> some View {
+        ScrollViewReader { proxy in
+            list(groups, contents: contents, now: now)
+                // The days run from today on and then back, so today's agenda is the first line of the first group.
+                .onChange(of: browser.timelineTodayRequests) {
+                    guard let first = groups.first.flatMap({ lines(of: $0, now: now).first }) else { return }
+                    withAnimation { proxy.scrollTo(first.id, anchor: .top) }
+                }
+        }
+    }
+
+    private func list(_ groups: [ItemTimelineGroup], contents: [ItemID: RowContent], now: Date) -> some View {
         List(selection: $browser.selection) {
             ForEach(groups) { group in
                 ForEach(lines(of: group, now: now)) { line in
