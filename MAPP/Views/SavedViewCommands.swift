@@ -91,8 +91,8 @@ struct SavedViewMenu: View {
     }
 }
 
-/// The Views heading, with New View, which shows only while the pointer is over the heading, as the control of a
-/// sidebar's section heading does.
+/// The heading of the section that holds the saved views, with New View, which shows only while the pointer is over
+/// the heading, as the control of a sidebar's section heading does.
 struct ViewsHeading: View {
     let title: String
     let browser: Browser
