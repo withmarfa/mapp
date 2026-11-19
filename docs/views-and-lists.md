@@ -232,6 +232,9 @@ The rule for large lists is in [`MAPP/Views/AGENTS.md`](../MAPP/Views/AGENTS.md)
 
 The window has three areas: the sidebar, the list pane and the page. What a person moves between goes in the list pane. A screen adds no new kind of column or toolbar, and only the pins sit under a page's title. A screen that needs something this does not allow changes the rule first.
 
+- The toolbar holds the same buttons on every screen: Search, View Options, View As, Share, More and the right sidebar. A screen hides a button that does not apply. No screen adds its own controls to the toolbar, and the gaps between its groups are the system's.
+- The page holds at most one main action, such as New Collection or New Item.
+
 ## Settings
 
 Settings is a place in the sidebar. See [Settings storage](settings-storage.md) for its pages. Its measurements, measured on the built app, which gets them from the system's grouped form:
