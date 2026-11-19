@@ -28,6 +28,11 @@ struct SavedViewCommand {
                 })
             }
         }
+        if browser.isDefaultViewChanged {
+            commands.append(SavedViewCommand(title: String(localized: "Reset View"), systemImage: "arrow.uturn.backward") {
+                browser.resetView(in: library)
+            })
+        }
         if let view = shown {
             if browser.hasViewChanges {
                 commands.append(SavedViewCommand(title: String(localized: "Save View"), systemImage: "arrow.trianglehead.2.clockwise") {
@@ -55,8 +60,13 @@ struct SavedViewMenu: View {
     let browser: Browser?
     let library: (any ItemLibrary)?
     @StoredOrder private var order
+    // Read by `isDefaultViewChanged`, so a change of the default view draws the menu again.
+    @AppStorage(PlaceDefaults.key) private var storedDefaults = Data()
+    @AppStorage(PlaceDensities.key) private var storedDensities = Data()
+    @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
 
     var body: some View {
+        let _ = (storedDefaults, storedDensities, storedColumns)
         let shown = browser.flatMap { browser in library.flatMap { SavedViews.shown(browser, in: $0) } }
         let canEdit = library?.reachesServer == true
         let canSave = browser.flatMap { browser in library.map { SavedViews.canSave(browser, in: $0) } } ?? false
@@ -72,6 +82,10 @@ struct SavedViewMenu: View {
             if let browser, let library { browser.openNewViewPanel(in: library) }
         }
         .disabled(!canSave || shown != nil)
+        Button("Reset View", systemImage: "arrow.uturn.backward") {
+            if let browser, let library { browser.resetView(in: library) }
+        }
+        .disabled(browser?.isDefaultViewChanged != true)
         Button("Duplicate View", systemImage: "plus.square.on.square") {
             if let browser, let library, let shown { Task { await browser.duplicateView(shown.id, in: library, order: order) } }
         }
@@ -157,8 +171,11 @@ private struct SavedViewDialogs: ViewModifier {
             .onChange(of: browser.item, initial: true) {
                 browser.placeChanged()
                 browser.followView(in: library)
+                browser.followPlaceDefault(in: library)
                 browser.choicesChanged()
             }
+            // A place's default view is read once the catalogue is, since a condition on a field is kept only while a type declares it.
+            .onChange(of: library.isLoaded) { browser.followPlaceDefault(in: library) }
             // Each change of the place's order, grouping or filters is one step of Undo and, in a saved view, a write.
             .onChange(of: browser.liveChoices, initial: true) { browser.choicesChanged() }
             .onChange(of: library.reachesServer, initial: true) { browser.reachabilityChanged(in: library) }

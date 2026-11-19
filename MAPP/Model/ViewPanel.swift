@@ -11,7 +11,7 @@ final class ViewPanel {
         case edit(ItemID)
         /// A view that does not exist yet, made of what the window shows: Done makes it, and Escape makes nothing.
         case new
-        /// A place that is not a view, such as a type's list: it has no name and keeps nothing, and offers Save as View.
+        /// A place that is not a view, such as a type's list: it has no name, keeps its choices in its default view (`PlaceDefaults`), and offers Save as View.
         case place
     }
 
@@ -29,6 +29,8 @@ final class ViewPanel {
         let cards: ViewCards?
         /// The density this Mac kept for the place, where it is not a view.
         let density: Density?
+        /// What the place's default view kept, where the place is not a view.
+        let placeDefault: PlaceDefault?
     }
 
     private(set) var purpose: Purpose

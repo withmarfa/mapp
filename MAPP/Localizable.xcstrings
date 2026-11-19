@@ -3696,6 +3696,9 @@
     "Reset Columns" : {
 
     },
+    "Reset View" : {
+
+    },
     "Reset Widths" : {
       "extractionState" : "manual"
     },

@@ -133,7 +133,7 @@ final class Browser {
     }
 
     /// Sets the date field the timeline places every item by, or, with nil, lets each item sit on the date its type's
-    /// look names. Nil is no choice, so a place that is not a view keeps nothing and a view writes no day grouping.
+    /// look names. Nil is no choice, so a place that is not a view has only what its default view kept and a view writes no day grouping.
     func setTimelineField(_ key: String?, in library: any ItemLibrary) {
         timelineFields[item] = key
     }
@@ -166,7 +166,8 @@ final class Browser {
         guard !showsSidebarIndex, !showsSettings, !availableViewModes(in: library).contains(viewMode) else { return }
         set(layout: .list)
     }
-    /// How each place's table is grouped, sorted and filtered, as the person left it, for the life of the window.
+    /// How each place's table is grouped, sorted and filtered, as the person left it. A place that is not a saved view
+    /// keeps them in its default view too (`Browser+PlaceDefaults`).
     var tableOptions: [SidebarItem: ItemTableOptions] = [:]
     /// The pages of the table the person has loaded, with what they belong to. Held apart from the table's content,
     /// which a page never makes again, and read as one page once the key has changed (`tablePaging`).
@@ -880,10 +881,10 @@ final class Browser {
     /// Whether Add Filter… asked for its panel, which the row opens and then clears (`Browser+FilterRow`).
     var isAddFilterRequested = false
 
-    /// What the gallery draws on each card in a place that is not a saved view, kept for this window only, as the
-    /// window keeps that place's other choices (`Browser+SavedViews`).
+    /// What the gallery draws on each card in a place that is not a saved view, as its default view keeps it
+    /// (`Browser+PlaceDefaults`).
     var placeCards: [SidebarItem: ViewCards] = [:]
-    /// The scale of each place's calendar that is not a saved view, for the life of the window (`calendarScale`).
+    /// The scale of each place's calendar that is not a saved view, as its default view keeps it (`calendarScale`).
     var placeCalendarScales: [SidebarItem: CalendarScale] = [:]
     /// A day in the week or month the calendar shows, or nil for the one that holds today. Kept for the window.
     var calendarDay: Date?

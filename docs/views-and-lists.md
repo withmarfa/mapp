@@ -1,6 +1,6 @@
 # Views and lists
 
-Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built in v0.0.45. The table's margin, whole-cell hover and add to an empty cell, the palettes' bar, rows and material setting, and the selection and hover greys and the favorite's star as described below, are built, not yet released, as are Items, Collections and Sources as index pages with tabs and a table, the sidebar customized in place and Settings > Sidebar, opening an item as a modal, a full page or a window with one row menu for every layout, and making an item with quick add and the empty states. See [Looks](looks.md).
+Status: Built in v0.0.43. The list row reading a type's look is built in v0.0.44; the gallery card, the board card and the table reading it are built in v0.0.45. The table's margin, whole-cell hover and add to an empty cell, the palettes' bar, rows and material setting, and the selection and hover greys and the favorite's star as described below, are built, not yet released, as are Items, Collections and Sources as index pages with tabs and a table, the sidebar customized in place and Settings > Sidebar, opening an item as a modal, a full page or a window with one row menu for every layout, making an item with quick add and the empty states, and the default view of every place that is not a saved view, with Save as View… and Reset View in View Options. See [Looks](looks.md).
 
 Where it lives: `Browser`, `ItemViewMode`, `ItemOpening`, `QuickAdd`, `PlaceEmpty`, `ListNeighbors`, `RowMenuEntry`, `ViewLayouts`, `SidebarLayout`, `IndexPlace`, `IndexTab`, `IndexSort`, `IndexPreferences`, `IndexChoice` and `ItemIndexModel` under `MAPP/Model/`, with `IndexRow`, `IndexRows`, `ItemIndexRow`, `CardContents`, `ItemTableLayout`, `ItemTimelineLayout`, `ItemPlacement`, `EventSpan`, `CalendarLayout` and `CalendarCorner` under `MAPP/Model/Items/`; `ItemList`, `ItemRow`, `ItemRowMenu`, `ItemModal`, `ItemGallery`, `GalleryCard`, `ItemBoard`, `ItemTable`, `ItemTableCell`, `SoftSelection`, `ChipLine`, `ItemTimeline`, `ItemCalendar`, `SidebarIndex`, `SidebarSettings`, `SidebarSettingsPlan`, `SidebarColorPicker`, `IndexPage`, `ItemsIndex`, `IndexInspector`, `IndexViewOptions`, `WindowCorner`, `ViewCorner`, `CalendarCornerView`, `CalendarMonthCard`, `ViewEditPanel`, `FilterRow`, `FilterChipsBar`, `ItemViewOptions` and `CommandPalette` under `MAPP/Views/`.
 
@@ -89,12 +89,27 @@ A saved view splits between Marfa and the Mac. The rules for each side, and for 
 - **Marfa holds** the view's title, query, sort and group.
 - **The Mac holds** the layout, the table's columns, whether the board hides empty groups, the gallery's cards, the calendar's Week or Month, the list's density and the table's widths (`ViewMacSettings`). See [Settings storage](settings-storage.md).
 
-A type's list, and the other places that are not views, can become one with Save as View in the toolbar. The view keeps the filters, the sort and the grouping the window shows:
+A type's list, and the other places that are not views, can become one with Save as View…, which is in View Options and the View menu and opens New View's panel filled in. The view keeps the filters, the sort and the grouping the window shows:
 
 - A type's place saves what the window lists: with Include Subtypes on, the type alone as the view's types (Marfa lists it with its subtypes); with it off, the type's own items, as the type plus an exact-type condition where it has subtypes.
 - A Type filter is saved as the view's types, so the view lists the types the window chose: they replace the types the place listed and a type's own exact-type condition. Marfa lists a type with its subtypes, so a chosen type that has any is also saved as an exact-type condition in the view's filter, which lists the same items as the window.
 - An existing view's own Type filter is different: a chosen type within the types the view lists leaves them as they are, and is saved as an exact-type condition (`type eq`), so the view keeps its types and the filter stays a chip that can be removed or undone. A view of several types opens with those types as a Type filter only while its filter has no condition on the type. A chosen type outside the view's types replaces them.
 - A list's sections by date (Today, Yesterday and the months) are not kept, and the Save as View sheet says so. A view groups by a field's value or a bucket of it, and Today, Yesterday and Previous 7 Days move with the day, so no grouping stands for them.
+
+## Default views
+
+Every place opens in a default view. A person can change the default view, but can't rename or delete it. A saved view has none: its choices are its own, as above. The indexes of collections and sources keep their table as they did (`IndexPreferences`).
+
+- **What it keeps.** The filters, the sort, the grouping, the layout and the layout's Mac settings: the timeline's date field, the board's compact cards, the gallery's cards, the calendar's Week or Month, the density and the table's columns. A place with no change keeps nothing, and choosing the layout a place opens in is not a change.
+- **Where it is kept.** On this Mac, never in Marfa, so every window and every launch opens a place as it was left. [Settings storage](settings-storage.md) says where.
+- **Two windows on one place.** Both write the one entry, so the last change wins. A window keeps what it shows until it opens the place again, and then shows the other window's change.
+- **What has gone stale.** A place whose type or collection no longer exists is ignored. A condition, sort or grouping on a field that no type of the place declares any more is dropped and the rest is kept. A layout the place no longer offers is not taken, and the place opens in its own.
+- **Save as View…** is the last item of View Options and a View menu command. It shows only when there is something to keep, and opens New View's panel filled in with what the window shows. While that panel is open the default view keeps nothing, and Escape puts the place back as it was.
+- **Reset View** sits above Save as View… once a default view is changed. It is also a View menu command and a palette command. It puts back the place's own layout, columns, density and cards, and one Undo brings the choices back. A saved view keeps Revert View.
+
+## Toolbar
+
+The toolbar holds the same buttons on every screen: Search, View Options, View As, Share, More and the right sidebar, in that order. A screen hides a button that does not apply, and none leaves one out, so the person's customized layout is kept. No screen adds its own controls to the toolbar, and Save as View… is not in it. The page holds at most one main action, such as New Collection. Every toolbar action is also a menu command. New Item, Format, the calendar's controls and Reader or Original are still declared in the toolbar until the corner takes them (see [Agreed designs](agreed-designs.md)).
 
 ## Edit View
 

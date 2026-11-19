@@ -65,9 +65,14 @@ struct ViewModeMenu: View {
 struct ViewOptionsMenu: View {
     @CurrentLibrary private var library
     @Environment(\.controlActiveState) private var activeState
+    // Read by `isDefaultViewChanged`, so a change of the default view draws the menu again.
+    @AppStorage(PlaceDefaults.key) private var storedDefaults = Data()
+    @AppStorage(PlaceDensities.key) private var storedDensities = Data()
+    @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
     let browser: Browser
 
     var body: some View {
+        let _ = (storedDefaults, storedDensities, storedColumns)
         let count = browser.filterCount
         // Only an active window tints the button. In any other state it sets no style of its own, so it dims as its
         // neighbours do.
@@ -84,6 +89,7 @@ struct ViewOptionsMenu: View {
                 Button("Edit View") { browser.openViewPanel(in: library) }
                     .accessibilityIdentifier("EditViewMenuItem")
             }
+            DefaultViewOptions(browser: browser)
         } label: {
             HStack(spacing: 3) {
                 Image(systemName: "slider.horizontal.3")
@@ -95,6 +101,32 @@ struct ViewOptionsMenu: View {
         .menuIndicator(.hidden)
         .help("View Options")
         .accessibilityIdentifier("ViewOptionsToolbar")
+    }
+}
+
+/// The last items of View Options in a place that is not a saved view: Reset View, once its default view is changed, and
+/// Save as View… under it, while there is something to keep. The View menu and the palette hold the same commands.
+struct DefaultViewOptions: View {
+    @CurrentLibrary private var library
+    let browser: Browser
+
+    var body: some View {
+        let resets = browser.isDefaultViewChanged
+        let saves = browser.offersViewOptions && SavedViews.hasChoicesToKeep(browser, in: library)
+        if resets || saves {
+            Divider()
+        }
+        if resets {
+            Button("Reset View") { browser.resetView(in: library) }
+                .accessibilityIdentifier("ResetViewMenuItem")
+        }
+        if saves {
+            let canSave = SavedViews.canSave(browser, in: library)
+            Button("Save as View…") { browser.openNewViewPanel(in: library) }
+                .disabled(!canSave)
+                .help(canSave ? "Make a view of what this window shows" : "Saving a view needs your Marfa server")
+                .accessibilityIdentifier("SaveAsViewMenuItem")
+        }
     }
 }
 
@@ -155,7 +187,7 @@ struct ItemBoardOptions: View {
         .accessibilityIdentifier("BoardGroupBy")
         Picker("Card Density", systemImage: "rectangle.compress.vertical", selection: Binding {
             browser.compactBoards[browser.item, default: false]
-        } set: { browser.compactBoards[browser.item] = $0 }) {
+        } set: { browser.setCompactBoard($0, in: browser.item) }) {
             Text("Comfortable").tag(false)
             Text("Compact").tag(true)
         }

@@ -5,8 +5,8 @@ import UniformTypeIdentifiers
 /// layout of its own (`WindowToolbarLayout`), since the system reshuffles a saved layout when one identifier moves between
 /// split views. Nothing else in a window may declare a plain `toolbar`, which turns customization off for the whole window.
 ///
-/// The defaults run Save as View while a place that is not a view has something to keep, Search and View Options, View
-/// As, Share and More, and Details at the far right. In the list Search and View Options are the list column's
+/// The defaults run Search and View Options, View As, Share and More, and Details at the far right. Save as View… is in
+/// View Options and the View menu, never here. In the list Search and View Options are the list column's
 /// (`ListToolbar`). `ExtraToolbarItems` start in the tray. Format and the Reader and Original switch are in the page's
 /// corner (`ItemCorner`), not here.
 struct WindowToolbar: CustomizableToolbarContent {
@@ -57,9 +57,6 @@ struct WindowToolbar: CustomizableToolbarContent {
             .customizationBehavior(.disabled)
         }
         ToolbarSpacer(.flexible)
-        if let browser {
-            ViewChangeItems(browser: browser)
-        }
         // A hidden spacer still leaves its gap, so the fixed spacers are not hidden: each stands after a group that
         // shows and before another that does, which keeps one standard gap between groups in every state. They are
         // locked, so they come and go like the items that are.

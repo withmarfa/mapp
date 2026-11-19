@@ -280,6 +280,18 @@ enum ItemTableColumnLayouts {
         layouts(in: stored)[key(for: place)] ?? .init()
     }
 
+    /// Whether the person arranged the place's columns: an entry with nothing in it is the table's own arrangement.
+    static func isChanged(for place: SidebarItem, in stored: Data) -> Bool {
+        layouts(in: stored)[key(for: place)].map { $0 != .init() } ?? false
+    }
+
+    /// The stored layouts without the place's, so its table starts again from its own columns.
+    static func removing(_ place: SidebarItem, in stored: Data) -> Data {
+        var layouts = layouts(in: stored)
+        layouts[key(for: place)] = nil
+        return (try? JSONEncoder().encode(layouts)) ?? stored
+    }
+
     static func storing(_ layout: TableColumnCustomization<ItemTableRow>, for place: SidebarItem, in stored: Data) -> Data {
         var layouts = layouts(in: stored)
         layouts[key(for: place)] = layout

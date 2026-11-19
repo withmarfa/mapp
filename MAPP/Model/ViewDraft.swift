@@ -435,7 +435,7 @@ nonisolated enum ViewDraft {
     }
 
     /// Stands for a column by its identifier: the table finds its own column by the identifier (`ItemTableLayout.sort`).
-    private static func placeholder(_ id: String) -> ItemTableColumn {
+    static func placeholder(_ id: String) -> ItemTableColumn {
         ItemTableColumn(id: id, label: "", content: .title, style: .text)
     }
 

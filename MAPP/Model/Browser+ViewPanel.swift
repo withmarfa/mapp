@@ -117,7 +117,8 @@ extension Browser {
         return ViewPanel.Snapshot(
             place: place, options: tableOptions[place], timelineDate: timelineFields[place], viewMode: viewMode,
             columns: defaults.data(forKey: ItemTableColumnLayouts.key), mac: id.map { macSettings(for: $0) },
-            cards: id == nil ? placeCards[place] : nil, density: id == nil ? density : nil)
+            cards: id == nil ? placeCards[place] : nil, density: id == nil ? density : nil,
+            placeDefault: id == nil && Self.hasDefaultView(place) ? PlaceDefaults.stored(in: defaults).default(for: place) ?? PlaceDefault() : nil)
     }
 
     /// Puts the place back. A new view that was made keeps the layout the person chose for it.
@@ -136,6 +137,7 @@ extension Browser {
         } else {
             placeCards[snapshot.place] = snapshot.cards
             store(snapshot.density, for: snapshot.place)
+            if let stored = snapshot.placeDefault { reinstate(stored, for: snapshot.place) }
         }
     }
 

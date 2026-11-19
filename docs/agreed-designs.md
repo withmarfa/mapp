@@ -6,12 +6,6 @@ Where it lives: not built yet.
 
 This page lists what has been agreed for MAPP and is not in the app yet, so the next build starts from one list. What was turned down is in [Rejected designs](rejected-designs.md).
 
-## Views
-
-- Every place opens in a default view. A person can change the default view, but can't rename or delete it.
-- Save as View… makes a second view with a name. It is the last item of View Options, shown only when there is something to keep. It is never in the toolbar. It opens New View's panel, filled in.
-- Once a default view is changed, View Options offers Reset View above Save as View…, which puts it back.
-
 ## The toolbar and the bottom-right corner
 
 - The toolbar holds the same buttons on every screen: Search, View Options, View As, Share, More and the right sidebar. A screen hides a button that does not apply. No screen adds its own controls to the toolbar.

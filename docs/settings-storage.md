@@ -2,7 +2,7 @@
 
 Status: Built in v0.0.43. The store of type looks and the list density are built in v0.0.44. See [Looks](looks.md).
 
-Where it lives: `ListKey`, `PageKey`, `OrderKey` and `InterfaceKey` under `MAPP/Views/`, and `PagePlacements`, `ViewLayouts`, `Density`, `SidebarLayouts`, `TypeLooks`, `IncludedSubtypes`, `DateFormat` and `RemotePictureSetting` under `MAPP/Model/`.
+Where it lives: `ListKey`, `PageKey`, `OrderKey` and `InterfaceKey` under `MAPP/Views/`, and `PagePlacements`, `ViewLayouts`, `PlaceDefaults`, `Density`, `SidebarLayouts`, `TypeLooks`, `IncludedSubtypes`, `DateFormat` and `RemotePictureSetting` under `MAPP/Model/`.
 
 MAPP keeps its own settings in the app's defaults on this Mac and never writes them to Marfa. This page lists where each kind of setting lives, so you know which scope a new setting belongs to.
 
@@ -14,8 +14,8 @@ A setting has one scope. Pick the narrowest scope that matches what the person w
 | --- | --- | --- |
 | Every window | One key in the defaults. | `listDensity`, `openItemsIn` (where an item opens: `modal`, `fullPage` or `newWindow`), `dateFormat`, `noteSort`, `groupsByDate`, the page options in `PageKey` (`titleLines`, `linkLook`, `fullWidthPages`, `showsCoordinates` and others), `remotePictures`, the interface options in `InterfaceKey`. |
 | A type | One value keyed by type identifier. | `pagePlacements` (pins, shown rows, property order, sidebar sections, where Linked From goes), `includedSubtypes`. |
-| A saved view | One value keyed by the view's item identifier. | `viewLayouts`: a `ViewMacSettings` with the layout, columns, whether the board hides empty groups, the gallery's cards, the calendar's Week or Month choice, the list's density and the table's widths. A place's own calendar choice lasts only as long as its window. |
-| A place | A key built from the place. | `itemTableColumns` (the table's columns for each place), `placeDensities` (the density of a place that is not a saved view), `indexTab.<place>` and `indexSort.<place>` (an index page's tab and the order of its table). |
+| A saved view | One value keyed by the view's item identifier. | `viewLayouts`: a `ViewMacSettings` with the layout, columns, whether the board hides empty groups, the gallery's cards, the calendar's Week or Month choice, the list's density and the table's widths. A place's own calendar choice is kept in `placeDefaults`. |
+| A place | A key built from the place. | `placeDefaults` (the default view of a place that is not a saved view: its filters, sort, grouping, layout, timeline date, compact board, gallery cards and calendar scale), `itemTableColumns` (the table's columns for each place), `placeDensities` (the density of a place that is not a saved view), `indexTab.<place>` and `indexSort.<place>` (an index page's tab and the order of its table). |
 | A server | One value keyed by server address. | `sidebarLayouts`: for each server, the hidden places, their order, the tabs, the sections of each tab with their shortcuts, where a place sits when it was moved to another section, and the color of each view's mark; and `typeLooks`: the looks chosen for its types. |
 | A window | Scene storage, or memory only. | The layout in `SceneStorage("browser")`, `detailsPresented` and `sidebarHidden`. |
 
@@ -26,7 +26,7 @@ Column widths are `interfaceDefaultWidth.<column>`, and the right sidebar's widt
 The rules that apply to every setting are in the `AGENTS.md` files: [that nothing goes to Marfa](../AGENTS.md), [how a saved view's Mac settings are kept and forgotten](../MAPP/Model/AGENTS.md), and [how a Debug build keeps its own values](../AGENTS.md). Three more belong to this page.
 
 - **A type's setting has little inheritance.** `pagePlacements` for a child type does not read its parent's. A look does: it follows the `parent` chain, place by place; see [Looks](looks.md).
-- **Unreadable stored text is set aside, not dropped.** When a stored value cannot be decoded, MAPP keeps the text under a `...SetAside` key (`pagePlacementsSetAside`, `viewLayoutsSetAside`, `sidebarLayoutsSetAside`, `typeLooksSetAside`, `placeDensitiesSetAside`) and starts from the defaults, so a person's arrangement can be recovered.
+- **Unreadable stored text is set aside, not dropped.** When a stored value cannot be decoded, MAPP keeps the text under a `...SetAside` key (`pagePlacementsSetAside`, `viewLayoutsSetAside`, `sidebarLayoutsSetAside`, `typeLooksSetAside`, `placeDensitiesSetAside`, `placeDefaultsSetAside`) and starts from the defaults, so a person's arrangement can be recovered.
 - **A new field on a stored value is optional.** A value saved before the field existed must still decode.
 
 ## The Settings window
