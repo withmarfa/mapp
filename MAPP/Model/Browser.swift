@@ -351,7 +351,6 @@ final class Browser {
         focusRequest = .list
     }
 
-
     func searchScope(in library: any ItemLibrary) -> SearchScope {
         guard searchesPlace, SearchScope.narrows(item) else { return .everywhere }
         // A type's place lists its subtypes' items too while it includes them, and the search follows the list.

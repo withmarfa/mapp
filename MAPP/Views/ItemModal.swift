@@ -129,8 +129,7 @@ struct ItemModal: View {
             .glassEffect(.regular, in: .capsule)
     }
 
-    /// The page goes to a window of its own and leaves the modal, so the item never has two editors: what was typed
-    /// is saved first.
+    /// Closes the modal and opens the item in a window of its own, once what was typed is saved.
     private func openInNewWindow() {
         guard let id = browser.modalItem else { return }
         browser.closeModal()
