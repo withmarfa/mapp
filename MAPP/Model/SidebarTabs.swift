@@ -211,12 +211,15 @@ nonisolated extension SidebarLayout {
         groups?[index].title = name.isEmpty ? nil : name
     }
 
-    /// Hides a built-in section, which Add Section brings back, or takes a person's own away.
+    /// Hides a built-in section, which Add Section brings back, or takes a person's own away, with where its places were put.
     mutating func hideGroup(_ id: String) {
         guard let index = allGroups.firstIndex(where: { $0.id == id }) else { return }
         materialize()
         if groups?[index].kind == .custom {
             groups?.remove(at: index)
+            // What was put there is no longer put anywhere, so a collection or a source can be added again.
+            homes = homes?.filter { $0.value != id }
+            if homes?.isEmpty == true { homes = nil }
         } else {
             groups?[index].isHidden = true
         }

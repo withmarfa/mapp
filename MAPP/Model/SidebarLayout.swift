@@ -131,7 +131,8 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
 nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
     private(set) var hidden: Set<String> = []
     /// The keys of the places the person has placed, in order. Places of different groups share the list, because a
-    /// group only ever reads the keys of its own.
+    /// group only ever reads the keys of its own. Keys stay for a collection, a source or a view that is deleted or
+    /// missing from a sync, so its row returns to its place with it.
     private(set) var order: [String] = []
 
     /// The keys of the type rows the person has folded shut.
@@ -142,8 +143,10 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
     /// Every section of every tab, in order, hidden ones included; nil until the person changes one, which reads as
     /// the sections the sidebar always had, in Home.
     var groups: [SidebarGroup]?
-    /// Where a place sits when the person put it in a section other than its own, by the place's key and the section's
-    /// identifier. A collection or a source has no section of its own, so it shows only where it is put.
+    /// Where a place sits when the person put it in a section, by the place's key and the section's identifier. A
+    /// collection or a source has no section of its own, so it shows only where it is put. Keys stay for a collection,
+    /// a source or a view that is deleted or missing from a sync, so its row returns with it; only removing the section
+    /// they name drops them (`hideGroup`).
     var homes: [String: String]?
     /// The color the person chose for a view's mark, by the place's key and the tone's name.
     var colors: [String: String]?
@@ -191,6 +194,19 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
         case .collection, .source: homes?.removeValue(forKey: place.key)
         default: setHidden(place, true)
         }
+    }
+
+    /// A drag of a section's rows in place: moves as `move(_:shown:by:fromOffsets:toOffset:)` does, then records every
+    /// place of the section as put there, so the section reads as the one list the person arranged and a row can cross
+    /// from one of its blocks to another (`SidebarGroupPlan`).
+    mutating func moveInSection(
+        _ group: String, places: [SidebarPlace], shown: [SidebarPlace], fromOffsets source: IndexSet, toOffset destination: Int
+    ) {
+        guard allGroups.contains(where: { $0.id == group && $0.holdsPlaces }) else { return }
+        move(places, shown: shown, by: \.key, fromOffsets: source, toOffset: destination)
+        tabs = allTabs
+        groups = allGroups
+        homes = (homes ?? [:]).merging(places.map { ($0.key, group) }) { _, new in new }
     }
 
     /// `places` with the ones in `shown` moved as a list showing only those would move them. The hidden ones keep

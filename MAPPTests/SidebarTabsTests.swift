@@ -55,6 +55,39 @@ struct SidebarTabsTests {
         #expect(places == [.inbox, .recents, .favorites, .view(ItemID("v-Reading")), .view(ItemID("v-Open work"))])
     }
 
+    @Test func savedViewsOrderedBeforeTheBuiltInViewsInTheStoredOrderStillShowAfterThem() throws {
+        // Today's Settings > Sidebar moves the built-in views and the saved views as two lists, each appended to the order.
+        let saved = Data(#"{"hidden":[],"order":["view:v-Reading","view:v-Open work","inbox","recents","favorites"]}"#.utf8)
+        let layout = try JSONDecoder().decode(SidebarLayout.self, from: saved)
+        let places = SidebarPlan(library(), layout: layout).section(.views)?.shown ?? []
+        #expect(places == [.inbox, .recents, .favorites, .view(ItemID("v-Reading")), .view(ItemID("v-Open work"))])
+    }
+
+    @Test func theBuiltInViewsKeepTheirOwnOrderWithinTheirBlock() throws {
+        let saved = Data(#"{"hidden":[],"order":["favorites","view:v-Reading","inbox"]}"#.utf8)
+        let layout = try JSONDecoder().decode(SidebarLayout.self, from: saved)
+        let places = SidebarPlan(library(), layout: layout).section(.views)?.shown ?? []
+        #expect(places == [.favorites, .inbox, .recents, .view(ItemID("v-Reading")), .view(ItemID("v-Open work"))])
+    }
+
+    @Test func draggingARowAcrossTheBlocksOfADefaultSectionIsKept() {
+        var layout = SidebarLayout()
+        let members = SidebarPlan(library(), layout: layout).section(.views)?.members ?? []
+        // The first saved view, dragged above Inbox.
+        let from = members.firstIndex(of: .view(ItemID("v-Open work"))) ?? 0
+        layout.moveInSection("views", places: members, shown: members, fromOffsets: [from], toOffset: 0)
+        let after = SidebarPlan(library(), layout: layout).section(.views)?.shown ?? []
+        #expect(after.first == .view(ItemID("v-Open work")))
+        #expect(Set(after) == Set(members))
+    }
+
+    @Test func placingARowInASectionByHandMakesItOneListInThePersonsOrder() {
+        var layout = SidebarLayout()
+        layout.put(.view(ItemID("v-Reading")), in: "views")
+        let places = SidebarPlan(library(), layout: layout).section(.views)?.shown ?? []
+        #expect(places.first == .view(ItemID("v-Reading")), "placed, so it has a position, ahead of those never placed")
+    }
+
     @Test func aNewLibrarysShortcutsAreNewAndSearchAndNoneMakesAnItemOfATypeThePersonMade() {
         let shortcuts = SidebarGroup.defaults(tab: SidebarTab.homeID).first { $0.kind == .shortcuts }?.shortcuts
         #expect(shortcuts == [.new, .search])
@@ -105,6 +138,50 @@ struct SidebarTabsTests {
         #expect(SidebarPlan(library, layout: layout).groups.first { $0.id == section }?.shown.isEmpty == true)
         library.items.append(collection)
         #expect(SidebarPlan(library, layout: layout).groups.first { $0.id == section }?.shown == [.collection(collection.id)])
+    }
+
+    @Test func removingASectionFreesItsCollectionsAndSourcesToBeAddedAgain() {
+        let library = library()
+        let collection = FakeItemLibrary.collection("Reading list")
+        library.items.append(collection)
+        var layout = SidebarLayout()
+        let section = layout.addGroup(.custom, toTab: SidebarTab.homeID, id: "mine")
+        let other = layout.addGroup(.custom, toTab: SidebarTab.homeID, id: "other")
+        layout.put(.collection(collection.id), in: section)
+        layout.put(.source("feed"), in: section)
+        layout.put(.source("kept"), in: other)
+        #expect(layout.home(of: .collection(collection.id)) == section)
+
+        let placed = SidebarContent(library: library, layout: layout, tab: nil, customizing: true).choices
+        #expect(!placed.unplacedCollections.contains { $0.key == SidebarPlace.collection(collection.id).key }, "in a section already")
+        #expect(placed.collections.contains { $0.key == SidebarPlace.collection(collection.id).key }, "Go To still offers it")
+
+        layout.hideGroup(section)
+        #expect(layout.homes == [SidebarPlace.source("kept").key: other], "only the removed section's places are freed")
+        #expect(layout.home(of: .collection(collection.id)) == nil)
+        let freed = SidebarContent(library: library, layout: layout, tab: nil, customizing: true).choices
+        #expect(freed.unplacedCollections.contains { $0.key == SidebarPlace.collection(collection.id).key })
+    }
+
+    @Test func aCollectionMissingFromTheCopyIsOfferedNowhereAndKeepsItsPlace() {
+        let library = library()
+        let collection = FakeItemLibrary.collection("Reading list")
+        var layout = SidebarLayout()
+        let section = layout.addGroup(.custom, toTab: SidebarTab.homeID, id: "mine")
+        layout.put(.collection(collection.id), in: section)
+        // Missing from the copy, as in a sync gap: its key stays so the row returns, and no picker offers what the library lacks.
+        let choices = SidebarContent(library: library, layout: layout, tab: nil, customizing: true).choices
+        #expect(choices.collections.isEmpty && choices.unplacedCollections.isEmpty)
+        #expect(layout.homes?[SidebarPlace.collection(collection.id).key] == section)
+    }
+
+    @Test func aChangeOfAViewsColorChangesTheSidebarMarksSignature() {
+        var layout = SidebarLayout()
+        let before = SidebarContent(library: library(), layout: layout, tab: nil, customizing: false).marksSignature
+        layout.setColor(.green, of: .view(ItemID("v-Reading")))
+        let after = SidebarContent(library: library(), layout: layout, tab: nil, customizing: false)
+        #expect(after.marksSignature != before)
+        #expect(after.sections.flatMap(\.rows).first { $0.place == .view(ItemID("v-Reading")) }?.tone == .green)
     }
 
     @Test func aShortcutToWhatIsGoneIsKeptInTheLayout() {

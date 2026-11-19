@@ -16,11 +16,10 @@ nonisolated struct SidebarGroupPlan: Identifiable, Equatable {
     @MainActor
     static func plans(in library: any ItemLibrary, layout: SidebarLayout, views: [LibraryView], showsTypes: Bool) -> [SidebarGroupPlan] {
         let savedViews = layout.isHidden(.views) ? [] : views.map { SidebarPlace.view($0.id) }
-        let defaults = SidebarPlace.destinations + SidebarPlace.builtInViews + savedViews
-        let candidates = defaults + extras(in: library, layout: layout, views: views)
+        let candidates = SidebarPlace.destinations + SidebarPlace.builtInViews + savedViews + extras(in: library, layout: layout, views: views)
         return layout.allGroups.map { group in
             let mine = group.holdsPlaces ? candidates.filter { layout.home(of: $0) == group.id } : []
-            let members = ordered(mine, defaults: defaults, layout: layout)
+            let members = ordered(mine, in: group.id, layout: layout)
             let hidden = layout.hidden
             let isEmpty: Bool = switch group.kind {
             case .shortcuts: group.shortcuts.isEmpty
@@ -49,14 +48,18 @@ nonisolated struct SidebarGroupPlan: Identifiable, Equatable {
         }
     }
 
-    /// The places as the person ordered them. While some have never been placed, the sidebar's own blocks keep their
-    /// order, so a layout from before sections existed reads as it did: Inbox, Recents and Favorites before the saved
-    /// views, whatever the views' own order.
-    private static func ordered(_ places: [SidebarPlace], defaults: [SidebarPlace], layout: SidebarLayout) -> [SidebarPlace] {
-        let placed = Set(layout.order)
-        if places.allSatisfy({ placed.contains($0.key) }) { return layout.ordered(places) }
-        let own = Set(defaults)
-        let blocks = [SidebarPlace.destinations, SidebarPlace.builtInViews, defaults.filter { if case .view = $0 { true } else { false } }]
-        return blocks.flatMap { layout.ordered($0.filter(places.contains)) } + layout.ordered(places.filter { !own.contains($0) })
+    /// The places as the person ordered them. A section that holds only its default places keeps the sidebar's own
+    /// blocks in order, whatever `order` says: the library's indexes, then Inbox, Recents and Favorites, then the saved
+    /// views, each block in the person's order within it. Settings > Sidebar moves the blocks as separate lists, so
+    /// `order` can name the saved views before Inbox, and a layout from before sections existed must read as it did.
+    /// Once something has been put in the section by hand (`SidebarLayout.put`, or dragging its rows in place), the
+    /// section is one list in the person's order.
+    private static func ordered(_ places: [SidebarPlace], in group: String, layout: SidebarLayout) -> [SidebarPlace] {
+        if places.contains(where: { layout.homes?[$0.key] == group }) { return layout.ordered(places) }
+        let blocks = [
+            SidebarPlace.destinations, SidebarPlace.builtInViews,
+            places.filter { if case .view = $0 { true } else { false } },
+        ]
+        return blocks.flatMap { layout.ordered($0.filter(places.contains)) }
     }
 }
