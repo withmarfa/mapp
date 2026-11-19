@@ -164,6 +164,7 @@ struct PaletteFooter: View {
                 HStack(spacing: 6) {
                     Text(openTitle)
                     ShortcutKeys("↩")
+                        .accessibilityHidden(true)
                 }
             }
             .accessibilityIdentifier("CommandPaletteOpen")
@@ -172,6 +173,7 @@ struct PaletteFooter: View {
                     HStack(spacing: 6) {
                         Text("Actions")
                         ShortcutKeys("⌘K")
+                            .accessibilityHidden(true)
                     }
                 }
                 .accessibilityIdentifier("CommandPaletteActions")

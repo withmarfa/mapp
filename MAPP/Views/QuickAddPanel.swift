@@ -502,6 +502,7 @@ struct QuickAddPanel: View {
                 HStack(spacing: 6) {
                     Text("Add \(label)")
                     ShortcutKeys("⌘↩", onAccent: true)
+                        .accessibilityHidden(true)
                 }
             }
             .mappButton(.primary)
