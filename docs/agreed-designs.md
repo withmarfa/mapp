@@ -8,7 +8,7 @@ This page lists what has been agreed for MAPP and is not in the app yet, so the 
 
 ## Settings > Sidebar
 
-Customizing the sidebar in place is built (see [Views and lists](views-and-lists.md)). What is left is its page in Settings.
+Customizing the sidebar in place is built (see [Views and lists](views-and-lists.md)). What is left is its page in Settings, which today only switches places on or off and reorders them.
 
 - Settings > Sidebar customizes the same layout: the tabs, each tab's sections, and the views with their colors.
 - A person chooses a view's color there as well as from the view's context menu. The color is kept on this Mac.

@@ -377,17 +377,6 @@ struct SidebarTests {
         #expect(plan.destinations == [.all, .sources, .collections])
     }
 
-    @Test func showAllTypesBringsBackTypesAndLeavesOtherPlacesHidden() {
-        var layout = SidebarLayout()
-        layout.setHidden(.type("aic.ticket"), true)
-        layout.setHidden(.type("core.note"), true)
-        layout.setHidden(.sources, true)
-        #expect(layout.hidesTypes)
-        layout.showAllTypes()
-        #expect(!layout.hidesTypes)
-        #expect(layout.isHidden(.sources))
-    }
-
     @Test func hidingARowHidesWhatIsUnderIt() async throws {
         let library = try await marfaLibrary()
         var layout = SidebarLayout()

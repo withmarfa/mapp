@@ -193,14 +193,6 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
         }
     }
 
-    /// Whether any type's row is hidden, at any level.
-    var hidesTypes: Bool { hidden.contains { $0.hasPrefix(Self.typePrefix) } }
-
-    /// Shows every type again, leaving the other places as they were.
-    mutating func showAllTypes() {
-        hidden = hidden.filter { !$0.hasPrefix(Self.typePrefix) }
-    }
-
     /// `places` with the ones in `shown` moved as a list showing only those would move them. The hidden ones keep
     /// their slots, so showing one again puts it back where it was.
     mutating func move<Place>(
@@ -216,8 +208,6 @@ nonisolated struct SidebarLayout: Codable, Equatable, Sendable {
         let keys = ordered(places, by: key).map(key).map { shownKeys.contains($0) ? next.next()! : $0 }
         order = order.filter { !keys.contains($0) } + keys
     }
-
-    private static let typePrefix = SidebarPlace.type("").key
 
     /// `places` as the person ordered them; the ones never placed follow, in the order given.
     func ordered<Place>(_ places: [Place], by key: (Place) -> String) -> [Place] {

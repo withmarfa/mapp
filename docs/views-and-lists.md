@@ -88,7 +88,7 @@ Built, not yet released.
 
 ## Sidebar
 
-Status: the sidebar customized in place is built, not yet released. Settings > Sidebar is agreed and not built ([Agreed designs](agreed-designs.md)).
+Status: the sidebar customized in place is built, not yet released. Settings > Sidebar is built as it was: it switches places on or off and reorders them within Library, Views and Types, and knows nothing of tabs, sections or colors. Its redesign is agreed and not built ([Agreed designs](agreed-designs.md)).
 
 The sidebar is a list of sections. A new library has four, in one tab: the shortcuts New and Search, Library (Items, Sources and Collections), Views (Inbox, Recents, Favorites and the saved views) and Types. The arrangement is kept for each server (`sidebarLayouts`).
 
