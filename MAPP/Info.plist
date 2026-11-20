@@ -13,10 +13,10 @@
 			</array>
 		</dict>
 	</array>
-	<key>MARFA_POSTHOG_HOST</key>
-	<string>$(MARFA_POSTHOG_HOST)</string>
-	<key>MARFA_POSTHOG_PROJECT_TOKEN</key>
-	<string>$(MARFA_POSTHOG_PROJECT_TOKEN)</string>
+	<key>MAPP_POSTHOG_HOST</key>
+	<string>$(MAPP_POSTHOG_HOST)</string>
+	<key>MAPP_POSTHOG_PROJECT_TOKEN</key>
+	<string>$(MAPP_POSTHOG_PROJECT_TOKEN)</string>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

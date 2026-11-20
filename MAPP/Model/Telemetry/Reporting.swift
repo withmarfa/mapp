@@ -32,8 +32,8 @@ nonisolated final class Reporting: Sendable {
 
     /// The `Info.plist` keys (build settings of the same names) a build carries its destination in. Both are empty in
     /// the repository, so a build from the public source sends nothing.
-    static let hostKey = "MARFA_POSTHOG_HOST"
-    static let tokenKey = "MARFA_POSTHOG_PROJECT_TOKEN"
+    static let hostKey = "MAPP_POSTHOG_HOST"
+    static let tokenKey = "MAPP_POSTHOG_PROJECT_TOKEN"
     /// The Settings switch, in the defaults. On until the person turns it off.
     static let switchKey = "sendErrorReports"
 

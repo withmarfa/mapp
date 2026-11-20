@@ -55,7 +55,7 @@ The unit, UI and `Live` test commands, and measuring, are in `MAPPTests/AGENTS.m
 
 ## Signing and releases
 
-- Never commit a team identifier, a report destination (`MARFA_POSTHOG_HOST`, `MARFA_POSTHOG_PROJECT_TOKEN`) or a version. They go in the ignored `Config/Local.xcconfig`; `MARKETING_VERSION` stays `0.0.0`.
+- Never commit a team identifier, a report destination (`MAPP_POSTHOG_HOST`, `MAPP_POSTHOG_PROJECT_TOKEN`) or a version. They go in the ignored `Config/Local.xcconfig`; `MARKETING_VERSION` stays `0.0.0`.
 - A version exists only as a git tag (`v0.0.x`, candidates `v0.0.x-rcN`), made soon after a merge to `main` that changes what a person sees or does; tests, CI and docs alone are not tagged. Before you sign, tag or check a release, read the README's Signing and Releasing sections.
 - TestFlight is for internal testers: tag freely. Use a local build to try a choice before it ships.
 

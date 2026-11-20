@@ -33,7 +33,7 @@ struct ReportingTests {
         #expect(!gate(info: [:]).sends)
         #expect(!gate(info: [Reporting.hostKey: "", Reporting.tokenKey: ""]).sends)
         // An unset build setting reaches the plist as its own name.
-        #expect(!gate(info: [Reporting.hostKey: "$(MARFA_POSTHOG_HOST)", Reporting.tokenKey: "$(MARFA_POSTHOG_PROJECT_TOKEN)"]).sends)
+        #expect(!gate(info: [Reporting.hostKey: "$(MAPP_POSTHOG_HOST)", Reporting.tokenKey: "$(MAPP_POSTHOG_PROJECT_TOKEN)"]).sends)
         #expect(!gate(info: [Reporting.hostKey: "http://reports.example.com", Reporting.tokenKey: "phc_abc123"]).sends)
         #expect(!gate(info: [Reporting.hostKey: "https://reports.example.com", Reporting.tokenKey: "phc abc"]).sends)
     }
