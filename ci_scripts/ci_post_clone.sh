@@ -27,8 +27,8 @@ if [[ -n "${MAPP_POSTHOG_HOST:-}" || -n "${MAPP_POSTHOG_PROJECT_TOKEN:-}" ]]; th
     exit 1
   }
   # An xcconfig reads // as a comment, so the scheme's slashes are written around an empty expansion.
-  local_config+=("MARFA_POSTHOG_HOST = https:/\$()/${MAPP_POSTHOG_HOST#https://}")
-  local_config+=("MARFA_POSTHOG_PROJECT_TOKEN = $MAPP_POSTHOG_PROJECT_TOKEN")
+  local_config+=("MAPP_POSTHOG_HOST = https:/\$()/${MAPP_POSTHOG_HOST#https://}")
+  local_config+=("MAPP_POSTHOG_PROJECT_TOKEN = $MAPP_POSTHOG_PROJECT_TOKEN")
 fi
 
 if (( ${#local_config} )); then

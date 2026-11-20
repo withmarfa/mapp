@@ -20,7 +20,7 @@ This builds the app and runs the unit tests. To run the app, open `MAPP.xcodepro
 A checkout builds without a developer account and signs to run locally. `Config/Signing.xcconfig`, the project's base configuration, leaves the team empty and includes the ignored `Config/Local.xcconfig`.
 
 - To sign with a team, write `DEVELOPMENT_TEAM = <team ID>` into `Config/Local.xcconfig`. The repository holds no tool for keeping that line.
-- To send errors and timings (`MAPP/Model/Telemetry/Reporting.swift`), write `MARFA_POSTHOG_HOST` and `MARFA_POSTHOG_PROJECT_TOKEN` into `Config/Local.xcconfig` the same way. `Info.plist` carries them into the build; a build without both sends nothing.
+- To send errors and timings (`MAPP/Model/Telemetry/Reporting.swift`), write `MAPP_POSTHOG_HOST` and `MAPP_POSTHOG_PROJECT_TOKEN` into `Config/Local.xcconfig` the same way. `Info.plist` carries them into the build; a build without both sends nothing.
 - Never commit a team identifier or either report setting.
 
 In Xcode Cloud, `ci_scripts/ci_post_clone.sh` writes `Config/Local.xcconfig` from the workflow secrets `MAPP_DEVELOPMENT_TEAM`, `MAPP_POSTHOG_HOST` and `MAPP_POSTHOG_PROJECT_TOKEN`. Without a team, Xcode Cloud uses its own managed signing. The script stops the build when only one report setting is set, or when the host is not `https` or the token does not start with `phc_`.
