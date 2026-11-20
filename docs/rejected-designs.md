@@ -53,7 +53,10 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 ## Buttons and messages
 
 - **Capsule buttons, black buttons and the Mac's push buttons.** Every button MAPP draws is a rounded rectangle; see [Components](components.md).
-- **A large 36-point button size.** There are two sizes, 22 and 28 points.
+- **A large 36-point button size.** There are two sizes, 22 and 28 points. Settings uses one, 28 points, except inside a table.
+- **Buttons in a section's header in Settings.** Adding is the card's last row; other actions are regular buttons in a row.
+- **Run Now or Restore on one table row only, the row under the pointer.** One button on one row reads as special. A row action shows on every row.
+- **Sheets and alerts placed under the toolbar**, AppKit's default sheet position (August, 20 November 2026). They sit in the middle of the window.
 - **A blue focus ring.** Keyboard focus is a gray ring.
 - **A solid red destructive button.** It is a pale red fill with red text.
 - **MAPP's own alert.** MAPP uses Apple's.
@@ -81,6 +84,9 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 - **Minus and plus buttons for a number.** A field with its unit inside, or a pop-up of steps.
 - **A list of words or patterns as one text field.** Each line is edited in place.
 - **A Paper theme.** Theme is System, Light or Dark.
+- **Types and sources left out of Items, Inbox and Recents.** Those are only the views a library starts with. Leaving things out belongs to Search.
+- **Advanced as a page of two settings.** Window Layout is in Appearance.
+- **"Rows and Cards" as a page's name.** It named surfaces, not the setting, and held only half of how a type looks. The page is Layouts.
 
 ## Collections and Sources
 
