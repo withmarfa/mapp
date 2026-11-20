@@ -50,6 +50,10 @@
 				Model/CLAUDE.md,
 				Model/Marfa/AGENTS.md,
 				Model/Marfa/CLAUDE.md,
+				Settings/AGENTS.md,
+				Settings/CLAUDE.md,
+				Settings/Marfa/AGENTS.md,
+				Settings/Marfa/CLAUDE.md,
 				Views/AGENTS.md,
 				Views/CLAUDE.md,
 			);

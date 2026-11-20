@@ -110,13 +110,7 @@ final class ItemLayoutTests: XCTestCase {
             }
         }
         capture("Compact title in toolbar after scrolling")
-        app.typeKey(",", modifierFlags: .command)
-        let settings = app.descendants(matching: .any).matching(identifier: "SettingsPageList").element(boundBy: 0)
-        XCTAssertTrue(settings.waitForExistence(timeout: 3))
-        // Choosing the place shown before leaves Settings with the window as it was.
-        app.outlines["Sidebar"].staticTexts["Items"].click()
-        XCTAssertTrue(settings.waitForNonExistence(timeout: 3))
-        XCTAssertTrue(compactTitle.waitForExistence(timeout: 3), "returning from Settings preserves the item's scroll position")
+        XCTAssertTrue(compactTitle.waitForExistence(timeout: 3), "the item's scroll position is kept")
         XCTAssertFalse(header.isHittable)
         app.typeKey("f", modifierFlags: .command)
         capture("Find bar on scrolled document")

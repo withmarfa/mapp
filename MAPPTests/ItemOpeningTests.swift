@@ -86,12 +86,11 @@ struct ItemOpeningTests {
 
     // MARK: The modal's end
 
-    @Test func theModalEndsWhenAnotherItemOrPlaceOrLayoutOrSettingsTakesTheWindow() {
+    @Test func theModalEndsWhenAnotherItemOrPlaceOrLayoutTakesTheWindow() {
         for leave in [
             { (browser: Browser, id: ItemID) in browser.selection = [id] },
             { browser, _ in browser.sidebarItem = .favorites },
             { browser, _ in browser.viewMode = .table },
-            { browser, _ in browser.showSettings() },
         ] {
             let (browser, _, ids) = browser()
             browser.open([ids[0]], as: .modal)

@@ -31,9 +31,9 @@ final class DisconnectWhileShownTests: XCTestCase {
 
     private func disconnectFromSettings() {
         app.typeKey(",", modifierFlags: .command)
-        let list = app.descendants(matching: .any).matching(identifier: "SettingsPageList").element(boundBy: 0)
-        XCTAssertTrue(list.waitForExistence(timeout: 5))
-        app.descendants(matching: .any).matching(identifier: "SettingsPage-library").element(boundBy: 0).click()
+        let sidebar = app.descendants(matching: .any).matching(identifier: "SettingsSidebar").element(boundBy: 0)
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 5))
+        app.descendants(matching: .any).matching(identifier: "SettingsPage-connection").element(boundBy: 0).click()
         let disconnect = app.buttons["MarfaDisconnect"]
         XCTAssertTrue(disconnect.waitForExistence(timeout: 5))
         let confirm = app.sheets.buttons["Disconnect"]
@@ -46,7 +46,7 @@ final class DisconnectWhileShownTests: XCTestCase {
         confirm.click()
     }
 
-    /// Settings shows inside the main window, so once the library is gone it is Settings, with its server form, that is left.
+    /// Once the library is gone the main window asks for a server again, and Settings shows Connection's server form.
     private func assertLeft(_ extra: String) {
         XCTAssertTrue(app.textFields["MarfaAddress"].waitForExistence(timeout: 20), "the window asks for a server again \(extra)")
         XCTAssertNotEqual(app.state, .notRunning, "the app is still running")

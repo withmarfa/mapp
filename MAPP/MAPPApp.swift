@@ -48,14 +48,14 @@ enum TestHost {
 
 struct MAPPApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
-    @State private var settingsRequest = SettingsRequest()
+    @State private var settingsLauncher = SettingsLauncher()
     @State private var shortcuts = KeyboardShortcutsModel()
     @AppStorage(InterfaceKey.toolbarLabelStyle) private var toolbarLabelStyle: ToolbarLabelStyle = .iconOnly
     private var libraries: Libraries { delegate.libraries }
 
     var body: some Scene {
         WindowGroup(id: "main") {
-            RootView(settingsRequest: settingsRequest, libraries: libraries)
+            RootView(settingsLauncher: settingsLauncher, libraries: libraries)
                 .interfaceTextStyle()
                 // The page's web view is backed by this color, which, unlike the window's default background, is
                 // not tinted by the desktop. Making it the window's background gives the list, Settings and the
@@ -77,12 +77,21 @@ struct MAPPApp: App {
             LooksCommands(libraries: libraries)
             FormatCommands()
             ToolbarCommands()
-            SettingsCommands(request: settingsRequest)
+            SettingsCommands(launcher: settingsLauncher)
+            AboutCommands()
             HelpCommands(shortcuts: shortcuts)
             #if DEBUG
             TuningCommands()
             #endif
         }
+
+        Window("Settings", id: SettingsLauncher.windowID) {
+            SettingsWindowView(launcher: settingsLauncher, libraries: libraries)
+        }
+        .defaultSize(width: SettingsTokens.Metric.windowWidth, height: SettingsTokens.Metric.windowHeight)
+        .windowResizability(.contentMinSize)
+        .defaultLaunchBehavior(.suppressed)
+        .commandsRemoved()
 
         Window("Keyboard Shortcuts", id: KeyboardShortcutsView.windowID) {
             KeyboardShortcutsView()
@@ -119,7 +128,7 @@ struct MAPPApp: App {
             }
             .interfaceTextStyle()
             .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
-            .modifier(ItemWindowNotices(notices: libraries.host.notices, settingsRequest: settingsRequest))
+            .modifier(ItemWindowNotices(notices: libraries.host.notices, launcher: settingsLauncher))
         }
         .defaultSize(width: 640, height: 720)
         .windowToolbarLabelStyle($toolbarLabelStyle)

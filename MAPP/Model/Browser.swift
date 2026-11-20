@@ -163,7 +163,7 @@ final class Browser {
     /// A window left on a layout its place cannot show goes back to the list without saying so. The indexes of
     /// collections and sources have no layout, so they leave it as it is for the place that follows to judge.
     func fallBackToListIfUnavailable(in library: any ItemLibrary) {
-        guard !showsSidebarIndex, !showsSettings, !availableViewModes(in: library).contains(viewMode) else { return }
+        guard !showsSidebarIndex, !availableViewModes(in: library).contains(viewMode) else { return }
         set(layout: .list)
     }
     /// How each place's table is grouped, sorted and filtered, as the person left it. A place that is not a saved view
@@ -190,13 +190,9 @@ final class Browser {
     /// The date field each place's timeline shows its items by, where the person chose one. A view's own comes from
     /// its day grouping (`followView`).
     var timelineFields: [SidebarItem: String] = [:]
-    /// Whether the window shows Settings in place of the list and the item page. The place the window was
-    /// showing, and its selection are kept, so choosing that place again returns to them.
-    private(set) var showsSettings = false {
-        didSet { if showsSettings { modalItem = nil } }
-    }
-    /// The page of Settings shown, and the one shown next time Settings is.
-    var settingsPage = SettingsPage.appearance
+    /// Opens the Settings window at a page, or where it was left when none is given. Settings is a window of its own, so
+    /// the browser keeps nothing of it; the window's views set this to the app's launcher.
+    @ObservationIgnored var openSettings: (SettingsPage?) -> Void = { _ in }
     var searchText = "" {
         didSet { if !isSearching { relevanceChoice = nil } }
     }
@@ -263,22 +259,17 @@ final class Browser {
     /// Whether the window shows Items as an index, the table of every item with its right sidebar. Items has no list
     /// column and no layout, so whatever layout the window was last left on is not shown there. An item opened from it
     /// as a full page takes the window until Back.
-    var showsItemsIndex: Bool { !showsSettings && item == .allItems && !isCollectionItemPresented }
-    var showsSidebarIndex: Bool { !showsSettings && (item == .sources || item == .collections || showsItemsIndex) }
-    var canSearchList: Bool { !showsSettings }
+    var showsItemsIndex: Bool { item == .allItems && !isCollectionItemPresented }
+    var showsSidebarIndex: Bool { item == .sources || item == .collections || showsItemsIndex }
     /// Whether an item's page is what the window shows, as against a collection, an index or Settings. The editor
     /// stays mounted behind the others, so every command that acts on the page asks this first. An item open in the
     /// modal is shown over an index as over any layout.
-    var showsPage: Bool { !showsSettings && (isModalPresented || (!showsCollection && !showsSidebarIndex)) }
+    var showsPage: Bool { isModalPresented || (!showsCollection && !showsSidebarIndex) }
 
-    /// Shows Settings, at `page` when one is given and at the page shown last otherwise.
+    /// Shows Settings, at `page` when one is given and where it was left otherwise.
     func showSettings(_ page: SettingsPage? = nil) {
-        if let page { settingsPage = page }
-        showsSettings = true
+        openSettings(page)
     }
-
-    /// Settings gives way to whatever the window showed, or to a place chosen in the sidebar.
-    func leaveSettings() { showsSettings = false }
 
     var isSearching: Bool { !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
@@ -315,10 +306,8 @@ final class Browser {
     func reveal(_ item: Item, in library: any ItemLibrary, order: ItemOrder) {
         // An item reached from the modal, by a link or the palette, is shown in the modal.
         let staysInModal = isModalPresented
-        leaveSettings()
         if !items(in: library).contains(where: { $0.id == item.id }) {
             showListing(item, in: library, order: order)
-            guard !showsSettings else { return }
         }
         selection = [item.id]
         if self.item == .allItems { revealOnItems(item) }
@@ -348,7 +337,6 @@ final class Browser {
     /// last seen when that place still lists it, and in All Items otherwise; any search is put away to show it.
     func go(_ direction: SelectionHistory.Direction, in library: any ItemLibrary) {
         guard let (index, entry) = history.target(direction, in: library, shown: selection) else { return }
-        leaveSettings()
         isMovingThroughHistory = true
         defer { isMovingThroughHistory = false }
         isCollectionItemPresented = false
@@ -616,7 +604,6 @@ final class Browser {
     func show(_ item: SidebarItem, in library: any ItemLibrary, order: ItemOrder) {
         let interval = Telemetry.begin(.navigation, "place.choose")
         defer { interval.end() }
-        leaveSettings()
         isCollectionItemPresented = false
         modalItem = nil
         searchText = ""

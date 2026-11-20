@@ -3,7 +3,7 @@ import SwiftUI
 /// A column whose default width the person sets in Settings. The split view only takes an ideal width per column, so
 /// the app keeps these three values itself and hands each to its column as the ideal for a new window.
 enum ColumnWidth: String, CaseIterable, Identifiable {
-    case sidebar, list, settings
+    case sidebar, list
 
     var id: Self { self }
 
@@ -14,7 +14,6 @@ enum ColumnWidth: String, CaseIterable, Identifiable {
         switch self {
         case .sidebar: 230
         case .list: 330
-        case .settings: 280
         }
     }
 
@@ -23,7 +22,6 @@ enum ColumnWidth: String, CaseIterable, Identifiable {
         switch self {
         case .sidebar: 200...340
         case .list: 280...480
-        case .settings: 200...340
         }
     }
 
@@ -36,64 +34,6 @@ enum ColumnWidth: String, CaseIterable, Identifiable {
 
     func stored(in defaults: UserDefaults = .standard) -> CGFloat {
         resolved(defaults.object(forKey: key) as? Double)
-    }
-}
-
-/// Settings for the width a column starts at in a new window. A width dragged in a window is that window's own and
-/// never changes these.
-struct ColumnWidthOptions: View {
-    private var registry = ColumnWidthRegistry.shared
-
-    var body: some View {
-        ForEach(ColumnWidth.allCases) { ColumnWidthRow(column: $0) }
-        HStack {
-            Button("Reset Widths") {
-                for column in ColumnWidth.allCases { UserDefaults.standard.removeObject(forKey: column.key) }
-            }
-            .accessibilityIdentifier("ColumnWidthsReset")
-            Button("Use Current Widths") {
-                guard let front = registry.front else { return }
-                for column in ColumnWidth.allCases {
-                    UserDefaults.standard.set(Double(column.resolved(Double(front.width(of: column)))), forKey: column.key)
-                }
-            }
-            .disabled(registry.front == nil)
-            .help(registry.front == nil ? "Open a window to use its column widths." : "Make the widths set in this window the defaults for new windows.")
-            .accessibilityIdentifier("ColumnWidthsUseCurrent")
-        }
-    }
-}
-
-private struct ColumnWidthRow: View {
-    let column: ColumnWidth
-    @AppStorage private var stored: Double
-
-    init(column: ColumnWidth) {
-        self.column = column
-        _stored = AppStorage(wrappedValue: Double(column.defaultWidth), column.key)
-    }
-
-    private var width: Binding<Double> {
-        Binding { Double(column.resolved(stored)) } set: { stored = Double(column.resolved($0)) }
-    }
-
-    private var title: LocalizedStringKey {
-        switch column {
-        case .sidebar: "Sidebar"
-        case .list: "List"
-        case .settings: "Settings"
-        }
-    }
-
-    var body: some View {
-        LabeledContent(title) {
-            HStack {
-                Text("\(Int(width.wrappedValue)) pt").monospacedDigit().foregroundStyle(.secondary)
-                Stepper(title, value: width, in: Double(column.range.lowerBound)...Double(column.range.upperBound), step: 10)
-                    .labelsHidden()
-            }
-        }
-        .accessibilityIdentifier("ColumnWidth-\(column.rawValue)")
     }
 }
 

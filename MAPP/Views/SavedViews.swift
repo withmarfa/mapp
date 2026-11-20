@@ -7,20 +7,20 @@ enum SavedViews {
     /// Whether the window's place can be saved as a view: Recents, the indexes, a single favorite
     /// and a collection cannot.
     static func canSave(_ browser: Browser, in library: any ItemLibrary) -> Bool {
-        library.isLoaded && library.reachesServer && !browser.showsSettings && !browser.showsSidebarIndex
+        library.isLoaded && library.reachesServer && !browser.showsSidebarIndex
             && ViewDraft.query(for: browser.item, catalogue: library.catalogue, views: library.views) != nil
     }
 
     /// Whether Edit View has a panel for the window's place: a saved view, or a place that could become one.
     static func canEdit(_ browser: Browser, in library: any ItemLibrary) -> Bool {
-        library.isLoaded && !browser.showsSettings && !browser.showsSidebarIndex
+        library.isLoaded && !browser.showsSidebarIndex
             && (shown(browser, in: library) != nil
                 || ViewDraft.query(for: browser.item, catalogue: library.catalogue, views: library.views) != nil)
     }
 
     /// The view the window shows, while the library holds it.
     static func shown(_ browser: Browser, in library: any ItemLibrary) -> LibraryView? {
-        guard !browser.showsSettings, case .view(let id) = browser.item else { return nil }
+        guard case .view(let id) = browser.item else { return nil }
         return library.views.first { $0.id == id }
     }
 

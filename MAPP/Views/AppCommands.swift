@@ -11,6 +11,7 @@ struct AppCommands: Commands {
     @FocusedValue(\.editor) private var editor
     @FocusedValue(\.detailsPresentation) private var details
     @FocusedValue(\.indexActions) private var indexActions
+    @FocusedValue(\.settingsNavigation) private var settingsNavigation
     @Environment(\.openWindow) private var openWindow
     @StoredOrder private var order
     @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
@@ -155,14 +156,17 @@ struct AppCommands: Commands {
             // ⌘[ and ⌘], as in Safari and the Finder.
             // The page uses the same keys to outdent and indent a list item and to move between table cells, so
             // while it has the keyboard the menu items give the keys up (the items still work from the menu).
+            // While the Settings window is key the same keys move through its pages.
             Button(String(localized: browser?.viewMode.backTitle ?? "Back"), systemImage: "chevron.backward") {
-                if browser?.isCollectionItemPresented == true { browser?.returnToCollection() }
+                if let settingsNavigation { settingsNavigation.back() }
+                else if browser?.isCollectionItemPresented == true { browser?.returnToCollection() }
                 else if let browser, let library { browser.go(.back, in: library) }
             }
                 .keyboardShortcut(pageKeepsHistoryKeys ? nil : KeyboardShortcut(KeyEquivalent(Character(HistoryKeys.back)), modifiers: .command))
                 .disabled(!canGoBack)
             Button("Forward", systemImage: "chevron.forward") {
-                if let browser, let library { browser.go(.forward, in: library) }
+                if let settingsNavigation { settingsNavigation.forward() }
+                else if let browser, let library { browser.go(.forward, in: library) }
             }
                 .keyboardShortcut(pageKeepsHistoryKeys ? nil : KeyboardShortcut(KeyEquivalent(Character(HistoryKeys.forward)), modifiers: .command))
                 .disabled(!canGoForward)
@@ -212,12 +216,14 @@ extension AppCommands {
     }
 
     private var canGoBack: Bool {
+        if let settingsNavigation { return settingsNavigation.canGoBack }
         guard let browser else { return false }
         if browser.usesCollection || browser.isCollectionItemPresented { return browser.isCollectionItemPresented }
         return library.map { browser.canGoBack(in: $0) } ?? false
     }
 
     private var canGoForward: Bool {
+        if let settingsNavigation { return settingsNavigation.canGoForward }
         guard let browser, !browser.usesCollection, !browser.isCollectionItemPresented else { return false }
         return library.map { browser.canGoForward(in: $0) } ?? false
     }
@@ -245,6 +251,6 @@ struct SearchListButton: View {
         Button("Search List", systemImage: "magnifyingglass") {
             browser?.focusRequest = .search
         }
-        .disabled(browser?.canSearchList != true)
+        .disabled(browser == nil)
     }
 }

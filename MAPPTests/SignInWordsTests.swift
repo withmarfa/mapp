@@ -67,7 +67,7 @@ import Testing
         let signIns = SystemSignIns(bundleIdentifier: "com.withmarfa.mapp.tests", anchor: { nil })
         let connection = try MarfaConnection(address: "https://marfa.test")
         do {
-            _ = try await signIns.signInWithBrowser(to: connection)
+            _ = try await signIns.signInWithBrowser(to: connection, asking: [])
             Issue.record("a sign-in began with no window")
         } catch {
             #expect(error is NoSignInWindow)

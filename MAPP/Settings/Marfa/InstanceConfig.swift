@@ -194,7 +194,7 @@ nonisolated enum InstanceConfigFailure: Error, Hashable, Sendable {
         case .unsupported:
             String(localized: "There are no server settings to show for this library.")
         case .keyRefused:
-            String(localized: "The server has ended MAPP’s sign-in. Sign in again in Library.")
+            String(localized: "The server has ended MAPP’s sign-in. Sign in again in Connection.")
         case .refused(let reason), .failed(let reason):
             reason
         }

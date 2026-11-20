@@ -42,39 +42,26 @@ struct BrowserTests {
         return (library, older, newer, favorite)
     }
 
-    @Test func settingsIsAPlaceThatKeepsTheListAndSelectionBehindIt() {
+    @Test func showingSettingsAsksTheWindowToOpenAtThePageAndChangesNothingHere() {
         let (library, _, newer, _) = makeFakeLibrary()
         let browser = Browser()
         browser.show(.inbox, in: library, order: ItemOrder())
         browser.selection = [newer.id]
-        browser.showSettings(.library)
-        #expect(browser.showsSettings)
-        #expect(browser.settingsPage == .library)
+        var asked: [SettingsPage?] = []
+        browser.openSettings = { asked.append($0) }
+        browser.showSettings(.connection)
+        browser.showSettings()
+        #expect(asked == [.connection, nil], "no page leaves the window where it was")
         #expect(browser.sidebarItem == .inbox)
         #expect(browser.selection == [newer.id])
-        browser.showSettings()
-        #expect(browser.settingsPage == .library, "opening Settings again keeps the page it was on")
-    }
-
-    @Test func choosingAPlaceOrAnItemLeavesSettings() throws {
-        let (library, older, _, _) = makeFakeLibrary()
-        let item = try #require(library.item(older.id))
-        let browser = Browser()
-        browser.showSettings()
-        browser.show(.allItems, in: library, order: ItemOrder())
-        #expect(!browser.showsSettings)
-        browser.showSettings()
-        browser.reveal(item, in: library, order: ItemOrder())
-        #expect(!browser.showsSettings)
-        browser.showSettings()
-        browser.openQuickAdd(in: library)
-        #expect(!browser.showsSettings)
     }
 
     @Test func everySettingsPageIsListedOnceAndNamed() {
-        #expect(SettingsPage.groups.flatMap { $0 } == SettingsPage.allCases)
-        #expect(Set(SettingsPage.allCases.map(\.title)).count == SettingsPage.allCases.count)
-        #expect(SettingsPage.allCases.allSatisfy { !$0.symbol.isEmpty })
+        #expect(Set(SettingsPage.all).count == SettingsPage.all.count)
+        #expect(Set(SettingsPage.all.map(\.title)).count == SettingsPage.all.count)
+        #expect(SettingsPage.all.allSatisfy { !$0.symbol.isEmpty })
+        #expect(SettingsPage.mappGroups.flatMap { $0 }.allSatisfy { $0.marfaPage == nil })
+        #expect(SettingsPage.marfaGroups.flatMap { $0 }.allSatisfy { $0.marfaPage != nil })
     }
 
     @Test func revealingExistingItemsKeepsReadingFocusInListAndGallery() throws {
@@ -238,17 +225,6 @@ struct BrowserTests {
         #expect(browser.selection.isEmpty, "Items is an index, which chooses nothing until the person does")
         browser.show(.inbox, in: library, order: ItemOrder())
         #expect(browser.selection == [newer.id])
-    }
-
-    @Test(arguments: [SidebarItem.sources, .collections, .inbox, .source("test"), .collection(ItemID("parent"))])
-    func searchIsAvailableOnEveryPlaceButSettings(place: SidebarItem) {
-        let browser = Browser()
-        browser.sidebarItem = place
-        #expect(browser.canSearchList)
-        browser.showSettings()
-        #expect(!browser.canSearchList)
-        browser.leaveSettings()
-        #expect(browser.canSearchList)
     }
 
     @Test func aWhitespaceSearchIsNoSearch() {

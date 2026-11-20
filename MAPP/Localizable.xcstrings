@@ -1,10 +1,31 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ Isn’t Answering" : {
+
+    },
+    "%@ ended MAPP’s sign-in. Sign in again in Connection." : {
+
+    },
+    "%@ items" : {
+
+    },
     "%@ you make show here." : {
 
     },
+    "%lld Lines" : {
+
+    },
+    "%lld of %@" : {
+
+    },
+    "%lld to %lld points" : {
+
+    },
     "A Collection" : {
+
+    },
+    "A Marfa server’s address." : {
 
     },
     "A Source" : {
@@ -16,6 +37,9 @@
     "A View" : {
 
     },
+    "About MAPP" : {
+
+    },
     "Add and Open" : {
 
     },
@@ -25,7 +49,10 @@
     "Add Shortcut" : {
 
     },
-    "Add Tab" : {
+    "All Deleted Items" : {
+
+    },
+    "Allow More…" : {
 
     },
     "Apps you sign in show here." : {
@@ -40,6 +67,12 @@
     "Choose one item to read or edit it." : {
 
     },
+    "Choose…" : {
+
+    },
+    "Cleanup" : {
+
+    },
     "Collections you make show here." : {
 
     },
@@ -52,10 +85,118 @@
     "Color" : {
 
     },
+    "Connect to a Marfa" : {
+
+    },
+    "Connect to a Marfa in Connection to see this page." : {
+
+    },
+    "Connection" : {
+
+    },
     "Couldn’t Confirm the Sign-In" : {
 
     },
     "Couldn’t Sign In" : {
+
+    },
+    "Custom…" : {
+
+    },
+    "Delete Permanently" : {
+
+    },
+    "Deleted Items" : {
+
+    },
+    "Disconnect from %@" : {
+
+    },
+    "Empty Recently Deleted" : {
+
+    },
+    "Empty…" : {
+
+    },
+    "Filter" : {
+
+    },
+    "Hide" : {
+
+    },
+    "How wide Standard pages run. Full Width leaves it aside." : {
+
+    },
+    "Items you delete wait here before they are permanently deleted." : {
+
+    },
+    "Last answered %@. MAPP keeps trying." : {
+
+    },
+    "MAPP" : {
+
+    },
+    "MAPP isn’t allowed to list and permanently delete deleted items." : {
+
+    },
+    "MAPP isn’t allowed to see and change this Marfa’s settings." : {
+
+    },
+    "MAPP keeps trying." : {
+
+    },
+    "MAPP opens the server’s own page to sign in and never sees your password." : {
+
+    },
+    "MAPP shows one Marfa at a time." : {
+
+    },
+    "Needs a Permission" : {
+
+    },
+    "No Marfa Open" : {
+
+    },
+    "Nothing Is in Recently Deleted" : {
+
+    },
+    "Nothing is waiting here." : {
+
+    },
+    "On the server’s own page, in your browser." : {
+
+    },
+    "Open Connection…" : {
+
+    },
+    "Other Marfas" : {
+
+    },
+    "Overview" : {
+
+    },
+    "Palettes" : {
+
+    },
+    "Pattern" : {
+
+    },
+    "Permanently deletes %@ items." : {
+
+    },
+    "Removes this Mac’s copy and signs MAPP out." : {
+
+    },
+    "Sent once you sign in again." : {
+
+    },
+    "Settings Not Saved" : {
+
+    },
+    "Signed Out" : {
+
+    },
+    "pt" : {
 
     },
     "Switched Servers, but MAPP May Still Be Approved on the Previous One" : {
@@ -68,6 +209,12 @@
 
     },
     "MAPP dropped a sign-in it didn’t use, but couldn’t confirm that %@ ended its approval." : {
+
+    },
+    "The server has ended MAPP’s sign-in. Sign in again in Connection." : {
+
+    },
+    "This Marfa’s own page, in your browser." : {
 
     },
     "To end it, run “marfa apps list” with the command line signed in to %@ as the owner, find MAPP’s entry, then run “marfa apps revoke <id>”." : {
@@ -247,9 +394,6 @@
     "No items match this view." : {
 
     },
-    "No sections in this tab." : {
-
-    },
     "No Window to Sign In From" : {
 
     },
@@ -263,9 +407,6 @@
 
     },
     "No Shortcuts" : {
-
-    },
-    "Or Control-click the sidebar and choose Customize Sidebar." : {
 
     },
     "Orange" : {
@@ -316,9 +457,6 @@
     "Show Formats" : {
 
     },
-    "Show Section" : {
-
-    },
     "Show %lld" : {
 
     },
@@ -355,13 +493,28 @@
     "The server wouldn’t approve MAPP, so nothing changed. Check that you are signing in to the right server and account, then try again." : {
 
     },
+    "Translucent" : {
+
+    },
+    "Unknown" : {
+
+    },
+    "Unsent Changes" : {
+
+    },
+    "Use Another Marfa" : {
+
+    },
+    "Value panels open under a date, status, tags, or other value. Palettes are the command palette, Search Items, and New Item. Translucent uses the system’s popover material, and Solid uses the window color." : {
+
+    },
+    "Waiting…" : {
+
+    },
+    "today, %@" : {
+
+    },
     "What’s New in MAPP" : {
-
-    },
-    "With one tab, the sidebar shows no tab bar." : {
-
-    },
-    "The sidebar lists the first six types and keeps the rest under Show More. New types appear in the Types section automatically." : {
 
     },
     "Yellow" : {
@@ -472,6 +625,9 @@
 
     },
     "MAPP couldn’t confirm that %@ ended MAPP’s earlier approval." : {
+
+    },
+    "You closed Settings before saving the changes to this Marfa’s settings." : {
 
     },
     "Your items are still loading." : {
@@ -3298,9 +3454,6 @@
     "No items match the filters." : {
 
     },
-    "No Library Is Open" : {
-
-    },
     "no limit" : {
       "extractionState" : "manual"
     },
@@ -3384,9 +3537,6 @@
     },
     "Nothing Hidden" : {
       "extractionState" : "manual"
-    },
-    "Nothing is in Recently Deleted." : {
-
     },
     "Nothing on the Page" : {
       "extractionState" : "manual"
@@ -3493,12 +3643,6 @@
         }
       }
     },
-    "Open a library to choose what its sidebar shows." : {
-
-    },
-    "Open a library to see what was deleted from it." : {
-
-    },
     "Open a window to use its column widths." : {
 
     },
@@ -3535,9 +3679,6 @@
     "Open the file in another app to view it." : {
 
     },
-    "Open the server’s console in the browser" : {
-
-    },
     "Open to view this PDF" : {
 
     },
@@ -3557,9 +3698,6 @@
       "extractionState" : "manual"
     },
     "Opens a panel to add a value" : {
-
-    },
-    "Opens in the browser" : {
 
     },
     "Opens this address" : {
@@ -3894,9 +4032,6 @@
     "Saved" : {
 
     },
-    "Saved views come from your Marfa server." : {
-
-    },
     "Saved. The server now has:" : {
       "extractionState" : "manual"
     },
@@ -4031,9 +4166,6 @@
 
     },
     "Show Formatted Text" : {
-
-    },
-    "Show Icons on Subtypes" : {
 
     },
     "Show in Finder" : {
@@ -4843,9 +4975,6 @@
     },
     "Unresolved connections will be preserved." : {
       "extractionState" : "manual"
-    },
-    "Unsent changes" : {
-
     },
     "Until you decide, these changes stay on this Mac." : {
 

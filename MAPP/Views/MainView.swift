@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Mounts one split view at a time: the workspace identity changes to switch. Settings is a place in the three-column split so macOS releases the outgoing toolbar, and the column count of a mounted split view is never changed. Browser, editor, undo, columns and sidebar scroll live above that boundary so they survive a switch.
+/// Mounts one split view at a time: the workspace identity changes to switch. The column count of a mounted split view is never changed. Browser, editor, undo, columns and sidebar scroll live above that boundary so they survive a switch.
 struct MainView: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries
@@ -44,12 +44,10 @@ struct MainView: View {
     var body: some View { lifecycleWindow }
 
     /// The gallery and the table have no list column, so they mount the two-column split view, as does the list while
-    /// an item is open as a full page. Settings shows in the three-column one, in place of the list and the page,
-    /// whatever the window is set to show.
-    private var usesCollectionLayout: Bool { (browser.usesCollection || browser.isCollectionItemPresented) && !browser.showsSettings }
+    /// an item is open as a full page.
+    private var usesCollectionLayout: Bool { browser.usesCollection || browser.isCollectionItemPresented }
 
     private var workspacePresentation: WorkspacePresentation {
-        if browser.showsSettings { return .settings }
         if details.history != nil { return .history }
         if browser.showsItemsIndex { return .items }
         if browser.showsSidebarIndex { return .index }
@@ -60,8 +58,7 @@ struct MainView: View {
     private var shownViewMode: ItemViewMode { heldViewMode ?? browser.viewMode }
 
     private var activeWindow: some View {
-        // Settings replaces both column toolbar providers even when the split keeps three columns.
-        // Release the outgoing providers before mounting that workspace or changing the column count.
+        // Release the outgoing toolbar providers before changing the column count.
         // Browser, editor, drafts, and column preferences remain above this presentation identity.
         dialogsWindow.id(shownPresentation)
         .modifier(ToolbarTrayWatch { isOpen in
@@ -81,21 +78,12 @@ struct MainView: View {
         .onChange(of: appearsActive, initial: true) {
             ColumnWidthRegistry.shared.windowBecame(active: appearsActive, tracker: measuredWidths)
         }
-        // Customizing happens in the sidebar, so a command that starts it brings the sidebar back. Settings keeps the
-        // sidebar column, so customizing there needs nothing more.
+        // Customizing happens in the sidebar, so a command that starts it brings the sidebar back.
         .onChange(of: browser.customizesSidebar) {
             if browser.customizesSidebar { isSidebarVisible = true }
         }
         .onChange(of: browser.showsCollection) {
             if browser.showsCollection { editor.releaseFocus(); editor.flush() }
-        }
-        .onChange(of: browser.showsSettings) {
-            if browser.showsSettings {
-                editor.flush()
-                browser.palette = nil
-                pane = nil
-                details.leaveHistory()
-            }
         }
         // Another place, or the index of one, is somewhere else to go: Version History is of the item it was opened for.
         .onChange(of: browser.sidebarItem) { details.leaveHistory() }
@@ -121,32 +109,20 @@ struct MainView: View {
         NavigationSplitView(columnVisibility: listColumnVisibility) {
             sidebarColumn
         } content: {
-            Group {
-                if shownPresentation == .settings {
-                    SettingsPageList(browser: browser)
-                } else {
-                    ItemList(browser: browser, order: order, pane: $pane).equatable()
-                        .filterChips(browser)
-                }
-            }
-            // The page list is about as wide as the sidebar; each keeps its own width. The split view reads the ideal
-            // only as it is built, so it comes from the tracker as it stands then.
-            .navigationSplitViewColumnWidth(
-                min: activeListColumn.range.lowerBound, ideal: measuredWidths.width(of: activeListColumn),
-                max: activeListColumn.range.upperBound)
+            ItemList(browser: browser, order: order, pane: $pane).equatable()
+                .filterChips(browser)
+                // The split view reads the ideal only as it is built, so it comes from the tracker as it stands then.
+                .navigationSplitViewColumnWidth(
+                    min: ColumnWidth.list.range.lowerBound, ideal: measuredWidths.width(of: .list),
+                    max: ColumnWidth.list.range.upperBound)
         } detail: {
-            if shownPresentation == .settings {
-                SettingsPageView(page: browser.settingsPage, browser: browser)
-                    .toastOverlay()
-            } else {
-                // The modal holds the window's one editor while it is open, so the page beside the list steps aside.
-                Group {
-                    if browser.isModalPresented { Color.clear } else { itemPage }
-                }
-                    .toastOverlay()
-                    .modifier(itemInspector(WindowToolbarLayout.list))
-                    .toolbar(id: WindowToolbarLayout.list) { windowToolbar(hasListColumn: true) }
+            // The modal holds the window's one editor while it is open, so the page beside the list steps aside.
+            Group {
+                if browser.isModalPresented { Color.clear } else { itemPage }
             }
+                .toastOverlay()
+                .modifier(itemInspector(WindowToolbarLayout.list))
+                .toolbar(id: WindowToolbarLayout.list) { windowToolbar(hasListColumn: true) }
         }
     }
 
@@ -157,9 +133,7 @@ struct MainView: View {
     }
 
     /// Only the three-column split has a list column to measure.
-    private var hasListColumn: Bool { shownPresentation == .list || shownPresentation == .settings }
-
-    private var activeListColumn: ColumnWidth { shownPresentation == .settings ? .settings : .list }
+    private var hasListColumn: Bool { shownPresentation == .list }
 
     private var sidebarColumn: some View {
         VStack(spacing: 0) {
@@ -169,11 +143,11 @@ struct MainView: View {
         }
         .onSplitViewDividerDrag(placing: {
             hasListColumn
-                ? [measuredWidths.width(of: .sidebar), measuredWidths.width(of: activeListColumn)]
+                ? [measuredWidths.width(of: .sidebar), measuredWidths.width(of: .list)]
                 : [measuredWidths.width(of: .sidebar)]
         }) { widths in
             if let sidebar = widths.first { measuredWidths.record(sidebar, for: .sidebar) }
-            if hasListColumn, widths.count > 1 { measuredWidths.record(widths[1], for: activeListColumn) }
+            if hasListColumn, widths.count > 1 { measuredWidths.record(widths[1], for: .list) }
         }
         .navigationSplitViewColumnWidth(
             min: ColumnWidth.sidebar.range.lowerBound, ideal: measuredWidths.width(of: .sidebar), max: ColumnWidth.sidebar.range.upperBound)
@@ -447,7 +421,7 @@ struct MainView: View {
 }
 
 private enum WorkspacePresentation: Hashable {
-    case list, collection, settings, index, items, history
+    case list, collection, index, items, history
 }
 
 /// Applied to a detail column, before its toolbar, never to the split view: an inspector on the split view makes every

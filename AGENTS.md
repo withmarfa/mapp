@@ -7,7 +7,7 @@ MAPP is a macOS app for a Marfa server's items, with a sidebar, a list and a pag
 | If you change | Read first |
 | --- | --- |
 | `MAPP/Model/` | `MAPP/Model/AGENTS.md`; for `Marfa/` also `MAPP/Model/Marfa/AGENTS.md` |
-| `MAPP/Views/` | `MAPP/Views/AGENTS.md` |
+| `MAPP/Views/` or `MAPP/Settings/` | `AGENTS.md` there; for `Settings/Marfa/` also its own |
 | `MAPP/Editor/` or `editor/` | both `AGENTS.md` files, since the bridge spans them |
 | `MAPPTests/` | `MAPPTests/AGENTS.md` |
 | How anything looks: a row, chip, card, page or panel | the matching page in `docs/`; `docs/glossary.md` lists the terms |

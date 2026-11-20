@@ -1,6 +1,6 @@
 # Views
 
-Windows, panes, toolbars, commands and Settings. How things are drawn is in `docs/`: read the matching page before you change a list row, a chip, the item page, a panel or a view's controls, and note its status line, because a page marked "Agreed, not built" describes where the code is going, and its "Built today" or "Built, not yet released" says what the code does now.
+Windows, panes, toolbars and commands. Settings is a window of its own, in `MAPP/Settings/` (read its `AGENTS.md`); the main window holds no Settings place. How things are drawn is in `docs/`: read the matching page before you change a list row, a chip, the item page, a panel or a view's controls, and note its status line, because a page marked "Agreed, not built" describes where the code is going, and its "Built today" or "Built, not yet released" says what the code does now.
 
 - Buttons, keycaps and the toast: [components](../../docs/components.md); draw a button MAPP owns with `mappButton`; toolbar items, menus, alerts and text fields stay the system's.
 - Chips and values: [value-components](../../docs/value-components.md).

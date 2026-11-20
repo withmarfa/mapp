@@ -1,6 +1,6 @@
 import Foundation
 
-/// The addresses the app opens in the browser, all in one place: the Help menu, the About page and the command palette.
+/// The addresses the app opens in the browser, all in one place: the Help menu, the About panel and the command palette.
 nonisolated enum AppLinks {
     static let source = URL(string: "https://github.com/withmarfa/mapp")!
     static let license = URL(string: "https://github.com/withmarfa/mapp/blob/main/LICENSE")!

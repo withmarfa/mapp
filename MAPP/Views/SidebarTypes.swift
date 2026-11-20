@@ -148,7 +148,7 @@ struct SidebarFolding {
 
     /// Folding a row that holds the selected type selects the row, so something stays highlighted.
     func setCollapsed(_ id: String, _ collapsed: Bool) {
-        if collapsed, !browser.showsSettings {
+        if collapsed {
             if let item = plan.selectionAfterFolding(id, selected: browser.sidebarItem) {
                 browser.show(item, in: library, order: order)
             }
@@ -158,10 +158,10 @@ struct SidebarFolding {
         }
     }
 
-    /// An arrow key does what the system's outline does for the selected type. Settings shows no selection, and a
-    /// key with a modifier belongs to someone else.
+    /// An arrow key does what the system's outline does for the selected type, and a key with a
+    /// modifier belongs to someone else.
     func press(_ arrow: SidebarPlan.Arrow, _ press: KeyPress) -> KeyPress.Result {
-        guard press.modifiers.isEmpty, !browser.showsSettings else { return .ignored }
+        guard press.modifiers.isEmpty else { return .ignored }
         switch plan.outcome(of: arrow, selected: browser.sidebarItem) {
         case .fold(let id, let collapsed): setCollapsed(id, collapsed)
         case .select(let item): browser.show(item, in: library, order: order)

@@ -211,7 +211,7 @@ extension Notices {
         #expect(await eventually { !notices.waiting.isEmpty })
 
         let notice = try #require(notices.waiting.first)
-        #expect(notice.action == .openSettings(.library))
+        #expect(notice.action == .openSettings(.connection))
         #expect(notice.message == MarfaSync.keyRefused)
         #expect(notice.message.contains("disconnect"), "the words say Settings can start again")
         _ = library
@@ -233,9 +233,9 @@ extension Notices {
 
     @Test func theSameWordsWithAndWithoutAnActionAreTwoNotices() {
         let notices = Notices()
-        notices.tell("Title", "Message", action: .openSettings(.library))
-        notices.tell("Title", "Message", action: .openSettings(.library))
+        notices.tell("Title", "Message", action: .openSettings(.connection))
+        notices.tell("Title", "Message", action: .openSettings(.connection))
         notices.tell("Title", "Message")
-        #expect(notices.waiting.map(\.action) == [.openSettings(.library), nil])
+        #expect(notices.waiting.map(\.action) == [.openSettings(.connection), nil])
     }
 }

@@ -1,13 +1,13 @@
 import XCTest
 
-/// The Marfa server section of Settings > Library, starting as a first launch does. The sample's app has a host of its own, with
+/// The Marfa server section of Settings > Connection, starting as a first launch does. The sample's app has a host of its own, with
 /// sign-ins held in memory, so nothing here reaches the person's saved server or sign-in; the steps used need no server and open no browser,
 /// since an address that is no server is refused before anything is asked of the network.
 @MainActor
 final class MarfaSettingsTests: XCTestCase {
     private var app: XCUIApplication!
     private var window: XCUIElement { app.windows.firstMatch }
-    private var settings: XCUIElement { window.descendants(matching: .any).matching(identifier: "SettingsPageList").element(boundBy: 0) }
+    private var settings: XCUIElement { app.descendants(matching: .any).matching(identifier: "SettingsSidebar").element(boundBy: 0) }
 
     override func setUp() async throws {
         continueAfterFailure = false
@@ -23,23 +23,23 @@ final class MarfaSettingsTests: XCTestCase {
     private func openLibraryPage() {
         app.typeKey(",", modifierFlags: .command)
         XCTAssertTrue(settings.waitForExistence(timeout: 3))
-        let page = window.descendants(matching: .any).matching(identifier: "SettingsPage-library").element(boundBy: 0)
+        let page = app.descendants(matching: .any).matching(identifier: "SettingsPage-connection").element(boundBy: 0)
         XCTAssertTrue(page.waitForExistence(timeout: 3))
         page.click()
     }
 
-    private var address: XCUIElement { window.textFields["MarfaAddress"] }
-    private var connect: XCUIElement { window.buttons["MarfaConnect"] }
-    private var connectWithCode: XCUIElement { window.buttons["MarfaConnectCode"] }
+    private var address: XCUIElement { app.textFields["MarfaAddress"] }
+    private var connect: XCUIElement { app.buttons["MarfaConnect"] }
+    private var connectWithCode: XCUIElement { app.buttons["MarfaConnectCode"] }
 
     func testTheLibraryPageAsksForAnAddressAndOffersTwoWaysToSignIn() {
         openLibraryPage()
         XCTAssertTrue(address.waitForExistence(timeout: 3))
-        XCTAssertFalse(window.secureTextFields.firstMatch.exists, "no key is typed into the app")
+        XCTAssertFalse(app.secureTextFields.firstMatch.exists, "no key is typed into the app")
         XCTAssertTrue(connect.exists, "Sign In opens the server's own page")
         XCTAssertTrue(connectWithCode.exists, "Use a Code Instead is for a Mac that cannot open the browser")
-        XCTAssertFalse(window.buttons["MarfaDisconnect"].exists, "there is nothing to disconnect from")
-        XCTAssertTrue(window.descendants(matching: .any)["SettingsDetail"].staticTexts["Library"].waitForExistence(timeout: 3))
+        XCTAssertFalse(app.buttons["MarfaDisconnect"].exists, "there is nothing to disconnect from")
+        XCTAssertTrue(app.descendants(matching: .any)["SettingsDetail"].staticTexts["Connect to a Marfa"].waitForExistence(timeout: 3))
         attachScreenshot("SettingsMarfaDisconnected")
     }
 
@@ -60,11 +60,11 @@ final class MarfaSettingsTests: XCTestCase {
         address.click()
         address.typeText("marfa.example")
         connect.click()
-        let notice = window.descendants(matching: .any)["MarfaNotice"].firstMatch
+        let notice = app.descendants(matching: .any)["MarfaNotice"].firstMatch
         XCTAssertTrue(notice.waitForExistence(timeout: 3))
         let noticeText = notice.label + " " + (notice.value as? String ?? "")
         XCTAssertTrue(noticeText.contains("Check the Address"), "the combined notice exposes its title: \(notice.debugDescription)")
-        XCTAssertFalse(window.buttons["MarfaDisconnect"].exists, "nothing was connected")
+        XCTAssertFalse(app.buttons["MarfaDisconnect"].exists, "nothing was connected")
         attachScreenshot("SettingsMarfaNotAServer")
     }
 

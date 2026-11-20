@@ -1,0 +1,125 @@
+import AppKit
+import SwiftUI
+
+/// Every color, font and measure Settings draws with, named once, so a page never holds a literal and a theme can
+/// replace them later. The parts read these; a page reads only the parts.
+enum SettingsTokens {
+    /// The colors of a page's tile in the sidebar and of a row's lead.
+    enum Tone: CaseIterable, Hashable, Sendable {
+        case gray, blue, indigo, yellow, orange, purple, teal, green, pink, red
+
+        var color: Color {
+            switch self {
+            case .gray: Color(nsColor: .systemGray)
+            case .blue: Color(nsColor: .systemBlue)
+            case .indigo: Color(nsColor: .systemIndigo)
+            case .yellow: Color(nsColor: .systemYellow)
+            case .orange: Color(nsColor: .systemOrange)
+            case .purple: Color(nsColor: .systemPurple)
+            case .teal: Color(nsColor: .systemTeal)
+            case .green: Color(nsColor: .systemGreen)
+            case .pink: Color(nsColor: .systemPink)
+            case .red: Color(nsColor: .systemRed)
+            }
+        }
+    }
+
+    /// A card: white with a hairline, never gray.
+    static let card = adaptive(light: .white, dark: NSColor(white: 0.17, alpha: 1))
+    static let hairline = adaptive(light: NSColor(white: 0, alpha: 0.09), dark: NSColor(white: 1, alpha: 0.12))
+    /// A row's rule: lighter than the card's edge.
+    static let rule = adaptive(light: NSColor(white: 0, alpha: 0.07), dark: NSColor(white: 1, alpha: 0.09))
+    /// A gray button's fill and the fill of a quiet control.
+    static let buttonFill = adaptive(light: NSColor(white: 0, alpha: 0.06), dark: NSColor(white: 1, alpha: 0.12))
+    static let buttonFillPressed = adaptive(light: NSColor(white: 0, alpha: 0.12), dark: NSColor(white: 1, alpha: 0.2))
+    /// A destructive button: a pale red fill with red text.
+    static let destructiveFill = adaptive(light: NSColor(red: 1, green: 0.23, blue: 0.19, alpha: 0.12), dark: NSColor(red: 1, green: 0.27, blue: 0.23, alpha: 0.24))
+    /// A chosen row, card or table row: a soft gray, never blue.
+    static let selection = adaptive(light: NSColor(white: 0, alpha: 0.07), dark: NSColor(white: 1, alpha: 0.1))
+    /// Where a row is under the pointer.
+    static let hover = adaptive(light: NSColor(white: 0, alpha: 0.04), dark: NSColor(white: 1, alpha: 0.06))
+    /// The sidebar's field and the column's background.
+    static let field = adaptive(light: .white, dark: NSColor(white: 0.12, alpha: 1))
+    static let page = Color(nsColor: .windowBackgroundColor)
+    static let errorRed = adaptive(light: NSColor(red: 0.78, green: 0.13, blue: 0.1, alpha: 1), dark: NSColor(red: 1, green: 0.42, blue: 0.38, alpha: 1))
+    static let secondaryText = Color(nsColor: .secondaryLabelColor)
+    static let tertiaryText = Color(nsColor: .tertiaryLabelColor)
+    static let primaryText = Color(nsColor: .labelColor)
+    static let warning = Color(nsColor: .systemOrange)
+    static let ok = Color(nsColor: .systemGreen)
+    /// The one color a chosen choice's ring and a focused control's ring take: gray, never the accent.
+    static let focusRing = Color.primary.opacity(0.26)
+    /// The scrim behind a centered sheet.
+    static let scrim = Color.black.opacity(0.18)
+
+    /// The interface fonts of Settings. A page asks for these by role.
+    enum Role: Hashable, Sendable {
+        case title, line, sectionName, sectionLine, footer, control, small, mono, stateTitle, headTitle, count, sidebar, sidebarHeader
+    }
+
+    static func font(_ role: Role, scale: CGFloat = 1) -> Font {
+        switch role {
+        case .title, .control, .sidebar: .system(size: 13 * scale)
+        case .line, .sectionLine, .footer: .system(size: 11 * scale)
+        case .sectionName: .system(size: 13 * scale, weight: .semibold)
+        case .small: .system(size: 12 * scale)
+        case .mono: .system(size: 12 * scale, design: .monospaced)
+        case .stateTitle: .system(size: 15 * scale, weight: .semibold)
+        case .headTitle: .system(size: 15 * scale, weight: .semibold)
+        case .count: .system(size: 11 * scale)
+        case .sidebarHeader: .system(size: 11 * scale, weight: .semibold)
+        }
+    }
+
+    /// The measures, in points at the default text size.
+    enum Metric {
+        /// The column's widest width: wider windows add room either side.
+        static let column: CGFloat = 620
+        static let windowWidth: CGFloat = 1200
+        static let windowHeight: CGFloat = 900
+        static let windowMinWidth: CGFloat = 760
+        static let windowMinHeight: CGFloat = 480
+        static let sidebarWidth: CGFloat = 240
+        static let rowHeight: CGFloat = 44
+        static let rowHeightWithLine: CGFloat = 56
+        static let rowHeightCompact: CGFloat = 36
+        /// A card's side margin, where a row's text starts when it has no lead.
+        static let inset: CGFloat = 16
+        /// The lead column, in which a tile, a symbol or a mark sits; text starts after it, at 52.
+        static let leadColumn: CGFloat = 24
+        static let textInset: CGFloat = 52
+        static let controlWidth: CGFloat = 200
+        static let controlHeight: CGFloat = 28
+        static let cardRadius: CGFloat = 10
+        static let controlRadius: CGFloat = 7
+        static let buttonRadius: CGFloat = 9
+        static let tile: CGFloat = 22
+        static let headTile: CGFloat = 44
+        static let smallButtonHeight: CGFloat = 22
+    }
+
+    private static func adaptive(light: NSColor, dark: NSColor) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
+        })
+    }
+}
+
+extension EnvironmentValues {
+    /// The interface text size's scale, which the window sets from the person's choice.
+    @Entry var settingsTextScale: CGFloat = 1
+}
+
+private struct SettingsFont: ViewModifier {
+    let role: SettingsTokens.Role
+    @Environment(\.settingsTextScale) private var scale
+
+    func body(content: Content) -> some View {
+        content.font(SettingsTokens.font(role, scale: scale))
+    }
+}
+
+extension View {
+    /// Sets the interface font for `role`, at the person's text size.
+    func settingsFont(_ role: SettingsTokens.Role) -> some View { modifier(SettingsFont(role: role)) }
+}

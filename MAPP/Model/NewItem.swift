@@ -74,7 +74,6 @@ extension Browser {
         if !entry.attachments.isEmpty {
             Task { await attachFiles(of: entry, in: library) }
         }
-        leaveSettings()
         searchText = ""
         isSearchExpanded = false
         // The edge is queued, so the collection's list may not hold the item yet; it soon will.

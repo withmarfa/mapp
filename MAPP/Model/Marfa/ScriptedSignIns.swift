@@ -18,6 +18,11 @@ nonisolated final class ScriptedSignIns: SignIns {
         /// Whether the sign-ins that succeed leave a replaced approval standing at the server.
         var replacedStands = false
         var calls: [String] = []
+        /// The permissions the next browser sign-in grants of those asked, first to last; the last is repeated. Empty
+        /// grants everything asked.
+        var approving: [Set<InstancePermission>] = []
+        /// The permissions each browser sign-in was asked for, in order.
+        var asked: [Set<InstancePermission>] = []
     }
 
     private static let service = "com.withmarfa.mapp.scripted-sign-ins"
@@ -38,8 +43,22 @@ nonisolated final class ScriptedSignIns: SignIns {
         save(key, for: connection.address)
     }
 
-    func save(_ key: String, for address: URL) {
-        _ = try? keychain.signIn(to: address, service: Self.service, accessToken: key)
+    func save(_ key: String, for address: URL, permissions: Set<InstancePermission> = SystemSignIns.askedAtSignIn) {
+        _ = try? keychain.signIn(
+            to: address, service: Self.service, accessToken: key, scopes: permissions.map(\.rawValue).sorted())
+    }
+
+    /// The permissions each browser sign-in asked for, in order.
+    var asked: [Set<InstancePermission>] { state.withLock { $0.asked } }
+
+    /// What the next browser sign-ins grant of the permissions they ask for, so a test can approve fewer than asked.
+    func script(approving: [Set<InstancePermission>]) {
+        state.withLock { $0.approving = approving }
+    }
+
+    func grants(for connection: MarfaConnection) throws -> Set<InstancePermission>? {
+        guard let credential = try authorization(for: connection.address).credential() else { return nil }
+        return Set(InstancePermission.allCases.filter(credential.grants))
     }
 
     /// The token held for `address`; throws where it was made unreadable.
@@ -100,15 +119,19 @@ nonisolated final class ScriptedSignIns: SignIns {
         try held(connection.address)
     }
 
-    @MainActor func signInWithBrowser(to connection: MarfaConnection) async throws -> SignedIn {
-        let next: Result<String, any Error> = state.withLock { state in
+    @MainActor func signInWithBrowser(to connection: MarfaConnection, asking permissions: Set<InstancePermission>) async throws -> SignedIn {
+        let (next, granted): (Result<String, any Error>, Set<InstancePermission>) = state.withLock { state in
             state.calls.append("browser \(connection.address.absoluteString)")
-            return state.browser.count > 1 ? state.browser.removeFirst() : (state.browser.first ?? .success(signedInKey))
+            state.asked.append(permissions)
+            let approving = state.approving.count > 1 ? state.approving.removeFirst() : state.approving.first
+            let asked = SystemSignIns.askedAtSignIn.union(permissions)
+            let granted = approving.map { asked.intersection($0) } ?? asked
+            return (state.browser.count > 1 ? state.browser.removeFirst() : (state.browser.first ?? .success(signedInKey)), granted)
         }
         try await onBrowser.withLock { $0 }?()
         let token = try next.get()
         keychain.succeed()
-        save(token, for: connection.address)
+        save(token, for: connection.address, permissions: granted)
         return signedIn
     }
 

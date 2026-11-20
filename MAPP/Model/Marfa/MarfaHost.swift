@@ -340,14 +340,16 @@ import os
     /// cancels changes nothing. An open copy is given the new sign-in where it is (`ItemSource.use(_:)`): it is never
     /// closed or replaced, the writes in it wait there, and the package sends them with the next drain. Called after
     /// the sign-in ended, it brings the copy back even though the credential kept is the one it had.
-    func signInAgain(via method: SignInMethod) async throws(Problem) {
+    func signInAgain(via method: SignInMethod, asking permissions: Set<InstancePermission> = []) async throws(Problem) {
         guard let connection else { throw .notConnected }
         try begin()
         defer { isBusy = false }
         await dropPendingSignIn()
         // Nothing the sign-in or the copy's change can do may close the library over edits still being typed.
         if source != nil { try await handOver() }
-        try await signIn(to: connection, via: method)
+        // A sign-in again keeps what the owner already allowed, so signing in to change the account never takes it back.
+        try await signIn(to: connection, via: method, asking: permissions.union(grants))
+        await refreshGrants()
         guard let source else { return try await open(connection) }
         let server: Server?
         do {
@@ -516,14 +518,14 @@ import os
     }
 
     /// Signs in as the person chose. Nothing is kept unless it finishes.
-    private func signIn(to connection: MarfaConnection, via method: SignInMethod) async throws(Problem) {
+    private func signIn(to connection: MarfaConnection, via method: SignInMethod, asking permissions: Set<InstancePermission> = []) async throws(Problem) {
         isSigningIn = true
         defer { isSigningIn = false }
         let signedIn: SignedIn
         do {
             switch method {
             case .browser:
-                signedIn = try await signIns.signInWithBrowser(to: connection)
+                signedIn = try await signIns.signInWithBrowser(to: connection, asking: permissions)
             case .code(let shown):
                 let code = try await signIns.startCodeSignIn(to: connection)
                 shown(code)
@@ -630,8 +632,27 @@ import os
         }
     }
 
+    /// The permissions the kept sign-in holds, once `grantsRead`: after a copy opens and after each sign-in.
+    private(set) var grants: Set<InstancePermission> = []
+    /// Whether `grants` has been read for the copy shown: a sign-in the Keychain cannot give reads as holding none.
+    private(set) var grantsRead = false
+
+    /// Reads what the kept sign-in holds, where the main actor never waits on the Keychain.
+    func refreshGrants() async {
+        guard let connection = configuredConnection else {
+            grants = []
+            grantsRead = false
+            return
+        }
+        let held = try? await Self.offMain { [signIns] in try signIns.grants(for: connection) }
+        guard configuredConnection == connection else { return }
+        grants = held ?? []
+        grantsRead = true
+    }
+
     private func attach(_ source: any ItemSource, for connection: MarfaConnection) {
         detach()
+        Task { await refreshGrants() }
         let library = MarfaLibrary(
             source: source, notices: notices, history: historian(connection, signIns), typeIcons: iconKeeper(connection, signIns),
             typeSchemas: schemaKeeper(connection, signIns),
@@ -683,6 +704,8 @@ import os
         reading?.cancel()
         reading = nil
         library = nil
+        grants = []
+        grantsRead = false
     }
 
     /// What to tell of an error a step met. What a package error or the system said is never shown: the detail goes

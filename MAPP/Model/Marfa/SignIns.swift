@@ -14,8 +14,13 @@ nonisolated protocol SignIns: Sendable {
     func server(for connection: MarfaConnection) throws -> Server?
 
     /// Signs in through the system's web authentication session, which shows the server's own pages over the
-    /// window in front. The sign-in is kept before this returns, in place of any kept before.
-    @MainActor func signInWithBrowser(to connection: MarfaConnection) async throws -> SignedIn
+    /// window in front. The sign-in is kept before this returns, in place of any kept before. `permissions` are asked
+    /// for besides the scopes MAPP always asks; the owner may approve fewer.
+    @MainActor func signInWithBrowser(to connection: MarfaConnection, asking permissions: Set<InstancePermission>) async throws -> SignedIn
+
+    /// The permissions the sign-in kept for `connection` holds: nil where none is kept or it has ended, and a throw
+    /// where one is kept and cannot be read.
+    func grants(for connection: MarfaConnection) throws -> Set<InstancePermission>?
 
     /// Starts a device sign-in, for a Mac that cannot use the browser: the person types the code on any device.
     func startCodeSignIn(to connection: MarfaConnection) async throws -> CodeSignIn
@@ -155,6 +160,9 @@ nonisolated struct SystemSignIns: SignIns {
     /// (`schema.write`). The owner may approve less, and what is missing is told where it is needed.
     static let scopes = ["*:read", "*:write", "edge.*:read", "edge.*:write", "items.purge", "config.manage", "schema.write"]
 
+    /// The permissions `scopes` already asks for, which a sign-in holds unless the owner approved fewer.
+    static let askedAtSignIn: Set<InstancePermission> = [.itemsPurge, .configManage, .schemaWrite]
+
     /// The service the sign-ins are kept under: the bundle identifier followed by `.marfa-sign-in`.
     let service: String
     /// The scheme the browser returns the approval to: the bundle identifier, which the app claims in its
@@ -174,10 +182,16 @@ nonisolated struct SystemSignIns: SignIns {
         self.anchor = anchor
     }
 
-    func authorization(for connection: MarfaConnection) throws -> Authorization {
+    func authorization(for connection: MarfaConnection, asking permissions: Set<InstancePermission> = []) throws -> Authorization {
         let client = Authorization.Client(
-            name: "MAPP", redirect: URL(string: scheme + ":/signed-in"), scopes: Self.scopes)
+            name: "MAPP", redirect: URL(string: scheme + ":/signed-in"), scopes: Self.scopes,
+            permissions: permissions.sorted { $0.rawValue < $1.rawValue })
         return try Authorization(server: connection.address, client: client, service: service)
+    }
+
+    func grants(for connection: MarfaConnection) throws -> Set<InstancePermission>? {
+        guard let credential = try authorization(for: connection).credential() else { return nil }
+        return Set(InstancePermission.allCases.filter(credential.grants))
     }
 
     func server(for connection: MarfaConnection) throws -> Server? {
@@ -189,9 +203,9 @@ nonisolated struct SystemSignIns: SignIns {
         }
     }
 
-    @MainActor func signInWithBrowser(to connection: MarfaConnection) async throws -> SignedIn {
+    @MainActor func signInWithBrowser(to connection: MarfaConnection, asking permissions: Set<InstancePermission>) async throws -> SignedIn {
         guard let window = anchor() else { throw NoSignInWindow() }
-        return SignedIn(try await authorization(for: connection).signIn(presentingFrom: window))
+        return SignedIn(try await authorization(for: connection, asking: permissions).signIn(presentingFrom: window))
     }
 
     func startCodeSignIn(to connection: MarfaConnection) async throws -> CodeSignIn {

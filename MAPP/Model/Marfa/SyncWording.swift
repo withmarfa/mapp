@@ -14,7 +14,7 @@ nonisolated struct SyncStatus: Hashable, Sendable {
 
         let kind: Kind
         var title: String
-        /// The short line the sidebar and the Library page show, with the count that makes the title useful.
+        /// The short line the sidebar and the Connection page show, with the count that makes the title useful.
         var line: String
         var detail: String
         var symbol: String
