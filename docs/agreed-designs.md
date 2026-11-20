@@ -32,7 +32,7 @@ Agreed with August on 19 and 20 November 2026. The pages are drawn on the Settin
 - **Changing things.** A list of words or patterns is changed in place (double-click or Return edits a line; Add a Name or Pattern adds one; order is shown where it matters). Something new with several fields is a sheet. Sheets and alerts sit in the middle of the window, not under the toolbar. Apple's alert asks before what can't be undone. A thing with settings of its own is a page.
 - **Numbers.** A field with its unit inside, or a pop-up of sensible steps, then Custom, where steps guide the person.
 - **Problems and errors.** A problem row offers only actions that exist: Ignore and Edit… where both do, one button and a menu where there are more. An error uses the design system's red: a ring and one line under the title, never more.
-- **Buttons are gray**, the confirm button too. Blue is only for Update and for an alert's default button, unless that button is destructive, which macOS draws as it does today. Focus is a gray ring.
+- **Buttons are gray**, the confirm button too. Blue is only for Update and for an alert's default button, unless it is destructive, as macOS draws it. Focus is a gray ring.
 - **One button size.** Every button in Settings is 28 points, except inside a table, where row buttons stay small. No button sits in a section's header.
   - Adding something is the card's last row: + New Key…, + Add a Passkey…, + New Webhook…, + New Type…, + Add a Field….
   - Other actions are regular buttons in a row: Last Backup with Back Up Now, and Check for Updates beside Update.
@@ -42,7 +42,7 @@ Agreed with August on 19 and 20 November 2026. The pages are drawn on the Settin
 - **Tables.** In a section, the filter pop-up and the search sit together at the trailing edge of the section's name, and Show All is in the table's foot beside the count ("8 of 1,204"). A table that is a page of its own has its count on the left and the filter and search together on the right, in one row under the toolbar, and fills the pane with columns, selection and actions at the foot. A section's table is light, with no rules between rows, a page at a time. A table's row action (Restore…, Restore) shows on every row, never only on the row under the pointer.
 - **Words.** "Permanently Delete", never "for good".
 - **A synced folder's page** shows what it holds as a tree of its folders, counted in files, which MAPP builds from the server's paths.
-- **Themes later.** Every color and font is a named value, never hard-coded, so custom themes can come later without rework. Custom CSS, plugins, AI providers and Vim keys are not planned.
+- **Themes later.** Every color and font is a named value, never hard-coded, so custom themes can come later without rework. Not now: custom CSS, plugins for MAPP itself, AI providers and Vim keys.
 
 ### MAPP's pages
 
@@ -70,14 +70,14 @@ Nine pages in three groups: General, Appearance and Keyboard; Editor, Lists, Lay
   - Pasting: Markdown or plain text.
   - Display: Fold Headings, and Line Numbers in code blocks.
   - Some of these need Inkkit to add them first: Pair Brackets, Fold Headings, Line Numbers in code blocks, Indent With, Continue Lists in source mode, and a paste default.
-- **Lists.** Density, Dates, Sort and Group. Nothing about types or sources is left out here: Items, Inbox and Recents are only the views a library starts with, and leaving things out belongs to Search.
+- **Lists.** Density, Dates, Sort and Group. Lists has no setting to leave types or sources out: Items, Inbox and Recents are only the views a library starts with, and leaving things out belongs to Search.
 - **Layouts** (the name people see; it replaces "Rows and Cards" and "Looks"). One place for how each type looks. A type's page has Preview, Row (date, secondary line, color), Facts, Card (picture, facts on cards) and Page (pinned properties, the same as Customize Layout on an item), with Restore Defaults. Export and Import are on the list. The code keeps its names (`TypeLooks`, [Looks](looks.md)); only what people see is renamed.
 - **Search.**
   - Leave Out of Search, by type and by source. It is MAPP's own setting, applied inside the search.
   - Include Archived Items and Include Inbox Items.
   - Results in Best Match or Most Recent order, and Show Snippets.
   - Search Items itself stays as it is, and passes its Type and Source filters into the search, so nothing is lost to the 500-hit cut.
-- **On This Mac.** The copy of the library MAPP keeps on this Mac: the space it uses, opened files (a size budget and Remove Downloaded Files), export to a folder, and download everything again. "Recent files only" is not offered.
+- **On This Mac.** The copy of the library MAPP keeps on this Mac: the space it uses, opened files (a size budget and Remove Downloaded Files), export to a folder, and Download Everything Again, which keeps changes not yet sent. "Recent files only" is not offered.
 - **Connection.** As drawn, plus the "MAPP's Settings" section described under sync below.
 
 ### The Marfa's pages
