@@ -216,7 +216,7 @@ struct PaletteLeftOutLine: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Divider().padding(.horizontal, PaletteMetrics.rowInset).padding(.vertical, 6)
+            Divider().padding(.vertical, 6)
             HStack(spacing: PaletteMetrics.markGap) {
                 Image(systemName: "eye.slash")
                     .foregroundStyle(.tertiary)
@@ -229,6 +229,7 @@ struct PaletteLeftOutLine: View {
                 Spacer(minLength: 8)
                 Button("Show", action: show)
                     .mappButton(.secondary, size: .small)
+                    .accessibilityLabel(Text("Show Matches Left Out of Search"))
                     .accessibilityIdentifier("CommandPaletteShowLeftOut")
             }
             .padding(.horizontal, PaletteMetrics.rowInset)
