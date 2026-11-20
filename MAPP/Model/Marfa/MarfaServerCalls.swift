@@ -55,7 +55,7 @@ nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, Ty
         }
     }
 
-    /// The package's error a generated call carries: the call wraps what the package threw, so it is read out of the wrapper.
+    /// Returns a `MarfaError` directly or from an OpenAPI `ClientError`.
     static func marfaError(in error: any Error) -> MarfaError? {
         var current = error
         for _ in 0..<4 {

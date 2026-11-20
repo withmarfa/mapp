@@ -118,6 +118,25 @@ struct MarfaSyncFailureTests {
         await source.close()
     }
 
+    /// A refused key and a contract mismatch each have words of their own for every caller of `Words.message(for:)`.
+    @Test func aRefusedKeyAndAContractMismatchAreToldInTheAppsWords() {
+        let raw = "https://marfa.example.test refused"
+        let ended = "The server has ended MAPP’s sign-in. Sign in again in Settings."
+        let refusals = [
+            MarfaError.signedOut(origin: "https://marfa.example.test", message: raw),
+            .unauthorized(code: "unauthorized", message: raw, server: nil),
+            .copyExpired(reason: "credential_ended", message: raw, server: nil),
+        ]
+        for error in refusals { #expect(Words.message(for: error) == ended) }
+        #expect(Words.message(for: .copyExpired(reason: "reach_changed", message: raw, server: nil)) == Words.syncFailed)
+
+        let unsent = MarfaError.contractMismatch(served: "9", expected: 1, status: 412, writeSent: false, message: raw, server: nil)
+        let sent = MarfaError.contractMismatch(served: "9", expected: 1, status: nil, writeSent: true, message: raw, server: nil)
+        #expect(Words.message(for: unsent) == "This version of MAPP and the server use different versions of Marfa, so the server didn’t make the change. Update MAPP or the server, then try again.")
+        #expect(Words.message(for: sent) == "This version of MAPP and the server use different versions of Marfa, and the change may already have been made. Update MAPP or the server, then check the change.")
+        #expect(!Words.message(for: sent).contains("example.test"))
+    }
+
     /// The package reports it as a stopped follow, or as a copy that needs hydration when its first fill met it.
     @Test(arguments: [false, true])
     func aServerThatIsAnotherOneIsToldWithTheChangesThatWillNotBeSent(duringTheFirstFill: Bool) async throws {

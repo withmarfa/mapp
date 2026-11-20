@@ -119,7 +119,7 @@ import Testing
         }
         #expect(MarfaServerCalls.ending(MarfaError.versionConflict(message: raw, server: nil)) == .failed(Words.syncFailed))
         #expect(MarfaServerCalls.ending(MarfaError.notFound(code: "not_found", message: raw, server: nil)) == .notFound(Words.syncFailed))
-        // A generated call wraps what the package threw, so the package's error is read out of the wrapper.
+        // Exercise the fallback with a synthetic OpenAPI wrapper.
         let wrapped = ClientError(operationID: "getConfig", operationInput: "", causeDescription: "", underlyingError: MarfaError.noConnection(message: raw))
         #expect(MarfaServerCalls.ending(wrapped) == .unreachable)
         let view = MarfaMapping.viewFailure(MarfaError.versionConflict(message: raw, server: nil))

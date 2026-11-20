@@ -57,7 +57,7 @@ nonisolated struct SyncStatus: Hashable, Sendable {
     // MARK: Words
 
     private static func keyRefused(waiting: Int) -> Notice {
-        var detail = String(localized: "The server has ended MAPP’s sign-in. Sign in again in Settings.")
+        var detail = Words.signInEnded
         if waiting > 0 { detail += " " + Words.waiting(waiting) }
         let line = waiting > 0 ? Words.keyRefusedLine(waiting) : String(localized: "Signed out")
         return Notice(kind: .keyRefused, title: String(localized: "Signed out"), line: line, detail: detail, symbol: "exclamationmark.triangle", isWarning: true)
@@ -314,6 +314,18 @@ nonisolated enum Words {
         }
     }
 
+    /// The server ended MAPP's sign-in, whatever step met it.
+    static var signInEnded: String {
+        String(localized: "The server has ended MAPP’s sign-in. Sign in again in Settings.")
+    }
+
+    /// MAPP and the server speak different versions of Marfa. Where a write was sent, the server may have made it.
+    static func contractMismatch(writeSent: Bool) -> String {
+        writeSent
+            ? String(localized: "This version of MAPP and the server use different versions of Marfa, and the change may already have been made. Update MAPP or the server, then check the change.")
+            : String(localized: "This version of MAPP and the server use different versions of Marfa, so the server didn’t make the change. Update MAPP or the server, then try again.")
+    }
+
     /// The server or the copy stopped a step for a reason MAPP can't resolve itself.
     static var syncFailed: String {
         String(localized: "MAPP ran into a problem it can’t resolve itself. Choose Refresh to try again.")
@@ -340,6 +352,8 @@ nonisolated enum Words {
         // A string logged without a privacy level is private.
         Telemetry.logger(.library).error("A package step failed: \(String(describing: error))")
         if case .serverTooOld(let served, let oldest, _) = error { return serverTooOld(served: served, oldest: oldest) }
+        if error.isKeyRefusal { return signInEnded }
+        if case .contractMismatch(_, _, _, let writeSent, _, _) = error { return contractMismatch(writeSent: writeSent) }
         switch error {
         case .storeDamaged(let path, _, let unsent, let setAsideStopped, _):
             return storeDamaged(folder: path.isEmpty ? nil : URL(fileURLWithPath: path).deletingLastPathComponent().path, unsent: unsent, setAsideStopped: setAsideStopped)

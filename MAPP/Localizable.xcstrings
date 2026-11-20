@@ -4717,6 +4717,12 @@
     "This version has no text or title that fits this item, so it can only be read." : {
       "extractionState" : "manual"
     },
+    "This version of MAPP and the server use different versions of Marfa, and the change may already have been made. Update MAPP or the server, then check the change." : {
+      "extractionState" : "manual"
+    },
+    "This version of MAPP and the server use different versions of Marfa, so the server didn’t make the change. Update MAPP or the server, then try again." : {
+      "extractionState" : "manual"
+    },
     "This version of MAPP can’t read the copy of your library on this Mac, because a different version made it." : {
       "extractionState" : "manual"
     },

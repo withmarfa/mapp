@@ -19,7 +19,7 @@ nonisolated enum TypeIconFailure: Error, Hashable, Sendable {
         case .notPermitted:
             String(localized: "This connection can’t change the icon of a type. Ask whoever runs the server to allow it, or sign in again and approve it.")
         case .keyRefused:
-            String(localized: "The server has ended MAPP’s sign-in. Sign in again in Settings.")
+            Words.signInEnded
         case .refused(let reason):
             reason
         case .unsupported:

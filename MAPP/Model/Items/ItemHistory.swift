@@ -54,7 +54,7 @@ nonisolated enum ItemHistoryFailure: Error, Hashable, Sendable {
         case .unavailable:
             String(localized: "The server has no history to show for this item. It may be new and not sent yet, deleted, or of a kind MAPP isn’t approved to read.")
         case .keyRefused:
-            String(localized: "The server has ended MAPP’s sign-in. Sign in again in Settings.")
+            Words.signInEnded
         case .unsupported:
             String(localized: "This library doesn’t keep version history.")
         case .failed(let message):
