@@ -4,7 +4,7 @@ Status: Built in v0.0.43. The store of type looks and the list density are built
 
 Where it lives: `ListKey`, `PageKey`, `OrderKey` and `InterfaceKey` under `MAPP/Views/`, and `PagePlacements`, `ViewLayouts`, `PlaceDefaults`, `Density`, `SidebarLayouts`, `TypeLooks`, `IncludedSubtypes`, `DateFormat` and `RemotePictureSetting` under `MAPP/Model/`.
 
-MAPP keeps its own settings in the app's defaults on this Mac and never writes them to Marfa. This page lists where each kind of setting lives, so you know which scope a new setting belongs to.
+MAPP keeps its own settings in the app's defaults on this Mac today. It is agreed that they move into one hidden item in the Marfa, `app.mapp.preferences`, with window sizes, column widths and On This Mac staying on the Mac ([Agreed designs](agreed-designs.md#settings)). Until that is built, the scopes below stand. This page lists where each kind of setting lives, so you know which scope a new setting belongs to.
 
 ## Scopes
 
@@ -23,7 +23,7 @@ Column widths are `interfaceDefaultWidth.<column>`, and the right sidebar's widt
 
 ## Rules
 
-The rules that apply to every setting are in the `AGENTS.md` files: [that nothing goes to Marfa](../AGENTS.md), [how a saved view's Mac settings are kept and forgotten](../MAPP/Model/AGENTS.md), and [how a Debug build keeps its own values](../AGENTS.md). Three more belong to this page.
+The rules that apply to every setting are in the `AGENTS.md` files: [that today nothing goes to Marfa](../AGENTS.md), [how a saved view's Mac settings are kept and forgotten](../MAPP/Model/AGENTS.md), and [how a Debug build keeps its own values](../AGENTS.md). Three more belong to this page.
 
 - **A type's setting has little inheritance.** `pagePlacements` for a child type does not read its parent's. A look does: it follows the `parent` chain, place by place; see [Looks](looks.md).
 - **Unreadable stored text is set aside, not dropped.** When a stored value cannot be decoded, MAPP keeps the text under a `...SetAside` key (`pagePlacementsSetAside`, `viewLayoutsSetAside`, `sidebarLayoutsSetAside`, `typeLooksSetAside`, `placeDensitiesSetAside`, `placeDefaultsSetAside`, `itemTableColumnsSetAside`) and starts from the defaults, so a person's arrangement can be recovered.
@@ -33,11 +33,11 @@ The rules that apply to every setting are in the `AGENTS.md` files: [that nothin
 
 As built, Settings is a place in the sidebar, not a separate window; it is agreed to become a window of its own ([Agreed designs](agreed-designs.md#settings)), which leaves out the Settings column's width. It shows its pages in the list column (`SettingsPage`) and the chosen page in the detail column. The pages are Appearance, Lists, Editor and Sidebar ([Settings > Sidebar](views-and-lists.md#settings--sidebar)); then Library, This Marfa and Recently Deleted; then About.
 
-The sidebar, list and Settings columns each have a default width a person can change in Settings (`ColumnWidth`): 230, 330 and 280 points, each within a range the column allows. The measurements of a page's rows and boxes are in [Views and lists](views-and-lists.md).
+The sidebar, list and Settings columns each have a default width a person can change in Settings (`ColumnWidth`): 230, 330 and 280 points, each within a range the column allows. The measurements of a page's rows and boxes are in [Views and lists](views-and-lists.md). The agreed pages and rules for the new Settings window are in [Agreed designs](agreed-designs.md#settings).
 
 ## Looks
 
-`typeLooks` holds only what was chosen for a type, place by place, as sorted-key JSON; every other look is worked out from the type's fields. It replaces the type styles, which are gone with no migration. A density is not part of a look: it is kept in `viewLayouts` for a saved view and in `placeDensities` for a place, and an old row choice (`listRowStyle` and the other row keys) is not read. Export Looks and Import Looks move a server's looks as a file. Whether looks sync between Macs through Marfa is not decided. See [Looks](looks.md).
+`typeLooks` holds only what was chosen for a type, place by place, as sorted-key JSON; every other look is worked out from the type's fields. It replaces the type styles, which are gone with no migration. A density is not part of a look: it is kept in `viewLayouts` for a saved view and in `placeDensities` for a place, and an old row choice (`listRowStyle` and the other row keys) is not read. Export Looks and Import Looks move a server's looks as a file. It is agreed that looks move with the rest of MAPP's settings into the Marfa, as Layouts rows per type ([Agreed designs](agreed-designs.md#settings)); until that is built they stay on this Mac. See [Looks](looks.md).
 
 ## Related pages
 
