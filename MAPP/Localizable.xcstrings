@@ -1,10 +1,19 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%lld more in %@, left out of search." : {
+
+    },
+    "%lld more left out of search." : {
+
+    },
     "%@ you make show here." : {
 
     },
     "A Collection" : {
+
+    },
+    "A search can limit itself to ten types at most." : {
 
     },
     "A Source" : {
@@ -34,6 +43,12 @@
     "All Types" : {
 
     },
+    "At least %lld more in %@, left out of search." : {
+
+    },
+    "At least %lld more left out of search." : {
+
+    },
     "Blue" : {
 
     },
@@ -56,6 +71,9 @@
 
     },
     "Couldn’t Sign In" : {
+
+    },
+    "More types and sources are left out of search than one search can skip." : {
 
     },
     "Switched Servers, but MAPP May Still Be Approved on the Previous One" : {

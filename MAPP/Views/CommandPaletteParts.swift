@@ -208,6 +208,37 @@ private struct PaletteSegmentStyle: ButtonStyle {
     }
 }
 
+/// The last line of Search Items' results when what is left out of search matches too: how many more matched there, and
+/// Show, which searches once more with nothing left out.
+struct PaletteLeftOutLine: View {
+    let text: String
+    let show: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Divider().padding(.horizontal, PaletteMetrics.rowInset).padding(.vertical, 6)
+            HStack(spacing: PaletteMetrics.markGap) {
+                Image(systemName: "eye.slash")
+                    .foregroundStyle(.tertiary)
+                    .frame(width: PaletteMetrics.markWidth)
+                Text(text)
+                    .interfaceFont(.callout)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer(minLength: 8)
+                Button("Show", action: show)
+                    .mappButton(.secondary, size: .small)
+                    .accessibilityIdentifier("CommandPaletteShowLeftOut")
+            }
+            .padding(.horizontal, PaletteMetrics.rowInset)
+            .padding(.vertical, 4)
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("CommandPaletteLeftOut")
+    }
+}
+
 /// The glass button at the bar's left in Search Items that shows and hides the filter row. With filters set, it shows
 /// their number beside its symbol and a soft fill inside its glass, in the bar's own neutral color.
 struct PaletteFilterButton: View {

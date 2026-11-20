@@ -105,8 +105,8 @@ nonisolated enum SearchScope: Hashable, Sendable {
 /// What a source is asked to search.
 nonisolated enum SearchTarget: Hashable, Sendable {
     /// The items `query` allows, narrowed by `filter` where one is given: an expression in the server's listing
-    /// grammar, which the copy answers and `query` cannot.
-    case items(ItemQuery, filter: String? = nil)
+    /// grammar, which the copy answers and `query` cannot, and at most `limit` of them.
+    case items(ItemQuery, filter: String? = nil, limit: Int = SearchResults.limit)
     /// What a saved view lists.
     case view(ItemID)
 }
@@ -127,6 +127,8 @@ nonisolated struct SourceSearch: Hashable, Sendable {
 nonisolated struct SearchResults: Sendable {
     /// The most the copy lists for one search.
     static let limit = 500
+    /// The most it lists when it only counts what the person left out of search.
+    static let leftOutLimit = 100
     static let none = SearchResults()
 
     var items: [Item] = []
