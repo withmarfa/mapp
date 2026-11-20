@@ -306,6 +306,27 @@ struct MarfaSyncLifecycleTests {
         await source.close()
     }
 
+    /// The package retries a drain that met a refused renewal, as for a transient error, so it is no stopping fault.
+    @Test func aDrainThatMeetsARefusedRenewalIsNotShownStoppedAndALaterDrainLeavesItOnline() async throws {
+        let (fake, source, log) = try await scriptedSource(refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()))
+        let sync = await source.engine.sync
+        let refused = MarfaError.renewalRefused(reason: .refused, message: "the server answered 503")
+        sync.hooks.faulting.set { step in step == .drain ? refused : nil }
+        fake.sendUpdate(update(.following))
+        try #require(await eventually { sync.hooks.drains >= 1 })
+        await sync.flush()
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(unavailable(log.current) == 0, "a refused renewal on a drain stopped the copy")
+        #expect(source.connectionState == .online)
+
+        sync.hooks.faulting.set(nil)
+        await sync.flush()
+        fake.sendUpdate(update(.following))
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(source.connectionState == .online)
+        await source.close()
+    }
+
     /// The package leaves the connection following when a drain fails on a fault, so the updates that follow must
     /// not show the library online while writes wait.
     @Test func aDrainFaultStaysShownThroughFollowingUpdatesUntilADrainSucceeds() async throws {

@@ -158,7 +158,7 @@ struct MarfaSyncFailureTests {
     /// `renewalRefused`: each reason has its own words, and none of the package's text.
     @Test(arguments: [
         (RenewalRefusalReason.refused, "MAPP couldn’t renew its sign-in with the server, because the server didn’t accept the renewal. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again."),
-        (RenewalRefusalReason.redirected, "MAPP couldn’t renew its sign-in with the server, because the server answered from another address. Check the address in Settings. If it’s right, try again later, or sign in again."),
+        (RenewalRefusalReason.redirected, "MAPP couldn’t renew its sign-in because the server redirected the request. Check the server address in Settings, then try again. If this keeps happening, sign in again."),
         (RenewalRefusalReason.unreadable, "MAPP couldn’t renew its sign-in with the server, because it couldn’t read the server’s answer. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again."),
     ])
     func aRefusedRenewalIsToldInTheAppsWordsForItsReason(reason: RenewalRefusalReason, words: String) {

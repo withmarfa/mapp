@@ -2,6 +2,7 @@ import Foundation
 import Marfa
 import MarfaAPI
 import MarfaTesting
+import OpenAPIRuntime
 import Testing
 @testable import MAPP
 
@@ -94,7 +95,7 @@ import Testing
     @Test func anotherInstanceAtTheAddressIsRefusedAndTheDraftIsLeftToTheModel() {
         let ending = MarfaServerCalls.ending(MarfaError.instanceChanged(message: "other", server: nil))
         #expect(MarfaServerCalls.configFailure(ending) == .instanceChanged)
-        #expect(MarfaServerCalls.configFailure(MarfaServerCalls.ending(MarfaError.versionConflict(message: "stale", server: nil))) == .failed("stale"))
+        #expect(MarfaServerCalls.configFailure(MarfaServerCalls.ending(MarfaError.versionConflict(message: "stale", server: nil))) == .failed(Words.syncFailed))
     }
 
     @Test func aRefusalGivesTheServersReason() {
@@ -107,7 +108,25 @@ import Testing
     @Test func anItemTheServerHoldsNoHistoryForIsUnavailable() {
         let ending = MarfaServerCalls.ending(MarfaError.notFound(code: "not_found", message: "gone", server: nil))
         #expect(MarfaServerCalls.historyFailure(ending) == .unavailable)
-        #expect(MarfaServerCalls.iconFailure(ending) == .failed("gone"))
+        #expect(MarfaServerCalls.iconFailure(ending) == .failed(Words.syncFailed))
+    }
+
+    /// What the package says, sometimes with the server's address, is logged and never shown.
+    @Test func aFailureIsToldInTheAppsWordsNeverThePackagesText() {
+        let raw = "https://marfa.example.test answered 500 for getConfig"
+        for error in [MarfaError.notFound(code: "not_found", message: raw, server: nil), .instanceChanged(message: raw, server: nil), .versionConflict(message: raw, server: nil)] {
+            #expect(!Words.message(for: error).contains("example.test"))
+        }
+        #expect(MarfaServerCalls.ending(MarfaError.versionConflict(message: raw, server: nil)) == .failed(Words.syncFailed))
+        #expect(MarfaServerCalls.ending(MarfaError.notFound(code: "not_found", message: raw, server: nil)) == .notFound(Words.syncFailed))
+        // A generated call wraps what the package threw, so the package's error is read out of the wrapper.
+        let wrapped = ClientError(operationID: "getConfig", operationInput: "", causeDescription: "", underlyingError: MarfaError.noConnection(message: raw))
+        #expect(MarfaServerCalls.ending(wrapped) == .unreachable)
+        let view = MarfaMapping.viewFailure(MarfaError.versionConflict(message: raw, server: nil))
+        #expect(!view.message.contains("example.test"))
+        struct Other: LocalizedError { var errorDescription: String? { "https://marfa.example.test went wrong" } }
+        #expect(MarfaServerCalls.ending(Other()) == .failed(Words.syncFailed))
+        #expect(MarfaMapping.viewFailure(Other()).message == Words.syncFailed)
     }
 
     @Test func aSnapshotsWriterIsKeptAndAnUnknownKindIsAKey() {

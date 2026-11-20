@@ -88,7 +88,7 @@ struct LibraryChangeTests {
     @Test func aFileThatCannotBeFetchedIsAFailureNotAnAbsence() async {
         let library = FakeItemLibrary(now: start)
         library.fetchFails = true
-        #expect(await ItemFileResolution.fetch(.mint(), in: library) == .failed)
+        #expect(await ItemFileResolution.fetch(.mint(), in: library) == .failed(reason: "The server can’t be reached."))
     }
 
     /// A fetch still running for one item, as from Try Again, never shows its file under the next item.
