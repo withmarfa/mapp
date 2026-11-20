@@ -59,13 +59,13 @@ private struct ThisMarfaFields: View {
             }
             SettingsSection(
                 "Recently Deleted",
-                footer: "Deleted items stay in Recently Deleted this long, then the server removes them for good, with their history. 0 keeps them with no limit. Empty uses the server’s default, 60 days, unless whoever runs the server has set another."
+                footer: "Deleted items stay in Recently Deleted this long, then the server permanently deletes them, with their history. 0 keeps them with no limit. Empty uses the server’s default."
             ) {
                 field(.trashRetentionDays, unit: "days")
             }
             SettingsSection(
                 "Version History",
-                footer: "The server keeps every version of an item for the first period, then one a day, then one a week, and removes older ones. Each period must be at least as long as the one before. A type can set its own policy, which wins. Empty uses the server’s defaults, 30, 90 and 365 days and 500 versions, unless whoever runs the server has set others."
+                footer: "The server keeps every version for the first period, then one a day, then one a week. Each period must be at least as long as the one before. A type’s own policy wins. Empty uses the server’s defaults."
             ) {
                 field(.versionRecentDays, unit: "days")
                 field(.versionDailyDays, unit: "days")

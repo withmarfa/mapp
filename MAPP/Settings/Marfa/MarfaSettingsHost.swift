@@ -67,7 +67,7 @@ struct MarfaDeletedItem: Identifiable, Hashable {
     var deletedRetentionDays: Int? { get }
     var canDeletePermanently: Bool { get }
     func restoreDeleted(_ ids: Set<String>)
-    /// Asks to confirm, then erases for good.
+    /// Asks to confirm, then permanently deletes.
     func deleteDeletedPermanently(_ ids: Set<String>)
     func emptyDeleted()
 }

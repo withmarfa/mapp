@@ -8,7 +8,6 @@ struct ConnectionPage: View {
     @Environment(Libraries.self) private var libraries
     @Environment(\.library) private var library
     @State private var isChoosingOther = false
-    @Environment(\.openURL) private var openURL
 
     private var host: MarfaHost { libraries.host }
     private var model: MarfaSettingsModel { libraries.marfaSettings }
@@ -91,10 +90,6 @@ struct ConnectionPage: View {
             }
             SettingsRow("Unsent Changes", line: isSignedOut ? "Sent once you sign in again." : nil) {
                 SettingsValue(verbatim: host.waitingChanges.map { $0 > 0 ? Words.changes($0) : String(localized: "None") } ?? String(localized: "Unknown"))
-            }
-            SettingsRow("Console", line: "This Marfa’s own page, in your browser.") {
-                SettingsButton("Open in Browser") { openURL(connection.address) }
-                    .accessibilityIdentifier("SettingsConsole")
             }
             if let fill = library?.syncReport.fill, fill.state != .complete {
                 SettingsRow(fill.state == .updating ? "Updating library…" : "Downloading library…") {

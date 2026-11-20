@@ -214,9 +214,6 @@
     "The server has ended MAPP’s sign-in. Sign in again in Connection." : {
 
     },
-    "This Marfa’s own page, in your browser." : {
-
-    },
     "To end it, run “marfa apps list” with the command line signed in to %@ as the owner, find MAPP’s entry, then run “marfa apps revoke <id>”." : {
 
     },
@@ -2340,9 +2337,6 @@
     "Connection Actions" : {
 
     },
-    "Console" : {
-      "extractionState" : "manual"
-    },
     "Contents" : {
       "extractionState" : "manual"
     },
@@ -2496,7 +2490,7 @@
     "Deleted items kept for" : {
       "extractionState" : "manual"
     },
-    "Deleted items stay in Recently Deleted this long, then the server removes them for good, with their history. 0 keeps them with no limit. Empty uses the server’s default, 60 days, unless whoever runs the server has set another." : {
+    "Deleted items stay in Recently Deleted this long, then the server permanently deletes them, with their history. 0 keeps them with no limit. Empty uses the server’s default." : {
       "extractionState" : "manual"
     },
     "Deleting for good needs the server, which can’t be reached right now. The items are still in Recently Deleted." : {
@@ -4558,7 +4552,7 @@
     "The server has no history to show for this item. It may be new and not sent yet, deleted, or of a kind MAPP isn’t approved to read." : {
       "extractionState" : "manual"
     },
-    "The server keeps every version of an item for the first period, then one a day, then one a week, and removes older ones. Each period must be at least as long as the one before. A type can set its own policy, which wins. Empty uses the server’s defaults, 30, 90 and 365 days and 500 versions, unless whoever runs the server has set others." : {
+    "The server keeps every version for the first period, then one a day, then one a week. Each period must be at least as long as the one before. A type’s own policy wins. Empty uses the server’s defaults." : {
       "extractionState" : "manual"
     },
     "The server refused it: %@" : {

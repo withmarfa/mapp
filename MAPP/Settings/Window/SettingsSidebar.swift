@@ -87,7 +87,7 @@ struct SettingsSidebar: View {
                 switch badges(page) {
                 case .count(let count)?:
                     Text("\(count)")
-                        .font(.system(size: 11 * scale, weight: .medium))
+                        .font(SettingsTokens.font(.count, scale: scale))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 6)
                         .frame(minWidth: 18, minHeight: 18)
@@ -110,7 +110,7 @@ struct SettingsSidebar: View {
 
     private var searchField: some View {
         HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(SettingsTokens.tertiaryText)
+            Image(systemName: "magnifyingglass").font(SettingsTokens.font(.small, scale: scale)).foregroundStyle(SettingsTokens.tertiaryText)
             TextField("Search", text: $search)
                 .labelsHidden()
                 .textFieldStyle(.plain)
@@ -120,7 +120,7 @@ struct SettingsSidebar: View {
                 .accessibilityIdentifier("SettingsSearch")
             if !search.isEmpty {
                 Button { search = "" } label: {
-                    Image(systemName: "xmark.circle.fill").font(.system(size: 12)).foregroundStyle(SettingsTokens.tertiaryText)
+                    Image(systemName: "xmark.circle.fill").font(SettingsTokens.font(.small, scale: scale)).foregroundStyle(SettingsTokens.tertiaryText)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Clear Search")

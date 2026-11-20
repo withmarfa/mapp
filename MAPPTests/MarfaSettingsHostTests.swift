@@ -110,8 +110,9 @@ import Testing
         #expect(notice.isNotKept)
         #expect(notice.text == "Name: Renamed")
         #expect(!settings.hasEdits)
+        let told = libraries.host.notices.waiting.count
         adapter.handOverDrafts()
-        #expect(libraries.host.notices.waiting.count == 1, "a second close has nothing more to hand over")
+        #expect(libraries.host.notices.waiting.count == told, "a second close has nothing more to hand over")
     }
 
     @Test func aWriteTheServerRefusesKeepsWhatWasTypedWithItsReason() async throws {
