@@ -96,6 +96,37 @@ enum SettingsTokens {
         static let tile: CGFloat = 22
         static let headTile: CGFloat = 44
         static let smallButtonHeight: CGFloat = 22
+        /// The sidebar's tile, rows, field and headers.
+        static let sidebarTile: CGFloat = 20
+        static let sidebarRowHeight: CGFloat = 28
+        static let sidebarRowRadius: CGFloat = 8
+        static let sidebarRowSpacing: CGFloat = 8
+        static let sidebarRowInset: CGFloat = 10
+        static let sidebarInset: CGFloat = 10
+        static let sidebarBottomInset: CGFloat = 12
+        static let sidebarHeaderInset: CGFloat = 20
+        static let sidebarHeaderTop: CGFloat = 14
+        static let sidebarHeaderBottom: CGFloat = 4
+        static let sidebarGroupGap: CGFloat = 10
+        static let sidebarEmptyTop: CGFloat = 24
+        static let sidebarFieldSpacing: CGFloat = 6
+        static let sidebarFieldInset: CGFloat = 8
+        static let sidebarFieldMargin: CGFloat = 12
+        static let sidebarFieldTop: CGFloat = 8
+        static let sidebarFieldBottom: CGFloat = 4
+        /// A count badge's side padding, smallest size and a dot badge's size.
+        static let badgeInset: CGFloat = 6
+        static let badgeSize: CGFloat = 18
+        static let badgeDot: CGFloat = 8
+        static let badgeLabelSpacing: CGFloat = 4
+        /// The sheet that asks about changes that wait: its stack spacing, a change's spacing, padding and radius, and
+        /// the tallest its list of texts grows.
+        static let sheetSpacing: CGFloat = 12
+        static let sheetListSpacing: CGFloat = 10
+        static let sheetChangeSpacing: CGFloat = 4
+        static let sheetChangePadding: CGFloat = 8
+        static let sheetChangeRadius: CGFloat = 6
+        static let sheetListMaxHeight: CGFloat = 220
     }
 
     private static func adaptive(light: NSColor, dark: NSColor) -> Color {

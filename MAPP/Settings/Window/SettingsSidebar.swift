@@ -37,12 +37,12 @@ struct SettingsSidebar: View {
                         Text(half.name)
                             .font(SettingsTokens.font(.sidebarHeader, scale: scale))
                             .foregroundStyle(SettingsTokens.secondaryText)
-                            .padding(.horizontal, 20)
-                            .padding(.top, 14)
-                            .padding(.bottom, 4)
+                            .padding(.horizontal, SettingsTokens.Metric.sidebarHeaderInset)
+                            .padding(.top, SettingsTokens.Metric.sidebarHeaderTop)
+                            .padding(.bottom, SettingsTokens.Metric.sidebarHeaderBottom)
                             .accessibilityAddTraits(.isHeader)
                         ForEach(Array(half.groups.enumerated()), id: \.offset) { index, pages in
-                            if index > 0 { Color.clear.frame(height: 10) }
+                            if index > 0 { Color.clear.frame(height: SettingsTokens.Metric.sidebarGroupGap) }
                             ForEach(pages, id: \.self) { page in row(page) }
                         }
                     }
@@ -51,12 +51,12 @@ struct SettingsSidebar: View {
                             .font(SettingsTokens.font(.small, scale: scale))
                             .foregroundStyle(SettingsTokens.secondaryText)
                             .frame(maxWidth: .infinity)
-                            .padding(.top, 24)
+                            .padding(.top, SettingsTokens.Metric.sidebarEmptyTop)
                             .accessibilityIdentifier("SettingsSearchEmpty")
                     }
                 }
-                .padding(.horizontal, 10)
-                .padding(.bottom, 12)
+                .padding(.horizontal, SettingsTokens.Metric.sidebarInset)
+                .padding(.bottom, SettingsTokens.Metric.sidebarBottomInset)
             }
         }
         .focusable()
@@ -80,27 +80,27 @@ struct SettingsSidebar: View {
     private func row(_ page: SettingsPage) -> some View {
         let isSelected = page == selection
         return Button { selection = page } label: {
-            HStack(spacing: 8) {
-                SettingsTile(symbol: page.symbol, tone: page.tone, size: 20)
+            HStack(spacing: SettingsTokens.Metric.sidebarRowSpacing) {
+                SettingsTile(symbol: page.symbol, tone: page.tone, size: SettingsTokens.Metric.sidebarTile)
                 Text(page.title).font(SettingsTokens.font(.sidebar, scale: scale))
-                Spacer(minLength: 4)
+                Spacer(minLength: SettingsTokens.Metric.badgeLabelSpacing)
                 switch badges(page) {
                 case .count(let count)?:
                     Text("\(count)")
                         .font(SettingsTokens.font(.count, scale: scale))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 6)
-                        .frame(minWidth: 18, minHeight: 18)
+                        .padding(.horizontal, SettingsTokens.Metric.badgeInset)
+                        .frame(minWidth: SettingsTokens.Metric.badgeSize, minHeight: SettingsTokens.Metric.badgeSize)
                         .background(SettingsTokens.Tone.red.color, in: .capsule)
                 case .dot?:
-                    Circle().fill(SettingsTokens.Tone.red.color).frame(width: 8, height: 8)
+                    Circle().fill(SettingsTokens.Tone.red.color).frame(width: SettingsTokens.Metric.badgeDot, height: SettingsTokens.Metric.badgeDot)
                 case nil:
                     EmptyView()
                 }
             }
-            .padding(.horizontal, 10)
-            .frame(height: 28 * scale)
-            .background(isSelected ? SettingsTokens.selection : Color.clear, in: .rect(cornerRadius: 8, style: .continuous))
+            .padding(.horizontal, SettingsTokens.Metric.sidebarRowInset)
+            .frame(height: SettingsTokens.Metric.sidebarRowHeight * scale)
+            .background(isSelected ? SettingsTokens.selection : Color.clear, in: .rect(cornerRadius: SettingsTokens.Metric.sidebarRowRadius, style: .continuous))
             .contentShape(.rect)
         }
         .buttonStyle(.plain)
@@ -109,7 +109,7 @@ struct SettingsSidebar: View {
     }
 
     private var searchField: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: SettingsTokens.Metric.sidebarFieldSpacing) {
             Image(systemName: "magnifyingglass").font(SettingsTokens.font(.small, scale: scale)).foregroundStyle(SettingsTokens.tertiaryText)
             TextField("Search", text: $search)
                 .labelsHidden()
@@ -126,11 +126,11 @@ struct SettingsSidebar: View {
                 .accessibilityLabel("Clear Search")
             }
         }
-        .padding(.horizontal, 8)
-        .frame(height: 28 * scale)
-        .background(SettingsTokens.buttonFill, in: .rect(cornerRadius: 8, style: .continuous))
-        .padding(.horizontal, 12)
-        .padding(.top, 8)
-        .padding(.bottom, 4)
+        .padding(.horizontal, SettingsTokens.Metric.sidebarFieldInset)
+        .frame(height: SettingsTokens.Metric.sidebarRowHeight * scale)
+        .background(SettingsTokens.buttonFill, in: .rect(cornerRadius: SettingsTokens.Metric.sidebarRowRadius, style: .continuous))
+        .padding(.horizontal, SettingsTokens.Metric.sidebarFieldMargin)
+        .padding(.top, SettingsTokens.Metric.sidebarFieldTop)
+        .padding(.bottom, SettingsTokens.Metric.sidebarFieldBottom)
     }
 }

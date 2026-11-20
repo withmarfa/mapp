@@ -27,7 +27,7 @@ struct DepartureSheet: View {
 
     var body: some View {
         SettingsSheet(title: Text("Changes Haven’t Been Sent"), isWide: true) {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetSpacing) {
                 if departure.isAskedAgain {
                     Text("More changes arrived while you were deciding. Look at them before you choose.")
                         .settingsFont(.small)
@@ -76,21 +76,21 @@ struct DepartureSheet: View {
     @ViewBuilder private func changes(_ unsent: UnsentChanges) -> some View {
         if !unsent.texts.isEmpty {
             ScrollView {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetListSpacing) {
                     ForEach(unsent.texts) { text in
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetChangeSpacing) {
                             Text(text.content.plainText)
                                 .textSelection(.enabled)
                                 .lineLimit(8)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             SettingsButton("Copy Text", small: true) { copy(text.content.plainText) }
                         }
-                        .padding(8)
-                        .background(SettingsTokens.buttonFill, in: .rect(cornerRadius: 6))
+                        .padding(SettingsTokens.Metric.sheetChangePadding)
+                        .background(SettingsTokens.buttonFill, in: .rect(cornerRadius: SettingsTokens.Metric.sheetChangeRadius))
                     }
                 }
             }
-            .frame(maxHeight: 220)
+            .frame(maxHeight: SettingsTokens.Metric.sheetListMaxHeight)
         }
         if unsent.count > unsent.texts.count {
             Text(Words.moreNotShown(unsent.count - unsent.texts.count))
