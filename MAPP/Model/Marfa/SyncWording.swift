@@ -301,6 +301,19 @@ nonisolated enum Words {
         String(localized: "This server runs Marfa \(served). Update the server to Marfa \(oldest) or later to use this app.")
     }
 
+    /// A renewal of the sign-in failed and the sign-in stands, so the way forward is to try again, then to check where
+    /// the server is, then to sign in again. The package's own text, which can hold the address, is only logged.
+    static func renewalRefused(_ reason: RenewalRefusalReason) -> String {
+        switch reason {
+        case .refused:
+            String(localized: "MAPP couldn’t renew its sign-in with the server, because the server didn’t accept the renewal. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again.")
+        case .redirected:
+            String(localized: "MAPP couldn’t renew its sign-in with the server, because the server answered from another address. Check the address in Settings. If it’s right, try again later, or sign in again.")
+        case .unreadable:
+            String(localized: "MAPP couldn’t renew its sign-in with the server, because it couldn’t read the server’s answer. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again.")
+        }
+    }
+
     /// The server or the copy stopped a step for a reason MAPP can't resolve itself.
     static var syncFailed: String {
         String(localized: "MAPP ran into a problem it can’t resolve itself. Choose Refresh to try again.")
@@ -331,6 +344,7 @@ nonisolated enum Words {
         case .storeDamaged(let path, _, let unsent, let setAsideStopped, _):
             return storeDamaged(folder: path.isEmpty ? nil : URL(fileURLWithPath: path).deletingLastPathComponent().path, unsent: unsent, setAsideStopped: setAsideStopped)
         case .noKeychain: return signInUnreadable
+        case .renewalRefused(let reason, _): return renewalRefused(reason)
         case .store, .io, .closed: return copyCouldNotBeOpened
         case .wrongServer: return differentServer
         case .storageFull: return storageFull

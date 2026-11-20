@@ -51,7 +51,7 @@ The data model, free of SwiftUI: the `ItemLibrary` protocol, `MarfaLibrary` over
 
 - `MAPP/Model/Telemetry/` is the one place for logs and signposts (`Telemetry.logger(_:)`, `Telemetry.signposter(_:)`); never make a `Logger` of your own. `Cost` stays the one mechanism the `Measure` plan reads.
 - **Never log a person's text, titles, property values or keys.** Log kinds, durations and counts, with `privacy: .public` for those alone. Name an item by a count, never its id or title. A message that may quote the person's text uses the default (private) privacy.
-- **Reports to WithMarfa.** Everything the app sends leaves through `Telemetry+Reports.swift`, a closed list of calls over `Reporting`; no call site reports itself, and only `MAPP/Model/Telemetry/` imports `MarfaTelemetry`. A report carries only fixed words, numbers and flags: never a person's text, an item's id or title, the server's address, a path, or an error's message. `Reporting.Gate` keeps tests, previews and the isolated host from reporting.
+- **Reports to WithMarfa.** Everything the app sends leaves through `Telemetry+Reports.swift`, a closed list of calls over `Reporting`; no call site reports itself, and only `MAPP/Model/Telemetry/` imports `WithMarfaTelemetry`. A report carries only fixed words, numbers and flags: never a person's text, an item's id or title, the server's address, a path, or an error's message. `Reporting.Gate` keeps tests, previews and the isolated host from reporting.
 - Every alert to the person goes through `Notices` (`tell`, `notKept`); add no other route. A change not kept goes to the clipboard the first time it is shown and is never written over before the person answers.
 
 ## Code Review Rules

@@ -154,6 +154,44 @@ struct MarfaSyncFailureTests {
         await source.close()
     }
 
+    /// A renewal the server or the app's renewer could not finish, with the sign-in kept, is the package's
+    /// `renewalRefused`: each reason has its own words, and none of the package's text.
+    @Test(arguments: [
+        (RenewalRefusalReason.refused, "MAPP couldn’t renew its sign-in with the server, because the server didn’t accept the renewal. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again."),
+        (RenewalRefusalReason.redirected, "MAPP couldn’t renew its sign-in with the server, because the server answered from another address. Check the address in Settings. If it’s right, try again later, or sign in again."),
+        (RenewalRefusalReason.unreadable, "MAPP couldn’t renew its sign-in with the server, because it couldn’t read the server’s answer. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again."),
+    ])
+    func aRefusedRenewalIsToldInTheAppsWordsForItsReason(reason: RenewalRefusalReason, words: String) {
+        let raw = "https://marfa.example.test refused to renew the sign-in: the server answered 301"
+        let error = MarfaError.renewalRefused(reason: reason, message: raw)
+        #expect(Words.message(for: error) == words)
+        #expect(!Words.message(for: error).contains("301"), "the package's text is never shown")
+        #expect(!Words.message(for: error).contains("example.test"), "the address in the package's text is never shown")
+        #expect(Set(RenewalRefusalReason.allCases.map { Words.message(for: .renewalRefused(reason: $0, message: raw)) }).count == RenewalRefusalReason.allCases.count)
+    }
+
+    /// A stopped follow that met a refused renewal is an unavailable library in those words: not signed out, and not
+    /// offline, since the server answered and the sign-in stands.
+    @Test(arguments: RenewalRefusalReason.allCases)
+    func aFollowStoppedOnARefusedRenewalIsShownUnavailableInTheAppsWords(reason: RenewalRefusalReason) async throws {
+        let error = MarfaError.renewalRefused(reason: reason, message: "the server answered 301")
+        let (fake, source, _, log) = try await open(failing: [])
+        fake.sendUpdate(update(.stopped(error)))
+        let words = Words.message(for: error)
+        #expect(words != Words.syncFailed)
+        let state = try #require(await log.wait { unavailable($0) == 1 })
+        let told = state.changes.compactMap { change -> String? in
+            if case .unavailable(let failure) = change { failure.message } else { nil }
+        }
+        #expect(told == [words])
+        #expect(await waitForConnection(source) { $0 == .unavailable(message: words) })
+        #expect(source.connectionState != .keyRefused)
+        let foot = try #require(SyncFootLine(state: source.connectionState, report: source.syncReport, lastSynced: nil, now: Date()))
+        #expect(foot.kind == .failed)
+        #expect(foot.help == words)
+        await source.close()
+    }
+
     /// A key the server ended is the package's `.keyRefused`: shown as that, told once, and waiting for another key.
     @Test func aKeyTheServerEndedIsShownRefusedAndToldOnce() async throws {
         let (fake, source, _, log) = try await open(failing: [])

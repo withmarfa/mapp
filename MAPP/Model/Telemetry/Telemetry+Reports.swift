@@ -1,6 +1,6 @@
 import Foundation
 import Marfa
-import MarfaTelemetry
+import WithMarfaTelemetry
 import os
 
 /// What the app reports to WithMarfa, as a closed list of calls: each logs locally with the words it always used and
