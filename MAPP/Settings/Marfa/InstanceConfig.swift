@@ -45,11 +45,11 @@ nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
     var title: String {
         switch self {
         case .name: String(localized: "Name")
-        case .trashRetentionDays: String(localized: "Deleted items kept for")
-        case .versionRecentDays: String(localized: "All versions kept for")
-        case .versionDailyDays: String(localized: "One version a day kept for")
-        case .versionWeeklyDays: String(localized: "One version a week kept for")
-        case .versionMaxVersions: String(localized: "Most versions kept per item")
+        case .trashRetentionDays: String(localized: "Deleted Items Kept For")
+        case .versionRecentDays: String(localized: "All Versions Kept For")
+        case .versionDailyDays: String(localized: "One Version a Day Kept For")
+        case .versionWeeklyDays: String(localized: "One Version a Week Kept For")
+        case .versionMaxVersions: String(localized: "Most Versions Kept per Item")
         }
     }
 

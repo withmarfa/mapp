@@ -65,10 +65,12 @@ struct ConnectionPage: View {
         // Read again as the clock passes, so "2 minutes ago" turns to "3" on time.
         SyncStatusReading(host: host) { status in
             let words = standing(status)
+            let name = LibraryDescription.name(libraries)
+            let host = ConnectionHeadWording.hostName(of: connection.address)
             VStack(alignment: .leading, spacing: 10) {
                 SettingsHead(
-                    symbol: "server.rack", tone: .blue, title: Text(verbatim: LibraryDescription.name(libraries)),
-                    line: Text(verbatim: [connection.address.absoluteString, words.line].joined(separator: ". "))
+                    symbol: "server.rack", tone: .blue, title: Text(verbatim: name),
+                    line: Text(verbatim: [name == host ? nil : host, words.line].compactMap { $0 }.joined(separator: ". "))
                 ) {
                     if isSignedOut {
                         signInButtons(
@@ -92,7 +94,7 @@ struct ConnectionPage: View {
                 SettingsValue(verbatim: host.waitingChanges.map { $0 > 0 ? Words.changes($0) : String(localized: "None") } ?? String(localized: "Unknown"))
             }
             if let fill = library?.syncReport.fill, fill.state != .complete {
-                SettingsRow(fill.state == .updating ? "Updating library…" : "Downloading library…") {
+                SettingsRow(fill.state == .updating ? "Updating Library…" : "Downloading Library…") {
                     SettingsValue(verbatim: FillWording.line(fill)).monospacedDigit().accessibilityIdentifier("LibraryFillProgress")
                 }
             }
@@ -183,7 +185,7 @@ struct ConnectionPage: View {
     @ViewBuilder private var codeSection: some View {
         if let code = model.code {
             SettingsSection(
-                name: Text("Approve MAPP With This Code"),
+                name: Text("Approve MAPP with This Code"),
                 footer: Text("Open \(code.address.absoluteString) on any device, sign in and type the code. It stops working at \(code.expiresAt.formatted(date: .omitted, time: .shortened)).")
             ) {
                 SettingsRow(verbatim: code.code) {
@@ -215,16 +217,35 @@ struct ConnectionPage: View {
     // MARK: Standing
 
     /// How the server stands: a word, a dot, and what to do about it.
-    private func standing(_ status: SyncStatus) -> (title: String, line: String, detail: String?, color: Color) {
+    /// The status word goes once, at the head's trailing edge; the line says only what else is true of it.
+    private func standing(_ status: SyncStatus) -> (title: String, line: String?, detail: String?, color: Color) {
         let connection = ConnectionStatus(host.state)
         if let note = status.primary {
             return (connection.title, note.line, connection.detail ?? note.detail, note.dotColor)
         }
         switch host.state {
-        case .online: return (connection.title, String(localized: "Connected, up to date"), nil, SettingsTokens.ok)
+        case .online: return (connection.title, upToDate(), nil, SettingsTokens.ok)
         default:
-            return (connection.title, connection.title, connection.detail, connection.isProblem ? SettingsTokens.Tone.red.color : SettingsTokens.secondaryText)
+            return (connection.title, nil, connection.detail, connection.isProblem ? SettingsTokens.Tone.red.color : SettingsTokens.secondaryText)
         }
+    }
+
+    private func upToDate() -> String { ConnectionHeadWording.upToDate(since: host.lastSynced, now: .now) }
+}
+
+/// The words of the Connection head's line.
+enum ConnectionHeadWording {
+    /// The server's address without its scheme, with its port where it has one.
+    static func hostName(of address: URL) -> String {
+        guard let host = address.host(percentEncoded: false) else { return address.absoluteString }
+        return address.port.map { "\(host):\($0)" } ?? host
+    }
+
+    /// "Up to date 2 minutes ago", or "Up to date" before the first sync has finished.
+    static func upToDate(since synced: Date?, now: Date, locale: Locale = .current) -> String {
+        guard let synced else { return String(localized: "Up to date") }
+        guard let age = SyncFootLine.age(of: synced, now: now, locale: locale) else { return String(localized: "Up to date just now") }
+        return String(localized: "Up to date \(age)")
     }
 }
 

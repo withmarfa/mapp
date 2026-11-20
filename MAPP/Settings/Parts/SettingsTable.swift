@@ -83,6 +83,7 @@ private struct TableRow<Row>: View {
     let columns: [SettingsTableColumn<Row>]
     let action: SettingsRowAction<Row>?
     let isSelected: Bool
+    var isBanded = false
     @State private var isHovered = false
 
     var body: some View {
@@ -102,13 +103,13 @@ private struct TableRow<Row>: View {
         }
         .padding(.horizontal, SettingsTokens.Metric.inset)
         .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
-        .background(isSelected ? SettingsTokens.selection : (isHovered ? SettingsTokens.hover : Color.clear))
+        .background(isSelected ? SettingsTokens.selection : (isHovered ? SettingsTokens.hover : (isBanded ? SettingsTokens.band : Color.clear)))
         .contentShape(.rect)
         .onHover { isHovered = $0 }
     }
 }
 
-/// A table in a section: light, with no rules between rows, a page at a time. Its foot says how many it shows of how many
+/// A table in a section: light, with no rules between rows but every other row shaded, a page at a time. Its foot says how many it shows of how many
 /// and has Show All, which opens the table as a page.
 struct SettingsSectionTable<Row: Identifiable>: View {
     let rows: [Row]
@@ -123,8 +124,8 @@ struct SettingsSectionTable<Row: Identifiable>: View {
             VStack(spacing: 0) {
                 TableHeader(columns: columns, hasAction: action != nil)
                 Rectangle().fill(SettingsTokens.rule).frame(height: 1)
-                ForEach(rows) { row in
-                    TableRow(row: row, columns: columns, action: action, isSelected: false)
+                ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                    TableRow(row: row, columns: columns, action: action, isSelected: false, isBanded: index.isMultiple(of: 2))
                 }
                 Rectangle().fill(SettingsTokens.rule).frame(height: 1)
                 HStack {

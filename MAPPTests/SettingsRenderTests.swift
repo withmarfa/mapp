@@ -39,7 +39,9 @@ import Testing
 }
 
 /// The window as the boards draw it, for a pull request's pictures: the sidebar and the page, with a strip standing for
-/// the toolbar, which an offscreen draw has no window to give.
+/// the toolbar. The system's Back and Forward pill and title belong to the real window's toolbar, which an offscreen draw
+/// has no window to give, so the strip only marks where they sit and is not their size or look; the pictures taken from
+/// the running app show them as the system draws them.
 private struct RenderedWindow<Detail: View>: View {
     let selection: SettingsPage
     var search = ""

@@ -2,7 +2,8 @@ import AppKit
 import SwiftUI
 
 /// Draws a view into a PNG without the screen: an `NSHostingView` in a window that is never shown, drawn with
-/// `cacheDisplay(in:to:)`, in the light appearance. The folder comes from the environment variable
+/// `cacheDisplay(in:to:)`, in the light appearance. It draws a page and its sidebar but cannot draw the window's own
+/// toolbar (the system's Back and Forward pill and the title), since there is no real window. The folder comes from the environment variable
 /// `MAPP_SETTINGS_RENDERS`, and a suite that renders is skipped by name while it is unset, as the `measure` suites are.
 @MainActor
 enum SettingsRender {

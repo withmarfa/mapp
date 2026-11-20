@@ -21,7 +21,7 @@ struct SettingsWindowView: View {
     private var navigation: SettingsNavigation { launcher.navigation }
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: .constant(.all)) {
             SettingsSidebar(
                 selection: Binding { navigation.page } set: { navigation.show($0) }, search: $search
             )
@@ -42,6 +42,7 @@ struct SettingsWindowView: View {
                     }
                 }
         }
+        .toolbar(removing: .sidebarToggle)
         .frame(minWidth: SettingsTokens.Metric.windowMinWidth, minHeight: SettingsTokens.Metric.windowMinHeight)
         .interfaceTextStyle()
         .environment(\.settingsTextScale, InterfaceStyle.scale(for: textSize))

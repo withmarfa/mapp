@@ -22,16 +22,16 @@ struct AppearancePage: View {
             }
             SettingsSection(
                 "Panels",
-                footer: "Value panels open under a date, status, tags, or other value. Palettes are the command palette, Search Items, and New Item. Translucent uses the system’s popover material, and Solid uses the window color."
+                footer: "Glass lets what is behind a panel show through, and Solid is the window’s own color. Palettes also offer Translucent, the system’s popover material."
             ) {
-                SettingsRow("Value Panels") {
+                SettingsRow("Value Panels", line: "Open under a date, status, or tag.") {
                     SettingsPopUp(title: "Value Panels", selection: $panelStyle) {
                         Text("Glass").tag(ValuePanelStyle.glass)
                         Text("Solid").tag(ValuePanelStyle.solid)
                     }
                     .accessibilityIdentifier("ValuePanelStyle")
                 }
-                SettingsRow("Palettes") {
+                SettingsRow("Palettes", line: "Command palette, Search Items, and New Item.") {
                     SettingsPopUp(title: "Palettes", selection: $paletteMaterial) {
                         Text("Glass").tag(PaletteMaterial.glass)
                         Text("Translucent").tag(PaletteMaterial.translucent)
@@ -49,29 +49,28 @@ struct AppearancePage: View {
                         .accessibilityIdentifier("ToolbarPageBackground")
                 }
             }
-            VStack(alignment: .leading, spacing: 12) {
-                SettingsSection(
-                    "Default Column Widths",
-                    footer: "Where each column starts in a new window. Dragging a column to a new width changes only that window."
-                ) {
-                    ForEach(ColumnWidth.allCases) { ColumnWidthRow(column: $0) }
-                }
-                HStack(spacing: 8) {
-                    SettingsButton("Reset Widths") {
-                        for column in ColumnWidth.allCases { UserDefaults.standard.removeObject(forKey: column.key) }
-                    }
-                    .accessibilityIdentifier("ColumnWidthsReset")
-                    SettingsButton("Use Current Widths") {
-                        guard let front = registry.front else { return }
-                        for column in ColumnWidth.allCases {
-                            UserDefaults.standard.set(Double(column.resolved(Double(front.width(of: column)))), forKey: column.key)
+            SettingsSection(
+                "Default Column Widths",
+                footer: "Where each column starts in a new window. Dragging a column to a new width changes only that window."
+            ) {
+                ForEach(ColumnWidth.allCases) { ColumnWidthRow(column: $0) }
+                SettingsRow("From This Window", line: "Or back to \(ColumnWidth.allCases.map { Int($0.defaultWidth).formatted() }.formatted(.list(type: .and))).") {
+                    HStack(spacing: 8) {
+                        SettingsButton("Reset Widths") {
+                            for column in ColumnWidth.allCases { UserDefaults.standard.removeObject(forKey: column.key) }
                         }
+                        .accessibilityIdentifier("ColumnWidthsReset")
+                        SettingsButton("Use Current Widths") {
+                            guard let front = registry.front else { return }
+                            for column in ColumnWidth.allCases {
+                                UserDefaults.standard.set(Double(column.resolved(Double(front.width(of: column)))), forKey: column.key)
+                            }
+                        }
+                        .disabled(registry.front == nil)
+                        .help(registry.front == nil ? "Open a window to use its column widths." : "Make the widths set in this window the defaults for new windows.")
+                        .accessibilityIdentifier("ColumnWidthsUseCurrent")
                     }
-                    .disabled(registry.front == nil)
-                    .help(registry.front == nil ? "Open a window to use its column widths." : "Make the widths set in this window the defaults for new windows.")
-                    .accessibilityIdentifier("ColumnWidthsUseCurrent")
                 }
-                .padding(.horizontal, SettingsTokens.Metric.inset)
             }
             SettingsSection(
                 "Dates",

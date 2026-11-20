@@ -112,4 +112,16 @@ struct SettingsWindowTests {
         let earlier = MarfaPageGate<EmptyView>.notAnswering(now.addingTimeInterval(-3 * 86_400), now: now, calendar: calendar)
         #expect(!earlier.contains("today"))
     }
+
+    @Test func theConnectionHeadNamesTheServerWithoutItsSchemeAndSaysWhenItWasUpToDate() throws {
+        #expect(ConnectionHeadWording.hostName(of: try #require(URL(string: "https://marfa.castell.studio"))) == "marfa.castell.studio")
+        #expect(ConnectionHeadWording.hostName(of: try #require(URL(string: "http://localhost:8080/"))) == "localhost:8080")
+
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let english = Locale(identifier: "en_GB")
+        #expect(ConnectionHeadWording.upToDate(since: nil, now: now, locale: english) == "Up to date")
+        #expect(ConnectionHeadWording.upToDate(since: now.addingTimeInterval(-20), now: now, locale: english) == "Up to date just now")
+        let later = ConnectionHeadWording.upToDate(since: now.addingTimeInterval(-125), now: now, locale: english)
+        #expect(later.hasPrefix("Up to date ") && later.contains("minute"))
+    }
 }

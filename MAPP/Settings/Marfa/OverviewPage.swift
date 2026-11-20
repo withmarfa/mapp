@@ -8,41 +8,63 @@ struct OverviewPage: View {
     private var model: InstanceSettingsModel { host.instanceSettings }
 
     var body: some View {
-        SettingsPageColumn {
-            SettingsHead(
-                symbol: MarfaSettingsPage.overview.symbol, tone: MarfaSettingsPage.overview.tone,
-                title: Text(verbatim: host.serverName), line: host.serverAddress.map { Text(verbatim: $0) })
-            if model.isAvailable {
-                ThisMarfaFields(model: model)
-            } else {
-                unavailable
+        content
+            .task(id: host.serverAddress) { await model.load() }
+            .confirmationDialog(
+                "Keep things for less time?", isPresented: Binding { model.pending != nil } set: { if !$0 { model.cancelPending() } },
+                presenting: model.pending
+            ) { pending in
+                Button("Shorten and Save", role: .destructive) { Task { await model.confirm(pending) } }
+            } message: { pending in
+                Text(pending.shortenings.map(InstanceWording.consequence).joined(separator: "\n\n"))
             }
-        }
-        .task(id: host.serverAddress) { await model.load() }
-        .confirmationDialog(
-            "Keep things for less time?", isPresented: Binding { model.pending != nil } set: { if !$0 { model.cancelPending() } },
-            presenting: model.pending
-        ) { pending in
-            Button("Shorten and Save", role: .destructive) { Task { await model.confirm(pending) } }
-        } message: { pending in
-            Text(pending.shortenings.map(InstanceWording.consequence).joined(separator: "\n\n"))
-        }
-        .accessibilityIdentifier("OverviewPage")
+            .accessibilityIdentifier("OverviewPage")
     }
 
-    /// Nothing can be shown yet: still reading, or the server said why not.
-    @ViewBuilder private var unavailable: some View {
-        SettingsSection("This Marfa") {
-            if let failure = model.failure {
-                SettingsRow(verbatim: failure.message, lead: .tint("exclamationmark.triangle", .orange)) {
-                    if failure != .unsupported && failure != .notPermitted {
-                        SettingsButton("Try Again") { Task { await model.load() } }
-                            .disabled(model.isLoading)
+    /// The page, or, where the server's settings can't be shown, the state that says why.
+    @ViewBuilder private var content: some View {
+        if let failure = model.failure, !model.isAvailable {
+            SettingsPageState(
+                symbol: Self.symbol(for: failure), title: Text(Self.title(for: failure)), line: Text(verbatim: failure.message),
+                action: Self.canTryAgain(failure) ? ("Try Again", { Task { await model.load() } }) : nil)
+        } else {
+            SettingsPageColumn {
+                SettingsHead(
+                    symbol: MarfaSettingsPage.overview.symbol, tone: MarfaSettingsPage.overview.tone,
+                    title: Text(verbatim: host.serverName), line: host.serverAddress.map { Text(verbatim: $0) })
+                if model.isAvailable {
+                    ThisMarfaFields(model: model)
+                } else {
+                    SettingsSection("This Marfa") {
+                        SettingsRow("Reading the Server’s Settings…") { ProgressView().controlSize(.small) }
                     }
                 }
-            } else {
-                SettingsRow("Reading the server’s settings…") { ProgressView().controlSize(.small) }
             }
+        }
+    }
+
+    private static func canTryAgain(_ failure: InstanceConfigFailure) -> Bool {
+        failure != .unsupported && failure != .notPermitted
+    }
+
+    private static func title(for failure: InstanceConfigFailure) -> String {
+        switch failure {
+        case .unsupported: String(localized: "No Server Settings")
+        case .notPermitted: String(localized: "Needs a Permission")
+        case .unreachable: String(localized: "Can’t Reach the Server")
+        case .keyRefused: String(localized: "Signed Out")
+        case .instanceChanged: String(localized: "Another Marfa Answers")
+        case .refused, .failed: String(localized: "Couldn’t Read the Settings")
+        }
+    }
+
+    private static func symbol(for failure: InstanceConfigFailure) -> String {
+        switch failure {
+        case .unsupported: "gearshape"
+        case .notPermitted: "lock"
+        case .unreachable: "wifi.exclamationmark"
+        case .keyRefused: "person.crop.circle.badge.exclamationmark"
+        case .instanceChanged, .refused, .failed: "exclamationmark.triangle"
         }
     }
 }
@@ -59,13 +81,13 @@ private struct ThisMarfaFields: View {
             }
             SettingsSection(
                 "Recently Deleted",
-                footer: "Deleted items stay in Recently Deleted this long, then the server permanently deletes them, with their history. 0 keeps them with no limit. Empty uses the server’s default."
+                footer: "Deleted items stay in Recently Deleted this long, then the server permanently deletes them, with their history. 0 keeps them with no limit. Empty uses the default."
             ) {
                 field(.trashRetentionDays, unit: "days")
             }
             SettingsSection(
                 "Version History",
-                footer: "The server keeps every version for the first period, then one a day, then one a week. Each period must be at least as long as the one before. A type’s own policy wins. Empty uses the server’s defaults."
+                footer: "The server keeps every version for the first period, then one a day, then one a week. Each period is at least as long as the one before. A type’s own policy wins. Empty uses the defaults."
             ) {
                 field(.versionRecentDays, unit: "days")
                 field(.versionDailyDays, unit: "days")
@@ -121,6 +143,7 @@ private struct ThisMarfaFields: View {
                     .settingsFont(.line)
                     .foregroundStyle(message.isError ? SettingsTokens.errorRed : SettingsTokens.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, SettingsTokens.Metric.inset)
             }
             if !model.saved.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {
@@ -129,10 +152,10 @@ private struct ThisMarfaFields: View {
                 }
                 .settingsFont(.line)
                 .foregroundStyle(SettingsTokens.secondaryText)
+                .padding(.horizontal, SettingsTokens.Metric.inset)
                 .accessibilityIdentifier("ThisMarfaSaved")
             }
-            HStack(spacing: 8) {
-                Spacer(minLength: 0)
+            SettingsBar {
                 if model.isSaving || model.isLoading { ProgressView().controlSize(.small) }
                 if case .unreachable? = model.failure {
                     SettingsButton("Try Again") { Task { await model.load() } }.disabled(model.isLoading)
@@ -145,7 +168,6 @@ private struct ThisMarfaFields: View {
                     .accessibilityIdentifier("ThisMarfaSave")
             }
         }
-        .padding(.horizontal, SettingsTokens.Metric.inset)
     }
 
     private var statusLine: (text: String, isError: Bool)? {

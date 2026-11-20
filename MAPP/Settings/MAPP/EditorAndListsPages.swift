@@ -22,12 +22,11 @@ struct EditorPage: View {
                 }
                 SettingsRow("Standard Width", line: "How wide Standard pages run. Full Width leaves it aside.", look: fullWidth ? .off : .normal) {
                     let range = PageStyle.readingWidths
-                    Slider(
+                    SettingsSizeSlider(
+                        title: "Standard Width",
                         value: Binding { Double(readingWidth) } set: { readingWidth = Int($0.rounded()) },
-                        in: Double(range.lowerBound)...Double(range.upperBound), step: 2
+                        range: Double(range.lowerBound)...Double(range.upperBound)
                     )
-                    .labelsHidden()
-                    .frame(width: SettingsTokens.Metric.controlWidth)
                     .accessibilityLabel("Standard Width")
                     .accessibilityIdentifier("ReadingWidth")
                 }
@@ -109,14 +108,14 @@ struct ListsPage: View {
                 }
             }
             SettingsSection("In Every List") {
-                SettingsRow("Sort by") {
-                    SettingsPopUp(title: "Sort by", selection: $sort) {
+                SettingsRow("Sort By") {
+                    SettingsPopUp(title: "Sort By", selection: $sort) {
                         ForEach(ItemSort.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
                     .accessibilityIdentifier("ItemSort")
                 }
-                SettingsRow("Group by", look: sort == .title ? .off : .normal) {
-                    SettingsPopUp(title: "Group by", selection: $groupsByDate) {
+                SettingsRow("Group By", look: sort == .title ? .off : .normal) {
+                    SettingsPopUp(title: "Group By", selection: $groupsByDate) {
                         Text("None").tag(false)
                         Text("Date").tag(true)
                     }

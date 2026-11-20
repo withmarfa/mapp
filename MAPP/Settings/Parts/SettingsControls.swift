@@ -102,7 +102,17 @@ struct SettingsMoreMenu<Content: View>: View {
     }
 }
 
-/// A pop-up of choices, 200 wide. The system draws it.
+extension View {
+    /// The system's menu pop-up at Settings' one input size: 200 wide, and 28 tall, which the large control size draws.
+    /// Without the flexible sizing the system pop-up fits its title instead of filling the width.
+    func settingsPopUpSize() -> some View {
+        controlSize(.large)
+            .buttonSizing(.flexible)
+            .frame(width: SettingsTokens.Metric.controlWidth)
+    }
+}
+
+/// A pop-up of choices, 200 by 28. The system draws it.
 struct SettingsPopUp<Value: Hashable, Content: View>: View {
     let title: LocalizedStringKey
     @Binding var selection: Value
@@ -112,7 +122,7 @@ struct SettingsPopUp<Value: Hashable, Content: View>: View {
         Picker(title, selection: $selection) { content }
             .labelsHidden()
             .pickerStyle(.menu)
-            .frame(width: SettingsTokens.Metric.controlWidth, alignment: .trailing)
+            .settingsPopUpSize()
     }
 }
 
@@ -284,7 +294,7 @@ struct SettingsStepsPopUp: View {
             }
             .labelsHidden()
             .pickerStyle(.menu)
-            .frame(width: SettingsTokens.Metric.controlWidth, alignment: .trailing)
+            .settingsPopUpSize()
         }
     }
 
@@ -293,5 +303,31 @@ struct SettingsStepsPopUp: View {
     private func commit() {
         if let number = Int(typed.trimmingCharacters(in: .whitespaces)) { value = number }
         isCustom = false
+    }
+}
+
+/// A slider with a small and a large "A" at its ends, 200 wide, for a size. It draws ticks only when it has a `step`, one
+/// at each of the few values it can take; a size that moves smoothly has none.
+struct SettingsSizeSlider: View {
+    let title: LocalizedStringKey
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    var step: Double?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text("A").settingsFont(.line).foregroundStyle(SettingsTokens.secondaryText).accessibilityHidden(true)
+            slider
+            Text("A").settingsFont(.largeGlyph).foregroundStyle(SettingsTokens.secondaryText).accessibilityHidden(true)
+        }
+        .frame(width: SettingsTokens.Metric.controlWidth)
+    }
+
+    @ViewBuilder private var slider: some View {
+        if let step {
+            Slider(value: $value, in: range, step: step) { Text(title) }.labelsHidden()
+        } else {
+            Slider(value: $value, in: range) { Text(title) }.labelsHidden()
+        }
     }
 }

@@ -72,7 +72,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
                 String(localized: "Default Column Widths"), String(localized: "Date Format"),
             ]
         case .lists:
-            [String(localized: "Density"), String(localized: "Sort"), String(localized: "Group"), String(localized: "Open Items In")]
+            [String(localized: "Density"), String(localized: "Sort By"), String(localized: "Group By"), String(localized: "Open Items In")]
         case .editor:
             [
                 String(localized: "Page Width"), String(localized: "Standard Width"), String(localized: "Title Length"),
@@ -82,7 +82,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
         case .connection:
             [
                 String(localized: "Server"), String(localized: "Address"), String(localized: "Sign In"), String(localized: "Disconnect"),
-                String(localized: "Downloaded files"), String(localized: "Send Error Reports"), String(localized: "Use a different server"),
+                String(localized: "Downloaded Files"), String(localized: "Send Error Reports"), String(localized: "Use Another Marfa"),
             ]
         case .marfa(let page): page.searchWords
         }

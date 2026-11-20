@@ -152,8 +152,8 @@ struct SettingsStateContent: View {
     }
 }
 
-/// What a page says in place of itself, centered in the space under the toolbar. It stands for a page the person may not
-/// open, a server that is not answering, or a page with nothing to show.
+/// What a page says in place of itself: its words centered a third of the way down the space under the toolbar. It stands
+/// for a page the person may not open, a server that is not answering, or a page with nothing to show.
 struct SettingsPageState: View {
     let symbol: String
     let title: Text
@@ -161,11 +161,27 @@ struct SettingsPageState: View {
     var action: (title: LocalizedStringKey, perform: () -> Void)?
 
     var body: some View {
-        SettingsStateContent(symbol: symbol, title: title, line: line, action: action)
-            .padding(.horizontal, 24)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding(.bottom, 80)
-            .background(SettingsTokens.page)
+        GeometryReader { space in
+            SettingsStateContent(symbol: symbol, title: title, line: line, action: action)
+                .padding(.horizontal, 24)
+                .position(x: space.size.width / 2, y: space.size.height / 3)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(SettingsTokens.page)
+    }
+}
+
+/// A row of buttons at the end of a page, at the trailing edge, for what the page's fields hold: Revert and Save for a
+/// draft, or what sends or discards it. Buttons are regular size, since it is not inside a table.
+struct SettingsBar<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Spacer(minLength: 0)
+            content
+        }
+        .padding(.horizontal, SettingsTokens.Metric.inset)
     }
 }
 

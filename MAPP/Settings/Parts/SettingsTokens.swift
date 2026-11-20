@@ -36,6 +36,8 @@ enum SettingsTokens {
     static let destructiveFill = adaptive(light: NSColor(red: 1, green: 0.23, blue: 0.19, alpha: 0.12), dark: NSColor(red: 1, green: 0.27, blue: 0.23, alpha: 0.24))
     /// A chosen row, card or table row: a soft gray, never blue.
     static let selection = adaptive(light: NSColor(white: 0, alpha: 0.07), dark: NSColor(white: 1, alpha: 0.1))
+    /// Every other row of a section's table, a shade off the card's white.
+    static let band = adaptive(light: NSColor(white: 0, alpha: 0.024), dark: NSColor(white: 1, alpha: 0.04))
     /// Where a row is under the pointer.
     static let hover = adaptive(light: NSColor(white: 0, alpha: 0.04), dark: NSColor(white: 1, alpha: 0.06))
     /// The sidebar's field and the column's background.
@@ -54,7 +56,7 @@ enum SettingsTokens {
 
     /// The interface fonts of Settings. A page asks for these by role.
     enum Role: Hashable, Sendable {
-        case title, line, sectionName, sectionLine, footer, control, small, mono, stateTitle, headTitle, count, sidebar, sidebarHeader
+        case title, line, sectionName, sectionLine, footer, control, small, mono, stateTitle, headTitle, count, sidebar, sidebarHeader, largeGlyph
     }
 
     static func font(_ role: Role, scale: CGFloat = 1) -> Font {
@@ -64,7 +66,8 @@ enum SettingsTokens {
         case .sectionName: .system(size: 13 * scale, weight: .semibold)
         case .small: .system(size: 12 * scale)
         case .mono: .system(size: 12 * scale, design: .monospaced)
-        case .stateTitle: .system(size: 15 * scale, weight: .semibold)
+        case .stateTitle: .system(size: 13 * scale, weight: .semibold)
+        case .largeGlyph: .system(size: 15 * scale)
         case .headTitle: .system(size: 15 * scale, weight: .semibold)
         case .count: .system(size: 11 * scale)
         case .sidebarHeader: .system(size: 11 * scale, weight: .semibold)
