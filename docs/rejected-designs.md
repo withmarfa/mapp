@@ -67,13 +67,20 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 ## The sidebar and Settings
 
 - **A tab bar when there is only one tab.**
-- **A Customize Sidebar button in the sidebar.** Customize from a Control-click or in Settings > Sidebar.
+- **A Customize Sidebar button in the sidebar.** Customize from a Control-click.
+- **Settings > Sidebar.** The sidebar is customized in place only (August, 19 November 2026); the page that is built goes.
 - **Customizing the sidebar in a window of its own, or in a panel beside a section.**
 - **Checkboxes and a dashed Show More line while customizing.** A section's menu sets how many show.
 - **Handles at the leading edge, beside the marks.** They sit at each row's trailing edge.
 - **A view's mark as a round tinted tile.** It is the view's symbol in its own color.
-- **Settings taking over the window's sidebar**, with a way back and a search field. Settings keeps the app's sidebar and its list.
+- **Settings taking over the main window's sidebar**, with a way back and a search field, and a sidebar as wide as Codex's. Settings is a window of its own.
 - **Descriptions of three lines or more in Settings.** One line, two at most.
+- **Gray cards in Settings**, as System Settings draws them. Cards are white with a hairline.
+- **A back button beside a Settings page's title.** Back and Forward sit in the toolbar, beside the page's name.
+- **A Settings page split by a segmented control**, such as a folder's Settings, Contents and Copies.
+- **Minus and plus buttons for a number.** A field with its unit inside, or a pop-up of steps.
+- **A list of words or patterns as one text field.** Each line is edited in place.
+- **A Paper theme.** Theme is System, Light or Dark.
 
 ## Collections and Sources
 
