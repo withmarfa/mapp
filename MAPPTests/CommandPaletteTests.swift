@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import Synchronization
 import SwiftUI
 import Testing
 @testable import MAPP
@@ -275,5 +276,38 @@ struct CommandPaletteTests {
         #expect(PaletteAction.filtered(actions, by: "").count == actions.count)
         #expect(PaletteAction.filtered(actions, by: "fav").map(\.kind) == [.addToFavorites])
         #expect(PaletteAction.filtered(actions, by: "zzz").isEmpty)
+    }
+
+    @Test func aSearchFromACopyStillFillingNeverSaysNoResults() async throws {
+        let source = FakeItemSource()
+        source.report.update { $0.fill = LibraryFill(state: .filling, listed: 1, expected: 9) }
+        let library = MarfaLibrary(source: source, notices: Notices())
+        source.send(.loaded(SourceSnapshot(items: LibraryFixture.items, catalogue: LibraryFixture.catalogue)))
+        try #require(await eventually { library.isLoaded })
+        source.searchIncomplete.withLock { $0 = true }
+
+        // The copy answers nothing, and says it may hold more.
+        #expect(await eventually {
+            let found = library.search("nothing", in: .everywhere)
+            return !found.isPending && found.isIncomplete
+        })
+        let filling = library.search("nothing", in: .everywhere)
+        #expect(filling.items.isEmpty)
+        #expect(CommandPalette.emptyAnswer(searching: true, results: filling) == .stillLooking)
+
+        // Once whole, the same words answer that nothing matches.
+        source.searchIncomplete.withLock { $0 = false }
+        source.report.update { $0.fill = LibraryFill(state: .complete, listed: 9, expected: 9) }
+        #expect(await eventually {
+            let found = library.search("nothing", in: .everywhere)
+            return !found.isPending && !found.isIncomplete
+        })
+        #expect(CommandPalette.emptyAnswer(searching: true, results: library.search("nothing", in: .everywhere)) == .noResults)
+    }
+
+    @Test func theCommandsListSaysNoResultsWhateverTheLastSearchWas() {
+        var results = SearchResults.none
+        results.isIncomplete = true
+        #expect(CommandPalette.emptyAnswer(searching: false, results: results) == .noResults)
     }
 }

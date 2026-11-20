@@ -267,7 +267,13 @@ struct CommandPalette: View {
             Group {
                 if rows.isEmpty {
                     VStack(spacing: 0) {
-                        Text("No Results")
+                        Group {
+                            if Self.emptyAnswer(searching: mode == .search && isTyped, results: searched) == .stillLooking {
+                                Text("Still Looking")
+                            } else {
+                                Text("No Results")
+                            }
+                        }
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, minHeight: PaletteMetrics.emptyResultsHeight - (leftOutLine == nil ? 0 : 60))
                         leftOutRow
@@ -572,6 +578,14 @@ struct CommandPalette: View {
             setSearched(results, leftOut: found)
             for await _ in changes { break }
         }
+    }
+
+    /// What the palette says when it lists nothing. A search from a copy that is filling or behind never says nothing
+    /// matches, since what matches may not have arrived (the rule `SearchEmptyState` follows in the window).
+    enum EmptyAnswer: Equatable { case noResults, stillLooking }
+
+    static func emptyAnswer(searching: Bool, results: SearchResults) -> EmptyAnswer {
+        searching && results.isIncomplete ? .stillLooking : .noResults
     }
 
     /// The most a search lists.
