@@ -1,13 +1,22 @@
 {
-  "originHash" : "08fa2355ed4b2df9fd7ef184a0c83c839f9876b0f8bb81edfbe9f7bea6972d46",
+  "originHash" : "bd3290b67327971e2ac3ff21d8766538f495766a6849848c2b35650624b996f6",
   "pins" : [
+    {
+      "identity" : "app-telemetry",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/withmarfa/app-telemetry",
+      "state" : {
+        "revision" : "d8349fec06fb6af635bbda7d776019e7371fdee2",
+        "version" : "0.0.1"
+      }
+    },
     {
       "identity" : "marfa-swift",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/withmarfa/marfa-swift",
       "state" : {
-        "revision" : "6d7f50adc95a6f33f6c1057e471f480c52164123",
-        "version" : "0.0.68"
+        "revision" : "33206e060b5259d1d603914345cfe1f2c183c1c7",
+        "version" : "0.0.70"
       }
     },
     {

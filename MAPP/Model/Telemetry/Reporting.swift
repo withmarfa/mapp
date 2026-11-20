@@ -1,13 +1,13 @@
 import Foundation
 import Marfa
-import MarfaTelemetry
+import WithMarfaTelemetry
 import Synchronization
 
 /// The SDK's reporter and what it takes, named here because the app's own `Telemetry` hides the SDK's type of that
-/// name. Only the files in `MAPP/Model/Telemetry/` import `MarfaTelemetry`.
-typealias SDKReporter = MarfaTelemetry.Telemetry
-typealias ReportLevel = MarfaTelemetry.Telemetry.LogLevel
-typealias ReportAttribute = MarfaTelemetry.Telemetry.LogAttribute
+/// name. Only the files in `MAPP/Model/Telemetry/` import `WithMarfaTelemetry`.
+typealias SDKReporter = WithMarfaTelemetry.Telemetry
+typealias ReportLevel = WithMarfaTelemetry.Telemetry.LogLevel
+typealias ReportAttribute = WithMarfaTelemetry.Telemetry.LogAttribute
 
 /// What the app hands to the SDK. A test gives its own, so no test reaches the network.
 nonisolated protocol ReportSink: Sendable {

@@ -181,7 +181,7 @@ nonisolated enum TypeSchemaFailure: Error, Hashable, Sendable {
         case .notPermitted:
             String(localized: "This connection can’t change a type. Ask whoever runs the server to allow it, or sign in again and approve it.")
         case .keyRefused:
-            String(localized: "The server has ended MAPP’s sign-in. Sign in again in Settings.")
+            Words.signInEnded
         case .changedOnServer:
             String(localized: "This type has changed on the server since MAPP last read it, so nothing was changed. Look at the field again and try once more.")
         case .refused(let reason):

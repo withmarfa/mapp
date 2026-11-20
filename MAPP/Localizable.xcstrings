@@ -118,6 +118,15 @@
     "MAPP couldn’t reach the server. Check your connection, then try again." : {
 
     },
+    "MAPP couldn’t renew its sign-in with the server, because the server didn’t accept the renewal. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again." : {
+
+    },
+    "MAPP couldn’t renew its sign-in because the server redirected the request. Check the server address in Settings, then try again. If this keeps happening, sign in again." : {
+
+    },
+    "MAPP couldn’t renew its sign-in with the server, because it couldn’t read the server’s answer. Try again later. If it keeps happening, check the server’s address in Settings, or sign in again." : {
+
+    },
     "This address reaches a different Marfa server from the one this library was made for, so MAPP left the library as it was." : {
 
     },
@@ -4706,6 +4715,12 @@
       "extractionState" : "manual"
     },
     "This version has no text or title that fits this item, so it can only be read." : {
+      "extractionState" : "manual"
+    },
+    "This version of MAPP and the server use different versions of Marfa, and the change may already have been made. Update MAPP or the server, then check the change." : {
+      "extractionState" : "manual"
+    },
+    "This version of MAPP and the server use different versions of Marfa, so the server didn’t make the change. Update MAPP or the server, then try again." : {
       "extractionState" : "manual"
     },
     "This version of MAPP can’t read the copy of your library on this Mac, because a different version made it." : {

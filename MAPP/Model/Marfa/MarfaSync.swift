@@ -455,28 +455,27 @@ actor MarfaSync {
         #if DEBUG
         hooks.seen.update { $0.drains += 1 }
         #endif
-        var faulted = false
+        var drained = false
         do {
             #if DEBUG
             if let fault = hooks.faulting.current?(.drain) { throw fault }
             #endif
             _ = try await MarfaEngine.asking { try await copy.queue.drain() }
+            drained = true
         } catch {
             // A drain that throws loses its report, and the writes it answered first are recorded, so the engine
-            // takes them from the queue below. A copy that needs it hydrates again. The package retries a drain only
-            // for a key refusal or a transient error and does not set the connection for a drain, so any other fault
-            // leaves the writes queued, and is told once until a drain succeeds.
+            // takes them from the queue below. A copy that needs it hydrates again.
+            // The package parks a refused key and retries transient errors and refused renewals while the copy follows. Tell other drain faults once and keep them visible until a drain succeeds.
             if (error as? MarfaError)?.isHydrationNeeded ?? false {
                 wantsHydration = true
             } else if Self.isDrainFault(error) {
-                faulted = true
                 if !drainFailureTold {
                     drainFailureTold = true
                     if let error = error as? MarfaError { stop(for: error) } else { failed(error) }
                 }
             }
         }
-        if !faulted, drainFailureTold {
+        if drained, drainFailureTold {
             drainFailureTold = false
             told = false
             if connection == .following || connection == .local { hub.set(.online) }
@@ -489,13 +488,13 @@ actor MarfaSync {
 
     /// Whether a failed drain left the writes queued for a reason asking again may not clear, which the package
     /// neither retries nor shows. A copy with no server has nothing to send to, so that is no fault. An unreachable
-    /// server, a transient error and a refused key are shown through the connection, and a copy that needs hydrating
-    /// is hydrated.
+    /// server, a transient error, a refused key and a refused renewal are shown through the connection (the package
+    /// retries a refused renewal as it does a transient error), and a copy that needs hydrating is hydrated.
     private static func isDrainFault(_ error: any Error) -> Bool {
         guard let error = error as? MarfaError else { return !(error is CancellationError) }
         if error.isOffline || error.isTransient || error.isKeyRefusal || error.isHydrationNeeded { return false }
         switch error {
-        case .canceled, .closed, .noServer: return false
+        case .canceled, .closed, .noServer, .renewalRefused: return false
         default: return true
         }
     }

@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import os
 import UniformTypeIdentifiers
 
 /// Reads the package's values into the item layer's. Pure, so the rules are tested on values made by hand.
@@ -161,8 +162,9 @@ nonisolated enum MarfaMapping {
     /// The server's refusal of a view write, in words for the person. A view is written at once, so a server that
     /// cannot be reached saved nothing.
     static func viewFailure(_ error: any Error) -> ViewWriteFailure {
-        guard let error = error as? MarfaError else {
-            return ViewWriteFailure(kind: .refused, message: error.localizedDescription)
+        guard let error = MarfaServerCalls.marfaError(in: error) else {
+            Telemetry.logger(.library).error("A view write failed: \(String(describing: error))")
+            return ViewWriteFailure(kind: .refused, message: Words.syncFailed)
         }
         if error.isOffline {
             return ViewWriteFailure(kind: .offline, message: String(localized: "MAPP can’t reach your Marfa server, so nothing was saved. Try again when it’s back."))
@@ -176,8 +178,10 @@ nonisolated enum MarfaMapping {
             return ViewWriteFailure(kind: .gone, message: String(localized: "Your Marfa server no longer has this view."))
         case .forbidden:
             return ViewWriteFailure(kind: .notPermitted, message: String(localized: "MAPP’s sign-in can’t change views on your Marfa server."))
+        case .validation(_, let message, _, _):
+            return ViewWriteFailure(kind: .refused, message: message)
         default:
-            return ViewWriteFailure(kind: .refused, message: error.message)
+            return ViewWriteFailure(kind: .refused, message: Words.message(for: error))
         }
     }
 

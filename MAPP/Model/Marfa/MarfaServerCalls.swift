@@ -1,6 +1,8 @@
 import Foundation
 import Marfa
 import MarfaAPI
+import OpenAPIRuntime
+import os
 
 /// The calls that ask the Marfa server itself instead of the working copy: an item's snapshots (Version History),
 /// the server's own settings (This Marfa), the owner's icon for a type, changes to a type's fields and the names, marks and counts of sources.
@@ -38,16 +40,30 @@ nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, Ty
 
     /// What the package's error stands for, by its own classes: away, a refused key, or what the server said.
     static func ending(_ error: any Error) -> Ending {
-        guard let error = error as? MarfaError else { return .failed(error.localizedDescription) }
+        guard let error = marfaError(in: error) else {
+            Telemetry.logger(.library).error("A server call failed: \(String(describing: error))")
+            return .failed(Words.syncFailed)
+        }
         if error.isOffline { return .unreachable }
         if error.isKeyRefusal { return .keyRefused }
         switch error {
         case .forbidden: return .notPermitted
-        case .notFound: return .notFound(error.message)
+        case .notFound: return .notFound(Words.message(for: error))
         case .validation(_, let message, _, _): return .refused(message)
-        case .instanceChanged: return .instanceChanged(error.message)
-        default: return .failed(error.message)
+        case .instanceChanged: return .instanceChanged(Words.message(for: error))
+        default: return .failed(Words.message(for: error))
         }
+    }
+
+    /// Returns a `MarfaError` directly or from an OpenAPI `ClientError`.
+    static func marfaError(in error: any Error) -> MarfaError? {
+        var current = error
+        for _ in 0..<4 {
+            if let known = current as? MarfaError { return known }
+            guard let wrapped = current as? ClientError else { return nil }
+            current = wrapped.underlyingError
+        }
+        return nil
     }
 
     // MARK: Version History (`GET /items/{id}/versions`)

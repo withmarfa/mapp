@@ -65,7 +65,7 @@ nonisolated enum SourceEditFailure: Error, Hashable, Sendable {
         case .notPermitted:
             String(localized: "This connection can’t change this source. Ask whoever runs the server to allow it, or sign in again and approve it.")
         case .keyRefused:
-            String(localized: "The server has ended MAPP’s sign-in. Sign in again in Settings.")
+            Words.signInEnded
         case .refused(let reason):
             reason
         case .unsupported:

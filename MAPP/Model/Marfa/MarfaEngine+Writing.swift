@@ -229,9 +229,9 @@ extension MarfaEngine {
                 try await Self.asking { try await copy.items.purge(id.rawValue, version: version.rawValue) }
                 outcome = .accepted
             } catch let error as MarfaError {
-                outcome = .refused(Self.problem(for: error))
+                outcome = .refused(SyncProblem(code: Self.refusalCode(of: error), message: Words.message(for: error)))
             } catch {
-                outcome = .refused(SyncProblem(code: "failed", message: error.localizedDescription))
+                outcome = .refused(SyncProblem(code: "failed", message: Words.syncFailed))
             }
             _ = tell(.answer(write, outcome))
         }

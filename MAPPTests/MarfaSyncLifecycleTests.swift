@@ -306,6 +306,48 @@ struct MarfaSyncLifecycleTests {
         await source.close()
     }
 
+    /// The package retries a drain that met a refused renewal, as for a transient error, so it is no stopping fault.
+    @Test func aDrainThatMeetsARefusedRenewalIsNotShownStoppedAndALaterDrainLeavesItOnline() async throws {
+        let (fake, source, log) = try await scriptedSource(refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()))
+        let sync = await source.engine.sync
+        let refused = MarfaError.renewalRefused(reason: .refused, message: "the server answered 503")
+        sync.hooks.faulting.set { step in step == .drain ? refused : nil }
+        fake.sendUpdate(update(.following))
+        try #require(await eventually { sync.hooks.drains >= 1 })
+        await sync.flush()
+        #expect(sync.hooks.stops == 0)
+        #expect(unavailable(log.current) == 0, "a refused renewal on a drain stopped the copy")
+        #expect(await waitForConnection(source) { $0 == .online })
+
+        sync.hooks.faulting.set(nil)
+        await sync.flush()
+        #expect(source.connectionState == .online)
+        await source.close()
+    }
+
+    /// A drain fault stays told through a later drain the package retries, until a drain succeeds.
+    @Test func aDrainFaultIsNotClearedByARefusedRenewalAndAnOnlineShowsOnlyAfterASuccessfulDrain() async throws {
+        let (fake, source, log) = try await scriptedSource(refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()))
+        let sync = await source.engine.sync
+        sync.hooks.faulting.set { step in step == .drain ? .store(message: "the store failed") : nil }
+        fake.sendUpdate(update(.following))
+        try #require(await eventually { sync.hooks.drains >= 1 })
+        await sync.flush()
+        _ = try #require(await log.wait { unavailable($0) == 1 })
+
+        let refused = MarfaError.renewalRefused(reason: .refused, message: "the server answered 503")
+        sync.hooks.faulting.set { step in step == .drain ? refused : nil }
+        let drains = sync.hooks.drains
+        await sync.flush()
+        #expect(sync.hooks.drains > drains)
+        #expect(source.connectionState != .online, "a refused renewal cleared a drain fault with the writes still waiting")
+
+        sync.hooks.faulting.set(nil)
+        await sync.flush()
+        #expect(await waitForConnection(source) { $0 == .online })
+        await source.close()
+    }
+
     /// The package leaves the connection following when a drain fails on a fault, so the updates that follow must
     /// not show the library online while writes wait.
     @Test func aDrainFaultStaysShownThroughFollowingUpdatesUntilADrainSucceeds() async throws {

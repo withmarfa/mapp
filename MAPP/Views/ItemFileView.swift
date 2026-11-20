@@ -5,15 +5,18 @@ enum ItemFileResolution: Equatable {
     case ready(URL)
     /// The library has no file for the item.
     case unavailable
-    /// The library has one but could not get it.
-    case failed
+    /// The library has one but could not get it. `reason` is in the person's words where the library gave them, and
+    /// nil where the person is only told to check the connection.
+    case failed(reason: String?)
 
     /// The file, fetched from the library.
     @MainActor static func fetch(_ id: ItemID, in library: any ItemLibrary) async -> Self {
         do {
             return try await library.fileURL(of: id).map { .ready($0) } ?? .unavailable
+        } catch let failure as SourceFailure {
+            return .failed(reason: failure.message)
         } catch {
-            return .failed
+            return .failed(reason: nil)
         }
     }
 }
@@ -65,11 +68,15 @@ struct ItemFileView: View {
                 FileItemContent(url: url, title: item?.name ?? url.lastPathComponent, contentType: item?.fileType, item: id, details: details)
             case .unavailable:
                 ContentUnavailableView("File Unavailable", systemImage: "doc.badge.ellipsis")
-            case .failed:
+            case .failed(let reason):
                 ContentUnavailableView {
                     Label("Can’t Get This File", systemImage: "exclamationmark.icloud")
                 } description: {
-                    Text("MAPP couldn’t get the file from the server. Check your connection, then try again.")
+                    if let reason {
+                        Text(reason)
+                    } else {
+                        Text("MAPP couldn’t get the file from the server. Check your connection, then try again.")
+                    }
                 } actions: {
                     Button("Try Again") { Task { await load() } }
                 }

@@ -204,7 +204,7 @@ nonisolated final class MarfaSource: ItemSource {
                 // An empty answer means nothing was taken, as when the write was no longer withdrawable.
                 return try await !MarfaEngine.asking { try await copy.queue.withdraw(id) }.isEmpty
             } catch let error as MarfaError {
-                throw SourceFailure(kind: .failed, message: error.message)
+                throw SourceFailure(kind: .failed, message: Words.message(for: error))
             }
         case (.conflictedCopy(let copy), .discard):
             submit(.transition(copy, .trashed), as: WriteID())
@@ -314,7 +314,7 @@ nonisolated final class MarfaSource: ItemSource {
         return switch error {
         case .noRoom, .storageFull: String(localized: "This Mac doesn’t have enough space to download this file.")
         case .bytesAbsent: String(localized: "The Marfa server doesn’t have this file’s contents.")
-        default: error.message
+        default: Words.message(for: error)
         }
     }
 
@@ -524,7 +524,7 @@ nonisolated final class MarfaSource: ItemSource {
             let rows = try await MarfaEngine.asking { try await copy.items.get([id.rawValue], includingBin: true) }
             if let row = rows.first { return row }
         } catch let error as MarfaError {
-            throw SourceFailure(kind: .failed, message: error.message)
+            throw SourceFailure(kind: .failed, message: Words.message(for: error))
         }
         throw SourceFailure(kind: .missing, message: String(localized: "This item isn’t in the library."))
     }
