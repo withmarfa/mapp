@@ -103,12 +103,17 @@ enum LibraryDescription {
     /// Hands over what was typed in This Marfa's fields and not saved, as MAPP's rules say for a panel that ends any way but
     /// the person's own Cancel: the text goes through `Notices.notKept`, to the clipboard, and the draft is dropped.
     func handOverDrafts() {
-        let model = instanceSettings
-        guard model.hasEdits else { return }
-        let lines = InstanceSetting.allCases.filter(model.isEdited).map { "\($0.title): \(model.draft[$0] ?? "")" }
-        libraries.host.notices.notKept(
-            String(localized: "Settings Not Saved"), text: lines.joined(separator: "\n"),
-            reason: String(localized: "You closed Settings before saving the changes to this Marfa’s settings."))
-        model.revert()
+        instanceSettings.handOver(
+            to: libraries.host.notices, because: String(localized: "You closed Settings before saving the changes to this Marfa’s settings."))
+    }
+}
+
+extension InstanceSettingsModel {
+    /// Tells the person what they typed and did not save, as a change not kept, and drops it. Nothing typed hands over nothing.
+    func handOver(to notices: Notices, because reason: String) {
+        guard hasEdits else { return }
+        let lines = InstanceSetting.allCases.filter(isEdited).map { "\($0.title): \(draft[$0] ?? "")" }
+        notices.notKept(String(localized: "Settings Not Saved"), text: lines.joined(separator: "\n"), reason: reason)
+        revert()
     }
 }

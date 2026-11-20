@@ -2,7 +2,7 @@ import Foundation
 @testable import MAPP
 import Testing
 
-/// Deleting for good, writing a view and choosing a type's icon are never queued, so each is offered by one rule:
+/// Deleting permanently, writing a view and choosing a type's icon are never queued, so each is offered by one rule:
 /// `ItemLibrary.reachesServer`, true only while the server can be reached.
 @Suite(.hangLimit)
 @MainActor struct ServerReachTests {

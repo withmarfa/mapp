@@ -47,6 +47,33 @@ import Testing
         #expect(bench.hasCopy(first))
     }
 
+    @Test func aKeychainThatCannotBeReadIsNotReadAsHoldingNothing() async throws {
+        let bench = try HostBench()
+        let host = bench.host()
+        try await host.connect(address: "http://first.test:8210", key: "k")
+        #expect(await eventually { host.grantsRead })
+        let held = host.grants
+        #expect(held == SystemSignIns.askedAtSignIn)
+        bench.signIns.makeUnreadable(first)
+        await host.refreshGrants()
+        #expect(!host.grantsRead, "the read failed, so it is not a read")
+        #expect(host.grants == held, "what was last read stands")
+    }
+
+    @Test func signingInAgainWhereTheKeychainCannotBeReadAsksForEverythingThePagesUse() async throws {
+        let bench = try HostBench()
+        let host = bench.host()
+        try await host.connect(address: "http://first.test:8210", key: "k")
+        #expect(await eventually { host.grantsRead })
+        bench.signIns.makeUnreadable(first)
+        try await host.signInAgain(via: host.scripted("again"))
+        #expect(bench.signIns.asked.last == MarfaHost.usedPermissions)
+        #expect(MarfaHost.usedPermissions.isSuperset(of: MarfaSettingsPage.allCases.map(\.permission)))
+        #expect(host.grantsRead, "the new sign-in is readable")
+        #expect(host.grants == MarfaHost.usedPermissions)
+        #expect(host.notices.waiting.filter { $0.title == Words.permissionsLostTitle }.isEmpty, "what was held was never read, so nothing is said lost")
+    }
+
     /// The package asks for the call after a sign-in that ended even where the credential is the one it had.
     @Test func aSignInAgainThatLeavesTheCredentialUnchangedStillGivesItToTheCopy() async throws {
         let bench = try HostBench()

@@ -14,6 +14,8 @@ nonisolated final class ScriptedSignIns: SignIns {
         /// What each browser sign-in does, first to last; the last is repeated. Empty signs in with `signedInKey`.
         var browser: [Result<String, any Error>] = []
         var code: [Result<CodeSignIn, any Error>] = []
+        /// The token a code sign-in leaves held when none is scripted in `code`; nil leaves no code scripted.
+        var codeKey: String?
         var signOutAnswer: Result<SignOutOutcome, any Error> = .success(.endedAtServer)
         /// Whether the sign-ins that succeed leave a replaced approval standing at the server.
         var replacedStands = false
@@ -21,7 +23,7 @@ nonisolated final class ScriptedSignIns: SignIns {
         /// The permissions the next browser sign-in grants of those asked, first to last; the last is repeated. Empty
         /// grants everything asked.
         var approving: [Set<InstancePermission>] = []
-        /// The permissions each browser sign-in was asked for, in order.
+        /// The permissions each browser or code sign-in was asked for, in order.
         var asked: [Set<InstancePermission>] = []
     }
 
@@ -48,7 +50,7 @@ nonisolated final class ScriptedSignIns: SignIns {
             to: address, service: Self.service, accessToken: key, scopes: permissions.map(\.rawValue).sorted())
     }
 
-    /// The permissions each browser sign-in asked for, in order.
+    /// The permissions each browser or code sign-in asked for, in order.
     var asked: [Set<InstancePermission>] { state.withLock { $0.asked } }
 
     /// What the next browser sign-ins grant of the permissions they ask for, so a test can approve fewer than asked.
@@ -93,6 +95,12 @@ nonisolated final class ScriptedSignIns: SignIns {
         state.withLock { $0.code = code }
     }
 
+    /// Makes each code sign-in that is not scripted by `script(code:)` keep `key`, approving what the browser's
+    /// `script(approving:)` does of the permissions asked.
+    func script(codeKey: String) {
+        state.withLock { $0.codeKey = codeKey }
+    }
+
     func script(signOut: Result<SignOutOutcome, any Error>) {
         state.withLock { $0.signOutAnswer = signOut }
     }
@@ -122,10 +130,7 @@ nonisolated final class ScriptedSignIns: SignIns {
     @MainActor func signInWithBrowser(to connection: MarfaConnection, asking permissions: Set<InstancePermission>) async throws -> SignedIn {
         let (next, granted): (Result<String, any Error>, Set<InstancePermission>) = state.withLock { state in
             state.calls.append("browser \(connection.address.absoluteString)")
-            state.asked.append(permissions)
-            let approving = state.approving.count > 1 ? state.approving.removeFirst() : state.approving.first
-            let asked = SystemSignIns.askedAtSignIn.union(permissions)
-            let granted = approving.map { asked.intersection($0) } ?? asked
+            let granted = Self.take(asking: permissions, in: &state)
             return (state.browser.count > 1 ? state.browser.removeFirst() : (state.browser.first ?? .success(signedInKey)), granted)
         }
         try await onBrowser.withLock { $0 }?()
@@ -135,13 +140,29 @@ nonisolated final class ScriptedSignIns: SignIns {
         return signedIn
     }
 
-    func startCodeSignIn(to connection: MarfaConnection) async throws -> CodeSignIn {
-        let next: Result<CodeSignIn, any Error>? = state.withLock { state in
+    /// Records what a sign-in asked for and answers which of it the owner approves.
+    private static func take(asking permissions: Set<InstancePermission>, in state: inout State) -> Set<InstancePermission> {
+        state.asked.append(permissions)
+        let approving = state.approving.count > 1 ? state.approving.removeFirst() : state.approving.first
+        let asked = SystemSignIns.askedAtSignIn.union(permissions)
+        return approving.map { asked.intersection($0) } ?? asked
+    }
+
+    func startCodeSignIn(to connection: MarfaConnection, asking permissions: Set<InstancePermission>) async throws -> CodeSignIn {
+        let (next, granted, key): (Result<CodeSignIn, any Error>?, Set<InstancePermission>, String?) = state.withLock { state in
             state.calls.append("code \(connection.address.absoluteString)")
-            return state.code.count > 1 ? state.code.removeFirst() : state.code.first
+            let granted = Self.take(asking: permissions, in: &state)
+            return (state.code.count > 1 ? state.code.removeFirst() : state.code.first, granted, state.codeKey)
         }
-        guard let next else { throw SignInError.unavailable(message: "No code was scripted.") }
-        return try next.get()
+        if let next { return try next.get() }
+        guard let key else { throw SignInError.unavailable(message: "No code was scripted.") }
+        let address = connection.address
+        return CodeSignIn(
+            code: "SCRIPTED", address: address, completeAddress: nil, expiresAt: .distantFuture,
+            finish: { [self] in
+                save(key, for: address, permissions: granted)
+                return signedIn
+            })
     }
 
     func signOut(of connection: MarfaConnection) async throws -> SignOutOutcome {

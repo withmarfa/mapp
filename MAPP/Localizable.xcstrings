@@ -64,6 +64,9 @@
     "Blue" : {
 
     },
+    "choose a type’s icon and change a type’s fields" : {
+      "extractionState" : "manual"
+    },
     "Choose one item to read or edit it." : {
 
     },
@@ -118,6 +121,9 @@
     "Empty…" : {
 
     },
+    "Fewer Permissions Allowed" : {
+      "extractionState" : "manual"
+    },
     "Filter" : {
 
     },
@@ -133,8 +139,38 @@
     "Last answered %@. MAPP keeps trying." : {
 
     },
+    "list and permanently delete deleted items" : {
+      "extractionState" : "manual"
+    },
+    "list and revoke keys" : {
+      "extractionState" : "manual"
+    },
+    "list, make and restore backups" : {
+      "extractionState" : "manual"
+    },
+    "list, narrow and revoke other apps’ access" : {
+      "extractionState" : "manual"
+    },
+    "make keys" : {
+      "extractionState" : "manual"
+    },
+    "manage connectors" : {
+      "extractionState" : "manual"
+    },
+    "manage files across this Marfa" : {
+      "extractionState" : "manual"
+    },
+    "manage the owner’s sign-ins and passkeys" : {
+      "extractionState" : "manual"
+    },
+    "manage webhooks" : {
+      "extractionState" : "manual"
+    },
     "MAPP" : {
 
+    },
+    "MAPP is no longer allowed to %@. Allow it again from the page that needs it." : {
+      "extractionState" : "manual"
     },
     "MAPP isn’t allowed to list and permanently delete deleted items." : {
 
@@ -184,8 +220,17 @@
     "Permanently deletes %@ items." : {
 
     },
+    "read the audit log" : {
+      "extractionState" : "manual"
+    },
+    "read the server’s health and status" : {
+      "extractionState" : "manual"
+    },
     "Removes this Mac’s copy and signs MAPP out." : {
 
+    },
+    "see and change this Marfa’s settings" : {
+      "extractionState" : "manual"
     },
     "Sent once you sign in again." : {
 
@@ -499,6 +544,9 @@
     "Unsent Changes" : {
 
     },
+    "update the server and run its housekeeping" : {
+      "extractionState" : "manual"
+    },
     "Use Another Marfa" : {
 
     },
@@ -627,6 +675,9 @@
     "You closed Settings before saving the changes to this Marfa’s settings." : {
 
     },
+    "You quit MAPP before saving the changes to this Marfa’s settings." : {
+      "extractionState" : "manual"
+    },
     "Your items are still loading." : {
 
     },
@@ -639,7 +690,7 @@
     "“%@” can hold only one link of this kind, and already holds it." : {
       "extractionState" : "manual"
     },
-    "“%@” changes to %@. Older versions of items may be removed for good the next time the server tidies up, so Version History will show fewer." : {
+    "“%@” changes to %@. Older versions of items may be permanently deleted the next time the server tidies up, so Version History will show fewer." : {
       "extractionState" : "manual"
     },
     "Clear Location" : {
@@ -1860,7 +1911,7 @@
     "An item can’t be linked to itself." : {
       "extractionState" : "manual"
     },
-    "An item with more than %lld versions will lose its oldest ones for good the next time the server tidies up." : {
+    "An item with more than %lld versions will have its oldest versions permanently deleted the next time the server tidies up." : {
       "extractionState" : "manual"
     },
     "An item’s text can name a picture at a web address. MAPP loads it only when you choose to, or always for items in the Inbox. Pictures you have loaded stay on this Mac until you disconnect the library." : {
@@ -2493,7 +2544,7 @@
     "Deleted items stay in Recently Deleted this long, then the server permanently deletes them, with their history. 0 keeps them with no limit. Empty uses the server’s default." : {
       "extractionState" : "manual"
     },
-    "Deleting for good needs the server, which can’t be reached right now. The items are still in Recently Deleted." : {
+    "Deleting permanently needs the server, which can’t be reached right now. The items are still in Recently Deleted." : {
       "extractionState" : "manual"
     },
     "Descending" : {
@@ -3020,7 +3071,7 @@
     "Items About This" : {
       "extractionState" : "manual"
     },
-    "Items deleted more than %@ ago will be removed for good, with their history, the next time the server tidies up. They can’t be recovered." : {
+    "Items deleted more than %@ ago will be permanently deleted, with their history, the next time the server tidies up. They can’t be recovered." : {
       "extractionState" : "manual"
     },
     "Items listed: %llu" : {

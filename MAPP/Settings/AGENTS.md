@@ -15,7 +15,7 @@ Settings is a window of its own (`SettingsWindowView`, a `Window` scene, not the
 - A row is a lead, a title, one line under it (two at most) and one trailing edge. A refused input keeps what was typed, with the red ring and one line under the title (`SettingsRow(error:)`). A problem's words are told whole (`lines: nil`).
 - Something new with several fields is a `SettingsSheet`, in the middle of the window and shown from `SettingsWindowView`, never `.sheet`. A question before what cannot be undone is the system's alert.
 - Back and Forward are the View menu's own commands (`AppCommands`); a sub-page is pushed with `settingsPush`.
-- What is typed in a page and not saved is handed over when the window closes (`MAPPMarfaSettingsHost.handOverDrafts`, through `Notices.notKept`).
+- What is typed in a page and not saved is handed over when the window closes (`MAPPMarfaSettingsHost.handOverDrafts`) and when the app quits (`Libraries.handOffDraftsAtQuit`, from `applicationShouldTerminate`, since a window's close is not posted at quit), through `Notices.notKept`.
 - `Browser` keeps nothing of Settings. Never add a Settings place to the main window.
 
 ## Code Review Rules

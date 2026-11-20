@@ -189,6 +189,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if kept {
                 QuickAdd.handOffAll(to: libraries.host.notices, in: libraries.current)
                 ViewPanel.handOffAll()
+                libraries.handOffDraftsAtQuit()
             }
             let told = kept && libraries.host.notices.tellBeforeQuitting(copying: Notices.copyToClipboard) { notice in
                 let alert = NSAlert()

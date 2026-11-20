@@ -47,7 +47,7 @@ import os
     init(
         host: MarfaHost, defaults: UserDefaults = .standard,
         handOverPages: ((@escaping (Bool) -> Void) -> Void)? = nil,
-        valuePanels: ValueEditPresenter = .shared
+        valuePanels: ValueEditPresenter = .shared, instanceSettings: InstanceSettingsModel? = nil
     ) {
         self.host = host
         self.valuePanels = valuePanels
@@ -56,8 +56,8 @@ import os
         sidebarLayouts = SidebarLayouts(defaults: defaults)
         typeLooks = TypeLooks(defaults: defaults)
         marfaSettings = MarfaSettingsModel(host: host)
-        instanceSettings = InstanceSettingsModel(provider: { [host] in host.instanceConfigTarget() })
-        instanceSettings.onSaved = { [host] answer, settings, address in host.instanceSaved(answer, changing: settings, of: address) }
+        self.instanceSettings = instanceSettings ?? InstanceSettingsModel(provider: { [host] in host.instanceConfigTarget() })
+        self.instanceSettings.onSaved = { [host] answer, settings, address in host.instanceSaved(answer, changing: settings, of: address) }
         isLaunching = host.configuredConnection != nil
         host.handOverEdits = { [weak self] in await self?.flushEditors() ?? false }
         LaunchTrace.shared.mark(.librariesInit, note: isLaunching ? "server set" : "no server")
@@ -126,6 +126,13 @@ import os
         await library.finish()
         trace.end(.queue)
         return true
+    }
+
+    /// Hands over what was typed in This Marfa's settings and not saved, as the window does when it closes: a window's
+    /// close is not posted when the app quits, and the draft has no other home.
+    func handOffDraftsAtQuit() {
+        instanceSettings.handOver(
+            to: host.notices, because: String(localized: "You quit MAPP before saving the changes to this Marfa’s settings."))
     }
 
     /// Quitting waits at most `limit` and is cancelled if the editors or library cannot finish. A page or a title

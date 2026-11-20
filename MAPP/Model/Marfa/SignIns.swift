@@ -23,7 +23,8 @@ nonisolated protocol SignIns: Sendable {
     func grants(for connection: MarfaConnection) throws -> Set<InstancePermission>?
 
     /// Starts a device sign-in, for a Mac that cannot use the browser: the person types the code on any device.
-    func startCodeSignIn(to connection: MarfaConnection) async throws -> CodeSignIn
+    /// `permissions` are asked for as `signInWithBrowser` asks for them.
+    func startCodeSignIn(to connection: MarfaConnection, asking permissions: Set<InstancePermission>) async throws -> CodeSignIn
 
     /// Forgets the sign-in on this Mac and revokes it at the server. Only `.notConfirmed` leaves an approval that may
     /// stand there until the owner ends it. Sign-out can wait for a renewal before asking the server to end the
@@ -208,8 +209,8 @@ nonisolated struct SystemSignIns: SignIns {
         return SignedIn(try await authorization(for: connection, asking: permissions).signIn(presentingFrom: window))
     }
 
-    func startCodeSignIn(to connection: MarfaConnection) async throws -> CodeSignIn {
-        let started = try await authorization(for: connection).startDeviceSignIn()
+    func startCodeSignIn(to connection: MarfaConnection, asking permissions: Set<InstancePermission>) async throws -> CodeSignIn {
+        let started = try await authorization(for: connection, asking: permissions).startDeviceSignIn()
         return CodeSignIn(
             code: started.userCode, address: started.verificationURL, completeAddress: started.verificationURLComplete,
             expiresAt: started.expiresAt, finish: { SignedIn(try await started.credential()) })

@@ -347,9 +347,17 @@ import os
         await dropPendingSignIn()
         // Nothing the sign-in or the copy's change can do may close the library over edits still being typed.
         if source != nil { try await handOver() }
-        // A sign-in again keeps what the owner already allowed, so signing in to change the account never takes it back.
-        try await signIn(to: connection, via: method, asking: permissions.union(grants))
+        // A sign-in again asks for what the owner already allowed, so signing in to change the account never takes it
+        // back. Where the Keychain cannot say what is held, it asks for everything the pages use, which the owner may untick.
         await refreshGrants()
+        let held = grantsRead ? grants : nil
+        try await signIn(to: connection, via: method, asking: permissions.union(held ?? Self.usedPermissions))
+        await refreshGrants()
+        // The owner may approve fewer than MAPP held, and that stands, but never silently.
+        if let held, grantsRead {
+            let lost = held.subtracting(grants)
+            if !lost.isEmpty { notices.tell(Words.permissionsLostTitle, Words.permissionsLost(lost)) }
+        }
         guard let source else { return try await open(connection) }
         let server: Server?
         do {
@@ -527,7 +535,7 @@ import os
             case .browser:
                 signedIn = try await signIns.signInWithBrowser(to: connection, asking: permissions)
             case .code(let shown):
-                let code = try await signIns.startCodeSignIn(to: connection)
+                let code = try await signIns.startCodeSignIn(to: connection, asking: permissions)
                 shown(code)
                 signedIn = try await code.finish()
             }
@@ -637,14 +645,26 @@ import os
     /// Whether `grants` has been read for the copy shown: a sign-in the Keychain cannot give reads as holding none.
     private(set) var grantsRead = false
 
-    /// Reads what the kept sign-in holds, where the main actor never waits on the Keychain.
+    /// Every permission the Settings pages and the features behind them use: what a sign-in asks for where what it holds
+    /// cannot be read.
+    nonisolated static let usedPermissions = SystemSignIns.askedAtSignIn.union(MarfaSettingsPage.allCases.map(\.permission))
+
+    /// Reads what the kept sign-in holds, where the main actor never waits on the Keychain. A sign-in the Keychain
+    /// cannot give is not read: the grants last read stand and `grantsRead` is false, so nothing reads as holding none.
     func refreshGrants() async {
         guard let connection = configuredConnection else {
             grants = []
             grantsRead = false
             return
         }
-        let held = try? await Self.offMain { [signIns] in try signIns.grants(for: connection) }
+        let held: Set<InstancePermission>?
+        do {
+            held = try await Self.offMain { [signIns] in try signIns.grants(for: connection) }
+        } catch {
+            guard configuredConnection == connection else { return }
+            grantsRead = false
+            return
+        }
         guard configuredConnection == connection else { return }
         grants = held ?? []
         grantsRead = true

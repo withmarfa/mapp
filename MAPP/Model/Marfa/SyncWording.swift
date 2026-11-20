@@ -233,6 +233,16 @@ nonisolated enum Words {
         String(localized: "MAPP couldn’t confirm that \(address) ended MAPP’s earlier approval.") + " " + String(localized: "Run “marfa apps list” with the command line signed in to \(address) as the owner. Use the approval date to identify the earlier MAPP approval. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID.")
     }
 
+    /// What MAPP is no longer allowed to do after a sign-in the owner approved with fewer permissions than it held.
+    static var permissionsLostTitle: String {
+        String(localized: "Fewer Permissions Allowed")
+    }
+
+    static func permissionsLost(_ lost: Set<InstancePermission>) -> String {
+        let list = lost.sorted { $0.rawValue < $1.rawValue }.map(\.allowedTo).formatted(.list(type: .and))
+        return String(localized: "MAPP is no longer allowed to \(list). Allow it again from the page that needs it.")
+    }
+
     /// A clean-up sign-out that threw before it forgot or revoked anything, so the sign-in and the approval may both stand.
     static var signOutFailedTitle: String {
         String(localized: "MAPP’s Sign-In May Still Be Kept")
@@ -527,6 +537,28 @@ nonisolated struct ProblemWording: Hashable, Sendable {
         case .tryAgain: Action(action: action, title: String(localized: "Try Again"), isDestructive: false, needsServer: false)
         case .withdraw: Action(action: action, title: String(localized: "Undo Change"), isDestructive: true, needsServer: true)
         case .keep: Action(action: action, title: String(localized: "Keep Copy"), isDestructive: false, needsServer: false)
+        }
+    }
+}
+
+extension InstancePermission {
+    /// What holding the permission lets MAPP do, said as the Settings pages say it after "MAPP isn’t allowed to".
+    nonisolated var allowedTo: String {
+        switch self {
+        case .configManage: String(localized: "see and change this Marfa’s settings")
+        case .itemsPurge: String(localized: "list and permanently delete deleted items")
+        case .schemaWrite: String(localized: "choose a type’s icon and change a type’s fields")
+        case .auditRead: String(localized: "read the audit log")
+        case .backupsManage: String(localized: "list, make and restore backups")
+        case .blobsManage: String(localized: "manage files across this Marfa")
+        case .connectorsManage: String(localized: "manage connectors")
+        case .grantsManage: String(localized: "list, narrow and revoke other apps’ access")
+        case .instanceMaintain: String(localized: "update the server and run its housekeeping")
+        case .instanceRead: String(localized: "read the server’s health and status")
+        case .keysManage: String(localized: "list and revoke keys")
+        case .keysMint: String(localized: "make keys")
+        case .signInsManage: String(localized: "manage the owner’s sign-ins and passkeys")
+        case .webhooksManage: String(localized: "manage webhooks")
         }
     }
 }

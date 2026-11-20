@@ -91,6 +91,64 @@ import Testing
         #expect(adapter.grants.contains(.backupsManage))
     }
 
+    @Test func signingInAgainWithACodeKeepsWhatWasAllowedBefore() async throws {
+        let bench = try HostBench()
+        let (adapter, libraries, _) = try await connected(bench)
+        bench.signIns.script(browser: [.success("again")])
+        _ = await adapter.allowMore([.backupsManage])
+        bench.signIns.script(codeKey: "by-code")
+        await libraries.marfaSettings.start(.signInAgain(usingCode: true)).value
+        #expect(bench.signIns.calls.last == "code http://first.test:8210")
+        #expect(bench.signIns.asked.last?.contains(.backupsManage) == true, "the code asks for what the browser asks for")
+        #expect(adapter.grants == SystemSignIns.askedAtSignIn.union([.backupsManage]))
+        #expect(try bench.signIns.key(for: first.address) == "by-code")
+        #expect(libraries.host.notices.waiting.filter { $0.title == Words.permissionsLostTitle }.isEmpty)
+    }
+
+    @Test func anApprovalThatDropsAPermissionHeldIsToldAndTheNeedingPageAsksAgain() async throws {
+        let bench = try HostBench()
+        let (adapter, libraries, _) = try await connected(bench)
+        bench.signIns.script(browser: [.success("again")])
+        #expect(await adapter.allowMore([.backupsManage]) == .allowed)
+        // The owner unticks Backups on the approval page of a later sign-in.
+        bench.signIns.script(approving: [SystemSignIns.askedAtSignIn])
+        bench.signIns.script(browser: [.success("narrower")])
+        await libraries.marfaSettings.start(.signInAgain(usingCode: false)).value
+        let notice = try #require(libraries.host.notices.waiting.first { $0.title == Words.permissionsLostTitle })
+        #expect(notice.message == "MAPP is no longer allowed to list, make and restore backups. Allow it again from the page that needs it.")
+        #expect(!adapter.grants.contains(.backupsManage))
+        #expect(adapter.connection == .connected, "the page that asked is gated again by its missing permission")
+    }
+
+    @Test func anAllowMoreApprovedWithFewerThanHeldNamesEveryPermissionLost() async throws {
+        let bench = try HostBench()
+        let (adapter, libraries, _) = try await connected(bench)
+        bench.signIns.script(approving: [[.itemsPurge]])
+        bench.signIns.script(browser: [.success("narrower")])
+        #expect(await adapter.allowMore([.backupsManage]) == .approvedFewer)
+        let notice = try #require(libraries.host.notices.waiting.first { $0.title == Words.permissionsLostTitle })
+        #expect(notice.message.contains("see and change this Marfa’s settings"))
+        #expect(notice.message.contains("choose a type’s icon and change a type’s fields"))
+        #expect(!notice.message.contains("permanently delete"), "what is still held is not named")
+        #expect(adapter.grants == [.itemsPurge])
+    }
+
+    @Test func anApprovalOfFewerThanAskedThatKeepsEverythingHeldTellsNothing() async throws {
+        let bench = try HostBench()
+        let (adapter, libraries, _) = try await connected(bench)
+        bench.signIns.script(approving: [SystemSignIns.askedAtSignIn])
+        bench.signIns.script(browser: [.success("again")])
+        #expect(await adapter.allowMore([.backupsManage]) == .approvedFewer)
+        #expect(adapter.grants == SystemSignIns.askedAtSignIn)
+        #expect(libraries.host.notices.waiting.filter { $0.title == Words.permissionsLostTitle }.isEmpty)
+    }
+
+    @Test func everyPermissionAPageNeedsIsNamedTheSameWayWhereItIsLost() {
+        for page in MarfaSettingsPage.allCases {
+            #expect(page.permissionLine == "MAPP isn’t allowed to \(page.permission.allowedTo).")
+        }
+    }
+
     @Test func allowMoreNeverAsksForSignInsManageAtSignIn() async throws {
         let bench = try HostBench()
         let (_, _, _) = try await connected(bench)
@@ -105,14 +163,41 @@ import Testing
         await settings.load()
         let (adapter, libraries, _) = try await connected(bench, settings: settings)
         settings.draft[.name] = "Renamed"
+        // Plain http to another machine is told once a run, to whichever test connects first; it is not a handover.
+        let before = libraries.host.notices.waiting.count
         adapter.handOverDrafts()
         let notice = try #require(libraries.host.notices.waiting.last)
         #expect(notice.isNotKept)
         #expect(notice.text == "Name: Renamed")
         #expect(!settings.hasEdits)
-        let told = libraries.host.notices.waiting.count
+        #expect(libraries.host.notices.waiting.count == before + 1, "the draft is handed over once")
         adapter.handOverDrafts()
-        #expect(libraries.host.notices.waiting.count == told, "a second close has nothing more to hand over")
+        #expect(libraries.host.notices.waiting.count == before + 1, "a second close has nothing more to hand over")
+    }
+
+    @Test func quittingHandsAnUnsavedDraftToTheNoticesAndTheClipboard() async throws {
+        let bench = try HostBench()
+        let source = FakeInstanceConfig([.name: .text("Library")])
+        let settings = InstanceSettingsModel { .init(id: "https://marfa.test", source: source) }
+        await settings.load()
+        let defaults = try #require(UserDefaults(suiteName: "MarfaSettingsHostTests-\(UUID().uuidString)"))
+        let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) }, instanceSettings: settings)
+        let model = libraries.instanceSettings
+        model.draft[.name] = "Renamed on quit"
+        let before = libraries.host.notices.waiting.count
+        libraries.handOffDraftsAtQuit()
+        let notice = try #require(libraries.host.notices.waiting.last)
+        #expect(notice.isNotKept)
+        #expect(notice.text == "Name: Renamed on quit")
+        #expect(notice.message.contains("quit MAPP"))
+        #expect(!model.hasEdits)
+        #expect(libraries.host.notices.waiting.count == before + 1)
+        let copied = Mutex<[String]>([])
+        let quits = libraries.host.notices.tellBeforeQuitting(copying: { text in copied.withLock { $0.append(text) } }) { _ in }
+        #expect(quits)
+        #expect(copied.withLock { $0 } == ["Name: Renamed on quit"], "the text reaches the clipboard before the app goes")
+        libraries.handOffDraftsAtQuit()
+        #expect(libraries.host.notices.waiting.filter(\.isNotKept).isEmpty, "a draft already handed over is not handed over again")
     }
 
     @Test func aWriteTheServerRefusesKeepsWhatWasTypedWithItsReason() async throws {

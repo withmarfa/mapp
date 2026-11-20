@@ -44,7 +44,7 @@ struct MarfaDeletedItem: Identifiable, Hashable {
     var grants: Set<InstancePermission> { get }
 
     /// Signs in again, asking for the permissions already held and `permissions`. Cancelled, or approved with fewer than
-    /// asked, nothing changes.
+    /// asked, nothing is added; an approval that drops a permission held before is told to the owner.
     func allowMore(_ permissions: Set<InstancePermission>) async -> MarfaAllowMoreOutcome
     /// Whether an Allow More… is waiting on the owner.
     var isAllowingMore: Bool { get }
