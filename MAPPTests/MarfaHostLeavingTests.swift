@@ -124,8 +124,12 @@ import Testing
             try await host.disconnect()
             Issue.record("said the key and the copy were removed")
         } catch {
-            #expect("\(error)".contains("The keychain refused."), "\(error)")
-            #expect("\(error)".contains("copy"), "\(error)")
+            guard case .notRemoved(let signIn?, let copy?, _) = error else {
+                Issue.record("expected both the sign-in and the copy reported, got \(error)")
+                return
+            }
+            #expect(!signIn.isEmpty && !copy.isEmpty)
+            #expect(!signIn.contains("The keychain refused."), "the Keychain's own words stay in the log")
         }
     }
 }
