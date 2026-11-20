@@ -169,9 +169,11 @@ The sidebar is a list of sections. A new library has four, in one tab: the short
 - **A section's menu** (at its heading while customizing) has Show (which rows the section lists), Rename, Move Up, Move Down, Move to Tab (including a new tab) and Hide Section. A section's handle drags it onto another section of the tab. Hiding a built-in section keeps it, and Add Section brings it back; hiding a section of the person's own removes it. Add Section also adds a new section, alone or holding a collection or a source.
 - **Rows.** A section of Library, Views or the person's own can hold views, collections and sources. A row whose view, collection or source is gone, or has not synced yet, is left out and the section stays; the layout still holds it, so the row returns with it. A section that holds only its own places keeps the order of the sidebar's blocks (the Library's three, then Inbox, Recents and Favorites, then the saved views); once a row is dragged or moved into it, the section is one list in the person's order. Removing a section the person made frees the collections and sources in it to be added again. A row's context menu has Move to Section and Hide from Sidebar. The Types section lists top-level types while customizing.
 - **Shortcuts** are rows that act or go somewhere and never take the selection: New, Search, Settings, a place to go to, or a kind of item to create. A new library has New and Search; no shortcut makes an item of a type the person made. Add Shortcut adds one to the tab, and a shortcut's context menu removes it.
-- **A view's mark** is its symbol in its own color, with no tile: Inbox is blue, Favorites pink and the other views gray until the person chooses a color from the view's context menu or from Settings > Sidebar. The choice is kept on this Mac.
+- **A view's mark** is its symbol in its own color, with no tile: Inbox is blue, Favorites pink and the other views gray until the person chooses a color from the view's context menu. The choice is kept on this Mac.
 
 ### Settings > Sidebar
+
+August rejected this page on 19 November 2026: the sidebar is customized in place only, and the build of the new Settings removes it. It is described here while it is built.
 
 Settings > Sidebar (`SidebarSettings`) customizes the layout the sidebar reads, so it does what customizing in place does and no more. A change applies at once and is kept on this Mac, and the sidebar follows live; customizing in place while Settings is open shows the same state. `SidebarSettingsPlan` works out what each row says from the same `SidebarPlan` the sidebar reads, and the page has no copy of the layout.
 
@@ -244,7 +246,7 @@ Settings is a place in the sidebar. See [Settings storage](settings-storage.md) 
 - Push buttons are gray with no edge.
 - The density setting is in the Lists pane, after Appearance. Open Items In is in the same pane, in In Every List, after Group by.
 
-Settings keeps its structure: the app's sidebar, the Settings list, then the page. A page is a column of sections. Each section has its title outside one card of rows, and a row's description is one line, two at most. A page may have a line under its title (`SettingsPage.summary`). Sidebar is built to this ([Settings > Sidebar](#settings--sidebar)); the other pages are being redesigned to it ([Agreed designs](agreed-designs.md)).
+This describes Settings as built. It is agreed to become a window of its own, with its own sidebar and rules ([Agreed designs](agreed-designs.md#settings)).
 
 ## The list's rows
 
