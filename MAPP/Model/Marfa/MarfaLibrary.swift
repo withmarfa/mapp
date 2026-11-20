@@ -1049,7 +1049,12 @@ import Observation
         } ?? true
         if outdated { startSearch(key, at: revision, fill: fill) }
         let answered = held?.answered ?? false
-        let ids = answered ? held?.found.hits ?? [] : key.asksLeftOut ? [] : lastFound
+        // Until the answer arrives the last one stands, cut to what this narrowing admits, so a changed Type shows
+        // nothing of another type and the list does not empty and fill.
+        let ids = answered ? held?.found.hits ?? [] : key.asksLeftOut ? [] : lastFound.filter { id in
+            guard let item = records[id]?.item else { return false }
+            return key.narrowing.admitsType(item.type, in: catalogue) && key.narrowing.leftOutBy(item, in: catalogue) == nil
+        }
         var results = SearchResults(isIncomplete: held?.found.isIncomplete ?? false, isCapped: held?.found.isCapped ?? false)
         results.isPending = !answered
         for id in ids {
@@ -1110,20 +1115,23 @@ import Observation
         while searchOrder.count > 16 { searches[searchOrder.removeFirst()] = nil }
         let asked: Result<SearchTarget?, any Error> = Result { try target(for: key) }
         Task { [weak self, source] in
-            let found: Result<SourceSearch, any Error>
+            let found: Result<SourceSearch?, any Error>
             do {
                 // A narrowing that admits nothing is answered without asking the copy.
                 if let target = try asked.get() {
                     found = .success(try await source.search(key.query, in: target))
                 } else {
-                    found = .success(SourceSearch())
+                    found = .success(nil)
                 }
             } catch {
                 found = .failure(error)
             }
             guard let self else { return }
             switch found {
-            case .success(let result):
+            case .success(let answer):
+                // Nothing is asked of a narrowing that admits nothing, so how the copy stands is the only word on
+                // whether more would match once it is whole.
+                let result = answer ?? SourceSearch(isIncomplete: syncReport.fill.map { $0.state != .complete } ?? false)
                 searches[key] = SearchRun(revision: revision, found: result, running: false, answered: true, fill: fill)
                 if !key.asksLeftOut { lastFound = result.hits }
             case .failure(let error):

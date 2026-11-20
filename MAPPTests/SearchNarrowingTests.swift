@@ -42,9 +42,43 @@ import Testing
         #expect(expression.filter == nil)
     }
 
-    @Test func aTypeKeptWithoutItsSubtypesSkipsEachOneBelowIt() throws {
+    @Test func aTypeKeptWithoutItsSubtypesIsOneExactTypeCondition() throws {
         let expression = try narrowing(types: [F.ticket]).kept(in: F.catalogue)
-        #expect(expression.types == [F.ticket])
+        // The `types` key takes the subtree, so it stays empty and `type eq` names the type alone.
+        #expect(expression.types.isEmpty)
+        #expect(try conditions(expression.filter) == ["type eq aic.ticket"])
+    }
+
+    @Test func aTypeKeptWithoutItsSubtypesStaysOneConditionWhateverItsSubtreeHolds() throws {
+        let root = ItemTypeInfo(id: TypeID("t.root"), label: "Root", fields: [], titleField: nil, bodyField: nil, parent: nil)
+        let below = (0..<12).map {
+            ItemTypeInfo(id: TypeID("t.root.\($0)"), label: "Sub", fields: [], titleField: nil, bodyField: nil, parent: root.id)
+        }
+        let big = Catalogue(itemTypes: [root] + below)
+        let leave = SearchLeaveOut(sources: ["a", "b", "c"])
+        let expression = try narrowing(types: [root.id], leavingOut: leave).kept(in: big)
+        #expect(expression.types.isEmpty)
+        #expect(try conditions(expression.filter) == ["type eq t.root", "source neq a", "source neq b", "source neq c"])
+    }
+
+    @Test func aTypeKeptWithoutItsSubtypesThatIsLeftOutMatchesNothing() throws {
+        let leave = SearchLeaveOut(types: [F.ticket])
+        #expect(try narrowing(types: [F.ticket], leavingOut: leave).kept(in: F.catalogue).matchesNothing)
+        // A type with no subtypes below it, left out through a type above it, keeps the plain form: the copy answers none.
+        let leaf = try narrowing(types: [F.bug], leavingOut: SearchLeaveOut(types: [F.ticket])).kept(in: F.catalogue)
+        #expect(leaf.types == [F.bug])
+        #expect(try conditions(leaf.filter) == ["type neq aic.ticket.bug"])
+    }
+
+    @Test func tooManyConditionsAreToldAsTheirOwnCause() {
+        let message = SearchNarrowing.Refusal.tooManyConditions.message
+        #expect(message.contains("chosen"), "the chosen types count too, so the message must not blame the leave-out alone")
+        #expect(message.contains("left out"))
+    }
+
+    @Test func severalTypesWithoutSubtypesStillSkipEachSubtype() throws {
+        let expression = try narrowing(types: [F.ticket, F.project]).kept(in: F.catalogue)
+        #expect(expression.types == [F.ticket, F.project])
         #expect(try conditions(expression.filter) == ["type neq aic.ticket.bug", "type neq aic.ticket.task"])
     }
 
@@ -125,10 +159,25 @@ import Testing
 
     @Test func theLeftOutSearchKeepsTheChosenTypesAsTheTypesKey() throws {
         let leave = SearchLeaveOut(types: [F.bug, F.project])
-        let expression = try narrowing(types: [F.ticket], leavingOut: leave).leftOutOfSearch(in: F.catalogue)
+        let expression = try narrowing(types: [F.ticket], withSubtypes: [F.ticket], leavingOut: leave).leftOutOfSearch(in: F.catalogue)
         #expect(expression.types == [F.ticket])
         // The project is not under the ticket, so only the bug is asked for.
         #expect(try conditions(expression.filter) == ["type eq aic.ticket.bug"])
+        // Without Include Subtypes the bug is not among the items chosen, so nothing left out can match.
+        #expect(try narrowing(types: [F.ticket], leavingOut: leave).leftOutOfSearch(in: F.catalogue).matchesNothing)
+    }
+
+    @Test func theLeftOutSearchOfOneTypeAloneNamesThatTypeExactlySoItsSubtypesDoNotFillTheCap() throws {
+        // One source left out: both conditions are ANDed, so the copy answers only the type's own items.
+        let source = try narrowing(types: [F.ticket], leavingOut: SearchLeaveOut(sources: ["github"])).leftOutOfSearch(in: F.catalogue)
+        #expect(source.types.isEmpty)
+        #expect(try conditions(source.filter) == ["type eq aic.ticket", "source eq github"])
+        #expect(try #require(source.filter).contains(" AND "))
+        // The type itself left out: every one of its own items is left out, whatever the sources.
+        let leaveType = SearchLeaveOut(types: [F.ticket], sources: ["github", "other"])
+        let own = try narrowing(types: [F.ticket], leavingOut: leaveType).leftOutOfSearch(in: F.catalogue)
+        #expect(own.types.isEmpty)
+        #expect(try conditions(own.filter) == ["type eq aic.ticket"])
     }
 
     @Test func nothingLeftOutMeansNothingToAsk() throws {
@@ -245,6 +294,44 @@ import Testing
         guard case .items(_, let filter, let limit) = target else { Issue.record("not an items search"); return }
         #expect(filter == "source eq \"github\"")
         #expect(limit == SearchResults.leftOutLimit)
+    }
+
+    @Test func whileANarrowedSearchIsPendingTheLastAnswerShowsOnlyWhatTheNarrowingAdmits() async throws {
+        let source = FakeItemSource()
+        let library = MarfaLibrary(source: source, notices: Notices())
+        source.send(.loaded(SourceSnapshot(items: LibraryFixture.items, catalogue: LibraryFixture.catalogue)))
+        try #require(await eventually { library.isLoaded })
+        source.hits.withLock { $0["body"] = [LibraryFixture.n1, LibraryFixture.p1] }
+        let first = await settled(library) { library.search("body", narrowedBy: SearchNarrowing()) }
+        #expect(first.items.map(\.id) == [LibraryFixture.n1, LibraryFixture.p1])
+
+        // The new key has no answer yet: the earlier one stands, cut to the project.
+        let narrowing = SearchNarrowing(types: [LibraryFixture.project])
+        let pending = library.search("body", narrowedBy: narrowing)
+        #expect(pending.isPending)
+        #expect(pending.items.map(\.id) == [LibraryFixture.p1])
+        // Excluding the project reads the same way.
+        let excluding = library.search("body", narrowedBy: SearchNarrowing(types: [LibraryFixture.project], excludesTypes: true))
+        #expect(excluding.items.map(\.id) == [LibraryFixture.n1])
+    }
+
+    @Test func aNarrowingThatAdmitsNothingIsNotCompleteWhileTheCopyIsFilling() async throws {
+        let source = FakeItemSource()
+        source.report.update { $0.fill = LibraryFill(state: .filling, listed: 1, expected: 9) }
+        let library = MarfaLibrary(source: source, notices: Notices())
+        source.send(.loaded(SourceSnapshot(items: LibraryFixture.items, catalogue: LibraryFixture.catalogue)))
+        try #require(await eventually { library.isLoaded })
+        let nothing = SearchNarrowing(types: [TypeID("gone.type")])
+        let filling = await settled(library) { library.search("alpha", narrowedBy: nothing) }
+        #expect(filling.items.isEmpty)
+        #expect(filling.isIncomplete, "a copy still filling may hold items the narrowing admits")
+
+        source.report.update { $0.fill = LibraryFill(state: .complete, listed: 9, expected: 9) }
+        #expect(await eventually {
+            let whole = library.search("alpha", narrowedBy: nothing)
+            return !whole.isPending && !whole.isIncomplete
+        })
+        #expect(source.searches.withLock { $0 } == 0, "a narrowing that admits nothing asks the copy nothing")
     }
 
     // MARK: A real copy answers the filter

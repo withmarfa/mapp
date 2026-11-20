@@ -25,9 +25,10 @@ nonisolated struct SearchLeaveOut: Codable, Hashable, Sendable {
 /// lists is counted after them. Nothing here matches an item: it only words the types and sources as the copy's filter
 /// grammar takes them (`search-and-filters.md`).
 ///
-/// The grammar's `types` key takes each type with its subtypes and its `type` field compares one identifier alone, so a
-/// type kept without its subtypes, and a type left out with its own, are written as `type neq` conditions for the
-/// types below it. A filter joins its conditions with one of `AND` or `OR` and holds at most ten.
+/// The grammar's `types` key takes each type with its subtypes and its `type` field compares one identifier alone. One
+/// type kept without its subtypes is therefore one `type eq` condition, and several, or a type left out with its own,
+/// are `type neq` conditions for the types below them. A filter joins its conditions with one of `AND` or `OR` and
+/// holds at most ten.
 nonisolated struct SearchNarrowing: Hashable, Sendable {
     /// The types a search is limited to, or, with `excludesTypes`, the types it skips.
     var types: Set<TypeID> = []
@@ -60,7 +61,7 @@ nonisolated struct SearchNarrowing: Hashable, Sendable {
         var message: String {
             switch self {
             case .tooManyTypes: String(localized: "A search can limit itself to ten types at most.")
-            case .tooManyConditions: String(localized: "More types and sources are left out of search than one search can skip.")
+            case .tooManyConditions: String(localized: "The types and sources chosen and left out make more conditions than one search can hold.")
             case .refused(let message): message
             }
         }
@@ -79,6 +80,12 @@ nonisolated struct SearchNarrowing: Hashable, Sendable {
             included = types.intersection(catalogue.itemTypes.keys)
             guard !included.isEmpty else { return Expression(matchesNothing: true) }
             guard included.count <= Self.maxTypes else { throw Refusal.tooManyTypes }
+            if let only = exactType(in: catalogue) {
+                // One `type eq` condition however many subtypes it has; the `types` key would take them too.
+                guard !excluded.contains(only) else { return Expression(matchesNothing: true) }
+                let conditions = [Self.condition(.type, .eq, only.rawValue)] + leaveOut.sources.sorted().map { Self.condition(.source, .neq, $0) }
+                return Expression(filter: try Self.text(of: conditions, join: .all))
+            }
             let below = included.reduce(into: Set<TypeID>()) { $0.formUnion(Self.subtree(of: $1, in: catalogue)) }
             let admitted = included.reduce(into: included) { held, type in
                 if typesWithSubtypes.contains(type) { held.formUnion(catalogue.descendants(of: type)) }
@@ -103,6 +110,19 @@ nonisolated struct SearchNarrowing: Hashable, Sendable {
             included = types.intersection(catalogue.itemTypes.keys)
             guard !included.isEmpty else { return Expression(matchesNothing: true) }
             guard included.count <= Self.maxTypes else { throw Refusal.tooManyTypes }
+            if let only = exactType(in: catalogue) {
+                // The filter joins with `OR`, so the type's own items are asked for by `AND` where one condition
+                // says what is left out: the type itself, or a single source. Several sources fall through to the
+                // `types` key and `admitsType`.
+                if leftOutTypes(in: catalogue).contains(only) {
+                    return Expression(filter: try Self.text(of: [Self.condition(.type, .eq, only.rawValue)], join: .all))
+                }
+                guard !leaveOut.sources.isEmpty else { return Expression(matchesNothing: true) }
+                if leaveOut.sources.count == 1, let source = leaveOut.sources.first {
+                    let conditions = [Self.condition(.type, .eq, only.rawValue), Self.condition(.source, .eq, source)]
+                    return Expression(filter: try Self.text(of: conditions, join: .all))
+                }
+            }
             reached = included.reduce(into: Set<TypeID>()) { $0.formUnion(Self.subtree(of: $1, in: catalogue)) }
         }
         let leftOut = leftOutTypes(in: catalogue).intersection(reached ?? Set(catalogue.itemTypes.keys))
@@ -141,6 +161,14 @@ nonisolated struct SearchNarrowing: Hashable, Sendable {
     /// The types left out with every type below them.
     private func leftOutTypes(in catalogue: Catalogue) -> Set<TypeID> {
         leaveOut.types.reduce(into: Set<TypeID>()) { $0.formUnion(Self.subtree(of: $1, in: catalogue)) }
+    }
+
+    /// The one type a search is limited to, taken without its subtypes and with subtypes below it to skip, or nil.
+    private func exactType(in catalogue: Catalogue) -> TypeID? {
+        guard !excludesTypes, types.count == 1, let only = types.first, catalogue.itemTypes[only] != nil,
+            !typesWithSubtypes.contains(only), !catalogue.descendants(of: only).isEmpty
+        else { return nil }
+        return only
     }
 
     private static func subtree(of type: TypeID, in catalogue: Catalogue) -> Set<TypeID> {
