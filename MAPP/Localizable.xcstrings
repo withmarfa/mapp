@@ -52,6 +52,75 @@
     "Color" : {
 
     },
+    "Couldn’t Confirm the Sign-In" : {
+
+    },
+    "Couldn’t Sign In" : {
+
+    },
+    "Switched Servers, but MAPP May Still Be Approved on the Previous One" : {
+
+    },
+    "MAPP May Still Be Approved" : {
+
+    },
+    "MAPP forgot the previous server’s sign-in on this Mac, but couldn’t confirm that %@ ended the approval." : {
+
+    },
+    "MAPP dropped a sign-in it didn’t use, but couldn’t confirm that %@ ended its approval." : {
+
+    },
+    "To end it, run “marfa apps list” with the command line signed in to %@ as the owner, find MAPP’s entry, then run “marfa apps revoke <id>”." : {
+
+    },
+    "The copy of your library on this Mac is damaged, so MAPP can’t open it." : {
+
+    },
+    "The copy is in the folder “%@”." : {
+
+    },
+    "It holds no changes that haven’t reached the server." : {
+
+    },
+    "MAPP couldn’t read whether it holds changes that haven’t reached the server." : {
+
+    },
+    "MAPP started to set the damaged copy aside and stopped partway. Open the library again to finish it." : {
+
+    },
+    "Run “marfa apps list” with the command line signed in to %@ as the owner. Use the approval date to identify the earlier MAPP approval. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID." : {
+
+    },
+    "MAPP couldn’t make or open the copy of your library on this Mac. Check that MAPP can change its own files, then try again." : {
+
+    },
+    "Couldn’t Finish Signing In" : {
+
+    },
+    "MAPP couldn’t finish signing in. Check your connection and try again, or sign in with a code." : {
+
+    },
+    "Sign in to the previous server again to see them." : {
+
+    },
+    "MAPP’s Sign-In May Still Be Kept" : {
+
+    },
+    "MAPP couldn’t drop a sign-in it didn’t use, so the sign-in may still be kept on this Mac and the approval may stand at %@." : {
+
+    },
+    "MAPP ran into a problem it can’t resolve itself. Choose Refresh to try again." : {
+
+    },
+    "There isn’t enough room on this Mac for the copy of your library. Free some space, then try again." : {
+
+    },
+    "MAPP couldn’t reach the server. Check your connection, then try again." : {
+
+    },
+    "This address reaches a different Marfa server from the one this library was made for, so MAPP left the library as it was." : {
+
+    },
     "Customize Sidebar…" : {
 
     },
@@ -139,6 +208,9 @@
     "MAPP Help" : {
 
     },
+    "MAPP needs a window to show the server’s sign-in page over. Open a MAPP window, then try again, or use a code instead." : {
+
+    },
     "Marfa Documentation" : {
 
     },
@@ -167,6 +239,9 @@
 
     },
     "No sections in this tab." : {
+
+    },
+    "No Window to Sign In From" : {
 
     },
     "Nothing from this source yet." : {
@@ -238,6 +313,9 @@
     "Show %lld" : {
 
     },
+    "Something went wrong while signing in, so nothing changed. Try again, or use a code if the browser won’t open." : {
+
+    },
     "Sources show where items came from." : {
 
     },
@@ -251,6 +329,21 @@
 
     },
     "Teal" : {
+
+    },
+    "That address isn’t a Marfa server MAPP can sign in to. Check the address, then try again." : {
+
+    },
+    "MAPP couldn’t verify the approval. Try signing in again." : {
+
+    },
+    "MAPP’s Earlier Approval May Still Stand" : {
+
+    },
+    "The editor ran into a problem, so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again." : {
+
+    },
+    "The server wouldn’t approve MAPP, so nothing changed. Check that you are signing in to the right server and account, then try again." : {
 
     },
     "What’s New in MAPP" : {
@@ -367,6 +460,9 @@
 
     },
     "The collection is deleted for every app connected to your Marfa server." : {
+
+    },
+    "MAPP couldn’t confirm that %@ ended MAPP’s earlier approval." : {
 
     },
     "Your items are still loading." : {
@@ -2289,7 +2385,7 @@
     "Disconnect…" : {
 
     },
-    "Disconnected, but MAPP Is Still Approved" : {
+    "Disconnected, but MAPP May Still Be Approved" : {
       "extractionState" : "manual"
     },
     "Disconnected, but Not Everything Was Removed" : {
@@ -2987,7 +3083,7 @@
     "MAPP closed the library before it could keep your change. Make the change again." : {
       "extractionState" : "manual"
     },
-    "MAPP couldn’t finish signing in. Check the address and your connection, then try again, or use a code if the browser won’t open." : {
+    "MAPP couldn’t reach that address, so nothing changed. Check the address and your connection, then try again." : {
       "extractionState" : "manual"
     },
     "MAPP couldn’t get the file from the server. Check your connection, then try again." : {
@@ -3008,7 +3104,7 @@
     "MAPP doesn’t have permission for “%@”. Ask whoever runs the server to allow it, then make the change again." : {
       "extractionState" : "manual"
     },
-    "MAPP forgot its sign-in on this Mac, but couldn’t reach the server to end it there. To end it, open Connected apps from Home on the server, choose MAPP and select Disconnect." : {
+    "MAPP forgot its sign-in on this Mac, but couldn’t confirm that %@ ended the approval." : {
       "extractionState" : "manual"
     },
     "MAPP is still saving what you last typed. Try again in a moment." : {
@@ -3273,9 +3369,6 @@
     },
     "Note" : {
 
-    },
-    "Nothing changed." : {
-      "extractionState" : "manual"
     },
     "Nothing has changed since." : {
 
@@ -4159,9 +4252,6 @@
     "The date couldn’t be saved." : {
       "extractionState" : "manual"
     },
-    "The editor ran into a problem (“%@”), so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again." : {
-
-    },
     "The editor stopped responding, so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again." : {
 
     },
@@ -4933,7 +5023,7 @@
     "Yesterday" : {
 
     },
-    "You are signed in again, but the copy of your library on this Mac can’t be opened." : {
+    "MAPP kept the new sign-in, but the copy of your library on this Mac can’t be opened." : {
       "extractionState" : "manual"
     },
     "You can bring them back from Recently Deleted." : {

@@ -1,7 +1,8 @@
 import Foundation
 import Marfa
-import Synchronization
 import Observation
+import Synchronization
+import os
 
 /// The Marfa library the app is connected to, from the address the person gives and the sign-in they make to it.
 /// The address is kept in defaults, the sign-in by the package in the Keychain, and the copy in its own directory, so a launch
@@ -55,14 +56,15 @@ import Observation
         case signIn(SignInOutcome)
         /// The connection was left, but its sign-in is still in the Keychain, or the copy the person discarded is
         /// still on disk, or both; each message says why. A discarded copy is never opened as it is:
-        /// connecting its address again removes it first, or fails with this.
-        case notRemoved(signIn: String?, copy: String?)
-        /// The connection was left and the sign-in forgotten on this Mac, but the server could not be reached to end
-        /// the approval, which stands there until the owner ends it.
-        case notRevoked
+        /// connecting its address again removes it first, or fails with this. `approvalAt` is the address of the
+        /// server left where the sign-out also could not confirm it ended the approval.
+        case notRemoved(signIn: String?, copy: String?, approvalAt: String? = nil)
+        /// The connection to the server at `address` was left and the sign-in forgotten on this Mac, but MAPP could not
+        /// confirm that the server ended the approval, which may stand there until the owner ends it.
+        case notRevoked(address: String)
         /// The copy was not removed, and is no longer marked to go: the package would not remove it. `signIn` is why
-        /// the sign-in is still in the Keychain, where it is.
-        case copyKept(CopyKept, signIn: String?)
+        /// the sign-in is still in the Keychain, where it is. `approvalAt` is as for `notRemoved`.
+        case copyKept(CopyKept, signIn: String?, approvalAt: String? = nil)
         /// The person chose to discard a copy whose changes were not counted for them, which the package never
         /// removes. Nothing was left; `folder` is where the copy is, for the person to remove.
         case cannotDiscard(folder: String)
@@ -279,9 +281,9 @@ import Observation
     /// Signs in to the server at `address`, keeping the sign-in once the copy opens. Connecting while connected
     /// changes the address, or only signs in again where the address is the same.
     func connect(address: String, via method: SignInMethod) async throws(Problem) {
-        let connection = try Self.validated(address)
+        let connection = try typed(address)
         if let current = self.connection {
-            if current == connection { return try await signInAgain(via: method) }
+            if current.sameServer(as: connection) { return try await signInAgain(via: method) }
             return try await changeAddress(to: address, via: method)
         }
         try begin()
@@ -396,9 +398,9 @@ import Observation
     /// the person's `choice`, asked for again when more arrive while the new copy opens. The new copy is opened
     /// before this one is left, so a failure leaves things as they were.
     func changeAddress(to address: String, via method: SignInMethod, choice: DisconnectChoice? = nil) async throws(Problem) {
-        let connection = try Self.validated(address)
+        let connection = try typed(address)
         guard let old = self.connection else { return try await connect(address: address, via: method) }
-        if connection == old { return try await signInAgain(via: method) }
+        if connection.sameServer(as: old) { return try await signInAgain(via: method) }
         try begin()
         defer { isBusy = false }
         // Taken at once, so a step that stops before the approval is used or dropped does not leave it live.
@@ -422,7 +424,7 @@ import Observation
             if let kept { await endSignIn(of: kept) }
             throw error
         }
-        if kept == connection, await holdsSignIn(for: connection) {
+        if let kept, kept.sameServer(as: connection), await holdsSignIn(for: connection) {
             // The person has answered the question put after this sign-in, so it is used and not made again.
         } else {
             if let kept { await endSignIn(of: kept) }
@@ -468,6 +470,8 @@ import Observation
         remember(connection)
         attach(opened, for: connection)
         forgetName(of: old)
+        // The old sign-in is ended only here: a same-origin address returned above as Sign In Again, so the package's
+        // origin-keyed sign-in is never one the new connection shares.
         if let problem = await finishLeaving(old, agreed: agreed) { throw problem }
     }
 
@@ -502,7 +506,8 @@ import Observation
         isBusy = true
     }
 
-    private static func validated(_ address: String) throws(Problem) -> MarfaConnection {
+    /// The address the person typed, as entered: each spelling of an address is its own copy.
+    private func typed(_ address: String) throws(Problem) -> MarfaConnection {
         do {
             return try MarfaConnection(address: address)
         } catch {
@@ -514,17 +519,21 @@ import Observation
     private func signIn(to connection: MarfaConnection, via method: SignInMethod) async throws(Problem) {
         isSigningIn = true
         defer { isSigningIn = false }
+        let signedIn: SignedIn
         do {
             switch method {
             case .browser:
-                try await signIns.signInWithBrowser(to: connection)
+                signedIn = try await signIns.signInWithBrowser(to: connection)
             case .code(let shown):
                 let code = try await signIns.startCodeSignIn(to: connection)
                 shown(code)
-                try await code.finish()
+                signedIn = try await code.finish()
             }
         } catch {
             throw .signIn(SignInOutcome(error))
+        }
+        if signedIn.replacedApprovalStands {
+            notices.tell(Words.replacedApprovalTitle, Words.replacedApproval(address: connection.address.absoluteString))
         }
     }
 
@@ -534,9 +543,19 @@ import Observation
         return held != nil
     }
 
-    /// Ends a sign-in made for a step that was abandoned. The server is told where it can be.
+    /// Ends a sign-in made for a step that was abandoned. The server is told where it can be; where it could not
+    /// confirm the approval ended, or the sign-out did not run, the person is told how to end it.
     func endSignIn(of connection: MarfaConnection) async {
-        _ = try? await signIns.signOut(of: connection)
+        let address = connection.address.absoluteString
+        do {
+            if try await signIns.signOut(of: connection) == .notConfirmed {
+                notices.tell(Words.approvalMayStandTitle(.abandoned), Words.approvalMayStand(.abandoned, address: address))
+            }
+        } catch {
+            // A string logged without a privacy level is private.
+            Telemetry.logger(.library).error("A clean-up sign-out did not run: \(String(describing: error))")
+            notices.tell(Words.signOutFailedTitle, Words.signOutFailed(address: address))
+        }
     }
 
     #if DEBUG
@@ -636,9 +655,10 @@ import Observation
     }
 
     /// Takes a save made in This Marfa: reads the server's name again where it changed, and gives the open library
-    /// the server's answer, for the server the windows show.
-    func instanceSaved(_ answer: InstanceConfig, changing settings: Set<InstanceSetting>) {
-        guard let connection, connection == configuredConnection else { return }
+    /// the server's answer, for the server the windows show. A save sent to `address` that
+    /// answers after the app has moved to another server is dropped.
+    func instanceSaved(_ answer: InstanceConfig, changing settings: Set<InstanceSetting>, of address: String) {
+        guard let connection, connection.address.absoluteString == address else { return }
         if settings.contains(.name) { readName(of: connection) }
         library?.take(answer)
     }
@@ -665,8 +685,14 @@ import Observation
         library = nil
     }
 
+    /// What to tell of an error a step met. What a package error or the system said is never shown: the detail goes
+    /// to the log, and the person is told what MAPP could not do.
     static func message(_ error: any Error) -> String {
-        (error as? MarfaError).map(Words.message(for:)) ?? error.localizedDescription
+        if let error = error as? MarfaError { return Words.message(for: error) }
+        // A string logged without a privacy level is private.
+        Telemetry.logger(.library).error("A library step failed: \(String(describing: error))")
+        if error is SignInError || error is any KeychainRefusal { return Words.signInUnreadable }
+        return Words.copyCouldNotBeOpened
     }
 
     /// The plain http origins the person has been told of in this run, since the package keeps no state.

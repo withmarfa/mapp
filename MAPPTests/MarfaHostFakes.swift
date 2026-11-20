@@ -230,7 +230,9 @@ nonisolated extension MarfaHost.DisconnectChoice {
     }
 
     /// A host that removes nothing outside its own copy: `cleaner` stands for the kept files and cached pictures, which a test must not touch.
-    func host(opener: MarfaHost.Opener? = nil, remover: MarfaHost.Remover? = nil, cleaner: MarfaHost.Cleaner? = nil) -> MarfaHost {
+    func host(
+        opener: MarfaHost.Opener? = nil, remover: MarfaHost.Remover? = nil, cleaner: MarfaHost.Cleaner? = nil
+    ) -> MarfaHost {
         MarfaHost(
             defaults: defaults, signIns: signIns, location: location, opener: opener ?? servers.opener, describer: servers.describer,
             remover: remover ?? { try await MarfaHost.removeStore($0, agreedToLose: $1) }, cleaner: cleaner ?? {})

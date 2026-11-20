@@ -219,12 +219,13 @@ extension EditorTests {
 
     /// A page whose flush fails for any reason but a composition, an import or a reload held back by either is not
     /// asked again for the flush's limit:
-    /// the person is told once, at once and with the page's own message, and trying again goes ahead without the page.
+    /// the person is told once, at once and with the recovery step alone, never the page's own text, which is logged,
+    /// and trying again goes ahead without the page.
     @Test(arguments: [
         "throw new TypeError('the flush broke')",
         "return { commandError: 'internal', message: 'the flush broke' }",
     ])
-    func aFlushThatFailsInThePageIsToldWithItsOwnMessageNotAskedAgain(failure: String) async throws {
+    func aFlushThatFailsInThePageIsToldWithoutThePagesTextAndNotAskedAgain(failure: String) async throws {
         let library = FakeItemLibrary()
         let note = library.add("Note\n")
         let page = try await Page(library: library)
@@ -235,7 +236,12 @@ extension EditorTests {
         #expect(!kept)
         #expect(try await page.editor.webView.evaluateJavaScript("window.asked") as? Int == 1)
         let messages = library.notices.waiting.map(\.message)
-        #expect(messages.count == 1 && messages[0].contains("the flush broke"), "\(messages)")
+        #expect(messages.count == 1, "\(messages)")
+        let message = try #require(messages.first)
+        for raw in ["the flush broke", "TypeError", "Error", "internal", "“"] {
+            #expect(!message.contains(raw), "“\(message)” shows “\(raw)”")
+        }
+        #expect(message.hasSuffix("To go ahead without it, try again."))
         #expect(library.notices.waiting.first?.title == "Couldn’t Save “Note”")
         // Time for anything the page's error listener posts to arrive, which nothing signals when it does not.
         try await Task.sleep(for: .milliseconds(200))

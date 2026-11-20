@@ -208,6 +208,16 @@ struct MarfaSyncLifecycleTests {
         await source.close()
     }
 
+    /// A full disk the package reports as a wait is not an unreachable server: it is shown as stopped, in the words for a full disk.
+    @Test func aFullDiskReportedWhileSyncingIsNotToldAsAnUnreachableServer() async throws {
+        let refresh = ScriptedRefresh(status: ScriptedRefresh.complete())
+        let (fake, source, _) = try await scriptedSource(refreshing: refresh)
+        fake.sendUpdate(update(.offline(.storageFull(message: "SQLITE_FULL"))))
+        #expect(await waitForConnection(source) { $0 == .unavailable(message: Words.storageFull) })
+        #expect(Words.storageFull != Words.serverUnreachable)
+        await source.close()
+    }
+
     /// The package waits for a person's Refresh after a fault in the first fill, rather than trying it again.
     @Test func aFirstFillThatFailedOnAFaultIsNotFilledAgainByItself() async throws {
         let refresh = ScriptedRefresh(status: ScriptedRefresh.complete())
@@ -336,7 +346,7 @@ struct MarfaSyncLifecycleTests {
         await sync.refresh()
         try await Task.sleep(for: .milliseconds(200))
         #expect(unavailable(log.current) == 1)
-        #expect(source.connectionState == .unavailable(message: error.message))
+        #expect(source.connectionState == .unavailable(message: Words.message(for: error)))
         await source.close()
     }
 

@@ -57,7 +57,7 @@ import os
         typeLooks = TypeLooks(defaults: defaults)
         marfaSettings = MarfaSettingsModel(host: host)
         instanceSettings = InstanceSettingsModel(provider: { [host] in host.instanceConfigTarget() })
-        instanceSettings.onSaved = { [host] answer, settings in host.instanceSaved(answer, changing: settings) }
+        instanceSettings.onSaved = { [host] answer, settings, address in host.instanceSaved(answer, changing: settings, of: address) }
         isLaunching = host.configuredConnection != nil
         host.handOverEdits = { [weak self] in await self?.flushEditors() ?? false }
         LaunchTrace.shared.mark(.librariesInit, note: isLaunching ? "server set" : "no server")

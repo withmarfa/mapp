@@ -1,5 +1,6 @@
 import Foundation
 import Marfa
+import os
 
 /// What the window says of how the library stands with its server, in the app's words. The model gives states
 /// and counts; this turns them into sentences, with no view in it, so each is tested as state in, words out.
@@ -217,17 +218,125 @@ nonisolated enum Words {
         String(localized: "MAPP couldn’t read this library’s sign-in from the Keychain. Unlock the Keychain and quit and reopen MAPP, or sign in again in Settings.")
     }
 
+    /// How the owner ends an approval the server at `address` may still hold: only they can, with the command line
+    /// signed in to that address.
+    private static func endApproval(at address: String) -> String {
+        String(localized: "To end it, run “marfa apps list” with the command line signed in to \(address) as the owner, find MAPP’s entry, then run “marfa apps revoke <id>”.")
+    }
+
+    /// A sign-in that replaced another on the same server, where MAPP could not confirm the older approval ended.
+    static var replacedApprovalTitle: String {
+        String(localized: "MAPP’s Earlier Approval May Still Stand")
+    }
+
+    static func replacedApproval(address: String) -> String {
+        String(localized: "MAPP couldn’t confirm that \(address) ended MAPP’s earlier approval.") + " " + String(localized: "Run “marfa apps list” with the command line signed in to \(address) as the owner. Use the approval date to identify the earlier MAPP approval. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID.")
+    }
+
+    /// A clean-up sign-out that threw before it forgot or revoked anything, so the sign-in and the approval may both stand.
+    static var signOutFailedTitle: String {
+        String(localized: "MAPP’s Sign-In May Still Be Kept")
+    }
+
+    static func signOutFailed(address: String) -> String {
+        String(localized: "MAPP couldn’t drop a sign-in it didn’t use, so the sign-in may still be kept on this Mac and the approval may stand at \(address).") + " " + endApproval(at: address)
+    }
+
+    /// A sign-in MAPP dropped, or forgot on this Mac, whose approval it could not confirm the server ended.
+    enum ForgottenApproval {
+        /// The sign-in of the server the person left.
+        case left
+        /// The sign-in of the server the person switched away from.
+        case previous
+        /// A sign-in made for a step that did not go on, such as a switch that was abandoned.
+        case abandoned
+    }
+
+    static func approvalMayStandTitle(_ which: ForgottenApproval) -> String {
+        switch which {
+        case .left: String(localized: "Disconnected, but MAPP May Still Be Approved")
+        case .previous: String(localized: "Switched Servers, but MAPP May Still Be Approved on the Previous One")
+        case .abandoned: String(localized: "MAPP May Still Be Approved")
+        }
+    }
+
+    /// `address` is the server whose approval may stand: after a switch, the previous one.
+    static func approvalMayStand(_ which: ForgottenApproval, address: String) -> String {
+        let told = switch which {
+        case .left:
+            String(localized: "MAPP forgot its sign-in on this Mac, but couldn’t confirm that \(address) ended the approval.")
+        case .previous:
+            String(localized: "MAPP forgot the previous server’s sign-in on this Mac, but couldn’t confirm that \(address) ended the approval.")
+        case .abandoned:
+            String(localized: "MAPP dropped a sign-in it didn’t use, but couldn’t confirm that \(address) ended its approval.")
+        }
+        return told + " " + endApproval(at: address)
+    }
+
+    /// The copy could not be opened or made, for a reason the package did not name.
+    static var copyCouldNotBeOpened: String {
+        String(localized: "MAPP couldn’t make or open the copy of your library on this Mac. Check that MAPP can change its own files, then try again.")
+    }
+
+    /// The copy's file is damaged. It says where the copy is, what it holds that no server has taken (`unsent` is nil
+    /// where the queue could not be read), and, when setting the damaged copy aside stopped partway, that opening the
+    /// library again finishes it.
+    static func storeDamaged(folder: String?, unsent: UInt64?, setAsideStopped: Bool) -> String {
+        var parts = [String(localized: "The copy of your library on this Mac is damaged, so MAPP can’t open it.")]
+        if let folder { parts.append(String(localized: "The copy is in the folder “\(folder)”.")) }
+        switch unsent {
+        case let count? where count > 0: parts.append(notSent(Int(clamping: count)))
+        case 0?: parts.append(String(localized: "It holds no changes that haven’t reached the server."))
+        default: parts.append(String(localized: "MAPP couldn’t read whether it holds changes that haven’t reached the server."))
+        }
+        if setAsideStopped {
+            parts.append(String(localized: "MAPP started to set the damaged copy aside and stopped partway. Open the library again to finish it."))
+        }
+        return parts.joined(separator: " ")
+    }
+
     /// A server whose release is older than the oldest this build works with. Asking again cannot clear it, so
     /// the words say to update the server, never what the server said.
     static func serverTooOld(served: String, oldest: String) -> String {
         String(localized: "This server runs Marfa \(served). Update the server to Marfa \(oldest) or later to use this app.")
     }
 
-    /// What to show a person of an error the package raised: the words above for one the app words itself,
-    /// the package's own for the rest.
+    /// The server or the copy stopped a step for a reason MAPP can't resolve itself.
+    static var syncFailed: String {
+        String(localized: "MAPP ran into a problem it can’t resolve itself. Choose Refresh to try again.")
+    }
+
+    /// There is not enough room on this Mac for the copy.
+    static var storageFull: String {
+        String(localized: "There isn’t enough room on this Mac for the copy of your library. Free some space, then try again.")
+    }
+
+    /// The address reaches another Marfa server than the one the open library was made for, which a new sign-in cannot change.
+    static var differentServer: String {
+        String(localized: "This address reaches a different Marfa server from the one this library was made for, so MAPP left the library as it was.")
+    }
+
+    /// The server could not be reached.
+    static var serverUnreachable: String {
+        String(localized: "MAPP couldn’t reach the server. Check your connection, then try again.")
+    }
+
+    /// What to show a person of an error the package raised, in the app's words: what the package, the system or the
+    /// server said goes to the log and is never shown.
     static func message(for error: MarfaError) -> String {
+        // A string logged without a privacy level is private.
+        Telemetry.logger(.library).error("A package step failed: \(String(describing: error))")
         if case .serverTooOld(let served, let oldest, _) = error { return serverTooOld(served: served, oldest: oldest) }
-        return error.message
+        switch error {
+        case .storeDamaged(let path, _, let unsent, let setAsideStopped, _):
+            return storeDamaged(folder: path.isEmpty ? nil : URL(fileURLWithPath: path).deletingLastPathComponent().path, unsent: unsent, setAsideStopped: setAsideStopped)
+        case .noKeychain: return signInUnreadable
+        case .store, .io, .closed: return copyCouldNotBeOpened
+        case .wrongServer: return differentServer
+        case .storageFull: return storageFull
+        case .network, .noConnection: return serverUnreachable
+        default: return error.isOffline ? serverUnreachable : syncFailed
+        }
     }
 
     /// The address now reaches another Marfa server than the one this copy was made for, so nothing in the copy is

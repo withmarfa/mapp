@@ -9,7 +9,9 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
         case notAServer
     }
 
-    /// Scheme and host in lower case and no trailing slash, so one server is one address however it was typed.
+    /// Scheme and host in lower case and no trailing slash, otherwise the address as it was entered: the copy and the
+    /// discard marks are named by this exact text, so `https://host` and `https://host:443` are two copies. Compare
+    /// connections with `sameServer(as:)`, never `==`, where the question is whether two addresses are one server.
     let address: URL
 
     init(address text: String) throws(Problem) {
@@ -25,6 +27,20 @@ nonisolated struct MarfaConnection: Hashable, Sendable {
         while components.path.hasSuffix("/") { components.path.removeLast() }
         guard let address = components.url else { throw .notAServer }
         self.address = address
+    }
+
+    /// Whether `other` names the same server: the same address once a port the scheme already means is left out. The
+    /// package keys the sign-in by this origin, so two spellings share one sign-in but keep two copies.
+    func sameServer(as other: MarfaConnection) -> Bool {
+        Self.origin(address) == Self.origin(other.address)
+    }
+
+    private static func origin(_ address: URL) -> URL {
+        guard var components = URLComponents(url: address, resolvingAgainstBaseURL: false) else { return address }
+        if (components.scheme == "https" && components.port == 443) || (components.scheme == "http" && components.port == 80) {
+            components.port = nil
+        }
+        return components.url ?? address
     }
 
     /// Throws only for an address holding a user or password, which `init(address:)` already refuses.

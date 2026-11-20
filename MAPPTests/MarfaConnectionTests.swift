@@ -12,6 +12,26 @@ struct MarfaConnectionTests {
         #expect(try MarfaConnection(address: "https://marfa.example/api/").address.absoluteString == "https://marfa.example/api")
     }
 
+    /// An address names its copy and its discard marks as it was entered, so a port the scheme already means is kept.
+    @Test func anAddressKeepsAPortTheSchemeAlreadyMeansAndSoItsOwnCopy() throws {
+        let withPort = try MarfaConnection(address: "HTTPS://Marfa.Example:443/")
+        let without = try MarfaConnection(address: "https://marfa.example")
+        #expect(withPort.address.absoluteString == "https://marfa.example:443")
+        #expect(withPort != without)
+        let location = MarfaStoreLocation(root: URL.temporaryDirectory.appending(path: "Stores", directoryHint: .isDirectory))
+        #expect(location.directory(for: withPort) != location.directory(for: without))
+        #expect(location.directory(for: withPort) == location.directory(for: try MarfaConnection(address: "https://marfa.example:443/")))
+    }
+
+    @Test(arguments: [
+        ("https://marfa.example:443", "https://marfa.example", true), ("https://marfa.example", "https://marfa.example:443", true),
+        ("http://marfa.example:80/api", "http://marfa.example/api", true), ("https://marfa.example:8443", "https://marfa.example", false),
+        ("https://marfa.example", "https://other.example", false), ("https://marfa.example:80", "https://marfa.example", false),
+    ])
+    func twoAddressesAreOneServerByTheirOriginNotTheirText(_ one: String, _ other: String, _ same: Bool) throws {
+        #expect(try MarfaConnection(address: one).sameServer(as: MarfaConnection(address: other)) == same)
+    }
+
     @Test(arguments: ["ftp://marfa.example", "marfa.example", "http://", "https://user:secret@marfa.example", "https://marfa.example/?key=1", ""])
     func anAddressThatNamesNoServerIsRefused(_ text: String) {
         #expect(throws: MarfaConnection.Problem.notAServer) { try MarfaConnection(address: text) }

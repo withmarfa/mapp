@@ -78,9 +78,9 @@ import Testing
     }
 
     @Test(arguments: [
-        MarfaHost.Problem.notSignedIn, .signIn(.denied), .signIn(.expired), .signIn(.refused("The server refused it.")),
-        .signIn(.unreachable("Could not connect.")), .signIn(.inUse), .signIn(.keychain("SecItemAdd failed: -25299.")),
-        .notRevoked, .notRemoved(signIn: "errSecItemNotFound", copy: nil),
+        MarfaHost.Problem.notSignedIn, .signIn(.denied), .signIn(.expired), .signIn(.refused), .signIn(.unreachable), .signIn(.couldNotFinish),
+        .signIn(.notMarfa), .signIn(.notVerified), .signIn(.inUse), .signIn(.keychain), .signIn(.noWindow), .signIn(.failed),
+        .notRevoked(address: "https://marfa.test"), .notRemoved(signIn: "errSecItemNotFound", copy: nil),
         .notRemoved(signIn: nil, copy: "NSCocoaErrorDomain 513"), .notConnected, .busy, .notAServer,
         .otherVersion(unsent: 2), .otherVersion(unsent: nil), .inUse,
         .copyKept(.changed(now: 2), signIn: nil), .copyKept(.unreadable(folder: "/Library/Marfa/ab12"), signIn: "errSecItemNotFound"),
@@ -105,14 +105,23 @@ import Testing
         }
         #expect(try title(.denied) == "MAPP Wasn’t Approved")
         #expect(try title(.expired) == "The Code Expired")
-        #expect(try title(.refused("No.")) == "The Server Refused the Sign-In")
-        #expect(try title(.unreachable("Offline.")) == "Can’t Reach the Server")
-        #expect(try title(.keychain("Denied.")) == "Can’t Keep the Sign-In")
+        #expect(try title(.refused) == "The Server Refused the Sign-In")
+        #expect(try title(.unreachable) == "Can’t Reach the Server")
+        #expect(try title(.notMarfa) == "Check the Address")
+        #expect(try title(.couldNotFinish) == "Couldn’t Finish Signing In")
+        #expect(try title(.notVerified) == "Couldn’t Confirm the Sign-In")
+        #expect(try #require(MarfaSettingsModel.notice(for: .signIn(.notVerified))).message == "MAPP couldn’t verify the approval. Try signing in again.")
+        #expect(try title(.noWindow) == "No Window to Sign In From")
+        #expect(try title(.failed) == "Couldn’t Sign In")
+        #expect(try title(.keychain) == "Can’t Keep the Sign-In")
         #expect(try title(.inUse) == "The Sign-In Is in Use")
-        let revoke = try #require(MarfaSettingsModel.notice(for: .notRevoked))
-        #expect(revoke.title == "Disconnected, but MAPP Is Still Approved")
-        #expect(revoke.message.contains("Connected apps"))
-        #expect(revoke.message.contains("Disconnect"))
+        let revoke = try #require(MarfaSettingsModel.notice(for: .notRevoked(address: "https://marfa.test")))
+        #expect(revoke.title == "Disconnected, but MAPP May Still Be Approved")
+        #expect(revoke.message.contains("marfa apps list"))
+        #expect(revoke.message.contains("marfa apps revoke"))
+        for claim in ["Connected apps", "still lists", "You are signed in"] {
+            #expect(!revoke.message.contains(claim))
+        }
     }
 
     @Test func theQuestionAboutWaitingChangesIsAskedNotTold() {
@@ -133,14 +142,16 @@ import Testing
         #expect(!model.isWorking)
     }
 
-    @Test func aSignInTheServerRefusesIsToldWithTheServersWords() async throws {
+    @Test func aSignInTheServerRefusesIsToldInMAPPsWordsNotTheServers() async throws {
         let bench = try HostBench()
         let (model, _) = model(bench)
         bench.signIns.script(browser: [.failure(SignInError.refused(code: "invalid_client", message: "This app is not known."))])
         model.address = "http://first.test:8210"
         await model.connect()
         #expect(model.notice?.title == "The Server Refused the Sign-In")
-        #expect(model.notice?.message.hasPrefix("Nothing changed.") == true)
+        #expect(model.notice?.message.hasPrefix("The server wouldn’t approve MAPP, so nothing changed.") == true)
+        #expect(model.notice?.message.contains("invalid_client") == false)
+        #expect(model.notice?.message.contains("This app is not known.") == false)
         #expect(!model.isConnected)
     }
 
@@ -172,7 +183,7 @@ import Testing
         signIns.script(code: [.success(CodeSignIn(
             code: "ABCD-1234", address: URL(string: "http://first.test:8210/device")!, completeAddress: nil,
             expiresAt: .distantFuture,
-            finish: { for await _ in approved {}; signIns.save("approved", for: address) }))])
+            finish: { for await _ in approved {}; signIns.save("approved", for: address); return SignedIn() }))])
         model.address = "http://first.test:8210"
         let task = model.start(.connect(usingCode: true))
         #expect(await eventually { model.code?.code == "ABCD-1234" })
@@ -191,7 +202,7 @@ import Testing
         defer { hold.finish() }
         bench.signIns.script(code: [.success(CodeSignIn(
             code: "ABCD-1234", address: URL(string: "http://first.test:8210/device")!, completeAddress: nil,
-            expiresAt: .distantFuture, finish: { for await _ in never {}; try Task.checkCancellation() }))])
+            expiresAt: .distantFuture, finish: { for await _ in never {}; try Task.checkCancellation(); return SignedIn() }))])
         model.address = "http://first.test:8210"
         let task = model.start(.connect(usingCode: true))
         #expect(await eventually { model.code != nil })
@@ -228,7 +239,7 @@ import Testing
         _ = model.host.scripted("key-2")
         await model.signInAgain()
         #expect(model.notice?.title == "Can’t Open the Library")
-        #expect(model.notice?.message == "You are signed in again, but the copy of your library on this Mac can’t be opened. The store is damaged.")
+        #expect(model.notice?.message == "MAPP kept the new sign-in, but the copy of your library on this Mac can’t be opened. MAPP couldn’t make or open the copy of your library on this Mac. Check that MAPP can change its own files, then try again.")
         #expect(try bench.signIns.key(for: first.address) == "key-2")
     }
 
@@ -488,11 +499,55 @@ import Testing
         let bench = try HostBench()
         let (model, _) = model(bench)
         await connect(model)
-        bench.signIns.script(signOut: .success(false))
+        bench.signIns.script(signOut: .success(.notConfirmed))
         await model.disconnect()
         #expect(!model.isConnected)
         #expect(bench.savedAddress == nil)
-        #expect(model.notice?.title == "Disconnected, but MAPP Is Still Approved")
+        #expect(model.notice?.title == "Disconnected, but MAPP May Still Be Approved")
+    }
+
+    /// Only a sign-out the server did not confirm leaves an approval standing; one the server ended, or one that had
+    /// nothing kept, has nothing more to tell.
+    @Test(arguments: [SignOutOutcome.endedAtServer, .nothingKept])
+    func disconnectingTellsNothingMoreWhenTheApprovalEndedOrNothingWasKept(outcome: SignOutOutcome) async throws {
+        let bench = try HostBench()
+        let (model, _) = model(bench)
+        await connect(model)
+        bench.signIns.script(signOut: .success(outcome))
+        await model.disconnect()
+        #expect(!model.isConnected)
+        #expect(bench.savedAddress == nil)
+        #expect(model.notice == nil)
+    }
+
+    /// A sign-out that waits on a server that does not answer holds the step for up to a minute: the person is shown
+    /// it is working, and nothing else may start meanwhile.
+    @Test func disconnectingShowsItIsWorkingWhileTheServerDoesNotAnswerAndStartsNothingElse() async throws {
+        let bench = try HostBench()
+        let (model, _) = model(bench)
+        let host = model.host
+        await connect(model)
+        let (release, letGo) = AsyncStream<Void>.makeStream()
+        defer { letGo.finish() }
+        bench.signIns.signOutGate.withLock { $0 = { for await _ in release {} } }
+        let task = Task { await model.disconnect() }
+        try #require(await eventually { bench.signIns.calls.contains("signOut http://first.test:8210") })
+        #expect(model.isWorking)
+        #expect(host.isBusy)
+        let calls = bench.signIns.calls
+        do {
+            try await host.connect(address: "http://second.test:8210", key: "k")
+            Issue.record("a connect started while the sign-out waited")
+        } catch {
+            #expect(error == .busy)
+        }
+        await model.signInAgain()
+        #expect(bench.signIns.calls == calls, "nothing else started")
+        letGo.finish()
+        await task.value
+        #expect(!model.isWorking)
+        #expect(!host.isBusy)
+        #expect(!model.isConnected)
     }
 
     // MARK: Words and what shows

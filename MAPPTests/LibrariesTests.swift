@@ -155,4 +155,19 @@ import Testing
         #expect(libraries.host.notices.waiting.last?.message == "MAPP is still saving what you last typed. Try again in a moment.")
         handOver?(true)
     }
+
+    /// A save in This Marfa answers for the server it was sent to. The callback `Libraries` wires carries that address
+    /// through, so one that lands after the switch is dropped, never taken by the library now open.
+    @Test func aSaveThatAnswersAfterASwitchIsDroppedByTheCallbackLibrariesWires() async throws {
+        let bench = try HostBench()
+        let libraries = try libraries(bench)
+        try await libraries.host.connect(address: "http://first.test:8210", key: "k")
+        try await libraries.host.changeAddress(to: "http://second.test:8210", key: "k", choice: .discardNothing)
+        let answer = InstanceConfig(values: [.trashRetentionDays: .number(90)])
+
+        libraries.instanceSettings.onSaved(answer, [.trashRetentionDays], "http://first.test:8210")
+        #expect(libraries.host.library?.trashDays == nil, "an answer for the server left was taken")
+        libraries.instanceSettings.onSaved(answer, [.trashRetentionDays], "http://second.test:8210")
+        #expect(libraries.host.library?.trashDays == 90)
+    }
 }

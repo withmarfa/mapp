@@ -114,13 +114,13 @@ import Testing
         let source = try #require(bench.servers.last)
         source.useFailure.withLock { $0 = MarfaError.closed(message: "The copy closed.") }
         source.useCloses.withLock { $0 = true }
-        await expect(.unavailable(message: "The copy closed.")) { () throws(MarfaHost.Problem) in
+        await expect(.unavailable(message: Words.copyCouldNotBeOpened)) { () throws(MarfaHost.Problem) in
             try await host.signInAgain(via: host.scripted("new"))
         }
         #expect(host.source == nil)
         #expect(host.library == nil)
         #expect(source.calls == ["use", "close"])
-        #expect(host.state == .unavailable(message: "The copy closed."))
+        #expect(host.state == .unavailable(message: Words.copyCouldNotBeOpened))
         #expect(bench.savedAddress == "http://first.test:8210", "the address stays, so Settings offers a sign-in")
         #expect(try bench.signIns.key(for: first.address) == "new", "the sign-in is kept, since the server gave it")
         #expect(host.connection == first)
@@ -133,7 +133,7 @@ import Testing
         try await host.connect(address: "http://first.test:8210", key: "old")
         let source = try #require(bench.servers.last)
         source.useFailure.withLock { $0 = MarfaError.wrongServer(expected: "a", got: "b", message: "Another server.") }
-        await expect(.unavailable(message: "Another server.")) { () throws(MarfaHost.Problem) in
+        await expect(.unavailable(message: Words.differentServer)) { () throws(MarfaHost.Problem) in
             try await host.signInAgain(via: host.scripted("new"))
         }
         #expect(host.source === source)

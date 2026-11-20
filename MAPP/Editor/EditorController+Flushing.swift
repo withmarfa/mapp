@@ -11,7 +11,8 @@ extension EditorController {
     /// flush goes ahead without it, so a stuck page never holds the window or the app for good. What the page
     /// last reported is already saved; only what it never reported is lost. Until then it is asked again only while
     /// it is composing or importing a picture. Any other failure in the page, an exception or another refusal, is
-    /// logged and told at once with its own message, and the page is given up on the same way.
+    /// logged with the page's own words and told at once as a problem with the editor, with the step to take, and the
+    /// page is given up on the same way.
     ///
     /// Outside text reloading the item mid-flush leaves the item the one being flushed, so the flush goes ahead. A
     /// flush whose item was replaced on the page stops, and the person is told why.
@@ -83,8 +84,8 @@ extension EditorController {
                     Task { try? await Task.sleep(for: .milliseconds(50)); capture() }
                     return
                 }
-                if let error { return failed(error.localizedDescription) }
-                if let code { return failed(refusal?["message"] as? String ?? code) }
+                if let error { return failed(detail: error.localizedDescription) }
+                if let code { return failed(detail: refusal?["message"] as? String ?? code) }
                 guard self.pageItemID == pageItemID else { return replaced() }
                 finish(true)
             }
@@ -95,10 +96,11 @@ extension EditorController {
         }
         // The page answered, so it is not stuck, but asking again would only fail again. It is given up on as a page
         // that stopped answering is, so trying again goes ahead without it.
-        func failed(_ message: String) {
+        // `detail` is JavaScript's or WebKit's own text, for the log alone.
+        func failed(detail: String) {
             abandonedGeneration = self.generation
-            Telemetry.logger(.editor).error("flush failed: \(message)")
-            tellNotSaved(pageItemID, reason: String(localized: "The editor ran into a problem (“\(message)”), so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again."))
+            Telemetry.logger(.editor).error("flush failed: \(detail)")
+            tellNotSaved(pageItemID, reason: String(localized: "The editor ran into a problem, so MAPP couldn’t save your most recent typing. Everything before it is saved. To go ahead without it, try again."))
             finish(false)
         }
         // Held weakly, so a finished flush does not keep a closed editor among the open ones until the limit.

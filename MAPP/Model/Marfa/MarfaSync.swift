@@ -240,7 +240,12 @@ actor MarfaSync {
                 hub.set(.online)
             }
         case .offline(let error):
-            hub.set(.offline(reason: error.message))
+            // A full disk is not an unreachable server: it is shown as stopped, with the words for a full disk.
+            if case .storageFull = error {
+                if changed { stop(for: error) }
+            } else {
+                hub.set(.offline(reason: error.message))
+            }
         case .stopped(let error):
             if changed { stop(for: error) }
         case .keyRefused:
@@ -386,8 +391,8 @@ actor MarfaSync {
             return
         }
         Telemetry.syncStoppedUnnamed(during: "refresh")
-        hub.set(.unavailable(message: error.localizedDescription))
-        tellOnce(SourceFailure(kind: .failed, message: error.localizedDescription))
+        hub.set(.unavailable(message: Words.syncFailed))
+        tellOnce(SourceFailure(kind: .failed, message: Words.syncFailed))
     }
 
     // MARK: Attachments
