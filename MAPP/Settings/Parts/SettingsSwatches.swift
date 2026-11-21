@@ -37,13 +37,34 @@ struct SettingsSwatches<Value: Hashable>: View {
             }
             if let custom {
                 Rectangle().fill(SettingsTokens.rule).frame(width: 1, height: SettingsTokens.Metric.swatch)
-                ColorPicker("Custom Color", selection: custom.color, supportsOpacity: false)
-                    .labelsHidden()
-                    .accessibilityLabel("Custom Color")
+                customSwatch(custom)
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text(title))
+    }
+}
+
+extension SettingsSwatches {
+    /// The color of the person's own: a rainbow until they have made one, then that color with the chosen dot. The system's
+    /// color panel opens from it, through a color well laid over it that draws nothing of its own.
+    @ViewBuilder fileprivate func customSwatch(_ custom: (isSelected: Bool, color: Binding<Color>)) -> some View {
+        Circle()
+            .fill(custom.isSelected ? AnyShapeStyle(custom.color.wrappedValue) : AnyShapeStyle(SettingsTokens.rainbow))
+            .frame(width: SettingsTokens.Metric.swatch, height: SettingsTokens.Metric.swatch)
+            .overlay {
+                if custom.isSelected {
+                    Circle().fill(.white).frame(width: SettingsTokens.Metric.swatchDot, height: SettingsTokens.Metric.swatchDot)
+                }
+            }
+            .overlay {
+                ColorPicker("Custom Color", selection: custom.color, supportsOpacity: false)
+                    .labelsHidden()
+                    .opacity(SettingsTokens.Metric.invisibleWell)
+                    .frame(width: SettingsTokens.Metric.swatch, height: SettingsTokens.Metric.swatch)
+                    .clipShape(.circle)
+            }
+            .help("Custom Color")
     }
 }
 

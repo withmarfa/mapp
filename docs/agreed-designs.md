@@ -36,17 +36,7 @@ The rules that are built (the window, the toolbar, rows, sections, changing thin
 
 Nine pages in three groups: General, Appearance and Keyboard; Editor, Lists, Layouts and Search; On This Mac and Connection. There is no Advanced page, and Settings > Sidebar stays gone.
 
-- **General.**
-  - Start With, and Reopen Windows after quitting.
-  - Open Items In (moved from Lists), and New Items Are.
-  - Today and Yesterday (moved from Lists), Week Starts On, Date Format and Time Format.
-  - Pictures from Websites and Send Error Reports.
-  - Reset MAPP's Settings… at the foot, with an alert.
-- **Appearance.**
-  - Theme, Accent with a custom color, and the Highlights color.
-  - Text Font (any installed font) and Code Font (any monospaced font). The interface stays the system font.
-  - Text Size, the materials and scrolling switches, and Symbols on Subtypes.
-  - Window Layout: the column widths, with Use Current Widths and Reset.
+- **General and Appearance** are built: see [Settings pages](settings.md).
 - **Keyboard.**
   - Every menu command can be changed.
   - A section of shortcuts that work in any app while MAPP is running, all off by default: Show Command Palette, Search and New Item. Each must include ⌘ or ⌃.

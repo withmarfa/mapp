@@ -47,6 +47,8 @@ enum SettingsTokens {
     static let secondaryText = Color(nsColor: .secondaryLabelColor)
     static let tertiaryText = Color(nsColor: .tertiaryLabelColor)
     static let primaryText = Color(nsColor: .labelColor)
+    /// The swatch of a color the person makes, before they have made one.
+    static let rainbow = AngularGradient(colors: [.red, .orange, .yellow, .green, .blue, .purple, .red], center: .center)
     /// The accent the Mac is set to, which the first swatch of a color choice shows.
     static let systemAccent = Color(nsColor: .controlAccentColor)
     static let warning = Color(nsColor: .systemOrange)
@@ -138,6 +140,8 @@ enum SettingsTokens {
         static let swatch: CGFloat = 18
         static let swatchDot: CGFloat = 6
         static let swatchSpacing: CGFloat = 8
+        /// How much of the system's color well shows over a swatch that stands for it: none to the eye, all to the pointer.
+        static let invisibleWell: Double = 0.02
         /// A theme tile's sidebar, as a share of its width, and its lines' height, spacing and radius.
         static let previewSidebar: CGFloat = 0.3
         static let previewLine: CGFloat = 3
