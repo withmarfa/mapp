@@ -273,7 +273,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
                 secretTail: "8f2c", active: true, created: .now,
                 maker: .init(kind: .app, id: "maker", name: "MAPP"))
             state.webhooks.append(made)
-            return CreatedWebhook(webhook: made, secret: "whsec_3fKq8Vn2Lp7Xr1Tz9Bm4Yc6Wd0Hs5Ja")
+            return CreatedWebhook(webhook: made, secret: "whsec_3fKq8Vn2Lp7Xr1Tz9Bm4Yc6Wd0Hs5Ja2e7b91c4d60a38f5e1b9c2d7a4f08e63b15d9c0a7e24f")
         }
     }
 

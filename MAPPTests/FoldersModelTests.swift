@@ -34,7 +34,7 @@ import Testing
         #expect(model.folders.map(\.title) == ["Studio Notes", "Client Drawings", "Empty"])
         #expect(model.condition(of: model.folders[0]) == .init(title: "3 to receive", tone: .quiet))
         #expect(model.condition(of: model.folders[1]) == .init(title: "12 removals wait", tone: .warning))
-        #expect(model.condition(of: model.folders[2]) == .init(title: "No Copies", tone: .quiet))
+        #expect(model.condition(of: model.folders[2]) == .init(title: "No copies", tone: .quiet))
         #expect(FoldersModel.copies(2) == "2 copies.")
         #expect(FoldersModel.copies(1) == "1 copy.")
     }
@@ -43,12 +43,12 @@ import Testing
         #expect(FoldersModel.condition(of: Self.copy("1")) == .init(title: "Up to date", tone: .ok))
         #expect(FoldersModel.condition(of: Self.copy("1", uploads: 2)) == .init(title: "2 to send", tone: .quiet))
         #expect(FoldersModel.condition(of: Self.copy("1", uploads: 2, downloads: 3)) == .init(title: "5 waiting", tone: .quiet))
-        #expect(FoldersModel.condition(of: Self.copy("1", waiting: true)) == .init(title: "Waiting to Start", tone: .quiet))
+        #expect(FoldersModel.condition(of: Self.copy("1", waiting: true)) == .init(title: "Waiting to start", tone: .quiet))
     }
 
     @Test func aProblemOutranksWhatIsWaiting() {
         let problem = FolderProblem(code: .heldFile, count: 8)
-        #expect(FoldersModel.condition(of: Self.copy("1", downloads: 5, problems: [problem])) == .init(title: "Needs Attention", tone: .warning))
+        #expect(FoldersModel.condition(of: Self.copy("1", downloads: 5, problems: [problem])) == .init(title: "Needs attention", tone: .warning))
         #expect(FoldersModel.condition(of: Self.copy("1", removals: 1, problems: [problem])).title == "1 removal waits")
         #expect(FoldersModel.title(of: problem) == "8 files are held back")
         #expect(FoldersModel.title(of: FolderProblem(code: .conflict, count: 1)) == "1 conflicted copy")
@@ -135,5 +135,16 @@ import Testing
         bench.calls.state.withLock { $0.reports = [:] }
         await model.loadReport("a")
         #expect(model.folder("a") == nil)
+    }
+
+    @Test func aCopyWithRemovalsOrAProblemIsToldUnderNeedsAttentionOnly() {
+        #expect(FoldersModel.needsAttention(Self.copy("1", removals: 2)))
+        #expect(FoldersModel.needsAttention(Self.copy("1", problems: [FolderProblem(code: .paused, count: 1)])))
+        #expect(!FoldersModel.needsAttention(Self.copy("1", downloads: 4)))
+    }
+
+    @Test func aProblemLineSaysWhichCopyReportsItAndWhereToLook() {
+        #expect(FoldersModel.problemLine(signIn: "Folder watcher") == "Reported by Folder watcher. Review it where that copy runs.")
+        #expect(FoldersModel.removalsLine == "Review them where it runs.")
     }
 }

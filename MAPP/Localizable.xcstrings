@@ -49,7 +49,7 @@
     "Change Address" : {
 
     },
-    "Change this folder’s ignore patterns, limits and files with the command line: marfa folders." : {
+    "Change this folder’s ignore patterns, limits and files with the command line: %@." : {
 
     },
     "Changing the events or the type drops waiting deliveries that no longer match." : {
@@ -76,7 +76,7 @@
     "Delete This Webhook" : {
 
     },
-    "Delete “%@”?" : {
+    "Delete This Webhook?" : {
 
     },
     "Delivered" : {
@@ -127,7 +127,7 @@
     "It is shown only once. The service checks each request with it." : {
 
     },
-    "It stops sending at once, and its deliveries and signing secret are gone. This can’t be undone." : {
+    "%@ stops sending at once, and its deliveries and signing secret are gone. This can’t be undone." : {
 
     },
     "It stops sending at once." : {
@@ -233,6 +233,9 @@
     "No Copies" : {
 
     },
+    "No copies" : {
+
+    },
     "No copies yet." : {
 
     },
@@ -266,9 +269,6 @@
     "%@ on %@" : {
 
     },
-    "On %@." : {
-
-    },
     "Only webhooks this sign-in made are listed. An app or a key sees only its own." : {
 
     },
@@ -290,7 +290,10 @@
     "Reported %@." : {
 
     },
-    "Review them where the copy is kept, with the command line: marfa folders confirm or marfa folders restore." : {
+    "Reported by %@. Review it where that copy runs." : {
+
+    },
+    "Review them where it runs." : {
 
     },
     "Send" : {
@@ -1355,7 +1358,7 @@
     "%lld waiting" : {
 
     },
-    "Waiting to Start" : {
+    "Waiting to start" : {
 
     },
     "Webhook" : {

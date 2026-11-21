@@ -102,7 +102,7 @@ import Observation
     }
 
     static func condition(of report: FolderReport) -> Condition {
-        guard !report.copies.isEmpty else { return Condition(title: String(localized: "No Copies"), tone: .quiet) }
+        guard !report.copies.isEmpty else { return Condition(title: String(localized: "No copies"), tone: .quiet) }
         return condition(
             pausedRemovals: report.pausedRemovals, problems: report.copies.contains { !$0.problems.isEmpty },
             uploads: report.pendingUploads, downloads: report.pendingDownloads, starting: report.copies.contains(where: \.firstSyncWaiting))
@@ -119,8 +119,8 @@ import Observation
             let title = pausedRemovals == 1 ? String(localized: "1 removal waits") : String(localized: "\(pausedRemovals) removals wait")
             return Condition(title: title, tone: .warning)
         }
-        if problems { return Condition(title: String(localized: "Needs Attention"), tone: .warning) }
-        if starting { return Condition(title: String(localized: "Waiting to Start"), tone: .quiet) }
+        if problems { return Condition(title: String(localized: "Needs attention"), tone: .warning) }
+        if starting { return Condition(title: String(localized: "Waiting to start"), tone: .quiet) }
         switch (uploads, downloads) {
         case (0, 0): return Condition(title: String(localized: "Up to date"), tone: .ok)
         case (let sending, 0): return Condition(title: String(localized: "\(sending) to send"), tone: .quiet)
@@ -128,6 +128,9 @@ import Observation
         case (let sending, let receiving): return Condition(title: String(localized: "\(sending + receiving) waiting"), tone: .quiet)
         }
     }
+
+    /// Whether a copy is listed under a folder's Needs Attention.
+    static func needsAttention(_ copy: FolderCopy) -> Bool { copy.pausedRemovals > 0 || !copy.problems.isEmpty }
 
     /// "Reported 20 minutes ago.", the line under a copy.
     static func reported(ageSeconds: Int, now: Date = .now) -> String {
@@ -155,5 +158,10 @@ import Observation
     }
 
     /// The words under a copy's removals that wait: where they are decided, since only the copy that holds the files can.
-    static let removalsLine = String(localized: "Review them where the copy is kept, with the command line: marfa folders confirm or marfa folders restore.")
+    static let removalsLine = String(localized: "Review them where it runs.")
+
+    /// The words under a copy's problem: which copy reports it and where it is looked into.
+    static func problemLine(signIn: String) -> String {
+        String(localized: "Reported by \(signIn). Review it where that copy runs.")
+    }
 }

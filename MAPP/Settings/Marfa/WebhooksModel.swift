@@ -281,8 +281,8 @@ import Observation
 
     func askToDelete(_ webhook: OwnerWebhook) {
         question = Question(
-            action: .delete(webhook.id), title: String(localized: "Delete “\(Self.display(webhook.url))”?"),
-            message: String(localized: "It stops sending at once, and its deliveries and signing secret are gone. This can’t be undone."),
+            action: .delete(webhook.id), title: String(localized: "Delete This Webhook?"),
+            message: String(localized: "\(Self.display(webhook.url)) stops sending at once, and its deliveries and signing secret are gone. This can’t be undone."),
             confirm: String(localized: "Delete"))
     }
 

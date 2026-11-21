@@ -287,12 +287,14 @@ private struct NewWebhookSheet: View {
     }
 
     var body: some View {
-        SettingsSheet(title: Text("New Webhook"), line: Text("\(serverName) sends a request to an address you choose.")) {
+        SettingsSheet(
+            title: Text("New Webhook"), line: Text("\(serverName) sends a request to an address you choose."), isWide: true
+        ) {
             VStack(alignment: .leading, spacing: 16) {
                 SettingsSheetField(label: "Address", error: model.draftError) {
                     SettingsField(
                         title: "Address", text: $model.draft.address, prompt: "https://", isError: model.draftError != nil,
-                        isMonospaced: true, width: nil, onSubmit: { Task { await model.make() } })
+                        width: nil, onSubmit: { Task { await model.make() } })
                 }
                 SettingsSection("Send") {
                     SettingsRow("For") {
@@ -354,7 +356,7 @@ private struct AddressChangeSheet: View {
             SettingsSheetField(label: "Address", error: model.addressError) {
                 SettingsField(
                     title: "Address", text: $model.addressDraft, prompt: "https://", isError: model.addressError != nil,
-                    isMonospaced: true, width: nil, onSubmit: { Task { await model.saveAddress() } })
+                    width: nil, onSubmit: { Task { await model.saveAddress() } })
             }
         } buttons: {
             Spacer(minLength: 0)

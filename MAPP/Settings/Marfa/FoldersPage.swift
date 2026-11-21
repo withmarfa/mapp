@@ -95,7 +95,6 @@ private struct FolderDetail: View {
                     line: Text(verbatim: FoldersModel.copies(report.copies.count)))
                 attention(report)
                 copies(report)
-                SettingsNote(verbatim: String(localized: "Change this folder’s ignore patterns, limits and files with the command line: marfa folders."))
             } else if let failure = model.reportFailures[folder.id] {
                 SettingsHead(symbol: "folder.fill", tone: .blue, title: Text(verbatim: folder.title))
                 OwnerProblem(title: "Couldn’t Read This Folder", line: OwnerWording.line(failure))
@@ -107,7 +106,7 @@ private struct FolderDetail: View {
     }
 
     @ViewBuilder private func attention(_ report: FolderReport) -> some View {
-        let held = report.copies.filter { $0.pausedRemovals > 0 || !$0.problems.isEmpty }
+        let held = report.copies.filter(FoldersModel.needsAttention)
         if !held.isEmpty {
             SettingsSection("Needs Attention") {
                 ForEach(held) { copy in
@@ -118,7 +117,8 @@ private struct FolderDetail: View {
                     }
                     ForEach(copy.problems, id: \.code) { problem in
                         SettingsProblemRow(
-                            title: Text(verbatim: FoldersModel.title(of: problem)), line: Text("On \(copy.signIn)."), actions: [])
+                            title: Text(verbatim: FoldersModel.title(of: problem)),
+                            line: Text(verbatim: FoldersModel.problemLine(signIn: copy.signIn)), actions: [])
                     }
                 }
             }
@@ -126,7 +126,10 @@ private struct FolderDetail: View {
     }
 
     private func copies(_ report: FolderReport) -> some View {
-        SettingsSection(name: Text("Copies"), line: Text("Named by the sign-in that keeps each one.")) {
+        SettingsSection(
+            name: Text("Copies"), line: Text("Named by the sign-in that keeps each one."),
+            footer: Text("Change this folder’s ignore patterns, limits and files with the command line: \(Text.settingsCode("marfa folders")).")
+        ) {
             if report.copies.isEmpty {
                 SettingsEmptyCard(
                     symbol: "externaldrive", title: Text("No Copies"),
@@ -135,7 +138,8 @@ private struct FolderDetail: View {
             ForEach(report.copies) { copy in
                 let condition = FoldersModel.condition(of: copy)
                 SettingsRow(verbatim: copy.signIn, line: FoldersModel.reported(ageSeconds: copy.ageSeconds)) {
-                    SettingsValue(verbatim: condition.title, dot: FoldersPage.dot(condition))
+                    // A copy under Needs Attention is not told again here.
+                    if !FoldersModel.needsAttention(copy) { SettingsValue(verbatim: condition.title, dot: FoldersPage.dot(condition)) }
                 }
             }
         }
