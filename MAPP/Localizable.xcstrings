@@ -49,10 +49,16 @@
     "9 Nov" : {
 
     },
+    "A control turned off is in the page’s More menu, and the View menu keeps every command." : {
+
+    },
     "A folder that already exists on the machine %@ runs on." : {
 
     },
     "A webhook sends events to an address you choose, as they happen." : {
+
+    },
+    "Aa, which opens the formats bar." : {
 
     },
     "Address: %@" : {
@@ -201,6 +207,9 @@
 
     },
     "Heartbeat Address" : {
+
+    },
+    "Hides the title and properties." : {
 
     },
     "It was undone." : {
@@ -513,6 +522,9 @@
 
     },
     "On the server’s own page, in a sheet." : {
+
+    },
+    "Page Corner" : {
 
     },
     "Passkey Not Renamed" : {
@@ -1129,6 +1141,9 @@
 
     },
     "Show Spelling and Grammar" : {
+
+    },
+    "The page’s text size and width." : {
 
     },
     "The server can’t read this secret, so it can’t use it until it is set again." : {
