@@ -118,6 +118,8 @@ struct ItemModal: View {
                     }
                     .help(Text(ItemOpening.fullPage.commandTitle))
                     .accessibilityIdentifier("ModalFullPage")
+                }
+                capsule {
                     Button(ItemOpening.newWindow.commandTitle, systemImage: ItemOpening.newWindow.symbol) { openInNewWindow() }
                         .help(Text(ItemOpening.newWindow.commandTitle))
                         .accessibilityIdentifier("ModalNewWindow")
@@ -143,16 +145,21 @@ struct ItemModal: View {
         }
     }
 
-    /// A capsule of glass holding buttons, filled with the accent color while the one it holds is on.
+    /// A capsule of glass holding buttons, filled with the accent color while the one it holds is on. Each button is a
+    /// square of the toolbar's button height, so one alone is a circle and a pair is a capsule with no gap between them,
+    /// as the window toolbar draws them.
     private func capsule<Content: View>(isOn: Bool = false, @ViewBuilder _ content: () -> Content) -> some View {
-        HStack(spacing: 2) { content() }
-            .buttonStyle(.borderless)
-            .labelStyle(.iconOnly)
-            .controlSize(.large)
-            .foregroundStyle(isOn ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-            .padding(.horizontal, 8)
-            .frame(minWidth: Self.buttonHeight, minHeight: Self.buttonHeight)
-            .glassEffect(isOn ? .regular.tint(.accentColor) : .regular, in: .capsule)
+        HStack(spacing: 0) {
+            content()
+                .frame(width: Self.buttonHeight, height: Self.buttonHeight)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.borderless)
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .labelStyle(.iconOnly)
+        .foregroundStyle(isOn ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+        .glassEffect(isOn ? .regular.tint(.accentColor) : .regular, in: .capsule)
     }
 
     /// Closes the modal and opens the item in a window of its own, once what was typed is saved.
