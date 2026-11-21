@@ -1,51 +1,14 @@
 import SwiftUI
 
-// The trailing controls of a row. Toggles, pop-ups and text fields are the system's; the buttons are drawn here, since
-// Settings has one gray button at 28 points (22 inside a table) and blue only for Update.
+// The trailing controls of a row. Every one is the system's: bordered buttons, menu pop-ups, switches and rounded text fields,
+// at their own regular size (small inside a table).
 
-/// What a Settings button is for. `update` is the one blue button; `destructive` is a pale red fill with red text and is
-/// never the default.
+/// What a Settings button is for. `update` is the prominent one, filled with the accent; `destructive` is the system's
+/// destructive role, which draws red text, and is never the default.
 enum SettingsButtonRole { case normal, destructive, update }
 
-struct SettingsButtonStyle: ButtonStyle {
-    let role: SettingsButtonRole
-    let small: Bool
-    @Environment(\.isEnabled) private var isEnabled
-    @Environment(\.isFocused) private var isFocused
-    @Environment(\.settingsTextScale) private var scale
-
-    func makeBody(configuration: Configuration) -> some View {
-        let height = (small ? SettingsTokens.Metric.smallButtonHeight : SettingsTokens.Metric.controlHeight) * scale
-        let shape = RoundedRectangle(cornerRadius: small ? 7 : SettingsTokens.Metric.buttonRadius, style: .continuous)
-        configuration.label
-            .font(.system(size: (small ? 12 : 13) * scale, weight: .medium))
-            .foregroundStyle(foreground)
-            .padding(.horizontal, small ? 9 : 12)
-            .frame(height: height)
-            .background(shape.fill(fill(pressed: configuration.isPressed)))
-            .overlay { if isFocused { shape.stroke(SettingsTokens.focusRing, lineWidth: 3).padding(-1.5) } }
-            .contentShape(shape)
-            .opacity(isEnabled ? 1 : 0.4)
-    }
-
-    private var foreground: Color {
-        switch role {
-        case .normal: SettingsTokens.primaryText
-        case .destructive: SettingsTokens.errorRed
-        case .update: .white
-        }
-    }
-
-    private func fill(pressed: Bool) -> Color {
-        switch role {
-        case .normal: pressed ? SettingsTokens.buttonFillPressed : SettingsTokens.buttonFill
-        case .destructive: SettingsTokens.destructiveFill.opacity(pressed ? 0.7 : 1)
-        case .update: Color.accentColor.opacity(pressed ? 0.8 : 1)
-        }
-    }
-}
-
-/// A button at a row's trailing edge.
+/// A button at a row's trailing edge. A default action, made so with `keyboardShortcut(.defaultAction)`, takes the system's
+/// default look.
 struct SettingsButton: View {
     private let title: Text
     private let role: SettingsButtonRole
@@ -83,17 +46,27 @@ struct SettingsButton: View {
     }
 
     var body: some View {
-        Button(action: action) {
+        Group {
+            if role == .update {
+                button.buttonStyle(.borderedProminent)
+            } else {
+                button.buttonStyle(.bordered)
+            }
+        }
+        .controlSize(small ? .small : .regular)
+    }
+
+    private var button: some View {
+        Button(role: role == .destructive ? .destructive : nil, action: action) {
             ZStack {
                 if let reserved { reserved.hidden() }
                 title
             }
         }
-            .buttonStyle(SettingsButtonStyle(role: role, small: small))
     }
 }
 
-/// A row's "more actions" menu: a small round button with three dots.
+/// A row's "more actions" menu: the system's round button with three dots.
 struct SettingsMoreMenu<Content: View>: View {
     @ViewBuilder let content: Content
 
@@ -101,32 +74,18 @@ struct SettingsMoreMenu<Content: View>: View {
         Menu {
             content
         } label: {
-            Image(systemName: "ellipsis")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(SettingsTokens.secondaryText)
-                .frame(width: 24, height: 24)
-                .background(SettingsTokens.buttonFill, in: .circle)
-                .contentShape(.circle)
+            Label("More", systemImage: "ellipsis").labelStyle(.iconOnly)
         }
         .menuStyle(.button)
-        .buttonStyle(.plain)
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.circle)
+        .controlSize(.small)
         .menuIndicator(.hidden)
         .fixedSize()
-        .accessibilityLabel("More")
     }
 }
 
-extension View {
-    /// The system's menu pop-up at Settings' one input size: 200 wide, and 28 tall, which the large control size draws.
-    /// Without the flexible sizing the system pop-up fits its title instead of filling the width.
-    func settingsPopUpSize() -> some View {
-        controlSize(.large)
-            .buttonSizing(.flexible)
-            .frame(width: SettingsTokens.Metric.controlWidth)
-    }
-}
-
-/// A pop-up of choices, 200 by 28. The system draws it.
+/// A pop-up of choices, as the system draws it at its regular size and its own width.
 struct SettingsPopUp<Value: Hashable, Content: View>: View {
     let title: LocalizedStringKey
     @Binding var selection: Value
@@ -136,12 +95,11 @@ struct SettingsPopUp<Value: Hashable, Content: View>: View {
         Picker(title, selection: $selection) { content }
             .labelsHidden()
             .pickerStyle(.menu)
-            .settingsPopUpSize()
+            .fixedSize()
     }
 }
 
-/// A switch. The system draws it, and its label is the row's title for VoiceOver. It is the mini switch, which Apple's guidance
-/// for toggles recommends in a grouped form for rows of an even height, as the boards draw it.
+/// A switch. The system draws it, and its label is the row's title for VoiceOver.
 struct SettingsToggle: View {
     let title: LocalizedStringKey
     @Binding var isOn: Bool
@@ -150,7 +108,6 @@ struct SettingsToggle: View {
         Toggle(title, isOn: $isOn)
             .labelsHidden()
             .toggleStyle(.switch)
-            .controlSize(.mini)
     }
 }
 
@@ -213,17 +170,6 @@ struct SettingsChevron: View {
     }
 }
 
-/// The two chevrons at the trailing edge of a pop-up. The system draws them in `SettingsPopUp`; a pop-up the system has no
-/// control for (`SettingsMultiPopUp`) ends in this, drawn to land where the system's land.
-struct SettingsPopUpChevron: View {
-    var body: some View {
-        Image(systemName: "chevron.up.chevron.down")
-            .font(.system(size: SettingsTokens.Metric.popUpChevronSize, weight: .semibold))
-            .padding(.trailing, -SettingsTokens.Metric.popUpChevronPull)
-            .accessibilityHidden(true)
-    }
-}
-
 extension View {
     /// The red ring of a refused input. The line that says why is the row's `error`.
     func settingsErrorRing(_ isError: Bool) -> some View {
@@ -238,7 +184,7 @@ extension View {
     }
 }
 
-/// A text field, 200 by 28. The system draws the field; `isError` puts the red ring round it.
+/// A text field, 200 wide. The system draws the field, at its own height; `isError` puts the red ring round it.
 struct SettingsField: View {
     let title: LocalizedStringKey
     @Binding var text: String
@@ -269,7 +215,7 @@ struct SettingsField: View {
         .focused($isFocused)
         .onSubmit(onSubmit)
         .onChange(of: isFocused) { if !$1 { onEndEditing?() } }
-        .frame(width: width, height: SettingsTokens.Metric.controlHeight)
+        .frame(width: width)
         .settingsErrorRing(isError)
     }
 }
@@ -321,7 +267,7 @@ struct SettingsNumberField: View {
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
-            .frame(width: SettingsTokens.Metric.controlWidth, height: SettingsTokens.Metric.controlHeight)
+            .frame(width: SettingsTokens.Metric.controlWidth)
             .settingsErrorRing(isError)
     }
 }

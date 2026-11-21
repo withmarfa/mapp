@@ -104,7 +104,7 @@ struct RenderedWindow<Detail: View>: View {
         HStack(spacing: 0) {
             SettingsSidebar(
                 selection: .constant(selection), search: .constant(search),
-                badges: { page in page == .updates && updatesBadge ? .count(1) : (page == .overview ? badge.map { .count($0) } : nil) })
+                badges: { page in page == .updates && updatesBadge ? 1 : (page == .overview ? badge : nil) })
                 .frame(width: SettingsTokens.Metric.sidebarWidth)
                 .background(Color(white: 0.93))
             VStack(spacing: 0) {
