@@ -24,7 +24,7 @@ Settings > Keyboard gives every menu command MAPP adds a shortcut that its perso
 
 ## Search
 
-A small search at the top right filters by command name. The keyboard button beside it searches by pressing keys instead (⌘K finds Command Palette), and typing searches by name again when it is off. While it searches by keys, each section says how many of its commands use the keys.
+A small search at the top right filters by command name. Agreed, not built: its trailing edge on the cards' edge ([Agreed designs](agreed-designs.md#general-rules)). The keyboard button beside it searches by pressing keys instead (⌘K finds Command Palette), and typing searches by name again when it is off. While it searches by keys, each section says how many of its commands use the keys.
 
 ## Files
 

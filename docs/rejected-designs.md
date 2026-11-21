@@ -30,7 +30,14 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 - **Dividers that run to the edges of a grouped box.**
 - **Centered headers.**
 - **Blue links for maps and places.**
-- **Empty frames where a picture belongs.**
+- **Empty frames where a picture belongs.** A picture that is not loaded is one quiet line with a Load button, which is not a frame.
+- **Pictures from other websites left out until they are loaded.** Each shows as one line where it belongs.
+- **A picture placeholder as a box with a pill in the page's reading font.** It is a line in the system font with the standard button.
+- **Aa on a page that cannot be written.** Such a page has the text size and Focus.
+- **A reading page's settings behind a page symbol in a smaller capsule, or Width and Text Size behind a toolbar button.** The text size is one control in the corner.
+- **Text size as smaller, actual and larger segments, and Width and Text Size inside the formats.** The text size is one named control with a menu that holds the width.
+- **A note's formats as a compact card, or a menu of styles each in its own look.** They are one bar at the page's foot.
+- **The page's corner in the modal.**
 
 ## Rows, cards and views
 
@@ -48,7 +55,14 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 - **An agenda narrowed to a column.** The timeline uses the window's width.
 - **A thumbnail column of a new kind beside a document.**
 - **A flat, squared or hand-drawn segmented control.** MAPP uses the system's. See [Views and lists](views-and-lists.md).
-- **A separate filter button in the list toolbar.** Filters live in the row above the list.
+- **A separate filter button in the list toolbar.** Filters live in the row above the list. An index page is the exception: Filter at its tabs' end shows or hides that row.
+- **Items grouped by date by default, or as sections that open, shelves, a card for each section, a digest for each period, or grouped by type.** Items is a table, for now.
+- **Filled cards for an index page's groups.**
+- **The tabs and the column headings pinned as one solid band over the table.** Scrolled, the tabs come into the toolbar.
+- **A filled Edit button that appears over New.** Edit is an ordinary toolbar item.
+- **A filter row that always shows, or a count of items beside it.** The row shows while Filter is on.
+- **A New row on Collections or Sources.**
+- **Collections grouped by kind, as tiles, or as a list beside the chosen collection's contents, and Sources grouped into apps and keys, as cards, or as a list beside a detail**, for now. Both are drawn as Items is.
 
 ## Buttons and messages
 
@@ -77,6 +91,8 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 - **Handles at the leading edge, beside the marks.** They sit at each row's trailing edge.
 - **A view's mark as a round tinted tile.** It is the view's symbol in its own color.
 - **Settings taking over the main window's sidebar**, with a way back and a search field, and a sidebar as wide as Codex's. Settings is a window of its own.
+- **A sidebar, search field or buttons that MAPP draws itself in Settings**, to match a board. Settings uses the system's own controls (August, 21 November 2026).
+- **Keyboard's search in the toolbar, or as a glass field.** It is a short field at the trailing end above the cards.
 - **Descriptions of three lines or more in Settings.** One line, two at most.
 - **Gray cards in Settings**, as System Settings draws them. Cards are white with a hairline.
 - **A back button beside a Settings page's title.** Back and Forward sit in the toolbar, beside the page's name.
@@ -93,19 +109,18 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 - **Collections as a gallery**, for now. They are a table.
 - **Buttons in the right sidebar**, such as Rename, Change Mark and Show Items. The right sidebar can be narrow.
 - **A back button from an open collection**, for now.
-- **The bottom-right corner as a strip along the page's foot.**
+- **The bottom-right corner as a strip along the page's foot.** The corner stays separate buttons. The formats bar that Aa opens floats at the page's foot, which August chose on 21 November 2026.
 
 ## The toolbar, the corner and opening an item
 
 - **Save as View… in the toolbar.** It is the last item of View Options.
-- **New Collection in the toolbar, with only the tabs on the page.** New Collection is on the page.
-- **Search beside an index page's tabs.** Search is in the toolbar.
+- **New only in the toolbar.** At rest, New (+) is at an index page's tabs' end, and it moves into the toolbar with the tabs only when the page scrolls.
 - **The Calendar's controls in the toolbar, or as one glass bar with dividers.** They are separate buttons in the corner.
 - **Today, Week and Month inside the month card.** The buttons stay, and the month opens above them.
 - **Small, Medium and Large as segments in the corner.** The size is one control, named, with a menu.
 - **Separate Zoom In, Zoom Out and Fit buttons.** Zoom is one control with a menu.
 - **"Page 3 of 12".** It reads "3 of 12".
-- **A Format panel copied from the iPhone's Notes.** MAPP's own formats, from its Format menu, in a compact card.
+- **A Format panel copied from the iPhone's Notes.** MAPP's own formats, from its Format menu, in one bar opened from Aa.
 - **An item's page sliding in over the list from the right (a side peek).** An item opens in a modal, a full page or a window.
 - **A back button labeled with the place, such as "‹ Items", or a path such as Items › name**, for now. Back has no label.
 - **Focus that hides the sidebar and the list.** Focus hides only the title and the properties.
@@ -137,6 +152,15 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 ## Marks
 
 - **A heart for favorites.** Favorites use the star (August, 19 November 2026).
+
+## Reversed
+
+Turned down once, then chosen by August on 21 November 2026. They are agreed now; see [Agreed designs](agreed-designs.md).
+
+- **A Filter button beside an index page's tabs**, which shows or hides the filter row.
+- **New (+) in the toolbar**, on an index page that has scrolled.
+- **Search beside an index page's tabs**, as a symbol that opens into a field.
+- **A note's formats as a bar along the page's foot**, opened from Aa.
 
 ## Related pages
 
