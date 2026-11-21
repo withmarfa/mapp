@@ -6,8 +6,9 @@ import Foundation
 nonisolated extension AttentionConcern {
     var shownTitle: String {
         guard kind == .setting else { return title }
-        let name = reference.split(separator: "_").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
-        return name.isEmpty ? title : String(localized: "Set \(name) Again")
+        // The server's own title names the setting by its key, so a setting MAPP has no name for is told without it.
+        guard let secret = MonitoringSecret.named(key: reference) else { return String(localized: "Set a Secret Again") }
+        return String(localized: "Set \(secret.settingTitle) Again")
     }
 
     var shownLine: String? {

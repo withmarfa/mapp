@@ -46,17 +46,7 @@ Only the agreed changes are listed. A change marked "needs a server change" wait
 
 - **Webhooks.** Every app's, grouped by the app that made them. The owner can end any of them (needs a server change). The page that lists MAPP's own webhooks is built.
 - **A key.** Extend… beside the expiry date, for the owner. The secret keeps working (needs a server change).
-- **Built:** Overview, Account, Apps, Keys, Addresses, Sources, Recently Deleted, History, File Storage, Webhooks, a read-only Folders, Activity, Monitoring (was Reporting), Limits (new) and Start-Up (read-only) are in [The Marfa's half of Settings](marfa-settings.md).
-- **Updates.**
-  - Check for Updates sits beside Update on every Updates page.
-  - A failed update that was put back reads "The update to 0.0.85 didn't work. <Marfa> is back on 0.0.84, as before. Nothing was lost." with Try Again and no second Update button.
-  - Last Update rows read "Updated to 0.0.84", or "Tried 0.0.85" with why it was undone (Undone).
-  - A backup folder row has a folder symbol.
-- **Housekeeping.**
-  - The problem row says "Clean-up is paused" and "<Marfa>'s clock jumped to 3 March 2027.", with Confirm Date….
-  - The jobs table has Job, Every, Last Run and Result (Done, Paused), with the contract's intervals (version thinning hourly, file copying every minute, reading new files every 30 seconds), and no Run Now.
-  - The alert asks "Is it 3 March 2027?" and says "<Marfa>'s clock says so. If it's right, clean-up starts again." Its buttons are Cancel and Confirm Date (blue).
-  - Only jobs that delete pause, once the clock runs more than 7 days past the last trusted time.
+- **Built:** Overview, Account, Apps, Keys, Addresses, Sources, Recently Deleted, History, File Storage, Webhooks, a read-only Folders, Backups, Updates, Housekeeping, Activity, Monitoring (was Reporting), Limits (new) and Start-Up (read-only) are in [The Marfa's half of Settings](marfa-settings.md).
 - **Plugins, Connectors and Types** are drawn and agreed separately, and wait on server work.
 
 ### Settings sync through Marfa

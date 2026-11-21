@@ -34,14 +34,19 @@ enum LibraryDescription {
 
     // MARK: Overview
 
-    @ObservationIgnored private var overviewModel: (address: String?, model: OverviewModel)?
+    @ObservationIgnored private var overviewModels: (address: String?, overview: OverviewModel, health: ServerHealthModel)?
 
-    /// What the Overview and the sidebar's badge read. It is made again for another server, since its calls are bound to one.
-    var overview: OverviewModel {
-        if let held = overviewModel, held.address == serverAddress { return held.model }
-        let model = OverviewModel(context: OwnerContext(host: self))
-        overviewModel = (serverAddress, model)
-        return model
+    /// What the Overview and the sidebar's badge read, and the one reader of health that Overview, Backups and Housekeeping
+    /// share. Both are made again for another server, since their calls are bound to one.
+    var overview: OverviewModel { models.overview }
+    var health: ServerHealthModel { models.health }
+
+    private var models: (address: String?, overview: OverviewModel, health: ServerHealthModel) {
+        if let held = overviewModels, held.address == serverAddress { return held }
+        let health = ServerHealthModel(context: OwnerContext(host: self))
+        let made = (serverAddress, OverviewModel(context: OwnerContext(host: self), health: health), health)
+        overviewModels = made
+        return made
     }
 
     func show(_ page: MarfaSettingsPage) { launcher.show(.marfa(page)) }
@@ -144,26 +149,41 @@ enum LibraryDescription {
 
     /// The owner's calls, made through a client that shows the system's sign-in in place where the server asks the owner to
     /// confirm it is them, and sends the call again once they have.
-    var ownerCalls: any OwnerCalls { ClientOwnerCalls(client: confirmingClient) }
+    var ownerCalls: any OwnerCalls { ClientOwnerCalls(server: plainServer, client: confirmingClient) }
 
     /// What Activity, Monitoring, Limits and Start-Up ask of the server, through the same client.
     var instanceCalls: any InstanceCalls { ClientInstanceCalls(client: confirmingClient) }
+
+    /// The package's server, for the one call the generated client does not hold (`Server.health()`).
+    private var plainServer: (@Sendable () throws -> Server)? {
+        guard let connection = host.configuredConnection else { return nil }
+        let signIns = host.signIns
+        let address = connection.address.absoluteString
+        return { try Self.server(address: address) { try MarfaServerCalls(connection: connection, signIns: signIns).server() } }
+    }
 
     private var confirmingClient: @Sendable () throws -> Client {
         guard let connection = host.configuredConnection else {
             return { throw MarfaError.signedOut(origin: "", message: "no server is set") }
         }
         let signIns = host.signIns
+        let address = connection.address.absoluteString
         return {
-            do {
-                let calls = MarfaServerCalls(connection: connection, signIns: signIns)
-                let server = try calls.server().confirming(from: { NSApp.keyWindow ?? NSApp.windows.first ?? NSWindow() })
-                return Client(server, timeout: calls.timeout)
-            } catch let ending as MarfaServerCalls.Ending {
-                switch ending {
-                case .keyRefused: throw MarfaError.signedOut(origin: connection.address.absoluteString, message: "the sign-in ended")
-                default: throw MarfaError.invalid(message: Words.signInUnreadable)
-                }
+            let calls = MarfaServerCalls(connection: connection, signIns: signIns)
+            let server = try Self.server(address: address) { try calls.server() }
+                .confirming(from: { NSApp.keyWindow ?? NSApp.windows.first ?? NSWindow() })
+            return Client(server, timeout: calls.timeout)
+        }
+    }
+
+    /// The package's server from `build`: an ended sign-in is the server ending it, anything else cannot be read.
+    nonisolated private static func server(address: String, _ build: () throws -> Server) throws -> Server {
+        do {
+            return try build()
+        } catch let ending as MarfaServerCalls.Ending {
+            switch ending {
+            case .keyRefused: throw MarfaError.signedOut(origin: address, message: "the sign-in ended")
+            default: throw MarfaError.invalid(message: Words.signInUnreadable)
             }
         }
     }

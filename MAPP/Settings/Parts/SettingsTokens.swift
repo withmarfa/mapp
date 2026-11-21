@@ -133,6 +133,11 @@ enum SettingsTokens {
         /// A log table's count bar and foot, which sit closer than a table with selection and actions.
         static let logTableBar: CGFloat = 34
         static let logTableFoot: CGFloat = 44
+        /// The narrow columns of a table of jobs, which put the table's later columns at the board's proportions in a full-width
+        /// card: how often, when it last ran, and how it went.
+        static let columnEvery: CGFloat = 88
+        static let columnLastRun: CGFloat = 108
+        static let columnResult: CGFloat = 66
         /// A table's header band.
         static let tableHeader: CGFloat = 30
         /// A table row's height: in a section, and on a page of its own, which draws them closer.

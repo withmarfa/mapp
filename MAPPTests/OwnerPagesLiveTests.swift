@@ -14,7 +14,23 @@ extension LiveMarfaTests {
         private func calls() throws -> ClientOwnerCalls {
             let connection = try MarfaConnection(address: try LiveMarfa.address())
             let calls = MarfaServerCalls(connection: connection, signIns: ScriptedSignIns([connection.address: try LiveMarfa.key()]))
-            return ClientOwnerCalls { try calls.client() }
+            return ClientOwnerCalls(server: { try calls.server() }, client: { try calls.client() })
+        }
+
+        /// Backups, Updates and Housekeeping read what the server holds, writing nothing: the health the three pages share, the
+        /// backups (none where the server has nowhere to keep them), the settings, the update and the jobs.
+        @Test(.timeLimit(.minutes(2))) func upkeepPagesReadWhatTheServerHoldsAndWriteNothing() async throws {
+            let calls = try calls()
+            let health = try await calls.health()
+            #expect(health.housekeeping != nil, "a key holding instance.read is given the detail")
+            let backups = try await calls.backups()
+            let settings = try await calls.upkeepSettings()
+            if settings.folder == nil, !settings.objectStore { #expect(backups.isEmpty, "nowhere to keep backups is no failure") }
+            let update = try await calls.updateStatus()
+            #expect(!update.running.isEmpty)
+            let jobs = try await calls.housekeepingJobs()
+            #expect(jobs.contains { $0.name == "trash-purge" })
+            #expect(try await calls.upkeepSettings() == settings, "reading changes nothing")
         }
 
         @Test(.timeLimit(.minutes(2))) func everyPageReadsWhatTheServerHolds() async throws {

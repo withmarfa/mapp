@@ -107,7 +107,7 @@ struct SettingsWindowTests {
         #expect(
             SettingsPage.marfaGroups.flatMap { $0 } == [
                 .overview, .account, .apps, .keys, .addresses, .sources, .recentlyDeleted, .history, .fileStorage, .webhooks, .folders,
-                .activity, .monitoring, .limits, .startUp,
+                .backups, .updates, .housekeeping, .activity, .monitoring, .limits, .startUp,
             ])
     }
 

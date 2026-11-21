@@ -27,13 +27,6 @@ nonisolated struct HealthPart: Hashable, Sendable {
     var condition: Condition
 }
 
-nonisolated struct BackupsHealth: Hashable, Sendable {
-    enum State: String, Hashable, Sendable { case ok, incomplete, failing, off, unknown }
-
-    var state: State
-    var lastBackup: Date?
-}
-
 /// What the Overview reads of the server besides what needs attention. Every part is optional: a part the server did not give
 /// is left out, never guessed.
 nonisolated struct InstanceReading: Hashable, Sendable {
