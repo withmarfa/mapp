@@ -55,6 +55,8 @@ async function withItem(
   source: string,
   run: (editor: ItemEditor) => void | Promise<void>,
   words = {},
+  /** Runs before the item is set, as the app sends the new header before the item when it changes first. */
+  before: (editor: ItemEditor) => void = () => {},
 ) {
   const root = document.createElement('div')
   document.body.append(root)
@@ -74,6 +76,7 @@ async function withItem(
     {},
     words,
   )
+  before(editor)
   editor.setItem('note')
   editor.load(source, 1)
   try {
@@ -131,6 +134,20 @@ test('a picture whose description repeats the item title is called Picture, in t
       await vi.waitFor(() => expect(labels()).toEqual(['A picture']))
     },
     { picture: 'Image' },
+  )
+})
+
+test('a title sent before the item is set still names a picture that repeats it', async () => {
+  app(() => ({ state: 'waiting' }))
+  await withItem(
+    picture,
+    async () => {
+      await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
+      await settled()
+      expect(labels()).toEqual(['Picture'])
+    },
+    {},
+    (editor) => editor.setTitle('A picture'),
   )
 })
 

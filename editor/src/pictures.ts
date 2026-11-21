@@ -74,7 +74,8 @@ export class WebPictures {
   private announced = ''
   private dismissed = false
   private scheduled = false
-  /** The item's title, which a picture's description may only repeat. */
+  /** The item's title, which a picture's description may only repeat. The header owns it and sends it only when it
+   *  changes, so an item change leaves it be: the app may send the new header before or after the item. */
   private title = ''
   /** The description each picture on the page was drawn with. */
   private alts = new Map<string, string | undefined>()
@@ -103,7 +104,6 @@ export class WebPictures {
     this.states.clear()
     this.asking.clear()
     this.alts.clear()
-    this.title = ''
     this.dismissed = false
     this.schedule()
   }
