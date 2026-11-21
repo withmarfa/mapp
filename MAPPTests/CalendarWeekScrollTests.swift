@@ -91,6 +91,8 @@ struct CalendarWeekScrollTests {
         #expect(rest == CalendarStrip.Position(leading: 3, nearest: 3, isBetween: false))
         let between = CalendarStrip.position(offset: 360, dayWidth: 100)
         #expect(between == CalendarStrip.Position(leading: 3, nearest: 4, isBetween: true))
+        let shortOfTheEdge = CalendarStrip.position(offset: 299.9, dayWidth: 100)
+        #expect(shortOfTheEdge == rest)
         #expect(rest.shown() == 3..<10)
         #expect(between.shown() == 3..<11)
     }

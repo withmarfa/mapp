@@ -61,7 +61,9 @@ nonisolated struct CalendarStrip: Equatable, Sendable {
         guard dayWidth > 0, offset.isFinite else { return Position(leading: 0, nearest: 0, isBetween: false) }
         let days = offset / dayWidth
         let nearest = Int(days.rounded())
-        return Position(leading: Int(days.rounded(.down)), nearest: nearest, isBetween: abs(days - CGFloat(nearest)) > 0.01)
+        let isBetween = abs(days - CGFloat(nearest)) > 0.01
+        // A scroll that rests on a day's edge by a fraction of a point short of it is on that day, not the one before.
+        return Position(leading: isBetween ? Int(days.rounded(.down)) : nearest, nearest: nearest, isBetween: isBetween)
     }
 
     /// The offset of the day nearest `offset`, which a scroll that is let go of settles on.

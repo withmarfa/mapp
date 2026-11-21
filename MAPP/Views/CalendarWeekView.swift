@@ -87,17 +87,20 @@ struct CalendarWeekView: View {
         .scrollBounceBehavior(.basedOnSize, axes: .vertical)
         .scrollPosition($position)
         .scrollTargetBehavior(DaySnap(dayWidth: column))
+        // `ScrollPosition` counts from the content's own corner, while `contentOffset` counts from the safe area's (the
+        // sidebar and the toolbar are part of it), so both are read with the inset added back.
         .onScrollGeometryChange(for: CalendarStrip.Position.self) {
-            CalendarStrip.position(offset: $0.contentOffset.x, dayWidth: column)
+            CalendarStrip.position(offset: $0.contentOffset.x + $0.contentInsets.leading, dayWidth: column)
         } action: { _, new in
             scrolled = new
         }
-        .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y } action: { _, offset in
+        .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { _, offset in
             keyboard.offsetY = offset
         }
-        .onScrollPhaseChange { _, phase in
-            if phase == .idle { settle() }
+        .onScrollPhaseChange { old, phase, context in
+            if phase == .idle { settle(atOffset: context.geometry.contentOffset.x + context.geometry.contentInsets.leading) }
         }
+        .overlay(alignment: .top) { Color.clear.frame(height: 1).background(.background, ignoresSafeAreaEdges: .top).allowsHitTesting(false) }
         .coordinateSpace(.named(Self.space))
         .onGeometryChange(for: CGSize.self) { $0.size } action: { size = $0; updateViewport() }
         .background(
@@ -106,7 +109,7 @@ struct CalendarWeekView: View {
         .opacity(isReady ? 1 : 0)
         .task(id: size.width > 0) { await start() }
         .onChange(of: column) {
-            if isReady { position.scrollTo(x: CGFloat(tracker.settledIndex) * column) }
+            if isReady { position.scrollTo(x: CGFloat(tracker.settledIndex) * column, y: keyboard.offsetY) }
         }
         .onChange(of: firstDay) { _, day in go(to: day) }
         .navigationTitle(ItemCalendar.title(of: DateInterval(start: first, end: end), calendar: calendar))
@@ -139,26 +142,29 @@ struct CalendarWeekView: View {
             index = strip.index(of: day, calendar: calendar)
             rebuilt = true
         }
-        guard rebuilt || index != scrolled.nearest || scrolled.isBetween else { return }
+        // The day a scroll here settled on comes back as `firstDay`, and is already where the strip is.
+        guard rebuilt || index != tracker.settledIndex else { return }
         tracker.settledIndex = index
         let x = CGFloat(index) * columnWidth
         if near && !rebuilt {
-            withAnimation(.smooth) { position.scrollTo(x: x) }
+            withAnimation(.smooth) { position.scrollTo(x: x, y: keyboard.offsetY) }
         } else {
             scrolled = CalendarStrip.Position(leading: index, nearest: index, isBetween: false)
-            position.scrollTo(x: x)
+            position.scrollTo(x: x, y: keyboard.offsetY)
         }
     }
 
     /// Tells the browser which day the scroll came to rest on. A scroll that stopped between days (a mouse wheel, say)
     /// is brought to the nearest one first.
-    private func settle() {
+    private func settle(atOffset offset: CGFloat) {
         guard isReady else { return }
-        let index = scrolled.nearest
-        if scrolled.isBetween {
-            withAnimation(.smooth(duration: 0.2)) { position.scrollTo(x: CGFloat(index) * columnWidth) }
+        let rest = CalendarStrip.position(offset: offset, dayWidth: columnWidth)
+        let index = rest.nearest
+        if rest.isBetween {
+            withAnimation(.smooth(duration: 0.2)) { position.scrollTo(x: CGFloat(index) * columnWidth, y: keyboard.offsetY) }
             return
         }
+        guard index != tracker.settledIndex else { return }
         tracker.settledIndex = index
         let day = strip.day(at: index, calendar: calendar)
         if day != calendar.startOfDay(for: firstDay) { browser.calendarDay = day }
