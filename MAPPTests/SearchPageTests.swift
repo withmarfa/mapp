@@ -93,8 +93,15 @@ private func item(
 @Suite struct SearchLeaveOutListTests {
     typealias F = LibraryFixture
 
+    private func entries(
+        _ leaveOut: SearchLeaveOut, catalogue: Catalogue = F.catalogue, sources: SourceDirectory = SourceDirectory(), offered: [TypeID] = []
+    ) -> [SearchLeaveOutList.Entry] {
+        let labels = SearchLeaveOutList.labels(offered: offered, leaveOut: leaveOut, catalogue: catalogue)
+        return SearchLeaveOutList.entries(for: leaveOut, catalogue: catalogue, sources: sources, labels: labels)
+    }
+
     @Test func aTypeLeftOutListsItsSubtypesAsLeftOutToo() {
-        let entries = SearchLeaveOutList.entries(for: SearchLeaveOut(types: [F.ticket]), catalogue: F.catalogue, sources: SourceDirectory())
+        let entries = entries(SearchLeaveOut(types: [F.ticket]))
         #expect(entries.map(\.title) == ["Tickets", "Bugs", "Tasks"])
         #expect(entries.map(\.kind) == [.type(F.ticket), .subtype(F.bug, parent: F.ticket), .subtype(F.task, parent: F.ticket)])
     }
@@ -103,8 +110,7 @@ private func item(
         var directory = SourceDirectory()
         directory.infos = ["github": SourceInfo(code: "github", name: "GitHub", mark: nil, hasChosenName: false)]
         directory.counts = ["github": 1_840]
-        let entries = SearchLeaveOutList.entries(
-            for: SearchLeaveOut(sources: ["github", "gone"]), catalogue: F.catalogue, sources: directory)
+        let entries = entries(SearchLeaveOut(sources: ["github", "gone"]), sources: directory)
         let github = entries.first { $0.kind == .source("github") }
         let gone = entries.first { $0.kind == .source("gone") }
         #expect(github?.isKnown == true && github?.count == 1_840)
@@ -113,8 +119,7 @@ private func item(
     }
 
     @Test func beforeTheServerHasAnsweredNoSourceIsCalledUnknown() {
-        let entries = SearchLeaveOutList.entries(for: SearchLeaveOut(sources: ["github"]), catalogue: F.catalogue, sources: SourceDirectory())
-        #expect(entries.map(\.isKnown) == [true])
+        #expect(entries(SearchLeaveOut(sources: ["github"])).map(\.isKnown) == [true])
     }
 
     @MainActor @Test func anUnknownSourceCanBeRemovedAndTheRestStays() throws {
@@ -130,11 +135,47 @@ private func item(
             ItemTypeCount(id: F.note, label: "Notes", icon: nil, count: 3), ItemTypeCount(id: F.ticket, label: "Tickets", icon: nil, count: 2),
             ItemTypeCount(id: F.bug, label: "Bugs", icon: nil, count: 1), ItemTypeCount(id: F.project, label: "Projects", icon: nil, count: 1),
         ]
-        let offered = SearchLeaveOutList.typesToAdd(counts, leaveOut: SearchLeaveOut(types: [F.ticket]), catalogue: F.catalogue)
-        #expect(offered.map(\.id) == [F.note, F.project], "Tickets is left out and Bugs go with it")
+        let leaveOut = SearchLeaveOut(types: [F.ticket])
+        let labels = SearchLeaveOutList.labels(offered: counts.map(\.id), leaveOut: leaveOut, catalogue: F.catalogue)
+        let offered = SearchLeaveOutList.typesToAdd(counts, leaveOut: leaveOut, catalogue: F.catalogue, labels: labels)
+        #expect(offered.map(\.id) == [F.note, F.project], "Tickets is left out and Bugs go with it, Notes before Projects")
         let sources = SearchLeaveOutList.sourcesToAdd(
             [SourceCount(code: "a", name: "A", count: 1), SourceCount(code: "b", name: "B", count: 2)], leaveOut: SearchLeaveOut(sources: ["a"]))
         #expect(sources.map(\.code) == ["b"])
+    }
+
+    @Test func theMenuIsAToZAsTheListIsAndSaysWhichTypesTakeSubtypes() {
+        let counts = [
+            ItemTypeCount(id: F.project, label: "Projects", icon: nil, count: 9), ItemTypeCount(id: F.note, label: "Notes", icon: nil, count: 3),
+            ItemTypeCount(id: F.bug, label: "Bugs", icon: nil, count: 1), ItemTypeCount(id: F.entity, label: "Entities", icon: nil, count: 1),
+        ]
+        let labels = SearchLeaveOutList.labels(offered: counts.map(\.id), leaveOut: SearchLeaveOut(), catalogue: F.catalogue)
+        let offered = SearchLeaveOutList.typesToAdd(counts, leaveOut: SearchLeaveOut(), catalogue: F.catalogue, labels: labels)
+        #expect(offered.map(\.label) == ["Bugs", "Entities", "Notes", "Projects"])
+        #expect(offered.map(\.title) == ["Bugs", "Entities", "Notes, with 4 subtypes", "Projects"])
+        let sources = SearchLeaveOutList.sourcesToAdd(
+            [SourceCount(code: "z", name: "Zeta", count: 1), SourceCount(code: "a", name: "Alpha", count: 1)], leaveOut: SearchLeaveOut())
+        #expect(sources.map(\.name) == ["Alpha", "Zeta"])
+    }
+
+    /// Two types that share a name are told apart the same way in the menu and in the list: "Tasks (Tickets)".
+    @Test func twoTypesWithOneNameAreToldApartInTheMenuAndTheList() {
+        let fields = F.ticketFields
+        func type(_ id: String, _ plural: String, parent: TypeID?) -> ItemTypeInfo {
+            ItemTypeInfo(id: TypeID(id), label: plural, plural: plural, fields: fields, titleField: "title", bodyField: "body", parent: parent)
+        }
+        let tickets = type("aic.ticket", "Tickets", parent: nil), chores = type("aic.chore", "Chores", parent: nil)
+        let catalogue = Catalogue(itemTypes: [
+            tickets, chores, type("aic.ticket.task", "Tasks", parent: tickets.id), type("aic.chore.task", "Tasks", parent: chores.id),
+        ])
+        let counts = [tickets, chores, catalogue.itemTypes[TypeID("aic.ticket.task")]!, catalogue.itemTypes[TypeID("aic.chore.task")]!]
+            .map { ItemTypeCount(id: $0.id, label: $0.plural, icon: nil, count: 1) }
+        let leaveOut = SearchLeaveOut(types: [TypeID("aic.ticket.task")])
+        let labels = SearchLeaveOutList.labels(offered: counts.map(\.id), leaveOut: leaveOut, catalogue: catalogue)
+        let offered = SearchLeaveOutList.typesToAdd(counts, leaveOut: leaveOut, catalogue: catalogue, labels: labels)
+        #expect(offered.map(\.label) == ["Chores", "Tasks (Chores)", "Tickets"])
+        let listed = SearchLeaveOutList.entries(for: leaveOut, catalogue: catalogue, sources: SourceDirectory(), labels: labels)
+        #expect(listed.map(\.title) == ["Tasks (Tickets)"])
     }
 
     /// Every condition is a type or a source, and a filter holds ten: past that every search fails, so the page stops short.
@@ -157,6 +198,16 @@ private func item(
             _ = try narrowing.kept(in: F.catalogue)
             _ = try narrowing.leftOutOfSearch(in: F.catalogue)
         }
+    }
+
+    /// More than one is dimmed once the limit is close, not only the one that crosses it first.
+    @Test func everyAdditionThatWouldCrossTheLimitIsTold() {
+        let leaveOut = SearchLeaveOut(sources: Set((0..<9).map { "source-\($0)" }))
+        let crossing: [SearchLeaveOutList.Addition] = [.type(F.note), .type(F.ticket), .source("tenth"), .type(F.bug)]
+        let dimmed = crossing.filter { !SearchLeaveOutList.fits($0, in: leaveOut, catalogue: F.catalogue) }
+        #expect(dimmed == [.type(F.note), .type(F.ticket)], "a ticket takes two subtypes, so three conditions; a source or a bug is one and fits")
+        let full = SearchLeaveOut(sources: Set((0..<10).map { "source-\($0)" }))
+        #expect(crossing.allSatisfy { !SearchLeaveOutList.fits($0, in: full, catalogue: F.catalogue) })
     }
 
     @Test func aTypeCountsForEveryTypeTheCopyHoldsBelowIt() {

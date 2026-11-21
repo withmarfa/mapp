@@ -70,6 +70,26 @@ import Testing
         #expect(!without.holdsAll && without.permissionsLine == "MAPP holds 13 of the owner’s 14 permissions.")
     }
 
+    /// S26 to S30: Signed In As is shown while the sign-in is held, answered or not, and not once it has ended.
+    @Test func signedInAsIsShownWheneverTheSignInIsHeld() {
+        func account(_ state: MarfaConnectionState, readsProfile: Bool = true) -> ConnectionAccount {
+            ConnectionAccount(state: state, grants: [], grantsRead: true, readsProfile: readsProfile, waiting: 0, serverName: "X")
+        }
+        #expect(account(.online).showsName && account(.connecting).showsName && account(.offline(reason: nil)).showsName)
+        #expect(!account(.keyRefused).showsName && !account(.disconnected).showsName)
+    }
+
+    @Test func withoutTheNameScopeSignedInAsIsEmptyAndPointsToTheOneAllowMore() {
+        let without = ConnectionAccount(state: .online, grants: [], grantsRead: true, readsProfile: false, waiting: 0, serverName: "X")
+        #expect(without.showsName && without.offersName)
+        #expect(without.nameLine == "Allow More… lets MAPP read the owner’s name.")
+        let with = ConnectionAccount(state: .online, grants: [], grantsRead: true, readsProfile: true, waiting: 0, serverName: "X")
+        #expect(with.nameLine == nil)
+        // Where no Allow More… is there to give the name, no line promises one.
+        let unreached = ConnectionAccount(state: .offline(reason: nil), grants: [], grantsRead: true, readsProfile: false, waiting: 0, serverName: "X")
+        #expect(unreached.showsName && unreached.nameLine == nil)
+    }
+
     @Test func notAnsweringSaysWhatWaitsAndNothingOfPermissions() {
         let account = ConnectionAccount(state: .offline(reason: nil), grants: [.itemsPurge], grantsRead: true, waiting: 3, serverName: "Castell Studio")
         #expect(!account.showsPermissions)

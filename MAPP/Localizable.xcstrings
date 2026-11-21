@@ -4,6 +4,28 @@
     "%@ (Missing)" : {
 
     },
+    "%@, with %lld subtypes" : {
+      "localizations" : {
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%@, with %lld subtype"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%@, with %lld subtypes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld more left out of search." : {
 
     },
@@ -28,6 +50,12 @@
     "Address Not Added" : {
 
     },
+    "Allow More… lets MAPP read the owner’s name." : {
+
+    },
+    "Couldn’t be downloaded." : {
+
+    },
     "It must sign in again with your password or a passkey. Apps and keys keep working." : {
 
     },
@@ -38,6 +66,15 @@
 
     },
     "Key Not Renamed" : {
+
+    },
+    "MAPP removes its copy from this Mac and signs out. Webhooks it made are deleted. Your items stay." : {
+
+    },
+    "Needs more disk space." : {
+
+    },
+    "On the server’s own page, in a sheet." : {
 
     },
     "Passkey Not Renamed" : {
@@ -337,9 +374,6 @@
     "Leave Out a Type or Source…" : {
 
     },
-    "Leaving out more would make a search too long to run." : {
-
-    },
     "Left Out of Search" : {
 
     },
@@ -359,6 +393,9 @@
 
     },
     "Signed out. This Mac’s copy is kept." : {
+
+    },
+    "Some can’t be left out as well: a search can skip only so much. Stop leaving one out to make room." : {
 
     },
     "Space Used" : {
@@ -548,9 +585,6 @@
 
     },
     "On an item’s page." : {
-
-    },
-    "On the server’s own page, in your browser." : {
 
     },
     "Open Connection…" : {
@@ -964,6 +998,9 @@
     "Translucent" : {
 
     },
+    "Unavailable on the server." : {
+
+    },
     "Unknown" : {
 
     },
@@ -995,6 +1032,18 @@
 
     },
     "Value panels open under a date, status, tags, or other value. Palettes are the command palette, Search Items, and New Item. Translucent uses the system’s popover material, and Solid uses the window color." : {
+
+    },
+    "Waiting for a connection." : {
+
+    },
+    "Waiting for file details." : {
+
+    },
+    "Waiting for the server." : {
+
+    },
+    "Waiting to download." : {
 
     },
     "Waiting…" : {
@@ -6028,9 +6077,6 @@
     "Look After This Marfa" : {
 
     },
-    "MAPP can’t read the owner’s name yet." : {
-
-    },
     "MAPP fetches the whole library from %@ again. It keeps working while it downloads." : {
 
     },
@@ -6038,9 +6084,6 @@
 
     },
     "MAPP holds %lld of the owner’s %lld permissions." : {
-
-    },
-    "MAPP removes its copy of %@ from this Mac and ends its sign-in, also on the server. Your items on the server don’t change." : {
 
     },
     "MAPP will try again." : {

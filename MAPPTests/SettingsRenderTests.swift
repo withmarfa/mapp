@@ -259,12 +259,27 @@ private struct RenderedWindow<Detail: View>: View {
             size: Self.size, named: "Search")
     }
 
+    /// The limit of ten conditions reached: what is left offered is dimmed in the menu, and the footer says why.
+    @Test func searchAtTheLimit() async throws {
+        let library = FakeItemLibrary(items: [])
+        let codes = (0..<12).map { "source-\($0)" }
+        library.sources.infos = Dictionary(uniqueKeysWithValues: codes.map { ($0, SourceInfo(code: $0, name: "Source \($0)", mark: nil, hasChosenName: false)) })
+        library.sources.counts = Dictionary(uniqueKeysWithValues: codes.map { ($0, 10) })
+        let (libraries, bench) = try await connected()
+        _ = bench
+        libraries.searchLeaveOuts.update(libraries.libraryKey) { $0.sources = Set(codes.prefix(10)) }
+        library.catalogue = LibraryFixture.catalogue
+        try await SettingsRender.png(
+            RenderedWindow(selection: .search, detail: SearchPage().environment(libraries).environment(\.library, library)),
+            size: Self.size, named: "Search, at the limit")
+    }
+
     @Test func onThisMac() async throws {
         let library = FakeItemLibrary(items: [])
         library.downloadedFiles = FakeDownloads(
             state: DownloadedFileState(
                 budget: .automatic, limit: 12_000_000_000, bytes: 1_200_000_000,
-                attachments: .init(held: 14, missing: 0, reasons: [])))
+                attachments: .init(held: 53, missing: 3, reasons: [MissingAttachments(reason: .waiting, count: 3)])))
         let (libraries, bench) = try await connected()
         _ = bench
         try await SettingsRender.png(

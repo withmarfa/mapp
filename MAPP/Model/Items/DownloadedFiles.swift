@@ -29,6 +29,26 @@ nonisolated protocol DownloadedFiles: Sendable {
 }
 
 nonisolated enum DownloadWording {
+    /// The line under "Attachments Not Yet Offline": the one reason as a sentence, "Waiting to download.", or, where
+    /// there are several, each with its count. Nil where the copy has not said why.
+    static func line(_ reasons: [MissingAttachments]) -> String? {
+        guard let only = reasons.first else { return nil }
+        guard reasons.count > 1 else { return sentence(only.reason) }
+        return reasons.map(reason).joined(separator: ". ") + "."
+    }
+
+    static func sentence(_ reason: MissingAttachments.Reason) -> String {
+        switch reason {
+        case .waiting: String(localized: "Waiting to download.")
+        case .space: String(localized: "Needs more disk space.")
+        case .offline: String(localized: "Waiting for a connection.")
+        case .later: String(localized: "Waiting for the server.")
+        case .absent: String(localized: "Unavailable on the server.")
+        case .failed: String(localized: "Couldn’t be downloaded.")
+        case .missingItem: String(localized: "Waiting for file details.")
+        }
+    }
+
     static func reason(_ missing: MissingAttachments) -> String {
         let count = missing.count
         switch missing.reason {

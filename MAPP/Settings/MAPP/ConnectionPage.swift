@@ -9,7 +9,9 @@ struct ConnectionPage: View {
     @Environment(Libraries.self) private var libraries
     @Environment(\.library) private var library
     @State private var isChoosingOther = false
+    /// The owner's name and the server it was read from, kept while that server does not answer.
     @State private var accountName: String?
+    @State private var accountNameServer: MarfaConnection?
 
     private var host: MarfaHost { libraries.host }
     private var model: MarfaSettingsModel { libraries.marfaSettings }
@@ -33,12 +35,15 @@ struct ConnectionPage: View {
             Button("Cancel", role: .cancel) {}
             Button("Disconnect", role: .destructive) { Task { await model.disconnect() } }
         } message: {
-            Text("MAPP removes its copy of \(LibraryDescription.name(libraries)) from this Mac and ends its sign-in, also on the server. Your items on the server don’t change.")
+            Text("MAPP removes its copy from this Mac and signs out. Webhooks it made are deleted. Your items stay.")
         }
         .task(id: NameRequest(connection: host.configuredConnection, isOnline: host.state == .online, readsProfile: host.readsProfile)) {
-            accountName = nil
+            if accountNameServer != host.configuredConnection {
+                accountName = nil
+                accountNameServer = host.configuredConnection
+            }
             guard let connection = host.configuredConnection, host.state == .online else { return }
-            accountName = await MarfaServerCalls(connection: connection, signIns: host.signIns).ownerName()
+            accountName = host.readsProfile ? await MarfaServerCalls(connection: connection, signIns: host.signIns).ownerName() : nil
         }
     }
 
@@ -60,7 +65,7 @@ struct ConnectionPage: View {
                 .disabled(model.isWorking)
                 .accessibilityIdentifier("MarfaAddress")
             }
-            SettingsRow("Sign In", line: "On the server’s own page, in your browser.") {
+            SettingsRow("Sign In", line: "On the server’s own page, in a sheet.") {
                 signInButtons(
                     title: "Sign In…", canStart: model.canConnect, browser: .connect(usingCode: false), code: .connect(usingCode: true),
                     identifier: "MarfaConnect")
@@ -135,28 +140,24 @@ struct ConnectionPage: View {
             state: host.state, grants: host.grants, grantsRead: host.grantsRead, readsProfile: host.readsProfile,
             waiting: host.waitingChanges, serverName: name)
         return SettingsSection("Account") {
-            if let accountName {
-                SettingsRow("Signed In As") { SettingsValue(verbatim: accountName) }
-            } else if account.offersName {
-                SettingsRow("Signed In As", line: "MAPP can’t read the owner’s name yet.") {
-                    SettingsButton(settingsHost.isAllowingMore ? "Waiting…" : "Allow More…") {
-                        Task { _ = await settingsHost.allowMore([]) }
-                    }
-                    .disabled(settingsHost.isAllowingMore)
-                    .accessibilityIdentifier("AllowName")
+            if account.showsName {
+                SettingsRow(title: Text("Signed In As"), line: account.nameLine.map { Text(verbatim: $0) }) {
+                    SettingsValue(verbatim: accountName ?? "")
                 }
                 .accessibilityIdentifier("SignedInAs")
             }
             if account.showsPermissions {
                 SettingsRow(title: Text("Look After This Marfa"), line: Text(verbatim: account.permissionsLine)) {
-                    if account.holdsAll {
-                        SettingsValue(verbatim: account.permissionsValue)
-                    } else {
-                        SettingsButton(settingsHost.isAllowingMore ? "Waiting…" : "Allow More…") {
-                            Task { _ = await settingsHost.allowMore(ConnectionAccount.asked) }
+                    HStack(spacing: 8) {
+                        if account.holdsAll { SettingsValue(verbatim: account.permissionsValue) }
+                        // The one Allow More… on the page: it asks for the owner's name too, which every sign-in asks for.
+                        if !account.holdsAll || account.offersName {
+                            SettingsButton(settingsHost.isAllowingMore ? "Waiting…" : "Allow More…") {
+                                Task { _ = await settingsHost.allowMore(ConnectionAccount.asked) }
+                            }
+                            .disabled(settingsHost.isAllowingMore)
+                            .accessibilityIdentifier("AllowMore")
                         }
-                        .disabled(settingsHost.isAllowingMore)
-                        .accessibilityIdentifier("AllowMore")
                     }
                 }
                 .accessibilityIdentifier("LookAfterThisMarfa")

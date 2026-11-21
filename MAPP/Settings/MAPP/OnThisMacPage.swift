@@ -124,9 +124,11 @@ struct OnThisMacPage: View {
                 SettingsValue(verbatim: attachments.held.formatted())
             }
             if attachments.missing > 0 {
-                SettingsRow("Attachments Not Yet Offline") { SettingsValue(verbatim: attachments.missing.formatted()) }
-                ForEach(attachments.reasons, id: \.reason) { missing in
-                    SettingsRow(verbatim: DownloadWording.reason(missing), size: .compact, lines: nil)
+                SettingsRow(
+                    title: Text("Attachments Not Yet Offline"), line: DownloadWording.line(attachments.reasons).map { Text(verbatim: $0) },
+                    lines: nil
+                ) {
+                    SettingsValue(verbatim: attachments.missing.formatted())
                 }
             }
         } else {

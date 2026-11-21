@@ -28,19 +28,45 @@ struct SearchPage: View {
         libraries.searchLeaveOuts.update(libraries.libraryKey, change)
     }
 
+    /// What the add menu offers, with the names the list uses.
+    private struct Offer {
+        let types: [SearchLeaveOutList.TypeChoice]
+        let sources: [SourceCount]
+        let labels: [TypeID: String]
+        let isDimmed: (SearchLeaveOutList.Addition) -> Bool
+        /// Whether some of what is offered would make more conditions than a search holds.
+        let atLimit: Bool
+    }
+
+    private func offer(in library: any ItemLibrary) -> Offer {
+        let catalogue = library.catalogue
+        let counts = library.itemTypeCounts
+        let labels = SearchLeaveOutList.labels(offered: counts.map(\.id), leaveOut: leaveOut, catalogue: catalogue)
+        let types = SearchLeaveOutList.typesToAdd(counts, leaveOut: leaveOut, catalogue: catalogue, labels: labels)
+        let sources = SearchLeaveOutList.sourcesToAdd(library.sourceCounts, leaveOut: leaveOut)
+        let leaveOut = leaveOut
+        let isDimmed = { (addition: SearchLeaveOutList.Addition) in !SearchLeaveOutList.fits(addition, in: leaveOut, catalogue: catalogue) }
+        let atLimit = types.contains { isDimmed(.type($0.id)) } || sources.contains { isDimmed(.source($0.code)) }
+        return Offer(types: types, sources: sources, labels: labels, isDimmed: isDimmed, atLimit: atLimit)
+    }
+
     private var leftOut: some View {
-        SettingsSection("Left Out of Search", line: "They still show in their own place, in views and in Favorites.") {
-            if let library {
-                ForEach(SearchLeaveOutList.entries(for: leaveOut, catalogue: library.catalogue, sources: library.sources)) { entry in
-                    row(for: entry, library: library)
+        let offer = library.map(offer(in:))
+        return SettingsSection(
+            "Left Out of Search", line: "They still show in their own place, in views and in Favorites.",
+            footer: offer?.atLimit == true ? "Some can’t be left out as well: a search can skip only so much. Stop leaving one out to make room." : nil
+        ) {
+            if let library, let offer {
+                ForEach(SearchLeaveOutList.entries(for: leaveOut, catalogue: library.catalogue, sources: library.sources, labels: offer.labels)) { entry in
+                    row(for: entry, library: library, labels: offer.labels)
                 }
-                addMenu(in: library)
+                addMenu(offer)
             }
         }
         .accessibilityIdentifier("SearchLeftOut")
     }
 
-    @ViewBuilder private func row(for entry: SearchLeaveOutList.Entry, library: any ItemLibrary) -> some View {
+    @ViewBuilder private func row(for entry: SearchLeaveOutList.Entry, library: any ItemLibrary, labels: [TypeID: String]) -> some View {
         switch entry.kind {
         case .type(let type):
             SettingsRow(
@@ -51,7 +77,7 @@ struct SearchPage: View {
             }
         case .subtype(_, let parent):
             SettingsRow(verbatim: entry.title, lead: .mark(Image(typeGlyph: entry.icon)), size: .compact) {
-                SettingsValue(verbatim: String(localized: "Left out with \(library.catalogue.plural(for: parent))"))
+                SettingsValue(verbatim: String(localized: "Left out with \(labels[parent] ?? library.catalogue.plural(for: parent))"))
             }
         case .source(let code):
             SettingsRow(
@@ -77,35 +103,26 @@ struct SearchPage: View {
         return String(localized: "A source. \(count.formatted()) items.")
     }
 
-    private func addMenu(in library: any ItemLibrary) -> some View {
-        let catalogue = library.catalogue
-        let types = SearchLeaveOutList.typesToAdd(library.itemTypeCounts, leaveOut: leaveOut, catalogue: catalogue)
-        let sources = SearchLeaveOutList.sourcesToAdd(library.sourceCounts, leaveOut: leaveOut)
-        let fitting = { (addition: SearchLeaveOutList.Addition) in SearchLeaveOutList.fits(addition, in: leaveOut, catalogue: catalogue) }
-        let crossesLimit = types.contains { !fitting(.type($0.id)) } || sources.contains { !fitting(.source($0.code)) }
-        return SettingsAddMenu("Leave Out a Type or Source…") {
-            if !types.isEmpty {
+    private func addMenu(_ offer: Offer) -> some View {
+        SettingsAddMenu("Leave Out a Type or Source…") {
+            if !offer.types.isEmpty {
                 Section("Types") {
-                    ForEach(types) { type in
-                        Button { change { $0.types.insert(type.id) } } label: { Text(verbatim: type.label) }
-                            .disabled(!fitting(.type(type.id)))
+                    ForEach(offer.types) { type in
+                        Button { change { $0.types.insert(type.id) } } label: { Text(verbatim: type.title) }
+                            .disabled(offer.isDimmed(.type(type.id)))
                     }
                 }
             }
-            if !sources.isEmpty {
+            if !offer.sources.isEmpty {
                 Section("Sources") {
-                    ForEach(sources) { source in
+                    ForEach(offer.sources) { source in
                         Button { change { $0.sources.insert(source.code) } } label: { Text(verbatim: source.name) }
-                            .disabled(!fitting(.source(source.code)))
+                            .disabled(offer.isDimmed(.source(source.code)))
                     }
                 }
-            }
-            if crossesLimit {
-                Divider()
-                Text("Leaving out more would make a search too long to run.")
             }
         }
-        .disabled(types.isEmpty && sources.isEmpty)
+        .disabled(offer.types.isEmpty && offer.sources.isEmpty)
         .accessibilityIdentifier("LeaveOutAdd")
     }
 

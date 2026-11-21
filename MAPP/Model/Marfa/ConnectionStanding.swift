@@ -98,8 +98,10 @@ nonisolated struct ConnectionAccount: Equatable, Sendable {
     var unsent: String
     var unsentLine: String?
     var showsPermissions: Bool
+    /// Whether Signed In As is shown: whenever the sign-in is held, so also while the server does not answer.
+    var showsName: Bool
     /// Signed In As cannot be told because the sign-in may not read the owner's name, as one made before MAPP asked for it
-    /// cannot; Allow More… or signing in again gives it.
+    /// cannot; Allow More… gives it, and it is the one Allow More… on the page, beside Look After This Marfa.
     var offersName: Bool
 
     init(
@@ -108,6 +110,10 @@ nonisolated struct ConnectionAccount: Equatable, Sendable {
     ) {
         let reached = state == .online || state == .connecting
         showsPermissions = reached && grantsRead
+        switch state {
+        case .online, .connecting, .offline: showsName = true
+        default: showsName = false
+        }
         offersName = showsPermissions && !readsProfile
         held = showsPermissions ? grants.intersection(Self.asked).count : nil
         unsent = waiting.map { $0 > 0 ? Words.changes($0) : String(localized: "None") } ?? String(localized: "Unknown")
@@ -116,6 +122,11 @@ nonisolated struct ConnectionAccount: Equatable, Sendable {
         case .offline: unsentLine = (waiting ?? 0) > 0 ? String(localized: "Sent when \(serverName) answers.") : nil
         default: unsentLine = nil
         }
+    }
+
+    /// What sits under Signed In As where the name is not read: nothing unless Allow More… is there to give it.
+    var nameLine: String? {
+        offersName ? String(localized: "Allow More… lets MAPP read the owner’s name.") : nil
     }
 
     /// "MAPP holds 5 of the owner’s 14 permissions."
