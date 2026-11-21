@@ -454,3 +454,66 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         #expect(MarfaSettingsPage.housekeeping.permission == .instanceRead)
     }
 }
+
+@MainActor
+@Suite(.hangLimit) struct UpkeepReviewFixTests {
+    private func ready() -> UpdateStatus {
+        UpdateStatus(
+            running: "0.0.84", checksAutomatically: true, latest: UpdateRelease(version: "0.0.85", published: someday), available: true,
+            checkFailed: false, updatesItself: true, step: nil, progress: nil, last: nil)
+    }
+
+    @Test func confirmDateSendsEvenWhenTheAlertsBindingClearedTheAskFirst() async {
+        let bench = OwnerBench(grants: [.instanceRead, .instanceMaintain])
+        let model = HousekeepingModel(context: bench.context)
+        let health = ServerHealthModel(context: bench.context)
+        model.askToConfirm(clock: someday)
+        model.cancelConfirming()
+        await model.confirm(health: health)
+        #expect(bench.calls.state.withLock { $0.clocksConfirmed } == 1)
+    }
+
+    @Test func aFolderRefusedInItsSheetLeavesNoLineOnThePage() async {
+        let bench = OwnerBench(grants: [.backupsManage, .configManage])
+        bench.calls.fail("changeUpkeep", with: .refused("no"))
+        let model = BackupsModel(context: bench.context)
+        await model.load()
+        model.beginFolder()
+        model.folderDraft = "/Volumes/Gone"
+        await model.saveFolder()
+        #expect(model.rowError == nil)
+        bench.calls.fail("changeUpkeep", with: .refused("no"))
+        await model.setInterval(86_400)
+        #expect(model.rowError != nil, "the interval pop-up's refusal does stand on the page")
+        model.beginFolder()
+        #expect(model.rowError == nil)
+        await model.setInterval(900)
+        model.close()
+        #expect(model.rowError == nil)
+    }
+
+    @Test func aStatusReadClearsHasntComeBackYet() async {
+        let bench = OwnerBench(grants: [.instanceRead, .instanceMaintain, .configManage])
+        bench.calls.state.withLock { $0.update = ready() }
+        let model = UpdatesModel(context: bench.context, pause: .zero, patience: 2)
+        await model.load()
+        bench.calls.fail("updateStatus", with: .unreachable)
+        await model.update()
+        #expect(model.lostTrack)
+        bench.calls.fail("updateStatus", with: nil)
+        await model.checkForUpdates()
+        #expect(!model.lostTrack)
+    }
+
+    @Test func updateIsNotReadyAgainWhileTheServerMayStillBeUpdating() async {
+        let bench = OwnerBench(grants: [.instanceRead, .instanceMaintain, .configManage])
+        bench.calls.state.withLock { $0.update = ready() }
+        let model = UpdatesModel(context: bench.context, pause: .zero, patience: 2)
+        await model.load()
+        bench.calls.fail("updateStatus", with: .unreachable)
+        await model.update()
+        #expect(model.lostTrack)
+        #expect(!model.canUpdate)
+        #expect(model.ready == nil)
+    }
+}
