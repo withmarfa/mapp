@@ -43,6 +43,12 @@ import os
     /// What each library's person leaves out of search.
     let searchLeaveOuts: SearchLeaveOuts
 
+    /// The shortcut each menu command has, on this Mac and for every library.
+    let shortcuts: ShortcutBindings
+
+    /// The shortcuts that work in any app, off until the person sets one.
+    let anyAppShortcuts: AnyAppShortcuts
+
     /// Asks every open page for its last edit and answers whether they all handed it over. A test gives its own, since
     /// the real one waits on every page in the process, those of tests running beside it too.
     private let handOverPages: (QuitTrace, @escaping (Bool) -> Void) -> Void
@@ -50,18 +56,24 @@ import os
     /// The value panel open, if any, whose typed text is written or handed back before anything else changes.
     private let valuePanels: ValueEditPresenter
 
+    private let defaults: UserDefaults
+
     init(
         host: MarfaHost, defaults: UserDefaults = .standard,
         handOverPages: ((@escaping (Bool) -> Void) -> Void)? = nil,
-        valuePanels: ValueEditPresenter = .shared, instanceSettings: InstanceSettingsModel? = nil
+        valuePanels: ValueEditPresenter = .shared, instanceSettings: InstanceSettingsModel? = nil,
+        hotKeys: any HotKeyRegistrar = NoHotKeys()
     ) {
         self.host = host
+        self.defaults = defaults
         self.valuePanels = valuePanels
         self.handOverPages = handOverPages.map { injected in { _, done in injected(done) } }
             ?? { trace, done in EditorController.flushAll(trace: trace, then: done) }
         sidebarLayouts = SidebarLayouts(defaults: defaults)
         typeLooks = TypeLooks(defaults: defaults)
         searchLeaveOuts = SearchLeaveOuts(defaults: defaults)
+        shortcuts = ShortcutBindings(defaults: defaults)
+        anyAppShortcuts = AnyAppShortcuts(defaults: defaults, registrar: hotKeys)
         marfaSettings = MarfaSettingsModel(host: host)
         self.instanceSettings = instanceSettings ?? InstanceSettingsModel(provider: { [host] in host.instanceConfigTarget() })
         self.instanceSettings.onSaved = { [host] answer, settings, address in host.instanceSaved(answer, changing: settings, of: address) }
@@ -71,6 +83,14 @@ import os
         }
         host.handOverEdits = { [weak self] in await self?.flushEditors() ?? false }
         LaunchTrace.shared.mark(.librariesInit, note: isLaunching ? "server set" : "no server")
+    }
+
+    /// Puts every setting on this Mac back (`MacSettings`) and the shortcuts already held in memory with it, so the menus
+    /// and the hot keys change at once and nothing writes the old choices back.
+    func resetMacSettings() {
+        shortcuts.restoreDefaults()
+        anyAppShortcuts.clearAll()
+        MacSettings.reset(in: defaults)
     }
 
     /// Opens the saved server's copy and paints from it before the network is asked anything.
@@ -252,7 +272,7 @@ import os
         }
         #endif
         let host = MarfaHost(defaults: .standard, signIns: SystemSignIns(), location: location())
-        return Libraries(host: host)
+        return Libraries(host: host, hotKeys: SystemHotKeys())
     }
 
     private static func location(root: URL = MarfaStoreLocation.applicationSupport) -> MarfaStoreLocation {

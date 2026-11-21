@@ -50,11 +50,13 @@ struct TypeChangeButton: View {
     let ids: Set<ItemID>
     let details: DetailsPresentation?
     let undoManager: UndoManager?
+    var shortcuts: ShortcutBindings?
 
     var body: some View {
         Button("Change Type…", systemImage: "square.on.square") {
             details?.typeChange = TypeChangeRequest(ids: ids, undoManager: undoManager)
         }
+        .shortcut(.changeType, shortcuts)
         .disabled(details == nil || !library.offersTypeChange(for: ids))
     }
 }

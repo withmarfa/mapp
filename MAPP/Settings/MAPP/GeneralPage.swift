@@ -3,6 +3,7 @@ import SwiftUI
 /// The General page: how MAPP opens, what a new item is, how dates and times read, what MAPP does with the web, and
 /// putting every setting back.
 struct GeneralPage: View {
+    let libraries: Libraries
     @AppStorage(StartWith.key) private var startWith = StartWith.standard
     @AppStorage(ReopenWindows.key) private var reopensWindows = ReopenWindows.standard
     @AppStorage(ListKey.openItemsIn) private var openItemsIn = ItemOpening.standard
@@ -183,7 +184,7 @@ struct GeneralPage: View {
     }
 
     private func resetSettings() {
-        MacSettings.reset()
+        libraries.resetMacSettings()
         Reporting.shared.switchChanged(to: true)
     }
 }

@@ -7,8 +7,8 @@ struct ViewOptionCommand {
     let systemImage: String
     /// The menu group ⌘K lists it under: the View menu's, unless it sorts or groups.
     var group = PaletteSections.CommandGroup.view
-    /// The key the View menu binds to it, as the palette prints it.
-    var shortcut: String?
+    /// The menu command whose key the palette prints beside it.
+    var key: ShortcutCommand?
     let action: () -> Void
 
     /// - Parameter storedColumns: Each place's table columns as kept (`ItemTableColumnLayouts`).
@@ -120,28 +120,28 @@ struct ViewOptionCommand {
         let scale = browser.calendarScale
         let unit = scale == .week ? String(localized: "Week") : String(localized: "Month")
         var commands = [
-            ViewOptionCommand(title: String(localized: "Today"), systemImage: "calendar.circle", shortcut: "⌘T") {
+            ViewOptionCommand(title: String(localized: "Today"), systemImage: "calendar.circle", key: .today) {
                 browser.moveCalendar(by: nil, now: library.now())
             },
-            ViewOptionCommand(title: String(localized: "Previous \(unit)"), systemImage: "chevron.left", shortcut: "⌥⌘←") {
+            ViewOptionCommand(title: String(localized: "Previous \(unit)"), systemImage: "chevron.left", key: .previousPeriod) {
                 browser.moveCalendar(by: -1, now: library.now())
             },
-            ViewOptionCommand(title: String(localized: "Next \(unit)"), systemImage: "chevron.right", shortcut: "⌥⌘→") {
+            ViewOptionCommand(title: String(localized: "Next \(unit)"), systemImage: "chevron.right", key: .nextPeriod) {
                 browser.moveCalendar(by: 1, now: library.now())
             },
         ]
         if scale == .week {
-            commands.append(ViewOptionCommand(title: String(localized: "Calendar by Month"), systemImage: "calendar", shortcut: "⌥⌘2") {
+            commands.append(ViewOptionCommand(title: String(localized: "Calendar by Month"), systemImage: "calendar", key: .showMonthScale) {
                 browser.changeCalendarScale(.month)
             })
         } else {
-            commands.append(ViewOptionCommand(title: String(localized: "Calendar by Week"), systemImage: "calendar", shortcut: "⌥⌘1") {
+            commands.append(ViewOptionCommand(title: String(localized: "Calendar by Week"), systemImage: "calendar", key: .showWeek) {
                 browser.changeCalendarScale(.week)
             })
         }
         commands.append(ViewOptionCommand(
             title: browser.showsCalendarMonth ? String(localized: "Hide Month") : String(localized: "Show Month"),
-            systemImage: "calendar", shortcut: "⇧⌘D"
+            systemImage: "calendar", key: .toggleMonth
         ) { browser.toggleCalendarMonth() })
         return commands
     }
@@ -156,7 +156,7 @@ struct ViewOptionCommand {
         let place = browser.item
         let fields = browser.timelineFieldChoices(in: library)
         let field = ItemTimelineLayout.selectedField(browser.timelineFields[place], fields: fields)
-        var commands = [ViewOptionCommand(title: String(localized: "Today"), systemImage: "calendar.circle", shortcut: "⌘T") {
+        var commands = [ViewOptionCommand(title: String(localized: "Today"), systemImage: "calendar.circle", key: .today) {
             browser.requestTimelineToday()
         }]
         commands += fields.filter { $0.key != field }.map { field in

@@ -52,6 +52,9 @@
     "%lld to %lld points" : {
 
     },
+    "%lld were skipped: MAPP no longer has their commands, or their keys can’t be used." : {
+
+    },
     "12-Hour" : {
 
     },
@@ -103,6 +106,9 @@
     "Allow More…" : {
 
     },
+    "Another app already uses %@." : {
+
+    },
     "An item’s text." : {
 
     },
@@ -127,6 +133,9 @@
     "Blue" : {
 
     },
+    "Check Document Now" : {
+
+    },
     "choose a type’s icon and change a type’s fields" : {
       "extractionState" : "manual"
     },
@@ -137,6 +146,9 @@
 
     },
     "Cleanup" : {
+
+    },
+    "Close All" : {
 
     },
     "Code and Markdown marks." : {
@@ -184,6 +196,27 @@
     "Remove “%@” from “%@”?" : {
 
     },
+    "Emoji & Symbols" : {
+
+    },
+    "Enter Full Screen" : {
+
+    },
+    "macOS" : {
+
+    },
+    "Minimize All" : {
+
+    },
+    "One was skipped: MAPP no longer has its command, or its keys can’t be used." : {
+
+    },
+    "Paste and Match Style" : {
+
+    },
+    "Show All Tabs" : {
+
+    },
     "Custom Color" : {
 
     },
@@ -200,6 +233,9 @@
 
     },
     "The key “%@” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key on the Keys page." : {
+
+    },
+    "Show Spelling and Grammar" : {
 
     },
     "The types and sources chosen and left out make more conditions than one search can hold." : {
@@ -677,9 +713,6 @@
 
     },
     "Nothing matches your search." : {
-
-    },
-    "No Shortcuts" : {
 
     },
     "Orange" : {
@@ -6170,6 +6203,195 @@
 
     },
     "yesterday" : {
+
+    },
+    "%@ is %@’s." : {
+
+    },
+    "%lld commands use %@." : {
+
+    },
+    "%lld shortcuts were imported." : {
+
+    },
+    "Brings MAPP forward to add an item." : {
+
+    },
+    "Brings MAPP forward with the palette open." : {
+
+    },
+    "Quick Add" : {
+
+    },
+    "Show Toolbar" : {
+
+    },
+    "Clear Shortcut" : {
+
+    },
+    "Couldn’t Export Shortcuts" : {
+
+    },
+    "Couldn’t Import Shortcuts" : {
+
+    },
+    "Cut" : {
+
+    },
+    "Every command goes back to its own shortcut, and the shortcuts that work in any app are turned off." : {
+
+    },
+    "Export Shortcuts" : {
+
+    },
+    "Export Shortcuts…" : {
+
+    },
+    "Hide Others" : {
+
+    },
+    "Import Shortcuts" : {
+
+    },
+    "Import Shortcuts…" : {
+
+    },
+    "Imported Shortcuts" : {
+
+    },
+    "In Any App" : {
+
+    },
+    "Include ⌘ or ⌃." : {
+
+    },
+    "Include ⌘, ⌃, or ⌥." : {
+
+    },
+    "It will have none if you replace it." : {
+
+    },
+    "Keyboard" : {
+
+    },
+    "MAPP Shortcuts" : {
+
+    },
+    "Minimize" : {
+
+    },
+    "Move Between Windows" : {
+
+    },
+    "Next Week or Month" : {
+
+    },
+    "No Shortcuts Found" : {
+
+    },
+    "No command has the keys you pressed." : {
+
+    },
+    "No command matches your search." : {
+
+    },
+    "Off until you set one. They work from any app while MAPP is running." : {
+
+    },
+    "One command uses %@." : {
+
+    },
+    "One shortcut was imported." : {
+
+    },
+    "Paste" : {
+
+    },
+    "Press a Shortcut" : {
+
+    },
+    "Previous Week or Month" : {
+
+    },
+    "Quit" : {
+
+    },
+    "Record Shortcut" : {
+
+    },
+    "Replace" : {
+
+    },
+    "Replace the Shortcut?" : {
+
+    },
+    "Restore Default Shortcuts?" : {
+
+    },
+    "Restore Defaults" : {
+
+    },
+    "Restore Defaults…" : {
+
+    },
+    "Search Shortcuts" : {
+
+    },
+    "Search by Pressing a Shortcut" : {
+
+    },
+    "Select All" : {
+
+    },
+    "Show Command Palette" : {
+
+    },
+    "Show Markdown Source or Formatted Text" : {
+
+    },
+    "Show Reader or Original" : {
+
+    },
+    "Show a Month" : {
+
+    },
+    "Show a Week" : {
+
+    },
+    "Show or Hide Details" : {
+
+    },
+    "Show or Hide Filters" : {
+
+    },
+    "Show or Hide Formats" : {
+
+    },
+    "Show or Hide Month" : {
+
+    },
+    "Spotlight" : {
+
+    },
+    "That key can’t be used." : {
+
+    },
+    "The shortcuts could not be written to “%@”. Choose another place and try again." : {
+
+    },
+    "Type Shortcut" : {
+
+    },
+    "With the keyboard button on, pressing keys searches for that shortcut. Typing searches by name." : {
+
+    },
+    "“%@” could not be read. No shortcuts were changed." : {
+
+    },
+    "“%@” is not a shortcuts file that MAPP can read. No shortcuts were changed." : {
+
+    },
+    "“%@” was made by a newer version of MAPP. Update MAPP to import it. No shortcuts were changed." : {
 
     }
   },

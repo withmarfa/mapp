@@ -3,7 +3,7 @@ import Foundation
 /// A page of Settings: one of MAPP's own, or one of the Marfa's. The window lists a page only once it exists, so a later
 /// piece adds its pages here and to the sidebar's groups, and nothing else.
 nonisolated enum SettingsPage: Hashable, Sendable {
-    case general, appearance, lists, editor, connection
+    case general, appearance, keyboard, lists, editor, connection
     case marfa(MarfaSettingsPage)
 
     static let overview = SettingsPage.marfa(.overview)
@@ -14,7 +14,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
     static let recentlyDeleted = SettingsPage.marfa(.recentlyDeleted)
 
     /// MAPP's pages as the sidebar lists them, in groups split by space.
-    static let mappGroups: [[SettingsPage]] = [[.general, .appearance], [.editor, .lists], [.connection]]
+    static let mappGroups: [[SettingsPage]] = [[.general, .appearance, .keyboard], [.editor, .lists], [.connection]]
     /// The Marfa's pages, in groups.
     static let marfaGroups: [[SettingsPage]] = MarfaSettingsPage.groups.map { $0.map(SettingsPage.marfa) }
 
@@ -30,6 +30,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
         switch self {
         case .general: "general"
         case .appearance: "appearance"
+        case .keyboard: "keyboard"
         case .lists: "lists"
         case .editor: "editor"
         case .connection: "connection"
@@ -41,6 +42,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
         switch self {
         case .general: String(localized: "General")
         case .appearance: String(localized: "Appearance")
+        case .keyboard: String(localized: "Keyboard")
         case .lists: String(localized: "Lists")
         case .editor: String(localized: "Editor")
         case .connection: String(localized: "Connection")
@@ -52,6 +54,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
         switch self {
         case .general: "gearshape.fill"
         case .appearance: "paintbrush.pointed.fill"
+        case .keyboard: "keyboard"
         case .lists: "list.bullet"
         case .editor: "square.and.pencil"
         case .connection: "antenna.radiowaves.left.and.right"
@@ -63,6 +66,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
         switch self {
         case .general: .gray
         case .appearance: .blue
+        case .keyboard: .indigo
         case .lists: .orange
         case .editor: .amber
         case .connection: .green
@@ -87,6 +91,11 @@ nonisolated enum SettingsPage: Hashable, Sendable {
                 String(localized: "Palettes"), String(localized: "Title When Scrolling"), String(localized: "Toolbar Background When Scrolling"),
                 String(localized: "Symbols on Subtypes"), String(localized: "Window Layout"), String(localized: "Sidebar"), String(localized: "List"),
             ]
+        case .keyboard:
+            [
+                String(localized: "Shortcuts"), String(localized: "Export Shortcuts"), String(localized: "Import Shortcuts"),
+                String(localized: "Restore Defaults"), String(localized: "In Any App"),
+            ] + AnyAppCommand.allCases.map(\.title) + ShortcutCommand.all.map(\.title)
         case .lists:
             [String(localized: "Density"), String(localized: "Sort By"), String(localized: "Group By")]
         case .editor:

@@ -24,7 +24,7 @@ nonisolated enum HelpItem: CaseIterable {
         }
     }
 
-    /// Where the command goes in the browser, or nil for the one that opens a window of the app's own.
+    /// Where the command goes in the browser, or nil for the one that opens a page of Settings.
     var url: URL? {
         switch self {
         case .help: AppLinks.help

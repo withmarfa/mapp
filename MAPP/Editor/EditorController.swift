@@ -155,6 +155,8 @@ final class EditorController: NSObject {
     }
     @ObservationIgnored private var wantsFocus: FocusWish?
     @ObservationIgnored var style = PageStyle()
+    /// A Format command's chosen shortcut, or nothing for one the person cleared; a command not here has its default.
+    @ObservationIgnored var formatShortcuts: [Format: Shortcut?] = [:]
     @ObservationIgnored private var pageURL: URL?
     @ObservationIgnored private var appearanceObservation: NSKeyValueObservation?
     @ObservationIgnored var printRenderer: PrintDocumentRenderer?

@@ -13,7 +13,7 @@ struct CommandPalette: View {
     @Environment(\.undoManager) private var undoManager
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openURL) private var openURL
-    @Environment(KeyboardShortcutsModel.self) private var shortcuts: KeyboardShortcutsModel?
+    @Environment(ShortcutBindings.self) private var shortcuts: ShortcutBindings?
     @Environment(MarfaHost.self) private var host: MarfaHost?
     @Environment(Libraries.self) private var libraries: Libraries?
     @StoredOrder private var order
@@ -644,17 +644,17 @@ struct CommandPalette: View {
         func historyKey(_ key: String) -> String? { returnFocus == .page ? nil : key }
 
         if library.isLoaded {
-            add(String(localized: "Search List"), "magnifyingglass", "⌥⌘F", in: .edit) { browser.focusRequest = .search }
+            add(String(localized: "Search List"), "magnifyingglass", keys(.searchList), in: .edit) { browser.focusRequest = .search }
             let modes = browser.showsSidebarIndex ? [] : browser.availableViewModes(in: library)
-            func addLayout(_ mode: ItemViewMode, _ title: String, _ systemImage: String, _ shortcut: String) {
-                if modes.contains(mode) { add(title, systemImage, shortcut, in: .view) { browser.viewMode = mode } }
+            func addLayout(_ mode: ItemViewMode, _ title: String, _ systemImage: String, _ command: ShortcutCommand) {
+                if modes.contains(mode) { add(title, systemImage, keys(command), in: .view) { browser.viewMode = mode } }
             }
-            addLayout(.list, String(localized: "View as List"), "list.bullet", "⌘1")
-            addLayout(.gallery, String(localized: "View as Gallery"), "square.grid.2x2", "⌘2")
-            addLayout(.table, String(localized: "View as Table"), "tablecells", "⌘3")
-            addLayout(.board, String(localized: "View as Board"), "rectangle.split.3x1", "⌘4")
-            addLayout(.timeline, String(localized: "View as Timeline"), ItemViewMode.timeline.symbol, "⌘5")
-            addLayout(.calendar, String(localized: "View as Calendar"), ItemViewMode.calendar.symbol, "⌘6")
+            addLayout(.list, String(localized: "View as List"), "list.bullet", .viewAsList)
+            addLayout(.gallery, String(localized: "View as Gallery"), "square.grid.2x2", .viewAsGallery)
+            addLayout(.table, String(localized: "View as Table"), "tablecells", .viewAsTable)
+            addLayout(.board, String(localized: "View as Board"), "rectangle.split.3x1", .viewAsBoard)
+            addLayout(.timeline, String(localized: "View as Timeline"), ItemViewMode.timeline.symbol, .viewAsTimeline)
+            addLayout(.calendar, String(localized: "View as Calendar"), ItemViewMode.calendar.symbol, .viewAsCalendar)
             if browser.stackableType(in: library) != nil {
                 let isOn = browser.stacksSubtypes(in: library)
                 add(isOn ? String(localized: "Show This Type Only") : String(localized: "Include Subtypes"), IncludeSubtypes.symbol, in: .view) {
@@ -705,22 +705,21 @@ struct CommandPalette: View {
             // (`FileViewCommand`).
             if let fileView = browser.showsPage ? details?.fileViewing(of: browser.selection.count == 1 ? browser.selection.first : nil) : nil {
                 for command in FileViewCommand.offered(for: fileView.kind) where command.isEnabled(on: fileView) {
-                    let shortcut = command.shortcut.map { Self.symbols($0.modifiers) + String($0.key.character).uppercased() }
-                    add(String(localized: command.title), command.systemImage, shortcut, in: .view) { command.perform(on: fileView) }
+                    add(String(localized: command.title), command.systemImage, keys(command.shortcutCommand), in: .view) { command.perform(on: fileView) }
                 }
             } else {
                 // The palette holds the keyboard itself, so the page counts as focused where it was when the palette opened.
                 let zoom = TextZoom.acting(pageFocused: returnFocus == .page)
                 let size = UserDefaults.standard.object(forKey: zoom.key) as? Int ?? zoom.defaultSize
                 if zoom.size(after: .bigger, from: size) != nil {
-                    add(String(localized: "Make Text Bigger"), "textformat.size.larger", "⌘+", in: .textSize) { zoom.apply(.bigger) }
+                    add(String(localized: "Make Text Bigger"), "textformat.size.larger", keys(.makeTextBigger), in: .textSize) { zoom.apply(.bigger) }
                 }
                 if zoom.size(after: .smaller, from: size) != nil {
-                    add(String(localized: "Make Text Smaller"), "textformat.size.smaller", "⌘-", in: .textSize) { zoom.apply(.smaller) }
+                    add(String(localized: "Make Text Smaller"), "textformat.size.smaller", keys(.makeTextSmaller), in: .textSize) { zoom.apply(.smaller) }
                 }
-                add(String(localized: "Actual Size"), "textformat.size", "⌘0", in: .textSize) { zoom.apply(.actual) }
+                add(String(localized: "Actual Size"), "textformat.size", keys(.actualSize), in: .textSize) { zoom.apply(.actual) }
             }
-            entries.append(Entry(id: "command:newItem", title: String(localized: "New Item"), icon: .symbol("plus"), shortcut: "⌘N",
+            entries.append(Entry(id: "command:newItem", title: String(localized: "New Item"), icon: .symbol("plus"), shortcut: keys(.newItem),
                                  takesFocus: true) {
                 browser.openQuickAdd(remembered: lastType, in: library)
             })
@@ -731,16 +730,16 @@ struct CommandPalette: View {
                 })
             }
             // After New Item and the typed ones, so the commands "new" finds lead with New Item.
-            add(String(localized: "New Window"), "macwindow.badge.plus", "⌥⌘N", in: .file) { openWindow(id: "main") }
+            add(String(localized: "New Window"), "macwindow.badge.plus", keys(.newWindow), in: .file) { openWindow(id: "main") }
             if let host, host.canRefresh {
-                add(String(localized: "Refresh"), "arrow.clockwise", "⌘R", in: .file) { host.refresh() }
+                add(String(localized: "Refresh"), "arrow.clockwise", keys(.refresh), in: .file) { host.refresh() }
             }
             if browser.selection.count == 1, let details {
-                add(details.isPresented ? String(localized: "Hide Details") : String(localized: "Show Details"), "sidebar.right", "⌥⌘I", in: .view) { details.isPresented.toggle() }
+                add(details.isPresented ? String(localized: "Hide Details") : String(localized: "Show Details"), "sidebar.right", keys(.toggleDetails), in: .view) { details.isPresented.toggle() }
             }
         }
         let search = String(localized: "Search Items")
-        entries.append(Entry(id: "command:" + search, title: search, icon: .symbol("magnifyingglass"), shortcut: "⇧⌘P", takesFocus: true, group: .edit) {
+        entries.append(Entry(id: "command:" + search, title: search, icon: .symbol("magnifyingglass"), shortcut: keys(.searchItems), takesFocus: true, group: .edit) {
             browser.palette = .search
         })
 
@@ -754,16 +753,14 @@ struct CommandPalette: View {
                 for format in [Format.title, .heading, .subheading, .heading4, .heading5, .heading6, .body, .bold, .italic,
                                .strikethrough, .highlight, .code, .link, .codeBlock, .quote, .bulletList, .orderedList, .checklist, .table]
                 where format != .table || !editor.caret.inTable {
-                    let shortcut = format.shortcut.map { Self.symbols($0.modifiers) + String($0.key).uppercased() }
-                    add(String(localized: format.title), "textformat", shortcut, in: .format) { editor.apply(format) }
+                    add(ShortcutCommand.format(format).title, "textformat", keys(.format(format)), in: .format) { editor.apply(format) }
                 }
             }
         }
         // The same commands, titles and rules as the menu bar and the More menu (`ItemCommand`).
         let itemContext = ItemCommandContext(library: library, ids: browser.selection, browser: browser, editor: editor, details: details)
         for command in ItemCommand.allCases where command.isEnabled(in: itemContext) {
-            let shortcut = command.shortcut.map { Self.symbols($0.modifiers) + String($0.key.character).uppercased() }
-            add(String(localized: command.title(in: itemContext)), command.systemImage, shortcut, in: command.paletteGroup) {
+            add(String(localized: command.title(in: itemContext)), command.systemImage, keys(command.shortcutCommand), in: command.paletteGroup) {
                 command.perform(in: itemContext, editor: editor) { openWindow(value: $0) }
             }
         }
@@ -834,7 +831,7 @@ struct CommandPalette: View {
 
         if library.isLoaded {
             for command in ViewOptionCommand.commands(for: browser, in: library, storedColumns: $storedColumns) {
-                add(command.title, command.systemImage, command.shortcut, in: command.group, action: command.action)
+                add(command.title, command.systemImage, keys(command.key), in: command.group, action: command.action)
             }
             for command in SavedViewCommand.commands(for: browser, in: library, order: order) {
                 add(command.title, command.systemImage, in: .view, action: command.action)
@@ -867,7 +864,7 @@ struct CommandPalette: View {
             add(String(localized: "Full Width"), "arrow.left.and.right", in: .view) { fullWidth = true }
         }
         let settingsTitle = String(localized: "Settings…")
-        entries.append(Entry(id: "command:" + settingsTitle, title: settingsTitle, icon: .symbol("gearshape"), shortcut: "⌘,", takesFocus: true, group: .settings) {
+        entries.append(Entry(id: "command:" + settingsTitle, title: settingsTitle, icon: .symbol("gearshape"), shortcut: keys(.settings), takesFocus: true, group: .settings) {
             browser.showSettings()
         })
         for page in SettingsPage.all {
@@ -876,11 +873,9 @@ struct CommandPalette: View {
                 browser.showSettings(page)
             })
         }
-        if let shortcuts {
-            for item in HelpItem.allCases {
-                add(String(localized: item.title), item.systemImage, in: .help) {
-                    item.perform(shortcuts: shortcuts, browser: browser, openWindow: openWindow, openURL: openURL)
-                }
+        for item in HelpItem.allCases {
+            add(String(localized: item.title), item.systemImage, in: .help) {
+                item.perform(openSettings: { browser.showSettings($0) }, openURL: openURL)
             }
         }
         // Whatever else shares a title, such as two table columns of one label, is told apart by its place.
@@ -904,7 +899,7 @@ struct CommandPalette: View {
     private var searchItemsEntry: Entry {
         let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         return Entry(id: Self.searchItemsID, title: String(localized: "Search Items for “\(typed)”"), icon: .symbol("magnifyingglass"),
-                     shortcut: "⇧⌘P", takesFocus: true) {
+                     shortcut: keys(.searchItems), takesFocus: true) {
             browser.paletteSeed = typed
             browser.palette = .search
         }
@@ -922,9 +917,8 @@ struct CommandPalette: View {
         browser.reveal(item, in: library, order: order)
     }
 
-    /// Modifier keys as the menus write them.
-    private static func symbols(_ modifiers: EventModifiers) -> String {
-        (modifiers.contains(.control) ? "⌃" : "") + (modifiers.contains(.option) ? "⌥" : "")
-            + (modifiers.contains(.shift) ? "⇧" : "") + (modifiers.contains(.command) ? "⌘" : "")
+    /// The key the person has given a menu command, as the menus write it, for the row that runs the command.
+    private func keys(_ command: ShortcutCommand?) -> String? {
+        command.flatMap { shortcuts?.display(for: $0) }
     }
 }

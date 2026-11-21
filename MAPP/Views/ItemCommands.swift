@@ -139,15 +139,24 @@ enum ItemCommand: CaseIterable {
         }
     }
 
-    /// The key the menu bar binds. The toolbar's menu binds none, so a key is never registered twice.
-    var shortcut: KeyboardShortcut? {
+    /// The command whose key the menu bar binds, which the person can change in Settings. The toolbar's menu binds none, so a
+    /// key is never registered twice. Focus is not on ⌃⌘F, which is the system's Full Screen.
+    var shortcutCommand: ShortcutCommand {
         switch self {
-        case .openInNewWindow: KeyboardShortcut("o")
-        case .addAttachment: KeyboardShortcut("a", modifiers: [.command, .shift])
-        case .print: KeyboardShortcut("p")
-        // Not ⌃⌘F, which is the system's Full Screen.
-        case .toggleFocus: KeyboardShortcut("f", modifiers: [.command, .shift])
-        case .open, .openAsModal, .openAsFullPage, .quickLook, .openOriginal, .openInBrowser, .toggleSource, .toggleReader, .toggleFormats, .exportPDF: nil
+        case .open: .open
+        case .openAsModal: .openAsModal
+        case .openAsFullPage: .openAsFullPage
+        case .quickLook: .quickLook
+        case .openInNewWindow: .openInNewWindow
+        case .openOriginal: .openOriginal
+        case .openInBrowser: .openInBrowser
+        case .addAttachment: .addAttachment
+        case .toggleSource: .toggleSource
+        case .toggleReader: .toggleReader
+        case .toggleFormats: .toggleFormats
+        case .toggleFocus: .focus
+        case .print: .print
+        case .exportPDF: .exportPDF
         }
     }
 
@@ -198,13 +207,14 @@ struct ItemCommandButton: View {
     let command: ItemCommand
     let context: ItemCommandContext
     let editor: EditorController?
-    var bindsShortcut = false
+    /// The keys the menu bar binds; the toolbar's menu leaves them to it.
+    var shortcuts: ShortcutBindings?
 
     var body: some View {
         Button(command.title(in: context), systemImage: command.systemImage) {
             command.perform(in: context, editor: editor) { openWindow(value: $0) }
         }
-        .keyboardShortcut(bindsShortcut ? command.shortcut : nil)
+        .shortcut(command.shortcutCommand, shortcuts)
         .disabled(!command.isEnabled(in: context))
     }
 }

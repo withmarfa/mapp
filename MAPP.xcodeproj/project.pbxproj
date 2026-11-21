@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3310002A3066ED47005D07A2 /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = 331000293066ED47005D07A2 /* KeyboardShortcuts */; };
 		331000123066ED47005D07A2 /* MarfaAPI in Frameworks */ = {isa = PBXBuildFile; productRef = 331000133066ED47005D07A2 /* MarfaAPI */; };
 		331000043066ED47005D07A2 /* Marfa in Frameworks */ = {isa = PBXBuildFile; productRef = 331000053066ED47005D07A2 /* Marfa */; };
 		331000073066ED47005D07A2 /* MarfaTesting in Frameworks */ = {isa = PBXBuildFile; productRef = 331000083066ED47005D07A2 /* MarfaTesting */; };
@@ -86,6 +87,7 @@
 		3303FCF63066ED46005D07A2 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			files = (
+				3310002A3066ED47005D07A2 /* KeyboardShortcuts in Frameworks */,
 				331000123066ED47005D07A2 /* MarfaAPI in Frameworks */,
 				331000043066ED47005D07A2 /* Marfa in Frameworks */,
 				331000113066ED47005D07A2 /* MarfaBrandIcons in Frameworks */,
@@ -154,6 +156,7 @@
 			);
 			name = MAPP;
 			packageProductDependencies = (
+				331000293066ED47005D07A2 /* KeyboardShortcuts */,
 				331000133066ED47005D07A2 /* MarfaAPI */,
 				331000053066ED47005D07A2 /* Marfa */,
 				331000103066ED47005D07A2 /* MarfaBrandIcons */,
@@ -244,6 +247,7 @@
 			packageReferences = (
 				331000063066ED47005D07A2 /* XCRemoteSwiftPackageReference "marfa-swift" */,
 				3310001B3066ED47005D07A2 /* XCRemoteSwiftPackageReference "app-telemetry" */,
+				331000283066ED47005D07A2 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 3303FCFA3066ED46005D07A2 /* Products */;
@@ -740,6 +744,14 @@
 				minimumVersion = 0.0.1;
 			};
 		};
+		331000283066ED47005D07A2 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sindresorhus/KeyboardShortcuts";
+			requirement = {
+				kind = exactVersion;
+				version = 3.1.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -772,6 +784,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 331000063066ED47005D07A2 /* XCRemoteSwiftPackageReference "marfa-swift" */;
 			productName = MarfaTesting;
+		};
+		331000293066ED47005D07A2 /* KeyboardShortcuts */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 331000283066ED47005D07A2 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */;
+			productName = KeyboardShortcuts;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

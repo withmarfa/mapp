@@ -30,7 +30,7 @@ struct SettingsWindowView: View {
             .navigationSplitViewColumnWidth(min: SettingsTokens.Metric.sidebarWidth, ideal: SettingsTokens.Metric.sidebarWidth, max: SettingsTokens.Metric.sidebarWidth)
             .toolbar(removing: .sidebarToggle)
         } detail: {
-            SettingsDetail(navigation: navigation, host: host)
+            SettingsDetail(navigation: navigation, host: host, libraries: libraries)
                 .navigationTitle(navigation.title)
                 .toolbar {
                     ToolbarItemGroup(placement: .navigation) {
@@ -84,12 +84,14 @@ struct SettingsWindowView: View {
 struct SettingsDetail: View {
     let navigation: SettingsNavigation
     let host: MAPPMarfaSettingsHost
+    let libraries: Libraries
 
     var body: some View {
         Group {
             switch navigation.page {
-            case .general: GeneralPage()
+            case .general: GeneralPage(libraries: libraries)
             case .appearance: AppearancePage()
+            case .keyboard: KeyboardPage(libraries: libraries)
             case .lists: ListsPage()
             case .editor: EditorPage()
             case .connection: ConnectionPage()

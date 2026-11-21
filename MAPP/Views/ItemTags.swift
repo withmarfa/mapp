@@ -13,11 +13,13 @@ struct AddTagButton: View {
     let ids: Set<ItemID>
     let details: DetailsPresentation?
     let undoManager: UndoManager?
+    var shortcuts: ShortcutBindings?
 
     var body: some View {
         Button("Add Tag…", systemImage: "tag") {
             details?.tagRequest = TagRequest(ids: ids, undoManager: undoManager)
         }
+        .shortcut(.addTag, shortcuts)
         .disabled(details == nil || !library.canTag(ids))
     }
 }

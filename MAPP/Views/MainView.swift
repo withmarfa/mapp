@@ -77,6 +77,7 @@ struct MainView: View {
         }
         .onChange(of: appearsActive, initial: true) {
             ColumnWidthRegistry.shared.windowBecame(active: appearsActive, tracker: measuredWidths)
+            if appearsActive { FrontBrowser.shared.last = browser }
         }
         // Customizing happens in the sidebar, so a command that starts it brings the sidebar back.
         .onChange(of: browser.customizesSidebar) {

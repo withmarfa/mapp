@@ -14,6 +14,7 @@ enum MacSettings {
                 QuickAdd.lastTypeKey, RemotePictureSetting.key, Reporting.switchKey, SidebarTypeRow.subtypeIconsKey,
                 SourceViewMode.key, PlaceDensities.key, PlaceDefaults.key, ItemTableColumnLayouts.key, ViewLayouts.key,
                 PagePlacements.key, IncludedSubtypes.key, SidebarLayouts.defaultsKey, TypeLooks.defaultsKey, SearchLeaveOuts.defaultsKey,
+                ShortcutBindings.defaultsKey, AnyAppShortcuts.defaultsKey,
             ]
     }
 

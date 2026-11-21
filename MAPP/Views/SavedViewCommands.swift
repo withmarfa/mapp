@@ -59,6 +59,7 @@ struct SavedViewCommand {
 struct SavedViewMenu: View {
     let browser: Browser?
     let library: (any ItemLibrary)?
+    var shortcuts: ShortcutBindings?
     @StoredOrder private var order
     // Read by `offersResetView`, so a change of the default view draws the menu again.
     @AppStorage(PlaceDefaults.key) private var storedDefaults = Data()
@@ -73,22 +74,27 @@ struct SavedViewMenu: View {
         Button("New View", systemImage: "plus.rectangle.on.rectangle") {
             if let browser, let library { browser.openNewViewPanel(in: library) }
         }
+        .shortcut(.newView, shortcuts)
         .disabled(!canSave)
         Button("Edit View", systemImage: "slider.horizontal.3") {
             if let browser, let library { browser.openViewPanel(in: library) }
         }
+        .shortcut(.editView, shortcuts)
         .disabled(!(browser.flatMap { browser in library.map { SavedViews.canEdit(browser, in: $0) } } ?? false))
         Button("Save as View…", systemImage: "plus.rectangle.on.rectangle") {
             if let browser, let library { browser.openNewViewPanel(in: library) }
         }
+        .shortcut(.saveAsView, shortcuts)
         .disabled(!canSave || shown != nil)
         Button("Reset View", systemImage: "arrow.uturn.backward") {
             if let browser, let library { browser.resetView(in: library) }
         }
+        .shortcut(.resetView, shortcuts)
         .disabled(browser?.offersResetView != true)
         Button("Duplicate View", systemImage: "plus.square.on.square") {
             if let browser, let library, let shown { Task { await browser.duplicateView(shown.id, in: library, order: order) } }
         }
+        .shortcut(.duplicateView, shortcuts)
         .disabled(!canEdit || shown == nil)
         Button("Save View", systemImage: "arrow.trianglehead.2.clockwise") {
             browser?.writeViewAgain()

@@ -25,9 +25,8 @@ Agreed with August on 19 and 20 November 2026. The pages are drawn on the Settin
 
 ### General rules
 
-The rules that are built (the window, the toolbar, rows, sections, changing things, numbers, problems and errors, buttons, tables, words and named values) are in [Views and lists](views-and-lists.md#settings). Two are not built yet:
+The rules that are built (the window, the toolbar, rows, sections, changing things, numbers, problems and errors, buttons, tables, words and named values) are in [Views and lists](views-and-lists.md#settings). One is not built yet:
 
-- **Shortcuts.** Keyboard lists every command in a white shortcut field with a clear button, with a small search at the top right of the list and Restore Defaults… at the end. A keyboard button beside the search field searches by pressing: while it is on, pressing keys finds that shortcut (⌘K finds Command Palette), and typing searches by name.
 - **A synced folder's page** shows what it holds as a tree of its folders, counted in files, which MAPP builds from the server's paths.
 - **Not now:** custom CSS, plugins for MAPP itself, AI providers and Vim keys. Themes come later; every color and font is already a named value.
 - The button rows under a card (Restore Defaults…, Export Shortcuts…, Import…) are regular size, and Select All is an "All Events" checkbox row.
@@ -37,10 +36,7 @@ The rules that are built (the window, the toolbar, rows, sections, changing thin
 Nine pages in three groups: General, Appearance and Keyboard; Editor, Lists, Layouts and Search; On This Mac and Connection. There is no Advanced page, and Settings > Sidebar stays gone.
 
 - **General and Appearance** are built: see [Settings pages](settings.md).
-- **Keyboard.**
-  - Every menu command can be changed.
-  - A section of shortcuts that work in any app while MAPP is running, all off by default: Show Command Palette, Search and New Item. Each must include ⌘ or ⌃.
-  - Export Shortcuts… and Import Shortcuts….
+- **Keyboard** is built: see [Keyboard shortcuts](keyboard-shortcuts.md).
 - **Editor.**
   - Page Width, Standard Width, Line Spacing, Paragraph Spacing, Title Length, Links to Items and Articles Open In.
   - Editing Mode: Formatted or Markdown Source.

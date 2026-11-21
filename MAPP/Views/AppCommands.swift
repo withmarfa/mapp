@@ -6,6 +6,8 @@ struct AppCommands: Commands {
     /// Nil while no library is open: before a server is set, or while a server's copy opens.
     let library: (any ItemLibrary)?
     let host: MarfaHost
+    /// The key each command has, as the person set them in Settings.
+    let shortcuts: ShortcutBindings
     @FocusedValue(\.browser) private var browser
     @FocusedValue(\.focusedItems) private var focused
     @FocusedValue(\.editor) private var editor
@@ -22,8 +24,10 @@ struct AppCommands: Commands {
         CommandGroup(after: .sidebar) {
             if browser?.customizesSidebar == true {
                 Button("Finish Customizing Sidebar", systemImage: "checkmark") { browser?.customizesSidebar = false }
+                    .shortcut(.customizeSidebar, shortcuts)
             } else {
                 Button("Customize Sidebar…", systemImage: "sidebar.squares.leading") { browser?.customizesSidebar = true }
+                    .shortcut(.customizeSidebar, shortcuts)
                     .disabled(browser == nil)
             }
         }
@@ -32,16 +36,16 @@ struct AppCommands: Commands {
             Button("New Item", systemImage: "plus") {
                 if let library { browser?.openQuickAdd(remembered: lastType, in: library) }
             }
-                .keyboardShortcut("n")
+                .shortcut(.newItem, shortcuts)
                 .disabled(browser == nil || library?.isLoaded != true)
             Button("New Window", systemImage: "macwindow.badge.plus") {
                 openWindow(id: "main")
             }
-            .keyboardShortcut("n", modifiers: [.command, .option])
+            .shortcut(.newWindow, shortcuts)
             Divider()
             // Pulls what the server has changed and sends what waits; the sidebar's instance menu and the palette have it too.
             Button("Refresh", systemImage: "arrow.clockwise") { host.refresh() }
-                .keyboardShortcut("r")
+                .shortcut(.refresh, shortcuts)
                 .disabled(!host.canRefresh)
         }
 
@@ -63,7 +67,7 @@ struct AppCommands: Commands {
                 ItemShare(item: one, fileURL: ids.count == 1 ? ids.first.flatMap { browser?.fileURL(of: $0) } : nil, in: library)
             } ?? ItemShare())
             if let library {
-                ItemActions(ids: ids, undoManager: focused?.undoManager, inMenuBar: true)
+                ItemActions(ids: ids, undoManager: focused?.undoManager, inMenuBar: true, shortcuts: shortcuts)
                     .environment(\.library, library)
                     .environment(details)
             }
@@ -96,9 +100,9 @@ struct AppCommands: Commands {
 
         CommandGroup(after: .textEditing) {
             palette("Search Items…", systemImage: "magnifyingglass", .search)
-                .keyboardShortcut("p", modifiers: [.command, .shift])
+                .shortcut(.searchItems, shortcuts)
             palette("Command Palette", systemImage: "command", .commands, asksActionsWhenOut: true)
-                .keyboardShortcut("k")
+                .shortcut(.commandPalette, shortcuts)
         }
 
         // The dividers here are drawn whether or not the views between them render anything, and the system adds its
@@ -113,10 +117,10 @@ struct AppCommands: Commands {
             if let place = browser?.indexPlace {
                 IndexViewOptions(place: place, browser: browser)
             } else {
-                ItemViewOptions(browser: browser, modes: browser.flatMap { browser in library.map { browser.availableViewModes(in: $0) } } ?? ItemViewMode.allCases, bindsKeys: true)
+                ItemViewOptions(browser: browser, modes: browser.flatMap { browser in library.map { browser.availableViewModes(in: $0) } } ?? ItemViewMode.allCases, shortcuts: shortcuts)
             }
             Divider()
-            SavedViewMenu(browser: browser, library: library)
+            SavedViewMenu(browser: browser, library: library, shortcuts: shortcuts)
             // The toolbar's Done for a view's panel.
             Button("Finish Editing View", systemImage: "checkmark") {
                 if let browser, let library { Task { await browser.finishViewPanel(in: library, order: order) } }
@@ -126,7 +130,7 @@ struct AppCommands: Commands {
             Button(details?.isPresented == true ? "Hide Details" : "Show Details", systemImage: "sidebar.right") {
                 details?.isPresented.toggle()
             }
-            .keyboardShortcut("i", modifiers: [.command, .option])
+            .shortcut(.toggleDetails, shortcuts)
             .disabled(details == nil || (browser?.showsSidebarIndex != true && focused?.ids.count != 1))
             Divider()
             // The toolbar's View Options and its filters, for the view in front.
@@ -136,8 +140,8 @@ struct AppCommands: Commands {
                     // The library is given inside the branch that shows it, so the menu's views never read it while it is
                     // gone: SwiftUI can update a view of a branch it is about to drop, which then still has its old one.
                     Group {
-                        FilterCommands(browser: browser)
-                        CurrentViewOptions(browser: browser, bindsKeys: true)
+                        FilterCommands(browser: browser, shortcuts: shortcuts)
+                        CurrentViewOptions(browser: browser, shortcuts: shortcuts)
                     }
                     .environment(\.library, library)
                 }
@@ -148,9 +152,9 @@ struct AppCommands: Commands {
             PageWidthOptions()
             Divider()
             if let fileView {
-                FileViewCommands(viewing: fileView)
+                FileViewCommands(viewing: fileView, shortcuts: shortcuts)
             } else {
-                TextZoomCommands(pageFocused: pageKeepsHistoryKeys)
+                TextZoomCommands(pageFocused: pageKeepsHistoryKeys, shortcuts: shortcuts)
             }
             Divider()
             // ⌘[ and ⌘], as in Safari and the Finder.
@@ -162,21 +166,21 @@ struct AppCommands: Commands {
                 else if browser?.isCollectionItemPresented == true { browser?.returnToCollection() }
                 else if let browser, let library { browser.go(.back, in: library) }
             }
-                .keyboardShortcut(pageKeepsHistoryKeys ? nil : KeyboardShortcut(KeyEquivalent(Character(HistoryKeys.back)), modifiers: .command))
+                .keyboardShortcut(pageKeepsHistoryKeys ? nil : shortcuts.shortcut(for: .back)?.keyboardShortcut)
                 .disabled(!canGoBack)
             Button("Forward", systemImage: "chevron.forward") {
                 if let settingsNavigation { settingsNavigation.forward() }
                 else if let browser, let library { browser.go(.forward, in: library) }
             }
-                .keyboardShortcut(pageKeepsHistoryKeys ? nil : KeyboardShortcut(KeyEquivalent(Character(HistoryKeys.forward)), modifiers: .command))
+                .keyboardShortcut(pageKeepsHistoryKeys ? nil : shortcuts.shortcut(for: .forward)?.keyboardShortcut)
                 .disabled(!canGoForward)
             Divider()
             // The modal's own moves: through the items behind it, and out.
             Button("Previous Item", systemImage: "chevron.up") { step(.previous) }
-                .keyboardShortcut(.upArrow, modifiers: [.command, .option])
+                .shortcut(.previousItem, shortcuts)
                 .disabled(!canStep(.previous))
             Button("Next Item", systemImage: "chevron.down") { step(.next) }
-                .keyboardShortcut(.downArrow, modifiers: [.command, .option])
+                .shortcut(.nextItem, shortcuts)
                 .disabled(!canStep(.next))
             Button("Close Modal", systemImage: "xmark") { browser?.closeModal() }
                 .disabled(browser?.isModalPresented != true)
@@ -191,7 +195,7 @@ extension AppCommands {
         ItemCommandButton(
             command: command,
             context: ItemCommandContext(library: library, ids: focused?.ids ?? [], browser: browser, editor: editor, details: details),
-            editor: editor, bindsShortcut: true)
+            editor: editor, shortcuts: shortcuts)
     }
 
     /// The image or PDF the window's page shows and has ready, whose size and page the View menu then commands.

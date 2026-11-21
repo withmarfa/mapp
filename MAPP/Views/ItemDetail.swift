@@ -57,6 +57,13 @@ struct ItemPage: View {
     let item: Item
     @Bindable var editor: EditorController
     @StoredPageStyle private var style
+    @Environment(ShortcutBindings.self) private var shortcuts: ShortcutBindings?
+
+    /// The keys the Format commands have now, which the page answers as the menu does.
+    private var formatShortcuts: [Format: Shortcut?] {
+        guard let shortcuts else { return [:] }
+        return Dictionary(uniqueKeysWithValues: Format.allCases.map { ($0, shortcuts.shortcut(for: .format($0))) })
+    }
     let headerDrafts: DetailsPresentation
     /// Whether the page backs the toolbar with glass while text is under it. A window whose toolbar draws its own
     /// background has no need.
@@ -113,6 +120,7 @@ struct ItemPage: View {
             editor.insertImages(urls.map(PastedImages.Source.file))
         }
         .onChange(of: style, initial: true) { _, style in editor.setStyle(style) }
+        .onChange(of: formatShortcuts, initial: true) { _, shortcuts in editor.setFormatShortcuts(shortcuts) }
         .onChange(of: item.id, initial: true) { old, id in
             if old != id { headerDrafts.headerScrolled(away: false, for: old) }
             guard let item = library.item(id) else { return }

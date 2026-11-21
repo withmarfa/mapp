@@ -36,18 +36,19 @@ struct TextZoomCommands: View {
     @AppStorage(PageKey.textSize) private var pageSize = PageStyle().textSize
     @AppStorage(InterfaceKey.textSize) private var interfaceSize = InterfaceStyle.defaultTextSize
     let pageFocused: Bool
+    let shortcuts: ShortcutBindings
 
     var body: some View {
         let zoom = TextZoom.acting(pageFocused: pageFocused)
         let current = pageFocused ? pageSize : interfaceSize
         // ⌘= is the same key as ⌘+ without Shift, and AppKit matches a "+" shortcut with it.
         Button("Make Text Bigger", systemImage: "textformat.size.larger") { zoom.apply(.bigger) }
-            .keyboardShortcut("+")
+            .shortcut(.makeTextBigger, shortcuts)
             .disabled(zoom.size(after: .bigger, from: current) == nil)
         Button("Make Text Smaller", systemImage: "textformat.size.smaller") { zoom.apply(.smaller) }
-            .keyboardShortcut("-")
+            .shortcut(.makeTextSmaller, shortcuts)
             .disabled(zoom.size(after: .smaller, from: current) == nil)
         Button("Actual Size", systemImage: "textformat.size") { zoom.apply(.actual) }
-            .keyboardShortcut("0")
+            .shortcut(.actualSize, shortcuts)
     }
 }
