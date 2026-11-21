@@ -13,10 +13,10 @@ struct StartUpPage: View {
 
     private var columns: [SettingsTableColumn<StartUpSetting>] {
         [
-            SettingsTableColumn("Setting", width: 250) { setting in
+            SettingsTableColumn("Setting", width: 270, truncation: .middle) { setting in
                 Text(verbatim: setting.name).settingsFont(.mono)
             },
-            SettingsTableColumn("What It Does") { setting in
+            SettingsTableColumn("What It Does", lines: 2) { setting in
                 Text(verbatim: StartUpWording.what(setting.name)).foregroundStyle(SettingsTokens.secondaryText)
             },
             SettingsTableColumn("State", width: 70) { setting in
@@ -37,7 +37,7 @@ struct StartUpPage: View {
         } else if let snapshot = store.snapshot {
             SettingsPageColumn {
                 SettingsSection(
-                    name: Text("Set Where \(host.serverName) Runs"), line: Text("Read when it starts. Change them there.")
+                    name: Text("Set Where \(host.serverName) Runs"), line: Text("Read when \(host.serverName) starts. Change them where it runs.")
                 ) {
                     if snapshot.startUp.isEmpty {
                         SettingsEmptyCard(symbol: "power", title: Text("Nothing listed"), line: Text("\(host.serverName) lists no start-up settings."))

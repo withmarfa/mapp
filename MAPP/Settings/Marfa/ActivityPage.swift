@@ -46,7 +46,7 @@ struct ActivityPage: View {
     }
 
     @ViewBuilder private var content: some View {
-        if let failure = model.failure, model.entries.isEmpty {
+        if let failure = model.failure, model.entries.isEmpty, !model.isFiltered {
             OwnerFailureState(failure: failure, host: host) { Task { await model.reload() } }
         } else if !model.hasLoaded {
             OwnerLoading()
@@ -61,26 +61,30 @@ struct ActivityPage: View {
                     }
                 },
                 foot: {
-                    if let failure = model.failure {
+                    if let failure = model.failure, !model.entries.isEmpty {
                         Text(verbatim: OwnerWording.line(failure)).settingsFont(.count).foregroundStyle(SettingsTokens.errorRed)
                     } else if let range = model.range {
                         Text(verbatim: range).settingsFont(.count).foregroundStyle(SettingsTokens.secondaryText)
                     }
                     Spacer(minLength: 0)
                     if model.isLoading { ProgressView().controlSize(.small) }
-                    SettingsButton("Newer", small: true) { Task { await model.newer() } }
-                        .disabled(model.pageIndex == 0 || model.isLoading)
-                        .accessibilityIdentifier("ActivityNewer")
-                    SettingsButton("Older", small: true) { Task { await model.older() } }
-                        .disabled(!model.hasNext || model.isLoading)
-                        .accessibilityIdentifier("ActivityOlder")
+                    if model.isPaged {
+                        SettingsButton("Newer", small: true) { Task { await model.newer() } }
+                            .disabled(model.pageIndex == 0 || model.isLoading)
+                            .accessibilityIdentifier("ActivityNewer")
+                        SettingsButton("Older", small: true) { Task { await model.older() } }
+                            .disabled(!model.hasNext || model.isLoading)
+                            .accessibilityIdentifier("ActivityOlder")
+                    }
                 },
                 empty: {
-                    if model.isFiltered {
-                        SettingsStateContent(symbol: "magnifyingglass", title: Text("Nothing matches"), line: Text("No activity fits this filter."), action: nil)
+                    if let failure = model.failure {
+                        OwnerFailureState(failure: failure, host: host) { Task { await model.reload() } }
+                    } else if model.isFiltered {
+                        SettingsStateContent(symbol: "magnifyingglass", title: Text("Nothing Matches"), line: Text("No activity fits this filter."), action: nil)
                     } else {
                         SettingsStateContent(
-                            symbol: "list.bullet.rectangle", title: Text("No activity yet"),
+                            symbol: "list.bullet.rectangle", title: Text("No Activity Yet"),
                             line: Text("What happens in \(host.serverName) is recorded here."), action: nil)
                     }
                 })

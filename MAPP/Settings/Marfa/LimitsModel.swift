@@ -36,9 +36,10 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
 
     var id: String { key }
 
-    /// The text a field shows for `held`: a whole number where it is one, otherwise up to two decimals, with thousands separated.
-    func text(for held: Int) -> String {
-        unit.shown(held).formatted(.number.precision(.fractionLength(0...2)).locale(Locale(identifier: "en_US")))
+    /// The text a field shows for `held`: a whole number where it is one, otherwise up to two decimals, grouped and pointed as
+    /// the Mac's region does.
+    func text(for held: Int, locale: Locale = .current) -> String {
+        unit.shown(held).formatted(.number.precision(.fractionLength(0...2)).locale(locale))
     }
 
     enum Entry: Equatable, Sendable {
@@ -48,20 +49,33 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
         case invalid(String)
     }
 
-    /// Reads what was typed, with a dot or a comma for a decimal, as a number the server accepts.
-    func entry(from text: String) -> Entry {
+    /// Reads what was typed as a number the server accepts, grouped and pointed as the Mac's region writes one: the field's own
+    /// text can be typed back, and a separator that is neither the region's grouping nor its point is refused, never guessed at.
+    func entry(from text: String, locale: Locale = .current) -> Entry {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return .useDefault }
-        // Thousands are separated by commas, as the field shows them; any other comma is a decimal one.
-        let grouped = trimmed.range(of: #"^\d{1,3}(,\d{3})+(\.\d+)?$"#, options: .regularExpression) != nil
-        let normalized = trimmed.replacingOccurrences(of: ",", with: grouped ? "" : ".")
-        guard let number = Double(normalized), number.isFinite, normalized.allSatisfy({ $0.isASCII && ($0.isNumber || $0 == ".") }) else {
-            return .invalid(String(localized: "Use digits only."))
-        }
+        guard let number = Self.number(trimmed, locale: locale) else { return .invalid(String(localized: "Use digits only.")) }
         if unit != .megabytes, number != number.rounded() { return .invalid(String(localized: "Use a whole number."))}
         let held = unit == .megabytes ? number * LimitUnit.bytesPerMegabyte : number
         guard held <= Double(range.upperBound), held >= Double(range.lowerBound) else { return .invalid(rangeLine) }
         return .value(unit == .megabytes ? Int(held.rounded()) : Int(number))
+    }
+
+    private static func number(_ text: String, locale: Locale) -> Double? {
+        let point = locale.decimalSeparator ?? "."
+        let group = locale.groupingSeparator ?? ","
+        var typed = text
+        // A region that groups with a space (or a narrow or no-break one) accepts any of them.
+        if group.allSatisfy(\.isWhitespace) { typed = String(typed.map { $0.isWhitespace ? Character(group) : $0 }) }
+        let digits = "[0-9]"
+        let fraction = "(\(NSRegularExpression.escapedPattern(for: point))\(digits)+)?"
+        let plain = "^\(digits)+\(fraction)$"
+        let grouped = "^\(digits){1,3}(\(NSRegularExpression.escapedPattern(for: group))\(digits){3})+\(fraction)$"
+        guard typed.range(of: plain, options: .regularExpression) != nil || typed.range(of: grouped, options: .regularExpression) != nil
+        else { return nil }
+        let normalized = typed.replacingOccurrences(of: group, with: "").replacingOccurrences(of: point, with: ".")
+        guard let number = Double(normalized), number.isFinite else { return nil }
+        return number
     }
 
     /// "Use a number from 1 to 32 MB." Where the least is a single byte, it is "above 0".
@@ -125,6 +139,7 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
     var drafts: [String: String] = [:]
     /// One line under a limit's title after a change that was not made.
     private(set) var lines: [String: String] = [:]
+    /// What was told after a change found changed elsewhere; it closes when the person next edits, or is closed.
     private(set) var notice: String?
     private(set) var saving: Set<String> = []
 
@@ -149,14 +164,14 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
 
     /// What the field shows: what was typed, else what the server holds.
     func text(_ limit: LimitSetting) -> String {
-        drafts[limit.key] ?? held(limit).map(limit.text(for:)) ?? ""
+        drafts[limit.key] ?? held(limit).map { limit.text(for: $0) } ?? ""
     }
 
     func isOn(_ key: String) -> Bool { store.setting(key)?.value?.bool ?? false }
 
     /// What is wrong with what was typed, before it is sent: the line to show under the title.
     func line(_ limit: LimitSetting) -> String? {
-        if case .invalid(let line)? = drafts[limit.key].map(limit.entry(from:)) { return line }
+        if case .invalid(let line)? = drafts[limit.key].map { limit.entry(from: $0) } { return line }
         return lines[limit.key]
     }
 
@@ -187,6 +202,14 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
         await send([limit.key: change], keys: [limit.key])
     }
 
+    /// Takes what is typed in a field; the notice about an earlier change closes.
+    func type(_ text: String, for limit: LimitSetting) {
+        drafts[limit.key] = text
+        notice = nil
+    }
+
+    func dismissNotice() { notice = nil }
+
     func setSwitch(_ key: String, _ on: Bool) async {
         guard !saving.contains(key), isOn(key) != on else { return }
         await send([key: .set(.bool(on))], keys: [key])
@@ -200,12 +223,18 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
         switch await store.write(changes) {
         case .saved:
             for key in keys { drafts[key] = nil }
-        case .elsewhere:
+        case .elsewhere(let moved):
             for key in keys { drafts[key] = nil }
-            notice = StoredSettingWording.elsewhere
+            notice = StoredSettingWording.elsewhere(moved.map(Self.name))
         case .failed(let failure):
             for key in keys { lines[key] = StoredSettingWording.line(failure) }
         }
+    }
+
+    private static func name(_ key: String) -> String {
+        if key == LimitSetting.rateLimitSwitch { return String(localized: "Limit Requests") }
+        if key == LimitSetting.fetchSwitch { return String(localized: "Let Tools Fetch Files") }
+        return LimitSetting.all.first { $0.key == key }?.title ?? key
     }
 
     // MARK: Drafts

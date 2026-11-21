@@ -29,8 +29,8 @@ struct LimitsPage: View {
             OwnerFailureState(failure: failure, host: host) { Task { await model.load() } }
         } else if model.isLoaded {
             SettingsPageColumn {
-                if let notice = model.notice { OwnerProblem(title: "Not Changed", line: notice) }
-                SettingsSection("Requests") {
+                if let notice = model.notice { OwnerProblem(title: "Changed Elsewhere", line: notice, close: { model.dismissNotice() }) }
+                SettingsSection("Requests", footer: "Leave a field empty to use \(host.serverName)’s own default.") {
                     field(.largestRequest)
                     field(.largestBulkRequest)
                 }
@@ -58,7 +58,6 @@ struct LimitsPage: View {
                     field(.largestFetch)
                     field(.fetchTime)
                 }
-                SettingsNote("Leave a field empty to use \(host.serverName)’s own default.")
             }
         } else {
             OwnerLoading()
@@ -66,7 +65,7 @@ struct LimitsPage: View {
     }
 
     private func field(_ limit: LimitSetting) -> some View {
-        let text = Binding { model.text(limit) } set: { model.drafts[limit.key] = $0 }
+        let text = Binding { model.text(limit) } set: { model.type($0, for: limit) }
         return SettingsRow(verbatim: limit.title, line: limit.line, error: model.line(limit)) {
             SettingsNumberField(
                 title: LocalizedStringKey(limit.title), text: text, unit: LocalizedStringKey(limit.unit.title),

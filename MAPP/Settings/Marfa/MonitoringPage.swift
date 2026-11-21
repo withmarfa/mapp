@@ -21,6 +21,15 @@ struct MonitoringPage: View {
         content
             .task(id: host.serverAddress) { await model.load() }
             .settingsSheet(presenting: model.sheet != nil, dismiss: { model.close() }) { MonitoringSecretSheetView(model: model) }
+            .alert(
+                model.question?.title ?? "", isPresented: Binding { model.question != nil } set: { if !$0 { model.cancelQuestion() } },
+                presenting: model.question
+            ) { asked in
+                Button("Cancel", role: .cancel) {}
+                Button("Remove", role: .destructive) { Task { await model.confirm(asked) } }
+            } message: { asked in
+                Text(verbatim: asked.message)
+            }
             .accessibilityIdentifier("MonitoringPage")
     }
 
@@ -29,7 +38,7 @@ struct MonitoringPage: View {
             OwnerFailureState(failure: failure, host: host) { Task { await model.load() } }
         } else if model.isLoaded {
             SettingsPageColumn {
-                if let notice = model.notice { OwnerProblem(title: "Not Changed", line: notice) }
+                if let notice = model.notice { OwnerProblem(title: "Changed Elsewhere", line: notice, close: { model.dismissNotice() }) }
                 SettingsSection("Heartbeat") {
                     switchRow(
                         "Send a Heartbeat", key: "heartbeat_enabled", hasReceiver: model.heartbeatHasReceiver,
@@ -68,11 +77,18 @@ struct MonitoringPage: View {
 
     private func secretRow(_ secret: MonitoringSecret) -> some View {
         let isSet = model.isSet(secret)
-        return SettingsRow(verbatim: secret.title) {
+        return SettingsRow(verbatim: secret.title, error: model.line(secret.key)) {
             HStack(spacing: 8) {
                 SettingsValue(isSet ? "Set" : "Not Set")
                 SettingsButton(isSet ? "Change…" : "Set…") { model.begin(secret) }
                     .accessibilityIdentifier("Monitoring-" + secret.rawValue)
+                if isSet {
+                    SettingsMoreMenu {
+                        Button("Remove…", role: .destructive) { model.askToRemove(secret) }
+                    }
+                    .disabled(model.isWriting)
+                    .accessibilityIdentifier("MonitoringMore-" + secret.rawValue)
+                }
             }
         }
     }
@@ -94,19 +110,14 @@ struct MonitoringSecretSheetView: View {
                             SettingsField(
                                 title: LocalizedStringKey(field.title),
                                 text: Binding { model.sheet?.inputs[field.key] ?? "" } set: { model.sheet?.inputs[field.key] = $0 },
-                                prompt: model.isSet(field) ? String(localized: "Type it again to change it") : field.prompt,
-                                isError: sheet.error != nil, isSecure: true, width: nil,
+                                prompt: model.isSet(field) && model.isSecure(field) ? String(localized: "Type it again to change it") : field.prompt,
+                                isError: sheet.error != nil, isSecure: model.isSecure(field), width: nil,
                                 onSubmit: { Task { await model.save() } })
                             .accessibilityIdentifier("MonitoringSecretField-" + field.rawValue)
                         }
                     }
                 }
             } buttons: {
-                if model.canRemove(sheet) {
-                    SettingsButton("Remove", role: .destructive) { Task { await model.remove() } }
-                        .disabled(model.isWriting)
-                        .accessibilityIdentifier("MonitoringSecretRemove")
-                }
                 Spacer(minLength: 0)
                 SettingsButton("Cancel") { model.close() }
                 SettingsButton("Save") { Task { await model.save() } }
@@ -121,7 +132,13 @@ struct MonitoringSecretSheetView: View {
         model.isSet(sheet.secret) ? Text("Change \(sheet.secret.title)") : Text("Set \(sheet.secret.title)")
     }
 
+    /// What the sheet says about what is typed, where the server never shows it again.
     private func line(_ sheet: MonitoringSecretSheet) -> String? {
-        model.removalNote(sheet) ?? String(localized: "It is never shown again.")
+        guard sheet.fields.contains(where: model.isSecure) else { return nil }
+        if sheet.fields.count > 1 { return String(localized: "The new host and token are never shown again.") }
+        switch sheet.secret {
+        case .heartbeatAddress, .telemetryAddress, .postHogHost: return String(localized: "The new address is never shown again.")
+        case .postHogToken, .telemetryHeaders: return String(localized: "The new value is never shown again.")
+        }
     }
 }

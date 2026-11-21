@@ -228,7 +228,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     func apply(_ plan: AddressPlan, instanceID: String?) async throws(OwnerFailure) -> AddressSettings {
         try enter("apply")
         return try state.withLock { state throws(OwnerFailure) in
-            if let instanceID, instanceID != state.settings.instanceID { throw .conflict }
+            if let instanceID, instanceID != state.settings.instanceID { throw .instanceChanged }
             state.applied.append(plan)
             state.settings.signIn = plan.signIn
             state.settings.addresses = plan.addresses
@@ -1267,7 +1267,8 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         await model.check()
         bench.calls.state.withLock { $0.settings.instanceID = "instance-2" }
         await model.confirm()
-        #expect(model.inputError == OwnerWording.line(.conflict))
+        #expect(model.inputError == "Another Marfa now answers at this address. Nothing was sent.")
+        #expect(model.settings?.instanceID == "instance-1", "the other Marfa's settings are not adopted")
         #expect(model.input == "studio.castell.design")
     }
 
@@ -1433,8 +1434,8 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(
             ClientOwnerCalls.failure(MarfaError.versionConflict(message: "Stale.", server: nil), plainConflict: { .sourceHeld($0) }) == .conflict)
         #expect(
-            ClientOwnerCalls.failure(MarfaError.instanceChanged(message: "Another instance.", server: nil)) == .conflict,
-            "another Marfa answering at the address is told as a change somewhere else")
+            ClientOwnerCalls.failure(MarfaError.instanceChanged(message: "Another instance.", server: nil)) == .instanceChanged,
+            "another Marfa answering at the address is not a change somewhere else")
         #expect(
             ClientOwnerCalls.failure(answer("sign_in_address_check_failed"), plainConflict: { _ in .conflict }) == .refused("The server’s words."),
             "the address refusals keep the server’s words whatever the call")

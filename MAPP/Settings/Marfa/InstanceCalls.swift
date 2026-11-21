@@ -94,6 +94,27 @@ nonisolated struct InstanceSettingsSnapshot: Hashable, Sendable {
     var startUp: [StartUpSetting]
 
     func setting(_ key: String) -> StoredSetting? { settings[key] }
+
+    /// What the server holds once it has taken `changes`, for when it can't be asked: a secret is set without a value being
+    /// known, and a setting cleared takes its default.
+    func applying(_ changes: [String: StoredSettingChange]) -> InstanceSettingsSnapshot {
+        var next = self
+        for (key, change) in changes {
+            guard var setting = next.settings[key] else { continue }
+            switch change {
+            case .set(let value):
+                setting.value = setting.isSecret ? nil : value
+                setting.isStored = true
+                setting.isSet = true
+            case .clear:
+                setting.value = setting.isSecret ? nil : setting.defaultValue
+                setting.isStored = false
+                setting.isSet = !setting.isSecret && setting.defaultValue != nil
+            }
+            next.settings[key] = setting
+        }
+        return next
+    }
 }
 
 nonisolated enum StoredSettingChange: Hashable, Sendable {

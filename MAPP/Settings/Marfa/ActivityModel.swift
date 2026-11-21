@@ -154,12 +154,16 @@ nonisolated enum ActivityWording {
         return String(localized: "\((first).formatted()) to \((first + entries.count - 1).formatted())")
     }
 
-    /// Reads the newest page again, under the filter as it is.
+    /// Reads the newest page again, under the filter as it is. Where that read fails the rows of the filter before it are not
+    /// kept: they would sit under the new filter's page.
     func reload() async {
         starts = [nil]
         pageIndex = 0
-        await read(at: 0)
+        await read(at: 0, clearingOnFailure: true)
     }
+
+    /// Whether there is another page to go to, or one to come back to.
+    var isPaged: Bool { hasNext || pageIndex > 0 }
 
     func older() async {
         guard hasNext, let next, !isLoading else { return }
@@ -172,7 +176,7 @@ nonisolated enum ActivityWording {
         await read(at: pageIndex - 1)
     }
 
-    private func read(at index: Int) async {
+    private func read(at index: Int, clearingOnFailure: Bool = false) async {
         generation += 1
         let mine = generation
         isLoading = true
@@ -190,6 +194,11 @@ nonisolated enum ActivityWording {
         } catch {
             guard mine == generation else { return }
             starts = Array(starts.prefix(pageIndex + 1))
+            if clearingOnFailure {
+                entries = []
+                next = nil
+                hasNext = false
+            }
             failure = error
             await context.learn(from: error)
         }

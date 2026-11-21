@@ -45,10 +45,14 @@ struct OwnerLoading: View {
 struct OwnerProblem: View {
     let title: LocalizedStringKey
     let line: String
+    /// What the Close button does, where the line is one the person closes and not one that goes with the next change.
+    var close: (() -> Void)?
 
     var body: some View {
         SettingsSection(name: nil) {
-            SettingsProblemRow(title: Text(title), line: Text(verbatim: line), actions: [])
+            SettingsProblemRow(
+                title: Text(title), line: Text(verbatim: line),
+                actions: close.map { close in [SettingsProblemAction("Close", perform: close)] } ?? [])
         }
     }
 }

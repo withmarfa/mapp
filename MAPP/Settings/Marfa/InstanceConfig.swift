@@ -183,6 +183,9 @@ nonisolated enum InstanceConfigFailure: Error, Hashable, Sendable {
     case refused(String)
     case failed(String)
 
+    /// What every page says when another Marfa answers at the address; Overview adds that what it shows is that Marfa's.
+    static let anotherMarfaSentence = String(localized: "Another Marfa now answers at this address. Nothing was sent.")
+
     var message: String {
         switch self {
         case .unreachable:
@@ -190,7 +193,7 @@ nonisolated enum InstanceConfigFailure: Error, Hashable, Sendable {
         case .notPermitted:
             String(localized: "MAPP’s sign-in isn’t allowed to change this server’s settings. Ask whoever runs the server to allow it, or use the server’s console.")
         case .instanceChanged:
-            String(localized: "Another Marfa now answers at this address. Nothing was sent, and these are its settings, not the ones you were editing.")
+            Self.anotherMarfaSentence + " " + String(localized: "These are its settings, not the ones you were editing.")
         case .unsupported:
             String(localized: "There are no server settings to show for this library.")
         case .keyRefused:

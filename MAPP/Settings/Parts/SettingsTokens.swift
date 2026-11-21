@@ -81,7 +81,7 @@ enum SettingsTokens {
 
     /// The interface fonts of Settings. A page asks for these by role.
     enum Role: Hashable, Sendable {
-        case title, line, sectionName, sectionLine, footer, control, small, mono, stateTitle, headTitle, count, sidebar, sidebarHeader, largeGlyph
+        case title, line, sectionName, sectionLine, footer, control, small, mono, stateTitle, headTitle, count, sidebar, sidebarHeader, largeGlyph, tableHeader
     }
 
     static func font(_ role: Role, scale: CGFloat = 1) -> Font {
@@ -95,6 +95,7 @@ enum SettingsTokens {
         case .largeGlyph: .system(size: 15 * scale)
         case .headTitle: .system(size: 15 * scale, weight: .semibold)
         case .count: .system(size: 11 * scale)
+        case .tableHeader: .system(size: 11 * scale, weight: .semibold)
         case .sidebarHeader: .system(size: 11 * scale, weight: .semibold)
         }
     }
@@ -126,7 +127,12 @@ enum SettingsTokens {
         static let popUpChevronPull: CGFloat = 5
         /// A table that is a page: its side margin, and the height of the bar above its columns and of the foot below them.
         static let pageTableInset: CGFloat = 24
-        static let pageTableBar: CGFloat = 48
+        static let pageTableBar: CGFloat = 44
+        static let pageTableFoot: CGFloat = 44
+        /// A table's header band, and a row of a table that is a page (a table in a section has taller rows).
+        static let tableHeader: CGFloat = 30
+        static let pageTableRow: CGFloat = 30
+        static let sectionTableRow: CGFloat = 34
         static let cardRadius: CGFloat = 10
         static let controlRadius: CGFloat = 7
         static let buttonRadius: CGFloat = 9

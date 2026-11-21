@@ -7,6 +7,12 @@
     "%@. %@" : {
 
     },
+    "%@ was changed elsewhere. MAPP read the new value; yours wasn’t saved." : {
+
+    },
+    "%@ were changed elsewhere. MAPP read the new values; yours weren’t saved." : {
+
+    },
     "1 conflicted copy" : {
 
     },
@@ -40,6 +46,9 @@
     "All Events" : {
 
     },
+    "Another Marfa now answers at this address. Nothing was sent." : {
+
+    },
     "Answer" : {
 
     },
@@ -50,6 +59,9 @@
 
     },
     "Change this folder’s ignore patterns, limits and files with the command line: %@." : {
+
+    },
+    "Changed Elsewhere" : {
 
     },
     "Changing the events or the type drops waiting deliveries that no longer match." : {
@@ -122,6 +134,9 @@
 
     },
     "For" : {
+
+    },
+    "heartbeat address" : {
 
     },
     "It is shown only once. The service checks each request with it." : {
@@ -227,6 +242,9 @@
     "New Webhook…" : {
 
     },
+    "No Activity Yet" : {
+
+    },
     "No Answer" : {
 
     },
@@ -263,6 +281,9 @@
     "Nothing is kept in step with a folder yet." : {
 
     },
+    "Nothing Matches" : {
+
+    },
     "Off" : {
 
     },
@@ -270,6 +291,15 @@
 
     },
     "Only webhooks this sign-in made are listed. An app or a key sees only its own." : {
+
+    },
+    "PostHog host" : {
+
+    },
+    "project token" : {
+
+    },
+    "Read when %@ starts. Change them where it runs." : {
 
     },
     "Redeliver" : {
@@ -285,6 +315,9 @@
 
     },
     "%lld removals wait" : {
+
+    },
+    "Remove the %@?" : {
 
     },
     "Reported %@." : {
@@ -332,6 +365,15 @@
     "Tags or Extra Data Changed" : {
 
     },
+    "telemetry address" : {
+
+    },
+    "telemetry headers" : {
+
+    },
+    "Telemetry is sent without these headers." : {
+
+    },
     "The folder is missing where this copy is kept" : {
 
     },
@@ -341,10 +383,31 @@
     "The latest events sent to this address. Only a failed one can be sent again." : {
 
     },
+    "The new address is never shown again." : {
+
+    },
+    "The new host and token are never shown again." : {
+
+    },
+    "The new value is never shown again." : {
+
+    },
+    "The PostHog host and the project token are removed together, and error reports stop." : {
+
+    },
     "The server refused this copy’s sign-in" : {
 
     },
+    "The server stops sending its heartbeat." : {
+
+    },
+    "The server stops sending telemetry." : {
+
+    },
     "The webhook “%@” was made, and its signing secret can’t be shown again. If you didn’t copy it, delete the webhook on the Webhooks page and make it again." : {
+
+    },
+    "These are its settings, not the ones you were editing." : {
 
     },
     "This copy can’t reach the server" : {
@@ -575,9 +638,6 @@
     "Issued an access token" : {
 
     },
-    "It is never shown again." : {
-
-    },
     "It must sign in again with your password or a passkey. Apps and keys keep working." : {
 
     },
@@ -707,9 +767,6 @@
     "No activity fits this filter." : {
 
     },
-    "No activity yet" : {
-
-    },
     "Nothing is sent until an address is set." : {
 
     },
@@ -717,9 +774,6 @@
 
     },
     "Nothing listed" : {
-
-    },
-    "Nothing matches" : {
 
     },
     "Older" : {
@@ -969,9 +1023,6 @@
 
     },
     "Read a file’s text" : {
-
-    },
-    "Read when it starts. Change them there." : {
 
     },
     "Refused a reused token" : {
@@ -1242,9 +1293,6 @@
 
     },
     "The port it listens on." : {
-
-    },
-    "The PostHog host and the project token are removed together." : {
 
     },
     "The server refused this change. Nothing was changed." : {
@@ -1533,9 +1581,6 @@
 
     },
     "Thinned old versions" : {
-
-    },
-    "This changed somewhere else, so MAPP read it again. Nothing was changed." : {
 
     },
     "Time Allowed" : {
@@ -1841,6 +1886,9 @@
     "Tries" : {
 
     },
+    "Type both the host and the project token." : {
+
+    },
     "Type it again to change it" : {
 
     },
@@ -1917,9 +1965,6 @@
 
     },
     "viewers" : {
-
-    },
-    "Wait for the last change to finish." : {
 
     },
     "Waiting for a connection." : {
@@ -3361,9 +3406,6 @@
     },
     "Another item opened before MAPP finished saving this one, so your most recent typing might not be saved. Try again." : {
 
-    },
-    "Another Marfa now answers at this address. Nothing was sent, and these are its settings, not the ones you were editing." : {
-      "extractionState" : "manual"
     },
     "Apache-2.0" : {
 

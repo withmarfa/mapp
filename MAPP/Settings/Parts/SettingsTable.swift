@@ -4,11 +4,19 @@ import SwiftUI
 struct SettingsTableColumn<Row> {
     let title: LocalizedStringKey
     var width: CGFloat?
+    /// How many lines a cell may take; a cell that needs more is cut, and `truncation` says where.
+    var lines = 1
+    var truncation: Text.TruncationMode = .tail
     let cell: (Row) -> AnyView
 
-    init(_ title: LocalizedStringKey, width: CGFloat? = nil, @ViewBuilder cell: @escaping (Row) -> some View) {
+    init(
+        _ title: LocalizedStringKey, width: CGFloat? = nil, lines: Int = 1, truncation: Text.TruncationMode = .tail,
+        @ViewBuilder cell: @escaping (Row) -> some View
+    ) {
         self.title = title
         self.width = width
+        self.lines = lines
+        self.truncation = truncation
         self.cell = { AnyView(cell($0)) }
     }
 }
@@ -64,7 +72,7 @@ private struct TableHeader<Row>: View {
         HStack(spacing: 12) {
             ForEach(columns.indices, id: \.self) { index in
                 Text(columns[index].title)
-                    .settingsFont(.line)
+                    .settingsFont(.tableHeader)
                     .foregroundStyle(SettingsTokens.secondaryText)
                     .frame(width: columns[index].width, alignment: .leading)
                     .frame(maxWidth: columns[index].width == nil ? .infinity : nil, alignment: .leading)
@@ -72,7 +80,7 @@ private struct TableHeader<Row>: View {
             if hasAction { Color.clear.frame(width: ActionWidth.value) }
         }
         .padding(.horizontal, inset)
-        .frame(height: 30)
+        .frame(height: SettingsTokens.Metric.tableHeader)
         .accessibilityHidden(true)
     }
 }
@@ -86,6 +94,7 @@ private struct TableRow<Row>: View {
     let isSelected: Bool
     var isBanded = false
     var inset = SettingsTokens.Metric.inset
+    var height = SettingsTokens.Metric.sectionTableRow
     @State private var isHovered = false
 
     var body: some View {
@@ -93,7 +102,8 @@ private struct TableRow<Row>: View {
             ForEach(columns.indices, id: \.self) { index in
                 columns[index].cell(row)
                     .settingsFont(.title)
-                    .lineLimit(1)
+                    .lineLimit(columns[index].lines)
+                    .truncationMode(columns[index].truncation)
                     .frame(width: columns[index].width, alignment: .leading)
                     .frame(maxWidth: columns[index].width == nil ? .infinity : nil, alignment: .leading)
             }
@@ -104,7 +114,7 @@ private struct TableRow<Row>: View {
             }
         }
         .padding(.horizontal, inset)
-        .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: height, alignment: .leading)
         .background(isSelected ? SettingsTokens.selection : (isHovered ? SettingsTokens.hover : (isBanded ? SettingsTokens.band : Color.clear)))
         .contentShape(.rect)
         .onHover { isHovered = $0 }
@@ -182,14 +192,17 @@ struct SettingsPageTable<Row: Identifiable, Filter: View, Foot: View>: View {
                     Rectangle().fill(SettingsTokens.rule).frame(height: 1)
                     LazyVStack(spacing: 0) {
                         ForEach(rows) { row in
-                            TableRow(row: row, columns: columns, action: action, isSelected: selection.contains(row.id))
-                                .onTapGesture { toggle(row.id) }
+                            TableRow(
+                                row: row, columns: columns, action: action, isSelected: selection.contains(row.id),
+                                height: SettingsTokens.Metric.pageTableRow
+                            )
+                            .onTapGesture { toggle(row.id) }
                         }
                     }
                     Rectangle().fill(SettingsTokens.rule).frame(height: 1)
                     HStack(spacing: 8) { foot }
                         .padding(.horizontal, SettingsTokens.Metric.inset)
-                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .frame(maxWidth: .infinity, minHeight: SettingsTokens.Metric.pageTableFoot, alignment: .leading)
                 }
             }
         }
@@ -231,7 +244,9 @@ struct SettingsLogTable<Row: Identifiable, Filter: View, Foot: View, Empty: View
                 ScrollView {
                     LazyVStack(spacing: 0) {
                         ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
-                            TableRow(row: row, columns: columns, action: nil, isSelected: false, isBanded: index.isMultiple(of: 2), inset: inset)
+                            TableRow(
+                                row: row, columns: columns, action: nil, isSelected: false, isBanded: index.isMultiple(of: 2), inset: inset,
+                                height: SettingsTokens.Metric.pageTableRow)
                         }
                     }
                 }
@@ -240,7 +255,7 @@ struct SettingsLogTable<Row: Identifiable, Filter: View, Foot: View, Empty: View
             Rectangle().fill(SettingsTokens.rule).frame(height: 1)
             HStack(spacing: 8) { foot }
                 .padding(.horizontal, inset)
-                .frame(maxWidth: .infinity, minHeight: SettingsTokens.Metric.pageTableBar, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: SettingsTokens.Metric.pageTableFoot, alignment: .leading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(SettingsTokens.page)

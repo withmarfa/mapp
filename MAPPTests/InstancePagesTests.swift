@@ -23,6 +23,10 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         var queries: [ActivityQuery] = []
         /// A refusal the server gives a write, in its words, instead of taking it.
         var refusal: String?
+        /// How long a write takes, so a second write can arrive while it runs.
+        var changeDelay: Duration?
+        /// Whether every read fails once a write has been taken.
+        var failReadsAfterChange = false
     }
 
     static let defaults: [String: StoredSetting] = {
@@ -100,9 +104,11 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
 
     func change(_ changes: [String: StoredSettingChange], instanceID: String?) async throws(OwnerFailure) {
         try enter("change")
+        // The write takes this long so that a test can start another while it is under way.
+        if let delay = state.withLock({ $0.changeDelay }) { try? await Task.sleep(for: delay) }
         try state.withLock { state throws(OwnerFailure) in
             state.instanceIDsSent.append(instanceID)
-            guard instanceID == nil || instanceID == state.instanceID else { throw .conflict }
+            guard instanceID == nil || instanceID == state.instanceID else { throw .instanceChanged }
             if let refusal = state.refusal { throw .refused(refusal) }
             state.sent.append(changes)
             for (key, change) in changes {
@@ -119,6 +125,7 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
                 }
                 state.settings[key] = setting
             }
+            if state.failReadsAfterChange { state.failures["storedSettings"] = .unreachable }
         }
     }
 }
@@ -137,25 +144,46 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
 }
 
 @Suite(.hangLimit) @MainActor struct LimitsTests {
+    private static let american = Locale(identifier: "en_US")
+    private static let german = Locale(identifier: "de_DE")
+    private static let french = Locale(identifier: "fr_FR")
+
     @Test func sizesAreShownInMegabytesAndSentInBytes() {
-        #expect(LimitSetting.largestRequest.text(for: 1_048_576) == "1")
-        #expect(LimitSetting.largestBulkRequest.text(for: 16_777_216) == "16")
-        #expect(LimitSetting.largestRequest.text(for: 1_572_864) == "1.5")
-        #expect(LimitSetting.largestRequest.entry(from: "2") == .value(2_097_152))
-        #expect(LimitSetting.largestRequest.entry(from: "0,5") == .value(524_288), "a comma is a decimal")
-        #expect(LimitSetting.requestsPerWindow.text(for: 4000) == "4,000", "thousands are separated, as the board shows them")
-        #expect(LimitSetting.mostTextKept.text(for: 100_000) == "100,000")
-        #expect(LimitSetting.mostTextKept.entry(from: "100,000") == .value(100_000), "what the field shows can be typed back")
-        #expect(LimitSetting.largestRequest.entry(from: "1,024") == .value(1_073_741_824))
-        #expect(LimitSetting.requestsPerWindow.entry(from: "4000") == .value(4000))
+        let us = Self.american
+        #expect(LimitSetting.largestRequest.text(for: 1_048_576, locale: us) == "1")
+        #expect(LimitSetting.largestBulkRequest.text(for: 16_777_216, locale: us) == "16")
+        #expect(LimitSetting.largestRequest.text(for: 1_572_864, locale: us) == "1.5")
+        #expect(LimitSetting.largestRequest.entry(from: "2", locale: us) == .value(2_097_152))
+        #expect(LimitSetting.largestRequest.entry(from: "0.5", locale: us) == .value(524_288))
+        #expect(LimitSetting.requestsPerWindow.text(for: 4000, locale: us) == "4,000", "thousands are separated, as the board shows them")
+        #expect(LimitSetting.mostTextKept.text(for: 100_000, locale: us) == "100,000")
+        #expect(LimitSetting.mostTextKept.entry(from: "100,000", locale: us) == .value(100_000), "what the field shows can be typed back")
+        #expect(LimitSetting.largestRequest.entry(from: "1,024", locale: us) == .value(1_073_741_824))
+        #expect(LimitSetting.requestsPerWindow.entry(from: "4000", locale: us) == .value(4000))
+    }
+
+    @Test func numbersAreGroupedAndPointedAsTheMacsRegionDoes() {
+        let de = Self.german
+        #expect(LimitSetting.requestsPerWindow.text(for: 4000, locale: de) == "4.000")
+        #expect(LimitSetting.largestRequest.text(for: 1_572_864, locale: de) == "1,5")
+        #expect(LimitSetting.requestsPerWindow.entry(from: "4.000", locale: de) == .value(4000), "what the field shows can be typed back")
+        #expect(LimitSetting.largestRequest.entry(from: "0,5", locale: de) == .value(524_288), "the region's comma is its point")
+        #expect(LimitSetting.largestRequest.entry(from: "1.024", locale: de) == .value(1_073_741_824))
+        #expect(LimitSetting.requestsPerWindow.entry(from: "4,000", locale: Self.american) == .value(4000))
+        #expect(LimitSetting.largestRequest.entry(from: "0,5", locale: Self.american) == .invalid("Use digits only."), "a separator the region does not use is refused, not guessed at")
+        #expect(LimitSetting.largestRequest.entry(from: "1.5", locale: de) == .invalid("Use digits only."))
+        let fr = Self.french
+        let shown = LimitSetting.mostTextKept.text(for: 100_000, locale: fr)
+        #expect(LimitSetting.mostTextKept.entry(from: shown, locale: fr) == .value(100_000), "a space between thousands is typed back as it is shown")
+        #expect(LimitSetting.mostTextKept.entry(from: "100 000", locale: fr) == .value(100_000))
     }
 
     @Test func aValueOutOfRangeIsToldBeforeAnythingIsSent() {
         #expect(LimitSetting.largestBulkRequest.entry(from: "33") == .invalid("Use a number above 0, up to 32 MB."))
         #expect(LimitSetting.tries.entry(from: "0") == .invalid("Use a number from 1 to 100 times."))
         #expect(LimitSetting.tries.entry(from: "101") == .invalid("Use a number from 1 to 100 times."))
-        #expect(LimitSetting.tries.entry(from: "2.5") == .invalid("Use a whole number."))
-        #expect(LimitSetting.tries.entry(from: "three") == .invalid("Use digits only."))
+        #expect(LimitSetting.tries.entry(from: "2.5", locale: Self.american) == .invalid("Use a whole number."))
+        #expect(LimitSetting.tries.entry(from: "three", locale: Self.american) == .invalid("Use digits only."))
         #expect(LimitSetting.mostViewers.entry(from: "0") == .value(0), "0 is allowed where the server allows it")
         #expect(LimitSetting.tries.entry(from: "  ") == .useDefault)
     }
@@ -221,18 +249,77 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         await model.commit(.tries)
         #expect(calls.sent.isEmpty, "nothing is written over the newer value")
         #expect(model.text(.tries) == "7", "the page shows what is there now")
-        #expect(model.notice == "This changed somewhere else, so MAPP read it again. Nothing was changed.")
+        #expect(model.notice == "Tries was changed elsewhere. MAPP read the new value; yours wasn’t saved.")
     }
 
-    @Test func anotherInstanceAnsweringIsToldAndNothingIsWritten() async {
+    @Test func anotherMarfaAtTheAddressIsToldAsThatAndNothingIsAdopted() async {
         let calls = FakeInstanceCalls()
         let model = limitsModel(calls)
         await model.load()
-        calls.state.withLock { $0.instanceID = "instance-2" }
+        calls.state.withLock {
+            $0.instanceID = "instance-2"
+            $0.settings["enrichment_max_attempts"]?.value = .int(9)
+        }
         model.drafts["enrichment_max_attempts"] = "4"
         await model.commit(.tries)
         #expect(calls.sent.isEmpty)
+        #expect(model.notice == nil, "it did not change somewhere else: another Marfa answered")
+        #expect(model.line(.tries) == "Another Marfa now answers at this address. Nothing was sent.")
+        #expect(model.held(.tries) == 3, "the other Marfa's value is not adopted")
+        #expect(model.text(.tries) == "4", "what was typed stays")
+        await model.commit(.tries)
+        #expect(calls.sent.isEmpty, "no retry is sent to it")
+        #expect(calls.state.withLock { $0.instanceIDsSent }.isEmpty)
+    }
+
+    @Test func aSecondFieldLeftWhileAWriteRunsIsSentAfterIt() async {
+        let calls = FakeInstanceCalls()
+        calls.state.withLock { $0.changeDelay = .milliseconds(150) }
+        let model = limitsModel(calls)
+        await model.load()
+        model.drafts["enrichment_max_attempts"] = "4"
+        model.drafts["rate_limit_window_seconds"] = "30"
+        async let first: Void = model.commit(.tries)
+        async let second: Void = model.commit(.window)
+        _ = await (first, second)
+        #expect(calls.sent.count == 2, "both were sent, one after the other")
+        #expect(model.held(.tries) == 4 && model.held(.window) == 30)
+        #expect(model.line(.window) == nil && model.line(.tries) == nil)
+        #expect(model.notice == nil, "the second was not told it changed elsewhere")
+    }
+
+    @Test func aFailedReadAfterASuccessfulWriteKeepsTheValuesSent() async {
+        let calls = FakeInstanceCalls()
+        calls.state.withLock { $0.failReadsAfterChange = true }
+        let model = limitsModel(calls)
+        await model.load()
+        model.drafts["enrichment_max_attempts"] = "4"
+        await model.commit(.tries)
+        #expect(model.held(.tries) == 4, "what was sent is kept, though the read after it failed")
+        calls.state.withLock { $0.failures["storedSettings"] = nil }
+        model.drafts["enrichment_max_attempts"] = "5"
+        await model.commit(.tries)
+        #expect(model.notice == nil, "a later write is not told it changed elsewhere")
+        #expect(calls.sent.count == 2)
+        #expect(model.held(.tries) == 5)
+    }
+
+    @Test func theNoticeClosesWhenThePersonNextEditsOrCloses() async {
+        let calls = FakeInstanceCalls()
+        let model = limitsModel(calls)
+        await model.load()
+        calls.changeElsewhere("enrichment_max_attempts", to: .int(7))
+        model.drafts["enrichment_max_attempts"] = "4"
+        await model.commit(.tries)
         #expect(model.notice != nil)
+        model.type("5", for: .window)
+        #expect(model.notice == nil, "the next edit closes it")
+        #expect(model.drafts["rate_limit_window_seconds"] == "5")
+        calls.changeElsewhere("enrichment_max_attempts", to: .int(8))
+        model.drafts["enrichment_max_attempts"] = "4"
+        await model.commit(.tries)
+        model.dismissNotice()
+        #expect(model.notice == nil, "Close closes it")
     }
 
     @Test func aWriteTheServerAnswersAsAConflictIsToldAndReadAgain() async {
@@ -330,9 +417,11 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         #expect(model.isSet(.heartbeatAddress))
         #expect(calls.state.withLock { $0.settings["heartbeat_url"]?.value } == nil, "the value is never read back")
 
-        model.begin(.heartbeatAddress)
-        #expect(model.canRemove(model.sheet!))
-        await model.remove()
+        model.askToRemove(.heartbeatAddress)
+        #expect(model.question?.title == "Remove the heartbeat address?", "it asks first")
+        #expect(model.question?.message == "The server stops sending its heartbeat.")
+        #expect(calls.sent.count == 1, "nothing is removed until the owner agrees")
+        await model.confirm(model.question!)
         #expect(calls.sent.last == ["heartbeat_url": .clear])
         #expect(!model.isSet(.heartbeatAddress))
         #expect(model.sheet == nil)
@@ -365,10 +454,24 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
 
         model.begin(.postHogToken)
         #expect(model.sheet?.fields == [.postHogToken], "with the host set, only the token is asked")
-        #expect(model.removalNote(model.sheet!) != nil)
-        await model.remove()
+        model.close()
+        model.askToRemove(.postHogToken)
+        #expect(model.question?.message == "The PostHog host and the project token are removed together, and error reports stop.")
+        await model.confirm(model.question!)
         #expect(Set(calls.sent.last?.keys.map { $0 } ?? []) == ["posthog_host", "posthog_project_token"])
         #expect(!model.isSet(.postHogHost) && !model.isSet(.postHogToken))
+    }
+
+    @Test func onePostHogFieldAloneIsToldBeforeAnythingIsSent() async {
+        let calls = FakeInstanceCalls()
+        let model = monitoringModel(calls)
+        await model.load()
+        model.begin(.postHogHost)
+        model.sheet?.inputs["posthog_host"] = "https://eu.example"
+        await model.save()
+        #expect(calls.sent.isEmpty)
+        #expect(model.sheet?.error == "Type both the host and the project token.")
+        #expect(model.sheet?.inputs["posthog_host"] == "https://eu.example", "what was typed stays")
     }
 
     @Test func aSecretIsNeverHandedOverOrKeptAfterTheSheetCloses() async {
@@ -404,6 +507,65 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         #expect(calls.sent.isEmpty)
         #expect(model.notice != nil)
         #expect(model.isSet(.heartbeatAddress), "the page now shows it as set")
+    }
+
+    @Test func aSecretChangedElsewhereNamesItByTheWordsOfThePage() async {
+        let calls = FakeInstanceCalls()
+        let model = monitoringModel(calls)
+        await model.load()
+        calls.state.withLock { $0.settings["posthog_host"]?.isSet = true }
+        model.begin(.postHogHost)
+        model.sheet?.inputs["posthog_host"] = "https://eu.example"
+        model.sheet?.inputs["posthog_project_token"] = "phc_secret"
+        await model.save()
+        #expect(model.notice == "PostHog Host was changed elsewhere. MAPP read the new value; yours wasn’t saved.")
+        model.dismissNotice()
+        #expect(model.notice == nil)
+    }
+
+    @Test func anotherMarfaAtTheAddressIsToldOnTheRowAndNothingIsAdopted() async {
+        let calls = FakeInstanceCalls()
+        let model = monitoringModel(calls)
+        await model.load()
+        calls.state.withLock {
+            $0.instanceID = "instance-2"
+            $0.settings["telemetry_enabled"]?.value = .bool(true)
+        }
+        await model.setSwitch("telemetry_enabled", false)
+        #expect(calls.sent.isEmpty)
+        #expect(model.notice == nil)
+        #expect(model.line("telemetry_enabled") == "Another Marfa now answers at this address. Nothing was sent.")
+        #expect(model.isOn("telemetry_enabled"), "what the page showed is not replaced by the other Marfa's")
+    }
+
+    @Test func aSecretIsTypedSecurelyUnlessTheServerKeepsItInPlainView() async {
+        let calls = FakeInstanceCalls()
+        calls.state.withLock {
+            $0.settings["otel_exporter_otlp_endpoint"] = StoredSetting(
+                key: "otel_exporter_otlp_endpoint", value: .text("https://collector.example"), defaultValue: nil, isStored: true,
+                isSecret: false, isSet: true)
+        }
+        let model = monitoringModel(calls)
+        await model.load()
+        #expect(model.isSecure(.heartbeatAddress), "a secret the server holds is typed securely")
+        #expect(!model.isSecure(.telemetryAddress))
+        model.begin(.telemetryAddress)
+        #expect(model.sheet?.inputs["otel_exporter_otlp_endpoint"] == "https://collector.example", "a setting that can be read is there to change")
+        model.close()
+        model.begin(.heartbeatAddress)
+        #expect(model.sheet?.inputs.isEmpty == true, "a secret is never put back in a field")
+    }
+
+    @Test func aRemovalFailingKeepsTheRowAndSaysWhyOnIt() async {
+        let calls = FakeInstanceCalls()
+        calls.state.withLock { $0.settings["heartbeat_url"]?.isSet = true }
+        let model = monitoringModel(calls)
+        await model.load()
+        calls.state.withLock { $0.refusal = "Not now." }
+        model.askToRemove(.heartbeatAddress)
+        await model.confirm(model.question!)
+        #expect(model.line("heartbeat_url") == "Not now.")
+        #expect(model.isSet(.heartbeatAddress))
     }
 
     @Test func theTelemetrySwitchIsSentAtOnce() async {
@@ -461,6 +623,22 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         #expect(model.entries.first?.id == "e0")
     }
 
+    @Test func pagingIsOfferedOnlyWhereThereIsAnotherPage() async {
+        let calls = FakeInstanceCalls()
+        let model = model(calls)
+        await model.reload()
+        #expect(!model.isPaged, "an empty log has nothing to page")
+        calls.state.withLock { $0.entries = entries(5) }
+        await model.reload()
+        #expect(!model.isPaged)
+        calls.state.withLock { $0.entries = entries(45) }
+        await model.reload()
+        #expect(model.isPaged)
+        await model.older()
+        await model.older()
+        #expect(model.isPaged, "the last page has a way back")
+    }
+
     @Test func aFilterStartsAgainFromTheNewest() async {
         let calls = FakeInstanceCalls()
         calls.state.withLock { $0.entries = entries(45) }
@@ -490,6 +668,24 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         calls.fail("activity", with: nil)
         await model.older()
         #expect(model.range == "21 to 40", "the way forward still works after a failure")
+    }
+
+    @Test func aFailedReadForANewFilterNeverLeavesTheOldFiltersRowsShown() async {
+        let calls = FakeInstanceCalls()
+        calls.state.withLock { $0.entries = entries(45) }
+        let model = model(calls)
+        await model.reload()
+        await model.older()
+        calls.fail("activity", with: .unreachable)
+        model.kind = .access
+        await model.reload()
+        #expect(model.failure == .unreachable)
+        #expect(model.entries.isEmpty, "rows of the old filter are not kept under the new one")
+        #expect(model.range == nil && !model.hasNext)
+        #expect(model.pageIndex == 0)
+        calls.fail("activity", with: nil)
+        await model.reload()
+        #expect(model.entries.allSatisfy { $0.action.hasPrefix("auth") })
     }
 
     @Test func aReadRefusedForWantOfAPermissionIsToldAndGrantsAreReadAgain() async {
