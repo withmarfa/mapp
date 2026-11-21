@@ -127,9 +127,13 @@ private struct WebhookDetail: View {
     private static let firstDeliveries = 10
 
     private var line: String {
-        let made = webhook.created.map { String(localized: "Made \(OwnerWording.day($0)).") }
-        let by = webhook.maker?.name.map { String(localized: "Made by \($0).") }
-        return [by, made].compactMap { $0 }.joined(separator: " ")
+        let day = webhook.created.map { OwnerWording.day($0) }
+        switch (webhook.maker?.name, day) {
+        case (let name?, let day?): return String(localized: "Made by \(name), \(day).")
+        case (let name?, nil): return String(localized: "Made by \(name).")
+        case (nil, let day?): return String(localized: "Made \(day).")
+        case (nil, nil): return ""
+        }
     }
 
     private var eventNames: [WebhookEvent] {
@@ -227,8 +231,12 @@ private struct WebhookDetail: View {
         }
     }
 
-    static func when(_ date: Date?) -> String {
-        date.map { DateDisplay.text(of: $0, place: .value, format: .stored()) } ?? ""
+    /// "Today, 14:02", or the day and time.
+    static func when(_ date: Date?, now: Date = .now, calendar: Calendar = .current) -> String {
+        guard let date else { return "" }
+        let format = DateFormat.stored()
+        guard calendar.isDate(date, inSameDayAs: now) else { return DateDisplay.text(of: date, place: .value, format: format, now: now, calendar: calendar) }
+        return String(localized: "Today, \(DateDisplay.timeOfDay(of: date, format: format, calendar: calendar))")
     }
 
     /// What the receiver answered, or what became of a delivery with no answer.

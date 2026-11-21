@@ -97,11 +97,11 @@ import Observation
 
     var atCap: Bool { webhooks.count >= Self.cap }
 
-    /// The webhooks grouped by the credential that made them, newest first within each group.
+    /// The webhooks grouped by the credential that made them, oldest first within each group.
     var groups: [Group] {
         var order: [String] = []
         var members: [String: [OwnerWebhook]] = [:]
-        for webhook in webhooks.sorted(by: { ($0.created ?? .distantPast) > ($1.created ?? .distantPast) }) {
+        for webhook in webhooks.sorted(by: { ($0.created ?? .distantFuture) < ($1.created ?? .distantFuture) }) {
             let key = webhook.maker?.id ?? ""
             if members[key] == nil { order.append(key) }
             members[key, default: []].append(webhook)
