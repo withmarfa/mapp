@@ -17,6 +17,8 @@ struct ItemTable: View {
     @AppStorage(ViewLayouts.key) private var viewLayouts = ViewLayouts()
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     @State private var daysSeen = 0
+    /// Whether rows have scrolled up past the headings, under the toolbar.
+    @State private var isUnderToolbar = false
     @State private var hover = ItemTableHover()
     @State private var placeTrace = TablePlaceTrace()
 
@@ -98,7 +100,9 @@ struct ItemTable: View {
         .tableStyle(.inset)
         .onChange(of: browser.panelIsOut) { _, isOut in if isOut { hover.clear() } }
         .softSelection(rows: pages.shownIDs + collapsed.sorted(), hovers: true, selection: { browser.selection })
-        .quietTableHeader()
+        .quietTableHeader(isUnderToolbar: $isUnderToolbar)
+        .scrollEdgeEffectHidden(true, for: .top)
+        .toolbarBand(isUnderToolbar: isUnderToolbar)
         .remembersScroll(in: browser.listMemory)
         .alternatingRowBackgrounds(.disabled)
         .scrollContentBackground(.hidden)
