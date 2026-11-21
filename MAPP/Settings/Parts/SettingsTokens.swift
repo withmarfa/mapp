@@ -120,6 +120,10 @@ enum SettingsTokens {
         static let textInset: CGFloat = 52
         static let controlWidth: CGFloat = 200
         static let controlHeight: CGFloat = 28
+        /// The chevrons that end a pop-up the system has no control for, sized and set to match the ones the system draws
+        /// in `SettingsPopUp`: `popUpChevronPull` is how far nearer the edge they sit than a bordered button's label ends.
+        static let popUpChevronSize: CGFloat = 13
+        static let popUpChevronPull: CGFloat = 5
         static let cardRadius: CGFloat = 10
         static let controlRadius: CGFloat = 7
         static let buttonRadius: CGFloat = 9

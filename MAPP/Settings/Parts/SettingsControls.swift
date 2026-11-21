@@ -191,6 +191,17 @@ struct SettingsChevron: View {
     }
 }
 
+/// The two chevrons at the trailing edge of a pop-up. The system draws them in `SettingsPopUp`; a pop-up the system has no
+/// control for (`SettingsMultiPopUp`) ends in this, drawn to land where the system's land.
+struct SettingsPopUpChevron: View {
+    var body: some View {
+        Image(systemName: "chevron.up.chevron.down")
+            .font(.system(size: SettingsTokens.Metric.popUpChevronSize, weight: .semibold))
+            .padding(.trailing, -SettingsTokens.Metric.popUpChevronPull)
+            .accessibilityHidden(true)
+    }
+}
+
 extension View {
     /// The red ring of a refused input. The line that says why is the row's `error`.
     func settingsErrorRing(_ isError: Bool) -> some View {

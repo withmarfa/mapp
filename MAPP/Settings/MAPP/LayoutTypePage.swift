@@ -23,7 +23,7 @@ struct LayoutTypePage: View {
             row
             facts
             page
-            SettingsBar {
+            SettingsBar(edge: .leading) {
                 SettingsButton("Restore Defaults") { restore() }
                     .disabled(!hasChanges)
                     .accessibilityIdentifier("RestoreLayout")

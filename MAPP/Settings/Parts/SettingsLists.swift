@@ -40,10 +40,7 @@ struct SettingsMultiPopUp: View {
                     Text(verbatim: names.joined(separator: ", "))
                 }
                 Spacer(minLength: 0)
-                // The pop-ups beside it end in these two chevrons, which a menu button does not draw.
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 11, weight: .semibold))
-                    .accessibilityHidden(true)
+                SettingsPopUpChevron()
             }
             .lineLimit(1)
         }
@@ -60,7 +57,7 @@ struct SettingsMultiPopUp: View {
 
 /// An ordered list changed in place, for a section's card (writing `entries` is how the page learns of a new order or a removal): each entry has a handle to drag it by and a menu that moves it
 /// or takes it out, and the last row adds one from the options not yet in the list. A list that cannot take more is full:
-/// its add row is dimmed and says why in `fullLine`.
+/// its add row is dimmed.
 struct SettingsOrderedList: View {
     @Binding var entries: [SettingsListEntry]
     /// What the add row offers: the choices not in the list.
@@ -89,19 +86,12 @@ struct SettingsOrderedList: View {
         addRow
     }
 
-    @ViewBuilder private var addRow: some View {
-        Menu {
+    private var addRow: some View {
+        SettingsAddMenu(addTitle, isOff: isFull || candidates.isEmpty) {
             ForEach(candidates) { candidate in
                 Button(candidate.title) { onAdd(candidate) }
             }
-        } label: {
-            SettingsRow(title: Text(addTitle), lead: .symbol("plus"), size: .compact, look: isFull || candidates.isEmpty ? .off : .normal)
         }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
-        .disabled(isFull || candidates.isEmpty)
-        .containerValue(\.settingsRuleInset, SettingsTokens.Metric.textInset)
     }
 
     private func move(_ entry: SettingsListEntry, by step: Int) {
