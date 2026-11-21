@@ -72,7 +72,7 @@ struct ItemCommandTests {
     }
 
     @Test func eachShortcutBelongsToOneCommand() {
-        let shortcuts = ItemCommand.allCases.compactMap(\.shortcut).map { "\($0.key.character)\($0.modifiers.rawValue)" }
+        let shortcuts = ItemCommand.allCases.compactMap { $0.shortcutCommand.defaultShortcut }
         #expect(Set(shortcuts).count == shortcuts.count)
     }
 

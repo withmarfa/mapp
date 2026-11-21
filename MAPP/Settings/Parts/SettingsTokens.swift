@@ -118,6 +118,14 @@ enum SettingsTokens {
         static let tile: CGFloat = 22
         static let headTile: CGFloat = 44
         static let smallButtonHeight: CGFloat = 22
+        /// A small search field at a list's trailing edge, and the button beside it that changes what it searches by.
+        static let searchWidth: CGFloat = 200
+        static let searchHeight: CGFloat = 24
+        static let searchRadius: CGFloat = 7
+        static let searchInset: CGFloat = 7
+        static let searchSpacing: CGFloat = 8
+        /// The clear button inside a shortcut field, and the space round it.
+        static let fieldClearInset: CGFloat = 8
         /// The sidebar's tile, rows, field and headers.
         static let sidebarTile: CGFloat = 20
         static let sidebarRowHeight: CGFloat = 28

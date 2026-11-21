@@ -70,39 +70,28 @@ struct CalendarCornerView: View {
 struct ItemCalendarOptions: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
-    /// Whether each command binds its key; the toolbar's copy in View Options leaves them to the menu.
-    var bindsKeys = false
+    /// The keys the menu binds; the toolbar's copy in View Options has none and leaves them to the menu.
+    var shortcuts: ShortcutBindings?
 
     var body: some View {
         let scale = browser.calendarScale
         Button("Today", systemImage: "calendar.circle") { browser.moveCalendar(by: nil, now: library.now()) }
-            .keyboardShortcut(bindsKeys ? CalendarShortcut.today : nil)
+            .shortcut(.today, shortcuts)
         Button(scale == .week ? "Previous Week" : "Previous Month", systemImage: "chevron.left") {
             browser.moveCalendar(by: -1, now: library.now())
         }
-        .keyboardShortcut(bindsKeys ? CalendarShortcut.previous : nil)
+        .shortcut(.previousPeriod, shortcuts)
         Button(scale == .week ? "Next Week" : "Next Month", systemImage: "chevron.right") {
             browser.moveCalendar(by: 1, now: library.now())
         }
-        .keyboardShortcut(bindsKeys ? CalendarShortcut.next : nil)
+        .shortcut(.nextPeriod, shortcuts)
         Toggle("Week", isOn: Binding { scale == .week } set: { _ in browser.changeCalendarScale(.week) })
-            .keyboardShortcut(bindsKeys ? CalendarShortcut.week : nil)
+            .shortcut(.showWeek, shortcuts)
         Toggle("Month", isOn: Binding { scale == .month } set: { _ in browser.changeCalendarScale(.month) })
-            .keyboardShortcut(bindsKeys ? CalendarShortcut.month : nil)
+            .shortcut(.showMonthScale, shortcuts)
         Button(browser.showsCalendarMonth ? "Hide Month" : "Show Month", systemImage: "calendar") {
             browser.toggleCalendarMonth()
         }
-        .keyboardShortcut(bindsKeys ? CalendarShortcut.showMonth : nil)
+        .shortcut(.toggleMonth, shortcuts)
     }
-}
-
-/// The keys of the calendar's commands. None is on a key another menu, the Find or Format menus or the page binds; ⌘T and
-/// ⌘⌥ with an arrow stay clear of the text fields' own use of ⌘ with an arrow.
-enum CalendarShortcut {
-    static let today = KeyboardShortcut("t")
-    static let previous = KeyboardShortcut(.leftArrow, modifiers: [.command, .option])
-    static let next = KeyboardShortcut(.rightArrow, modifiers: [.command, .option])
-    static let week = KeyboardShortcut("1", modifiers: [.command, .option])
-    static let month = KeyboardShortcut("2", modifiers: [.command, .option])
-    static let showMonth = KeyboardShortcut("d", modifiers: [.command, .shift])
 }

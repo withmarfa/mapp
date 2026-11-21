@@ -6,11 +6,13 @@ struct VersionHistoryButton: View {
     @CurrentLibrary private var library
     let ids: Set<ItemID>
     let details: DetailsPresentation?
+    var shortcuts: ShortcutBindings?
 
     var body: some View {
         Button("Version History…", systemImage: "clock.arrow.circlepath") {
             if let id = ids.first { details?.showHistory(of: id, in: library) }
         }
+        .shortcut(.versionHistory, shortcuts)
         .disabled(
             details == nil || details?.history != nil || ids.count != 1 || ids.first.flatMap { library.item($0) } == nil)
     }

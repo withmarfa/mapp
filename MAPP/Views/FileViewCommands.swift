@@ -38,13 +38,16 @@ enum FileViewCommand: CaseIterable {
         }
     }
 
-    var shortcut: KeyboardShortcut? {
+    /// The command whose key sizes the file. Zoom In, Zoom Out and Actual Size share the keys of the text size commands, so
+    /// one choice in Settings holds for the file and for the text, and a key sizes one or the other, never both.
+    var shortcutCommand: ShortcutCommand {
         switch self {
-        // ⌘= is the same key as ⌘+ without Shift, and AppKit matches a "+" shortcut with it.
-        case .zoomIn: KeyboardShortcut("+")
-        case .zoomOut: KeyboardShortcut("-")
-        case .actualSize: KeyboardShortcut("0")
-        case .zoomToFit, .nextPage, .previousPage: nil
+        case .zoomIn: .makeTextBigger
+        case .zoomOut: .makeTextSmaller
+        case .actualSize: .actualSize
+        case .zoomToFit: .zoomToFit
+        case .nextPage: .nextPage
+        case .previousPage: .previousPage
         }
     }
 
@@ -75,6 +78,7 @@ enum FileViewCommand: CaseIterable {
 /// The commands as View menu items for the file page in front, the pages' commands after a divider.
 struct FileViewCommands: View {
     let viewing: FileViewing
+    let shortcuts: ShortcutBindings
 
     var body: some View {
         let commands = FileViewCommand.offered(for: viewing.kind)
@@ -90,7 +94,7 @@ struct FileViewCommands: View {
 
     private func button(_ command: FileViewCommand) -> some View {
         Button(command.title, systemImage: command.systemImage) { command.perform(on: viewing) }
-            .keyboardShortcut(command.shortcut)
+            .shortcut(command.shortcutCommand, shortcuts)
             .disabled(!command.isEnabled(on: viewing))
     }
 }

@@ -6,17 +6,17 @@ struct ItemViewOptions: View {
     let browser: Browser?
     /// The layouts the window's place can show; all of them while no window is in front.
     var modes = ItemViewMode.allCases
-    /// Whether each choice binds its Command-number key; the toolbar's copy of the choices leaves them to the menu.
-    var bindsKeys = false
+    /// The keys the menu binds to each choice; the toolbar's copy of the choices has none and leaves them to the menu.
+    var shortcuts: ShortcutBindings?
 
     var body: some View {
         Group {
-            choice("as List", systemImage: ItemViewMode.list.symbol, .list, key: "1")
-            choice("as Gallery", systemImage: ItemViewMode.gallery.symbol, .gallery, key: "2")
-            choice("as Table", systemImage: ItemViewMode.table.symbol, .table, key: "3")
-            choice("as Board", systemImage: ItemViewMode.board.symbol, .board, key: "4")
-            choice("as Timeline", systemImage: ItemViewMode.timeline.symbol, .timeline, key: "5")
-            choice("as Calendar", systemImage: ItemViewMode.calendar.symbol, .calendar, key: "6")
+            choice("as List", systemImage: ItemViewMode.list.symbol, .list, command: .viewAsList)
+            choice("as Gallery", systemImage: ItemViewMode.gallery.symbol, .gallery, command: .viewAsGallery)
+            choice("as Table", systemImage: ItemViewMode.table.symbol, .table, command: .viewAsTable)
+            choice("as Board", systemImage: ItemViewMode.board.symbol, .board, command: .viewAsBoard)
+            choice("as Timeline", systemImage: ItemViewMode.timeline.symbol, .timeline, command: .viewAsTimeline)
+            choice("as Calendar", systemImage: ItemViewMode.calendar.symbol, .calendar, command: .viewAsCalendar)
         }
         .disabled(browser == nil)
     }
@@ -33,10 +33,10 @@ struct ItemViewOptions: View {
     }
 
     @ViewBuilder
-    private func choice(_ title: LocalizedStringKey, systemImage: String, _ mode: ItemViewMode, key: KeyEquivalent) -> some View {
+    private func choice(_ title: LocalizedStringKey, systemImage: String, _ mode: ItemViewMode, command: ShortcutCommand) -> some View {
         if modes.contains(mode) {
             Toggle(title, systemImage: systemImage, isOn: Binding { browser?.viewMode == mode } set: { _ in browser?.viewMode = mode })
-                .keyboardShortcut(bindsKeys ? KeyboardShortcut(key) : nil)
+                .shortcut(command, shortcuts)
                 .accessibilityIdentifier(identifier(mode))
         }
     }
@@ -138,16 +138,16 @@ struct DefaultViewOptions: View {
 struct CurrentViewOptions: View {
     /// Nil while no window is in front, when the list's order is still the app's to change.
     let browser: Browser?
-    var bindsKeys = false
+    var shortcuts: ShortcutBindings?
 
     var body: some View {
         switch browser?.viewMode {
         case .table: if let browser { ItemTableViewOptions(browser: browser) }
         case .board: if let browser { ItemBoardOptions(browser: browser) }
-        case .timeline: if let browser { ItemTimelineOptions(browser: browser, bindsKeys: bindsKeys) }
+        case .timeline: if let browser { ItemTimelineOptions(browser: browser, shortcuts: shortcuts) }
         case .calendar:
             if let browser {
-                ItemCalendarOptions(browser: browser, bindsKeys: bindsKeys)
+                ItemCalendarOptions(browser: browser, shortcuts: shortcuts)
                 Divider()
                 IncludeSubtypesOption(browser: browser)
             }
@@ -204,13 +204,13 @@ struct ItemBoardOptions: View {
 struct ItemTimelineOptions: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
-    var bindsKeys = false
+    var shortcuts: ShortcutBindings?
 
     var body: some View {
         let fields = browser.timelineFieldChoices(in: library)
         let field = ItemTimelineLayout.selectedField(browser.timelineFields[browser.item], fields: fields)
         Button("Today", systemImage: "calendar.circle") { browser.requestTimelineToday() }
-            .keyboardShortcut(bindsKeys ? CalendarShortcut.today : nil)
+            .shortcut(.today, shortcuts)
         Divider()
         Picker("Date Field", systemImage: "calendar", selection: Binding { field ?? "" } set: {
             browser.setTimelineField($0.isEmpty ? nil : $0, in: library)

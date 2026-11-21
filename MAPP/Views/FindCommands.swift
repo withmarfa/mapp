@@ -5,6 +5,7 @@ import SwiftUI
 /// system find bar. Search List leads it with ⌥⌘F, as Search does in Notes, so Find and Replace has no
 /// shortcut of its own.
 struct FindCommands: Commands {
+    let shortcuts: ShortcutBindings
     @FocusedValue(\.editor) private var editor
     @FocusedValue(\.browser) private var browser
 
@@ -12,18 +13,18 @@ struct FindCommands: Commands {
         CommandGroup(after: .textEditing) {
             Menu("Find", systemImage: "magnifyingglass") {
                 SearchListButton()
-                    .keyboardShortcut("f", modifiers: [.command, .option])
+                    .shortcut(.searchList, shortcuts)
                 Divider()
                 item("Find…", systemImage: "magnifyingglass", .showFindInterface)
-                    .keyboardShortcut("f")
+                    .shortcut(.find, shortcuts)
                 item("Find and Replace…", systemImage: "arrow.left.arrow.right", .showReplaceInterface)
                     .disabled(editor?.isEditable != true)
                 item("Find Next", systemImage: "chevron.down", .nextMatch)
-                    .keyboardShortcut("g")
+                    .shortcut(.findNext, shortcuts)
                 item("Find Previous", systemImage: "chevron.up", .previousMatch)
-                    .keyboardShortcut("g", modifiers: [.command, .shift])
+                    .shortcut(.findPrevious, shortcuts)
                 item("Use Selection for Find", systemImage: "text.cursor", .setSearchString)
-                    .keyboardShortcut("e")
+                    .shortcut(.useSelectionForFind, shortcuts)
             }
         }
     }

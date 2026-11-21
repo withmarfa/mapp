@@ -96,14 +96,18 @@ nonisolated enum Format: CaseIterable, Hashable {
         }
     }
 
-    /// The shortcut in ProseMirror's key names, so the page answers it even before the menu sees the key.
-    var pageKey: String? {
+    /// `shortcut` in ProseMirror's key names, so the page answers it even before the menu sees the key. A key the page has
+    /// no name for is left to the menu.
+    func pageKey(for shortcut: Shortcut?) -> String? {
         // Inkkit has no key binding for Link, which needs an address; the menu's shortcut asks for one.
-        guard self != .link, let (key, modifiers) = shortcut else { return nil }
+        guard self != .link, let shortcut, shortcut.key.count == 1, let key = shortcut.key.first,
+              !(key.unicodeScalars.first.map { (0xF700...0xF8FF).contains($0.value) || $0.value < 0x20 } ?? true)
+        else { return nil }
         var name = ""
-        if modifiers.contains(.shift) { name += "Shift-" }
-        if modifiers.contains(.option) { name += "Alt-" }
-        if modifiers.contains(.command) { name += "Mod-" }
+        if shortcut.modifiers.contains(.control) { name += "Ctrl-" }
+        if shortcut.modifiers.contains(.shift) { name += "Shift-" }
+        if shortcut.modifiers.contains(.option) { name += "Alt-" }
+        if shortcut.modifiers.contains(.command) { name += "Mod-" }
         return name + String(key)
     }
 

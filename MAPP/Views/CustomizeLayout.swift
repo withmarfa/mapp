@@ -9,12 +9,15 @@ struct CustomizeLayoutButton: View {
     @CurrentLibrary private var library
     let ids: Set<ItemID>
     let details: DetailsPresentation?
+    var shortcuts: ShortcutBindings?
 
     var body: some View {
         if details?.isCustomizingLayout == true {
             Button("Finish Customizing", systemImage: "slider.horizontal.3") { details?.endLayout() }
+                .shortcut(.customizeLayout, shortcuts)
         } else {
             Button("Customize Layout…", systemImage: "slider.horizontal.3") { details?.beginLayout() }
+                .shortcut(.customizeLayout, shortcuts)
                 .disabled(ids.count != 1 || details?.canBeginLayout(for: ids.first.flatMap { library.item($0) }) != true)
         }
     }

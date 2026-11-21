@@ -49,7 +49,6 @@ enum TestHost {
 struct MAPPApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
     @State private var settingsLauncher = SettingsLauncher()
-    @State private var shortcuts = KeyboardShortcutsModel()
     @AppStorage(InterfaceKey.toolbarLabelStyle) private var toolbarLabelStyle: ToolbarLabelStyle = .iconOnly
     private var libraries: Libraries { delegate.libraries }
 
@@ -66,21 +65,21 @@ struct MAPPApp: App {
                 .appAccent()
                 .environment(libraries)
                 .environment(libraries.host)
-                .environment(shortcuts)
+                .environment(libraries.shortcuts)
         }
         .defaultSize(width: 1100, height: 720)
         .windowToolbarLabelStyle($toolbarLabelStyle)
         .commands {
-            AppCommands(library: libraries.current, host: libraries.host)
+            AppCommands(library: libraries.current, host: libraries.host, shortcuts: libraries.shortcuts)
             PlaceCommands(library: libraries.current, libraries: libraries)
-            FindCommands()
+            FindCommands(shortcuts: libraries.shortcuts)
             ImportFromDevicesCommands()
             LooksCommands(libraries: libraries)
-            FormatCommands()
+            FormatCommands(shortcuts: libraries.shortcuts)
             ToolbarCommands()
-            SettingsCommands(launcher: settingsLauncher)
+            SettingsCommands(launcher: settingsLauncher, shortcuts: libraries.shortcuts)
             AboutCommands()
-            HelpCommands(shortcuts: shortcuts)
+            HelpCommands(launcher: settingsLauncher)
             #if DEBUG
             TuningCommands()
             #endif
@@ -92,16 +91,6 @@ struct MAPPApp: App {
         .defaultSize(width: SettingsTokens.Metric.windowWidth, height: SettingsTokens.Metric.windowHeight)
         .windowResizability(.contentMinSize)
         .defaultLaunchBehavior(.suppressed)
-        .commandsRemoved()
-
-        Window("Keyboard Shortcuts", id: KeyboardShortcutsView.windowID) {
-            KeyboardShortcutsView()
-                .interfaceTextStyle()
-                .appAccent()
-                .environment(shortcuts)
-        }
-        .windowResizability(.contentMinSize)
-        .restorationBehavior(.disabled)
         .commandsRemoved()
 
         #if DEBUG
@@ -131,6 +120,7 @@ struct MAPPApp: App {
             }
             .interfaceTextStyle()
             .appAccent()
+            .environment(libraries.shortcuts)
             .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
             .modifier(ItemWindowNotices(notices: libraries.host.notices, launcher: settingsLauncher))
         }
@@ -182,6 +172,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #endif
         // The sample library and the tests have no use of the system's reports of this app's real use.
         if !sampled { metrics = MetricsListener() }
+        // The shortcuts that work in any app are registered once the app can act on them, and only the ones set.
+        libraries.anyAppShortcuts.perform = { [libraries] command in FrontBrowser.shared.perform(command, in: libraries) }
+        libraries.anyAppShortcuts.start()
         // The saved server's copy opens and paints before the network is asked anything.
         Task { await libraries.launch() }
     }

@@ -175,12 +175,16 @@ struct SettingsPageState: View {
 /// A row of buttons at the end of a page, at the trailing edge, for what the page's fields hold: Revert and Save for a
 /// draft, or what sends or discards it. Buttons are regular size, since it is not inside a table.
 struct SettingsBar<Content: View>: View {
+    /// Which edge the buttons sit at: the trailing one for a draft's Revert and Save, the leading one for buttons under a
+    /// card that act on the whole page.
+    var edge: HorizontalEdge = .trailing
     @ViewBuilder let content: Content
 
     var body: some View {
         HStack(spacing: 8) {
-            Spacer(minLength: 0)
+            if edge == .trailing { Spacer(minLength: 0) }
             content
+            if edge == .leading { Spacer(minLength: 0) }
         }
         .padding(.horizontal, SettingsTokens.Metric.inset)
     }

@@ -189,10 +189,11 @@ struct FileViewingTests {
     }
 
     @Test func theSizeKeysAreTheTextSizeKeysAndAFilePageTakesThem() {
-        #expect(FileViewCommand.zoomIn.shortcut == KeyboardShortcut("+"))
-        #expect(FileViewCommand.zoomOut.shortcut == KeyboardShortcut("-"))
-        #expect(FileViewCommand.actualSize.shortcut == KeyboardShortcut("0"))
-        #expect(FileViewCommand.nextPage.shortcut == nil)
+        #expect(FileViewCommand.zoomIn.shortcutCommand == .makeTextBigger)
+        #expect(FileViewCommand.zoomOut.shortcutCommand == .makeTextSmaller)
+        #expect(FileViewCommand.actualSize.shortcutCommand == .actualSize)
+        #expect(ShortcutCommand.makeTextBigger.defaultShortcut == Shortcut(key: "+", modifiers: .command))
+        #expect(FileViewCommand.nextPage.shortcutCommand.defaultShortcut == nil)
     }
 
     @Test func aCommandIsEnabledOnlyWhereItChangesSomething() {

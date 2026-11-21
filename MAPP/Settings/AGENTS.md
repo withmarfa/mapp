@@ -5,7 +5,7 @@ Settings is a window of its own (`SettingsWindowView`, a `Window` scene, not the
 ## Structure
 
 - `Window/` is the shell: the window, the sidebar, the history behind Back and Forward (`SettingsNavigation`), and the one launcher every route opens the window through (`SettingsLauncher`; `Browser.showSettings` asks it). A page is listed in the sidebar only once it exists: add a case to `SettingsPage` (or `MarfaSettingsPage`), its group, its words for the sidebar's search, and its view in `SettingsDetail`.
-- `Parts/` is every part a page draws with: `SettingsSection`, `SettingsRow`, the trailing controls, `SettingsHead`, `SettingsProblemRow`, `SettingsPageState`, `SettingsBar`, `SettingsSizeSlider`, `SettingsSwatches`, `ChoiceTiles`, `PatternList`, the tables and `SettingsSheet`. They name nothing of MAPP's model. A page never draws its own row, button, section or sheet.
+- `Parts/` is every part a page draws with: `SettingsSection`, `SettingsRow`, the trailing controls, `SettingsHead`, `SettingsProblemRow`, `SettingsPageState`, `SettingsBar`, `SettingsSizeSlider`, `SettingsSwatches`, `ChoiceTiles`, `PatternList`, `SettingsShortcutField` and `SettingsShortcutSearch` (which take keys before the menus can), the tables and `SettingsSheet`. They name nothing of MAPP's model. A page never draws its own row, button, section or sheet.
 - `MAPP/` is MAPP's own pages and `MAPPMarfaSettingsHost`, which lends the Marfa's half what it needs. `Marfa/` is the Marfa's pages; read its `AGENTS.md`.
 
 ## Rules

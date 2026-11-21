@@ -148,10 +148,16 @@ extension EditorController {
         ]
     }
 
+    /// The keys the person gave the Format commands, which the page answers as the menu does.
+    func setFormatShortcuts(_ shortcuts: [Format: Shortcut?]) {
+        formatShortcuts = shortcuts
+        if isReady { applyKeymap() }
+    }
+
     func applyKeymap() {
         var keymap: [String: [String]] = ["Mod-O": ["openLink"]]
         for format in Format.allCases {
-            guard let key = format.pageKey else { continue }
+            guard let key = format.pageKey(for: formatShortcuts[format] ?? ShortcutCommand.format(format).defaultShortcut) else { continue }
             let (name, argument) = format.command
             keymap[key] = [name] + (argument.map { [$0] } ?? [])
         }

@@ -70,6 +70,7 @@ extension FocusedValues {
 /// Settings window's pages while it is key (`AppCommands`).
 struct SettingsCommands: Commands {
     let launcher: SettingsLauncher
+    let shortcuts: ShortcutBindings
     @Environment(\.openWindow) private var openWindow
 
     var body: some Commands {
@@ -78,7 +79,7 @@ struct SettingsCommands: Commands {
                 launcher.open = { openWindow(id: SettingsLauncher.windowID) }
                 launcher.show()
             }
-            .keyboardShortcut(",")
+            .shortcut(.settings, shortcuts)
         }
     }
 }

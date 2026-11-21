@@ -3,12 +3,16 @@ import SwiftUI
 /// The View menu's filter commands: Show or Hide Filters, Add Filter… and Clear Filters.
 struct FilterCommands: View {
     @Bindable var browser: Browser
+    let shortcuts: ShortcutBindings
 
     var body: some View {
         Button(browser.toggleFiltersTitle) { browser.toggleFilterRow() }
+            .shortcut(.toggleFilters, shortcuts)
         Button("Add Filter…") { browser.requestAddFilter() }
+            .shortcut(.addFilter, shortcuts)
         if browser.filterCount > 0 {
             Button("Clear Filters") { browser.clearFilters() }
+                .shortcut(.clearFilters, shortcuts)
         }
     }
 }

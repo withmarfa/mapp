@@ -11,12 +11,14 @@ struct ItemActions: View {
     let undoManager: UndoManager?
     /// The menu bar names what its items act on, since nothing has been clicked to say so.
     var inMenuBar = false
+    /// The keys the menu bar binds; a context menu has none.
+    var shortcuts: ShortcutBindings?
 
     var body: some View {
-        ItemOrganizeActions(ids: ids, undoManager: undoManager, inMenuBar: inMenuBar)
+        ItemOrganizeActions(ids: ids, undoManager: undoManager, inMenuBar: inMenuBar, shortcuts: shortcuts)
         CollectionActions(selection: ids, details: details, undoManager: undoManager)
         if inMenuBar || ids.contains(where: { library.item($0) != nil }) { Divider() }
-        ItemRemoveActions(ids: ids, undoManager: undoManager, inMenuBar: inMenuBar)
+        ItemRemoveActions(ids: ids, undoManager: undoManager, inMenuBar: inMenuBar, shortcuts: shortcuts)
     }
 }
 
@@ -49,6 +51,7 @@ struct ItemOrganizeActions: View {
     var inMenuBar = false
     /// Keeps the items in the menu, dimmed, when nothing is selected, as the menu bar and the More menu do.
     var keepsPlace = false
+    var shortcuts: ShortcutBindings?
 
     var body: some View {
         let context = ItemActionContext(library: library, ids: ids, keepsPlace: inMenuBar || keepsPlace)
@@ -56,16 +59,16 @@ struct ItemOrganizeActions: View {
             EmptyView()
         } else if context.allDeleted {
             Button("Recover", systemImage: "arrow.uturn.backward") { library.recover(ids, undoManager: undoManager) }
-            VersionHistoryButton(ids: ids, details: details)
+            VersionHistoryButton(ids: ids, details: details, shortcuts: shortcuts)
         } else {
-            FavoriteButton(ids: ids, undoManager: undoManager)
-            AddTagButton(ids: ids, details: details, undoManager: undoManager)
-            TypeChangeButton(ids: ids, details: details, undoManager: undoManager)
+            FavoriteButton(ids: ids, undoManager: undoManager, shortcuts: shortcuts)
+            AddTagButton(ids: ids, details: details, undoManager: undoManager, shortcuts: shortcuts)
+            TypeChangeButton(ids: ids, details: details, undoManager: undoManager, shortcuts: shortcuts)
             // A right click on a card with no page open has nothing to arrange; the menus keep the item in place.
             if details?.showsPage != false || inMenuBar || keepsPlace {
-                CustomizeLayoutButton(ids: ids, details: details)
+                CustomizeLayoutButton(ids: ids, details: details, shortcuts: shortcuts)
             }
-            VersionHistoryButton(ids: ids, details: details)
+            VersionHistoryButton(ids: ids, details: details, shortcuts: shortcuts)
         }
     }
 }
@@ -75,6 +78,7 @@ struct FavoriteButton: View {
     @CurrentLibrary private var library
     let ids: Set<ItemID>
     let undoManager: UndoManager?
+    var shortcuts: ShortcutBindings?
 
     var body: some View {
         // An item in the bin keeps its tags, so it neither decides the toggle nor takes the change.
@@ -83,6 +87,7 @@ struct FavoriteButton: View {
         Button(allFavorites ? "Remove from Favorites" : "Add to Favorites", systemImage: allFavorites ? "star.slash" : "star") {
             library.setFavorite(ids, !allFavorites, undoManager: undoManager)
         }
+        .shortcut(.favorite, shortcuts)
         .disabled(active.isEmpty)
     }
 }
@@ -96,6 +101,7 @@ struct ItemRemoveActions: View {
     let undoManager: UndoManager?
     var inMenuBar = false
     var keepsPlace = false
+    var shortcuts: ShortcutBindings?
 
     var body: some View {
         let context = ItemActionContext(library: library, ids: ids, keepsPlace: inMenuBar || keepsPlace)
@@ -110,6 +116,7 @@ struct ItemRemoveActions: View {
             Button("Delete", systemImage: "trash", role: .destructive) {
                 library.deleteAfterSaving(ids, undoManager: undoManager, asking: details)
             }
+            .shortcut(.delete, shortcuts)
             .disabled(context.items.isEmpty)
         }
     }

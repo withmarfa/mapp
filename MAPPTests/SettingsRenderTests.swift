@@ -123,6 +123,55 @@ private struct RenderedWindow<Detail: View>: View {
             size: CGSize(width: Self.size.width, height: 1_300), named: "Appearance, a missing font and a custom accent")
     }
 
+    private func keyboard(_ prepare: (KeyboardPageModel) -> Void = { _ in }) async throws -> (SettingsPage, KeyboardPage) {
+        let bench = try HostBench()
+        let defaults = try #require(UserDefaults(suiteName: "SettingsRenderTests-\(UUID().uuidString)"))
+        let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
+        let model = KeyboardPageModel(bindings: libraries.shortcuts, anyApp: libraries.anyAppShortcuts)
+        prepare(model)
+        return (.keyboard, KeyboardPage(libraries: libraries, model: model))
+    }
+
+    @Test func keyboardRecording() async throws {
+        let (page, detail) = try await keyboard { model in
+            model.bindings.set(nil, for: .addTag)
+            model.startRecording(.menu(.quickLook))
+        }
+        try await SettingsRender.png(RenderedWindow(selection: page, detail: detail), size: Self.size, named: "Keyboard, recording")
+    }
+
+    @Test func keyboardAnyApp() async throws {
+        let (page, detail) = try await keyboard { model in
+            model.anyApp.set(Shortcut(key: " ", modifiers: [.control, .option], keyCode: 49), for: .commandPalette)
+        }
+        try await SettingsRender.png(RenderedWindow(selection: page, detail: detail), size: Self.size, named: "Keyboard, in any app")
+    }
+
+    @Test func keyboardAnyAppRefusesOptionAlone() async throws {
+        let (page, detail) = try await keyboard { model in
+            model.startRecording(.anyApp(.searchItems))
+            model.record(Shortcut(key: "k", modifiers: .option, keyCode: 40))
+        }
+        try await SettingsRender.png(RenderedWindow(selection: page, detail: detail), size: Self.size, named: "Keyboard, Option alone refused")
+    }
+
+    @Test func keyboardTakenKey() async throws {
+        let (page, detail) = try await keyboard { model in
+            model.search = "tag"
+            model.startRecording(.menu(.addTag))
+            model.record(Shortcut(key: "k", modifiers: .command, keyCode: 40))
+        }
+        try await SettingsRender.png(RenderedWindow(selection: page, search: "", detail: detail), size: Self.size, named: "Keyboard, taken")
+    }
+
+    @Test func keyboardSearchingByKeys() async throws {
+        let (page, detail) = try await keyboard { model in
+            model.searchesByKeys = true
+            model.pressed = Shortcut(key: "k", modifiers: .command, keyCode: 40)
+        }
+        try await SettingsRender.png(RenderedWindow(selection: page, detail: detail), size: Self.size, named: "Keyboard, by keys")
+    }
+
     @Test func lists() async throws {
         try await SettingsRender.png(RenderedWindow(selection: .lists, detail: ListsPage()), size: Self.size, named: "Lists")
     }

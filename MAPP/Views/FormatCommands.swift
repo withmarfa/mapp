@@ -3,6 +3,7 @@ import SwiftUI
 /// The Format menu: text styles, lists and tables, acting on the item whose page has the keyboard, with a
 /// checkmark on the style the caret sits in.
 struct FormatCommands: Commands {
+    let shortcuts: ShortcutBindings
     @FocusedValue(\.editor) private var editor
 
     var body: some Commands {
@@ -40,7 +41,7 @@ struct FormatCommands: Commands {
         Toggle(isOn: Binding { format.isActive(in: caret) } set: { _ in editor?.format(format) }) {
             Text(title ?? format.title)
         }
-        .keyboardShortcut(format.shortcut.map { KeyboardShortcut(KeyEquivalent($0.key), modifiers: $0.modifiers) })
+        .shortcut(.format(format), shortcuts)
         .disabled(!enabled)
     }
 }
