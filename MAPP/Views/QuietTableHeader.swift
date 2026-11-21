@@ -49,7 +49,6 @@ private struct QuietTableHeader: NSViewRepresentable {
                 let old = column.headerCell
                 let cell = QuietHeaderCell(textCell: old.stringValue)
                 cell.font = QuietHeaderCell.headingFont
-                cell.textColor = .secondaryLabelColor
                 cell.alignment = old.alignment
                 cell.lineBreakMode = old.lineBreakMode
                 cell.truncatesLastVisibleLine = old.truncatesLastVisibleLine
@@ -78,6 +77,7 @@ private final class QuietHeaderView: NSTableHeaderView {
             let frame = headerRect(ofColumn: index)
             guard frame.intersects(dirtyRect), let cell = column.headerCell as? QuietHeaderCell else { continue }
             let isSorted = sorted != nil && sorted?.key == column.sortDescriptorPrototype?.key
+            cell.isSorted = isSorted
             cell.draw(withFrame: frame, in: self)
             if let sorted, isSorted {
                 cell.drawSortIndicator(withFrame: frame, in: self, ascending: sorted.ascending, priority: 0)
@@ -98,6 +98,26 @@ private final class QuietHeaderView: NSTableHeaderView {
 private final class QuietHeaderCell: NSTableHeaderCell {
     static let headingFont = NSFont.systemFont(ofSize: 12, weight: .medium)
     private static let bottomLine: CGFloat = 3
+
+    /// Whether the table is sorted by this column, which keeps its arrow clear of the title.
+    var isSorted = false
+
+    /// AppKit draws a header cell's title in its own white whatever `textColor` and `attributedStringValue` say, so the cell draws
+    /// the title itself, in its font and the secondary color, level with where AppKit puts it.
+    override func drawInterior(withFrame cellFrame: NSRect, in controlView: NSView) {
+        let style = NSMutableParagraphStyle()
+        style.alignment = alignment
+        style.lineBreakMode = .byTruncatingTail
+        let title = NSAttributedString(
+            string: stringValue,
+            attributes: [.font: Self.headingFont, .foregroundColor: NSColor.secondaryLabelColor, .paragraphStyle: style])
+        let area = titleRect(forBounds: cellFrame)
+        let height = title.size().height
+        // The 6 points a column keeps between its edge and its content, so a heading starts where its cells' content does.
+        let left = cellFrame.minX + 6
+        let right = isSorted ? sortIndicatorRect(forBounds: cellFrame).minX : cellFrame.maxX - 6
+        title.draw(in: NSRect(x: left, y: area.midY - height / 2, width: max(0, right - left), height: height))
+    }
 
     override func draw(withFrame cellFrame: NSRect, in controlView: NSView) {
         let height = cellFrame.height - Self.bottomLine
