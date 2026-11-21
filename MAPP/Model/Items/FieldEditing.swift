@@ -220,7 +220,7 @@ nonisolated extension ItemTypeInfo {
         return ItemTypeInfo(
             id: id, label: label, plural: plural, fields: changed, titleField: titleField, bodyField: bodyField,
             parent: parent, icon: icon, description: description, version: version, roles: roles,
-            compatibleWith: compatibleWith, linkField: linkField)
+            linkField: linkField)
     }
 }
 
