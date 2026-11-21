@@ -126,7 +126,8 @@ struct SettingsPopUp<Value: Hashable, Content: View>: View {
     }
 }
 
-/// A switch. The system draws it, and its label is the row's title for VoiceOver.
+/// A switch. The system draws it, and its label is the row's title for VoiceOver. It is the mini switch, which Apple's guidance
+/// for toggles recommends in a grouped form for rows of an even height, as the boards draw it.
 struct SettingsToggle: View {
     let title: LocalizedStringKey
     @Binding var isOn: Bool
@@ -135,6 +136,7 @@ struct SettingsToggle: View {
         Toggle(title, isOn: $isOn)
             .labelsHidden()
             .toggleStyle(.switch)
+            .controlSize(.mini)
     }
 }
 

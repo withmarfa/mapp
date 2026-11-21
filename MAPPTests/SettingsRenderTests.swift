@@ -24,6 +24,7 @@ import Testing
     var openInApp: ((String) -> Void)? { nil }
     var allowed: [Set<InstancePermission>] = []
     var ownerCalls: any OwnerCalls = FakeOwnerCalls()
+    var instanceCalls: any InstanceCalls = FakeInstanceCalls()
     var overview: OverviewModel
     var shown: [MarfaSettingsPage] = []
     var sources: [MarfaSourceRow] = []

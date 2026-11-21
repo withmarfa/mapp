@@ -46,9 +46,7 @@ Only the agreed changes are listed. A change marked "needs a server change" wait
 
 - **Webhooks.** Every app's, grouped by the app that made them. The owner can end any of them (needs a server change). The page that lists MAPP's own webhooks is built.
 - **A key.** Extend… beside the expiry date, for the owner. The secret keeps working (needs a server change).
-- **Built:** Overview, Account, Apps, Keys, Addresses, Sources, Recently Deleted, History, File Storage, Webhooks and a read-only Folders are in [The Marfa's half of Settings](marfa-settings.md).
-- **Start-Up.** Stays, read-only.
-- **Names.** Monitoring (was Reporting) and Limits (new).
+- **Built:** Overview, Account, Apps, Keys, Addresses, Sources, Recently Deleted, History, File Storage, Webhooks, a read-only Folders, Activity, Monitoring (was Reporting), Limits (new) and Start-Up (read-only) are in [The Marfa's half of Settings](marfa-settings.md).
 - **Updates.**
   - Check for Updates sits beside Update on every Updates page.
   - A failed update that was put back reads "The update to 0.0.85 didn't work. <Marfa> is back on 0.0.84, as before. Nothing was lost." with Try Again and no second Update button.

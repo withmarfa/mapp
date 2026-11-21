@@ -134,7 +134,8 @@ nonisolated enum OwnerFailure: Error, Hashable, Sendable {
     case notFound
     /// What the call read has changed since.
     case conflict
-    /// Another Marfa answers at the address than the one the call was made for, and it wrote nothing.
+    /// Another Marfa answers at the address than the one the call was made for. Nothing was sent to it, and nothing it
+    /// holds is taken as what the page showed.
     case instanceChanged
     /// The owner closed, or did not pass, the sign-in the server asked for.
     case notConfirmed

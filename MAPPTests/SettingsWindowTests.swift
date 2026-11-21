@@ -104,7 +104,11 @@ struct SettingsWindowTests {
 
     @Test func onlyThePagesThatExistAreListed() {
         #expect(SettingsPage.mappGroups.flatMap { $0 } == [.general, .appearance, .keyboard, .editor, .lists, .layouts, .search, .onThisMac, .connection])
-        #expect(SettingsPage.marfaGroups.flatMap { $0 } == [.overview, .account, .apps, .keys, .addresses, .sources, .recentlyDeleted, .history, .fileStorage, .webhooks, .folders])
+        #expect(
+            SettingsPage.marfaGroups.flatMap { $0 } == [
+                .overview, .account, .apps, .keys, .addresses, .sources, .recentlyDeleted, .history, .fileStorage, .webhooks, .folders,
+                .activity, .monitoring, .limits, .startUp,
+            ])
     }
 
     @Test func theMarfasPagesNameThePermissionTheyNeed() {

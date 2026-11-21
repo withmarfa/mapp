@@ -83,6 +83,8 @@ struct MarfaMarkSet: Identifiable, Hashable {
     func refreshGrants() async
     /// What the owner's pages (Account, Apps, Keys, Addresses) ask of the server.
     var ownerCalls: any OwnerCalls { get }
+    /// What Activity, Monitoring, Limits and Start-Up ask of the server.
+    var instanceCalls: any InstanceCalls { get }
     /// Whether an Allow More… is waiting on the owner.
     var isAllowingMore: Bool { get }
     /// Asks the server again, for a server that did not answer.
@@ -131,11 +133,11 @@ struct MarfaMarkSet: Identifiable, Hashable {
 
 /// A page of the Marfa's half of Settings, with the owner permission it needs to open.
 nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
-    case overview, account, apps, keys, addresses, sources, recentlyDeleted, history, fileStorage, webhooks, folders
+    case overview, account, apps, keys, addresses, sources, recentlyDeleted, history, fileStorage, webhooks, folders, activity, monitoring, limits, startUp
 
     /// The pages in groups, as the sidebar shows them.
     static let groups: [[MarfaSettingsPage]] = [
-        [.overview], [.account, .apps, .keys, .addresses], [.sources], [.recentlyDeleted, .history, .fileStorage], [.webhooks, .folders],
+        [.overview], [.account, .apps, .keys, .addresses], [.sources], [.recentlyDeleted, .history, .fileStorage], [.webhooks, .folders], [.activity, .monitoring], [.limits, .startUp],
     ]
 
     var title: String {
@@ -151,6 +153,10 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .fileStorage: String(localized: "File Storage")
         case .webhooks: String(localized: "Webhooks")
         case .folders: String(localized: "Folders")
+        case .activity: String(localized: "Activity")
+        case .monitoring: String(localized: "Monitoring")
+        case .limits: String(localized: "Limits")
+        case .startUp: String(localized: "Start-Up")
         }
     }
 
@@ -167,6 +173,10 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .fileStorage: "externaldrive.fill"
         case .webhooks: "dot.radiowaves.up.forward"
         case .folders: "folder.fill"
+        case .activity: "list.bullet.rectangle"
+        case .monitoring: "waveform.path.ecg"
+        case .limits: "gauge.with.needle"
+        case .startUp: "power"
         }
     }
 
@@ -183,6 +193,9 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .fileStorage: .blue
         case .webhooks: .pink
         case .folders: .blue
+        case .activity: .purple
+        case .monitoring: .red
+        case .limits, .startUp: .gray
         }
     }
 
@@ -192,13 +205,15 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
     var permission: InstancePermission? {
         switch self {
         case .overview: .instanceRead
-        case .addresses, .history, .fileStorage: .configManage
+        case .addresses, .history, .fileStorage, .monitoring, .limits: .configManage
         case .account: nil
         case .apps: .grantsManage
         case .keys, .sources: .keysManage
         case .recentlyDeleted: .itemsPurge
         case .webhooks: .webhooksManage
         case .folders: nil
+        case .activity: .auditRead
+        case .startUp: .instanceRead
         }
     }
 
@@ -217,6 +232,10 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .fileStorage: String(localized: "MAPP isn’t allowed to see or change how this Marfa keeps files.")
         case .webhooks: String(localized: "MAPP isn’t allowed to list, make, change or remove webhooks.")
         case .folders: ""
+        case .activity: String(localized: "MAPP isn’t allowed to read this Marfa’s audit log.")
+        case .monitoring: String(localized: "MAPP isn’t allowed to see or change how this Marfa is monitored.")
+        case .limits: String(localized: "MAPP isn’t allowed to see or change this Marfa’s limits.")
+        case .startUp: String(localized: "MAPP isn’t allowed to read the settings this Marfa started with.")
         }
     }
 
@@ -258,6 +277,17 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
             ]
         case .folders:
             [String(localized: "Copies"), String(localized: "Needs Attention"), String(localized: "Synced Folders")]
+        case .activity:
+            [String(localized: "Audit Log"), String(localized: "Who Did What")]
+        case .monitoring:
+            [
+                String(localized: "Heartbeat"), String(localized: "Error Reports"), String(localized: "Telemetry"), String(localized: "PostHog Host"),
+                String(localized: "Project Token"), String(localized: "Report Errors"),
+            ]
+        case .limits:
+            LimitSetting.all.map(\.title) + [String(localized: "Rate Limits"), String(localized: "Limit Requests"), String(localized: "Requests")]
+        case .startUp:
+            [String(localized: "Environment"), String(localized: "Settings Read When It Starts")]
         }
     }
 }
