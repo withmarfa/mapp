@@ -194,6 +194,30 @@ nonisolated protocol OwnerCalls: Sendable {
     func deliveries(of webhook: String) async throws(OwnerFailure) -> [WebhookDeliveryInfo]
     func redeliver(_ delivery: String, of webhook: String) async throws(OwnerFailure) -> WebhookDeliveryInfo
 
+    /// The server's health: the open fields for any sign-in, the rest for `instance.read`.
+    func health() async throws(OwnerFailure) -> ServerHealth
+
+    /// Where and how often the server backs up, and whether it checks for updates by itself (`config.manage`).
+    func upkeepSettings() async throws(OwnerFailure) -> UpkeepSettings
+    /// Changes only what `change` names, on the instance `instanceID` was read from, and answers the settings as the server now holds
+    /// them. A folder change needs a recent sign-in, which the call shows in place.
+    func change(_ settings: UpkeepSettings, _ change: UpkeepSettingsChange) async throws(OwnerFailure) -> UpkeepSettings
+    /// The backups the server holds, newest first (`backups.manage`).
+    func backups() async throws(OwnerFailure) -> [BackupRecord]
+    func backUpNow() async throws(OwnerFailure) -> BackupTaken
+    /// Restores `backup`, which needs a recent sign-in that the call shows in place.
+    func restore(_ backup: BackupRecord) async throws(OwnerFailure) -> BackupRestored
+
+    func updateStatus() async throws(OwnerFailure) -> UpdateStatus
+    /// Asks the server to look for a newer release now (`instance.maintain`), then reads the status again.
+    func checkForUpdates() async throws(OwnerFailure) -> UpdateStatus
+    /// Starts the update to the release found (`instance.maintain`).
+    func startUpdate() async throws(OwnerFailure) -> UpdateStatus
+
+    func housekeepingJobs() async throws(OwnerFailure) -> [HousekeepingJob]
+    /// Takes the server's clock as right, so jobs that delete run again (`instance.maintain`).
+    func confirmClock() async throws(OwnerFailure)
+
     func folders() async throws(OwnerFailure) -> FolderListing
     func folderReport(_ id: String) async throws(OwnerFailure) -> FolderReport
 }
@@ -227,7 +251,14 @@ nonisolated struct AddressPlan: Hashable, Sendable {
 
 /// `OwnerCalls` over the package's generated client.
 nonisolated struct ClientOwnerCalls: OwnerCalls {
+    /// The package's server, for `Server.health()`, which the generated client does not hold. Nil where there is none.
+    var server: (@Sendable () throws -> Server)?
     let client: @Sendable () throws -> Client
+
+    init(server: (@Sendable () throws -> Server)? = nil, client: @escaping @Sendable () throws -> Client) {
+        self.server = server
+        self.client = client
+    }
 
     func make() throws(OwnerFailure) -> Client {
         do { return try client() } catch { throw Self.failure(error) }

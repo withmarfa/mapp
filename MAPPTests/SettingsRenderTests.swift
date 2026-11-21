@@ -25,6 +25,7 @@ import Testing
     var allowed: [Set<InstancePermission>] = []
     var ownerCalls: any OwnerCalls = FakeOwnerCalls()
     var overview: OverviewModel
+    var health: ServerHealthModel
     var shown: [MarfaSettingsPage] = []
     var sources: [MarfaSourceRow] = []
     var canChangeSources = true
@@ -33,11 +34,17 @@ import Testing
 
     init(settings: InstanceSettingsModel) {
         instanceSettings = settings
-        overview = OverviewModel(context: OwnerContext(calls: FakeOwnerCalls(), grants: { [] }))
+        let context = OwnerContext(calls: FakeOwnerCalls(), grants: { [] })
+        let reader = ServerHealthModel(context: context)
+        health = reader
+        overview = OverviewModel(context: context, health: reader)
     }
 
-    /// Binds the Overview to the host's own calls and grants, as the app does.
-    func bindOverview() { overview = OverviewModel(context: OwnerContext(host: self)) }
+    /// Binds the Overview and the health reader to the host's own calls and grants, as the app does.
+    func bindOverview() {
+        health = ServerHealthModel(context: OwnerContext(host: self))
+        overview = OverviewModel(context: OwnerContext(host: self), health: health)
+    }
 
     func show(_ page: MarfaSettingsPage) { shown.append(page) }
     func refreshSources() async {}

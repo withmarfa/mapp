@@ -132,6 +132,9 @@ struct SettingsSectionTable<Row: Identifiable>: View {
     /// How many rows there are in all, where the table holds only a page of them.
     var total: Int?
     var showAll: (() -> Void)?
+    /// Whether the foot with the count stands under the rows. A table that is the whole of what its section lists, a few
+    /// rows that are never more, leaves it out.
+    var hasFoot = true
 
     var body: some View {
         SettingsCard {
@@ -141,16 +144,18 @@ struct SettingsSectionTable<Row: Identifiable>: View {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                     TableRow(row: row, columns: columns, action: action, isSelected: false, isBanded: index.isMultiple(of: 2))
                 }
-                Rectangle().fill(SettingsTokens.rule).frame(height: 1)
-                HStack {
-                    Text(count)
-                        .settingsFont(.count)
-                        .foregroundStyle(SettingsTokens.secondaryText)
-                    Spacer(minLength: 0)
-                    if let showAll { SettingsButton("Show All", small: true, action: showAll) }
+                if hasFoot {
+                    Rectangle().fill(SettingsTokens.rule).frame(height: 1)
+                    HStack {
+                        Text(count)
+                            .settingsFont(.count)
+                            .foregroundStyle(SettingsTokens.secondaryText)
+                        Spacer(minLength: 0)
+                        if let showAll { SettingsButton("Show All", small: true, action: showAll) }
+                    }
+                    .padding(.horizontal, SettingsTokens.Metric.inset)
+                    .frame(height: 38)
                 }
-                .padding(.horizontal, SettingsTokens.Metric.inset)
-                .frame(height: 38)
             }
         }
     }

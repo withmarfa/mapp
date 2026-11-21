@@ -72,6 +72,9 @@ struct MarfaSettingsPageView: View {
             case .fileStorage: FileStoragePage(host: host)
             case .webhooks: WebhooksPage(host: host, subpage: subpage)
             case .folders: FoldersPage(host: host, subpage: subpage)
+            case .backups: BackupsPage(host: host, showsAll: subpage?.id == BackupsPage.allBackups.id)
+            case .updates: UpdatesPage(host: host)
+            case .housekeeping: HousekeepingPage(host: host)
             }
         }
     }

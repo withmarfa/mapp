@@ -1,0 +1,109 @@
+import Marfa
+import SwiftUI
+
+/// The Housekeeping page: the jobs the server runs by itself, how often, when each last ran and how it went, and the problem
+/// that holds clean-up: the server's clock reading far past the time it last trusted. Confirm Date… asks first.
+struct HousekeepingPage: View {
+    let host: any MarfaSettingsHost
+    @State private var model: HousekeepingModel
+
+    init(host: any MarfaSettingsHost) {
+        self.host = host
+        _model = State(initialValue: HousekeepingModel(context: OwnerContext(host: host)))
+    }
+
+    private var health: ServerHealthModel { host.health }
+    private var housekeeping: HousekeepingHealth? { health.health?.housekeeping }
+
+    var body: some View {
+        content
+            .task(id: host.serverAddress) {
+                await model.load()
+                await host.health.load()
+            }
+            .alert(
+                model.confirming.map { String(localized: "Is it \(Self.date($0))?") } ?? "",
+                isPresented: Binding { model.confirming != nil } set: { if !$0 { model.cancelConfirming() } }
+            ) {
+                Button("Cancel", role: .cancel) {}
+                Button("Confirm Date") { Task { await model.confirm(health: host.health) } }
+            } message: {
+                Text("\(host.serverName)’s clock says so. If it’s right, clean-up starts again.")
+            }
+            .accessibilityIdentifier("HousekeepingPage")
+    }
+
+    @ViewBuilder private var content: some View {
+        if let failure = model.failure {
+            OwnerFailureState(page: .housekeeping, failure: failure, host: host) { Task { await model.load() } }
+        } else if !model.hasLoaded {
+            OwnerLoading()
+        } else {
+            SettingsPageColumn {
+                attention
+                jobs
+            }
+        }
+    }
+
+    /// A date as the alert and the problem say it: "3 March 2027", always with the year, since a clock that jumped is
+    /// judged by it.
+    static func date(_ date: Date) -> String { date.formatted(.dateTime.day().month(.wide).year()) }
+
+    // MARK: Needs attention
+
+    @ViewBuilder private var attention: some View {
+        let failed = housekeeping?.failed ?? []
+        let hold = housekeeping?.hold
+        if hold != nil || !failed.isEmpty || model.confirmError != nil {
+            SettingsSection("Needs Attention") {
+                if let hold {
+                    SettingsProblemRow(
+                        title: Text("Clean-up is paused"),
+                        line: hold.clockAt.map { Text("\(host.serverName)’s clock jumped to \(Self.date($0)).") } ?? Text("\(host.serverName)’s clock jumped."),
+                        actions: [confirmAction(hold)])
+                }
+                if let error = model.confirmError {
+                    OwnerProblemRow(title: "Couldn’t Confirm the Date", failure: error, page: .housekeeping, host: host)
+                }
+                ForEach(failed, id: \.name) { job in
+                    SettingsProblemRow(
+                        title: Text("\(UpkeepWording.jobTitle(job.name)) failed"), line: Text("Its last run failed."), actions: [])
+                }
+            }
+        }
+    }
+
+    private func confirmAction(_ hold: ClockHold) -> SettingsProblemAction {
+        if host.grants.contains(.instanceMaintain) {
+            SettingsProblemAction("Confirm Date…") { model.askToConfirm(clock: hold.clockAt) }
+        } else {
+            SettingsProblemAction("Allow More…") { host.askForMore(naming: InstancePermission.instanceMaintain.rawValue) }
+        }
+    }
+
+    // MARK: Jobs
+
+    private var columns: [SettingsTableColumn<HousekeepingJob>] {
+        [
+            SettingsTableColumn("Job") { Text(verbatim: UpkeepWording.jobTitle($0.name)) },
+            SettingsTableColumn("Every", width: 100) { Text(verbatim: UpkeepWording.every($0.intervalSeconds)).foregroundStyle(SettingsTokens.secondaryText) },
+            SettingsTableColumn("Last Run", width: 120) { job in
+                Text(verbatim: job.lastFinished.map { UpkeepWording.moment($0) } ?? "").foregroundStyle(SettingsTokens.secondaryText)
+            },
+            SettingsTableColumn("Result", width: 70) { Text(verbatim: UpkeepWording.result($0.outcome)).foregroundStyle(SettingsTokens.secondaryText) },
+        ]
+    }
+
+    private var jobs: some View {
+        SettingsSection(
+            name: Text("Jobs"), line: Text("\(host.serverName) runs these by itself. Jobs that delete pause while its clock looks wrong.")
+        ) {
+            if model.listed.isEmpty {
+                SettingsEmptyCard(symbol: "sparkles", title: Text("No Jobs Yet"), line: Text("\(host.serverName) lists its jobs once it has started them."))
+            } else {
+                SettingsSectionTable(rows: model.listed, columns: columns, hasFoot: false)
+            }
+        }
+    }
+}

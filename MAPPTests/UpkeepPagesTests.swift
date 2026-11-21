@@ -1,0 +1,441 @@
+import Foundation
+import Marfa
+import Synchronization
+import Testing
+@testable import MAPP
+
+nonisolated private let someday = Date(timeIntervalSince1970: 1_800_000_000)
+
+nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupRecord {
+    BackupRecord(instanceID: "instance-1", name: name, taken: someday.addingTimeInterval(Double(-hoursAgo) * 3600), bytes: 212_000_000)
+}
+
+@MainActor
+@Suite(.hangLimit) struct ServerHealthTests {
+    private func wire(
+        backups: InstanceHealth.Backups = .init(status: .ok), housekeeping: InstanceHealth.Housekeeping? = nil
+    ) -> InstanceHealth {
+        InstanceHealth(
+            status: .ok, claimed: true,
+            components: .init(
+                database: .init(status: .ok), databaseWrite: .init(status: .ok), disk: .init(status: .degraded, error: "/var/lib/marfa is 98% full"),
+                blobStorage: .init(status: .ok)),
+            backups: backups, housekeeping: housekeeping)
+    }
+
+    @Test func aBackupsAccountKeepsWhatTheServerCountsAndNeverItsOwnErrorText() {
+        let health = ServerHealth(
+            wire(
+                backups: .init(
+                    status: .failing, reason: .destinationUnusable, destination: .folder, lastBackupAt: someday, failures: 2,
+                    lastError: "ENOENT /Volumes/secret", copiesWaiting: 4, storeError: "refused", damagedParts: 1)))
+        #expect(health.disk == .degraded)
+        #expect(health.backups.state == .failing)
+        #expect(health.backups.destination == .folder)
+        #expect(health.backups.lastBackup == someday)
+        #expect(health.backups.faults == [.runFailed(count: 2), .destinationRefusing, .filesWaiting(4), .damagedParts(1)])
+        let words = UpkeepWording.problems(health.backups).flatMap { [$0.title, $0.line] }.joined(separator: " ")
+        #expect(!words.contains("ENOENT") && !words.contains("/Volumes"), "the server's own error is never shown")
+    }
+
+    @Test func aClockHoldIsKeptAndAnUnknownReasonIsNot() {
+        let held = ServerHealth(
+            wire(housekeeping: .init(failed: [.init(name: "version-thinning", at: someday, error: "boom")], unreadableSettings: [], held: .init(reason: .clockAhead, clockAt: someday, trustedAt: nil, endsAt: nil))))
+        #expect(held.housekeeping?.hold?.clockAt == someday)
+        #expect(held.housekeeping?.failed == [FailedJob(name: "version-thinning", at: someday)])
+        let other = ServerHealth(wire(housekeeping: .init(failed: nil, unreadableSettings: [], held: .init(reason: .other("new"), clockAt: nil, trustedAt: nil, endsAt: nil))))
+        #expect(other.housekeeping?.hold == nil)
+        #expect(other.housekeeping?.failed == nil, "a schedule that could not be read is not an empty one")
+    }
+
+    @Test func aSignInWithoutInstanceReadGetsNoHousekeepingDetail() {
+        #expect(ServerHealth(wire()).housekeeping == nil)
+    }
+
+    @Test func theSharedReaderKeepsNothingWhenAReadFails() async {
+        let bench = OwnerBench(grants: [.instanceRead])
+        let reader = ServerHealthModel(context: bench.context)
+        await reader.load()
+        #expect(reader.health != nil)
+        bench.calls.fail("health", with: .unreachable)
+        await reader.load()
+        #expect(reader.health == nil)
+        #expect(reader.failure == .unreachable)
+        bench.calls.fail("health", with: .notPermitted("instance.read"))
+        await reader.load()
+        #expect(bench.refreshed == 1)
+    }
+}
+
+@MainActor
+@Suite(.hangLimit) struct BackupsModelTests {
+    private func bench(grants: Set<InstancePermission> = [.backupsManage, .configManage]) -> OwnerBench {
+        let bench = OwnerBench(grants: grants)
+        bench.calls.state.withLock { $0.backups = [record("c", hoursAgo: 0), record("b", hoursAgo: 1), record("a", hoursAgo: 2)] }
+        return bench
+    }
+
+    @Test func itReadsTheBackupsAndWhereTheyGoWhereTheSignInMayChangeSettings() async {
+        let bench = bench()
+        let model = BackupsModel(context: bench.context)
+        await model.load()
+        #expect(model.backups.count == 3)
+        #expect(model.settings?.folder == "/Volumes/Studio Backup")
+        #expect(model.place == .folder)
+        #expect(model.latest?.name == "c")
+    }
+
+    @Test func withoutConfigManageItNeverAsksForTheSettings() async {
+        let bench = bench(grants: [.backupsManage])
+        let model = BackupsModel(context: bench.context)
+        await model.load()
+        #expect(model.settings == nil)
+        #expect(model.place == nil)
+        #expect(!bench.calls.calls.contains("upkeepSettings"))
+    }
+
+    @Test func aRefusedReadShowsTheStateAndReadsTheGrantsAgain() async {
+        let bench = bench()
+        bench.calls.fail("backups", with: .notPermitted("backups.manage"))
+        let model = BackupsModel(context: bench.context)
+        await model.load()
+        #expect(model.failure == .notPermitted("backups.manage"))
+        #expect(bench.refreshed == 1)
+    }
+
+    @Test func backUpNowWithNowhereToGoAsksNothingOfTheServerAndSaysWhy() async {
+        let bench = bench()
+        bench.calls.state.withLock { $0.upkeep.folder = nil }
+        let model = BackupsModel(context: bench.context)
+        await model.load()
+        #expect(model.place == .nowhere)
+        await model.backUpNow(reason: .noDestination)
+        #expect(!bench.calls.calls.contains("backUpNow"))
+        #expect(model.backUpError == "Choose where to keep backups first.")
+    }
+
+    @Test func backUpNowTakesOneAndShowsItFirst() async {
+        let bench = bench()
+        let model = BackupsModel(context: bench.context)
+        await model.load()
+        await model.backUpNow(reason: nil)
+        #expect(bench.calls.state.withLock { $0.backupsTaken } == 1)
+        #expect(model.backups.count == 4)
+        #expect(model.latest?.name == "now-1.json")
+        #expect(model.backUpError == nil)
+    }
+
+    @Test func aBackUpRefusedForWantOfAPermissionSaysSoOnTheRowAndReadsTheGrantsAgain() async {
+        let bench = bench()
+        bench.calls.fail("backUpNow", with: .notPermitted("backups.manage"))
+        let model = BackupsModel(context: bench.context)
+        await model.load()
+        await model.backUpNow(reason: nil)
+        #expect(model.backUpError == OwnerWording.line(.notPermitted("backups.manage"), on: .backups))
+        #expect(bench.refreshed == 1)
+    }
+
+    @Test func aRestoreAsksFirstThenShowsWhatItDid() async {
+        let bench = bench()
+        bench.calls.state.withLock { $0.restoreAnswer = BackupRestored(leftOut: ["sign_in"], added: 18, alreadyHeld: 1059, secretsToSet: ["posthog_project_token"]) }
+        let model = BackupsModel(context: bench.context)
+        await model.load()
+        model.beginRestore(model.backups[1])
+        #expect(model.sheet == .restore(model.backups[1]))
+        #expect(bench.calls.state.withLock { $0.restores }.isEmpty, "asking restores nothing")
+        await model.restore()
+        #expect(bench.calls.state.withLock { $0.restores.map(\.name) } == ["b"])
+        #expect(model.sheet == nil)
+        #expect(model.restored?.outcome.added == 18)
+        #expect(UpkeepWording.settingName("posthog_project_token") == "Posthog Project Token")
+    }
+
+    @Test func aRestoreCancelledAtTheSignInSheetRestoresNothingAndTheSheetStays() async {
+        let bench = bench()
+        bench.calls.fail("restore", with: .notConfirmed)
+        let model = BackupsModel(context: bench.context)
+        await model.load()
+        model.beginRestore(model.backups[0])
+        await model.restore()
+        #expect(model.sheet == .restore(model.backups[0]))
+        #expect(model.restored == nil)
+        #expect(model.sheetError == "Nothing was changed: the sign-in wasn’t confirmed.")
+        bench.calls.fail("restore", with: nil)
+        await model.restore()
+        #expect(model.restored != nil, "trying again after the owner confirms works")
+    }
+
+    @Test func aFolderThatIsNotAbsoluteIsNeverSent() async {
+        let bench = bench()
+        let model = BackupsModel(context: bench.context)
+        await model.load()
+        model.beginFolder()
+        model.folderDraft = "Backups"
+        #expect(!model.canSaveFolder)
+        model.folderDraft = "/Volumes/../etc"
+        #expect(!model.canSaveFolder)
+        model.folderDraft = "/Volumes/New Backups"
+        #expect(model.canSaveFolder)
+        await model.saveFolder()
+        #expect(bench.calls.state.withLock { $0.upkeepChanges } == [UpkeepSettingsChange(folder: .set("/Volumes/New Backups"))])
+        #expect(model.sheet == nil)
+        #expect(model.settings?.folder == "/Volumes/New Backups")
+    }
+
+    @Test func aFolderTheServerRefusesStaysInItsSheetWithTheLine() async {
+        let bench = bench()
+        bench.calls.fail("changeUpkeep", with: .refused("That folder does not exist."))
+        let model = BackupsModel(context: bench.context)
+        await model.load()
+        model.beginFolder()
+        model.folderDraft = "/Volumes/Gone"
+        await model.saveFolder()
+        #expect(model.sheet == .folder)
+        #expect(model.folderDraft == "/Volumes/Gone")
+        #expect(model.sheetError == "That folder does not exist.")
+        #expect(model.takeDrafts() == [.typed(title: "Backup Folder Not Kept", text: "/Volumes/Gone")])
+    }
+
+    @Test func theIntervalAndNowhereAreSentAlone() async {
+        let bench = bench()
+        let model = BackupsModel(context: bench.context)
+        await model.load()
+        await model.setInterval(86_400)
+        await model.setInterval(86_400)
+        await model.keepNowhere()
+        #expect(
+            bench.calls.state.withLock { $0.upkeepChanges }
+                == [UpkeepSettingsChange(intervalSeconds: 86_400), UpkeepSettingsChange(folder: .remove)])
+        #expect(model.place == .nowhere)
+    }
+
+    @Test func anObjectStoreIsShownAndNeverChangedFromHere() async {
+        let bench = bench()
+        bench.calls.state.withLock { $0.upkeep.objectStore = true }
+        let model = BackupsModel(context: bench.context)
+        await model.load()
+        #expect(model.place == .objectStore)
+    }
+
+    @Test func eachBackupProblemIsTheAppsOwnWordsFromWhatTheServerCounts() {
+        #expect(UpkeepWording.problems(BackupsHealth(state: .off, lastBackup: nil, reason: .noDestination)).map(\.title) == ["No backups are kept"])
+        #expect(UpkeepWording.problems(BackupsHealth(state: .off, lastBackup: nil, reason: .turnedOff)).map(\.title) == ["Backups are turned off"])
+        #expect(UpkeepWording.problems(BackupsHealth(state: .ok, lastBackup: nil)).isEmpty)
+        #expect(UpkeepWording.problems(BackupsHealth(state: .failing, lastBackup: nil)).count == 1, "a failing status the server gave no count for still says so")
+    }
+}
+
+@MainActor
+@Suite(.hangLimit) struct UpdatesModelTests {
+    private func ready(itself: Bool = true) -> UpdateStatus {
+        UpdateStatus(
+            running: "0.0.84", checksAutomatically: true, latest: UpdateRelease(version: "0.0.85", published: someday), available: true,
+            checkFailed: false, updatesItself: itself, step: itself ? nil : "Stop it, install 0.0.85, then start it.", progress: nil, last: nil)
+    }
+
+    private func bench(_ status: UpdateStatus, grants: Set<InstancePermission> = [.instanceRead, .instanceMaintain, .configManage]) -> OwnerBench {
+        let bench = OwnerBench(grants: grants)
+        bench.calls.state.withLock { $0.update = status }
+        return bench
+    }
+
+    @Test func updateIsOfferedOnlyWhereAReleaseIsReadyAndTheServerCanUpdateItself() async {
+        let itself = bench(ready())
+        let model = UpdatesModel(context: itself.context, pause: .zero)
+        await model.load()
+        #expect(model.canUpdate)
+        let manualBench = bench(ready(itself: false))
+        let manual = UpdatesModel(context: manualBench.context, pause: .zero)
+        await manual.load()
+        #expect(!manual.canUpdate)
+        let noneBench = bench(
+            UpdateStatus(
+                running: "0.0.84", checksAutomatically: true, latest: nil, available: false, checkFailed: false, updatesItself: true, step: nil,
+                progress: nil, last: nil))
+        let none = UpdatesModel(context: noneBench.context, pause: .zero)
+        await none.load()
+        #expect(!none.canUpdate)
+    }
+
+    @Test func anUpdateStartsOnceAndIsFollowedThroughItsStepsToTheEnd() async {
+        let bench = bench(ready())
+        var restarting = ready()
+        restarting.progress = UpdateProgress(stage: .restarting, release: "0.0.85")
+        var finished = ready()
+        finished.running = "0.0.85"
+        finished.available = false
+        finished.last = UpdateOutcome(result: .succeeded, release: "0.0.85", finished: someday)
+        let model = UpdatesModel(context: bench.context, pause: .zero)
+        await model.load()
+        bench.calls.state.withLock { $0.updateReads = [restarting, finished] }
+        await model.update()
+        #expect(bench.calls.state.withLock { $0.updatesStarted } == 1)
+        #expect(model.status?.running == "0.0.85")
+        #expect(!model.isUpdating)
+        #expect(model.undone == nil)
+    }
+
+    @Test func theStepsRunDoneNowNextWhileTheUpdateIsFollowed() async {
+        let bench = bench(ready())
+        var swapping = ready()
+        swapping.progress = UpdateProgress(stage: .swapping, release: "0.0.85")
+        bench.calls.state.withLock { $0.update = swapping }
+        let model = UpdatesModel(context: bench.context, pause: .milliseconds(5))
+        let loading = Task { await model.load() }
+        #expect(await eventually { model.status?.progress?.stage == .swapping })
+        #expect(model.isUpdating)
+        #expect(model.standing(of: .fetching) == .done)
+        #expect(model.standing(of: .swapping) == .now)
+        #expect(model.standing(of: .settling) == .next)
+        bench.calls.state.withLock { $0.update = ready() }
+        await loading.value
+        #expect(!model.isUpdating)
+    }
+
+    @Test func aServerThatNeverComesBackIsGivenUpOnAndSaidSo() async {
+        let bench = bench(ready())
+        let model = UpdatesModel(context: bench.context, pause: .zero, patience: 3)
+        await model.load()
+        bench.calls.fail("updateStatus", with: .unreachable)
+        await model.update()
+        #expect(model.lostTrack)
+        #expect(!model.isUpdating)
+    }
+
+    @Test func anUpdatePutBackIsToldAndOffersTryAgainWithNoSecondUpdate() async {
+        var status = ready()
+        status.last = UpdateOutcome(result: .putBack, release: "0.0.85", finished: someday)
+        let putBack = bench(status)
+        let model = UpdatesModel(context: putBack.context, pause: .zero)
+        await model.load()
+        #expect(model.undone?.release == "0.0.85")
+        #expect(model.canUpdate, "Try Again starts it again")
+        var done = status
+        done.running = "0.0.85"
+        done.last = UpdateOutcome(result: .succeeded, release: "0.0.85", finished: someday)
+        let doneBench = bench(done)
+        let after = UpdatesModel(context: doneBench.context, pause: .zero)
+        await after.load()
+        #expect(after.undone == nil)
+    }
+
+    @Test func anUpdateRefusedForWantOfAPermissionNamesItAndReadsTheGrantsAgain() async {
+        let bench = bench(ready())
+        bench.calls.fail("startUpdate", with: .notPermitted("instance.maintain"))
+        let model = UpdatesModel(context: bench.context, pause: .zero)
+        await model.load()
+        await model.update()
+        #expect(model.error == .notPermitted("instance.maintain"))
+        #expect(!model.isStarting)
+        #expect(bench.refreshed == 1)
+    }
+
+    @Test func checkingAsksTheServerToLookAndReadsItsAnswer() async {
+        let bench = bench(ready())
+        let model = UpdatesModel(context: bench.context, pause: .zero)
+        await model.load()
+        await model.checkForUpdates()
+        #expect(bench.calls.state.withLock { $0.updatesChecked } == 1)
+    }
+
+    @Test func checkAutomaticallyIsChangedOnlyWhereSettingsAreRead() async {
+        let allowed = bench(ready())
+        let model = UpdatesModel(context: allowed.context, pause: .zero)
+        await model.load()
+        await model.setChecksAutomatically(false)
+        #expect(allowed.calls.state.withLock { $0.upkeepChanges } == [UpkeepSettingsChange(checksForUpdates: false)])
+        #expect(model.status?.checksAutomatically == false)
+        let without = bench(ready(), grants: [.instanceRead])
+        let readOnly = UpdatesModel(context: without.context, pause: .zero)
+        await readOnly.load()
+        await readOnly.setChecksAutomatically(false)
+        #expect(without.calls.state.withLock { $0.upkeepChanges }.isEmpty)
+    }
+
+    @Test func aRefusedReadShowsTheState() async {
+        let bench = bench(ready())
+        bench.calls.fail("updateStatus", with: .notPermitted("instance.read"))
+        let model = UpdatesModel(context: bench.context, pause: .zero)
+        await model.load()
+        #expect(model.failure == .notPermitted("instance.read"))
+        #expect(bench.refreshed == 1)
+    }
+}
+
+@MainActor
+@Suite(.hangLimit) struct HousekeepingModelTests {
+    private func job(_ name: String, every: Int, _ outcome: HousekeepingJob.Outcome? = .succeeded) -> HousekeepingJob {
+        HousekeepingJob(name: name, intervalSeconds: every, lastFinished: someday, outcome: outcome)
+    }
+
+    private func bench(grants: Set<InstancePermission> = [.instanceRead, .instanceMaintain]) -> OwnerBench {
+        let bench = OwnerBench(grants: grants)
+        bench.calls.state.withLock {
+            $0.jobs = [
+                job("heartbeat", every: 60), job("version-thinning", every: 3600, .held), job("backup", every: 3600),
+                job("enrichment-sweep", every: 30), job("event-log-cleanup", every: 3600),
+            ]
+        }
+        return bench
+    }
+
+    @Test func itListsTheJobsAnOwnerKnowsInThePagesOrderAndLeavesTheServersTidyingOut() async {
+        let bench = bench()
+        let model = HousekeepingModel(context: bench.context)
+        await model.load()
+        #expect(model.listed.map(\.name) == ["backup", "version-thinning", "enrichment-sweep"])
+        #expect(UpkeepWording.every(30) == "30 seconds")
+        #expect(UpkeepWording.every(60) == "Minute")
+        #expect(UpkeepWording.every(3600) == "Hour")
+        #expect(UpkeepWording.every(21_600) == "6 hours")
+        #expect(UpkeepWording.every(86_400) == "Day")
+        #expect(UpkeepWording.result(.held) == "Paused")
+        #expect(UpkeepWording.result(.succeeded) == "Done")
+    }
+
+    @Test func confirmingAsksFirstAndSendsNothingUntilTheOwnerAgrees() async {
+        let bench = bench()
+        let model = HousekeepingModel(context: bench.context)
+        let health = ServerHealthModel(context: bench.context)
+        await model.load()
+        model.askToConfirm(clock: someday)
+        #expect(model.confirming == someday)
+        model.cancelConfirming()
+        #expect(model.confirming == nil)
+        #expect(bench.calls.state.withLock { $0.clocksConfirmed } == 0)
+        model.askToConfirm(clock: someday)
+        await model.confirm(health: health)
+        #expect(bench.calls.state.withLock { $0.clocksConfirmed } == 1)
+        #expect(model.confirming == nil)
+        #expect(health.hasLoaded, "the hold is read again")
+    }
+
+    @Test func aDateTheServerRefusesToConfirmIsToldAndReadsTheGrantsAgain() async {
+        let bench = bench()
+        bench.calls.fail("confirmClock", with: .notPermitted("instance.maintain"))
+        let model = HousekeepingModel(context: bench.context)
+        await model.load()
+        model.askToConfirm(clock: someday)
+        await model.confirm(health: ServerHealthModel(context: bench.context))
+        #expect(model.confirmError == .notPermitted("instance.maintain"))
+        #expect(bench.refreshed == 1)
+        #expect(model.confirming == nil)
+    }
+
+    @Test func aRefusedListShowsTheState() async {
+        let bench = bench()
+        bench.calls.fail("housekeepingJobs", with: .notPermitted("instance.read"))
+        let model = HousekeepingModel(context: bench.context)
+        await model.load()
+        #expect(model.failure == .notPermitted("instance.read"))
+        #expect(bench.refreshed == 1)
+    }
+
+    @Test func theNeedsAPermissionLinesOfTheThreePagesAreEachTheirOwn() {
+        let lines = [MarfaSettingsPage.backups, .updates, .housekeeping].map(\.permissionLine)
+        #expect(Set(lines).count == 3)
+        #expect(MarfaSettingsPage.backups.permission == .backupsManage)
+        #expect(MarfaSettingsPage.updates.permission == .instanceRead)
+        #expect(MarfaSettingsPage.housekeeping.permission == .instanceRead)
+    }
+}
