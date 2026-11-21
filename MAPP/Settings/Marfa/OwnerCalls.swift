@@ -239,7 +239,7 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
             if code == "access_denied" { return .notConfirmed }
             return .notPermitted(server?.details?.object?["required_scope"]?.string)
         case .notFound: return .notFound
-        case .versionConflict: return .conflict
+        case .versionConflict, .instanceChanged: return .conflict
         case .server(let status, let code, let message, _, _) where status == 409:
             let refusals: Set<String> = ["sign_in_address_check_failed", "sign_in_address_change_unconfirmed"]
             return refusals.contains(code) ? .refused(message) : plainConflict(message)

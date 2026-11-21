@@ -12,6 +12,12 @@ struct ActivityPage: View {
         _model = State(initialValue: ActivityModel(context: OwnerContext(host: host), calls: host.instanceCalls))
     }
 
+    /// A page over a model that already holds its state, for a render to draw.
+    init(host: any MarfaSettingsHost, model: ActivityModel) {
+        self.host = host
+        _model = State(initialValue: model)
+    }
+
     private var columns: [SettingsTableColumn<ActivityEntry>] {
         [
             SettingsTableColumn("When", width: 90) { entry in

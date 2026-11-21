@@ -11,6 +11,12 @@ struct LimitsPage: View {
         _model = State(initialValue: LimitsModel(context: OwnerContext(host: host), calls: host.instanceCalls))
     }
 
+    /// A page over a model that already holds its state, for a render to draw.
+    init(host: any MarfaSettingsHost, model: LimitsModel) {
+        self.host = host
+        _model = State(initialValue: model)
+    }
+
     var body: some View {
         content
             .task(id: host.serverAddress) { await model.load() }
@@ -47,11 +53,12 @@ struct LimitsPage: View {
                 SettingsSection("Live Updates") {
                     field(.mostViewers)
                 }
-                SettingsSection("Fetching Files", footer: "Leave a field empty to use \(host.serverName)’s own default.") {
+                SettingsSection("Fetching Files") {
                     switchRow("Let Tools Fetch Files", line: "From a web address, or one a chat attached.", key: LimitSetting.fetchSwitch)
                     field(.largestFetch)
                     field(.fetchTime)
                 }
+                SettingsNote("Leave a field empty to use \(host.serverName)’s own default.")
             }
         } else {
             OwnerLoading()

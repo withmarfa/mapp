@@ -36,9 +36,9 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
 
     var id: String { key }
 
-    /// The text a field shows for `held`: a whole number where it is one, otherwise up to two decimals.
+    /// The text a field shows for `held`: a whole number where it is one, otherwise up to two decimals, with thousands separated.
     func text(for held: Int) -> String {
-        unit.shown(held).formatted(.number.precision(.fractionLength(0...2)).grouping(.never))
+        unit.shown(held).formatted(.number.precision(.fractionLength(0...2)).locale(Locale(identifier: "en_US")))
     }
 
     enum Entry: Equatable, Sendable {
@@ -52,7 +52,9 @@ nonisolated struct LimitSetting: Identifiable, Hashable, Sendable {
     func entry(from text: String) -> Entry {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return .useDefault }
-        let normalized = trimmed.replacingOccurrences(of: ",", with: ".")
+        // Thousands are separated by commas, as the field shows them; any other comma is a decimal one.
+        let grouped = trimmed.range(of: #"^\d{1,3}(,\d{3})+(\.\d+)?$"#, options: .regularExpression) != nil
+        let normalized = trimmed.replacingOccurrences(of: ",", with: grouped ? "" : ".")
         guard let number = Double(normalized), number.isFinite, normalized.allSatisfy({ $0.isASCII && ($0.isNumber || $0 == ".") }) else {
             return .invalid(String(localized: "Use digits only."))
         }

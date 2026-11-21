@@ -11,6 +11,12 @@ struct MonitoringPage: View {
         _model = State(initialValue: MonitoringModel(context: OwnerContext(host: host), calls: host.instanceCalls))
     }
 
+    /// A page over a model that already holds its state, for a render to draw.
+    init(host: any MarfaSettingsHost, model: MonitoringModel) {
+        self.host = host
+        _model = State(initialValue: model)
+    }
+
     var body: some View {
         content
             .task(id: host.serverAddress) { await model.load() }

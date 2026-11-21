@@ -143,6 +143,11 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         #expect(LimitSetting.largestRequest.text(for: 1_572_864) == "1.5")
         #expect(LimitSetting.largestRequest.entry(from: "2") == .value(2_097_152))
         #expect(LimitSetting.largestRequest.entry(from: "0,5") == .value(524_288), "a comma is a decimal")
+        #expect(LimitSetting.requestsPerWindow.text(for: 4000) == "4,000", "thousands are separated, as the board shows them")
+        #expect(LimitSetting.mostTextKept.text(for: 100_000) == "100,000")
+        #expect(LimitSetting.mostTextKept.entry(from: "100,000") == .value(100_000), "what the field shows can be typed back")
+        #expect(LimitSetting.largestRequest.entry(from: "1,024") == .value(1_073_741_824))
+        #expect(LimitSetting.requestsPerWindow.entry(from: "4000") == .value(4000))
     }
 
     @Test func aValueOutOfRangeIsToldBeforeAnythingIsSent() {

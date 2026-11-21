@@ -1433,6 +1433,9 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(
             ClientOwnerCalls.failure(MarfaError.versionConflict(message: "Stale.", server: nil), plainConflict: { .sourceHeld($0) }) == .conflict)
         #expect(
+            ClientOwnerCalls.failure(MarfaError.instanceChanged(message: "Another instance.", server: nil)) == .conflict,
+            "another Marfa answering at the address is told as a change somewhere else")
+        #expect(
             ClientOwnerCalls.failure(answer("sign_in_address_check_failed"), plainConflict: { _ in .conflict }) == .refused("The server’s words."),
             "the address refusals keep the server’s words whatever the call")
     }
