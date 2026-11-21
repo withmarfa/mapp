@@ -1454,7 +1454,10 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     }
 
     @Test func theNewPagesAreInTheSidebarInTheBoardsOrder() {
-        #expect(MarfaSettingsPage.groups == [[.overview], [.account, .apps, .keys, .addresses], [.recentlyDeleted], [.webhooks, .folders]])
+        #expect(
+            MarfaSettingsPage.groups == [
+                [.overview], [.account, .apps, .keys, .addresses], [.recentlyDeleted], [.webhooks, .folders], [.activity, .monitoring], [.limits, .startUp],
+            ])
         for page in [MarfaSettingsPage.account, .apps, .keys, .addresses] {
             #expect(SettingsPage.marfa(page).matches(page.title))
         }

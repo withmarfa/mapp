@@ -50,6 +50,8 @@ struct MarfaDeletedItem: Identifiable, Hashable {
     func refreshGrants() async
     /// What the owner's pages (Account, Apps, Keys, Addresses) ask of the server.
     var ownerCalls: any OwnerCalls { get }
+    /// What Activity, Monitoring, Limits and Start-Up ask of the server.
+    var instanceCalls: any InstanceCalls { get }
     /// Whether an Allow More… is waiting on the owner.
     var isAllowingMore: Bool { get }
     /// Asks the server again, for a server that did not answer.
@@ -80,10 +82,12 @@ struct MarfaDeletedItem: Identifiable, Hashable {
 
 /// A page of the Marfa's half of Settings, with the owner permission it needs to open.
 nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
-    case overview, account, apps, keys, addresses, recentlyDeleted, webhooks, folders
+    case overview, account, apps, keys, addresses, recentlyDeleted, webhooks, folders, activity, monitoring, limits, startUp
 
     /// The pages in groups, as the sidebar shows them.
-    static let groups: [[MarfaSettingsPage]] = [[.overview], [.account, .apps, .keys, .addresses], [.recentlyDeleted], [.webhooks, .folders]]
+    static let groups: [[MarfaSettingsPage]] = [
+        [.overview], [.account, .apps, .keys, .addresses], [.recentlyDeleted], [.webhooks, .folders], [.activity, .monitoring], [.limits, .startUp],
+    ]
 
     var title: String {
         switch self {
@@ -95,6 +99,10 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .recentlyDeleted: String(localized: "Recently Deleted")
         case .webhooks: String(localized: "Webhooks")
         case .folders: String(localized: "Folders")
+        case .activity: String(localized: "Activity")
+        case .monitoring: String(localized: "Monitoring")
+        case .limits: String(localized: "Limits")
+        case .startUp: String(localized: "Start-Up")
         }
     }
 
@@ -108,6 +116,10 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .recentlyDeleted: "trash"
         case .webhooks: "dot.radiowaves.up.forward"
         case .folders: "folder.fill"
+        case .activity: "list.bullet.rectangle"
+        case .monitoring: "waveform.path.ecg"
+        case .limits: "gauge.with.needle"
+        case .startUp: "power"
         }
     }
 
@@ -121,6 +133,9 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .recentlyDeleted: .gray
         case .webhooks: .pink
         case .folders: .blue
+        case .activity: .purple
+        case .monitoring: .red
+        case .limits, .startUp: .gray
         }
     }
 
@@ -129,13 +144,15 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
     /// folder is read as an item, under the access MAPP holds to every type.
     var permission: InstancePermission? {
         switch self {
-        case .overview, .addresses: .configManage
+        case .overview, .addresses, .monitoring, .limits: .configManage
         case .account: nil
         case .apps: .grantsManage
         case .keys: .keysManage
         case .recentlyDeleted: .itemsPurge
         case .webhooks: .webhooksManage
         case .folders: nil
+        case .activity: .auditRead
+        case .startUp: .instanceRead
         }
     }
 
@@ -172,6 +189,17 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
             ]
         case .folders:
             [String(localized: "Copies"), String(localized: "Needs Attention"), String(localized: "Synced Folders")]
+        case .activity:
+            [String(localized: "Audit Log"), String(localized: "Who Did What")]
+        case .monitoring:
+            [
+                String(localized: "Heartbeat"), String(localized: "Error Reports"), String(localized: "Telemetry"), String(localized: "PostHog Host"),
+                String(localized: "Project Token"), String(localized: "Report Errors"),
+            ]
+        case .limits:
+            LimitSetting.all.map(\.title) + [String(localized: "Rate Limits"), String(localized: "Limit Requests"), String(localized: "Requests")]
+        case .startUp:
+            [String(localized: "Environment"), String(localized: "Settings Read When It Starts")]
         }
     }
 }

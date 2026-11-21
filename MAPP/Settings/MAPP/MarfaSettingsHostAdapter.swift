@@ -79,12 +79,17 @@ enum LibraryDescription {
 
     /// The owner's calls, made through a client that shows the system's sign-in in place where the server asks the owner to
     /// confirm it is them, and sends the call again once they have.
-    var ownerCalls: any OwnerCalls {
+    var ownerCalls: any OwnerCalls { ClientOwnerCalls(client: confirmingClient) }
+
+    /// What Activity, Monitoring, Limits and Start-Up ask of the server, through the same client.
+    var instanceCalls: any InstanceCalls { ClientInstanceCalls(client: confirmingClient) }
+
+    private var confirmingClient: @Sendable () throws -> Client {
         guard let connection = host.configuredConnection else {
-            return ClientOwnerCalls { throw MarfaError.signedOut(origin: "", message: "no server is set") }
+            return { throw MarfaError.signedOut(origin: "", message: "no server is set") }
         }
         let signIns = host.signIns
-        return ClientOwnerCalls {
+        return {
             do {
                 let calls = MarfaServerCalls(connection: connection, signIns: signIns)
                 let server = try calls.server().confirming(from: { NSApp.keyWindow ?? NSApp.windows.first ?? NSWindow() })

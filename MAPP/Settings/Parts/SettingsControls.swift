@@ -273,12 +273,17 @@ struct SettingsNumberField: View {
     var prompt: String?
     var isError = false
     var onSubmit: () -> Void = {}
+    /// Called when the field is left, so a value is kept without Return.
+    var onEnd: () -> Void = {}
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         TextField(title, text: $text, prompt: Text(verbatim: prompt ?? ""))
             .labelsHidden()
             .textFieldStyle(.roundedBorder)
             .autocorrectionDisabled()
+            .focused($isFocused)
+            .onChange(of: isFocused) { if !$1 { onEnd() } }
             .onSubmit(onSubmit)
             .padding(.trailing, 0)
             .overlay(alignment: .trailing) {

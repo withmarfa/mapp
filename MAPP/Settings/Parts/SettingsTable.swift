@@ -58,6 +58,7 @@ struct SettingsTableFilter<Value: Hashable, Choices: View>: View {
 private struct TableHeader<Row>: View {
     let columns: [SettingsTableColumn<Row>]
     let hasAction: Bool
+    var inset = SettingsTokens.Metric.inset
 
     var body: some View {
         HStack(spacing: 12) {
@@ -70,7 +71,7 @@ private struct TableHeader<Row>: View {
             }
             if hasAction { Color.clear.frame(width: ActionWidth.value) }
         }
-        .padding(.horizontal, SettingsTokens.Metric.inset)
+        .padding(.horizontal, inset)
         .frame(height: 30)
         .accessibilityHidden(true)
     }
@@ -84,6 +85,7 @@ private struct TableRow<Row>: View {
     let action: SettingsRowAction<Row>?
     let isSelected: Bool
     var isBanded = false
+    var inset = SettingsTokens.Metric.inset
     @State private var isHovered = false
 
     var body: some View {
@@ -101,7 +103,7 @@ private struct TableRow<Row>: View {
                     .frame(width: ActionWidth.value, alignment: .trailing)
             }
         }
-        .padding(.horizontal, SettingsTokens.Metric.inset)
+        .padding(.horizontal, inset)
         .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
         .background(isSelected ? SettingsTokens.selection : (isHovered ? SettingsTokens.hover : (isBanded ? SettingsTokens.band : Color.clear)))
         .contentShape(.rect)
@@ -118,6 +120,8 @@ struct SettingsSectionTable<Row: Identifiable>: View {
     /// How many rows there are in all, where the table holds only a page of them.
     var total: Int?
     var showAll: (() -> Void)?
+    /// Whether the foot says how many; a table that is the whole of a short list has none.
+    var showsCount = true
 
     var body: some View {
         SettingsCard {
@@ -127,16 +131,20 @@ struct SettingsSectionTable<Row: Identifiable>: View {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                     TableRow(row: row, columns: columns, action: action, isSelected: false, isBanded: index.isMultiple(of: 2))
                 }
-                Rectangle().fill(SettingsTokens.rule).frame(height: 1)
-                HStack {
-                    Text(count)
-                        .settingsFont(.count)
-                        .foregroundStyle(SettingsTokens.secondaryText)
-                    Spacer(minLength: 0)
-                    if let showAll { SettingsButton("Show All", small: true, action: showAll) }
+                if showsCount || showAll != nil {
+                    Rectangle().fill(SettingsTokens.rule).frame(height: 1)
+                    HStack {
+                        if showsCount {
+                            Text(count)
+                                .settingsFont(.count)
+                                .foregroundStyle(SettingsTokens.secondaryText)
+                        }
+                        Spacer(minLength: 0)
+                        if let showAll { SettingsButton("Show All", small: true, action: showAll) }
+                    }
+                    .padding(.horizontal, SettingsTokens.Metric.inset)
+                    .frame(height: 38)
                 }
-                .padding(.horizontal, SettingsTokens.Metric.inset)
-                .frame(height: 38)
             }
         }
     }
@@ -189,5 +197,52 @@ struct SettingsPageTable<Row: Identifiable, Filter: View, Foot: View>: View {
 
     private func toggle(_ id: Row.ID) {
         if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
+    }
+}
+
+/// A read-only table that is a page of its own, as a log is: it fills the pane edge to edge, with its count on the left and its
+/// filter and search together on the right under the toolbar, then the columns, and at the foot where the page stands with its
+/// way to the next. The rows scroll between the header and the foot. `empty` stands in the rows' place where there are none.
+struct SettingsLogTable<Row: Identifiable, Filter: View, Foot: View, Empty: View>: View {
+    let rows: [Row]
+    let columns: [SettingsTableColumn<Row>]
+    let count: Text
+    @ViewBuilder let filter: Filter
+    @ViewBuilder let foot: Foot
+    @ViewBuilder let empty: Empty
+
+    private var inset: CGFloat { SettingsTokens.Metric.pageTableInset }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                count.settingsFont(.small).foregroundStyle(SettingsTokens.secondaryText)
+                Spacer(minLength: 12)
+                filter
+            }
+            .padding(.horizontal, inset)
+            .frame(height: SettingsTokens.Metric.pageTableBar)
+            Rectangle().fill(SettingsTokens.rule).frame(height: 1)
+            TableHeader(columns: columns, hasAction: false, inset: inset)
+            Rectangle().fill(SettingsTokens.rule).frame(height: 1)
+            if rows.isEmpty {
+                empty.frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                            TableRow(row: row, columns: columns, action: nil, isSelected: false, isBanded: index.isMultiple(of: 2), inset: inset)
+                        }
+                    }
+                }
+                .scrollBounceBehavior(.basedOnSize)
+            }
+            Rectangle().fill(SettingsTokens.rule).frame(height: 1)
+            HStack(spacing: 8) { foot }
+                .padding(.horizontal, inset)
+                .frame(maxWidth: .infinity, minHeight: SettingsTokens.Metric.pageTableBar, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(SettingsTokens.page)
     }
 }

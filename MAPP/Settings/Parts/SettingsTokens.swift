@@ -124,6 +124,9 @@ enum SettingsTokens {
         /// in `SettingsPopUp`: `popUpChevronPull` is how far nearer the edge they sit than a bordered button's label ends.
         static let popUpChevronSize: CGFloat = 13
         static let popUpChevronPull: CGFloat = 5
+        /// A table that is a page: its side margin, and the height of the bar above its columns and of the foot below them.
+        static let pageTableInset: CGFloat = 24
+        static let pageTableBar: CGFloat = 48
         static let cardRadius: CGFloat = 10
         static let controlRadius: CGFloat = 7
         static let buttonRadius: CGFloat = 9
