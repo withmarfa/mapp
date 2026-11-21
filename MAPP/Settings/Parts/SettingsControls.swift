@@ -66,7 +66,8 @@ struct SettingsButton: View {
     }
 }
 
-/// A row's "more actions" menu: the system's round button with three dots.
+/// A row's "more actions" menu: the system's borderless pull-down with three dots, with no fill, as Finder and System
+/// Settings draw it.
 struct SettingsMoreMenu<Content: View>: View {
     @ViewBuilder let content: Content
 
@@ -76,16 +77,14 @@ struct SettingsMoreMenu<Content: View>: View {
         } label: {
             Label("More", systemImage: "ellipsis").labelStyle(.iconOnly)
         }
-        .menuStyle(.button)
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.circle)
-        .controlSize(.small)
+        .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .fixedSize()
     }
 }
 
-/// A pop-up of choices, as the system draws it at its regular size and its own width.
+/// A pop-up of choices, as the system draws it at its regular size, at the one width every pop-up of Settings has
+/// (`SettingsTokens.Metric.popUpWidth`), so those of a page line up in a column at the rows' trailing edge.
 struct SettingsPopUp<Value: Hashable, Content: View>: View {
     let title: LocalizedStringKey
     @Binding var selection: Value
@@ -95,7 +94,7 @@ struct SettingsPopUp<Value: Hashable, Content: View>: View {
         Picker(title, selection: $selection) { content }
             .labelsHidden()
             .pickerStyle(.menu)
-            .fixedSize()
+            .frame(width: SettingsTokens.Metric.popUpWidth)
     }
 }
 
@@ -108,6 +107,7 @@ struct SettingsToggle: View {
         Toggle(title, isOn: $isOn)
             .labelsHidden()
             .toggleStyle(.switch)
+            .controlSize(.small)
     }
 }
 

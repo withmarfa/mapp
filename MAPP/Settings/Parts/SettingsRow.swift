@@ -50,11 +50,24 @@ struct SettingsTile: View {
             .fill(tone.color)
             .frame(width: size, height: size)
             .overlay {
-                Image(systemName: symbol)
-                    .font(.system(size: size * SettingsTokens.Metric.tileGlyph, weight: .medium))
-                    .foregroundStyle(.white)
+                SettingsTileGlyph(symbol: symbol, tileSize: size).foregroundStyle(.white)
             }
             .accessibilityHidden(true)
+    }
+}
+
+/// A tile's symbol, fitted in a square of `SettingsTokens.Metric.tileGlyph` of the tile's side, so a wide or a tall symbol
+/// keeps the same padding as a square one and never reaches the tile's edge.
+struct SettingsTileGlyph: View {
+    let symbol: String
+    let tileSize: CGFloat
+
+    var body: some View {
+        Image(systemName: symbol)
+            .resizable()
+            .scaledToFit()
+            .fontWeight(.medium)
+            .frame(width: tileSize * SettingsTokens.Metric.tileGlyph, height: tileSize * SettingsTokens.Metric.tileGlyph)
     }
 }
 
@@ -148,7 +161,7 @@ struct SettingsRow<Trailing: View>: View {
             RoundedRectangle(cornerRadius: SettingsTokens.Metric.tile * SettingsTokens.Metric.tileRounding, style: .continuous)
                 .fill(tone.color.opacity(0.18))
                 .frame(width: SettingsTokens.Metric.tile, height: SettingsTokens.Metric.tile)
-                .overlay { Image(systemName: symbol).font(.system(size: SettingsTokens.Metric.tile * SettingsTokens.Metric.tileGlyph, weight: .medium)).foregroundStyle(tone.color) }
+                .overlay { SettingsTileGlyph(symbol: symbol, tileSize: SettingsTokens.Metric.tile).foregroundStyle(tone.color) }
                 .accessibilityHidden(true)
         case .symbol(let name):
             Image(systemName: name).font(.system(size: 14)).foregroundStyle(SettingsTokens.secondaryText).accessibilityHidden(true)

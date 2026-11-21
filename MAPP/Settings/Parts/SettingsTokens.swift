@@ -86,7 +86,7 @@ enum SettingsTokens {
         case .stateTitle: .system(size: 13 * scale, weight: .semibold)
         case .largeGlyph: .system(size: 15 * scale)
         case .headTitle: .system(size: 15 * scale, weight: .semibold)
-        case .tableHeader: .system(size: 11 * scale, weight: .semibold)
+        case .tableHeader: .system(size: 12 * scale, weight: .medium)
         }
     }
 
@@ -143,13 +143,16 @@ enum SettingsTokens {
         static let cardRadius: CGFloat = 10
         static let controlRadius: CGFloat = 7
         static let tile: CGFloat = 24
-        /// A tile's corner radius and symbol size, as shares of its side.
+        /// A tile's corner radius and the box its symbol is fitted in, as shares of its side: the symbol keeps even
+        /// padding whatever its shape, as in System Settings' sidebar.
         static let tileRounding: CGFloat = 0.27
-        static let tileGlyph: CGFloat = 0.55
+        static let tileGlyph: CGFloat = 0.62
         static let headTile: CGFloat = 44
         /// A small search field at a list's trailing edge, and the button beside it that changes what it searches by.
         static let searchWidth: CGFloat = 200
         static let searchSpacing: CGFloat = 8
+        /// The width of every pop-up: enough for the longest choice in common use, such as Where I Left Off.
+        static let popUpWidth: CGFloat = 168
         /// The sidebar's tile.
         static let sidebarTile: CGFloat = 20
         /// A color swatch and the dot that marks the chosen one, and the space between swatches.
