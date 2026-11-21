@@ -226,11 +226,10 @@ struct SettingsField: View {
 /// tall as a field and as wide as the space it is given, and its middle is cut where it is too long.
 struct SettingsReadOnlyValue: View {
     let text: String
-    var isMonospaced = true
 
     var body: some View {
         Text(verbatim: text)
-            .settingsFont(isMonospaced ? .mono : .title)
+            .settingsFont(.mono)
             .textSelection(.enabled)
             .lineLimit(1)
             .truncationMode(.middle)
