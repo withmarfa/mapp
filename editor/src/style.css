@@ -65,6 +65,12 @@ html.window-background body {
   background: transparent;
 }
 
+/* Highlighted text takes the color the app sends from Settings > Appearance (`--item-highlight`); without one it keeps
+   Inkkit's yellow. */
+.inkkit-root .ProseMirror mark {
+  background: var(--item-highlight, #e5c04161);
+}
+
 body {
   color: var(--inkkit-text-color);
   font:

@@ -63,6 +63,7 @@ struct MAPPApp: App {
                 // the window is inactive. The sidebar's material stays above it.
                 .containerBackground(Color(nsColor: .windowBackgroundColor), for: .window)
                 .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
+                .appAccent()
                 .environment(libraries)
                 .environment(libraries.host)
                 .environment(shortcuts)
@@ -127,6 +128,7 @@ struct MAPPApp: App {
                 }
             }
             .interfaceTextStyle()
+            .appAccent()
             .toolbarBackgroundVisibility(.visible, for: .windowToolbar)
             .modifier(ItemWindowNotices(notices: libraries.host.notices, launcher: settingsLauncher))
         }
@@ -139,6 +141,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let libraries = Libraries.standard()
     private let separators = MenuSeparatorTidy()
     private var metrics: MetricsListener?
+    private var themeObservation: (any NSObjectProtocol)?
 
     override init() {
         #if DEBUG
@@ -156,6 +159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         #endif
         super.init()
+        ReopenWindows.apply()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -164,6 +168,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         assert(NSApp is MAPPApplication, "MAPP runs under MAPPApplication")
         QuickLookFile.removeLeftovers()
         separators.start()
+        AppTheme.apply(.stored())
+        // A choice in Settings reaches every window at once, and a Reset puts the system's back.
+        themeObservation = NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { AppTheme.apply(.stored()) }
+        }
         #if DEBUG
         let sampled = SampleLibrary.isRequested
         #else
@@ -180,6 +189,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// waited for, so quitting offline is not held up; a library that cannot finish holds it up only so long. A change
     /// not kept that no window has told, as when no window is open, is told here, so its text reaches the clipboard.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        // What decides whether the windows come back is read as the app quits.
+        ReopenWindows.apply()
         Task { [libraries] in
             // A property typed in an inspector is written, or handed back, before the library finishes its writes.
             DetailsPresentation.handOffAllProperties(in: libraries.current)

@@ -190,7 +190,7 @@ struct PagePlacementsTests {
         let item = Self.item(Self.comment, ["github_id": .string("IC_kwDO")])
         func rows(_ placements: PagePlacements, tags: [String] = ["a"]) -> [String] {
             PropertyRow.rows(
-                of: item, type: type, hidden: ["title"], relationships: [], parentField: "child-of", format: .automatic, tags: tags,
+                of: item, type: type, hidden: ["title"], relationships: [], parentField: "child-of", format: .standard, tags: tags,
                 placement: placements.placement(of: Self.comment, in: Self.catalogue)
             ).map(\.id)
         }
@@ -222,7 +222,7 @@ struct PagePlacementsTests {
         func rows(_ placements: PagePlacements) -> [String] {
             PropertyRow.rows(
                 of: Self.item(Self.ticket), type: Self.catalogue.itemTypes[Self.ticket], hidden: ["title"], relationships: relationships,
-                parentField: "child-of", format: .automatic, tags: [], placement: placements.placement(of: Self.ticket, in: Self.catalogue)
+                parentField: "child-of", format: .standard, tags: [], placement: placements.placement(of: Self.ticket, in: Self.catalogue)
             ).map(\.id)
         }
         #expect(rows(PagePlacements()) == ["child-of", "about"])

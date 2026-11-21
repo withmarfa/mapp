@@ -410,7 +410,7 @@ struct SidebarPlan {
 /// library's sidebar starts from the default, and changes are saved as before.
 @Observable @MainActor
 final class SidebarLayouts {
-    private static let defaultsKey = "sidebarLayouts"
+    static let defaultsKey = "sidebarLayouts"
     /// Each entry is stored data that could not be read, in the order it was found.
     static let setAsideKey = "sidebarLayoutsSetAside"
 

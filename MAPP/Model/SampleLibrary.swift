@@ -31,9 +31,7 @@ nonisolated enum SampleLibrary {
     /// layout. Without these a column hidden or a layout chosen in one session stayed in every later one, whatever
     /// `-MAPPLayout` or the place's look says.
     @MainActor static func forgetStoredChoices(in defaults: UserDefaults) {
-        let keys = OrderKey.all + PageKey.all + ListKey.all + InterfaceKey.all
-            + [PlaceDensities.key, PlaceDefaults.key, ItemTableColumnLayouts.key, ViewLayouts.key]
-        for key in keys { defaults.removeObject(forKey: key) }
+        MacSettings.reset(in: defaults)
     }
 
     private static func argument(after flag: String) -> String? {

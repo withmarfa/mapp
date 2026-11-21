@@ -14,7 +14,7 @@ struct ValueEditRequest {
     var undoManager: UndoManager?
     /// Writes the field, and says whether it was taken. The parent is no field, so it has none.
     var write: (PropertyValue?) -> Bool = { _ in false }
-    var calendar = Calendar.current
+    var calendar = Calendar.mapp
     /// Opens the item the parent row names, for the parent's panel.
     var open: (ItemID) -> Void = { _ in }
     /// The items a panel changes where the window has several chosen, which `item` cannot name. Empty otherwise.

@@ -297,7 +297,10 @@ struct MainView: View {
             details.handOffProperties(except: browser.selection.count == 1 ? browser.selection.first : nil, in: library, undoManager: undoManager)
         }
         .onChange(of: browser.snapshotParts) {
-            if restoresWindow { storedBrowser = try? JSONEncoder().encode(browser.snapshot()) }
+            if restoresWindow {
+                storedBrowser = try? JSONEncoder().encode(browser.snapshot())
+                StartWith.remember(browser.item)
+            }
         }
         // The window has gone, by closing or changing library, once its titles were saved or the person chose to
         // go; its drafts take no part in what other windows do. The library is the one this view showed, so a
@@ -348,7 +351,7 @@ struct MainView: View {
             // After this update, not in it: chosen while the window's customizable toolbars are first mounted, the page
             // can miss the selection and stay on No Item Selected.
             Task {
-                if restoresWindow { browser.restore(from: storedBrowser, in: library, order: order) }
+                if restoresWindow { browser.restore(from: storedBrowser, in: library, order: order, start: StartWith.stored().startingPlace()) }
                 #if DEBUG
                 if SampleLibrary.isRequested, SampleLibrary.withCollections {
                     browser.sidebarItem = .itemType("core.task")

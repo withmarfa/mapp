@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Choices drawn as pictures filling a card, for a look the person should see, such as a theme or a row style. The
-/// chosen one takes a gray ring, never the accent.
+/// Choices drawn as pictures filling a section's card, for a look the person should see, such as a theme or a row style.
+/// The chosen one takes a gray ring, never the accent.
 struct ChoiceTiles<Value: Hashable>: View {
     struct Choice: Identifiable {
         let value: Value
@@ -14,31 +14,29 @@ struct ChoiceTiles<Value: Hashable>: View {
     @Binding var selection: Value
 
     var body: some View {
-        SettingsCard {
-            HStack(alignment: .top, spacing: 14) {
-                ForEach(choices) { choice in
-                    Button { selection = choice.value } label: {
-                        VStack(spacing: 6) {
-                            choice.picture
-                                .frame(maxWidth: .infinity)
-                                .aspectRatio(1.5, contentMode: .fit)
-                                .clipShape(.rect(cornerRadius: 8, style: .continuous))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .strokeBorder(
-                                            selection == choice.value ? SettingsTokens.primaryText.opacity(0.55) : SettingsTokens.hairline,
-                                            lineWidth: selection == choice.value ? 2 : 1)
-                                }
-                            choice.title.settingsFont(.small)
-                        }
-                        .contentShape(.rect)
+        HStack(alignment: .top, spacing: 14) {
+            ForEach(choices) { choice in
+                Button { selection = choice.value } label: {
+                    VStack(spacing: 6) {
+                        choice.picture
+                            .frame(maxWidth: .infinity)
+                            .aspectRatio(1.5, contentMode: .fit)
+                            .clipShape(.rect(cornerRadius: 8, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .strokeBorder(
+                                        selection == choice.value ? SettingsTokens.primaryText.opacity(0.55) : SettingsTokens.hairline,
+                                        lineWidth: selection == choice.value ? 2 : 1)
+                            }
+                        choice.title.settingsFont(.small).fontWeight(selection == choice.value ? .semibold : .regular)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(selection == choice.value ? .isSelected : [])
+                    .contentShape(.rect)
                 }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selection == choice.value ? .isSelected : [])
             }
-            .padding(SettingsTokens.Metric.inset)
         }
+        .padding(SettingsTokens.Metric.inset)
     }
 }
 

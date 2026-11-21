@@ -20,38 +20,36 @@ struct DateDisplayTests {
         return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day)!
     }
 
-    private func text(_ date: Date, hasTime: Bool = true, _ place: DateDisplay.Place, _ format: DateFormat, locale: Locale? = nil) -> String {
+    private func text(_ date: Date, hasTime: Bool = true, _ place: DateDisplay.Place, _ format: DateFormat = .standard, locale: Locale? = nil) -> String {
         DateDisplay.text(of: date, hasTime: hasTime, place: place, format: format, now: now, calendar: calendar, locale: locale ?? self.locale)
     }
 
-    // MARK: Automatic and relative keep the app's own wording
+    // MARK: The standard format keeps the app's own wording
 
     @Test func aListLineForADayToComeIsTheDayAndTheTimeOfDayIsAvailableApart() {
         let tomorrow = moment(daysAgo: -1)
-        #expect(text(tomorrow, .list, .automatic) == "Tomorrow")
-        #expect(DateDisplay.timeOfDay(of: tomorrow, calendar: calendar, locale: locale) == text(moment(daysAgo: 0), .list, .automatic))
+        #expect(text(tomorrow, .list) == "Tomorrow")
+        #expect(DateDisplay.timeOfDay(of: tomorrow, calendar: calendar, locale: locale) == text(moment(daysAgo: 0), .list))
     }
 
-    @Test(arguments: [DateFormat.automatic, .relative])
-    func aListLineIsTheTimeTodayThenWordsThenTheShortDate(_ format: DateFormat) {
-        #expect(text(moment(daysAgo: 0), .list, format) == "09:12")
-        #expect(text(moment(daysAgo: 0, hour: 23, minute: 59), .list, format) == "23:59")
-        #expect(text(moment(daysAgo: 1), .list, format) == "Yesterday")
-        #expect(text(moment(daysAgo: 2), .list, format) == "Wednesday")
-        #expect(text(moment(daysAgo: 6), .list, format) == "Saturday")
-        #expect(text(moment(daysAgo: 7), .list, format) == "18/09/2026")
+    @Test func aListLineIsTheTimeTodayThenWordsThenTheShortDate() {
+        #expect(text(moment(daysAgo: 0), .list) == "09:12")
+        #expect(text(moment(daysAgo: 0, hour: 23, minute: 59), .list) == "23:59")
+        #expect(text(moment(daysAgo: 1), .list) == "Yesterday")
+        #expect(text(moment(daysAgo: 2), .list) == "Wednesday")
+        #expect(text(moment(daysAgo: 6), .list) == "Saturday")
+        #expect(text(moment(daysAgo: 7), .list) == "18/09/2026")
     }
 
     @Test func theShortDateOfAListLineFollowsTheLocale() {
         let date = calendar.date(from: DateComponents(year: 2025, month: 12, day: 31, hour: 9))!
-        #expect(text(date, .list, .automatic, locale: Locale(identifier: "en_GB")) == "31/12/2025")
-        #expect(text(date, .list, .automatic, locale: Locale(identifier: "en_US")) == "12/31/2025")
+        #expect(text(date, .list, locale: Locale(identifier: "en_GB")) == "31/12/2025")
+        #expect(text(date, .list, locale: Locale(identifier: "en_US")) == "12/31/2025")
     }
 
-    @Test(arguments: [DateFormat.automatic, .relative])
-    func aTableCellReadsAsPeopleSayIt(_ format: DateFormat) {
+    @Test func aTableCellReadsAsPeopleSayIt() {
         func label(_ days: Int) -> String {
-            text(calendar.date(byAdding: .day, value: days, to: now)!, hasTime: false, .table, format)
+            text(calendar.date(byAdding: .day, value: days, to: now)!, hasTime: false, .table)
         }
         #expect(label(0) == "Today")
         #expect(label(1) == "Tomorrow")
@@ -63,54 +61,108 @@ struct DateDisplayTests {
     }
 
     // Value tests use an afternoon time: the morning hour's padding (9:12 or 09:12) is the system's to decide.
-    @Test func automaticValuesAreAbbreviatedWithTheTimeWhereThereIsOne() {
+    @Test func valuesAreAbbreviatedWithTheTimeWhereThereIsOneAndNeverSayToday() {
         let date = moment(daysAgo: 0, hour: 14, minute: 30)
-        #expect(text(date, .value, .automatic) == "25 Sep 2026 at 14:30")
-        #expect(text(date, hasTime: false, .value, .automatic) == "25 Sep 2026")
+        #expect(text(date, .value) == "25 Sep 2026 at 14:30")
+        #expect(text(date, hasTime: false, .value) == "25 Sep 2026")
     }
 
-    // MARK: The other formats
+    // MARK: Today and Yesterday off
 
-    @Test func relativeValuesSayTheDayInWordsAndKeepTheTime() {
-        #expect(text(moment(daysAgo: 0, hour: 14, minute: 30), .value, .relative) == "Today at 14:30")
-        #expect(text(moment(daysAgo: 1, hour: 14, minute: 30), .value, .relative) == "Yesterday at 14:30")
-        #expect(text(moment(daysAgo: 1, hour: 14, minute: 30), hasTime: false, .value, .relative) == "Yesterday")
-        #expect(text(moment(daysAgo: 30), hasTime: false, .value, .relative).hasPrefix("26 Aug"))
+    @Test func withoutWordsAListAndATableSayTheDate() {
+        let format = DateFormat(usesWords: false)
+        #expect(text(moment(daysAgo: 0), .list, format) == "25/09/2026")
+        #expect(text(moment(daysAgo: 1), .list, format) == "24/09/2026")
+        #expect(text(moment(daysAgo: 1), hasTime: false, .table, format) == "24 Sep")
+        #expect(text(moment(daysAgo: 400), hasTime: false, .table, format).hasSuffix("2025"))
     }
 
-    @Test func shortWritesTheDateInNumbersEverywhere() {
+    @Test func withoutWordsAValueIsUnchanged() {
+        let date = moment(daysAgo: 0, hour: 14, minute: 30)
+        #expect(text(date, .value, DateFormat(usesWords: false)) == text(date, .value))
+    }
+
+    // MARK: The date formats
+
+    @Test func numericWritesTheDateInNumbersEverywhere() {
+        let format = DateFormat(date: .numeric)
         let date = moment(daysAgo: 1, hour: 14, minute: 30)
-        #expect(text(date, .value, .short) == "24/09/2026, 14:30")
-        #expect(text(date, hasTime: false, .value, .short) == "24/09/2026")
-        #expect(text(date, .list, .short) == "24/09/2026")
-        #expect(text(date, hasTime: false, .table, .short) == "24/09/2026")
-        #expect(text(date, .value, .short, locale: Locale(identifier: "en_US")).hasPrefix("9/24/2026"))
+        #expect(text(date, .value, format) == "24/09/2026, 14:30")
+        #expect(text(date, hasTime: false, .value, format) == "24/09/2026")
+        #expect(text(moment(daysAgo: 20), .list, format) == "05/09/2026")
+        #expect(text(moment(daysAgo: 20), hasTime: false, .table, DateFormat(usesWords: false, date: .numeric)) == "05/09/2026")
+        #expect(text(date, .value, format, locale: Locale(identifier: "en_US")).hasPrefix("9/24/2026"))
+    }
+
+    @Test func abbreviatedWritesTheMonthShortEverywhere() {
+        let format = DateFormat(date: .abbreviated)
+        #expect(text(moment(daysAgo: 1, hour: 14, minute: 30), .value, format) == "24 Sep 2026 at 14:30")
+        #expect(text(moment(daysAgo: 20), .list, format) == "5 Sep 2026")
+        #expect(text(moment(daysAgo: 20), hasTime: false, .table, format) == "5 Sep 2026")
     }
 
     @Test func longWritesTheMonthInFullEverywhere() {
+        let format = DateFormat(date: .long)
         let date = moment(daysAgo: 1, hour: 14, minute: 30)
-        #expect(text(date, .value, .long) == "24 September 2026 at 14:30")
-        #expect(text(date, hasTime: false, .value, .long) == "24 September 2026")
-        #expect(text(date, .list, .long) == "24 September 2026")
-        #expect(text(date, hasTime: false, .table, .long) == "24 September 2026")
+        #expect(text(date, .value, format) == "24 September 2026 at 14:30")
+        #expect(text(date, hasTime: false, .value, format) == "24 September 2026")
+        #expect(text(moment(daysAgo: 20), .list, format) == "5 September 2026")
+        #expect(text(moment(daysAgo: 20), hasTime: false, .table, format) == "5 September 2026")
     }
 
-    @Test func theClockFollowsTheLocalesHours() {
+    @Test func wordsStillWinWhileADayIsRecentWhateverTheDateFormat() {
+        let format = DateFormat(date: .long)
+        #expect(text(moment(daysAgo: 1), .list, format) == "Yesterday")
+        #expect(text(moment(daysAgo: 0), hasTime: false, .table, format) == "Today")
+    }
+
+    // MARK: The clock
+
+    @Test func theClockFollowsTheLocalesHoursUnlessChosen() {
         let afternoon = moment(daysAgo: 0, hour: 14, minute: 30)
-        #expect(text(afternoon, .value, .long, locale: Locale(identifier: "en_GB")).hasSuffix("14:30"))
-        #expect(text(afternoon, .value, .long, locale: Locale(identifier: "en_US")).contains("2:30"))
+        #expect(text(afternoon, .value, locale: Locale(identifier: "en_GB")).hasSuffix("14:30"))
+        #expect(text(afternoon, .value, locale: Locale(identifier: "en_US")).contains("2:30"))
     }
 
-    @Test func aStoredChoiceIsReadBackAndAnUnknownOneIsAutomatic() throws {
+    @Test func aChosenClockHoldsInTheLocalesOfEitherKind() {
+        let afternoon = moment(daysAgo: 0, hour: 14, minute: 30)
+        let twelve = DateFormat(time: .twelveHour)
+        let twentyFour = DateFormat(time: .twentyFourHour)
+        for identifier in ["en_GB", "en_US"] {
+            let locale = Locale(identifier: identifier)
+            #expect(text(afternoon, .value, twelve, locale: locale).contains("2:30"))
+            #expect(!text(afternoon, .value, twelve, locale: locale).contains("14:30"))
+            #expect(text(afternoon, .value, twentyFour, locale: locale).hasSuffix("14:30"))
+            #expect(DateDisplay.timeOfDay(of: afternoon, format: twelve, calendar: calendar, locale: locale).contains("2:30"))
+            #expect(DateDisplay.timeOfDay(of: afternoon, format: twentyFour, calendar: calendar, locale: locale) == "14:30")
+        }
+        // A list says the time of today on the chosen clock too.
+        #expect(text(afternoon, .list, twelve).contains("2:30"))
+    }
+
+    // MARK: What is stored
+
+    @Test func aStoredChoiceIsReadBackAndAnUnknownOneIsTheStandard() throws {
         let suite = "DateDisplayTests.\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
-        #expect(DateFormat.stored(in: defaults) == .automatic)
-        for format in DateFormat.allCases {
-            defaults.set(format.rawValue, forKey: DateFormat.key)
-            #expect(DateFormat.stored(in: defaults) == format)
+        #expect(DateFormat.stored(in: defaults) == .standard)
+        let chosen = DateFormat(usesWords: false, date: .long, time: .twelveHour)
+        defaults.set(chosen.rawValue, forKey: DateFormat.key)
+        #expect(DateFormat.stored(in: defaults) == chosen)
+        for style in DateFormat.DateStyle.allCases {
+            let format = DateFormat(date: style)
+            #expect(DateFormat(rawValue: format.rawValue) == format)
         }
         defaults.set("calendar", forKey: DateFormat.key)
-        #expect(DateFormat.stored(in: defaults) == .automatic)
+        #expect(DateFormat.stored(in: defaults) == .standard)
+        defaults.set("automatic", forKey: DateFormat.key)
+        #expect(DateFormat.stored(in: defaults) == .standard)
+    }
+
+    @Test func aFormatWithAFieldMissingStillReadsAndTheMissingFieldIsTheStandard() throws {
+        // A new field on a stored value is optional: a value saved without one reads with its standard.
+        let format = try #require(DateFormat(rawValue: #"{"date":"long"}"#))
+        #expect(format == DateFormat(usesWords: true, date: .long, time: .system))
     }
 }

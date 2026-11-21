@@ -138,7 +138,7 @@ nonisolated struct RowContent: Hashable, Sendable {
 
         func date(of look: TypeLook, showsTime: Bool) -> String? {
             guard let moment = moment(of: look) else { return nil }
-            if showsTime, moment.hasTime { return DateDisplay.timeOfDay(of: moment.date, calendar: calendar, locale: locale) }
+            if showsTime, moment.hasTime { return DateDisplay.timeOfDay(of: moment.date, format: list.format, calendar: calendar, locale: locale) }
             return text(of: moment)
         }
 
@@ -187,7 +187,7 @@ nonisolated struct RowContent: Hashable, Sendable {
                 return isBody(field) ? Self.line(item.preview) : fieldText(field)
             case .time(let key):
                 guard !isPlacedBy(key, look: look), case .date(includesTime: true)? = field(key)?.kind, let moment = fieldMoment(key), moment.hasTime else { return nil }
-                return DateDisplay.timeOfDay(of: moment.date, calendar: calendar, locale: locale)
+                return DateDisplay.timeOfDay(of: moment.date, format: list.format, calendar: calendar, locale: locale)
             case .opening:
                 return Self.line(item.preview)
             case .site:

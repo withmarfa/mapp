@@ -46,7 +46,7 @@ struct PropertyRowTests {
         hidden: Set<String> = ["title", "body"]
     ) -> [PropertyRow] {
         PropertyRow.rows(
-            of: item(properties), type: ticket, hidden: hidden, relationships: relationships, parentField: "child-of", format: .automatic, tags: tags)
+            of: item(properties), type: ticket, hidden: hidden, relationships: relationships, parentField: "child-of", format: .standard, tags: tags)
     }
 
     private static func relationship(_ field: String, _ label: String, _ titles: [(String, String)]) -> ItemRelationship {
@@ -77,7 +77,7 @@ struct PropertyRowTests {
         #expect(rows.map(\.id) == ["status", "priority", "due_at", "done", "estimate", "link", "contact"])
         #expect(rows[0].value == .status)
         #expect(rows[1].value == .options(["High"]))
-        #expect(rows[2].value == .date(ItemDate.parse("2026-10-27")!.text(format: .automatic)))
+        #expect(rows[2].value == .date(ItemDate.parse("2026-10-27")!.text(format: .standard)))
         #expect(rows[3].value == .boolean(true))
         #expect(rows[4].value == .text("5"))
         #expect(rows[5].value == .url("https://example.com/a"))
@@ -86,7 +86,7 @@ struct PropertyRowTests {
 
     @Test func aDatetimeReadsAsADate() {
         let rows = Self.rows(["due_at": .string("2026-10-27T14:00:00Z")])
-        #expect(rows.first { $0.id == "due_at" }?.value == .date(ItemDate.parse("2026-10-27T14:00:00Z")!.text(format: .automatic)))
+        #expect(rows.first { $0.id == "due_at" }?.value == .date(ItemDate.parse("2026-10-27T14:00:00Z")!.text(format: .standard)))
     }
 
     @Test func labelsComeFromTheCatalogue() {
@@ -131,7 +131,7 @@ struct PropertyRowTests {
         let type = MarfaMapping.itemType(ItemType(id: "aic.note", label: "Note", fields: [Self.field("title")], titleField: "title"))
         let rows = PropertyRow.rows(
             of: Self.item([:]), type: type, hidden: ["title"],
-            relationships: [Self.relationship("child-of", "Parent", [("Project", "p1")])], parentField: "child-of", format: .automatic, tags: [])
+            relationships: [Self.relationship("child-of", "Parent", [("Project", "p1")])], parentField: "child-of", format: .standard, tags: [])
         #expect(rows.map(\.value) == [.parent])
     }
 
@@ -153,7 +153,7 @@ struct PropertyRowTests {
     @Test func aLinkCarriesTheIconOfTheItemItOpens() {
         let blocks = Self.relationship("blocks", "Blocks", [("Ship it", "a"), ("Test it", "b")])
         let rows = PropertyRow.rows(
-            of: Self.item([:]), type: Self.ticket, hidden: ["title", "body"], relationships: [blocks], parentField: "child-of", format: .automatic, tags: [],
+            of: Self.item([:]), type: Self.ticket, hidden: ["title", "body"], relationships: [blocks], parentField: "child-of", format: .standard, tags: [],
             icon: { $0 == ItemID("a") ? "lucide:rocket" : nil })
         #expect(rows[1].value == .items([
             PropertyRow.Target(title: "Ship it", item: ItemID("a"), icon: "lucide:rocket"),
@@ -222,7 +222,7 @@ struct PropertyRowTests {
             Self.relationship("blocks", "Blocks", [("Mine", "d")]),
         ]
         let list = LinkedItem.list(
-            pointingTo: ItemID("self"), in: relationships, catalogue: catalogue, now: day, format: .automatic, item: { id in items.first { $0.id == id } })
+            pointingTo: ItemID("self"), in: relationships, catalogue: catalogue, now: day, format: .standard, item: { id in items.first { $0.id == id } })
         #expect(list.map(\.title) == ["New", "Old"])
         #expect(list.first?.icon == "lucide:file-text")
         #expect(list.first?.type == "Note")
@@ -245,7 +245,7 @@ struct PropertyRowTests {
         ]
         func titles(_ members: LinkedItem.Members) -> [String] {
             LinkedItem.list(
-                pointingTo: ItemID("self"), in: relationships, catalogue: catalogue, now: day, format: .automatic, members: members,
+                pointingTo: ItemID("self"), in: relationships, catalogue: catalogue, now: day, format: .standard, members: members,
                 item: { id in items.first { $0.id == id } }).map(\.title)
         }
         #expect(titles(.only) == ["File"])

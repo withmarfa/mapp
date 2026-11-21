@@ -9,9 +9,11 @@ struct CalendarMonthCard: View {
     @Bindable var browser: Browser
     /// A day in the month the card shows, or nil while it follows the calendar.
     @State private var shown: Date?
+    @AppStorage(WeekStart.key) private var weekStart = 0
 
     var body: some View {
-        let calendar = Calendar.current
+        let _ = weekStart
+        let calendar = Calendar.mapp
         let now = library.now()
         let current = browser.calendarDay ?? now
         let anchor = shown ?? current

@@ -170,7 +170,7 @@ struct ItemTimeline: View {
                 if dateOnly {
                     if row.isEvent { Text("All day") }
                 } else {
-                    Text(verbatim: DateDisplay.timeOfDay(of: date)).monospacedDigit().help(raw)
+                    Text(verbatim: DateDisplay.timeOfDay(of: date, format: dateFormat)).monospacedDigit().help(raw)
                 }
             case .invalid(let raw):
                 Text(verbatim: raw).lineLimit(2)

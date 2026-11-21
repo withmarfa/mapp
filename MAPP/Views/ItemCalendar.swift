@@ -11,11 +11,13 @@ struct ItemCalendar: View {
     @State private var daysSeen = 0
     @State private var keyboard = CalendarKeyboard()
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
+    @AppStorage(WeekStart.key) private var weekStart = 0
 
     var body: some View {
         let _ = daysSeen
+        let _ = weekStart
         let items = browser.filteredItems(in: library)
-        let calendar = Calendar.current
+        let calendar = Calendar.mapp
         let now = library.now()
         let anchor = browser.calendarDay ?? now
         let placed = CalendarLayout.entries(for: items, looks: browser.looks(in: library), catalogue: library.catalogue, calendar: calendar)
@@ -401,7 +403,7 @@ private struct CalendarBlockLabel: View {
                 }
             }
             if showsTime {
-                Text(verbatim: DateDisplay.timeOfDay(of: entry.start, calendar: calendar))
+                Text(verbatim: DateDisplay.timeOfDay(of: entry.start, format: DateFormat.stored(), calendar: calendar))
                     .interfaceFont(.system(size: 10.5))
                     .lineLimit(1)
                     .foregroundStyle(isSelected ? Color.white.opacity(0.85) : .secondary)

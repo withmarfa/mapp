@@ -3,14 +3,14 @@ import Foundation
 /// A page of Settings: one of MAPP's own, or one of the Marfa's. The window lists a page only once it exists, so a later
 /// piece adds its pages here and to the sidebar's groups, and nothing else.
 nonisolated enum SettingsPage: Hashable, Sendable {
-    case appearance, lists, editor, connection
+    case general, appearance, lists, editor, connection
     case marfa(MarfaSettingsPage)
 
     static let overview = SettingsPage.marfa(.overview)
     static let recentlyDeleted = SettingsPage.marfa(.recentlyDeleted)
 
     /// MAPP's pages as the sidebar lists them, in groups split by space.
-    static let mappGroups: [[SettingsPage]] = [[.appearance], [.editor, .lists], [.connection]]
+    static let mappGroups: [[SettingsPage]] = [[.general, .appearance], [.editor, .lists], [.connection]]
     /// The Marfa's pages, in groups.
     static let marfaGroups: [[SettingsPage]] = MarfaSettingsPage.groups.map { $0.map(SettingsPage.marfa) }
 
@@ -24,6 +24,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
     /// A name for tests and accessibility, which never changes with the language.
     var key: String {
         switch self {
+        case .general: "general"
         case .appearance: "appearance"
         case .lists: "lists"
         case .editor: "editor"
@@ -34,6 +35,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
 
     var title: String {
         switch self {
+        case .general: String(localized: "General")
         case .appearance: String(localized: "Appearance")
         case .lists: String(localized: "Lists")
         case .editor: String(localized: "Editor")
@@ -44,6 +46,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
 
     var symbol: String {
         switch self {
+        case .general: "gearshape.fill"
         case .appearance: "paintbrush.pointed.fill"
         case .lists: "list.bullet"
         case .editor: "square.and.pencil"
@@ -54,6 +57,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
 
     var tone: SettingsTokens.Tone {
         switch self {
+        case .general: .gray
         case .appearance: .blue
         case .lists: .orange
         case .editor: .yellow
@@ -65,24 +69,31 @@ nonisolated enum SettingsPage: Hashable, Sendable {
     /// The titles of the rows the page holds, which the sidebar's search finds the page by.
     var searchWords: [String] {
         switch self {
+        case .general:
+            [
+                String(localized: "Start With"), String(localized: "Reopen Windows"), String(localized: "Open Items"),
+                String(localized: "New Items Are"), String(localized: "Today and Yesterday"), String(localized: "Week Starts On"),
+                String(localized: "Date Format"), String(localized: "Time Format"), String(localized: "Pictures from Websites"),
+                String(localized: "Send Error Reports"), String(localized: "Reset MAPP’s Settings"),
+            ]
         case .appearance:
             [
-                String(localized: "Base Text Size"), String(localized: "Value Panels"), String(localized: "Palettes"),
-                String(localized: "Show Title When Scrolling"), String(localized: "Show Toolbar Background When Scrolling"),
-                String(localized: "Default Column Widths"), String(localized: "Date Format"),
+                String(localized: "Theme"), String(localized: "Accent"), String(localized: "Highlights"), String(localized: "Text Size"),
+                String(localized: "Text Font"), String(localized: "Code Font"), String(localized: "Value Panels"),
+                String(localized: "Palettes"), String(localized: "Title When Scrolling"), String(localized: "Toolbar Background When Scrolling"),
+                String(localized: "Symbols on Subtypes"), String(localized: "Window Layout"), String(localized: "Sidebar"), String(localized: "List"),
             ]
         case .lists:
-            [String(localized: "Density"), String(localized: "Sort By"), String(localized: "Group By"), String(localized: "Open Items In")]
+            [String(localized: "Density"), String(localized: "Sort By"), String(localized: "Group By")]
         case .editor:
             [
                 String(localized: "Page Width"), String(localized: "Standard Width"), String(localized: "Title Length"),
                 String(localized: "Text Size"), String(localized: "Check Spelling While Typing"), String(localized: "Links"),
-                String(localized: "Remote Pictures"),
             ]
         case .connection:
             [
                 String(localized: "Server"), String(localized: "Address"), String(localized: "Sign In"), String(localized: "Disconnect"),
-                String(localized: "Downloaded Files"), String(localized: "Send Error Reports"), String(localized: "Use Another Marfa"),
+                String(localized: "Downloaded Files"), String(localized: "Use Another Marfa"),
             ]
         case .marfa(let page): page.searchWords
         }

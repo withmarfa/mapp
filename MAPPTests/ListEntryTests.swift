@@ -253,7 +253,7 @@ struct ListEntryTests {
         ])
         let lead = PageHeaderLead(for: item, kind: .person, now: .now)
         let rows = lead.refine(PropertyRow.rows(
-            of: item, type: Self.person, hidden: ["title"], relationships: [], parentField: "child-of", format: .automatic, tags: []))
+            of: item, type: Self.person, hidden: ["title"], relationships: [], parentField: "child-of", format: .standard, tags: []))
         #expect(rows.map(\.id) == ["emails", "phones", "addresses"])
         #expect(rows.map(\.value) == [.email("main@example.com"), .phone("+44 20 7946 0000"), .text("home, 1 High Street, London")])
     }
@@ -262,7 +262,7 @@ struct ListEntryTests {
         let item = Self.personItem(["phones": .array([Self.entry(["value": .string("+44 20 7946 0000"), "label": .string("work")])])])
         let lead = PageHeaderLead(for: item, kind: .person, now: .now)
         let rows = lead.refine(PropertyRow.rows(
-            of: item, type: Self.person, hidden: ["title"], relationships: [], parentField: "child-of", format: .automatic, tags: []))
+            of: item, type: Self.person, hidden: ["title"], relationships: [], parentField: "child-of", format: .standard, tags: []))
         #expect(rows.map(\.value) == [.phone("+44 20 7946 0000")])
     }
 
@@ -273,7 +273,7 @@ struct ListEntryTests {
             titleField: "title"))
         let item = Self.personItem(["addresses": .array([Self.entry(["postal_code": .string("90210 12345")])])])
         let lead = PageHeaderLead(for: item, kind: .person, now: .now)
-        let rows = lead.refine(PropertyRow.rows(of: item, type: person, hidden: ["title"], relationships: [], parentField: "child-of", format: .automatic, tags: []))
+        let rows = lead.refine(PropertyRow.rows(of: item, type: person, hidden: ["title"], relationships: [], parentField: "child-of", format: .standard, tags: []))
         #expect(rows.map(\.value) == [.text("90210 12345")])
         // Only a list whose first member is required plain text holds a number to call, and only in that member.
         #expect(try Self.shape(postcodes).numberToCall(in: ["postal_code": .string("90210 12345")]) == nil)
@@ -299,7 +299,7 @@ struct ListEntryTests {
         let item = MAPP.Item(
             id: ItemID("10000000-0000-0000-0000-000000000001"), type: TypeID("t"), title: "T", titleRule: .property("title"),
             properties: [Property(key: field.name, value: .array(entries))], version: ItemVersion(1), created: .now, modified: .now)
-        return PropertyRow.value(of: try #require(type.fields.first), in: item, format: .automatic)
+        return PropertyRow.value(of: try #require(type.fields.first), in: item, format: .standard)
     }
 
     @Test func everyEntryOfAListOfPeopleShowsAsAPerson() throws {
@@ -333,7 +333,7 @@ struct ListEntryTests {
 
     @Test func aPersonWithNoEntriesHasNoRows() {
         let item = Self.personItem(["emails": .array([])])
-        let rows = PropertyRow.rows(of: item, type: Self.person, hidden: ["title"], relationships: [], parentField: "child-of", format: .automatic, tags: [])
+        let rows = PropertyRow.rows(of: item, type: Self.person, hidden: ["title"], relationships: [], parentField: "child-of", format: .standard, tags: [])
         #expect(rows.isEmpty)
     }
 

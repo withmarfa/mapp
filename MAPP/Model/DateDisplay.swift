@@ -1,24 +1,85 @@
 import Foundation
 
-/// How the app writes the dates it shows, as the person chose in Settings. The 12 or 24 hour clock is the system's.
-nonisolated enum DateFormat: String, CaseIterable, Identifiable, Sendable {
-    /// Each place writes a date as it fits: in words in lists and tables, abbreviated where a value is read.
-    case automatic
-    /// "Today", "Yesterday", a weekday this week, then the date.
-    case relative
-    /// The date in numbers: 27/10/2026.
-    case short
-    /// The date with the month in full: 27 October 2026.
-    case long
+/// How the app writes the dates and times it shows, as the person chose in Settings > General > Dates and Times. It is
+/// one value in the defaults (`key`), read as JSON, so a change reaches every list, table, header and inspector that
+/// watches the key.
+nonisolated struct DateFormat: Hashable, Sendable, RawRepresentable {
+    /// How an absolute date is written. `system` keeps each place's own way, in the system's formats.
+    enum DateStyle: String, CaseIterable, Identifiable, Sendable, Codable {
+        /// Abbreviated in a value, the system's short date in a list and a day and month in a table.
+        case system
+        /// The date in numbers: 27/10/2026.
+        case numeric
+        /// The month shortened: 27 Oct 2026.
+        case abbreviated
+        /// The month in full: 27 October 2026.
+        case long
+
+        var id: Self { self }
+    }
+
+    /// The clock a time is read on.
+    enum TimeStyle: String, CaseIterable, Identifiable, Sendable, Codable {
+        case system
+        case twelveHour
+        case twentyFourHour
+
+        var id: Self { self }
+
+        var hourCycle: Locale.HourCycle? {
+            switch self {
+            case .system: nil
+            case .twelveHour: .oneToTwelve
+            case .twentyFourHour: .zeroToTwentyThree
+            }
+        }
+    }
+
+    /// Whether a list or a table says Today, Yesterday and the weekday instead of the date, while it is recent.
+    var usesWords = true
+    var date = DateStyle.system
+    var time = TimeStyle.system
 
     static let key = "dateFormat"
-    static let standard = DateFormat.automatic
+    static let standard = DateFormat()
+
+    init(usesWords: Bool = true, date: DateStyle = .system, time: TimeStyle = .system) {
+        self.usesWords = usesWords
+        self.date = date
+        self.time = time
+    }
+
+    /// The stored form. A field it lacks is the standard's, so a value saved before the field existed still reads.
+    private struct Stored: Codable {
+        var usesWords: Bool?
+        var date: DateStyle?
+        var time: TimeStyle?
+    }
+
+    /// A stored value that does not read gives the standard format.
+    init?(rawValue: String) {
+        guard let stored = try? JSONDecoder().decode(Stored.self, from: Data(rawValue.utf8)) else { return nil }
+        self.init(usesWords: stored.usesWords ?? true, date: stored.date ?? .system, time: stored.time ?? .system)
+    }
+
+    var rawValue: String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        let stored = Stored(usesWords: usesWords, date: date, time: time)
+        return (try? encoder.encode(stored)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
+    }
 
     static func stored(in defaults: UserDefaults = .standard) -> DateFormat {
         defaults.string(forKey: key).flatMap(Self.init(rawValue:)) ?? standard
     }
 
-    var id: Self { self }
+    /// `locale` read on the chosen clock.
+    func locale(_ locale: Locale) -> Locale {
+        guard let hourCycle = time.hourCycle else { return locale }
+        var components = Locale.Components(locale: locale)
+        components.hourCycle = hourCycle
+        return Locale(components: components)
+    }
 }
 
 /// The one place a date becomes text, so a choice of format reaches every list, table, header and inspector alike.
@@ -34,26 +95,32 @@ nonisolated enum DateDisplay {
         case table
     }
 
-    /// `hasTime` is false for a value that names only a day. `now` matters only to the relative formats.
+    /// `hasTime` is false for a value that names only a day. `now` matters only to the words of a list and a table.
     static func text(
         of date: Date, hasTime: Bool = true, place: Place, format: DateFormat, now: Date = .now,
         calendar: Calendar = .current, locale: Locale = .current
     ) -> String {
-        switch (format, place) {
-        case (.automatic, .value):
-            return absolute(date, hasTime: hasTime, style: .abbreviated, calendar: calendar, locale: locale)
-        case (.automatic, .list), (.relative, .list):
-            return listLabel(date, now: now, calendar: calendar, locale: locale)
-        case (.automatic, .table), (.relative, .table):
-            return dayLabel(date, now: now, calendar: calendar, locale: locale)
-        case (.relative, .value):
-            let day = dayLabel(date, now: now, calendar: calendar, locale: locale)
-            guard hasTime else { return day }
-            return String(localized: "\(day) at \(time(date, calendar: calendar, locale: locale))")
-        case (.short, _):
-            return absolute(date, hasTime: hasTime && place == .value, style: .numeric, calendar: calendar, locale: locale)
-        case (.long, _):
-            return absolute(date, hasTime: hasTime && place == .value, style: .long, calendar: calendar, locale: locale)
+        let locale = format.locale(locale)
+        switch place {
+        case .value:
+            return absolute(date, hasTime: hasTime, style: style(format.date, system: .abbreviated), calendar: calendar, locale: locale)
+        case .list:
+            guard format.usesWords else {
+                return absolute(date, hasTime: false, style: style(format.date, system: .numeric), calendar: calendar, locale: locale)
+            }
+            return listLabel(date, now: now, format: format, calendar: calendar, locale: locale)
+        case .table:
+            guard format.usesWords else { return dated(date, now: now, format: format, calendar: calendar, locale: locale) }
+            return dayLabel(date, now: now, format: format, calendar: calendar, locale: locale)
+        }
+    }
+
+    private static func style(_ choice: DateFormat.DateStyle, system: Date.FormatStyle.DateStyle) -> Date.FormatStyle.DateStyle {
+        switch choice {
+        case .system: system
+        case .numeric: .numeric
+        case .abbreviated: .abbreviated
+        case .long: .long
         }
     }
 
@@ -66,25 +133,34 @@ nonisolated enum DateDisplay {
 
     /// The time of day alone, which a row shows inside the group of a day, where the day is already said. It is
     /// written as a list line writes the time today, so a row reads the same in any group.
-    static func timeOfDay(of date: Date, calendar: Calendar = .current, locale: Locale = .current) -> String {
-        date.formatted(Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone).hour().minute())
+    static func timeOfDay(
+        of date: Date, format: DateFormat = .standard, calendar: Calendar = .current, locale: Locale = .current
+    ) -> String {
+        date.formatted(Date.FormatStyle(locale: format.locale(locale), calendar: calendar, timeZone: calendar.timeZone).hour().minute())
     }
 
-    private static func time(_ date: Date, calendar: Calendar, locale: Locale) -> String {
-        date.formatted(Date.FormatStyle(
-            date: .omitted, time: .shortened, locale: locale, calendar: calendar, timeZone: calendar.timeZone))
+    /// A day without words: the day and month, with the year when it is not this one, unless the person chose how a
+    /// date is written.
+    private static func dated(_ date: Date, now: Date, format: DateFormat, calendar: Calendar, locale: Locale) -> String {
+        if format.date != .system {
+            return absolute(date, hasTime: false, style: style(format.date, system: .abbreviated), calendar: calendar, locale: locale)
+        }
+        let sameYear = calendar.isDate(date, equalTo: now, toGranularity: .year)
+        var style = Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone).day().month(.abbreviated)
+        if !sameYear { style = style.year() }
+        return date.formatted(style)
     }
 
-    /// As Mail writes it: the time today, "Yesterday", the weekday within the week, and the system's short date
-    /// before that. A day to come, such as a due date or the start of an event, is a day as people say it.
-    private static func listLabel(_ date: Date, now: Date, calendar: Calendar, locale: Locale) -> String {
+    /// As Mail writes it: the time today, "Yesterday", the weekday within the week, and the short date before that. A
+    /// day to come, such as a due date or the start of an event, is a day as people say it.
+    private static func listLabel(_ date: Date, now: Date, format: DateFormat, calendar: Calendar, locale: Locale) -> String {
         let today = calendar.startOfDay(for: now)
         let day = calendar.startOfDay(for: date)
         let daysAgo = calendar.dateComponents([.day], from: day, to: today).day ?? 0
         var style = Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone)
         switch daysAgo {
         case ..<0:
-            return dayLabel(date, now: now, calendar: calendar, locale: locale)
+            return dayLabel(date, now: now, format: format, calendar: calendar, locale: locale)
         case 0:
             style = style.hour().minute()
         case 1:
@@ -92,13 +168,13 @@ nonisolated enum DateDisplay {
         case 2...6:
             style = style.weekday(.wide)
         default:
-            style = Date.FormatStyle(date: .numeric, time: .omitted, locale: locale, calendar: calendar, timeZone: calendar.timeZone)
+            return absolute(date, hasTime: false, style: self.style(format.date, system: .numeric), calendar: calendar, locale: locale)
         }
         return date.formatted(style)
     }
 
     /// A day as people say it: Today, Yesterday, Tomorrow, a weekday within a week, then the date.
-    private static func dayLabel(_ date: Date, now: Date, calendar: Calendar, locale: Locale) -> String {
+    private static func dayLabel(_ date: Date, now: Date, format: DateFormat, calendar: Calendar, locale: Locale) -> String {
         let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)).day ?? 0
         switch days {
         case 0: return String(localized: "Today")
@@ -107,10 +183,7 @@ nonisolated enum DateDisplay {
         case -6...(-2), 2...6:
             return date.formatted(Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone).weekday(.wide))
         default:
-            let sameYear = calendar.isDate(date, equalTo: now, toGranularity: .year)
-            var style = Date.FormatStyle(locale: locale, calendar: calendar, timeZone: calendar.timeZone).day().month(.abbreviated)
-            if !sameYear { style = style.year() }
-            return date.formatted(style)
+            return dated(date, now: now, format: format, calendar: calendar, locale: locale)
         }
     }
 }

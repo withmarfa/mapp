@@ -17,7 +17,7 @@ nonisolated enum ItemOpening: String, CaseIterable, Identifiable, Hashable, Send
     /// The value Settings names.
     var title: String {
         switch self {
-        case .modal: String(localized: "Modal")
+        case .modal: String(localized: "Over the List")
         case .fullPage: String(localized: "Full Page")
         case .newWindow: String(localized: "New Window")
         }
