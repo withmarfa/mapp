@@ -371,9 +371,8 @@ struct PicturesCalloutDismissal: Equatable {
 
 /// At the top of the page while some of its pictures wait for the person, in the words and the layout of the pictures
 /// banner at the top of an item's page (`#picture-bar` in the editor), which follows Mail's mailing-list banner: how
-/// many are not loaded, a button that loads them, and a small round close button that hides the banner for the
-/// page. Its spacing is the item page's, in steps of 4/13 of the interface text size (4 points at 13); its buttons are
-/// MAPP's own.
+/// many are not loaded, MAPP's small gray button that loads them, and a plain round close button that hides the banner
+/// for the page. Its spacing is the item page's, in steps of 4/13 of the interface text size (4 points at 13).
 struct PicturesWaitingCallout: View {
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
     let count: Int
@@ -385,7 +384,7 @@ struct PicturesWaitingCallout: View {
         let step = size * 4 / 13
         HStack(spacing: step * 3) {
             Image(systemName: "photo")
-                .foregroundStyle(.tint)
+                .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
             Group {
                 if count == 1 {
@@ -394,7 +393,6 @@ struct PicturesWaitingCallout: View {
                     Text("\(count) pictures from other websites aren’t loaded.")
                 }
             }
-            .fontWeight(.medium)
             .foregroundStyle(.primary)
             .frame(maxWidth: .infinity, alignment: .leading)
             // The close button sits two points (at 13) closer to Load Pictures than the other parts are to each other.
@@ -414,9 +412,9 @@ struct PicturesWaitingCallout: View {
             }
         }
         .font(.system(size: size))
-        .padding(.horizontal, step * 3)
-        .padding(.vertical, step * 2.5)
-        .background(.quinary, in: RoundedRectangle(cornerRadius: step * 3.5))
+        // 9, 10, 9 and 14 points at 13, as the editor's banner is padded.
+        .padding(EdgeInsets(top: size * 9 / 13, leading: size * 14 / 13, bottom: size * 9 / 13, trailing: size * 10 / 13))
+        .background(.quinary, in: RoundedRectangle(cornerRadius: size * 10 / 13, style: .continuous))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("PicturesWaitingCallout")
     }

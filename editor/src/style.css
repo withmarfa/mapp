@@ -101,14 +101,15 @@ body {
   --inkkit-table-grip-color: light-dark(rgb(0 0 0 / 0.25), rgb(255 255 255 / 0.3));
   --inkkit-table-header-background: light-dark(rgb(0 0 0 / 0.035), rgb(255 255 255 / 0.06));
   --inkkit-table-header-font-weight: 500;
-  /* A picture waiting for the person, Inkkit's file placeholder: one quiet line, not a box, in the interface's own font
-     and size, with the picture symbol, the description in the secondary color and a Load button at its end that is the
-     pictures banner's button (the --picture-* values below feed both, so the two cannot drift). The line is 28 high
-     and its button 22, centered; the 22 is off the 4 point grid by design. */
+  /* A picture waiting for the person, Inkkit's file placeholder: one full-width row with a hairline outline, in the
+     interface's own font and size, with the picture symbol, the description in the secondary color and, at the row's
+     trailing end, the same small gray Load button as the pictures banner's (the --picture-* values below feed both,
+     so the two cannot drift). The outline has no Inkkit token, so a rule below draws it. */
   --inkkit-file-placeholder-background: transparent;
-  --inkkit-file-placeholder-radius: 0;
-  --inkkit-file-placeholder-min-height: calc(var(--step) * 7);
-  --inkkit-file-placeholder-padding: 0;
+  --inkkit-file-placeholder-radius: calc(var(--step) * 2);
+  --inkkit-file-placeholder-min-height: 0px;
+  --inkkit-file-placeholder-padding: calc(var(--step) * 2) calc(var(--step) * 2.5)
+    calc(var(--step) * 2) calc(var(--step) * 3);
   --inkkit-file-placeholder-gap: calc(var(--step) * 2);
   --inkkit-file-placeholder-color: var(--label-secondary);
   --inkkit-file-placeholder-font-size: var(--interface-text-size);
@@ -117,11 +118,12 @@ body {
   --inkkit-file-placeholder-button-hover-background: var(--picture-button-fill-hover);
   --inkkit-file-placeholder-button-border-color: transparent;
   --inkkit-file-placeholder-button-hover-border-color: transparent;
-  --inkkit-file-placeholder-button-color: var(--inkkit-accent-color);
+  --inkkit-file-placeholder-button-color: var(--label-primary);
   --inkkit-file-placeholder-button-font-size: var(--picture-button-text-size);
   --inkkit-file-placeholder-button-font-weight: var(--picture-button-font-weight);
   --inkkit-file-placeholder-button-height: var(--picture-button-height);
   --inkkit-file-placeholder-button-padding-inline: var(--picture-button-padding);
+  --inkkit-file-placeholder-button-radius: var(--picture-button-radius);
 }
 
 /* Inkkit has no token for the font of a waiting picture's line or its button, which would otherwise take the page's
@@ -129,6 +131,20 @@ body {
 .inkkit-root .ProseMirror .inkkit-file[data-inkkit-file-appearance='placeholder'],
 .inkkit-root .ProseMirror .inkkit-file-action {
   font-family: -apple-system, system-ui, sans-serif;
+}
+
+.inkkit-root .ProseMirror .inkkit-file-action:active {
+  background: var(--picture-button-fill-pressed);
+}
+
+/* A waiting picture is one row of the text's full width, outlined by a hairline, with 14 points (at 13) of air above
+   and below. Inkkit has no token for the outline or the row's width and margins. */
+.inkkit-root .ProseMirror .inkkit-file[data-inkkit-file-appearance='placeholder'] {
+  display: flex;
+  box-sizing: border-box;
+  width: 100%;
+  margin-block: calc(var(--interface-text-size) * 14 / 13);
+  border: 0.5px solid var(--separator);
 }
 
 /* The item's header: the system font, a bold title at nearly twice the text's size, and pins sized from the
@@ -169,22 +185,24 @@ body {
 }
 
 /* The interface text size the pictures' measures follow, as the header's do: the app sets it on the root, and every
-   measure below is that size's share, so they scale with it. They are points at the default 13: the Load button is 22
-   high with 12 point text, and the box for a waiting picture is 30 high with 8 point corners. 22 and 30 are off the
-   4 point grid by design. */
+   measure below is that size's share, so they scale with it. They are points at the default 13, and are MAPP's small
+   gray button (`MappButton`): 22 high with 7 point corners, 9 points of padding and 12 point medium text, on the
+   label's own gray, darker under the pointer. 22 is off the 4 point grid by design. */
 :root {
   --interface-text-size: 13px;
   --step: calc(var(--interface-text-size) * 4 / 13);
   --picture-button-height: calc(var(--interface-text-size) * 22 / 13);
+  --picture-button-radius: calc(var(--interface-text-size) * 7 / 13);
   --picture-button-text-size: calc(var(--interface-text-size) * 12 / 13);
-  --picture-button-padding: calc(var(--step) * 3);
+  --picture-button-padding: calc(var(--interface-text-size) * 9 / 13);
   --picture-button-font-weight: 500;
-  --picture-button-fill: color-mix(in srgb, var(--inkkit-accent-color) 16%, transparent);
-  --picture-button-fill-hover: color-mix(in srgb, var(--inkkit-accent-color) 26%, transparent);
+  --picture-button-fill: color-mix(in srgb, CanvasText 6.5%, transparent);
+  --picture-button-fill-hover: color-mix(in srgb, CanvasText 10%, transparent);
+  --picture-button-fill-pressed: color-mix(in srgb, CanvasText 15%, transparent);
 }
 
 /* At the top of the page, above the title, while pictures at web addresses wait for the person: a quiet banner on the
-   text's margins, in the style of Mail's mailing-list banner, whose pill button loads them all. The header's own space
+   text's margins, in the style of Mail's mailing-list banner, whose gray button loads them all. The header's own space
    above its title is what separates it from the title. */
 #picture-bar {
   padding: calc(var(--step) * 3) var(--inkkit-column-inset) 0;
@@ -203,14 +221,15 @@ body {
   display: flex;
   align-items: center;
   gap: calc(var(--step) * 3);
-  padding: calc(var(--step) * 2.5) calc(var(--step) * 3);
-  border-radius: calc(var(--step) * 3.5);
+  padding: calc(var(--interface-text-size) * 9 / 13) calc(var(--interface-text-size) * 10 / 13)
+    calc(var(--interface-text-size) * 9 / 13) calc(var(--interface-text-size) * 14 / 13);
+  border-radius: calc(var(--interface-text-size) * 10 / 13);
   background: var(--label-quinary);
 }
 
 .picture-icon {
   flex: none;
-  background: var(--inkkit-accent-color);
+  background: var(--label-secondary);
   -webkit-mask: center / contain no-repeat;
   mask: center / contain no-repeat;
 }
@@ -223,7 +242,6 @@ body {
   flex: 1;
   min-width: 0;
   color: var(--label-primary);
-  font-weight: 500;
 }
 
 #picture-bar button {
@@ -234,9 +252,9 @@ body {
   height: var(--picture-button-height);
   padding: 0 var(--picture-button-padding);
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--picture-button-radius);
   background: var(--picture-button-fill);
-  color: var(--inkkit-accent-color);
+  color: var(--label-primary);
   font: inherit;
   font-size: var(--picture-button-text-size);
   font-weight: var(--picture-button-font-weight);
@@ -251,18 +269,28 @@ body {
   background: var(--picture-button-fill-hover);
 }
 
-/* The close button, as in Mail's banner: a grey circle with an x, as tall as the Load button and a little closer to
-   it than the other parts are to each other. It only hides the banner. */
+#picture-bar button:active {
+  background: var(--picture-button-fill-pressed);
+}
+
+/* The close button, MAPP's plain icon button: a circle as tall as the Load button with no fill until the pointer is
+   over it, and a little closer to Load than the other parts are to each other. It only hides the banner. */
 #picture-bar .picture-close {
   width: var(--picture-button-height);
   margin-inline-start: calc(var(--interface-text-size) * -2 / 13);
   padding: 0;
-  background: var(--fill-tertiary);
+  border-radius: 50%;
+  background: transparent;
   color: var(--label-secondary);
 }
 
 #picture-bar .picture-close:hover {
-  background: var(--fill-secondary);
+  background: color-mix(in srgb, CanvasText 4.7%, transparent);
+  color: var(--label-primary);
+}
+
+#picture-bar .picture-close:active {
+  background: color-mix(in srgb, CanvasText 9.8%, transparent);
 }
 
 .picture-close-icon {

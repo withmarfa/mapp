@@ -46,8 +46,9 @@ export type Ask = typeof askPicture
  * has of a picture. An `http` address is asked for too, and the app refuses it with a reason the card shows.
  *
  * Each picture is in one state: not loaded (`waiting`, or `off` where Settings says Never), loading, loaded or
- * refused. A picture that is `waiting` or `loading` is Inkkit's placeholder, one quiet line in the text: a picture
- * symbol, the picture's description (or its website when it has none) and, while it waits, a Load button at the end,
+ * refused. A picture that is `waiting` or `loading` is Inkkit's placeholder, one full-width outlined row in the text: a
+ * picture symbol, the picture's description (or its website when it has none) and, while it waits, a Load button at
+ * the row's trailing end,
  * which fires the adapter's `open` for that picture alone and loads only it; the banner's Load Pictures button
  * loads them all. A loading one names the same picture ("Loading <description>…", so several loading together read
  * apart), with no button, in the same line. The line's look is `--inkkit-file-placeholder-*` tokens in `style.css`. A picture that is `off` or `refused` keeps Inkkit's default card, readable, with its Open arrow. A

@@ -76,7 +76,7 @@ The choices are stored as `pagePlacements`. See [Settings storage](settings-stor
 
 A page for a saved web page shows its description under the title (`ReadingHeader`). The Reader and Original switch sits in the page's corner for a page with an article ([The page's corner](#the-pages-corner)), never in the toolbar. The byline above its title is agreed and not built; see Header.
 
-Pictures from other websites wait until the person loads them. The banner ("N pictures from other websites aren't loaded", with Load All) sits above the title, on a web page's page (`PicturesWaitingCallout`) and the editor's page (`#picture-bar`) alike. Each picture that is not loaded is one quiet line in the system font, never the page's reading font: a picture symbol, its description and a small Load button. A picture whose description repeats the item's title says "Picture". This is display only: the item's Markdown is never rewritten.
+Pictures from other websites wait until the person loads them. The banner ("N pictures from other websites aren't loaded", with Load All) sits above the title, on a web page's page (`PicturesWaitingCallout`) and the editor's page (`#picture-bar`) alike. Each picture that is not loaded is one full-width row with a hairline outline, in the system font and the secondary color, never the page's reading font: a picture symbol, its description and, at the row's trailing end, MAPP's small gray Load button. The banner is a quiet fill with a gray picture symbol, the sentence in the primary color, the same gray button and a plain round close button. A picture whose description repeats the item's title says "Picture". This is display only: the item's Markdown is never rewritten.
 
 ## The page's corner
 
