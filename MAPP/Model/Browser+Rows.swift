@@ -1,12 +1,14 @@
 import Foundation
 
 extension Browser {
-    /// What the list tells its rows about itself: whether its rows name their type, which date it is sorted by, and the day.
+    /// What the list tells its rows about itself: whether its rows name their type, which date it is sorted by, whether they
+    /// show a picture (a Standard list's do) and the day.
     /// A list grouped by type names each type once, in its group's header, so its rows leave the type off.
     /// It reads the items shown, so it holds for every place, search results and Include Subtypes alike. The sort is the
     /// table's resolved one, since a saved view stores its sort by column identifier alone.
     func rowList(
-        of items: [Item], in library: any ItemLibrary, order: ItemOrder, now: Date, format: DateFormat, calendar: Calendar = .current
+        of items: [Item], in library: any ItemLibrary, order: ItemOrder, now: Date, format: DateFormat, density: Density = .standard,
+        calendar: Calendar = .current
     ) -> RowList {
         let arranged = listShape?.arranged == true && !ordersByRelevance
         var groupedByType = false
@@ -16,6 +18,6 @@ extension Browser {
             date: RowDateSource.of(
                 sort: arranged ? tableContent(in: library).sort.first : nil, order: order,
                 ordersItself: keepsPlaceOrder || ordersByRelevance),
-            format: format, day: calendar.startOfDay(for: now))
+            format: format, showsPictures: density == .standard, day: calendar.startOfDay(for: now))
     }
 }

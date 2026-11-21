@@ -42,6 +42,8 @@ nonisolated struct RowList: Hashable, Sendable {
     /// The date field the list places each item by where the person chose one, nil where each item sits on its type's
     /// look's date. Only a time of that field is left out of the Secondary line.
     var placedField: String?
+    /// Whether the list's rows show a picture, which a Standard list does and a Compact one never does.
+    var showsPictures = false
     /// The start of today, which is all a row's dates need of the moment.
     var day: Date
 }
@@ -82,6 +84,9 @@ nonisolated struct RowContent: Hashable, Sendable {
     /// What Marfa is asked for the counts the look shows, which the view that draws the row wants while it is on screen
     /// (`ItemCounts.want`).
     var countQueries: Set<CountQuery> = []
+    /// What the row makes its small picture from, or nil where the list shows none or the item has no picture to make
+    /// (`RowPicture`).
+    var picture: RowPicture?
 
     /// The most facts a row shows after the status; the rest are counted.
     static let shownFacts = 2
@@ -104,11 +109,13 @@ nonisolated struct RowContent: Hashable, Sendable {
     // MARK: Making
 
     /// `includesDate` is false for a content that never says its date, so the date is not worked out to be dropped.
+    /// `attachments` are the items attached to the item, which the caller reads once and only for a list that shows pictures
+    /// (`RowList.showsPictures`).
     /// `relations` are the item's links as the library holds them now, which the caller works out once for the item
     /// (`ItemLibrary.relations(of:wanting:)`) for the links the look asks for (`TypeLook.relations`).
     static func make(
-        for item: Item, look: TypeLook, catalogue: Catalogue, list: RowList, relations: ItemRelations = .none, showsTime: Bool = false,
-        includesDate: Bool = true, calendar: Calendar = .current, locale: Locale = .current
+        for item: Item, look: TypeLook, catalogue: Catalogue, list: RowList, relations: ItemRelations = .none, attachments: [Item] = [],
+        showsTime: Bool = false, includesDate: Bool = true, calendar: Calendar = .current, locale: Locale = .current
     ) -> RowContent {
         let maker = Maker(
             item: item, info: catalogue.itemTypes[item.type], catalogue: catalogue, list: list, relations: relations, calendar: calendar,
@@ -118,6 +125,7 @@ nonisolated struct RowContent: Hashable, Sendable {
             typeIcon: catalogue.icon(for: item.type), typeLabel: catalogue.label(for: item.type), mixesTypes: list.mixesTypes)
         maker.addBottomLine(of: look, to: &content)
         content.countQueries = look.countQueries
+        content.picture = RowPicture.of(item, attachments: attachments, in: list)
         return content
     }
 

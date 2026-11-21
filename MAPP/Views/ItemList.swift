@@ -30,10 +30,10 @@ struct ItemList: View, Equatable {
         // Each row's content is worked out once for the item as it is and held by the browser, so a change of selection or
         // of one item makes the content of that row alone, and a row's body looks nothing up.
         let lines = ListLine.lines(of: sections)
-        let list = browser.rowList(of: items, in: library, order: order, now: now, format: dateFormat)
-        let contents = browser.rowContents.contents(of: lines.compactMap(\.entry), in: library, looks: browser.looks(in: library), list: list)
         let _ = placeDensities
         let density = browser.density ?? settingsDensity
+        let list = browser.rowList(of: items, in: library, order: order, now: now, format: dateFormat, density: density)
+        let contents = browser.rowContents.contents(of: lines.compactMap(\.entry), in: library, looks: browser.looks(in: library), list: list)
         let results = browser.searchResults(in: library)
         let excerpts = results?.excerpts ?? [:]
         let isPending = results?.isPending == true
