@@ -157,16 +157,17 @@ struct SettingsStateContent: View {
     let title: Text
     var line: Text?
     var action: (title: LocalizedStringKey, perform: () -> Void)?
-    /// Where the words stand in a card (a list with nothing in it), which the boards draw tighter than a page's own state: the
-    /// symbol 6 points and the line 4 points nearer the title.
+    /// Where the words stand in a card (a list with nothing in it), which the boards draw tighter than a page's own state.
     var isInCard = false
 
+    private typealias Gap = SettingsTokens.Metric.State
+
     var body: some View {
-        VStack(spacing: isInCard ? 4 : 8) {
+        VStack(spacing: isInCard ? Gap.cardSpacing : Gap.spacing) {
             Image(systemName: symbol)
-                .font(.system(size: 29, weight: .light))
+                .font(.system(size: Gap.glyph, weight: .light))
                 .foregroundStyle(SettingsTokens.tertiaryText)
-                .padding(.bottom, isInCard ? 4 : 6)
+                .padding(.bottom, isInCard ? Gap.cardSymbolGap : Gap.symbolGap)
                 .accessibilityHidden(true)
             title.settingsFont(.stateTitle).multilineTextAlignment(.center)
             if let line {
@@ -177,7 +178,7 @@ struct SettingsStateContent: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let action {
-                SettingsButton(action.title, action: action.perform).padding(.top, isInCard ? 16 : 12)
+                SettingsButton(action.title, action: action.perform).padding(.top, isInCard ? Gap.cardActionGap : Gap.actionGap)
             }
         }
         .frame(maxWidth: SettingsTokens.Metric.stateMeasure)

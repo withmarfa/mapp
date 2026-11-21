@@ -1621,14 +1621,6 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(OwnerWording.line(.unsupported) == InstanceConfigFailure.unsupported.message)
     }
 
-    @Test func aConcernOpensThePageThatDealsWithIt() {
-        #expect(AttentionConcern(kind: .key, reference: "key-1", title: "").page == .keys)
-        #expect(AttentionConcern(kind: .folder, reference: "f", title: "").page == .folders)
-        #expect(AttentionConcern(kind: .setting, reference: "heartbeat_url", title: "").page == .monitoring)
-        #expect(AttentionConcern(kind: .setting, reference: "object_store_secret_key", title: "").page == nil)
-        #expect(AttentionConcern(kind: .connector, reference: "rss", title: "").page == nil)
-    }
-
     @Test func aConflictIsChangedElsewhereOnlyWhereTheCallSaysSo() {
         func answer(_ code: String) -> MarfaError { .server(status: 409, code: code, message: "The server’s words.", details: nil, server: nil) }
         #expect(ClientOwnerCalls.failure(answer("sign_in_address_check_failed")) == .refused("The server’s words."))

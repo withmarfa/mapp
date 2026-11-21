@@ -200,9 +200,6 @@
     "%@ you make show here." : {
 
     },
-    "%@ is ready" : {
-
-    },
     "%@ of %@ selected" : {
 
     },
@@ -5212,9 +5209,6 @@
     "Property Not Saved" : {
       "extractionState" : "manual"
     },
-    "Published %@." : {
-
-    },
     "Question" : {
       "extractionState" : "manual"
     },
@@ -7039,9 +7033,6 @@
     "MAPP isn’t allowed to make keys." : {
 
     },
-    "MAPP isn’t allowed to read the jobs this Marfa runs by itself." : {
-
-    },
     "Made %@." : {
 
     },
@@ -7865,9 +7856,6 @@
 
     },
     "“%@” was attached to “%@” but isn’t in its text. It was meant for a folded section or text not yet shown." : {
-
-    },
-    "%@ is ready." : {
 
     },
     "%@%@ files nothing uses" : {
@@ -8708,9 +8696,6 @@
     "MAPP isn’t allowed to read the settings the server started with." : {
 
     },
-    "MAPP isn’t allowed to see or change how the server is monitored." : {
-
-    },
     "MAPP isn’t allowed to see or change how the server keeps files." : {
 
     },
@@ -8760,6 +8745,12 @@
 
     },
     "You closed Settings before saving the changes to the server’s settings." : {
+
+    },
+    "MAPP isn’t allowed to read the jobs the server runs by itself." : {
+
+    },
+    "MAPP isn’t allowed to see or change how the server is monitored." : {
 
     }
   },

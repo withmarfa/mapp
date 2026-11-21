@@ -249,7 +249,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .updates: String(localized: "MAPP isn’t allowed to read whether a newer Marfa is ready.")
         case .housekeeping: String(localized: "MAPP isn’t allowed to read the jobs the server runs by itself.")
         case .activity: String(localized: "MAPP isn’t allowed to read the server’s audit log.")
-        case .monitoring: String(localized: "MAPP isn’t allowed to see or change how this Marfa is monitored.")
+        case .monitoring: String(localized: "MAPP isn’t allowed to see or change how the server is monitored.")
         case .limits: String(localized: "MAPP isn’t allowed to see or change the server’s limits.")
         case .startUp: String(localized: "MAPP isn’t allowed to read the settings the server started with.")
         }

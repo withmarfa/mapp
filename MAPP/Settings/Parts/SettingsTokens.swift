@@ -137,11 +137,16 @@ enum SettingsTokens {
         /// A log table's count bar and foot, which sit closer than a table with selection and actions.
         static let logTableBar: CGFloat = 34
         static let logTableFoot: CGFloat = 44
-        /// The narrow columns of a table of jobs, which put the table's later columns at the board's proportions in a full-width
-        /// card: how often, when it last ran, and how it went.
-        static let columnEvery: CGFloat = 88
-        static let columnLastRun: CGFloat = 108
-        static let columnResult: CGFloat = 66
+        /// The words of a state: the symbol's size, and the gaps between its symbol, title, line and action, on a page and in a card.
+        enum State {
+            static let glyph: CGFloat = 29
+            static let spacing: CGFloat = 8
+            static let symbolGap: CGFloat = 6
+            static let actionGap: CGFloat = 12
+            static let cardSpacing: CGFloat = 4
+            static let cardSymbolGap: CGFloat = 4
+            static let cardActionGap: CGFloat = 16
+        }
         /// A table's header band.
         static let tableHeader: CGFloat = 30
         /// A table row's height: in a section, and on a page of its own, which draws them closer.

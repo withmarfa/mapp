@@ -93,7 +93,6 @@ struct OverviewPage: View {
         default:
             []
         }
-        return [SettingsProblemAction(title) { host.show(page) }]
     }
 
     // MARK: This Marfa

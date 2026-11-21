@@ -68,7 +68,7 @@ struct HousekeepingPage: View {
                     SettingsProblemRow(
                         title: Text("\(host.serverName) took another date"),
                         line: Text("You were shown \(Self.date(instead.shown)), and its clock read \(Self.date(instead.confirmed)) when it confirmed."),
-                        tone: .orange, actions: [])
+                        actions: [])
                 }
                 if let error = model.confirmError {
                     OwnerProblemRow(title: "Couldn’t Confirm the Date", failure: error, page: .housekeeping, host: host)
@@ -94,14 +94,14 @@ struct HousekeepingPage: View {
     private var columns: [SettingsTableColumn<HousekeepingJob>] {
         [
             SettingsTableColumn("Job") { Text(verbatim: UpkeepWording.jobTitle($0.name)) },
-            SettingsTableColumn("Every", width: SettingsTokens.Metric.columnEvery) {
+            SettingsTableColumn("Every", width: SettingsTokens.Metric.Column.day) {
                 Text(verbatim: UpkeepWording.every($0.intervalSeconds)).foregroundStyle(SettingsTokens.secondaryText)
             },
-            SettingsTableColumn("Last Run", width: SettingsTokens.Metric.columnLastRun) { job in
-                Text(verbatim: job.lastFinished.map { UpkeepWording.moment($0, hasTime: job.lastFinishedHasTime) } ?? "")
+            SettingsTableColumn("Last Run", width: SettingsTokens.Metric.Column.label) { job in
+                Text(verbatim: job.lastFinished.map { UpkeepWording.moment($0, hasTime: job.lastFinishedHasTime) } ?? String(localized: "Not Yet"))
                     .foregroundStyle(SettingsTokens.secondaryText)
             },
-            SettingsTableColumn("Result", width: SettingsTokens.Metric.columnResult) { Text(verbatim: UpkeepWording.result($0.outcome)).foregroundStyle(SettingsTokens.secondaryText) },
+            SettingsTableColumn("Result", width: SettingsTokens.Metric.Column.state) { Text(verbatim: UpkeepWording.result($0.outcome)).foregroundStyle(SettingsTokens.secondaryText) },
         ]
     }
 

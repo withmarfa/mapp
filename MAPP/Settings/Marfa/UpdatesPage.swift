@@ -100,7 +100,7 @@ struct UpdatesPage: View {
     private func marfa(_ status: UpdateStatus) -> some View {
         SettingsSection("Marfa") {
             SettingsRow(title: title(status), line: Text(verbatim: line(status))) {
-                HStack(spacing: 8) {
+                HStack(spacing: SettingsTokens.Metric.buttonGap) {
                     if model.needsMaintain {
                         SettingsButton("Allow More…") { host.askForMore(naming: InstancePermission.instanceMaintain.rawValue) }
                     } else {
@@ -121,12 +121,12 @@ struct UpdatesPage: View {
                 }
             }
             if model.ready != nil, !status.updatesItself, let step = status.step, !step.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetLabelSpacing) {
                     Text("The Server’s Steps").settingsFont(.title).foregroundStyle(SettingsTokens.primaryText)
                     SettingsReadOnlyValue(text: step)
                 }
                 .padding(.horizontal, SettingsTokens.Metric.inset)
-                .padding(.vertical, 10)
+                .padding(.vertical, SettingsTokens.Metric.cardGap)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             SettingsRow("Check Automatically", line: model.status?.checksAutomatically == false ? "Turned off." : "Every few hours.") {
