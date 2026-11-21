@@ -24,7 +24,7 @@ Column widths are `interfaceDefaultWidth.<column>`, and the right sidebar's widt
 
 ## Reset
 
-Settings > General > Reset MAPP's Settings… clears every key in `MacSettings.keys`, and the keys that come one for each app's inspector, and so removes MAPP's own `NSQuitAlwaysKeepsWindows`, which puts Reopen Windows back to the Mac's answer. It leaves the copy of the library, its queue, the sign-in, the connection (the server's address and its names) and any value set aside under a `...SetAside` key. One list holds the keys, which the Reset and the sample library's clean start both read: a new setting stored on this Mac is added to `MacSettings.keys` in the same change, and a test checks that each group of keys is in it.
+Settings > General > Reset MAPP's Settings… clears every key in `MacSettings.keys`, and the keys that come one for each app's inspector, and so removes MAPP's own `NSQuitAlwaysKeepsWindows`, which puts Reopen Windows back to the Mac's answer. It leaves the copy of the library, its queue, the sign-in, the connection (the server's address and its names) and any value set aside under a `...SetAside` key. The shortcuts held in memory are put back with it (`Libraries.resetMacSettings`), so the menus and the hot keys follow at once. One list holds the keys, which the Reset and the sample library's clean start both read: a new setting stored on this Mac is added to `MacSettings.keys` in the same change, and a test checks that each group of keys is in it.
 
 ## Rules
 

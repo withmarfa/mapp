@@ -164,6 +164,8 @@ enum SettingsTokens {
         static let previewHeading: CGFloat = 0.55
         /// The space between a page's sections, and above and below its column.
         static let pageSpacing: CGFloat = 32
+        /// The space between a card and the row of buttons under it, which sit nearer than a section does.
+        static let barGap: CGFloat = 14
         static let pageTop: CGFloat = 16
         static let pageBottom: CGFloat = 58
         /// A count badge's side padding, smallest size and a dot badge's size.

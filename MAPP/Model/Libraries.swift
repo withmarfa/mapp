@@ -53,6 +53,8 @@ import os
     /// The value panel open, if any, whose typed text is written or handed back before anything else changes.
     private let valuePanels: ValueEditPresenter
 
+    private let defaults: UserDefaults
+
     init(
         host: MarfaHost, defaults: UserDefaults = .standard,
         handOverPages: ((@escaping (Bool) -> Void) -> Void)? = nil,
@@ -60,6 +62,7 @@ import os
         hotKeys: any HotKeyRegistrar = NoHotKeys()
     ) {
         self.host = host
+        self.defaults = defaults
         self.valuePanels = valuePanels
         self.handOverPages = handOverPages.map { injected in { _, done in injected(done) } }
             ?? { trace, done in EditorController.flushAll(trace: trace, then: done) }
@@ -74,6 +77,14 @@ import os
         isLaunching = host.configuredConnection != nil
         host.handOverEdits = { [weak self] in await self?.flushEditors() ?? false }
         LaunchTrace.shared.mark(.librariesInit, note: isLaunching ? "server set" : "no server")
+    }
+
+    /// Puts every setting on this Mac back (`MacSettings`) and the shortcuts already held in memory with it, so the menus
+    /// and the hot keys change at once and nothing writes the old choices back.
+    func resetMacSettings() {
+        shortcuts.restoreDefaults()
+        anyAppShortcuts.clearAll()
+        MacSettings.reset(in: defaults)
     }
 
     /// Opens the saved server's copy and paints from it before the network is asked anything.

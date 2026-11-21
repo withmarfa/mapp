@@ -753,7 +753,7 @@ struct CommandPalette: View {
                 for format in [Format.title, .heading, .subheading, .heading4, .heading5, .heading6, .body, .bold, .italic,
                                .strikethrough, .highlight, .code, .link, .codeBlock, .quote, .bulletList, .orderedList, .checklist, .table]
                 where format != .table || !editor.caret.inTable {
-                    add(String(localized: format.title), "textformat", keys(.format(format)), in: .format) { editor.apply(format) }
+                    add(ShortcutCommand.format(format).title, "textformat", keys(.format(format)), in: .format) { editor.apply(format) }
                 }
             }
         }

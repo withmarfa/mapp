@@ -91,7 +91,7 @@ nonisolated enum Format: CaseIterable, Hashable {
         case .bulletList: ("7", [.command, .shift])
         case .orderedList: ("9", [.command, .shift])
         case .checklist: ("l", [.command, .shift])
-        case .table: ("t", [.command, .option])
+        case .table: ("t", [.control, .command])
         default: nil
         }
     }

@@ -79,8 +79,10 @@ nonisolated extension ShortcutCommand {
     /// A Format command, with the shortcut Notes gives it where Notes has one.
     static func format(_ format: Format) -> ShortcutCommand {
         let id = "format." + String(describing: format)
-        guard let shortcut = format.shortcut else { return ShortcutCommand(id, in: .format, String(localized: format.title)) }
-        return ShortcutCommand(id, in: .format, String(localized: format.title), String(shortcut.key), ShortcutModifiers(shortcut.modifiers))
+        // The menu's Table submenu opens with Insert Table, and the page names the command the same way.
+        let title = format == .table ? String(localized: "Insert Table") : String(localized: format.title)
+        guard let shortcut = format.shortcut else { return ShortcutCommand(id, in: .format, title) }
+        return ShortcutCommand(id, in: .format, title, String(shortcut.key), ShortcutModifiers(shortcut.modifiers))
     }
 
     /// Every command, in the order of the menus.

@@ -84,7 +84,7 @@ struct SettingsDetail: View {
     var body: some View {
         Group {
             switch navigation.page {
-            case .general: GeneralPage()
+            case .general: GeneralPage(libraries: libraries)
             case .appearance: AppearancePage()
             case .keyboard: KeyboardPage(libraries: libraries)
             case .lists: ListsPage()

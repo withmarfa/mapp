@@ -68,7 +68,7 @@ extension SettingsSection where Accessory == EmptyView {
     }
 }
 
-/// The white card with a hairline that holds a section's rows, with a rule between each pair. A thing's head card and a
+/// The white card with a hairline that holds a section's rows, with a rule between each pair, drawn inside the lower row. A thing's head card and a
 /// table use it on their own.
 struct SettingsCard<Content: View>: View {
     @ViewBuilder let content: Content
@@ -77,15 +77,18 @@ struct SettingsCard<Content: View>: View {
         VStack(spacing: 0) {
             Group(subviews: content) { rows in
                 ForEach(rows.indices, id: \.self) { index in
-                    if index > 0 {
-                        Rectangle()
-                            .fill(SettingsTokens.rule)
-                            .frame(height: 1)
-                            .padding(.leading, rows[index].containerValues.settingsRuleInset)
-                            .padding(.trailing, SettingsTokens.Metric.inset)
-                            .accessibilityHidden(true)
-                    }
+                    // The rule sits inside the row's top edge, so a row is its own height, divider included.
                     rows[index]
+                        .overlay(alignment: .top) {
+                            if index > 0 {
+                                Rectangle()
+                                    .fill(SettingsTokens.rule)
+                                    .frame(height: 1)
+                                    .padding(.leading, rows[index].containerValues.settingsRuleInset)
+                                    .padding(.trailing, SettingsTokens.Metric.inset)
+                                    .accessibilityHidden(true)
+                            }
+                        }
                 }
             }
         }

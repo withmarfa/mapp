@@ -4,22 +4,22 @@ import Observation
 /// What a shortcut that works in any app does. Each brings MAPP forward and does its action in the window that was in
 /// front, until a palette can be shown over another app.
 nonisolated enum AnyAppCommand: String, CaseIterable, Sendable {
-    case commandPalette, searchItems, newItem
+    case commandPalette, searchItems, quickAdd
 
     var title: String {
         switch self {
         case .commandPalette: String(localized: "Show Command Palette")
         case .searchItems: String(localized: "Search Items")
-        case .newItem: String(localized: "New Item")
+        case .quickAdd: String(localized: "Quick Add")
         }
     }
 
     /// The line under the title.
     var line: String? {
         switch self {
-        case .commandPalette: String(localized: "Brings MAPP forward.")
-        case .searchItems: String(localized: "Searches every item.")
-        case .newItem: String(localized: "A new item, in the front window.")
+        case .commandPalette: String(localized: "Over whatever you’re doing.")
+        case .searchItems: nil
+        case .quickAdd: String(localized: "A new item, over any app.")
         }
     }
 }

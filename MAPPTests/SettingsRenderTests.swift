@@ -95,7 +95,9 @@ private struct RenderedWindow<Detail: View>: View {
     }
 
     @Test func general() async throws {
-        try await SettingsRender.png(RenderedWindow(selection: .general, detail: GeneralPage()), size: Self.size, named: "General")
+        let (libraries, _) = try await connected()
+        try await SettingsRender.png(
+            RenderedWindow(selection: .general, detail: GeneralPage(libraries: libraries)), size: Self.size, named: "General")
     }
 
     @Test func appearance() async throws {

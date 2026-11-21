@@ -187,6 +187,8 @@ struct SettingsBar<Content: View>: View {
             if edge == .leading { Spacer(minLength: 0) }
         }
         .padding(.horizontal, SettingsTokens.Metric.inset)
+        // The page's spacing puts a section apart from the next; the buttons belong to the card above.
+        .padding(.top, SettingsTokens.Metric.barGap - SettingsTokens.Metric.pageSpacing)
     }
 }
 

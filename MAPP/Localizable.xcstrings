@@ -5596,10 +5596,16 @@
     "%lld shortcuts were imported." : {
 
     },
-    "A new item, in the front window." : {
+    "A new item, over any app." : {
 
     },
-    "Brings MAPP forward." : {
+    "Over whatever you’re doing." : {
+
+    },
+    "Quick Add" : {
+
+    },
+    "Show Toolbar" : {
 
     },
     "Clear Shortcut" : {
@@ -5714,9 +5720,6 @@
 
     },
     "Search by Pressing a Shortcut" : {
-
-    },
-    "Searches every item." : {
 
     },
     "Select All" : {

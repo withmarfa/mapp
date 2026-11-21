@@ -16,7 +16,7 @@ final class FrontBrowser {
         switch command {
         case .commandPalette: browser.palette = .commands
         case .searchItems: browser.palette = .search
-        case .newItem:
+        case .quickAdd:
             guard library.isLoaded else { return }
             browser.openQuickAdd(remembered: UserDefaults.standard.string(forKey: QuickAdd.lastTypeKey), in: library)
         }

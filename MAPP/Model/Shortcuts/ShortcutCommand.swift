@@ -60,6 +60,8 @@ nonisolated enum SystemShortcuts {
             entry(";", .command, String(localized: "Check Document Now")),
             entry(";", [.shift, .command], String(localized: "Show Spelling and Grammar")),
             entry("`", [.shift, .command], String(localized: "Move Between Windows")),
+            // The View menu's, which every window with a toolbar gets from the system.
+            entry("t", [.option, .command], String(localized: "Show Toolbar")),
         ])
     }()
 }

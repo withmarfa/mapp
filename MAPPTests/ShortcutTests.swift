@@ -84,6 +84,22 @@ struct ShortcutTests {
         #expect(defaults.allSatisfy { $0.menuProblem == nil })
     }
 
+    @Test func insertTableHasADefaultNoOtherCommandOrTheSystemHolds() throws {
+        let table = ShortcutCommand.format(.table)
+        let shortcut = try #require(table.defaultShortcut)
+        #expect(table.title == "Insert Table")
+        #expect(shortcut != key("t", [.option, .command]))
+        #expect(SystemShortcuts.owner(of: key("t", [.option, .command])) == "Show Toolbar")
+        #expect(ShortcutCommand.all.filter { $0.defaultShortcut == shortcut }.map(\.id) == [table.id])
+        #expect(SystemShortcuts.owner(of: shortcut) == nil)
+    }
+
+    @Test func theShortcutsInAnyAppAreNamedApartFromTheMenuCommands() {
+        #expect(AnyAppCommand.allCases.map(\.title) == ["Show Command Palette", "Search Items", "Quick Add"])
+        #expect(AnyAppCommand.searchItems.line == nil)
+        #expect(!ShortcutCommand.all.map(\.title).contains("Quick Add"))
+    }
+
     @Test func everyCommandTheMenusBindIsInTheCatalogue() {
         let ids = Set(ShortcutCommand.all.map(\.id))
         for command in ItemCommand.allCases { #expect(ids.contains(command.shortcutCommand.id)) }
@@ -214,12 +230,12 @@ struct ShortcutTests {
         let store = defaults()
         let first = AnyAppShortcuts(defaults: store, registrar: FakeHotKeys())
         first.start()
-        first.set(key("n", [.command, .option], code: 45), for: .newItem)
+        first.set(key("n", [.command, .option], code: 45), for: .quickAdd)
         let hotKeys = FakeHotKeys()
         let second = AnyAppShortcuts(defaults: store, registrar: hotKeys)
         #expect(hotKeys.registered.isEmpty)
         second.start()
-        #expect(hotKeys.registered.keys.sorted { $0.rawValue < $1.rawValue } == [.newItem])
+        #expect(hotKeys.registered.keys.sorted { $0.rawValue < $1.rawValue } == [.quickAdd])
     }
 
     @Test func twoAnyAppCommandsNeverShareKeys() {
@@ -284,7 +300,7 @@ struct ShortcutTests {
         hotKeys.heldByAnotherApp = [held]
         let anyApp = AnyAppShortcuts(defaults: store, registrar: hotKeys)
         anyApp.start()
-        #expect(anyApp.set(held, for: .newItem) == .unavailable)
+        #expect(anyApp.set(held, for: .quickAdd) == .unavailable)
         #expect(store.data(forKey: AnyAppShortcuts.defaultsKey) == nil)
     }
 
@@ -310,7 +326,7 @@ struct ShortcutTests {
     @Test func leavingThePageStopsRecordingAndSearchingByKeysAndWakesTheHotKeys() {
         let hotKeys = FakeHotKeys()
         let (model, _, _) = page(defaults(), hotKeys: hotKeys)
-        model.startRecording(.anyApp(.newItem))
+        model.startRecording(.anyApp(.quickAdd))
         model.pageDidDisappear()
         #expect(model.recording == nil)
         #expect(!hotKeys.isSuspended)
@@ -413,9 +429,9 @@ struct ShortcutTests {
         #expect(result.applied == 1 && result.skipped == 0)
         #expect(bindings.shortcut(for: .newWindow) == key("y", [.command, .option]))
         #expect(bindings.shortcut(for: .refresh) == key("j", [.command, .option]))
-        let anyAppResult = anyApp.apply(["newItem": key("n", [.command, .control], code: 45)])
+        let anyAppResult = anyApp.apply(["quickAdd": key("n", [.command, .control], code: 45)])
         #expect(anyAppResult.applied == 1 && anyAppResult.skipped == 0)
-        #expect(anyApp.shortcut(for: .newItem) != nil)
+        #expect(anyApp.shortcut(for: .quickAdd) != nil)
         #expect(anyApp.shortcut(for: .commandPalette) == key("k", [.command, .control]))
     }
 
@@ -437,7 +453,7 @@ struct ShortcutTests {
             "gone": key("g", [.command, .control], code: 5),
         ])
         #expect(result.applied == 1 && result.skipped == 2)
-        #expect(anyApp.shortcut(for: .newItem) == nil)
+        #expect(anyApp.shortcut(for: .quickAdd) == nil)
     }
 
     // MARK: Search

@@ -146,6 +146,38 @@ struct GeneralSettingsTests {
         #expect(ReopenWindows.stored(in: defaults) == (ReopenWindows.system() ?? ReopenWindows.standard))
     }
 
+    @Test func resetPutsTheLiveShortcutsBackAtOnceAndStoresNothingOfThem() throws {
+        let (defaults, done) = try defaults()
+        defer { done() }
+        let hotKeys = FakeHotKeys()
+        let bench = try HostBench()
+        let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) }, hotKeys: hotKeys)
+        libraries.anyAppShortcuts.start()
+        libraries.shortcuts.set(nil, for: .newItem)
+        libraries.shortcuts.set(Shortcut(key: "j", modifiers: [.command, .option]), for: .refresh)
+        let hotKey = Shortcut(key: "k", modifiers: [.command, .control], keyCode: 40)
+        #expect(libraries.anyAppShortcuts.set(hotKey, for: .commandPalette) == nil)
+        #expect(hotKeys.registered[.commandPalette] == hotKey)
+        #expect(defaults.data(forKey: ShortcutBindings.defaultsKey) != nil)
+        #expect(defaults.data(forKey: AnyAppShortcuts.defaultsKey) != nil)
+
+        libraries.resetMacSettings()
+
+        #expect(libraries.shortcuts.shortcut(for: .newItem) == ShortcutCommand.newItem.defaultShortcut)
+        #expect(libraries.shortcuts.shortcut(for: .refresh) == ShortcutCommand.refresh.defaultShortcut)
+        #expect(libraries.anyAppShortcuts.shortcut(for: .commandPalette) == nil)
+        #expect(hotKeys.registered.isEmpty)
+        #expect(defaults.object(forKey: ShortcutBindings.defaultsKey) == nil)
+        #expect(defaults.object(forKey: AnyAppShortcuts.defaultsKey) == nil)
+    }
+
+    @Test func theShortcutKeysAreInTheResetListAndTheSetAsideOnesAreNot() {
+        #expect(MacSettings.keys.contains(ShortcutBindings.defaultsKey))
+        #expect(MacSettings.keys.contains(AnyAppShortcuts.defaultsKey))
+        #expect(!MacSettings.keys.contains(ShortcutBindings.setAsideKey))
+        #expect(!MacSettings.keys.contains(AnyAppShortcuts.setAsideKey))
+    }
+
     @Test func everyKeyASettingsGroupNamesIsInTheResetList() {
         let groups: [[String]] = [
             OrderKey.all, PageKey.all, ListKey.all, InterfaceKey.all, AppearanceKey.all,
