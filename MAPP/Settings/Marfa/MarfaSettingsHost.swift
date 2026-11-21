@@ -80,10 +80,10 @@ struct MarfaDeletedItem: Identifiable, Hashable {
 
 /// A page of the Marfa's half of Settings, with the owner permission it needs to open.
 nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
-    case overview, account, apps, keys, addresses, recentlyDeleted
+    case overview, account, apps, keys, addresses, recentlyDeleted, webhooks
 
     /// The pages in groups, as the sidebar shows them.
-    static let groups: [[MarfaSettingsPage]] = [[.overview], [.account, .apps, .keys, .addresses], [.recentlyDeleted]]
+    static let groups: [[MarfaSettingsPage]] = [[.overview], [.account, .apps, .keys, .addresses], [.recentlyDeleted], [.webhooks]]
 
     var title: String {
         switch self {
@@ -93,6 +93,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .keys: String(localized: "Keys")
         case .addresses: String(localized: "Addresses")
         case .recentlyDeleted: String(localized: "Recently Deleted")
+        case .webhooks: String(localized: "Webhooks")
         }
     }
 
@@ -104,6 +105,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .keys: "key.fill"
         case .addresses: "globe"
         case .recentlyDeleted: "trash"
+        case .webhooks: "dot.radiowaves.up.forward"
         }
     }
 
@@ -115,6 +117,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .keys: .amber
         case .addresses: .teal
         case .recentlyDeleted: .gray
+        case .webhooks: .pink
         }
     }
 
@@ -127,6 +130,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .apps: .grantsManage
         case .keys: .keysManage
         case .recentlyDeleted: .itemsPurge
+        case .webhooks: .webhooksManage
         }
     }
 
@@ -156,6 +160,11 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
             ]
         case .recentlyDeleted:
             [String(localized: "Deleted Items"), String(localized: "Restore"), String(localized: "Delete Permanently"), String(localized: "Empty Recently Deleted")]
+        case .webhooks:
+            [
+                String(localized: "New Webhook"), String(localized: "Events"), String(localized: "Deliveries"), String(localized: "Redeliver"),
+                String(localized: "Signing Secret"), String(localized: "Sending"),
+            ]
         }
     }
 }

@@ -40,6 +40,11 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var applied: [AddressPlan] = []
         var websitesSent: [[String]] = []
         var gates: [String: OwnerCallGate] = [:]
+        var webhooks: [OwnerWebhook] = []
+        var deliveries: [String: [WebhookDeliveryInfo]] = [:]
+        var webhooksMade: [NewWebhook] = []
+        var webhookChanges: [(id: String, change: WebhookChange)] = []
+        var redelivered: [String] = []
     }
 
     let state = Mutex(State())
@@ -219,6 +224,68 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
             return state.settings
         }
     }
+
+    func webhooks() async throws(OwnerFailure) -> [OwnerWebhook] {
+        try enter("webhooks")
+        return state.withLock { $0.webhooks }
+    }
+
+    func create(_ webhook: NewWebhook) async throws(OwnerFailure) -> CreatedWebhook {
+        let failure = state.withLock { state in
+            state.calls.append("createWebhook")
+            return state.failures["createWebhook"]
+        }
+        await held("createWebhook")
+        if let failure { throw failure }
+        return state.withLock { state in
+            state.webhooksMade.append(webhook)
+            let made = OwnerWebhook(
+                id: "hook-\(state.webhooks.count + 1)", url: webhook.url, events: webhook.events, typeFilter: webhook.typeFilter,
+                secretTail: "8f2c", active: true, created: .now,
+                maker: .init(kind: .app, id: "maker", name: "MAPP"))
+            state.webhooks.append(made)
+            return CreatedWebhook(webhook: made, secret: "whsec_3fKq8Vn2Lp7Xr1Tz9Bm4Yc6Wd0Hs5Ja")
+        }
+    }
+
+    func change(webhook id: String, _ change: WebhookChange) async throws(OwnerFailure) -> OwnerWebhook {
+        try enter("changeWebhook")
+        return try state.withLock { state throws(OwnerFailure) in
+            guard let index = state.webhooks.firstIndex(where: { $0.id == id }) else { throw .notFound }
+            state.webhookChanges.append((id, change))
+            if let url = change.url { state.webhooks[index].url = url }
+            if let events = change.events { state.webhooks[index].events = events }
+            if let filter = change.typeFilter { state.webhooks[index].typeFilter = filter }
+            if let active = change.active { state.webhooks[index].active = active }
+            var answered = state.webhooks[index]
+            answered.maker = nil
+            return answered
+        }
+    }
+
+    func delete(webhook id: String) async throws(OwnerFailure) {
+        try enter("deleteWebhook")
+        try state.withLock { state throws(OwnerFailure) in
+            guard state.webhooks.contains(where: { $0.id == id }) else { throw .notFound }
+            state.webhooks.removeAll { $0.id == id }
+        }
+    }
+
+    func deliveries(of webhook: String) async throws(OwnerFailure) -> [WebhookDeliveryInfo] {
+        try enter("deliveries")
+        return state.withLock { $0.deliveries[webhook] ?? [] }
+    }
+
+    func redeliver(_ delivery: String, of webhook: String) async throws(OwnerFailure) -> WebhookDeliveryInfo {
+        try enter("redeliver")
+        return try state.withLock { state throws(OwnerFailure) in
+            guard let index = state.deliveries[webhook]?.firstIndex(where: { $0.id == delivery }) else { throw .notFound }
+            guard state.deliveries[webhook]?[index].status == .failed else { throw .refused("Only a failed delivery can be sent again.") }
+            state.redelivered.append(delivery)
+            state.deliveries[webhook]?[index].status = .pending
+            return state.deliveries[webhook]![index]
+        }
+    }
 }
 
 /// What a context lends a model in a test, with the grants it holds and what Allow More… answers.
@@ -231,7 +298,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     /// What a page handed over after Settings had closed.
     var late: [OwnerDraft] = []
 
-    init(grants: Set<InstancePermission> = [.signInsManage, .grantsManage, .keysManage, .keysMint, .configManage]) {
+    init(grants: Set<InstancePermission> = [.signInsManage, .grantsManage, .keysManage, .keysMint, .configManage, .webhooksManage]) {
         self.grants = grants
     }
 
@@ -1341,7 +1408,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     }
 
     @Test func theNewPagesAreInTheSidebarInTheBoardsOrder() {
-        #expect(MarfaSettingsPage.groups == [[.overview], [.account, .apps, .keys, .addresses], [.recentlyDeleted]])
+        #expect(MarfaSettingsPage.groups == [[.overview], [.account, .apps, .keys, .addresses], [.recentlyDeleted], [.webhooks]])
         for page in [MarfaSettingsPage.account, .apps, .keys, .addresses] {
             #expect(SettingsPage.marfa(page).matches(page.title))
         }
