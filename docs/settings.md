@@ -1,8 +1,8 @@
 # Settings pages
 
-Status: General and Appearance are built. The other pages are in [Agreed designs](agreed-designs.md#settings) until they are built.
+Status: General, Appearance, Search, On This Mac and Connection are built. The other pages are in [Agreed designs](agreed-designs.md#settings) until they are built.
 
-Where it lives: `GeneralPage`, `AppearancePage`, `StartWith`, `ReopenWindows`, `NewItemType`, `WeekStart`, `DateFormat`, `DateDisplay`, `MissingChoice`, `MacSettings`, `AppTheme`, `AccentChoice`, `HighlightChoice` and `FontChoice`, under `MAPP/Settings/`, `MAPP/Model/` and `MAPP/Views/`.
+Where it lives: `GeneralPage`, `AppearancePage`, `StartWith`, `ReopenWindows`, `NewItemType`, `WeekStart`, `DateFormat`, `DateDisplay`, `MissingChoice`, `MacSettings`, `SearchPage`, `SearchOptions`, `SearchLeaveOutList`, `OnThisMacPage`, `LibraryExport`, `StoreSize`, `ConnectionPage`, `ConnectionStanding`, `ConnectionAccount`, `AppTheme`, `AccentChoice`, `HighlightChoice` and `FontChoice`, under `MAPP/Settings/`, `MAPP/Model/` and `MAPP/Views/`.
 
 Every setting here is a Mac setting, kept in the defaults and never written to Marfa ([Settings storage](settings-storage.md)).
 
@@ -31,6 +31,27 @@ Every setting here is a Mac setting, kept in the defaults and never written to M
 - **Materials.** Value Panels and Palettes: Glass, Solid, and Translucent for palettes.
 - **Window.** Title When Scrolling and Toolbar Background When Scrolling (both for an item's page), and Symbols on Subtypes in the sidebar.
 - **Window Layout.** Where the sidebar and the list start in a new window, with From This Window: Reset puts the built-in widths back, and Use Current Widths keeps the widths of the front window.
+
+## Search
+
+- **Left Out of Search** lists the types and sources this server leaves out. They still show in their own place, in views and in Favorites. It is MAPP's own setting for this server (`SearchLeaveOuts`), applied inside the search call. A type left out takes its subtypes with it, and they are listed under it as left out too. "Leave Out a Type or Source…" is a menu of the types and sources not yet left out. A source the server no longer lists is kept, shown as unknown, and can be removed.
+- **It applies to every search across the whole library**: Search Items, and the items ⌘K matches by title. Both end with "N more in what is left out" and Show, which searches once with nothing left out. A search inside one place or list leaves nothing out, since the person chose that place. Collection and Updated in Search Items still narrow after the 500 results, since the filter grammar has no parentheses.
+- **Include.** Archived Items and Inbox Items are on by default. Off, they are asked of the copy in the search call itself (`ItemQuery.states` is active only, `ItemQuery.tier` is the library tier), so the most a search lists is counted after them. The Inbox is the feed tier.
+- **Results.** Order is Best Match, as the copy ranked them, or Most Recent, by when each was last edited; the sort runs on the up to 500 the copy answered, then the first 50 are listed. Show Snippets off gives Search Items one line to a row, with no words around the match.
+
+## On This Mac
+
+- **The head** says how much room the copy of this library takes: every file in its store folder, which MAPP sums itself, since the package reports downloaded files only.
+- **Files.** Keep Opened Files is the size the downloaded files may reach (Automatic, a size, or Keep All Downloads). Attachments are always kept so they open offline, and are counted, with the ones not yet offline and why. Opened Files shows their size, and Clear fetches again only what is needed: it keeps attachments and files waiting to upload. There is no "recent files only".
+- **Export Everything** asks for a folder and writes the server's whole archive there (`GET /export`, as an archive with files), named after the server and the day. It needs the server; it is written beside its name and moved into place only once whole, and a failure says so in one line and leaves no file.
+- **Download Everything Again** asks first, then hydrates the copy again from the server. Changes not yet sent stay in the queue and are sent afterwards; the queue is never cleared.
+
+## Connection
+
+- **The head** names the server and how it stands: Connected with how long ago it was up to date, Not Answering with Try Again, or Sign In… and Use a Code Instead… once the server has ended the sign-in. A copy that stopped shows no download progress.
+- **Account.** Signed In As (where the server tells the owner's name to this sign-in), Look After This Marfa ("MAPP holds N of the owner's 13 permissions" with Allow More…, or All 13) and Unsent Changes. The 13 are the owner's permissions without `sign_ins.manage`, which is asked for from Account only. Allow More… asks again for them all. Problems, the changes that need the person, follow Account.
+- **Other Marfas** and **Disconnect** follow every rule of [Marfa library](../MAPP/Model/Marfa/AGENTS.md): the queue is read in the same step, and the Departure sheet asks about changes that wait. Disconnect asks first with an alert.
+- **Not built.** The section "MAPP's Settings" and the alert's "Also remove MAPP's settings" wait for settings to sync through Marfa ([Agreed designs](agreed-designs.md#settings-sync-through-marfa)). The state after the sign-in address changed (a head that says where the server moved to) is not built: MAPP cannot learn the new address.
 
 ## Related pages
 

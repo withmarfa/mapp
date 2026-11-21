@@ -3,7 +3,7 @@ import Foundation
 /// A page of Settings: one of MAPP's own, or one of the Marfa's. The window lists a page only once it exists, so a later
 /// piece adds its pages here and to the sidebar's groups, and nothing else.
 nonisolated enum SettingsPage: Hashable, Sendable {
-    case general, appearance, keyboard, lists, editor, connection
+    case general, appearance, keyboard, lists, editor, search, onThisMac, connection
     case marfa(MarfaSettingsPage)
 
     static let overview = SettingsPage.marfa(.overview)
@@ -14,7 +14,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
     static let recentlyDeleted = SettingsPage.marfa(.recentlyDeleted)
 
     /// MAPP's pages as the sidebar lists them, in groups split by space.
-    static let mappGroups: [[SettingsPage]] = [[.general, .appearance, .keyboard], [.editor, .lists], [.connection]]
+    static let mappGroups: [[SettingsPage]] = [[.general, .appearance, .keyboard], [.editor, .lists, .search], [.onThisMac, .connection]]
     /// The Marfa's pages, in groups.
     static let marfaGroups: [[SettingsPage]] = MarfaSettingsPage.groups.map { $0.map(SettingsPage.marfa) }
 
@@ -33,6 +33,8 @@ nonisolated enum SettingsPage: Hashable, Sendable {
         case .keyboard: "keyboard"
         case .lists: "lists"
         case .editor: "editor"
+        case .search: "search"
+        case .onThisMac: "onThisMac"
         case .connection: "connection"
         case .marfa(let page): page.rawValue
         }
@@ -45,6 +47,8 @@ nonisolated enum SettingsPage: Hashable, Sendable {
         case .keyboard: String(localized: "Keyboard")
         case .lists: String(localized: "Lists")
         case .editor: String(localized: "Editor")
+        case .search: String(localized: "Search")
+        case .onThisMac: String(localized: "On This Mac")
         case .connection: String(localized: "Connection")
         case .marfa(let page): page.title
         }
@@ -57,6 +61,8 @@ nonisolated enum SettingsPage: Hashable, Sendable {
         case .keyboard: "keyboard"
         case .lists: "list.bullet"
         case .editor: "square.and.pencil"
+        case .search: "magnifyingglass"
+        case .onThisMac: "laptopcomputer"
         case .connection: "antenna.radiowaves.left.and.right"
         case .marfa(let page): page.symbol
         }
@@ -69,6 +75,8 @@ nonisolated enum SettingsPage: Hashable, Sendable {
         case .keyboard: .indigo
         case .lists: .orange
         case .editor: .amber
+        case .search: .teal
+        case .onThisMac: .gray
         case .connection: .green
         case .marfa(let page): page.tone
         }
@@ -103,10 +111,23 @@ nonisolated enum SettingsPage: Hashable, Sendable {
                 String(localized: "Page Width"), String(localized: "Standard Width"), String(localized: "Title Length"),
                 String(localized: "Text Size"), String(localized: "Check Spelling While Typing"), String(localized: "Links"),
             ]
+        case .search:
+            [
+                String(localized: "Left Out of Search"), String(localized: "Leave Out a Type or Source"), String(localized: "Archived Items"),
+                String(localized: "Inbox Items"), String(localized: "Order"), String(localized: "Best Match"), String(localized: "Most Recent"),
+                String(localized: "Show Snippets"),
+            ]
+        case .onThisMac:
+            [
+                String(localized: "Space Used"), String(localized: "Keep Opened Files"), String(localized: "Attachments"),
+                String(localized: "Opened Files"), String(localized: "Remove Downloaded Files"), String(localized: "Export Everything"),
+                String(localized: "Download Everything Again"),
+            ]
         case .connection:
             [
-                String(localized: "Server"), String(localized: "Address"), String(localized: "Sign In"), String(localized: "Disconnect"),
-                String(localized: "Downloaded Files"), String(localized: "Use Another Marfa"),
+                String(localized: "Server"), String(localized: "Address"), String(localized: "Sign In"), String(localized: "Signed In As"),
+                String(localized: "Look After This Marfa"), String(localized: "Unsent Changes"), String(localized: "Use Another Marfa"),
+                String(localized: "Disconnect"),
             ]
         case .marfa(let page): page.searchWords
         }

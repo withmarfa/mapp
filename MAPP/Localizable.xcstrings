@@ -52,6 +52,12 @@
     "%lld to %lld points" : {
 
     },
+    " " : {
+
+    },
+    "%@ on This Mac" : {
+
+    },
     "%lld were skipped: MAPP no longer has their commands, or their keys can’t be used." : {
 
     },
@@ -67,13 +73,22 @@
     "A search can limit itself to ten types at most." : {
 
     },
-    "A Marfa server’s address." : {
-
-    },
     "A Source" : {
 
     },
+    "A source." : {
+
+    },
+    "A source. %@ items." : {
+
+    },
     "A Type" : {
+
+    },
+    "A type, with those under it." : {
+
+    },
+    "A type." : {
 
     },
     "A View" : {
@@ -100,10 +115,19 @@
     "After you quit MAPP." : {
 
     },
+    "All %lld" : {
+
+    },
     "All Deleted Items" : {
 
     },
     "Allow More…" : {
+
+    },
+    "Always kept, so they open offline." : {
+
+    },
+    "An archive %@, or any Marfa, can restore." : {
 
     },
     "Another app already uses %@." : {
@@ -118,6 +142,12 @@
     "All Types" : {
 
     },
+    "Archived Items" : {
+
+    },
+    "Attachments Not Yet Offline" : {
+
+    },
     "Behind a date, a status or a tag you change." : {
 
     },
@@ -130,7 +160,13 @@
     "At least %lld more in %@, left out of search." : {
 
     },
+    "Best Match" : {
+
+    },
     "Blue" : {
+
+    },
+    "Changes not yet sent are kept." : {
 
     },
     "Check Document Now" : {
@@ -140,6 +176,9 @@
       "extractionState" : "manual"
     },
     "Choose one item to read or edit it." : {
+
+    },
+    "Choose where to save the archive." : {
 
     },
     "Choose…" : {
@@ -178,10 +217,37 @@
     "Connect to a Marfa in Connection to see this page." : {
 
     },
+    "Connect to a Marfa in Connection to see what MAPP keeps of it." : {
+
+    },
     "Connection" : {
 
     },
     "Couldn’t Confirm the Sign-In" : {
+
+    },
+    "Couldn’t export." : {
+
+    },
+    "Couldn’t export. %@ didn’t send the archive." : {
+
+    },
+    "Couldn’t export. %@ isn’t answering." : {
+
+    },
+    "Couldn’t export. MAPP can’t write to that folder." : {
+
+    },
+    "Couldn’t export. MAPP couldn’t write to that folder." : {
+
+    },
+    "Couldn’t export. MAPP isn’t allowed to export %@." : {
+
+    },
+    "Couldn’t export. Sign in again in Connection first." : {
+
+    },
+    "Couldn’t Read Downloaded Files" : {
 
     },
     "Couldn’t Sign In" : {
@@ -220,7 +286,91 @@
     "Custom Color" : {
 
     },
+    "Disconnect from %@?" : {
+
+    },
+    "Download Again" : {
+
+    },
+    "Download Again…" : {
+
+    },
+    "Download Everything Again" : {
+
+    },
+    "Download Everything Again?" : {
+
+    },
+    "Downloading library… %@" : {
+
+    },
+    "Export" : {
+
+    },
+    "Export Everything" : {
+
+    },
+    "Export…" : {
+
+    },
+    "Fetched again when you open them." : {
+
+    },
+    "Inbox Items" : {
+
+    },
+    "Include" : {
+
+    },
+    "Keep All Downloads" : {
+
+    },
+    "Keep Opened Files" : {
+
+    },
+    "Kept here so MAPP works offline and searches fast." : {
+
+    },
+    "Leave Out a Type or Source" : {
+
+    },
+    "Leave Out a Type or Source…" : {
+
+    },
+    "Left Out of Search" : {
+
+    },
+    "Left out with %@" : {
+
+    },
     "Show Matches Left Out of Search" : {
+
+    },
+    "Show Snippets" : {
+
+    },
+    "Sign In…" : {
+
+    },
+    "Signed In As" : {
+
+    },
+    "Signed out. This Mac’s copy is kept." : {
+
+    },
+    "Space Used" : {
+
+    },
+    "Start Again" : {
+
+    },
+    "Stop Leaving Out" : {
+
+    },
+    "The least used go first when there’s no room." : {
+
+    },
+    "The owner’s permissions MAPP holds." : {
 
     },
     "Sign out “%@”?" : {
@@ -362,9 +512,6 @@
 
     },
     "MAPP keeps trying." : {
-
-    },
-    "MAPP opens the server’s own page to sign in and never sees your password." : {
 
     },
     "MAPP shows one Marfa at a time." : {
@@ -517,7 +664,13 @@
     "The sidebar, lists and controls." : {
 
     },
+    "The words that matched, under each result." : {
+
+    },
     "Theme" : {
+
+    },
+    "They still show in their own place, in views and in Favorites." : {
 
     },
     "Time Format" : {
@@ -811,7 +964,25 @@
     "Unknown" : {
 
     },
+    "Unknown source, kept until you remove it." : {
+
+    },
+    "Unknown type, kept until you remove it." : {
+
+    },
     "Unsent Changes" : {
+
+    },
+    "Up to %@ now. %@" : {
+
+    },
+    "Up to date" : {
+
+    },
+    "Up to date %@" : {
+
+    },
+    "Up to date just now" : {
 
     },
     "update the server and run its housekeeping" : {
@@ -836,6 +1007,9 @@
 
     },
     "What a new window shows." : {
+
+    },
+    "What isn’t filed yet." : {
 
     },
     "What went wrong, never your items." : {
@@ -2877,9 +3051,6 @@
     "Disconnect" : {
       "extractionState" : "manual"
     },
-    "Disconnect from this server?" : {
-      "extractionState" : "manual"
-    },
     "Disconnect…" : {
 
     },
@@ -3253,9 +3424,6 @@
     "How a link to another item looks in an item’s text. A link to an item that doesn’t exist keeps its dashed line in every look." : {
       "extractionState" : "manual"
     },
-    "https://marfa.example.com" : {
-      "extractionState" : "manual"
-    },
     "Icon Set" : {
       "extractionState" : "manual"
     },
@@ -3620,9 +3788,6 @@
     "MAPP isn’t signed in to this server. Sign in below." : {
       "extractionState" : "manual"
     },
-    "MAPP keeps its sign-in in your Keychain and renews it itself. Sign in again only to change the account or permissions." : {
-      "extractionState" : "manual"
-    },
     "MAPP kept the copy, because it now holds a different number of changes than you saw." : {
       "extractionState" : "manual"
     },
@@ -3630,9 +3795,6 @@
       "extractionState" : "manual"
     },
     "MAPP reads and writes your library on a Marfa server. Enter its address and sign in from Settings." : {
-      "extractionState" : "manual"
-    },
-    "MAPP removes its copy of your library from this Mac and ends its sign-in, also on the server. Your items on the server don’t change." : {
       "extractionState" : "manual"
     },
     "MAPP tried again and again, and the server never took it. Try again, or copy what you wrote first if you want to keep it." : {
@@ -4532,9 +4694,6 @@
 
     },
     "Sign In" : {
-      "extractionState" : "manual"
-    },
-    "Sign In Again" : {
       "extractionState" : "manual"
     },
     "Sign In and Switch" : {
@@ -5500,9 +5659,6 @@
     "Your Marfa server no longer has this view." : {
       "extractionState" : "manual"
     },
-    "Your Sign-In" : {
-      "extractionState" : "manual"
-    },
     "Your sign-in is sent to %@ without encryption, so anyone on the network can read it. Use an https address unless this network is private." : {
       "extractionState" : "manual"
     },
@@ -5867,6 +6023,54 @@
 
     },
     "Look After This Marfa" : {
+
+    },
+    "MAPP fetches the whole library from %@ again. It keeps working while it downloads." : {
+
+    },
+    "MAPP fetches the whole library from %@ again. The %@ not yet sent stay on this Mac and are sent afterwards." : {
+
+    },
+    "MAPP holds %lld of the owner’s %lld permissions." : {
+
+    },
+    "MAPP removes its copy of %@ from this Mac and ends its sign-in, also on the server. Your items on the server don’t change." : {
+
+    },
+    "MAPP will try again." : {
+
+    },
+    "Most Recent" : {
+
+    },
+    "Needs %@ to answer." : {
+
+    },
+    "Not Answering" : {
+
+    },
+    "Not answering since %@. MAPP keeps trying." : {
+
+    },
+    "Not answering. MAPP keeps trying." : {
+
+    },
+    "On This Mac" : {
+
+    },
+    "Opened Files" : {
+
+    },
+    "Reading Downloaded Files…" : {
+
+    },
+    "Results" : {
+
+    },
+    "Saved as “%@”." : {
+
+    },
+    "Sent when %@ answers." : {
 
     },
     "MAPP can’t reach the server. Nothing was changed." : {

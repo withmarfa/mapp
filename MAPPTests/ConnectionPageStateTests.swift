@@ -1,0 +1,93 @@
+import Foundation
+import Marfa
+import Testing
+@testable import MAPP
+
+/// The head and the Account section of Connection in each state the boards draw (S26 to S30), as words in and out.
+@Suite struct ConnectionPageStateTests {
+    private static let now = Date(timeIntervalSince1970: 1_795_000_000)
+    private static let calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }()
+
+    private func standing(_ state: MarfaConnectionState, report: SyncReport = SyncReport(), synced: Date? = nil) -> ConnectionStanding {
+        ConnectionStanding(
+            state: state, status: SyncStatus(state: state, report: report, now: Self.now), lastSynced: synced, now: Self.now,
+            calendar: Self.calendar, format: DateFormat.standard)
+    }
+
+    @Test func connectedSaysItIsUpToDate() {
+        let state = standing(.online, synced: Self.now.addingTimeInterval(-60))
+        #expect(state.word == "Connected" && state.tone == .ok && state.action == .none)
+        #expect(state.line?.hasPrefix("Up to date") == true)
+    }
+
+    @Test func notAnsweringOffersTryAgainAndSaysSince() {
+        let state = standing(.offline(reason: "refused"), synced: Self.now.addingTimeInterval(-3_600))
+        #expect(state.word == "Not Answering" && state.tone == .warning && state.action == .tryAgain)
+        #expect(state.line?.hasPrefix("Not answering since ") == true && state.line?.hasSuffix("MAPP keeps trying.") == true)
+        #expect(standing(.offline(reason: nil)).line == "Not answering. MAPP keeps trying.")
+    }
+
+    @Test func signedOutOffersSignInAndSaysTheCopyIsKept() {
+        let state = standing(.keyRefused)
+        #expect(state.word == nil && state.action == .signIn && state.tone == .problem)
+        #expect(state.line == "Signed out. This Mac’s copy is kept.")
+    }
+
+    @Test func aLibraryThatCannotBeOpenedIsAProblemWithItsExplanationUnderTheCard() {
+        let state = standing(.unavailable(message: "The store is damaged."))
+        #expect(state.word == "Library unavailable" && state.tone == .problem && state.action == .none)
+        #expect(state.detail?.hasSuffix("The store is damaged.") == true)
+    }
+
+    @Test func accountWithEveryPermissionSaysAllOfThem() {
+        let account = ConnectionAccount(state: .online, grants: Set(InstancePermission.allCases), grantsRead: true, waiting: 0, serverName: "X")
+        #expect(account.showsPermissions && account.holdsAll)
+        #expect(account.permissionsValue == "All 13")
+        #expect(account.unsent == "None")
+    }
+
+    @Test func accountWithoutEveryPermissionSaysHowManyAndOffersMore() {
+        let grants: Set<InstancePermission> = [.itemsPurge, .configManage, .schemaWrite, .auditRead, .keysMint]
+        let account = ConnectionAccount(state: .online, grants: grants, grantsRead: true, waiting: 0, serverName: "X")
+        #expect(!account.holdsAll && account.held == 5)
+        #expect(account.permissionsLine == "MAPP holds 5 of the owner’s 13 permissions.")
+    }
+
+    @Test func signInsManageIsNeverAskedForHereAndNeverCounted() {
+        #expect(!ConnectionAccount.asked.contains(.signInsManage))
+        let account = ConnectionAccount(state: .online, grants: [.signInsManage], grantsRead: true, waiting: 0, serverName: "X")
+        #expect(account.held == 0)
+    }
+
+    @Test func notAnsweringSaysWhatWaitsAndNothingOfPermissions() {
+        let account = ConnectionAccount(state: .offline(reason: nil), grants: [.itemsPurge], grantsRead: true, waiting: 3, serverName: "Castell Studio")
+        #expect(!account.showsPermissions)
+        #expect(account.unsent == "3 changes" && account.unsentLine == "Sent when Castell Studio answers.")
+    }
+
+    @Test func signedOutSaysChangesAreSentOnceSignedInAgain() {
+        let account = ConnectionAccount(state: .keyRefused, grants: [], grantsRead: false, waiting: 3, serverName: "X")
+        #expect(!account.showsPermissions)
+        #expect(account.unsentLine == "Sent once you sign in again.")
+        #expect(ConnectionAccount(state: .keyRefused, grants: [], grantsRead: false, waiting: 0, serverName: "X").unsentLine == nil)
+    }
+
+    @Test func aCopyThatCannotSayWhatWaitsIsUnknownNotNone() {
+        #expect(ConnectionAccount(state: .online, grants: [], grantsRead: true, waiting: nil, serverName: "X").unsent == "Unknown")
+    }
+
+    /// withmarfa/mapp#454: progress stops showing once the copy has stopped.
+    @Test func downloadProgressIsShownOnlyWhileTheCopyCanStillBeFilled() {
+        let filling = LibraryFill(state: .filling, listed: 10, expected: 100)
+        #expect(FillWording.shows(filling, in: .online) && FillWording.shows(filling, in: .connecting))
+        for stopped: MarfaConnectionState in [.unavailable(message: "too old"), .keyRefused, .otherVersion(unsent: nil), .inUse, .offline(reason: nil), .disconnected] {
+            #expect(!FillWording.shows(filling, in: stopped), "\(stopped)")
+        }
+        #expect(!FillWording.shows(LibraryFill(state: .complete), in: .online))
+        #expect(!FillWording.shows(nil, in: .online))
+    }
+}

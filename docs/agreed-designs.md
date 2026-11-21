@@ -46,12 +46,7 @@ Nine pages in three groups: General, Appearance and Keyboard; Editor, Lists, Lay
   - Some of these need Inkkit to add them first: Pair Brackets, Fold Headings, Line Numbers in code blocks, Indent With, Continue Lists in source mode, and a paste default.
 - **Lists.** Density, Dates, Sort and Group. Lists has no setting to leave types or sources out: Items, Inbox and Recents are only the views a library starts with, and leaving things out belongs to Search.
 - **Layouts** (the name people see; it replaces "Rows and Cards" and "Looks"). One place for how each type looks. A type's page has Preview, Row (date, secondary line, color), Facts, Card (picture, facts on cards) and Page (pinned properties, the same as Customize Layout on an item), with Restore Defaults. Export and Import are on the list. The code keeps its names (`TypeLooks`, [Looks](looks.md)); only what people see is renamed.
-- **Search.**
-  - Leave Out of Search, by type and by source. It is MAPP's own setting, applied inside the search.
-  - Include Archived Items and Include Inbox Items.
-  - Results in Best Match or Most Recent order, and Show Snippets.
-- **On This Mac.** The copy of the library MAPP keeps on this Mac: the space it uses, opened files (a size budget and Remove Downloaded Files), export to a folder, and Download Everything Again, which keeps changes not yet sent. "Recent files only" is not offered.
-- **Connection.** As drawn, plus the "MAPP's Settings" section described under sync below.
+- **Search, On This Mac and Connection** are built: see [Settings pages](settings.md). Connection gets the "MAPP's Settings" section described under sync below once that is built.
 
 ### The Marfa's pages
 

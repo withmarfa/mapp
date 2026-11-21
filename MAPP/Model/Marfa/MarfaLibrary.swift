@@ -30,6 +30,7 @@ import Observation
     private(set) var views: [LibraryView] = []
     private(set) var syncReport: SyncReport
     var downloadedFiles: (any DownloadedFiles)? { source.downloadedFiles }
+    func downloadEverythingAgain() { source.downloadEverythingAgain() }
     /// How the server stands, for the app to show beside the library. The library is the one subscriber to the
     /// source's states; the host reads this while the copy is open.
     private(set) var connection: MarfaConnectionState
@@ -1053,7 +1054,7 @@ import Observation
         // nothing of another type and the list does not empty and fill.
         let ids = answered ? held?.found.hits ?? [] : key.asksLeftOut ? [] : lastFound.filter { id in
             guard let item = records[id]?.item else { return false }
-            return key.narrowing.admitsType(item.type, in: catalogue) && key.narrowing.leftOutBy(item, in: catalogue) == nil
+            return key.narrowing.admits(item, in: catalogue)
         }
         var results = SearchResults(isIncomplete: held?.found.isIncomplete ?? false, isCapped: held?.found.isCapped ?? false)
         results.isPending = !answered
@@ -1078,6 +1079,8 @@ import Observation
         guard !expression.matchesNothing else { return nil }
         var query = Self.searchScope
         query.types = expression.types
+        query.states = key.narrowing.searchedStates
+        query.tier = key.narrowing.searchedTier
         return .items(query, filter: expression.filter, limit: key.asksLeftOut ? SearchResults.leftOutLimit : SearchResults.limit)
     }
 

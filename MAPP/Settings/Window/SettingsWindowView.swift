@@ -94,7 +94,9 @@ struct SettingsDetail: View {
             case .keyboard: KeyboardPage(libraries: libraries)
             case .lists: ListsPage()
             case .editor: EditorPage()
-            case .connection: ConnectionPage()
+            case .search: SearchPage()
+            case .onThisMac: OnThisMacPage(openConnection: { navigation.show(.connection) })
+            case .connection: ConnectionPage(settingsHost: host)
             case .marfa(let page): MarfaSettingsPageView(page: page, host: host)
             }
         }
