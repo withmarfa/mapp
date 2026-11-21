@@ -1,9 +1,9 @@
-import CoreGraphics
-
 /// A button in the corner of an item's page, in the order the corner draws them: Focus is always the last.
 nonisolated enum PageCornerButton: Hashable, Sendable {
-    /// Aa, which opens the formats card.
+    /// Aa, which opens the formats bar. Only on a page that can be written.
     case formats
+    /// The text size of a page of text: its size with a menu of sizes and of the page's width.
+    case textSize
     /// Reader or Original, one segmented control.
     case look
     /// A PDF's page as "2 of 4", with arrows.
@@ -16,13 +16,15 @@ nonisolated enum PageCornerButton: Hashable, Sendable {
 /// Which buttons the corner of an item's page holds. Pure, so the rule is tested without a window.
 nonisolated enum PageCorner {
     /// The buttons for a page of `layout`. `hasReader` is whether a web page has a Reader view to switch to; a page
-    /// without one has no switch. Aa is only where the page is the editor, since a page that is not text has no
-    /// formats. `file` is the kind of file the page has ready to view: an image has its size, a PDF its page and its
-    /// size, and a file that is still arriving, failed to load or is neither has neither. Every page has Focus.
-    static func buttons(layout: ItemPageLayout, hasReader: Bool, file: FileViewKind? = nil) -> [PageCornerButton] {
+    /// without one has no switch and no text of the app's to size. `canWrite` is whether the page can be written: Aa
+    /// is only there then, since a page that cannot be written has no formats to apply. Every page of text has its
+    /// size, written or not. `file` is the kind of file the page has ready to view: an image has its size, a PDF its
+    /// page and its size, and a file that is still arriving, failed to load or is neither has neither. Every page has
+    /// Focus.
+    static func buttons(layout: ItemPageLayout, hasReader: Bool, canWrite: Bool = true, file: FileViewKind? = nil) -> [PageCornerButton] {
         switch layout {
-        case .text: [.formats, .focus]
-        case .webPage: hasReader ? [.look, .focus] : [.focus]
+        case .text: canWrite ? [.formats, .textSize, .focus] : [.textSize, .focus]
+        case .webPage: hasReader ? [.look, .textSize, .focus] : [.focus]
         case .file:
             switch file {
             case .image: [.zoom, .focus]
@@ -32,12 +34,10 @@ nonisolated enum PageCorner {
         }
     }
 
-    /// The most room the formats card takes, and the least before it would be too narrow to use, in points.
-    static let cardWidth: CGFloat = 340
-    static let narrowestCard: CGFloat = 220
-
-    /// The card's width for content `width` points wide, with the corner's inset on both sides kept clear.
-    static func cardWidth(forContentWidth width: CGFloat, inset: CGFloat) -> CGFloat {
-        min(cardWidth, max(narrowestCard, width - inset * 2))
+    /// Whether the text size applies to what the page shows. A web page's size is only the Reader view's, since the
+    /// original page is as it was written.
+    static func sizesText(layout: ItemPageLayout, look: SourceViewMode?) -> Bool {
+        if case .webPage = layout { return look == .reader }
+        return true
     }
 }

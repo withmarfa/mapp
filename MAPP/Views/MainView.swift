@@ -236,6 +236,8 @@ struct MainView: View {
 
     private var presentedWindow: some View {
         workspace
+        // The window's toolbar is part of what a modal covers: dimmed and silent, as behind a sheet.
+        .disabled(browser.isModalPresented)
         .escapesFromPage(details)
         .overlay {
             ZStack {

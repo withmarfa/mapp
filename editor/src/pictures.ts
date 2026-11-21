@@ -8,6 +8,8 @@ export interface PictureWords {
   loadAction?: string
   /** The line of a picture being fetched, with `%@` where the picture's description, or its website, goes. */
   loadingNamed?: string
+  /** What a picture is called when its description only repeats the item's title. */
+  picture?: string
   picturesOff?: string
   /** The callout's button for one waiting picture, and for several. */
   loadOnePicture?: string
@@ -44,15 +46,15 @@ export type Ask = typeof askPicture
  * has of a picture. An `http` address is asked for too, and the app refuses it with a reason the card shows.
  *
  * Each picture is in one state: not loaded (`waiting`, or `off` where Settings says Never), loading, loaded or
- * refused. A picture that is `waiting` or `loading` is Inkkit's placeholder, a quiet box in the text: a picture
+ * refused. A picture that is `waiting` or `loading` is Inkkit's placeholder, one quiet line in the text: a picture
  * symbol, the picture's description (or its website when it has none) and, while it waits, a Load button at the end,
  * which fires the adapter's `open` for that picture alone and loads only it; the banner's Load Pictures button
  * loads them all. A loading one names the same picture ("Loading <description>…", so several loading together read
- * apart), with no button, in the same box. The box's look is `--inkkit-file-placeholder-*` tokens in `style.css`. A picture that is `off` or `refused` keeps Inkkit's default card, readable, with its Open arrow. A
+ * apart), with no button, in the same line. The line's look is `--inkkit-file-placeholder-*` tokens in `style.css`. A picture that is `off` or `refused` keeps Inkkit's default card, readable, with its Open arrow. A
  * `refused` picture whose `retry` is set is tried again alone by its Open arrow. Any other card's Open
  * arrow opens the address in the browser (`opensInBrowser`). The page styles none of Inkkit's own classes.
  *
- * The callout above the text (`#picture-bar`) counts the distinct addresses still waiting among the cards drawn, and
+ * The callout at the top of the page, above the title (`#picture-bar`), counts the distinct addresses still waiting among the cards drawn, and
  * so drops as each one is chosen. Its close button (`dismiss`) hides it for the page on show, and nothing the
  * pictures do brings it back; a different item, or the same one opened anew (`opened`), does.
  *
@@ -72,6 +74,11 @@ export class WebPictures {
   private announced = ''
   private dismissed = false
   private scheduled = false
+  /** The item's title, which a picture's description may only repeat. The header owns it and sends it only when it
+   *  changes, so an item change leaves it be: the app may send the new header before or after the item. */
+  private title = ''
+  /** The description each picture on the page was drawn with. */
+  private alts = new Map<string, string | undefined>()
   /** While true the page only wants what the app already holds, as printing and exporting do. */
   cacheOnly = false
 
@@ -96,8 +103,25 @@ export class WebPictures {
     this.item = id
     this.states.clear()
     this.asking.clear()
+    this.alts.clear()
     this.dismissed = false
     this.schedule()
+  }
+
+  /** The item's title, as the header shows it. A waiting or loading picture whose description repeats it is drawn
+   *  again under the generic name, and one that no longer repeats it under its own. Display only: the text is never
+   *  changed. */
+  setTitle(title: string) {
+    if (title === this.title) return
+    const before = this.title
+    this.title = title
+    const changed = [...this.live.keys()].filter((address) => {
+      const kind = this.states.get(address)?.kind
+      if (kind !== 'waiting' && kind !== 'loading') return false
+      const alt = this.alts.get(address)
+      return repeats(alt, before) !== repeats(alt, title)
+    })
+    if (changed.length > 0) this.redraw(changed)
   }
 
   /** The item is opened anew, even if it is the one already on the page: a callout the person closed shows again. */
@@ -121,6 +145,7 @@ export class WebPictures {
     this.track(address, context.signal)
     const shown = label ?? address
     const alt = label?.trim()
+    this.alts.set(address, alt)
     let state = this.states.get(address)
     if (!state)
       state = await this.request(context.documentId, address, this.cacheOnly ? 'cached' : 'drawing')
@@ -141,7 +166,9 @@ export class WebPictures {
     switch (state.kind) {
       case 'loading':
         // Named like the waiting line, so pictures loading together read apart, and a copy or print says which.
-        return quiet((this.words.loadingNamed ?? 'Loading %@…').replace('%@', () => alt || host))
+        return quiet(
+          (this.words.loadingNamed ?? 'Loading %@…').replace('%@', () => this.named(alt, host)),
+        )
       case 'off':
         return {
           kind: 'file',
@@ -151,8 +178,15 @@ export class WebPictures {
         return { kind: 'file', label: `${host}: ${state.reason}` }
       default:
         // A box naming the picture, its description or else its website, with a button that loads it.
-        return quiet(alt || host, this.words.loadAction ?? 'Load')
+        return quiet(this.named(alt, host), this.words.loadAction ?? 'Load')
     }
+  }
+
+  /** What a line says of a picture: its description, or "Picture" where that only repeats the item's title, or else its
+   *  website. */
+  private named(alt: string | undefined, host: string): string {
+    if (repeats(alt, this.title)) return this.words.picture ?? 'Picture'
+    return alt || host
   }
 
   private track(address: string, signal: AbortSignal) {
@@ -319,7 +353,14 @@ export class WebPictures {
   }
 }
 
-/** Inkkit's quiet box for a picture the page shows no picture for yet: a symbol and the label, and with `action` a
+/** Whether a picture's description is the item's title again, as a feed entry's lead picture's is. */
+function repeats(alt: string | undefined, title: string): boolean {
+  const a = alt?.trim().toLowerCase()
+  const t = title.trim().toLowerCase()
+  return !!a && a === t
+}
+
+/** Inkkit's quiet line for a picture the page shows no picture for yet: a symbol and the label, and with `action` a
  *  button that fires the adapter's `open` for this picture alone. */
 function quiet(label: string, action?: string): FilePresentation {
   return {

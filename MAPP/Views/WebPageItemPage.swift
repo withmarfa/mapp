@@ -10,7 +10,8 @@ import SwiftUI
 /// not edited on the page, except a pinned status, which keeps its menu; the inspector shows them all.
 ///
 /// Its pictures are the app's to give (`SealedPictures`), for this item: while some wait for the person, a callout at the
-/// top of the page says how many and loads them, as the pictures banner on an item's page does (`PicturesWaitingCallout`).
+/// top of the page, above the title, says how many and loads them, as the pictures banner on an item's page does
+/// (`PicturesWaitingCallout`).
 /// Its close button hides it for the page until the page is opened again.
 struct WebPageItemPage: View {
     private enum Content: Equatable {
@@ -92,7 +93,8 @@ struct WebPageItemPage: View {
     /// How far the page has scrolled, which the header follows. Read only by the views that move with it, so a scroll
     /// redraws them and not the page.
     @State private var headerScroll = HeaderScroll()
-    /// The height of the title and pins, and with the callout under them, which the page starts below.
+    /// How far down the title and pins reach, below the callout when there is one: the distance the page scrolls before the
+    /// header is under the toolbar.
     @State private var headerHeight: CGFloat = 0
     @State private var blockHeight: CGFloat = 0
     @AppStorage(InterfaceKey.showsPageToolbarBackground) private var showsToolbarBackground = true
@@ -135,21 +137,24 @@ struct WebPageItemPage: View {
                 pageBody(toolbarHeight: geometry.safeAreaInsets.top)
                 ScrollingHeader(scroll: headerScroll) {
                     VStack(spacing: 0) {
-                        // Focus leaves only the page: its title is in the toolbar and its properties are hidden.
-                        if !drafts.isFocused(on: item.id) {
-                            WebPageHeader(item: item, inset: inset, drafts: drafts, open: open, reading: headerMode == .reader)
-                                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
-                        }
-                        // At the top of the page, clearly further from the header than from the text it belongs to.
+                        // Above the title, so the page says it first. It stays in Focus, which leaves only the page.
                         if let pictures, pictures.waitingCount > 0, !calloutDismissal.isClosed(for: item.id) {
                             PicturesWaitingCallout(
                                 count: pictures.waitingCount, load: { pictures.loadWaiting() },
                                 close: { calloutDismissal.close(for: item.id) })
                                 .padding(.horizontal, inset)
-                                .padding(.top, calloutGap * 2)
-                                .padding(.bottom, calloutGap * 0.75)
+                                .padding(.top, calloutGap * 3)
+                                // The header's own space is under it, unless Focus has taken the header out.
+                                .padding(.bottom, drafts.isFocused(on: item.id) ? calloutGap * 3 : 0)
+                        }
+                        // Focus leaves only the page: its title is in the toolbar and its properties are hidden.
+                        if !drafts.isFocused(on: item.id) {
+                            WebPageHeader(item: item, inset: inset, drafts: drafts, open: open, reading: headerMode == .reader)
+                                // As far down as the header reaches, with the callout above it counted.
+                                .onGeometryChange(for: CGFloat.self) { [space = Self.headerBlock] in $0.frame(in: .named(space)).maxY } action: { headerHeight = $0 }
                         }
                     }
+                    .coordinateSpace(name: Self.headerBlock)
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { blockHeight = $0 }
                     // Above the block too, so a page pulled past its start shows the window's color there and not the
                     // page's own.
@@ -197,6 +202,8 @@ struct WebPageItemPage: View {
         .onChange(of: remotePictures) { pictures?.redraw() }
         .onChange(of: library.savedPictureStates(of: item.id)) { pictures?.redraw() }
     }
+
+    private static let headerBlock = "headerBlock"
 
     /// How far a page pulled past its start can show above the header.
     private static let overscroll: CGFloat = 1_000

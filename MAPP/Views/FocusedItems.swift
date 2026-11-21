@@ -41,7 +41,7 @@ final class DetailsPresentation {
     /// The item the window has in Focus: its title is in the toolbar and its properties are hidden. It names the item,
     /// so another item's page is never in Focus, and `pageShows(_:)` forgets it when the page moves on.
     private(set) var focusedItem: ItemID?
-    /// The item whose formats card (Aa) is open, named for the same reason.
+    /// The item whose formats bar (Aa) is open, named for the same reason.
     private(set) var formatsItem: ItemID?
     /// The size and page of the image or PDF the window's page has ready, which the corner and the menus act on. It names
     /// its item, so another item's page never takes it, and the page withdraws it when it goes.
@@ -172,7 +172,7 @@ final class DetailsPresentation {
     /// How many pages `item`'s PDF has, once its page has read the file. Focus puts it under the title in the toolbar.
     func pages(of item: ItemID) -> Int? { fileViewing(of: item)?.pages?.count }
 
-    /// The page now shows `item`, or nothing. Focus and the formats card belong to the item they were chosen on, so
+    /// The page now shows `item`, or nothing. Focus and the formats bar belong to the item they were chosen on, so
     /// moving to another item, or leaving the page, puts both away.
     func pageShows(_ item: ItemID?) {
         if focusedItem != item { focusedItem = nil }
@@ -188,7 +188,7 @@ final class DetailsPresentation {
         if offeredFile?.item == item { offeredFile = nil }
     }
 
-    /// Escape on the page: an open size field closes first, then the formats card, then Focus on a second press. False
+    /// Escape on the page: an open size field closes first, then the formats bar, then Focus on a second press. False
     /// when none was showing, so the key is the caller's. The field closes here whether or not it holds the keyboard,
     /// so Escape never stays stuck behind a field that never took focus.
     @discardableResult

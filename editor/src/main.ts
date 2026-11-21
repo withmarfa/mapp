@@ -350,6 +350,7 @@ window.editor = {
   },
   setHeader: (model) => {
     header.set(model)
+    editor.setTitle(model?.title ?? '')
     if (model)
       document.documentElement.style.setProperty(
         '--interface-text-size',
