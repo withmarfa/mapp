@@ -18,7 +18,6 @@ import Observation
     private(set) var settings: UpkeepSettings?
     /// Why the backups could not be read: the page says so in place of itself.
     private(set) var failure: OwnerFailure?
-    private(set) var settingsFailure: OwnerFailure?
     private(set) var isLoading = false
     private(set) var hasLoaded = false
 
@@ -64,11 +63,9 @@ import Observation
         }
         do {
             settings = try await context.calls.upkeepSettings()
-            settingsFailure = nil
         } catch {
             let error = UpkeepWording.owned(error)
             settings = nil
-            settingsFailure = error
             await context.learn(from: error)
         }
     }
