@@ -60,7 +60,7 @@ struct HousekeepingPage: View {
             SettingsSection("Needs Attention") {
                 if let hold {
                     SettingsProblemRow(
-                        title: Text("Clean-up is paused"),
+                        title: Text("Clean-Up Is Paused"),
                         line: hold.clockAt.map { Text("\(host.serverName)’s clock jumped to \(Self.date($0)).") } ?? Text("\(host.serverName)’s clock jumped."),
                         actions: [confirmAction(hold)])
                 }
@@ -75,7 +75,7 @@ struct HousekeepingPage: View {
                 }
                 ForEach(failed, id: \.name) { job in
                     SettingsProblemRow(
-                        title: Text("\(UpkeepWording.jobTitle(job.name)) failed"), line: Text("Its last run failed."), actions: [])
+                        title: Text("\(UpkeepWording.jobTitle(job.name)) Failed"), line: Text("Its last run failed."), actions: [])
                 }
             }
         }

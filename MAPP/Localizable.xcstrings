@@ -61,10 +61,10 @@
     "Archived, unarchived or moved to or from another state." : {
 
     },
-    "Backups are failing" : {
+    "Backups Are Failing" : {
 
     },
-    "Backups are incomplete" : {
+    "Backups Are Incomplete" : {
 
     },
     "Change Address" : {
@@ -164,7 +164,7 @@
     "%@ ended MAPP’s sign-in. Sign in again in Connection." : {
 
     },
-    "%@ failed" : {
+    "%@ Failed" : {
 
     },
     "%@ files aren’t copied to the backup place yet." : {
@@ -1014,7 +1014,7 @@
     "Some files the newest backup needs are still waiting for a copy." : {
 
     },
-    "Some stored backups are damaged" : {
+    "Some Stored Backups Are Damaged" : {
 
     },
     "Some stored parts of backups are damaged." : {
@@ -1095,7 +1095,7 @@
     "The key “%@” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key on the Keys page." : {
 
     },
-    "The last backup didn’t finish" : {
+    "The Last Backup Didn’t Finish" : {
 
     },
     "Show Spelling and Grammar" : {
@@ -1143,7 +1143,7 @@
     "The types and sources chosen and left out make more conditions than one search can hold." : {
 
     },
-    "The update to %@ didn’t work" : {
+    "The Update to %@ Didn’t Work" : {
 
     },
     "Dark" : {
@@ -2193,7 +2193,7 @@
     "%@ has an entry that isn’t finished. Finish it, or cancel it, to add the item." : {
       "extractionState" : "manual"
     },
-    "%@ hasn’t come back yet" : {
+    "%@ Hasn’t Come Back Yet" : {
 
     },
     "%@ is attached to “%@”, but it couldn’t be put in its text." : {
@@ -4132,7 +4132,7 @@
     "Files Not in the Text" : {
       "extractionState" : "manual"
     },
-    "Files are waiting for a second copy" : {
+    "Files Are Waiting for a Second Copy" : {
 
     },
     "Files may be missing from it." : {
@@ -7099,7 +7099,7 @@
     "No apps are connected." : {
 
     },
-    "No backups are kept" : {
+    "No Backups Are Kept" : {
 
     },
     "No Browsers" : {
@@ -7976,10 +7976,10 @@
     "Backups" : {
 
     },
-    "Backups are turned off" : {
+    "Backups Are Turned Off" : {
 
     },
-    "Backups can’t be kept there" : {
+    "Backups Can’t Be Kept There" : {
 
     },
     "Backups of %@" : {
@@ -8000,7 +8000,7 @@
     "Clean-up" : {
 
     },
-    "Clean-up is paused" : {
+    "Clean-Up Is Paused" : {
 
     },
     "Connector Deliveries, Handled" : {
@@ -8180,7 +8180,7 @@
     "Logs" : {
 
     },
-    "MAPP can look after part of %@" : {
+    "MAPP Can Look After Part of %@" : {
 
     },
     "Largest File Read" : {

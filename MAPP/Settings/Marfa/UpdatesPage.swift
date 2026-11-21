@@ -77,7 +77,7 @@ struct UpdatesPage: View {
             SettingsSection("Needs Attention") {
                 if let undone {
                     SettingsProblemRow(
-                        title: Text("The update to \(undone.release) didn’t work"),
+                        title: Text("The Update to \(undone.release) Didn’t Work"),
                         line: Text(
                             undone.result == .putBack
                                 ? "\(host.serverName) is back on \(status.running), as before. Nothing was lost."
@@ -86,7 +86,7 @@ struct UpdatesPage: View {
                 }
                 if model.lostTrack {
                     SettingsProblemRow(
-                        title: Text("\(host.serverName) hasn’t come back yet"),
+                        title: Text("\(host.serverName) Hasn’t Come Back Yet"),
                         line: Text("MAPP stopped waiting. Check again to see where it stands."),
                         actions: [SettingsProblemAction("Check Again") { Task { await model.load() } }])
                 }

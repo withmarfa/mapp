@@ -65,7 +65,7 @@ struct OverviewPage: View {
 
     private var permissionsRow: some View {
         SettingsProblemRow(
-            title: Text("MAPP can look after part of \(host.serverName)"),
+            title: Text("MAPP Can Look After Part of \(host.serverName)"),
             line: Text("It holds \(host.grants.count) of the owner’s \(InstancePermission.allCases.count) permissions."),
             actions: [
                 SettingsProblemAction("Allow More…", isPrimary: true) {

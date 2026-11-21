@@ -131,7 +131,6 @@ private struct TableRow<Row>: View {
             }
         }
         .padding(.horizontal, inset)
-        .padding(.vertical, SettingsTokens.Metric.tableCellPadding)
         .frame(maxWidth: .infinity, minHeight: height, alignment: .leading)
         .background(isSelected ? SettingsTokens.selection : (isHovered ? SettingsTokens.hover : (isBanded ? SettingsTokens.band : Color.clear)))
         .contentShape(.rect)
@@ -143,8 +142,9 @@ private struct TableRow<Row>: View {
             .settingsFont(.title)
             .lineLimit(column.lines)
             .truncationMode(column.truncation)
-            // A cell that wraps grows its row rather than being cut.
+            // A cell that wraps grows its row rather than being cut, keeping the row's padding; a row of one line stays at its height.
             .fixedSize(horizontal: false, vertical: true)
+            .padding(.vertical, SettingsTokens.Metric.tableCellPadding)
             .frame(width: column.width, alignment: .leading)
             .frame(maxWidth: column.width == nil ? .infinity : nil, alignment: .leading)
     }
