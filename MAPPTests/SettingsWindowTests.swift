@@ -101,12 +101,16 @@ struct SettingsWindowTests {
 
     @Test func onlyThePagesThatExistAreListed() {
         #expect(SettingsPage.mappGroups.flatMap { $0 } == [.general, .appearance, .keyboard, .editor, .lists, .connection])
-        #expect(SettingsPage.marfaGroups.flatMap { $0 } == [.overview, .recentlyDeleted])
+        #expect(SettingsPage.marfaGroups.flatMap { $0 } == [.overview, .account, .apps, .keys, .addresses, .recentlyDeleted])
     }
 
     @Test func theMarfasPagesNameThePermissionTheyNeed() {
         #expect(MarfaSettingsPage.overview.permission == .configManage)
         #expect(MarfaSettingsPage.recentlyDeleted.permission == .itemsPurge)
+        #expect(MarfaSettingsPage.account.permission == nil, "Account opens without one and asks for sign_ins.manage from Change Password")
+        #expect(MarfaSettingsPage.apps.permission == .grantsManage)
+        #expect(MarfaSettingsPage.keys.permission == .keysManage)
+        #expect(MarfaSettingsPage.addresses.permission == .configManage)
     }
 
     @Test func aServerThatLastAnsweredTodayIsToldByTheTime() {

@@ -207,6 +207,15 @@ struct ProblemWordingTests {
         #expect(wording.confirmation(for: .withdraw)?.copiesText == true)
     }
 
+    @Test func aChangeThatWouldUndoARestoreIsHeldUntilThePersonSays() {
+        let wording = wording(entry(.blocked(.serverRestored)))
+        #expect(wording.headline == "A change to “Plan the launch” is on hold")
+        #expect(wording.explanation.hasPrefix("The server was restored to an earlier point"))
+        #expect(wording.actions.map(\.action) == [.tryAgain, .withdraw])
+        #expect(wording.actions.map(\.title) == ["Try Again", "Undo Change"])
+        #expect(wording.confirmation(for: .withdraw)?.copiesText == true)
+    }
+
     @Test func aRefusalWithNoReasonStillSaysSomething() {
         let wording = wording(entry(.refused, title: nil, body: nil))
         #expect(wording.explanation == "The server refused it.")
@@ -267,7 +276,7 @@ struct ProblemWordingTests {
     @Test func everyActionOfferedIsOneTheContractAllows() {
         let kinds: [SyncProblemEntry.Kind] = [
             .refused, .blocked(.credentialRefused), .blocked(.keySpent), .blocked(.ancestorUnavailable),
-            .blocked(.conflictUnresolved), .blocked(.failingAlone), .blocked(.instanceChanged), .blocked(.recordUnread), .dead,
+            .blocked(.conflictUnresolved), .blocked(.failingAlone), .blocked(.instanceChanged), .blocked(.recordUnread), .blocked(.serverRestored), .dead,
             .conflicted(sibling: ItemID("c"), original: nil)
         ]
         for kind in kinds {
@@ -278,7 +287,7 @@ struct ProblemWordingTests {
     @Test func noWordIsJargon() {
         let kinds: [SyncProblemEntry.Kind] = [
             .refused, .blocked(.credentialRefused), .blocked(.keySpent), .blocked(.ancestorUnavailable),
-            .blocked(.conflictUnresolved), .blocked(.failingAlone), .blocked(.instanceChanged), .blocked(.recordUnread), .dead,
+            .blocked(.conflictUnresolved), .blocked(.failingAlone), .blocked(.instanceChanged), .blocked(.recordUnread), .blocked(.serverRestored), .dead,
             .conflicted(sibling: ItemID("c"), original: nil)
         ]
         let unsent: [SyncProblem.Unsent] = [

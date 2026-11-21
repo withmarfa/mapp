@@ -45,7 +45,7 @@ import Testing
         let bench = try HostBench()
         let (adapter, _, _) = try await connected(bench)
         #expect(adapter.grants == SystemSignIns.askedAtSignIn)
-        #expect(adapter.grants.contains(MarfaSettingsPage.overview.permission))
+        #expect(adapter.grants.contains(.configManage))
         #expect(!adapter.grants.contains(.backupsManage))
     }
 
@@ -145,7 +145,8 @@ import Testing
 
     @Test func everyPermissionAPageNeedsIsNamedTheSameWayWhereItIsLost() {
         for page in MarfaSettingsPage.allCases {
-            #expect(page.permissionLine == "MAPP isn’t allowed to \(page.permission.allowedTo).")
+            guard let permission = page.permission else { continue }
+            #expect(page.permissionLine == "MAPP isn’t allowed to \(permission.allowedTo).")
         }
     }
 
@@ -198,6 +199,120 @@ import Testing
         #expect(copied.withLock { $0 } == ["Name: Renamed on quit"], "the text reaches the clipboard before the app goes")
         libraries.handOffDraftsAtQuit()
         #expect(libraries.host.notices.waiting.filter(\.isNotKept).isEmpty, "a draft already handed over is not handed over again")
+    }
+
+    @Test func closingSettingsHandsBackTheOwnerPagesDrafts() async throws {
+        let bench = try HostBench()
+        let (adapter, libraries, _) = try await connected(bench)
+        let context = OwnerContext(calls: FakeOwnerCalls(), grants: { [.keysMint, .keysManage, .configManage] })
+        let addresses = AddressesModel(context: context)
+        let keys = KeysModel(context: context)
+        adapter.ownerDrafts.register(addresses)
+        adapter.ownerDrafts.register(keys)
+        await addresses.load()
+        addresses.begin(.addAddress)
+        addresses.input = "studio.castell.design"
+        let before = libraries.host.notices.waiting.count
+        adapter.handOverDrafts()
+        let notice = try #require(libraries.host.notices.waiting.dropFirst(before).first)
+        #expect(notice.isNotKept)
+        #expect(notice.title == "Address Not Added")
+        #expect(notice.text == "studio.castell.design")
+        #expect(notice.message.contains("You closed Settings before this was saved."))
+        adapter.handOverDrafts()
+        #expect(libraries.host.notices.waiting.count == before + 1, "a second close has nothing more to hand back")
+        // A key shown once is told about, with no text to give back.
+        keys.beginNewKey()
+        keys.draft.name = "Importer"
+        keys.draft.source = "importer"
+        await keys.make()
+        adapter.handOverDrafts()
+        let told = try #require(libraries.host.notices.waiting.last { $0.title == "Key Not Copied" })
+        #expect(told.isNotKept, "a key's notice holds the quit, as a change not kept does")
+        #expect(told.text == nil)
+        #expect(told.message.contains("“Importer” was made"))
+    }
+
+    @Test func quittingWithAKeysSecretShownTellsThePersonTheKeyExists() async throws {
+        let bench = try HostBench()
+        let defaults = try #require(UserDefaults(suiteName: "MarfaSettingsHostTests-\(UUID().uuidString)"))
+        let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
+        let keys = KeysModel(context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.keysMint, .keysManage] }))
+        libraries.ownerDrafts.register(keys)
+        keys.beginNewKey()
+        keys.draft.name = "Importer"
+        keys.draft.source = "importer"
+        await keys.make()
+        libraries.handOffDraftsAtQuit()
+        #expect(libraries.host.notices.holdsQuit, "the quit waits to tell the person")
+        let told = Mutex<[String]>([])
+        let quits = libraries.host.notices.tellBeforeQuitting(copying: { _ in }) { notice in told.withLock { $0.append(notice.title) } }
+        #expect(quits)
+        #expect(told.withLock { $0 }.contains("Key Not Copied"))
+        #expect(!libraries.host.notices.holdsQuit)
+    }
+
+    @Test func aKeyMadeAfterSettingsClosedTellsThePersonThroughTheSameNotice() async throws {
+        let bench = try HostBench()
+        let defaults = try #require(UserDefaults(suiteName: "MarfaSettingsHostTests-\(UUID().uuidString)"))
+        let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
+        let calls = FakeOwnerCalls()
+        let keys = KeysModel(
+            context: OwnerContext(
+                calls: calls, grants: { [.keysMint, .keysManage] }, lateDraft: { libraries.ownerDrafts.arrive($0) }))
+        libraries.ownerDrafts.register(keys)
+        keys.beginNewKey()
+        keys.draft.name = "Importer"
+        keys.draft.source = "importer"
+        let gate = calls.hold("create")
+        let making = Task { await keys.make() }
+        #expect(try await eventuallyAsking { calls.calls.contains("create") })
+        libraries.handOffDraftsAtQuit()
+        #expect(libraries.host.notices.waiting.filter { $0.title == "Key Not Copied" }.isEmpty)
+        gate.open()
+        await making.value
+        let told = try #require(libraries.host.notices.waiting.last { $0.title == "Key Not Copied" })
+        #expect(told.isNotKept)
+        #expect(libraries.host.notices.holdsQuit)
+    }
+
+    @Test func quittingHandsBackAPasskeyAndKeyRenameTypedAndNotSaved() async throws {
+        let bench = try HostBench()
+        let defaults = try #require(UserDefaults(suiteName: "MarfaSettingsHostTests-\(UUID().uuidString)"))
+        let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
+        let calls = FakeOwnerCalls()
+        calls.state.withLock { $0.passkeys = [OwnerPasskey(id: "p", name: "Phone")] }
+        let context = OwnerContext(calls: calls, grants: { [.keysMint, .keysManage, .signInsManage] })
+        let account = AccountModel(context: context)
+        libraries.ownerDrafts.register(account)
+        await account.load()
+        await account.beginChangePassword()
+        account.closePasswordSheet()
+        account.beginRename(account.passkeys[0])
+        account.renameDraft = "Work phone"
+        let before = libraries.host.notices.waiting.count
+        libraries.handOffDraftsAtQuit()
+        let notice = try #require(libraries.host.notices.waiting.dropFirst(before).first)
+        #expect(notice.title == "Passkey Not Renamed")
+        #expect(notice.text == "Work phone")
+        #expect(notice.message.contains("You quit MAPP before this was saved."))
+    }
+
+    @Test func quittingHandsBackTheOwnerPagesDrafts() async throws {
+        let bench = try HostBench()
+        let defaults = try #require(UserDefaults(suiteName: "MarfaSettingsHostTests-\(UUID().uuidString)"))
+        let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
+        let keys = KeysModel(context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.keysMint, .keysManage] }))
+        libraries.ownerDrafts.register(keys)
+        keys.beginNewKey()
+        keys.draft.name = "Importer"
+        keys.draft.source = "importer"
+        let before = libraries.host.notices.waiting.count
+        libraries.handOffDraftsAtQuit()
+        let notice = try #require(libraries.host.notices.waiting.dropFirst(before).first)
+        #expect(notice.isNotKept)
+        #expect(notice.text == "Name: Importer\nSource: importer")
+        #expect(notice.message.contains("You quit MAPP before this was saved."))
     }
 
     @Test func aWriteTheServerRefusesKeepsWhatWasTypedWithItsReason() async throws {

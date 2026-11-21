@@ -230,13 +230,13 @@ nonisolated enum MarfaProblems {
     /// A write set aside `failing_alone` met failures that were no answer to it, so it may still be sent again, and
     /// the person may instead withdraw it. A write blocked `instanceChanged` was made for an instance that no longer
     /// answers at the address, and the package takes it back by `withdraw` as well. A write blocked `recordUnread` came from a
-    /// damaged store that could not say how it is sent, so it too is sent only when the person says so.
+    /// damaged store that could not say how it is sent, so it too is sent only when the person says so. A write blocked `serverRestored` would put back what a restore of the server removed, so it is sent only when the person says so, and may be withdrawn instead.
     static func actions(for kind: SyncProblemEntry.Kind) -> [SyncAction] {
         switch kind {
         case .refused: [.discard]
         case .blocked(.credentialRefused): []
         case .blocked(.keySpent), .dead: [.tryAgain]
-        case .blocked(.failingAlone), .blocked(.instanceChanged), .blocked(.recordUnread): [.tryAgain, .withdraw]
+        case .blocked(.failingAlone), .blocked(.instanceChanged), .blocked(.recordUnread), .blocked(.serverRestored): [.tryAgain, .withdraw]
         case .blocked(.ancestorUnavailable), .blocked(.conflictUnresolved): [.withdraw]
         case .conflicted: [.keep, .discard]
         }

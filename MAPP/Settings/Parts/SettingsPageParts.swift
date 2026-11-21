@@ -22,9 +22,10 @@ struct SettingsPageColumn<Content: View>: View {
     }
 }
 
-/// A thing's head card: a large tile, its name, one line, and its actions at the trailing edge. It is the one card with
-/// no name above it.
+/// A thing's head card: a large tile, its name, one line, and its actions at the trailing edge. It has no name above it
+/// on a thing's own page; on a list page that has one thing at its head, `name` puts a section's name above it.
 struct SettingsHead<Trailing: View>: View {
+    private let name: Text?
     private let symbol: String
     private let tone: SettingsTokens.Tone
     private let title: Text
@@ -32,7 +33,8 @@ struct SettingsHead<Trailing: View>: View {
     private let trailing: Trailing
     @Environment(\.settingsTextScale) private var scale
 
-    init(symbol: String, tone: SettingsTokens.Tone, title: Text, line: Text? = nil, @ViewBuilder trailing: () -> Trailing) {
+    init(name: Text? = nil, symbol: String, tone: SettingsTokens.Tone, title: Text, line: Text? = nil, @ViewBuilder trailing: () -> Trailing) {
+        self.name = name
         self.symbol = symbol
         self.tone = tone
         self.title = title
@@ -41,6 +43,17 @@ struct SettingsHead<Trailing: View>: View {
     }
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if let name {
+                name.settingsFont(.sectionName).accessibilityAddTraits(.isHeader)
+                    .padding(.horizontal, SettingsTokens.Metric.inset)
+                    .padding(.bottom, 2)
+            }
+            card
+        }
+    }
+
+    private var card: some View {
         SettingsCard {
             HStack(spacing: 14) {
                 SettingsTile(symbol: symbol, tone: tone, size: SettingsTokens.Metric.headTile)
@@ -62,8 +75,8 @@ struct SettingsHead<Trailing: View>: View {
 }
 
 extension SettingsHead where Trailing == EmptyView {
-    init(symbol: String, tone: SettingsTokens.Tone, title: Text, line: Text? = nil) {
-        self.init(symbol: symbol, tone: tone, title: title, line: line, trailing: { EmptyView() })
+    init(name: Text? = nil, symbol: String, tone: SettingsTokens.Tone, title: Text, line: Text? = nil) {
+        self.init(name: name, symbol: symbol, tone: tone, title: title, line: line, trailing: { EmptyView() })
     }
 }
 
@@ -130,9 +143,9 @@ struct SettingsStateContent: View {
     var action: (title: LocalizedStringKey, perform: () -> Void)?
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             Image(systemName: symbol)
-                .font(.system(size: 26, weight: .light))
+                .font(.system(size: 29, weight: .light))
                 .foregroundStyle(SettingsTokens.tertiaryText)
                 .padding(.bottom, 6)
                 .accessibilityHidden(true)
@@ -145,7 +158,7 @@ struct SettingsStateContent: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let action {
-                SettingsButton(action.title, action: action.perform).padding(.top, 10)
+                SettingsButton(action.title, action: action.perform).padding(.top, 12)
             }
         }
         .frame(maxWidth: 420)
@@ -165,7 +178,7 @@ struct SettingsPageState: View {
         GeometryReader { space in
             SettingsStateContent(symbol: symbol, title: title, line: line, action: action)
                 .padding(.horizontal, 24)
-                .position(x: space.size.width / 2, y: (space.size.height + space.safeAreaInsets.top) / 3 - space.safeAreaInsets.top - SettingsTokens.Metric.pageStateRise)
+                .position(x: space.size.width / 2, y: (space.size.height + space.safeAreaInsets.top) / 3 - space.safeAreaInsets.top + SettingsTokens.Metric.pageStateDrop)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(SettingsTokens.page)
@@ -192,7 +205,8 @@ struct SettingsBar<Content: View>: View {
     }
 }
 
-/// The empty card of a list with nothing in it yet: a symbol, a title, one line and an action.
+/// What fills the card of a list with nothing in it yet: a symbol, a title, one line and an action. It stands in a
+/// section's card, which draws the border, so the card never holds a second one.
 struct SettingsEmptyCard: View {
     let symbol: String
     let title: Text
@@ -200,11 +214,9 @@ struct SettingsEmptyCard: View {
     var action: (title: LocalizedStringKey, perform: () -> Void)?
 
     var body: some View {
-        SettingsCard {
-            SettingsStateContent(symbol: symbol, title: title, line: line, action: action)
-                .padding(.vertical, 28)
-                .frame(maxWidth: .infinity)
-        }
+        SettingsStateContent(symbol: symbol, title: title, line: line, action: action)
+            .padding(.vertical, 28)
+            .frame(maxWidth: .infinity)
     }
 }
 

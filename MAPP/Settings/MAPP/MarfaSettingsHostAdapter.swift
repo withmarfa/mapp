@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Marfa
 import MarfaAPI
@@ -19,6 +20,7 @@ enum LibraryDescription {
     private let launcher: SettingsLauncher
     private(set) var isAllowingMore = false
     let instanceSettings: InstanceSettingsModel
+    var ownerDrafts: OwnerDrafts { libraries.ownerDrafts }
 
     /// `instanceSettings` is the model the app keeps for This Marfa's fields, unless a test brings its own.
     init(libraries: Libraries, launcher: SettingsLauncher, instanceSettings: InstanceSettingsModel? = nil) {
@@ -73,6 +75,29 @@ enum LibraryDescription {
         return try MarfaServerCalls(connection: connection, signIns: host.signIns).client()
     }
 
+    func refreshGrants() async { await host.refreshGrants() }
+
+    /// The owner's calls, made through a client that shows the system's sign-in in place where the server asks the owner to
+    /// confirm it is them, and sends the call again once they have.
+    var ownerCalls: any OwnerCalls {
+        guard let connection = host.configuredConnection else {
+            return ClientOwnerCalls { throw MarfaError.signedOut(origin: "", message: "no server is set") }
+        }
+        let signIns = host.signIns
+        return ClientOwnerCalls {
+            do {
+                let calls = MarfaServerCalls(connection: connection, signIns: signIns)
+                let server = try calls.server().confirming(from: { NSApp.keyWindow ?? NSApp.windows.first ?? NSWindow() })
+                return Client(server, timeout: calls.timeout)
+            } catch let ending as MarfaServerCalls.Ending {
+                switch ending {
+                case .keyRefused: throw MarfaError.signedOut(origin: connection.address.absoluteString, message: "the sign-in ended")
+                default: throw MarfaError.invalid(message: Words.signInUnreadable)
+                }
+            }
+        }
+    }
+
     var openInApp: ((String) -> Void)? { nil }
 
     // MARK: Recently Deleted
@@ -100,11 +125,28 @@ enum LibraryDescription {
 
     // MARK: Closing
 
-    /// Hands over what was typed in This Marfa's fields and not saved, as MAPP's rules say for a panel that ends any way but
+    /// Hands over what was typed in the Marfa's pages and not saved, as MAPP's rules say for a panel that ends any way but
     /// the person's own Cancel: the text goes through `Notices.notKept`, to the clipboard, and the draft is dropped.
     func handOverDrafts() {
         instanceSettings.handOver(
             to: libraries.host.notices, because: String(localized: "You closed Settings before saving the changes to this Marfa’s settings."))
+        ownerDrafts.handOver(to: libraries.host.notices, because: String(localized: "You closed Settings before this was saved."))
+    }
+}
+
+extension OwnerDrafts {
+    /// Gives back what the open owner's pages hold: typed text as a change not kept, and what can't be shown again as a
+    /// notice that holds the quit. A password is never among it, and nor is a key's secret.
+    func handOver(to notices: Notices, because reason: String) {
+        for draft in takeAll() { deliver(draft, to: notices, because: reason) }
+    }
+
+    /// One draft as a notice. What can't be shown again is a change not kept with no text, which the quit waits to tell.
+    func deliver(_ draft: OwnerDraft, to notices: Notices, because reason: String) {
+        switch draft {
+        case .typed(let title, let text): notices.notKept(title, text: text, reason: reason)
+        case .told(let title, let message): notices.notKept(title, text: nil, reason: message, standsAlone: true)
+        }
     }
 }
 

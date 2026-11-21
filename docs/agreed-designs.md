@@ -59,10 +59,7 @@ Only the agreed changes are listed. A change marked "needs a server change" wait
 
 - **Webhooks.** Every app's, grouped by the app that made them. The owner can end any of them (needs a server change).
 - **A key.** Extend… beside the expiry date, for the owner. The secret keeps working (needs a server change).
-- **Account.**
-  - Change Password…, Add Passkey… (opens the server's own page) and the passkey list. Sign-Ins is folded in as Browsers.
-  - MAPP asks for the `sign_ins.manage` permission the first time the owner chooses Change Password (Allow More…), not at every sign-in.
-  - Passkeys stay in the system's sign-in sheet.
+- **Built:** Account, Apps, Keys and Addresses are in [The Marfa's half of Settings](marfa-settings.md).
 - **Start-Up.** Stays, read-only.
 - **Names.** Monitoring (was Reporting) and Limits (new).
 - **Updates.**
