@@ -68,37 +68,44 @@ extension SettingsSwatches {
     }
 }
 
-/// The small window a theme's tile draws: a sidebar and lines of text, in the light or the dark look.
+/// The small window a theme's tile draws: a sidebar of short bars and a page of lines, in the light or the dark look.
 struct SettingsThemePicture: View {
     enum Look { case light, dark }
 
     let look: Look
 
+    private typealias Metric = SettingsTokens.Metric
+    private typealias Preview = SettingsTokens.ThemePreview
+
     var body: some View {
         GeometryReader { space in
             HStack(spacing: 0) {
-                Rectangle().fill(look == .light ? SettingsTokens.ThemePreview.lightSidebar : SettingsTokens.ThemePreview.darkSidebar)
-                    .frame(width: space.size.width * SettingsTokens.Metric.previewSidebar)
-                VStack(alignment: .leading, spacing: SettingsTokens.Metric.previewLineSpacing) {
-                    line(widthShare: 0.4, heading: true)
-                    ForEach(0..<4, id: \.self) { _ in line(widthShare: 1, heading: false) }
+                VStack(alignment: .leading, spacing: Metric.previewLineSpacing) {
+                    ForEach(0..<Metric.previewSidebarLines, id: \.self) { _ in
+                        bar(look == .light ? Preview.lightSidebarLine : Preview.darkSidebarLine, widthShare: 1)
+                    }
                     Spacer(minLength: 0)
                 }
-                .padding(SettingsTokens.Metric.previewLineSpacing * 2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(look == .light ? SettingsTokens.ThemePreview.lightPage : SettingsTokens.ThemePreview.darkPage)
+                .padding(.horizontal, Metric.previewSidebarPadding)
+                .padding(.top, Metric.previewTop)
+                .frame(width: space.size.width * Metric.previewSidebar)
+                .frame(maxHeight: .infinity)
+                .background(look == .light ? Preview.lightSidebar : Preview.darkSidebar)
+                VStack(alignment: .leading, spacing: Metric.previewLineSpacing) {
+                    bar(look == .light ? Preview.lightLine : Preview.darkLine, widthShare: Metric.previewHeading)
+                    ForEach(0..<4, id: \.self) { _ in bar(look == .light ? Preview.lightLine : Preview.darkLine, widthShare: 1) }
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, Metric.previewPadding)
+                .padding(.top, Metric.previewTop)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .background(look == .light ? Preview.lightPage : Preview.darkPage)
             }
         }
     }
 
-    private func line(widthShare: CGFloat, heading: Bool) -> some View {
-        let color: Color = switch (look, heading) {
-        case (.light, true): SettingsTokens.ThemePreview.lightHeading
-        case (.light, false): SettingsTokens.ThemePreview.lightLine
-        case (.dark, true): SettingsTokens.ThemePreview.darkHeading
-        case (.dark, false): SettingsTokens.ThemePreview.darkLine
-        }
-        return GeometryReader { space in
+    private func bar(_ color: Color, widthShare: CGFloat) -> some View {
+        GeometryReader { space in
             Capsule().fill(color).frame(width: space.size.width * widthShare, height: SettingsTokens.Metric.previewLine)
         }
         .frame(height: SettingsTokens.Metric.previewLine)
@@ -117,10 +124,10 @@ struct SettingsSystemThemePicture: View {
     private struct DiagonalHalf: Shape {
         nonisolated func path(in rect: CGRect) -> Path {
             var path = Path()
-            path.move(to: CGPoint(x: rect.maxX * 0.62, y: 0))
+            path.move(to: CGPoint(x: rect.maxX * 0.56, y: 0))
             path.addLine(to: CGPoint(x: rect.maxX, y: 0))
             path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-            path.addLine(to: CGPoint(x: rect.maxX * 0.38, y: rect.maxY))
+            path.addLine(to: CGPoint(x: rect.maxX * 0.46, y: rect.maxY))
             path.closeSubpath()
             return path
         }

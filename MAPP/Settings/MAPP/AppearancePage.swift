@@ -89,7 +89,7 @@ struct AppearancePage: View {
             SettingsRow("Accent", line: "Switches, sliders and the text cursor.") {
                 SettingsSwatches(
                     swatches: [.init(value: .system, color: SettingsTokens.systemAccent, title: Text("System"))]
-                        + AccentChoice.Offered.allCases.map { offered in
+                        + AccentChoice.Offered.swatched.map { offered in
                             .init(value: .offered(offered), color: Color(nsColor: offered.nsColor), title: Text(verbatim: Self.name(of: offered)))
                         },
                     selection: $accent,

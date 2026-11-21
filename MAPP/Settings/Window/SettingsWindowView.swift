@@ -52,7 +52,6 @@ struct SettingsWindowView: View {
         .environment(libraries.host)
         .environment(\.library, libraries.current)
         .containerBackground(SettingsTokens.page, for: .window)
-        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .focusedSceneValue(\.settingsNavigation, navigation)
         .notices(libraries.host.notices) { launcher.show($0) }
         .modifier(OptionalLibraryDialogs())

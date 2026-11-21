@@ -55,6 +55,10 @@ nonisolated enum AccentChoice: Hashable, RawRepresentable {
 
         var id: Self { self }
 
+        /// The ones Settings draws a swatch for after the Mac's own accent: blue is left out, since it reads as the Mac's
+        /// default accent. A stored blue is still read and tints the app blue.
+        static let swatched = allCases.filter { $0 != .blue }
+
         /// The color in the light and in the dark appearance, as `#RRGGBB`.
         private var hex: (light: String, dark: String) {
             switch self {

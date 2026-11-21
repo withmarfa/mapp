@@ -20,7 +20,7 @@ struct ChoiceTiles<Value: Hashable>: View {
                     VStack(spacing: 6) {
                         choice.picture
                             .frame(maxWidth: .infinity)
-                            .aspectRatio(1.5, contentMode: .fit)
+                            .aspectRatio(SettingsTokens.Metric.choiceAspect, contentMode: .fit)
                             .clipShape(.rect(cornerRadius: 8, style: .continuous))
                             .overlay {
                                 RoundedRectangle(cornerRadius: 8, style: .continuous)

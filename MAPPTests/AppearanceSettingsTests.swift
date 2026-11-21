@@ -31,6 +31,15 @@ struct AppearanceSettingsTests {
         #expect(MissingChoice.label(MissingChoice.placeName(.itemType("core.event"))) == "Event (Missing)")
     }
 
+    @Test func theSwatchesAfterTheMacsAccentLeaveOutBlueButAStoredBlueStillReads() throws {
+        #expect(AccentChoice.Offered.swatched.map(\.rawValue) == ["purple", "pink", "red", "orange", "yellow", "green", "graphite"])
+        let (defaults, done) = try defaults()
+        defer { done() }
+        defaults.set("blue", forKey: AppearanceKey.accent)
+        #expect(AccentChoice.stored(in: defaults) == .offered(.blue))
+        #expect(AccentChoice.stored(in: defaults).nsColor != nil)
+    }
+
     @Test func everyAccentIsReadBackAndAnythingElseIsTheSystems() throws {
         let (defaults, done) = try defaults()
         defer { done() }
