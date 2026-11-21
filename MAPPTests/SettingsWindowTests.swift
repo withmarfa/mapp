@@ -83,6 +83,12 @@ struct SettingsWindowTests {
         #expect(SettingsPage.connection.matches("conn"))
         #expect(SettingsPage.appearance.matches("Palettes"))
         #expect(SettingsPage.editor.matches("spelling"))
+        #expect(SettingsPage.general.matches("week starts"))
+        #expect(SettingsPage.general.matches("Reset"))
+        #expect(SettingsPage.appearance.matches("code font"))
+        #expect(SettingsPage.general.matches("Open Items"))
+        #expect(!SettingsPage.lists.matches("Open Items"), "Open Items moved to General")
+        #expect(!SettingsPage.editor.matches("Remote Pictures"), "Pictures from Websites moved to General")
         #expect(SettingsPage.overview.matches("Version"))
         #expect(!SettingsPage.lists.matches("Palettes"))
         #expect(SettingsPage.lists.matches("  "), "an empty search keeps every page")
@@ -94,7 +100,7 @@ struct SettingsWindowTests {
     }
 
     @Test func onlyThePagesThatExistAreListed() {
-        #expect(SettingsPage.mappGroups.flatMap { $0 } == [.appearance, .editor, .lists, .connection])
+        #expect(SettingsPage.mappGroups.flatMap { $0 } == [.general, .appearance, .editor, .lists, .connection])
         #expect(SettingsPage.marfaGroups.flatMap { $0 } == [.overview, .recentlyDeleted])
     }
 
