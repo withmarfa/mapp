@@ -45,7 +45,7 @@ Every Editor setting reaches a page that is already open. The ones that are Inkk
 
 ## Lists
 
-Density (Standard or Compact, chosen from two small lists) is what every list takes until a saved view or a place chooses its own. Sort By and Group By are the order every list takes until a view or a place chooses its own; Group By is dimmed while the sort is by title. Lists has no setting to leave types or sources out: that belongs to Search. Open Items and Today and Yesterday are in General.
+Density (Standard or Compact, chosen from two small previews of a list's rows) is what every list takes until a saved view or a place chooses its own. Sort By and Group By are the order every list takes until a view or a place chooses its own; Group By is dimmed while the sort is by title. Lists has no setting to leave types or sources out: that belongs to Search. Open Items and Today and Yesterday are in General.
 
 ## Layouts
 

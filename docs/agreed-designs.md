@@ -76,9 +76,6 @@ The rules that are built (the window, the toolbar, rows, sections, changing thin
 
 - **A synced folder's page** shows what it holds as a tree of its folders, counted in files, which MAPP builds from the server's paths. Not built: the package's client offers no call for a folder's settings or paths (see [The Marfa's half of Settings](marfa-settings.md#left-out)).
 - **Not now:** custom CSS, plugins for MAPP itself, AI providers and Vim keys. Themes come later; every color and font is already a named value.
-- The button rows under a card (Restore Defaults…, Export Shortcuts…, Import…) are regular size, and Select All is an "All Events" checkbox row.
-- **The system's own controls** (August, 21 November 2026). The window's shared parts are the system's: the sidebar is the system's sidebar list with its search field, and the buttons, switches, pop-ups and text fields are the system's, so they look and behave as macOS does. A click outside a text field ends editing. The boards draw what the system draws, and the result is judged in a build.
-- **Keyboard's search** is a short field at the trailing end above the first card, its edge on the cards' edge, as a table's search sits at a section's name (board S13).
 
 ### MAPP's pages
 

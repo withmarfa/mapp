@@ -67,7 +67,7 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 ## Buttons and messages
 
 - **Capsule buttons, black buttons and the Mac's push buttons.** Every button MAPP draws is a rounded rectangle; see [Components](components.md).
-- **A large 36-point button size.** There are two sizes, 22 and 28 points. Settings uses one, 28 points, except inside a table.
+- **A large 36-point button size.** There are two sizes, 22 and 28 points. Settings uses the system's regular size, and small inside a table.
 - **Buttons in a section's header in Settings.** Adding is the card's last row; other actions are regular buttons in a row.
 - **Run Now or Restore on one table row only, the row under the pointer.** One button on one row reads as special. A row action shows on every row.
 - **Sheets and alerts placed under the toolbar**, AppKit's default sheet position (August, 20 November 2026). They sit in the middle of the window.
