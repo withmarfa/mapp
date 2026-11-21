@@ -157,7 +157,7 @@ Gaps on the page come from a 4-point step, with named gaps between the title and
 
 - Linked From and Customize Layout live in a row of actions above the title that takes no room. When it shows is in [`editor/AGENTS.md`](../editor/AGENTS.md).
 - A person's name and the status words are Marfa's. The look changes how they are drawn, not what they say.
-- Dates follow the person's Date Format choice (`dateFormat`).
+- Dates follow the Dates and Times choices in Settings > General (`dateFormat`).
 
 ## Related pages
 

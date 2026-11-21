@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Items as an index: every item of the library under the tabs All, Yours (the library tier) and From Apps (the feed
 /// tier), as a table with no list column. The chosen row is the window's selection, which the right sidebar shows
-/// (`ItemInspectorHost`), and opening one follows Settings > Lists > Open Items In (`Browser.open`).
+/// (`ItemInspectorHost`), and opening one follows Settings > General > Open Items (`Browser.open`).
 ///
 /// A library may hold tens of thousands of items, so the page works none of them out itself: the rows of each tab are
 /// the window's `ItemIndexModel`'s, worked out once and kept while the page is away, and a change of tab reads one of

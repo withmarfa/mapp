@@ -10,7 +10,7 @@ Every setting here is a Mac setting, kept in the defaults and never written to M
 
 - **Opening.**
   - Start With is what a window with nothing to restore shows: Where I Left Off (the place a window was last in), Inbox, Recents, All Items, Favorites or one of the library's types. A window that comes back with the app keeps what it showed.
-  - Reopen Windows says whether the windows that were open come back after MAPP quits. It holds whatever the Mac's own "close windows when quitting" setting says (`NSQuitAlwaysKeepsWindows` is set from it as the app starts and as it quits).
+  - Reopen Windows says whether the windows that were open come back after MAPP quits. MAPP's answer stands over the Mac's own "Close windows when quitting an application" setting: MAPP writes it to `NSQuitAlwaysKeepsWindows` in its own defaults as the app starts and as it quits.
   - Open Items is where an item opens from a list or a search: Over the List, Full Page or New Window ([Opening an item](views-and-lists.md#opening-an-item)).
 - **New Items.** New Items Are is the kind a new item takes outside a type's own list and the Collections and Files places: Last Used, or a kind from the catalogue that can be made. A kind the server no longer offers gives way to the last used one.
 - **Dates and Times.**
