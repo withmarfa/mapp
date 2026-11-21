@@ -17,7 +17,7 @@ The Marfa's pages show and change what the server holds, as the owner. They stan
 
 ## Rules
 
-- **`sign_ins.manage` is asked for from Account, never at sign-in.** The first time the owner chooses Change Password, or Allow More… beside the sign-ins, MAPP asks for it. Cancelled, or approved without it, nothing opens and the page says so.
+- **`sign_ins.manage` is asked for from Account, never at sign-in.** The first time the owner chooses Change Password, or Allow More… beside the sign-ins or on Connection, MAPP asks for it. Cancelled, or approved without it, nothing opens and the page says so.
 - **A password is never kept.** It lives in the sheet's fields until the call ends, is never logged, and is cleared on success, on Cancel and when the sheet closes. A wrong current password keeps both fields with the red ring and one line.
 - **Narrowing asks first, and only narrows.** An app's access is sent with the access it was read as; a change made elsewhere is told as a conflict, the page reads again and nothing is changed. A key's access is sent with `narrow_only`, and narrowing a key or removing one of its permissions names the change and says it can't be undone. Narrowing a grant that holds only a write to Read Only sends a read in its place, never nothing. Disconnecting an app deletes its webhooks and leaves the keys it made working (`keys-and-oauth/grant-revoke-keeps-keys`, `events/webhook-grant-revoked`). Signing a browser out asks first, naming the browser.
 - **Only a stale grant is "changed somewhere else".** A `409` that the server words itself (the sign-in address refusals, a new key's source held by another key) shows the server's words, the source's on the Source field.

@@ -28,6 +28,8 @@ protocol ItemLibrary: AnyObject, Observable {
     /// What the library has yet to send, and each write that needs the person. An item's own state is its `sync`.
     var syncReport: SyncReport { get }
     var downloadedFiles: (any DownloadedFiles)? { get }
+    /// Hydrates the library's copy again, keeping every write not yet sent.
+    func downloadEverythingAgain()
     /// False where the action is not offered for the problem.
     func resolve(_ problem: SyncProblemEntry.ID, by action: SyncAction) async throws -> Bool
     var now: () -> Date { get }
@@ -257,6 +259,7 @@ protocol ItemLibrary: AnyObject, Observable {
 
 extension ItemLibrary {
     var downloadedFiles: (any DownloadedFiles)? { nil }
+    func downloadEverythingAgain() {}
     func isWritingProperties(of id: ItemID) -> Bool { false }
     var lastPropertyWrite: Int? { nil }
     func tookPropertyWrite(_ mark: Int) -> Bool { false }

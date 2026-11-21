@@ -188,7 +188,8 @@ enum SettingsTokens {
         static let pageSpacing: CGFloat = 32
         /// The space between a card and the row of buttons under it, which sit nearer than a section does.
         static let barGap: CGFloat = 14
-        static let pageTop: CGFloat = 16
+        /// Below the toolbar: a head card sits 62 points under the window's top, as the boards draw.
+        static let pageTop: CGFloat = 10
         static let pageBottom: CGFloat = 58
         /// A count badge's side padding, smallest size and a dot badge's size.
         static let badgeInset: CGFloat = 6

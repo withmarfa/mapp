@@ -36,10 +36,19 @@ nonisolated struct SearchNarrowing: Hashable, Sendable {
     var typesWithSubtypes: Set<TypeID> = []
     var excludesTypes = false
     var leaveOut = SearchLeaveOut()
+    /// Whether archived items are searched (Include Archived Items).
+    var includesArchived = true
+    /// Whether Inbox items, the feed tier, are searched (Include Inbox Items).
+    var includesInbox = true
 
     static let none = SearchNarrowing()
 
-    var isEmpty: Bool { types.isEmpty && leaveOut.isEmpty }
+    var isEmpty: Bool { types.isEmpty && leaveOut.isEmpty && includesArchived && includesInbox }
+
+    /// The states a search over every item keeps, and the tier it is limited to: asked of the copy in the search call
+    /// itself (`ItemQuery.states`, `ItemQuery.tier`), so the most a search lists is counted after them.
+    var searchedStates: Set<ItemState> { includesArchived ? [.active, .archived] : [.active] }
+    var searchedTier: Tier? { includesInbox ? nil : .library }
 
     /// The most conditions a filter holds, and the most types the `types` key takes.
     static let maxConditions = 10
@@ -65,6 +74,13 @@ nonisolated struct SearchNarrowing: Hashable, Sendable {
             case .refused(let message): message
             }
         }
+    }
+
+    /// How many conditions a search over every item holds for the leave-out alone: one for each type left out and each
+    /// type below it that the copy holds, and one for each source. At `maxConditions` the next addition makes every
+    /// search fail, so the Search page counts them as a person adds.
+    func leaveOutConditionCount(in catalogue: Catalogue) -> Int {
+        leftOutTypes(in: catalogue).intersection(catalogue.itemTypes.keys).count + leaveOut.sources.count
     }
 
     // MARK: Asking the copy
@@ -134,6 +150,29 @@ nonisolated struct SearchNarrowing: Hashable, Sendable {
     }
 
     // MARK: Judging an item
+
+    /// Whether the search keeps `item`: its type is chosen, it is not left out, and it is not archived or in the Inbox
+    /// where those are turned off. The copy decides the same inside its call; this is for a list held locally.
+    func admits(_ item: Item, in catalogue: Catalogue) -> Bool {
+        admitsType(item.type, in: catalogue) && leftOutBy(item, in: catalogue) == nil && admitsOptions(item)
+    }
+
+    /// `items` as a typed search over the whole library keeps and leaves out: the items it keeps, and those the person's
+    /// leave-out holds that an archived or Inbox choice does not already take away. An item of a type the chosen types
+    /// do not take is in neither.
+    func split(_ items: [Item], in catalogue: Catalogue) -> (kept: [Item], leftOut: [Item]) {
+        var kept: [Item] = []
+        var out: [Item] = []
+        for item in items where admitsType(item.type, in: catalogue) && admitsOptions(item) {
+            if leftOutBy(item, in: catalogue) == nil { kept.append(item) } else { out.append(item) }
+        }
+        return (kept, out)
+    }
+
+    /// Whether `item` is one Include Archived Items and Include Inbox Items let through.
+    func admitsOptions(_ item: Item) -> Bool {
+        (includesArchived || item.state != .archived) && (includesInbox || item.tier != .feed)
+    }
 
     /// Whether an item of `type` is one the chosen types let through.
     func admitsType(_ type: TypeID, in catalogue: Catalogue) -> Bool {

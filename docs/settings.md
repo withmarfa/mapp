@@ -1,8 +1,8 @@
 # Settings pages
 
-Status: General, Appearance, Editor, Lists and Layouts are built. The other pages are in [Agreed designs](agreed-designs.md#settings) until they are built.
+Status: General, Appearance, Editor, Lists, Layouts, Search, On This Mac and Connection are built. The other pages are in [Agreed designs](agreed-designs.md#settings) until they are built.
 
-Where it lives: `GeneralPage`, `AppearancePage`, `EditorPage`, `ListsPage`, `LayoutsPage`, `LayoutTypePage`, `LayoutChoices`, `EditorOptions`, `LineSpacing`, `ParagraphSpacing`, `IndentWith`, `PasteAs`, `EditingMode`, `StartWith`, `ReopenWindows`, `NewItemType`, `WeekStart`, `DateFormat`, `DateDisplay`, `MissingChoice`, `MacSettings`, `AppTheme`, `AccentChoice`, `HighlightChoice` and `FontChoice`, under `MAPP/Settings/`, `MAPP/Model/` and `MAPP/Views/`.
+Where it lives: `GeneralPage`, `AppearancePage`, `EditorPage`, `ListsPage`, `LayoutsPage`, `LayoutTypePage`, `LayoutChoices`, `EditorOptions`, `LineSpacing`, `ParagraphSpacing`, `IndentWith`, `PasteAs`, `EditingMode`, `StartWith`, `ReopenWindows`, `NewItemType`, `WeekStart`, `DateFormat`, `DateDisplay`, `MissingChoice`, `MacSettings`, `AppTheme`, `AccentChoice`, `HighlightChoice`, `FontChoice`, `MAPP/Settings/`, `MAPP/Model/`, `MAPP/Views/`, `SearchPage`, `SearchOptions`, `SearchLeaveOutList`, `OnThisMacPage`, `LibraryExport`, `StoreSize`, `ConnectionPage`, `ConnectionStanding` and `ConnectionAccount`.
 
 Every setting here is a Mac setting, kept in the defaults and never written to Marfa ([Settings storage](settings-storage.md)).
 
@@ -62,6 +62,28 @@ A type's page is pushed on the list and Back returns to it. It has:
 Every change is written to the store that already holds it (`TypeLooks` for the row, `PagePlacements` for the page), so a list, a card, a table and an item's page see it at once. Only what differs from what the type's preset gives is kept, as an import keeps it, so a better preset still reaches every place nobody chose. Nothing is written to Marfa.
 
 Not built: the board's Color row (a type's color comes from its icon, which the server holds), its Card section (Picture and Facts on Cards are a gallery's own settings, kept for each view and place, and a card's words come from the type's look) and Show in Types (waits for the Types page).
+
+## Search
+
+- **Left Out of Search** lists the types and sources this server leaves out. They still show in their own place, in views and in Favorites. It is MAPP's own setting for this server (`SearchLeaveOuts`), applied inside the search call. A type left out takes its subtypes with it, and they are listed under it as left out too. "Leave Out a Type or Source…" is a menu of the types and sources not yet left out, A to Z as the list is; a type with subtypes says so ("Notes, with 2 subtypes"), and two types with one name are told apart in the menu and in the list ("Tasks (Tickets)"). A search holds at most ten conditions, and each type left out counts once for itself and once for each subtype below it, each source once, so the menu dims every type and source that would cross ten, and a footer under the card says why while any is dimmed. A source the server no longer lists is kept, shown as unknown, and can be removed.
+- **It applies to every search across the whole library**: Search Items, and the items ⌘K matches by title. Both end with "N more in what is left out" and Show, which searches once with nothing left out. A search inside one place or list leaves nothing out, since the person chose that place. Collection and Updated in Search Items still narrow after the 500 results, since the filter grammar has no parentheses.
+- **Include.** Archived Items and Inbox Items are on by default. Off, they are asked of the copy in the search call itself (`ItemQuery.states` is active only, `ItemQuery.tier` is the library tier), so the most a search lists is counted after them. The Inbox is the feed tier.
+- **Results.** Order is Best Match, as the copy ranked them, or Most Recent, by when each was last edited; the sort runs on the up to 500 the copy answered, then the first 50 are listed. Show Snippets off gives Search Items one line to a row, with no words around the match.
+
+## On This Mac
+
+- **The head** says how much room the copy of this library takes: every file in its store folder, which MAPP sums itself, since the package reports downloaded files only. It sums when the page opens, after a step on the page, when a download ends and then about every 30 seconds while the page stays open.
+- **Files.** Keep Opened Files is the size the downloaded files may reach (Automatic, a size, or Keep All Downloads). Attachments are always kept so they open offline, and are counted; "Attachments Not Yet Offline" counts the rest and gives the reason as its line ("Waiting to download.", or each reason with its count where there are several). Opened Files shows their size, and Clear fetches again only what is needed: it keeps attachments and files waiting to upload. There is no "recent files only".
+- **Export Everything** asks for a folder and writes the server's whole archive there (`GET /export`, as an archive with files), named after the server and the day. It needs the server; it is written beside its name and moved into place only once whole, and a failure says so in one line and leaves no file.
+- **Not built.** Export Automatically, a schedule that exports to a folder the person chose, is in [Agreed designs](agreed-designs.md#settings): MAPP has no scheduler, and keeping a chosen folder across launches needs a saved folder permission that MAPP does not keep yet.
+- **Download Everything Again** asks first, then hydrates the copy again from the server. Changes not yet sent stay in the queue and are sent afterwards; the queue is never cleared. While it downloads, the row shows the progress in place of its usual line and the button is off.
+
+## Connection
+
+- **The head** names the server and how it stands: Connected with how long ago it was up to date, Not Answering with Try Again, or Sign In… and Use a Code Instead… once the server has ended the sign-in. A copy that stopped shows no download progress.
+- **Account.** Signed In As, always shown while the sign-in is held, also while the server does not answer. Its value is the owner's name, which the server tells only to a sign-in that holds the profile name read scope: MAPP asks for it at every sign-in, and a Mac signed in before that has an empty value whose line says "Allow More… lets MAPP read the owner's name." The row has no button; the one Allow More… on the page is Look After This Marfa's, which also gives the name. Look After This Marfa ("MAPP holds N of the owner's 14 permissions" with Allow More…, or All 14, counted as a key's and an app's pages count them) and Unsent Changes. Allow More… asks for every permission not held, `sign_ins.manage` included, which is never asked at sign-in. Problems, the changes that need the person, follow Account.
+- **Other Marfas** and **Disconnect** follow every rule of [Marfa library](../MAPP/Model/Marfa/AGENTS.md): the queue is read in the same step, and the Departure sheet asks about changes that wait. Disconnect asks first with an alert: "MAPP removes its copy from this Mac and signs out. Webhooks it made are deleted. Your items stay." The server deletes the webhooks an app made when its sign-in ends (`events/webhook-grant-revoked`).
+- **Not built.** The section "MAPP's Settings" and the alert's "Also remove MAPP's settings" wait for settings to sync through Marfa ([Agreed designs](agreed-designs.md#settings-sync-through-marfa)). The state after the sign-in address changed (a head that says where the server moved to) is not built: MAPP cannot learn the new address.
 
 ## Related pages
 

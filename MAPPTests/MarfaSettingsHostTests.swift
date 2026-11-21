@@ -49,6 +49,56 @@ import Testing
         #expect(!adapter.grants.contains(.backupsManage))
     }
 
+    /// `GET /profile` answers a field only to a credential holding its profile read scope, so Signed In As needs it at
+    /// sign-in. It is a scope, not an owner permission.
+    @Test func aSignInAsksForTheReadOfTheOwnersNameAndItIsNoOwnerPermission() async throws {
+        #expect(SystemSignIns.scopes.contains("profile.name:read"))
+        #expect(SystemSignIns.profileScopes.allSatisfy { InstancePermission(rawValue: $0) == nil })
+        let bench = try HostBench()
+        let (adapter, libraries, _) = try await connected(bench)
+        #expect(bench.signIns.askedScopes.last?.contains("profile.name:read") == true)
+        #expect(libraries.host.readsProfile)
+        #expect(adapter.grants == SystemSignIns.askedAtSignIn, "the read of the name adds no permission")
+    }
+
+    @Test func aSignInMadeBeforeTheNameWasAskedForShowsItAfterAllowMore() async throws {
+        let bench = try HostBench()
+        let (adapter, libraries, _) = try await connected(bench)
+        bench.signIns.save("old", for: first.address, profile: false)
+        await libraries.host.refreshGrants()
+        #expect(!libraries.host.readsProfile)
+        let account = ConnectionAccount(
+            state: .online, grants: adapter.grants, grantsRead: true, readsProfile: libraries.host.readsProfile, waiting: 0, serverName: "X")
+        #expect(account.offersName, "Connection offers to allow it")
+        bench.signIns.script(browser: [.success("again")])
+        #expect(await adapter.allowMore([]) == .allowed)
+        #expect(libraries.host.readsProfile)
+        #expect(adapter.grants == SystemSignIns.askedAtSignIn, "what was held is kept")
+    }
+
+    @Test func signingInAgainGivesTheNameToASignInThatLackedItAndKeepsItAfter() async throws {
+        let bench = try HostBench()
+        let (_, libraries, _) = try await connected(bench)
+        bench.signIns.save("old", for: first.address, profile: false)
+        await libraries.host.refreshGrants()
+        #expect(!libraries.host.readsProfile)
+        await libraries.marfaSettings.start(.signInAgain(usingCode: false)).value
+        #expect(libraries.host.readsProfile)
+        bench.signIns.script(codeKey: "by-code")
+        await libraries.marfaSettings.start(.signInAgain(usingCode: true)).value
+        #expect(libraries.host.readsProfile, "a code sign-in asks for it too")
+    }
+
+    @Test func anOwnerWhoLeavesTheNameOutIsOfferedItAgainAndNothingIsTold() async throws {
+        let bench = try HostBench()
+        let (adapter, libraries, _) = try await connected(bench)
+        bench.signIns.script(approvingProfile: false)
+        bench.signIns.script(browser: [.success("without")])
+        #expect(await adapter.allowMore([]) == .allowed)
+        #expect(!libraries.host.readsProfile)
+        #expect(libraries.host.notices.waiting.filter { $0.title == Words.permissionsLostTitle }.isEmpty)
+    }
+
     @Test func allowMoreCancelledChangesNothingAndLeavesThePageMissingIt() async throws {
         let bench = try HostBench()
         let (adapter, libraries, _) = try await connected(bench)

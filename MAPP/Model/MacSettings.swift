@@ -15,7 +15,7 @@ enum MacSettings {
                 SourceViewMode.key, PlaceDensities.key, PlaceDefaults.key, ItemTableColumnLayouts.key, ViewLayouts.key,
                 PagePlacements.key, IncludedSubtypes.key, SidebarLayouts.defaultsKey, TypeLooks.defaultsKey, SearchLeaveOuts.defaultsKey,
                 ShortcutBindings.defaultsKey, AnyAppShortcuts.defaultsKey,
-            ]
+            ] + SearchOptions.keys
     }
 
     /// Settings kept one for each of a number of things, such as the open sections of each app's inspector.

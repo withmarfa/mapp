@@ -122,6 +122,13 @@ actor MarfaSync {
         work()
     }
 
+    /// The person asked to download everything again: the copy is hydrated again from the server. A hydration keeps the
+    /// queue, so what waits to be sent is sent afterwards (`drain` follows `refreshNow`), and the queue is never cleared.
+    func rehydrate() {
+        wantsHydration = true
+        work()
+    }
+
     /// Rows the copy could not read, found by a read: the copy replaces them on a hydration, which keeps its queue.
     func unreadable(_ ids: Set<String>) {
         guard rehydration.ask(about: ids) else { return }

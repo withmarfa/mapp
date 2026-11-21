@@ -97,11 +97,13 @@ struct PaletteRow: View {
     /// Search Items shows two lines on every row, so its rows are all one height: the title, then the words around the
     /// match or the item's own words. The command palette's rows, commands among them, all take one line.
     let isSearch: Bool
+    /// Whether a search row shows the words around the match (Show Snippets); without them it takes one line.
+    var showsSnippets = true
     let onHover: () -> Void
     let onRun: () -> Void
 
     var body: some View {
-        let words = isSearch ? (entry.excerpt?.attributed() ?? AttributedString(entry.snippet ?? " ")) : nil
+        let words = isSearch && showsSnippets ? (entry.excerpt?.attributed() ?? AttributedString(entry.snippet ?? " ")) : nil
         // A row with a second line keeps its mark and date on the title's line, as a one-line row has them.
         HStack(alignment: words == nil ? .center : .firstTextBaseline, spacing: PaletteMetrics.markGap) {
             PaletteMark(icon: entry.icon)

@@ -174,6 +174,10 @@ nonisolated final class MarfaSource: ItemSource {
         Task { [engine] in await engine.sync.refresh() }
     }
 
+    func downloadEverythingAgain() {
+        Task { [engine] in await engine.sync.rehydrate() }
+    }
+
     @discardableResult
     func submit(_ write: ItemWrite, as id: WriteID, undoing: UndoGroup?) -> Bool {
         let event: MarfaEngine.Event = undoing.map { .undo(write, id, $0) } ?? .write(write, id)

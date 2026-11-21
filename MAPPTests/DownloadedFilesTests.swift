@@ -28,6 +28,16 @@ import Testing
         #expect(DownloadWording.reason(MissingAttachments(reason: .noRoom, count: 3)).contains("space"))
     }
 
+    @Test func oneReasonIsTheLineOfTheRowAndSeveralAreCounted() {
+        #expect(DownloadWording.line([]) == nil)
+        #expect(DownloadWording.line([MissingAttachments(reason: .notFetched, count: 3)]) == "Waiting to download.")
+        #expect(DownloadWording.line([MissingAttachments(reason: .notFetched, count: 3), MissingAttachments(reason: .noRoom, count: 2)])
+            == "3 waiting to download. 2 need more disk space.")
+        for reason in NotHeldReason.allCases {
+            #expect(DownloadWording.line([MissingAttachments(reason: reason, count: 1)])?.hasSuffix(".") == true)
+        }
+    }
+
     @Test func removalKeepsTheChosenBudgetAndUploads() async throws {
         let directory = URL.temporaryDirectory.appending(path: UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }

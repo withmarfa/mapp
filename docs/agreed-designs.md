@@ -38,12 +38,7 @@ Nine pages in three groups: General, Appearance and Keyboard; Editor, Lists, Lay
 - **General and Appearance** are built: see [Settings pages](settings.md).
 - **Keyboard** is built: see [Keyboard shortcuts](keyboard-shortcuts.md).
 - **Editor, Lists and Layouts** are built: see [Settings pages](settings.md).
-- **Search.**
-  - Leave Out of Search, by type and by source. It is MAPP's own setting, applied inside the search.
-  - Include Archived Items and Include Inbox Items.
-  - Results in Best Match or Most Recent order, and Show Snippets.
-- **On This Mac.** The copy of the library MAPP keeps on this Mac: the space it uses, opened files (a size budget and Remove Downloaded Files), export to a folder, and Download Everything Again, which keeps changes not yet sent. "Recent files only" is not offered.
-- **Connection.** As drawn, plus the "MAPP's Settings" section described under sync below.
+- **Search, On This Mac and Connection** are built: see [Settings pages](settings.md). Agreed but not built: On This Mac's **Export Automatically** ("To a folder you choose", with Never as the default), a row in the Export section under Export Everything. MAPP has no scheduler, and keeping a chosen folder across launches needs a saved folder permission that MAPP does not keep yet. Connection gets the "MAPP's Settings" section described under sync below once that is built.
 
 ### The Marfa's pages
 

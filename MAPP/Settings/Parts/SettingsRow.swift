@@ -9,7 +9,9 @@ enum SettingsLead {
     case tint(String, SettingsTokens.Tone)
     /// A plain symbol.
     case symbol(String)
-    /// Anything else the row needs in the column, such as a type's mark or an app's picture.
+    /// A type's or a source's mark, drawn as a plain symbol is.
+    case mark(Image)
+    /// Anything else the row needs in the column, such as an app's picture.
     case custom(AnyView)
 
     var isNone: Bool {
@@ -129,6 +131,8 @@ struct SettingsRow<Trailing: View>: View {
                 .accessibilityHidden(true)
         case .symbol(let name):
             Image(systemName: name).font(.system(size: 14)).foregroundStyle(SettingsTokens.secondaryText).accessibilityHidden(true)
+        case .mark(let image):
+            image.font(.system(size: 14)).foregroundStyle(SettingsTokens.secondaryText).accessibilityHidden(true)
         case .custom(let view):
             view
         }

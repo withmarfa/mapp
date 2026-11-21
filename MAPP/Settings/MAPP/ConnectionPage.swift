@@ -1,13 +1,17 @@
 import AppKit
 import SwiftUI
 
-/// The Connection page: the server in use and how it stands, each change that needs the person, the sign-in and the
-/// other server, the downloaded files, and Disconnect. With no server set it is the address to sign in to. What each
-/// step does is `MarfaSettingsModel`'s, unchanged; this draws it from the parts.
+/// The Connection page: the server in use and how it stands, the account (who is signed in, what the owner has allowed
+/// MAPP, what waits to be sent), each change that needs the person, the other server, and Disconnect. With no server set
+/// it is the address to sign in to. What each step does is `MarfaSettingsModel`'s, unchanged; this draws it from the parts.
 struct ConnectionPage: View {
+    let settingsHost: MAPPMarfaSettingsHost
     @Environment(Libraries.self) private var libraries
     @Environment(\.library) private var library
     @State private var isChoosingOther = false
+    /// The owner's name and the server it was read from, kept while that server does not answer.
+    @State private var accountName: String?
+    @State private var accountNameServer: MarfaConnection?
 
     private var host: MarfaHost { libraries.host }
     private var model: MarfaSettingsModel { libraries.marfaSettings }
@@ -22,37 +26,48 @@ struct ConnectionPage: View {
             codeSection
             noticeSection
             if let connection = host.configuredConnection {
-                if isSignedOut == false { otherServer }
-                if let library, let files = library.downloadedFiles {
-                    ConnectionDownloads(files: files).id(ObjectIdentifier(library))
-                }
+                otherServer
                 disconnect(from: connection)
             }
         }
         .accessibilityIdentifier("ConnectionPage")
-        .confirmationDialog("Disconnect from this server?", isPresented: Bindable(model).isConfirmingDisconnect) {
+        .alert("Disconnect from \(LibraryDescription.name(libraries))?", isPresented: Bindable(model).isConfirmingDisconnect) {
+            Button("Cancel", role: .cancel) {}
             Button("Disconnect", role: .destructive) { Task { await model.disconnect() } }
         } message: {
-            Text("MAPP removes its copy of your library from this Mac and ends its sign-in, also on the server. Your items on the server don’t change.")
+            Text("MAPP removes its copy from this Mac and signs out. Webhooks it made are deleted. Your items stay.")
+        }
+        .task(id: NameRequest(connection: host.configuredConnection, isOnline: host.state == .online, readsProfile: host.readsProfile)) {
+            if accountNameServer != host.configuredConnection {
+                accountName = nil
+                accountNameServer = host.configuredConnection
+            }
+            guard let connection = host.configuredConnection, host.state == .online else { return }
+            accountName = host.readsProfile ? await MarfaServerCalls(connection: connection, signIns: host.signIns).ownerName() : nil
         }
     }
 
-    private var isSignedOut: Bool { host.state == .keyRefused }
+    private struct NameRequest: Hashable {
+        let connection: MarfaConnection?
+        let isOnline: Bool
+        /// Read again once Allow More… or a new sign-in gives the read of the name.
+        let readsProfile: Bool
+    }
 
     // MARK: Not connected
 
     private var disconnected: some View {
-        SettingsSection("Connect to a Marfa", line: "MAPP shows one Marfa at a time.", footer: "MAPP opens the server’s own page to sign in and never sees your password.") {
-            SettingsRow("Address", line: "A Marfa server’s address.") {
+        SettingsSection("Connect to a Marfa", line: "MAPP shows one Marfa at a time.") {
+            SettingsRow("Address") {
                 SettingsField(
-                    title: "Address", text: Bindable(model).address, prompt: "https://marfa.example.com", onSubmit: { model.start(.connect(usingCode: false)) }
+                    title: "Address", text: Bindable(model).address, onSubmit: { model.start(.connect(usingCode: false)) }
                 )
                 .disabled(model.isWorking)
                 .accessibilityIdentifier("MarfaAddress")
             }
-            SettingsRow("Sign In", line: "On the server’s own page, in your browser.") {
+            SettingsRow("Sign In", line: "On the server’s own page, in a sheet.") {
                 signInButtons(
-                    title: "Sign In", canStart: model.canConnect, browser: .connect(usingCode: false), code: .connect(usingCode: true),
+                    title: "Sign In…", canStart: model.canConnect, browser: .connect(usingCode: false), code: .connect(usingCode: true),
                     identifier: "MarfaConnect")
             }
         }
@@ -63,41 +78,29 @@ struct ConnectionPage: View {
     @ViewBuilder private func connected(to connection: MarfaConnection) -> some View {
         // Read again as the clock passes, so "2 minutes ago" turns to "3" on time.
         SyncStatusReading(host: host) { status in
-            let words = standing(status)
             let name = LibraryDescription.name(libraries)
-            let host = SettingsWording.hostName(of: connection.address)
+            let hostName = SettingsWording.hostName(of: connection.address)
+            let standing = ConnectionStanding(
+                state: host.state, status: status, lastSynced: host.lastSynced, now: .now, format: .stored())
             VStack(alignment: .leading, spacing: 10) {
                 SettingsHead(
                     symbol: "server.rack", tone: .blue, title: Text(verbatim: name),
-                    line: Text(verbatim: [name == host ? nil : host, words.line].compactMap { $0 }.joined(separator: ". "))
+                    line: Text(verbatim: [name == hostName || standing.action != .none ? nil : hostName, standing.line].compactMap { $0 }.joined(separator: ". "))
                 ) {
-                    if isSignedOut {
-                        signInButtons(
-                            title: "Sign In Again", canStart: !model.isWorking, browser: .signInAgain(usingCode: false),
-                            code: .signInAgain(usingCode: true), identifier: "MarfaSignInAgain")
-                    } else {
-                        SettingsValue(verbatim: words.title, dot: words.color)
-                    }
+                    headAction(standing)
                 }
                 .accessibilityIdentifier("LibrarySummary")
-                if let detail = words.detail {
+                if let detail = standing.detail {
                     SettingsNote(verbatim: detail)
                 }
-            }
-        }
-        SettingsSection("Library") {
-            if let library {
-                SettingsRow("Items") { SettingsValue(verbatim: library.count(in: .allItems).formatted()) }
-            }
-            SettingsRow("Unsent Changes", line: isSignedOut ? "Sent once you sign in again." : nil) {
-                SettingsValue(verbatim: host.waitingChanges.map { $0 > 0 ? Words.changes($0) : String(localized: "None") } ?? String(localized: "Unknown"))
-            }
-            if let fill = library?.syncReport.fill, fill.state != .complete {
-                SettingsRow(fill.state == .updating ? "Updating Library…" : "Downloading Library…") {
-                    SettingsValue(verbatim: FillWording.line(fill)).monospacedDigit().accessibilityIdentifier("LibraryFillProgress")
+                if FillWording.shows(library?.syncReport.fill, in: host.state), let fill = library?.syncReport.fill {
+                    SettingsNote(verbatim: String(localized: "Downloading library… \(FillWording.line(fill))"))
+                        .monospacedDigit()
+                        .accessibilityIdentifier("LibraryFillProgress")
                 }
             }
         }
+        account(name: LibraryDescription.name(libraries))
         if library != nil, !host.report.problems.isEmpty {
             SettingsSection("Problems", footer: "Until you decide, these changes stay on this Mac.") {
                 ForEach(host.report.problems) { problem in
@@ -105,30 +108,75 @@ struct ConnectionPage: View {
                 }
             }
         }
-        if !isSignedOut { signInSection }
     }
 
-    private var signInSection: some View {
-        SettingsSection(
-            "Your Sign-In",
-            footer: "MAPP keeps its sign-in in your Keychain and renews it itself. Sign in again only to change the account or permissions."
-        ) {
-            SettingsRow("Sign In Again") {
-                signInButtons(
-                    title: "Sign In Again", canStart: !model.isWorking, browser: .signInAgain(usingCode: false),
-                    code: .signInAgain(usingCode: true), identifier: "MarfaSignInAgain")
+    @ViewBuilder private func headAction(_ standing: ConnectionStanding) -> some View {
+        switch standing.action {
+        case .signIn:
+            signInButtons(
+                title: "Sign In…", canStart: !model.isWorking, browser: .signInAgain(usingCode: false),
+                code: .signInAgain(usingCode: true), identifier: "MarfaSignInAgain")
+        case .tryAgain:
+            HStack(spacing: 8) {
+                if let word = standing.word { SettingsValue(verbatim: word, dot: color(of: standing.tone)) }
+                SettingsButton("Try Again") { host.refresh() }.accessibilityIdentifier("MarfaTryAgain")
             }
+        case .none:
+            if let word = standing.word { SettingsValue(verbatim: word, dot: color(of: standing.tone)) }
         }
     }
 
+    private func color(of tone: ConnectionStanding.Tone) -> Color {
+        switch tone {
+        case .ok: SettingsTokens.ok
+        case .warning: SettingsTokens.warning
+        case .problem: SettingsTokens.Tone.red.color
+        case .quiet: SettingsTokens.secondaryText
+        }
+    }
+
+    private func account(name: String) -> some View {
+        let account = ConnectionAccount(
+            state: host.state, grants: host.grants, grantsRead: host.grantsRead, readsProfile: host.readsProfile,
+            waiting: host.waitingChanges, serverName: name)
+        return SettingsSection("Account") {
+            if account.showsName {
+                SettingsRow(title: Text("Signed In As"), line: account.nameLine.map { Text(verbatim: $0) }) {
+                    SettingsValue(verbatim: accountName ?? "")
+                }
+                .accessibilityIdentifier("SignedInAs")
+            }
+            if account.showsPermissions {
+                SettingsRow(title: Text("Look After This Marfa"), line: Text(verbatim: account.permissionsLine)) {
+                    HStack(spacing: 8) {
+                        if account.holdsAll { SettingsValue(verbatim: account.permissionsValue) }
+                        // The one Allow More… on the page: it asks for the owner's name too, which every sign-in asks for.
+                        if !account.holdsAll || account.offersName {
+                            SettingsButton(settingsHost.isAllowingMore ? "Waiting…" : "Allow More…") {
+                                Task { _ = await settingsHost.allowMore(ConnectionAccount.asked) }
+                            }
+                            .disabled(settingsHost.isAllowingMore)
+                            .accessibilityIdentifier("AllowMore")
+                        }
+                    }
+                }
+                .accessibilityIdentifier("LookAfterThisMarfa")
+            }
+            SettingsRow(title: Text("Unsent Changes"), line: account.unsentLine.map { Text(verbatim: $0) }) {
+                SettingsValue(verbatim: account.unsent)
+            }
+        }
+        .accessibilityIdentifier("ConnectionAccount")
+    }
+
     private var otherServer: some View {
-        SettingsSection("Other Marfas", footer: "Each server has its own copy on this Mac.") {
+        SettingsSection("Other Marfas") {
             SettingsRow("Use Another Marfa", line: "MAPP shows one Marfa at a time.") {
                 SettingsButton(isChoosingOther ? "Hide" : "Choose…") { isChoosingOther.toggle() }
             }
             if isChoosingOther {
-                SettingsRow("Address") {
-                    SettingsField(title: "Address", text: Bindable(model).otherAddress, prompt: "https://marfa.example.com")
+                SettingsRow("Address", line: "Each server has its own copy on this Mac.") {
+                    SettingsField(title: "Address", text: Bindable(model).otherAddress)
                         .disabled(model.isWorking)
                         .accessibilityIdentifier("MarfaOtherAddress")
                 }
@@ -151,7 +199,7 @@ struct ConnectionPage: View {
                     if model.isWorking { ProgressView().controlSize(.small) }
                     SettingsButton("Disconnect…", role: .destructive) { model.requestDisconnect() }
                         .disabled(model.isWorking)
-                        .accessibilityIdentifier(isSignedOut ? "MarfaRefusedDisconnect" : "MarfaDisconnect")
+                        .accessibilityIdentifier(host.state == .keyRefused ? "MarfaRefusedDisconnect" : "MarfaDisconnect")
                 }
             }
         }
@@ -211,34 +259,6 @@ struct ConnectionPage: View {
                 .accessibilityIdentifier("MarfaNotice")
             }
         }
-    }
-
-    // MARK: Standing
-
-    /// How the server stands: a word, a dot, and what to do about it.
-    /// The status word goes once, at the head's trailing edge; the line says only what else is true of it.
-    private func standing(_ status: SyncStatus) -> (title: String, line: String?, detail: String?, color: Color) {
-        let connection = ConnectionStatus(host.state)
-        if let note = status.primary {
-            return (connection.title, note.line, connection.detail ?? note.detail, note.dotColor)
-        }
-        switch host.state {
-        case .online: return (connection.title, upToDate(), nil, SettingsTokens.ok)
-        default:
-            return (connection.title, nil, connection.detail, connection.isProblem ? SettingsTokens.Tone.red.color : SettingsTokens.secondaryText)
-        }
-    }
-
-    private func upToDate() -> String { ConnectionHeadWording.upToDate(since: host.lastSynced, now: .now) }
-}
-
-/// The words of the Connection head's line.
-enum ConnectionHeadWording {
-    /// "Up to date 2 minutes ago", or "Up to date" before the first sync has finished.
-    static func upToDate(since synced: Date?, now: Date, locale: Locale = .current) -> String {
-        guard let synced else { return String(localized: "Up to date") }
-        guard let age = SyncFootLine.age(of: synced, now: now, locale: locale) else { return String(localized: "Up to date just now") }
-        return String(localized: "Up to date \(age)")
     }
 }
 

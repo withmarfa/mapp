@@ -160,6 +160,8 @@ nonisolated protocol ItemSource: AnyObject, Sendable {
 
     /// Hydrates or catches up, then sends what waits; never waited on.
     func refresh()
+    /// Hydrates the copy again from the server, whole, keeping every write not yet sent; never waited on.
+    func downloadEverythingAgain()
     /// The writes not sent once every write submitted before the call is in the queue; nil where the queue
     /// cannot be read.
     func unsentWrites() async -> UnsentChanges?
@@ -178,6 +180,8 @@ nonisolated extension ItemSource {
     func moreItemsTaken(with ids: [ItemID]) async -> Int? { nil }
 
     var downloadedFiles: (any DownloadedFiles)? { nil }
+
+    func downloadEverythingAgain() {}
 
     @discardableResult
     func submit(_ write: ItemWrite, as id: WriteID) -> Bool {

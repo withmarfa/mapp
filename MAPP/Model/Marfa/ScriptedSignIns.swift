@@ -24,8 +24,12 @@ nonisolated final class ScriptedSignIns: SignIns {
         /// The permissions the next browser sign-in grants of those asked, first to last; the last is repeated. Empty
         /// grants everything asked.
         var approving: [Set<InstancePermission>] = []
+        /// Whether the sign-ins that succeed are approved the read of the owner's name they ask for.
+        var approvesProfile = true
         /// The permissions each browser or code sign-in was asked for, in order.
         var asked: [Set<InstancePermission>] = []
+        /// The scopes each sign-in asked for besides those, as `SystemSignIns` asks them.
+        var askedScopes: [[String]] = []
     }
 
     private static let service = "com.withmarfa.mapp.scripted-sign-ins"
@@ -46,9 +50,12 @@ nonisolated final class ScriptedSignIns: SignIns {
         save(key, for: connection.address)
     }
 
-    func save(_ key: String, for address: URL, permissions: Set<InstancePermission> = SystemSignIns.askedAtSignIn) {
+    /// Keeps `key` as a sign-in holding `permissions` and, with `profile`, the read of the owner's name; a sign-in made
+    /// before MAPP asked for it is kept with `profile` false.
+    func save(_ key: String, for address: URL, permissions: Set<InstancePermission> = SystemSignIns.askedAtSignIn, profile: Bool = true) {
         _ = try? keychain.signIn(
-            to: address, service: Self.service, accessToken: key, scopes: permissions.map(\.rawValue).sorted())
+            to: address, service: Self.service, accessToken: key,
+            scopes: permissions.map(\.rawValue).sorted() + (profile ? SystemSignIns.profileScopes : []))
     }
 
     /// Keeps what the key held for `connection` really holds, as the server it is held for says (`GET /keys/current`), in
@@ -57,7 +64,9 @@ nonisolated final class ScriptedSignIns: SignIns {
     func adoptScopes(for connection: MarfaConnection) async {
         guard let server = try? held(connection.address), let token = try? key(for: connection.address) else { return }
         guard let key = try? await Client(server).getCurrentKey().ok.body.json else { return }
-        save(token, for: connection.address, permissions: Set(key.permissions.compactMap { InstancePermission(rawValue: $0.rawValue) }))
+        save(
+            token, for: connection.address, permissions: Set(key.permissions.compactMap { InstancePermission(rawValue: $0.rawValue) }),
+            profile: (try? readsProfile(for: connection)) ?? false)
     }
 
     /// The permissions each browser or code sign-in asked for, in order.
@@ -66,6 +75,19 @@ nonisolated final class ScriptedSignIns: SignIns {
     /// What the next browser sign-ins grant of the permissions they ask for, so a test can approve fewer than asked.
     func script(approving: [Set<InstancePermission>]) {
         state.withLock { $0.approving = approving }
+    }
+
+    /// Whether the sign-ins that follow are approved the read of the owner's name; the owner may leave it out.
+    func script(approvingProfile: Bool) {
+        state.withLock { $0.approvesProfile = approvingProfile }
+    }
+
+    /// The scopes every browser or code sign-in asked for, as `SystemSignIns` asks them, in order.
+    var askedScopes: [[String]] { state.withLock { $0.askedScopes } }
+
+    func readsProfile(for connection: MarfaConnection) throws -> Bool? {
+        guard let credential = try authorization(for: connection.address).credential() else { return nil }
+        return SystemSignIns.readsProfile(credential.scopes)
     }
 
     func grants(for connection: MarfaConnection) throws -> Set<InstancePermission>? {
@@ -138,31 +160,34 @@ nonisolated final class ScriptedSignIns: SignIns {
     }
 
     @MainActor func signInWithBrowser(to connection: MarfaConnection, asking permissions: Set<InstancePermission>) async throws -> SignedIn {
-        let (next, granted): (Result<String, any Error>, Set<InstancePermission>) = state.withLock { state in
+        let (next, granted, profile): (Result<String, any Error>, Set<InstancePermission>, Bool) = state.withLock { state in
             state.calls.append("browser \(connection.address.absoluteString)")
             let granted = Self.take(asking: permissions, in: &state)
-            return (state.browser.count > 1 ? state.browser.removeFirst() : (state.browser.first ?? .success(signedInKey)), granted)
+            return (
+                state.browser.count > 1 ? state.browser.removeFirst() : (state.browser.first ?? .success(signedInKey)), granted,
+                state.approvesProfile)
         }
         try await onBrowser.withLock { $0 }?()
         let token = try next.get()
         keychain.succeed()
-        save(token, for: connection.address, permissions: granted)
+        save(token, for: connection.address, permissions: granted, profile: profile)
         return signedIn
     }
 
     /// Records what a sign-in asked for and answers which of it the owner approves.
     private static func take(asking permissions: Set<InstancePermission>, in state: inout State) -> Set<InstancePermission> {
         state.asked.append(permissions)
+        state.askedScopes.append(SystemSignIns.scopes)
         let approving = state.approving.count > 1 ? state.approving.removeFirst() : state.approving.first
         let asked = SystemSignIns.askedAtSignIn.union(permissions)
         return approving.map { asked.intersection($0) } ?? asked
     }
 
     func startCodeSignIn(to connection: MarfaConnection, asking permissions: Set<InstancePermission>) async throws -> CodeSignIn {
-        let (next, granted, key): (Result<CodeSignIn, any Error>?, Set<InstancePermission>, String?) = state.withLock { state in
+        let (next, granted, key, profile): (Result<CodeSignIn, any Error>?, Set<InstancePermission>, String?, Bool) = state.withLock { state in
             state.calls.append("code \(connection.address.absoluteString)")
             let granted = Self.take(asking: permissions, in: &state)
-            return (state.code.count > 1 ? state.code.removeFirst() : state.code.first, granted, state.codeKey)
+            return (state.code.count > 1 ? state.code.removeFirst() : state.code.first, granted, state.codeKey, state.approvesProfile)
         }
         if let next { return try next.get() }
         guard let key else { throw SignInError.unavailable(message: "No code was scripted.") }
@@ -170,7 +195,7 @@ nonisolated final class ScriptedSignIns: SignIns {
         return CodeSignIn(
             code: "SCRIPTED", address: address, completeAddress: nil, expiresAt: .distantFuture,
             finish: { [self] in
-                save(key, for: address, permissions: granted)
+                save(key, for: address, permissions: granted, profile: profile)
                 return signedIn
             })
     }

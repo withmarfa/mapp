@@ -25,6 +25,10 @@ final class FakeItemLibrary: ItemLibrary {
     /// Every preview asked for, in order.
     @ObservationIgnored private(set) var previewsAsked: [LibraryViewQuery] = []
     var reachesServer = true
+    /// What Settings > On This Mac reads, where a test gives it files.
+    var downloadedFiles: (any DownloadedFiles)?
+    private(set) var downloadedAgain = 0
+    func downloadEverythingAgain() { downloadedAgain += 1 }
     /// Whether counts cannot be answered, as when the copy cannot be sure and the server is out of reach.
     var countsUnavailable = false
     /// The counts the library works out from its items the way Marfa does: only active items, the groups of each child's

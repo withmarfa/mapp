@@ -23,6 +23,10 @@ struct CommandPalette: View {
     @AppStorage(OrderKey.groupsByDate) private var groupsByDate = ItemOrder().groupsByDate
     @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
+    @AppStorage(SearchOptions.includesArchivedKey) private var includesArchived = SearchOptions.includesArchivedStandard
+    @AppStorage(SearchOptions.includesInboxKey) private var includesInbox = SearchOptions.includesInboxStandard
+    @AppStorage(SearchOptions.orderKey) private var searchOrder = SearchOptions.Order.standard
+    @AppStorage(SearchOptions.showsSnippetsKey) private var showsSnippets = SearchOptions.showsSnippetsStandard
     let browser: Browser
     let editor: EditorController
     let mode: Browser.Palette
@@ -82,13 +86,17 @@ struct CommandPalette: View {
         let returnFocus: Browser.Pane
         let selection: Set<ItemID>
         let filters: PaletteFilters
+        /// What a typed search keeps and leaves out, which the items it lists follow.
+        let narrowing: SearchNarrowing
+        let typed: Bool
     }
 
     /// What is held across runs of the body: the items' titles for a basis, and how the titles ranked for a query.
     /// The commands are never held, since they read the editor, the browser and the host, which change while the
     /// palette is open and are not part of the basis.
     private final class Listing {
-        var items: (basis: Basis, items: [Item], titles: [String])?
+        var items: (basis: Basis, items: [Item], titles: [String], leftOut: [Item], leftOutTitles: [String])?
+        var leftOutMatches: (key: Ranking, items: [Item])?
         var ranking: (key: Ranking, picks: [PaletteMatch.Pick], scores: [Int])?
     }
 
@@ -100,7 +108,8 @@ struct CommandPalette: View {
 
     private var basis: Basis {
         Basis(library: ObjectIdentifier(library), content: library.contentRevision, membership: library.membershipRevision,
-              mode: mode, returnFocus: returnFocus, selection: browser.selection, filters: filterState.filters)
+              mode: mode, returnFocus: returnFocus, selection: browser.selection, filters: filterState.filters,
+              narrowing: askedNarrowing, typed: isTyped)
     }
 
     private var isTyped: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -112,7 +121,8 @@ struct CommandPalette: View {
         let stacked = Set(browser.stackedTypes.map { TypeID($0) })
         return SearchNarrowing(
             types: filters.types, typesWithSubtypes: stacked.intersection(filters.types),
-            excludesTypes: filters.negated.contains(.type), leaveOut: libraries?.searchLeaveOut ?? SearchLeaveOut())
+            excludesTypes: filters.negated.contains(.type), leaveOut: libraries?.searchLeaveOut ?? SearchLeaveOut(),
+            includesArchived: includesArchived, includesInbox: includesInbox)
     }
 
     /// The search a query and its narrowing stand for, so a change of either starts the answer again.
@@ -237,6 +247,7 @@ struct CommandPalette: View {
             refreshSearch()
         }
         .task(id: searchAsk) { await watchSearch() }
+        .onChange(of: searchOrder) { applyFilters(to: searched, leftOut: leftOut) }
         // The row Actions is open for may go while it is open, as another device deletes it.
         .onChange(of: actionsFor != nil && (target == nil || target?.item.map { library.item($0) == nil } == true)) { _, isGone in
             if isGone { closeActions() }
@@ -336,7 +347,7 @@ struct CommandPalette: View {
                             let index = group.start + position
                             PaletteRow(
                                 entry: entry, query: query, isHighlighted: index == chosen,
-                                isSearch: mode == .search
+                                isSearch: mode == .search, showsSnippets: showsSnippets
                             ) {
                                 if highlighted != index { highlighted = index }
                             } onRun: {
@@ -364,21 +375,40 @@ struct CommandPalette: View {
 
     /// Says how many more items matched in what is left out of search, or nil where none did.
     private var leftOutLine: String? {
-        guard mode == .search, isTyped, !showsLeftOut, !leftOut.isPending else { return nil }
+        guard isTyped, !showsLeftOut else { return nil }
+        if mode != .search {
+            // The titles the palette matches itself: what is left out and answers them, counted in full.
+            return SearchLeftOutLine.text(
+                for: listing.leftOutMatches?.items ?? [], isCapped: false, narrowing: narrowing, catalogue: library.catalogue,
+                sources: library.sources)
+        }
+        guard !leftOut.isPending else { return nil }
         return SearchLeftOutLine.text(
             for: leftOutItems, isCapped: leftOut.isCapped, narrowing: narrowing, catalogue: library.catalogue, sources: library.sources)
     }
 
-    /// The active items the filters let through, most recently edited first, and their titles. Worked out once for a
-    /// basis, which holds the filters, and not for each keystroke or hover.
-    private func filteredItems(_ basis: Basis) -> (items: [Item], titles: [String]) {
-        if let held = listing.items, held.basis == basis { return (held.items, held.titles) }
-        let typed = narrowing
-        let recent = browser.paletteIndex(in: library).recent.filter { typed.admitsType($0.type, in: library.catalogue) }
-        let items = basis.filters.afterSearch.apply(to: recent, now: library.now())
+    /// The active items the filters let through, most recently edited first, and their titles. Once words are typed, an
+    /// item left out of search is not listed: the ones that would answer them are in `leftOut`, which the line at the
+    /// foot counts. Worked out once for a basis, which holds the filters and the narrowing, and not for each keystroke
+    /// or hover.
+    private func filteredItems(_ basis: Basis) -> (items: [Item], titles: [String], leftOut: [Item], leftOutTitles: [String]) {
+        if let held = listing.items, held.basis == basis { return (held.items, held.titles, held.leftOut, held.leftOutTitles) }
+        let typed = basis.narrowing
+        let catalogue = library.catalogue
+        let recent = browser.paletteIndex(in: library).recent
+        var kept = recent
+        var out: [Item] = []
+        if basis.typed {
+            (kept, out) = typed.split(recent, in: catalogue)
+        } else {
+            kept = recent.filter { typed.admitsType($0.type, in: catalogue) }
+        }
+        let items = basis.filters.afterSearch.apply(to: kept, now: library.now())
+        let leftOutItems = basis.filters.afterSearch.apply(to: out, now: library.now())
         let titles = items.map(\.title)
-        listing.items = (basis, items, titles)
-        return (items, titles)
+        let leftOutTitles = leftOutItems.map(\.title)
+        listing.items = (basis, items, titles, leftOutItems, leftOutTitles)
+        return (items, titles, leftOutItems, leftOutTitles)
     }
 
     private func openTitle(for row: Entry) -> String {
@@ -502,7 +532,7 @@ struct CommandPalette: View {
         let commands = commands
         let fixed = commands + places
         let fixedTitles = fixed.map(\.title)
-        let (recent, itemTitles) = filteredItems(basis)
+        let (recent, itemTitles, leftOutItems, leftOutTitles) = filteredItems(basis)
         let typed = isTyped
         let key = Ranking(basis: basis, query: query, fixedTitles: fixedTitles)
         let picks: [PaletteMatch.Pick]
@@ -514,6 +544,13 @@ struct CommandPalette: View {
             picks = scored.map(\.pick)
             scores = scored.map(\.score)
             listing.ranking = (key, picks, scores)
+        }
+        if typed, !leftOutItems.isEmpty {
+            if listing.leftOutMatches?.key != key {
+                listing.leftOutMatches = (key, titles.ranked(leftOutTitles, query).map { leftOutItems[$0] })
+            }
+        } else {
+            listing.leftOutMatches = nil
         }
         let sections = PaletteSections.forCommands(picks: picks, scores: scores, typed: typed, groups: commands.map(\.group), recentCount: recent.count)
         return sections.map { section in
@@ -555,7 +592,7 @@ struct CommandPalette: View {
 
     private func applyFilters(to results: SearchResults, leftOut found: SearchResults) {
         let rest = filterState.filters.afterSearch
-        searchedItems = rest.apply(to: results.items, now: library.now())
+        searchedItems = searchOrder.ordered(rest.apply(to: results.items, now: library.now()))
         leftOutItems = rest.apply(to: found.items, now: library.now())
     }
 

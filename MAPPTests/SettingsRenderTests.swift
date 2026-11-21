@@ -41,6 +41,14 @@ import Testing
     func emptyDeleted() {}
 }
 
+/// Files for On This Mac with canned answers.
+nonisolated struct FakeDownloads: DownloadedFiles {
+    var state: DownloadedFileState
+    func read() async throws -> DownloadedFileState { state }
+    func setBudget(_ budget: DownloadBudget) async throws {}
+    func removeDownloadedFiles() async throws {}
+}
+
 /// The window as the boards draw it, for a pull request's pictures: the sidebar and the page, with a strip standing for
 /// the toolbar. The system's Back and Forward pill and title belong to the real window's toolbar, which an offscreen draw
 /// has no window to give, so the strip only marks where they sit and is not their size or look; the pictures taken from
@@ -202,17 +210,106 @@ struct RenderedWindow<Detail: View>: View {
         let (libraries, bench) = try await connected()
         _ = bench
         try await SettingsRender.png(
-            RenderedWindow(selection: .connection, detail: ConnectionPage().environment(libraries).environment(libraries.host)),
+            RenderedWindow(selection: .connection, detail: ConnectionPage(settingsHost: MAPPMarfaSettingsHost(libraries: libraries, launcher: SettingsLauncher())).environment(libraries).environment(libraries.host)),
             size: Self.size, named: "Connection")
     }
+
+    /// A page's states against boards S26 to S30: the owner's permissions held in part or in full, the server not answering,
+    /// and the sign-in ended.
+    private func connection(
+        named name: String, grantsAll: Bool = false, readsName: Bool = true, state: MarfaConnectionState = .online, waiting: Int = 0
+    ) async throws {
+        let bench = try HostBench()
+        let defaults = try #require(UserDefaults(suiteName: "SettingsRenderTests-\(UUID().uuidString)"))
+        let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
+        bench.servers.names.withLock { $0[try! MarfaConnection(address: "https://marfa.castell.studio")] = "Castell Studio" }
+        try await libraries.host.connect(address: "https://marfa.castell.studio", key: "k")
+        let source = try #require(bench.servers.last)
+        if grantsAll {
+            bench.signIns.save("k", for: URL(string: "https://marfa.castell.studio")!, permissions: Set(InstancePermission.allCases))
+        }
+        if !readsName {
+            // A sign-in made before MAPP asked for the owner's name.
+            bench.signIns.save("k", for: URL(string: "https://marfa.castell.studio")!, permissions: SystemSignIns.askedAtSignIn, profile: false)
+        }
+        source.report.set(SyncReport(lastSynced: .now.addingTimeInterval(-60), waiting: waiting, queueRead: true))
+        source.state.set(state)
+        await libraries.host.refreshGrants()
+        let page = ConnectionPage(settingsHost: MAPPMarfaSettingsHost(libraries: libraries, launcher: SettingsLauncher()))
+        try await SettingsRender.png(
+            RenderedWindow(selection: .connection, detail: page.environment(libraries).environment(libraries.host)),
+            size: Self.size, named: name, settle: .milliseconds(800))
+    }
+
+    @Test func connectionWithEveryPermission() async throws { try await connection(named: "Connection", grantsAll: true) }
+    @Test func connectionWithoutTheOwnersName() async throws {
+        try await connection(named: "Connection, without the owner’s name", readsName: false)
+    }
+    @Test func connectionWithoutTheOwnersPermissions() async throws { try await connection(named: "Connection, without the owner’s permissions") }
+    @Test func connectionNotAnswering() async throws {
+        try await connection(named: "Connection, not answering", state: .offline(reason: "refused"), waiting: 3)
+    }
+    @Test func connectionSignedOut() async throws { try await connection(named: "Connection, signed out", state: .keyRefused, waiting: 3) }
 
     @Test func connectionNotConnected() async throws {
         let bench = try HostBench()
         let defaults = try #require(UserDefaults(suiteName: "SettingsRenderTests-\(UUID().uuidString)"))
         let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
         try await SettingsRender.png(
-            RenderedWindow(selection: .connection, detail: ConnectionPage().environment(libraries).environment(libraries.host)),
+            RenderedWindow(selection: .connection, detail: ConnectionPage(settingsHost: MAPPMarfaSettingsHost(libraries: libraries, launcher: SettingsLauncher())).environment(libraries).environment(libraries.host)),
             size: Self.size, named: "Connection, not connected")
+    }
+
+    @Test func search() async throws {
+        let library = FakeItemLibrary(items: [])
+        library.sources.infos = ["github": SourceInfo(code: "github", name: "GitHub", mark: "lucide:code-xml", hasChosenName: false)]
+        library.sources.counts = ["github": 1_840]
+        let (libraries, bench) = try await connected()
+        _ = bench
+        libraries.searchLeaveOuts.update(libraries.libraryKey) { $0.sources = ["github"]; $0.types = [LibraryFixture.ticket] }
+        library.catalogue = LibraryFixture.catalogue
+        try await SettingsRender.png(
+            RenderedWindow(selection: .search, detail: SearchPage().environment(libraries).environment(\.library, library)),
+            size: Self.size, named: "Search")
+    }
+
+    /// The limit of ten conditions reached: what is left offered is dimmed in the menu, and the footer says why.
+    @Test func searchAtTheLimit() async throws {
+        let library = FakeItemLibrary(items: [])
+        let codes = (0..<12).map { "source-\($0)" }
+        library.sources.infos = Dictionary(uniqueKeysWithValues: codes.map { ($0, SourceInfo(code: $0, name: "Source \($0)", mark: nil, hasChosenName: false)) })
+        library.sources.counts = Dictionary(uniqueKeysWithValues: codes.map { ($0, 10) })
+        let (libraries, bench) = try await connected()
+        _ = bench
+        libraries.searchLeaveOuts.update(libraries.libraryKey) { $0.sources = Set(codes.prefix(10)) }
+        library.catalogue = LibraryFixture.catalogue
+        try await SettingsRender.png(
+            RenderedWindow(selection: .search, detail: SearchPage().environment(libraries).environment(\.library, library)),
+            size: Self.size, named: "Search, at the limit")
+    }
+
+    @Test func onThisMac() async throws {
+        let library = FakeItemLibrary(items: [])
+        library.downloadedFiles = FakeDownloads(
+            state: DownloadedFileState(
+                budget: .automatic, limit: 12_000_000_000, bytes: 1_200_000_000,
+                attachments: .init(held: 53, missing: 3, reasons: [MissingAttachments(reason: .waiting, count: 3)])))
+        let (libraries, bench) = try await connected()
+        _ = bench
+        try await SettingsRender.png(
+            RenderedWindow(
+                selection: .onThisMac,
+                detail: OnThisMacPage(openConnection: {}).environment(libraries).environment(libraries.host).environment(\.library, library)),
+            size: Self.size, named: "On This Mac", settle: .milliseconds(1_000))
+    }
+
+    @Test func onThisMacWithNoMarfaOpen() async throws {
+        let bench = try HostBench()
+        let defaults = try #require(UserDefaults(suiteName: "SettingsRenderTests-\(UUID().uuidString)"))
+        let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
+        try await SettingsRender.png(
+            RenderedWindow(selection: .onThisMac, detail: OnThisMacPage(openConnection: {}).environment(libraries).environment(libraries.host)),
+            size: Self.size, named: "On This Mac, no Marfa open")
     }
 
     @Test func overview() async throws {
