@@ -45,6 +45,8 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var webhooksMade: [NewWebhook] = []
         var webhookChanges: [(id: String, change: WebhookChange)] = []
         var redelivered: [String] = []
+        var folders: [OwnerFolder] = []
+        var reports: [String: FolderReport] = [:]
     }
 
     let state = Mutex(State())
@@ -284,6 +286,19 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
             state.redelivered.append(delivery)
             state.deliveries[webhook]?[index].status = .pending
             return state.deliveries[webhook]![index]
+        }
+    }
+
+    func folders() async throws(OwnerFailure) -> [OwnerFolder] {
+        try enter("folders")
+        return state.withLock { $0.folders }
+    }
+
+    func folderReport(_ id: String) async throws(OwnerFailure) -> FolderReport {
+        try enter("folderReport")
+        return try state.withLock { state throws(OwnerFailure) in
+            guard let report = state.reports[id] else { throw .notFound }
+            return report
         }
     }
 }
@@ -1408,7 +1423,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     }
 
     @Test func theNewPagesAreInTheSidebarInTheBoardsOrder() {
-        #expect(MarfaSettingsPage.groups == [[.overview], [.account, .apps, .keys, .addresses], [.recentlyDeleted], [.webhooks]])
+        #expect(MarfaSettingsPage.groups == [[.overview], [.account, .apps, .keys, .addresses], [.recentlyDeleted], [.webhooks, .folders]])
         for page in [MarfaSettingsPage.account, .apps, .keys, .addresses] {
             #expect(SettingsPage.marfa(page).matches(page.title))
         }

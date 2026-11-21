@@ -71,6 +71,7 @@ struct MarfaSettingsPageView: View {
             case .addresses: AddressesPage(host: host)
             case .recentlyDeleted: RecentlyDeletedPage(host: host, showsAll: subpage?.id == RecentlyDeletedPage.allDeleted.id)
             case .webhooks: WebhooksPage(host: host, subpage: subpage)
+            case .folders: FoldersPage(host: host, subpage: subpage)
             }
         }
     }

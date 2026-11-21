@@ -176,6 +176,9 @@ nonisolated protocol OwnerCalls: Sendable {
     func delete(webhook id: String) async throws(OwnerFailure)
     func deliveries(of webhook: String) async throws(OwnerFailure) -> [WebhookDeliveryInfo]
     func redeliver(_ delivery: String, of webhook: String) async throws(OwnerFailure) -> WebhookDeliveryInfo
+
+    func folders() async throws(OwnerFailure) -> [OwnerFolder]
+    func folderReport(_ id: String) async throws(OwnerFailure) -> FolderReport
 }
 
 /// What changing the addresses would do, as the server said before anything was written, with the change it said it

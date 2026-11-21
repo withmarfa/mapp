@@ -13,6 +13,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
     static let addresses = SettingsPage.marfa(.addresses)
     static let recentlyDeleted = SettingsPage.marfa(.recentlyDeleted)
     static let webhooks = SettingsPage.marfa(.webhooks)
+    static let folders = SettingsPage.marfa(.folders)
 
     /// MAPP's pages as the sidebar lists them, in groups split by space.
     static let mappGroups: [[SettingsPage]] = [[.general, .appearance, .keyboard], [.editor, .lists, .layouts, .search], [.onThisMac, .connection]]
