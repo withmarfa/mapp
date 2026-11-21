@@ -5,7 +5,7 @@ import Observation
 /// The Account page: the owner's profile as the server holds it, the password, the passkeys and the browsers signed in.
 /// The sign-ins need `sign_ins.manage`, which is asked for the first time the owner chooses Change Password, never at
 /// sign-in. A refused write keeps what was typed.
-@Observable @MainActor final class AccountModel {
+@Observable @MainActor final class AccountModel: OwnerDraftHolding {
     enum Sheet: Equatable {
         case password
         case renamePasskey(String)
@@ -262,6 +262,26 @@ import Observation
                 rowErrors[browser.id] = OwnerWording.line(error)
             }
             await context.learn(from: error)
+        }
+    }
+
+    // MARK: Closing
+
+    /// The name typed for a passkey, which the app gives back when Settings closes. A password is dropped and never
+    /// handed over.
+    func takeDrafts() -> [OwnerDraft] {
+        switch sheet {
+        case .password?:
+            closePasswordSheet()
+            return []
+        case .renamePasskey(let id)?:
+            let name = renameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+            let held = passkeys.first { $0.id == id }?.name ?? ""
+            closeRename()
+            guard !name.isEmpty, name != held else { return [] }
+            return [.typed(title: String(localized: "Passkey Not Renamed"), text: name)]
+        case nil:
+            return []
         }
     }
 }

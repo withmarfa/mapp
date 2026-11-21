@@ -15,6 +15,7 @@ struct AccountPage: View {
     var body: some View {
         content
             .task(id: host.serverAddress) { await model.load() }
+            .onAppear { host.ownerDrafts.register(model) }
             .settingsSheet(presenting: model.sheet != nil, dismiss: dismissSheet) { AccountSheet(model: model) }
             .alert(
                 model.question?.title ?? "", isPresented: Binding { model.question != nil } set: { if !$0 { model.cancelQuestion() } },

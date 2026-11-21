@@ -236,6 +236,10 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
         }
     }
 
+    /// The settings changed while the server checked the address, the only `409` that `/config` answers without a cause of
+    /// its own.
+    static let configConflict: @Sendable (String) -> OwnerFailure = { _ in .conflict }
+
     private func run<Result>(
         plainConflict: (String) -> OwnerFailure = { .refused($0) }, _ call: (Client) async throws -> Result
     ) async throws(OwnerFailure) -> Result {
@@ -459,7 +463,7 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
     }
 
     func apply(_ plan: AddressPlan, instanceID: String?) async throws(OwnerFailure) -> AddressSettings {
-        try await run { client in
+        try await run(plainConflict: Self.configConflict) { client in
             let body = Operations.UpdateConfig.Input.Body.JsonPayload(
                 addresses: plan.askedAddresses.map { .value($0) }, signInAddress: plan.askedSignIn.map { .value($0) },
                 confirmSignInAddressChange: plan.requiresConfirmation ? true : nil)
@@ -469,7 +473,7 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
     }
 
     func setWebsites(_ websites: [String], instanceID: String?) async throws(OwnerFailure) -> AddressSettings {
-        try await run { client in
+        try await run(plainConflict: Self.configConflict) { client in
             let body = Operations.UpdateConfig.Input.Body.JsonPayload(corsOrigins: .value(websites))
             return Self.settings(
                 try await client.updateConfig(headers: .init(xMarfaInstanceId: instanceID), body: .json(body)).ok.body.json)

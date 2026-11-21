@@ -66,6 +66,9 @@ import os
         self.instanceSettings = instanceSettings ?? InstanceSettingsModel(provider: { [host] in host.instanceConfigTarget() })
         self.instanceSettings.onSaved = { [host] answer, settings, address in host.instanceSaved(answer, changing: settings, of: address) }
         isLaunching = host.configuredConnection != nil
+        ownerDrafts.arrival = { [ownerDrafts, notices = host.notices] draft in
+            ownerDrafts.deliver(draft, to: notices, because: String(localized: "You closed Settings before this was saved."))
+        }
         host.handOverEdits = { [weak self] in await self?.flushEditors() ?? false }
         LaunchTrace.shared.mark(.librariesInit, note: isLaunching ? "server set" : "no server")
     }

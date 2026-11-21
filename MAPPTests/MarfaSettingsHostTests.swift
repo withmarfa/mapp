@@ -228,9 +228,74 @@ import Testing
         await keys.make()
         adapter.handOverDrafts()
         let told = try #require(libraries.host.notices.waiting.last { $0.title == "Key Not Copied" })
-        #expect(!told.isNotKept)
+        #expect(told.isNotKept, "a key's notice holds the quit, as a change not kept does")
         #expect(told.text == nil)
         #expect(told.message.contains("“Importer” was made"))
+    }
+
+    @Test func quittingWithAKeysSecretShownTellsThePersonTheKeyExists() async throws {
+        let bench = try HostBench()
+        let defaults = try #require(UserDefaults(suiteName: "MarfaSettingsHostTests-\(UUID().uuidString)"))
+        let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
+        let keys = KeysModel(context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.keysMint, .keysManage] }))
+        libraries.ownerDrafts.register(keys)
+        keys.beginNewKey()
+        keys.draft.name = "Importer"
+        keys.draft.source = "importer"
+        await keys.make()
+        libraries.handOffDraftsAtQuit()
+        #expect(libraries.host.notices.holdsQuit, "the quit waits to tell the person")
+        let told = Mutex<[String]>([])
+        let quits = libraries.host.notices.tellBeforeQuitting(copying: { _ in }) { notice in told.withLock { $0.append(notice.title) } }
+        #expect(quits)
+        #expect(told.withLock { $0 }.contains("Key Not Copied"))
+        #expect(!libraries.host.notices.holdsQuit)
+    }
+
+    @Test func aKeyMadeAfterSettingsClosedTellsThePersonThroughTheSameNotice() async throws {
+        let bench = try HostBench()
+        let defaults = try #require(UserDefaults(suiteName: "MarfaSettingsHostTests-\(UUID().uuidString)"))
+        let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
+        let calls = FakeOwnerCalls()
+        let keys = KeysModel(
+            context: OwnerContext(
+                calls: calls, grants: { [.keysMint, .keysManage] }, lateDraft: { libraries.ownerDrafts.arrive($0) }))
+        libraries.ownerDrafts.register(keys)
+        keys.beginNewKey()
+        keys.draft.name = "Importer"
+        keys.draft.source = "importer"
+        let gate = calls.hold("create")
+        let making = Task { await keys.make() }
+        #expect(try await eventuallyAsking { calls.calls.contains("create") })
+        libraries.handOffDraftsAtQuit()
+        #expect(libraries.host.notices.waiting.filter { $0.title == "Key Not Copied" }.isEmpty)
+        gate.open()
+        await making.value
+        let told = try #require(libraries.host.notices.waiting.last { $0.title == "Key Not Copied" })
+        #expect(told.isNotKept)
+        #expect(libraries.host.notices.holdsQuit)
+    }
+
+    @Test func quittingHandsBackAPasskeyAndKeyRenameTypedAndNotSaved() async throws {
+        let bench = try HostBench()
+        let defaults = try #require(UserDefaults(suiteName: "MarfaSettingsHostTests-\(UUID().uuidString)"))
+        let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
+        let calls = FakeOwnerCalls()
+        calls.state.withLock { $0.passkeys = [OwnerPasskey(id: "p", name: "Phone")] }
+        let context = OwnerContext(calls: calls, grants: { [.keysMint, .keysManage, .signInsManage] })
+        let account = AccountModel(context: context)
+        libraries.ownerDrafts.register(account)
+        await account.load()
+        await account.beginChangePassword()
+        account.closePasswordSheet()
+        account.beginRename(account.passkeys[0])
+        account.renameDraft = "Work phone"
+        let before = libraries.host.notices.waiting.count
+        libraries.handOffDraftsAtQuit()
+        let notice = try #require(libraries.host.notices.waiting.dropFirst(before).first)
+        #expect(notice.title == "Passkey Not Renamed")
+        #expect(notice.text == "Work phone")
+        #expect(notice.message.contains("You quit MAPP before this was saved."))
     }
 
     @Test func quittingHandsBackTheOwnerPagesDrafts() async throws {

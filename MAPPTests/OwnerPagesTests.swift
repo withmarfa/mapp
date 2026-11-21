@@ -4,6 +4,17 @@ import Synchronization
 import Testing
 @testable import MAPP
 
+/// Holds a fake call open until a test lets it go.
+nonisolated final class OwnerCallGate: Sendable {
+    private let stream: AsyncStream<Void>
+    private let continuation: AsyncStream<Void>.Continuation
+
+    init() { (stream, continuation) = AsyncStream.makeStream(bufferingPolicy: .bufferingNewest(1)) }
+
+    func wait() async { for await _ in stream { return } }
+    func open() { continuation.yield() }
+}
+
 /// What the owner's pages ask of the server, held in memory: it answers as the server does, keeps what it was sent and fails
 /// a named call on request.
 nonisolated final class FakeOwnerCalls: OwnerCalls {
@@ -28,12 +39,24 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var changes: [(id: String, change: KeyChange)] = []
         var applied: [AddressPlan] = []
         var websitesSent: [[String]] = []
+        var gates: [String: OwnerCallGate] = [:]
     }
 
     let state = Mutex(State())
 
     func fail(_ call: String, with failure: OwnerFailure?) { state.withLock { $0.failures[call] = failure } }
     var calls: [String] { state.withLock { $0.calls } }
+
+    /// Holds the next calls named `call` open, once they have started, until the returned gate is opened.
+    func hold(_ call: String) -> OwnerCallGate {
+        let gate = OwnerCallGate()
+        state.withLock { $0.gates[call] = gate }
+        return gate
+    }
+
+    private func held(_ call: String) async {
+        if let gate = state.withLock({ $0.gates[call] }) { await gate.wait() }
+    }
 
     private func enter(_ call: String) throws(OwnerFailure) {
         let failure = state.withLock { state in
@@ -122,7 +145,12 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     }
 
     func create(_ key: NewKey) async throws(OwnerFailure) -> CreatedKey {
-        try enter("create")
+        let failure = state.withLock { state in
+            state.calls.append("create")
+            return state.failures["create"]
+        }
+        await held("create")
+        if let failure { throw failure }
         return state.withLock { state in
             state.created.append(key)
             let id = "key-\(state.keys.count + 1)"
@@ -163,6 +191,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 
     func check(signIn: String?, addresses: [String]?) async throws(OwnerFailure) -> AddressPlan {
         try enter("check")
+        await held("check")
         return state.withLock { state in
             AddressPlan(
                 askedSignIn: signIn, askedAddresses: addresses, signIn: signIn ?? state.settings.signIn,
@@ -199,6 +228,8 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     var allowing: MarfaAllowMoreOutcome = .allowed
     var asked: [Set<InstancePermission>] = []
     var refreshed = 0
+    /// What a page handed over after Settings had closed.
+    var late: [OwnerDraft] = []
 
     init(grants: Set<InstancePermission> = [.signInsManage, .grantsManage, .keysManage, .keysMint, .configManage]) {
         self.grants = grants
@@ -212,7 +243,8 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
                 if allowing == .allowed { grants.formUnion(permissions) }
                 return allowing
             },
-            refreshGrants: { [unowned self] in refreshed += 1 })
+            refreshGrants: { [unowned self] in refreshed += 1 },
+            lateDraft: { [unowned self] in late.append($0) })
     }
 }
 
@@ -324,6 +356,36 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(account.rowErrors["b"]?.contains("manage the owner’s sign-ins and passkeys") == true)
         #expect(account.browsers.count == 1)
         #expect(bench.refreshed == 1, "the grants held can be stale, so they are read again")
+    }
+
+    @Test func aPasskeyRenameTypedWhenSettingsClosesIsHandedBack() async {
+        let bench = OwnerBench()
+        bench.calls.state.withLock { $0.passkeys = [OwnerPasskey(id: "p", name: "Phone")] }
+        let account = model(bench)
+        let drafts = OwnerDrafts()
+        drafts.register(account)
+        await account.load()
+        account.beginRename(account.passkeys[0])
+        #expect(drafts.takeAll().isEmpty, "a name left as it was is nothing to keep")
+        account.beginRename(account.passkeys[0])
+        account.renameDraft = " Work phone "
+        #expect(drafts.takeAll() == [.typed(title: "Passkey Not Renamed", text: "Work phone")])
+        #expect(account.sheet == nil)
+        #expect(drafts.takeAll().isEmpty, "what was handed back is not handed back twice")
+    }
+
+    @Test func aPasswordTypedWhenSettingsClosesIsDroppedAndNeverHandedBack() async {
+        let bench = OwnerBench()
+        let account = model(bench)
+        let drafts = OwnerDrafts()
+        drafts.register(account)
+        await account.load()
+        await account.beginChangePassword()
+        account.currentPassword = "old password"
+        account.newPassword = "a new password"
+        #expect(drafts.takeAll().isEmpty)
+        #expect(account.currentPassword.isEmpty && account.newPassword.isEmpty)
+        #expect(account.sheet == nil)
     }
 
     @Test func aPasskeyIsRenamedAndRemoved() async throws {
@@ -725,6 +787,79 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(model.sheet == nil)
     }
 
+    @Test func aKeyMadeWhileSettingsClosesIsToldAboutOnceTheCallEnds() async throws {
+        let bench = bench([])
+        let model = KeysModel(context: bench.context)
+        let drafts = OwnerDrafts()
+        drafts.register(model)
+        model.beginNewKey()
+        model.draft.name = "Lisbon zine importer"
+        model.draft.source = "lisbon-zine"
+        let gate = bench.calls.hold("create")
+        let making = Task { await model.make() }
+        #expect(try await eventuallyAsking { bench.calls.calls.contains("create") })
+        #expect(drafts.takeAll().isEmpty, "a sheet that is making is not taken from")
+        #expect(bench.late.isEmpty)
+        gate.open()
+        await making.value
+        #expect(
+            bench.late == [
+                .told(
+                    title: "Key Not Copied",
+                    message: "The key “Lisbon zine importer” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key on the Keys page.")
+            ])
+        #expect(model.created == nil, "the secret is dropped, not kept for a window that is gone")
+        #expect(model.sheet == nil)
+    }
+
+    @Test func aKeyRefusedWhileSettingsClosesHandsBackWhatWasTyped() async throws {
+        let bench = bench([])
+        let model = KeysModel(context: bench.context)
+        let drafts = OwnerDrafts()
+        drafts.register(model)
+        model.beginNewKey()
+        model.draft.name = "Lisbon zine importer"
+        model.draft.source = "lisbon-zine"
+        bench.calls.fail("create", with: .refused("No."))
+        let gate = bench.calls.hold("create")
+        let making = Task { await model.make() }
+        #expect(try await eventuallyAsking { bench.calls.calls.contains("create") })
+        #expect(drafts.takeAll().isEmpty)
+        gate.open()
+        await making.value
+        #expect(bench.late == [.typed(title: "Key Not Made", text: "Name: Lisbon zine importer\nSource: lisbon-zine")])
+        #expect(model.sheet == nil)
+    }
+
+    @Test func aKeyMadeWithSettingsOpenIsShownNotToldAbout() async throws {
+        let bench = bench([])
+        let model = KeysModel(context: bench.context)
+        model.beginNewKey()
+        model.draft.name = "Importer"
+        model.draft.source = "importer"
+        await model.make()
+        #expect(model.sheet == .shown)
+        #expect(bench.late.isEmpty)
+    }
+
+    @Test func aRenameTypedWhenSettingsClosesIsHandedBack() async {
+        let bench = bench([key()])
+        let model = KeysModel(context: bench.context)
+        let drafts = OwnerDrafts()
+        drafts.register(model)
+        await model.load()
+        model.beginRename(model.keys[0])
+        #expect(drafts.takeAll().isEmpty, "a name left as it was is nothing to keep")
+        model.beginRename(model.keys[0])
+        model.renameDraft = "  Zine importer  "
+        #expect(drafts.takeAll() == [.typed(title: "Key Not Renamed", text: "Zine importer")])
+        #expect(model.sheet == nil)
+        #expect(drafts.takeAll().isEmpty)
+        model.beginRename(model.keys[0])
+        model.renameDraft = "   "
+        #expect(drafts.takeAll().isEmpty, "a blank name is nothing to keep")
+    }
+
     @Test func aKeyIsMadeToExpireSoonerAfterAskingAndNeverLater() async throws {
         let ends = Date.now.addingTimeInterval(86_400 * 30)
         let bench = bench([key(expires: ends)])
@@ -984,6 +1119,120 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(model.input == "studio.castell.design")
     }
 
+    private func count(_ call: String, in bench: OwnerBench) -> Int { bench.calls.calls.filter { $0 == call }.count }
+
+    @Test func anAddressAddedWhileTheSettingsChangedReadsAndChecksAgainAndWritesNothingOverTheNewerList() async throws {
+        let (model, bench) = await model()
+        model.begin(.addAddress)
+        model.input = "studio.castell.design"
+        await model.check()
+        bench.calls.state.withLock { $0.settings.addresses.append("https://newer.test") }
+        bench.calls.fail("apply", with: .conflict)
+        let reads = count("addresses", in: bench)
+        let checks = count("check", in: bench)
+        await model.confirm()
+        #expect(count("addresses", in: bench) == reads + 1, "the list is read again")
+        #expect(count("check", in: bench) == checks + 1, "and the address checked against it")
+        #expect(model.settings?.addresses.contains("https://newer.test") == true)
+        #expect(model.currentPlan?.askedAddresses?.contains("https://newer.test") == true, "a retry builds on the newer list")
+        #expect(model.inputError == OwnerWording.line(.conflict))
+        #expect(model.input == "studio.castell.design")
+        #expect(bench.calls.state.withLock { $0.applied.isEmpty })
+    }
+
+    @Test func aSignInAddressChangedWhileTheSettingsChangedReadsAndChecksAgain() async throws {
+        let bench = OwnerBench()
+        bench.calls.state.withLock { $0.reach = .answers }
+        let (model, _) = await model(bench)
+        model.begin(.changeSignIn)
+        model.input = "studio.castell.design"
+        await model.check()
+        bench.calls.fail("apply", with: .conflict)
+        let reads = count("addresses", in: bench)
+        let checks = count("check", in: bench)
+        await model.confirm()
+        #expect(count("addresses", in: bench) == reads + 1)
+        #expect(count("check", in: bench) == checks + 1)
+        #expect(model.inputError == OwnerWording.line(.conflict))
+        #expect(model.sheet == .changeSignIn)
+        #expect(bench.calls.state.withLock { $0.applied.isEmpty })
+    }
+
+    @Test func anAddressRemovedWhileTheSettingsChangedReadsTheNewerList() async throws {
+        let (model, bench) = await model()
+        await model.askToRemove(address: "https://100.84.12.7")
+        let question = try #require(model.question)
+        bench.calls.state.withLock { $0.settings.addresses.append("https://newer.test") }
+        bench.calls.fail("apply", with: .conflict)
+        let reads = count("addresses", in: bench)
+        await model.confirm(question)
+        #expect(count("addresses", in: bench) == reads + 1)
+        #expect(model.settings?.addresses.contains("https://newer.test") == true)
+        #expect(model.rowErrors["https://100.84.12.7"] == OwnerWording.line(.conflict))
+        #expect(bench.calls.state.withLock { $0.applied.isEmpty })
+    }
+
+    @Test func aWebsiteAddedWhileTheSettingsChangedReadsAndChecksAgainAndWritesNothingOverTheNewerList() async throws {
+        let (model, bench) = await model()
+        model.begin(.addWebsite)
+        model.input = "castell.studio"
+        await model.check()
+        bench.calls.state.withLock { $0.settings.websites = ["https://newer.test"] }
+        bench.calls.fail("setWebsites", with: .conflict)
+        let reads = count("addresses", in: bench)
+        await model.confirm()
+        #expect(count("addresses", in: bench) == reads + 1)
+        #expect(model.settings?.websites == ["https://newer.test"])
+        #expect(model.inputError == OwnerWording.line(.conflict))
+        #expect(model.input == "castell.studio")
+        #expect(model.sheet == .addWebsite)
+        #expect(bench.calls.state.withLock { $0.websitesSent.isEmpty })
+    }
+
+    @Test func aWebsiteAddedElsewhereMeanwhileIsToldAsAlreadyAllowed() async throws {
+        let (model, bench) = await model()
+        model.begin(.addWebsite)
+        model.input = "castell.studio"
+        await model.check()
+        bench.calls.state.withLock { $0.settings.websites = ["https://castell.studio"] }
+        bench.calls.fail("setWebsites", with: .conflict)
+        await model.confirm()
+        #expect(model.inputError == "It’s already allowed.")
+    }
+
+    @Test func aWebsiteRemovedWhileTheSettingsChangedReadsTheNewerList() async throws {
+        let (model, bench) = await model()
+        bench.calls.state.withLock { $0.settings.websites = ["https://castell.studio"] }
+        await model.load()
+        model.askToRemove(website: "https://castell.studio")
+        let question = try #require(model.question)
+        bench.calls.state.withLock { $0.settings.websites.append("https://newer.test") }
+        bench.calls.fail("setWebsites", with: .conflict)
+        await model.confirm(question)
+        #expect(model.settings?.websites == ["https://castell.studio", "https://newer.test"])
+        #expect(model.rowErrors["https://castell.studio"] == OwnerWording.line(.conflict))
+    }
+
+    @Test func aCheckThatEndsAfterTheInputChangedNeverWritesTheErrorLine() async throws {
+        let bench = OwnerBench()
+        bench.calls.state.withLock { $0.reach = .notAnswering(reason: nil) }
+        let (model, _) = await model(bench)
+        model.begin(.changeSignIn)
+        model.input = "studio.castell.design"
+        let gate = bench.calls.hold("check")
+        let stale = Task { await model.check() }
+        #expect(try await eventuallyAsking { bench.calls.calls.contains("check") })
+        model.input = "marfa test"
+        await model.check()
+        let line = model.inputError
+        #expect(line == "Use an address like https://marfa.example, with no path.")
+        gate.open()
+        await stale.value
+        #expect(model.inputError == line, "the stale answer is dropped")
+        #expect(model.plan == nil)
+        #expect(!model.isChecking)
+    }
+
     @Test func aWebsiteIsAddedAndRemovedAfterAsking() async throws {
         let (model, bench) = await model()
         model.begin(.addWebsite)
@@ -1034,6 +1283,13 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(
             ClientOwnerCalls.failure(answer("sign_in_address_check_failed"), plainConflict: { _ in .conflict }) == .refused("The server’s words."),
             "the address refusals keep the server’s words whatever the call")
+    }
+
+    @Test func aConfigWriteReadsA409AsTheSettingsChangingUnderIt() {
+        let conflict = MarfaError.server(status: 409, code: "conflict", message: "Changed.", details: nil, server: nil)
+        #expect(ClientOwnerCalls.failure(conflict, plainConflict: ClientOwnerCalls.configConflict) == .conflict)
+        let refusal = MarfaError.server(status: 409, code: "sign_in_address_change_unconfirmed", message: "Confirm.", details: nil, server: nil)
+        #expect(ClientOwnerCalls.failure(refusal, plainConflict: ClientOwnerCalls.configConflict) == .refused("Confirm."))
     }
 
     @Test func whenIsToldByDayAndNeverByTimeAlone() {

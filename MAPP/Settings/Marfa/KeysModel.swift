@@ -75,6 +75,8 @@ import Observation
     var renameDraft = ""
     private(set) var renameError: String?
     private(set) var revoked: String?
+    /// Set when Settings closed while a key was being made, so the call's end hands over what the sheet held.
+    private var closedWhileMaking = false
 
     init(context: OwnerContext) {
         self.context = context
@@ -150,13 +152,32 @@ import Observation
             source: draft.source.trimmingCharacters(in: .whitespacesAndNewlines), tier: draft.tier,
             expires: draft.expires.date(), types: types, permissions: draft.permissions.sorted())
         do {
-            created = try await context.calls.create(request)
-            sheet = .shown
+            let made = try await context.calls.create(request)
+            if closedWhileMaking {
+                closedWhileMaking = false
+                sheet = nil
+                context.lateDraft(Self.notCopied(made.label))
+            } else {
+                created = made
+                sheet = .shown
+            }
             await load()
         } catch {
+            if closedWhileMaking {
+                closedWhileMaking = false
+                sheet = nil
+                if let typed = typedDraft() { context.lateDraft(typed) }
+            }
             if case .sourceHeld(let reason) = error { sourceError = reason } else { draftError = OwnerWording.line(error) }
             await context.learn(from: error)
         }
+    }
+
+    /// The notice for a key made and never copied: its secret can't be shown again.
+    private static func notCopied(_ label: String) -> OwnerDraft {
+        .told(
+            title: String(localized: "Key Not Copied"),
+            message: String(localized: "The key “\(label)” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key on the Keys page."))
     }
 
     /// Closes the sheet; the plaintext key goes with it, as it is shown only once.
@@ -288,29 +309,44 @@ import Observation
 
     // MARK: Closing
 
-    /// What the New Key sheet holds, which the app gives back when Settings closes. A key already made is never handed back,
-    /// as its secret is shown once and kept nowhere: the person is told it was made, and that it can be revoked.
+    /// What the sheet holds, which the app gives back when Settings closes: what was typed for a new key or a new name,
+    /// never a key's secret. A key already made is told about instead, as its secret is shown once and kept nowhere. A key
+    /// still being made is told about when the call ends.
     func takeDrafts() -> [OwnerDraft] {
-        guard !isMaking else { return [] }
+        if isMaking {
+            closedWhileMaking = true
+            return []
+        }
         defer {
-            if sheet == .new || sheet == .shown { sheet = nil }
+            switch sheet {
+            case .new, .shown, .rename: sheet = nil
+            case nil: break
+            }
             created = nil
+            renameError = nil
         }
-        if sheet == .shown, let created {
-            return [
-                .told(
-                    title: String(localized: "Key Not Copied"),
-                    message: String(localized: "The key “\(created.label)” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key on the Keys page."))
-            ]
+        switch sheet {
+        case .shown:
+            return created.map { [Self.notCopied($0.label)] } ?? []
+        case .new:
+            return typedDraft().map { [$0] } ?? []
+        case .rename(let id):
+            let name = renameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty, name != key(id)?.label else { return [] }
+            return [.typed(title: String(localized: "Key Not Renamed"), text: name)]
+        case nil:
+            return []
         }
-        guard sheet == .new else { return [] }
+    }
+
+    /// What was typed in the New Key sheet, or nil where nothing was.
+    private func typedDraft() -> OwnerDraft? {
         let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
         let source = draft.source.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty || !source.isEmpty else { return [] }
         let lines = [
             name.isEmpty ? nil : String(localized: "Name: \(name)"),
             source.isEmpty ? nil : String(localized: "Source: \(source)"),
         ].compactMap { $0 }
-        return [.typed(title: String(localized: "Key Not Made"), text: lines.joined(separator: "\n"))]
+        return lines.isEmpty ? nil : .typed(title: String(localized: "Key Not Made"), text: lines.joined(separator: "\n"))
     }
 }

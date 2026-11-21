@@ -122,9 +122,12 @@ import Observation
 
     /// Asks the server what the typed change would do. Typing again while an answer waits drops the older answer.
     func check() async {
-        guard let settings, let sheet else { return }
+        checking += 1
+        let mine = checking
+        isChecking = false
         plan = nil
         inputError = nil
+        guard let settings, let sheet else { return }
         guard let origin = Self.origin(from: input) else {
             if !input.trimmingCharacters(in: .whitespaces).isEmpty {
                 inputError = String(localized: "Use an address like https://marfa.example, with no path.")
@@ -139,8 +142,6 @@ import Observation
             inputError = String(localized: "It’s already an address.")
             return
         }
-        checking += 1
-        let mine = checking
         isChecking = true
         defer { if mine == checking { isChecking = false } }
         do {
@@ -201,13 +202,17 @@ import Observation
             } catch {
                 inputError = OwnerWording.line(error)
                 await context.learn(from: error)
-                if error == .conflict {
-                    await load()
-                    await check()
-                    inputError = OwnerWording.line(error)
-                }
+                if error == .conflict { await readAgainAndCheck(telling: error) }
             }
         }
+    }
+
+    /// The settings changed while a write waited: reads them again and checks what is typed against them, so a retry
+    /// builds on the newer list, and keeps the line that says what happened unless the check found a reason of its own.
+    private func readAgainAndCheck(telling failure: OwnerFailure) async {
+        await load()
+        await check()
+        inputError = inputError ?? OwnerWording.line(failure)
     }
 
     private func commitWebsite(adding origin: String?) async {
@@ -221,6 +226,7 @@ import Observation
         } catch {
             inputError = OwnerWording.line(error)
             await context.learn(from: error)
+            if error == .conflict { await readAgainAndCheck(telling: error) }
         }
     }
 
@@ -278,6 +284,7 @@ import Observation
             } catch {
                 rowErrors[website] = OwnerWording.line(error)
                 await context.learn(from: error)
+                if error == .conflict { await load() }
             }
         }
     }

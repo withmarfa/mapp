@@ -4,7 +4,8 @@ import Foundation
 nonisolated enum OwnerDraft: Equatable, Sendable {
     /// Text the person typed, which the app gives back where they can get it again.
     case typed(title: String, text: String)
-    /// Something done that cannot be shown again, which the app tells the person about.
+    /// Something done that cannot be shown again, which the app tells the person about in a notice that holds the quit,
+    /// like a change not kept.
     case told(title: String, message: String)
 }
 
@@ -22,6 +23,12 @@ nonisolated enum OwnerDraft: Equatable, Sendable {
     }
 
     private var holders: [Holder] = []
+
+    /// Where a draft goes that a page hands over after Settings has closed, which the app sets.
+    var arrival: ((OwnerDraft) -> Void)?
+
+    /// Takes a draft from a page whose work ended after its hand-over, so the person is told it all the same.
+    func arrive(_ draft: OwnerDraft) { arrival?(draft) }
 
     /// Registers `holder` once, for as long as it lives.
     func register(_ holder: any OwnerDraftHolding) {

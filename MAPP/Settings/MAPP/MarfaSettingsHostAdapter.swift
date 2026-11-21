@@ -136,13 +136,16 @@ enum LibraryDescription {
 
 extension OwnerDrafts {
     /// Gives back what the open owner's pages hold: typed text as a change not kept, and what can't be shown again as a
-    /// notice. A password is never among it, and nor is a key's secret.
+    /// notice that holds the quit. A password is never among it, and nor is a key's secret.
     func handOver(to notices: Notices, because reason: String) {
-        for draft in takeAll() {
-            switch draft {
-            case .typed(let title, let text): notices.notKept(title, text: text, reason: reason)
-            case .told(let title, let message): notices.tell(title, message)
-            }
+        for draft in takeAll() { deliver(draft, to: notices, because: reason) }
+    }
+
+    /// One draft as a notice. What can't be shown again is a change not kept with no text, which the quit waits to tell.
+    func deliver(_ draft: OwnerDraft, to notices: Notices, because reason: String) {
+        switch draft {
+        case .typed(let title, let text): notices.notKept(title, text: text, reason: reason)
+        case .told(let title, let message): notices.notKept(title, text: nil, reason: message, standsAlone: true)
         }
     }
 }
