@@ -137,6 +137,8 @@ View Options also holds Include Subtypes, which lets a type's list show the item
 
 Built, not yet released. Items, Collections and Sources are index pages: a table under tabs, with no list, gallery or other layout. Views and types keep the list column and their layouts. Tabs and a New button on the page appear only on these three pages: a view or a type is split by the sidebar, its filters and saved views, and New is the sidebar's New and Command-N.
 
+Agreed, not built: Items as a page with a large title, New as tiles and Search, Filter and New at the tabs' end, which move into the toolbar when scrolled, and Collections and Sources in the same shape in a narrower column ([Agreed designs](agreed-designs.md#index-pages)). Today the rows show through the column headings when scrolled, since the header draws no background.
+
 The three index tables look as the item table does: rows 36 points high with the text centered, no line between the column headings, and one line under them that runs from where the first column's cells start to where the last one's end, as the rows' separators do, including under an icon. The headings look the same whether or not the window is the key one.
 
 ### Items
