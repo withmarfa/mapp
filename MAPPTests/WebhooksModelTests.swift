@@ -24,12 +24,155 @@ import Testing
         return WebhooksModel(context: bench.context)
     }
 
-    @Test func theWebhooksAreGroupedByTheirMakerSoAGroupPerAppCanJoin() async {
+    private static func keyHook(_ id: String, maker: String, name: String?) -> OwnerWebhook {
+        OwnerWebhook(
+            id: id, url: "https://\(id).example.com/hook", events: ["item.created"], typeFilter: nil, secretTail: "1a2b", active: true,
+            created: Date(timeIntervalSince1970: 1_700_000_100), maker: .init(kind: .key, id: maker, name: name))
+    }
+
+    private static func key(_ id: String, _ label: String, expires: Date? = nil) -> KeyInfo {
+        KeyInfo(id: id, label: label, source: id, permissions: [], tier: .feed, types: [:], expires: expires, appClientID: nil)
+    }
+
+    /// Every maker's webhooks as the owner's key lists them: MAPP's own, an app's, a live key's, an expired key's and a
+    /// revoked key's.
+    private func everyMaker(_ bench: OwnerBench) -> WebhooksModel {
+        bench.calls.state.withLock {
+            $0.keys = [Self.key("k-live", "Lisbon zine importer"), Self.key("k-old", "Backup script", expires: .now.addingTimeInterval(-86_400))]
+        }
+        return model(
+            bench,
+            hooks: [
+                Self.keyHook("revoked", maker: "k-gone", name: nil),
+                Self.keyHook("expired", maker: "k-old", name: "Backup script"),
+                Self.keyHook("live", maker: "k-live", name: "Lisbon zine importer"),
+                Self.hook("raycast", maker: "raycast-client", makerName: "Raycast"),
+                Self.hook("mine"),
+            ])
+    }
+
+    @Test func theWebhooksAreGroupedByWhoMadeThemWithMAPPsOwnFirstAndAMakerThatIsGoneLast() async {
         let bench = OwnerBench()
-        let model = model(bench, hooks: [Self.hook("a"), Self.hook("b", maker: "other", makerName: "Raycast")])
+        let model = everyMaker(bench)
         await model.load()
-        #expect(model.groups.map(\.id) == ["maker", "other"])
-        #expect(model.groups.map(\.name) == ["MAPP", "Raycast"])
+        #expect(model.seesEvery)
+        #expect(model.groups.map(\.id) == ["own", "app:raycast-client", "key:k-live", "key:k-old", "key:k-gone"])
+        #expect(model.groups.map { model.heading(of: $0) } == [
+            "Made by MAPP", "Made by Raycast", "Made by the key Lisbon zine importer", "Made by the key Backup script (expired)",
+            "Made by a revoked key",
+        ])
+        #expect(model.groups.map(\.isOwn) == [true, false, false, false, false])
+        #expect(model.groups.map(\.standing) == [.standing, .standing, .standing, .expired, .gone])
+    }
+
+    @Test func anAppThatIsNoLongerConnectedIsNamedAsSuch() async {
+        let bench = OwnerBench()
+        let model = model(bench, hooks: [Self.hook("a", maker: "client", makerName: nil)])
+        await model.load()
+        #expect(model.heading(of: model.groups[1]) == "Made by an app that’s no longer connected")
+        #expect(model.maker(of: model.webhooks[0]) == "an app that’s no longer connected")
+    }
+
+    @Test func thePageHasAnOwnGroupFirstEvenWithNoneOfItsOwn() async {
+        let bench = OwnerBench()
+        let model = model(bench, hooks: [Self.hook("a", maker: "other", makerName: "Raycast")])
+        await model.load()
+        #expect(model.groups.map(\.id) == ["own", "app:other"])
+        #expect(model.groups[0].webhooks.isEmpty, "New Webhook… has its place")
+    }
+
+    @Test func aSignInThatIsAKeyKnowsItsOwnByTheKeysId() async {
+        let bench = OwnerBench()
+        bench.calls.state.withLock { $0.identity = OwnIdentity(keyID: "k-live", expires: nil, appName: nil) }
+        let model = model(bench, hooks: [Self.keyHook("mine", maker: "k-live", name: "Lisbon zine importer"), Self.keyHook("theirs", maker: "k-other", name: "Other")])
+        await model.load()
+        #expect(model.isOwn(model.webhooks[0]) && !model.isOwn(model.webhooks[1]))
+    }
+
+    @Test func withoutManageKeysTheListIsMAPPsOwnAndNothingMoreIsAsked() async {
+        let bench = OwnerBench(grants: [.webhooksManage])
+        let model = model(bench, hooks: [Self.hook("a")])
+        await model.load()
+        #expect(!model.seesEvery)
+        #expect(model.isOwn(model.webhooks[0]), "the server lists only what this sign-in made")
+        #expect(model.groups.map(\.id) == ["own"])
+        #expect(!bench.calls.calls.contains("identity") && !bench.calls.calls.contains("keys"))
+    }
+
+    @Test func whenWhoMAPPIsCantBeReadNoneOfTheOthersListIsItsOwn() async {
+        let bench = OwnerBench()
+        bench.calls.fail("identity", with: .unreachable)
+        let model = model(bench, hooks: [Self.hook("a")])
+        await model.load()
+        #expect(model.hasLoaded && model.failure == nil)
+        #expect(!model.isOwn(model.webhooks[0]))
+    }
+
+    @Test func anotherMakersWebhookCanNeitherBeChangedNorSentAgain() async {
+        let bench = OwnerBench()
+        bench.calls.state.withLock { $0.deliveries["raycast"] = [Self.delivery("d1", .failed, code: 500)] }
+        let model = model(bench, hooks: [Self.hook("raycast", maker: "raycast-client", makerName: "Raycast"), Self.hook("mine")])
+        await model.load()
+        let theirs = model.webhooks[0]
+        #expect(!model.isOwn(theirs) && model.isOwn(model.webhooks[1]))
+        await model.setType("core.task", for: theirs)
+        await model.turnOn(theirs)
+        await model.setEvent(.itemTrashed, on: true, for: theirs)
+        await model.setAllEvents(on: false, for: theirs)
+        #expect(!bench.calls.calls.contains("changeWebhook") && !bench.calls.calls.contains("getWebhook"), "nothing is sent")
+        await model.loadDeliveries(of: "raycast")
+        #expect(!model.canRedeliver(model.deliveries["raycast"]![0], of: theirs), "a failed delivery of another maker's webhook can't be sent again")
+        await model.redeliver(model.deliveries["raycast"]![0], of: theirs)
+        #expect(!bench.calls.calls.contains("redeliver"))
+        await model.setType("core.task", for: model.webhooks[1])
+        #expect(bench.calls.calls.contains("changeWebhook"), "its own is changed")
+    }
+
+    @Test func deletingAnotherMakersWebhookAsksFirstNamingTheMakerThenEndsIt() async throws {
+        let bench = OwnerBench()
+        let model = everyMaker(bench)
+        await model.load()
+        let theirs = try #require(model.webhook("live"))
+        model.askToDelete(theirs)
+        let question = try #require(model.question)
+        #expect(question.title == "Delete This Webhook?")
+        #expect(question.message.contains("It was made by the key Lisbon zine importer."))
+        #expect(!bench.calls.calls.contains("deleteWebhook"), "nothing is sent before the owner agrees")
+        await model.confirm(question)
+        #expect(bench.calls.calls.contains("deleteWebhook"))
+        #expect(model.webhook("live") == nil && model.deleted == "live")
+    }
+
+    @Test func aRevokedMakersWebhookCanBeDeleted() async throws {
+        let bench = OwnerBench()
+        let model = everyMaker(bench)
+        await model.load()
+        let dead = try #require(model.webhook("revoked"))
+        model.askToDelete(dead)
+        #expect(try #require(model.question).message.contains("It was made by a revoked key."))
+        await model.confirm(try #require(model.question))
+        #expect(model.webhook("revoked") == nil)
+        #expect(model.groups.map(\.id).contains("key:k-gone") == false)
+    }
+
+    @Test func aRefusedDeleteKeepsTheWebhookNamesThePermissionAndReadsTheGrantsAgain() async throws {
+        let bench = OwnerBench()
+        let model = everyMaker(bench)
+        await model.load()
+        bench.calls.fail("deleteWebhook", with: .notPermitted("keys.manage"))
+        model.askToDelete(try #require(model.webhook("live")))
+        await model.confirm(try #require(model.question))
+        #expect(model.webhook("live") != nil && model.deleted == nil)
+        #expect(model.rowErrors["live"] == .notPermitted("keys.manage"))
+        #expect(bench.refreshed == 1)
+    }
+
+    @Test func theCapCountsOnlyWhatThisSignInMade() async {
+        let bench = OwnerBench()
+        let others = (0..<WebhooksModel.cap).map { Self.hook("o\($0)", maker: "other", makerName: "Raycast") }
+        let model = model(bench, hooks: others + [Self.hook("mine")])
+        await model.load()
+        #expect(!model.atCap)
     }
 
     @Test func aWebhookSaysItsTypeAndHowManyEventsItSends() async {

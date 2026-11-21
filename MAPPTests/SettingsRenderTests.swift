@@ -528,11 +528,18 @@ struct RenderedWindow<Detail: View>: View {
                 KeyInfo(id: "k3", label: "GitHub connector", source: "github", permissions: [], tier: .feed, types: ["core.task": .write, "core.bookmark": .write], created: Self.days(40), expires: nil, lastUsed: .now.addingTimeInterval(-240), appClientID: nil),
                 KeyInfo(id: "k4", label: "Raycast capture", source: "raycast", permissions: [], tier: .feed, types: ["core.note": .write], created: Self.days(30), expires: nil, lastUsed: .now, appClientID: "raycast"),
             ]
+            state.identity = OwnIdentity(keyID: nil, expires: nil, appName: "MAPP on MacBook Pro")
             let mapp = OwnerWebhook.Maker(kind: .app, id: "mapp", name: "MAPP on MacBook Pro")
             let raycast = OwnerWebhook.Maker(kind: .app, id: "raycast", name: "Raycast")
+            let zine = OwnerWebhook.Maker(kind: .key, id: "k2", name: "Lisbon zine importer")
             state.webhooks = [
                 OwnerWebhook(id: "w1", url: "https://build.castell.studio/hooks/marfa", events: ["item.created", "item.updated", "item.trashed"], typeFilter: "core.task", secretTail: "8f2c", active: true, created: Self.days(48), maker: mapp),
                 OwnerWebhook(id: "w2", url: "https://hooks.ledgerly.app/marfa", events: ["item.created"], typeFilter: "core.task", secretTail: "1a9d", active: false, created: Self.days(20), maker: mapp),
+                OwnerWebhook(id: "w3", url: "https://raycast.castell.studio/notify", events: ["item.created", "item.updated"], typeFilter: "core.task", secretTail: "5e07", active: true, created: Self.days(30), maker: raycast),
+                OwnerWebhook(id: "w4", url: "https://zine.castell.studio/hooks/new", events: ["item.created"], typeFilter: "core.bookmark", secretTail: "c3b1", active: true, created: Self.days(12), maker: zine),
+            ]
+            state.deliveries["w4"] = [
+                WebhookDeliveryInfo(id: "d4", event: "item.created", status: .failed, statusCode: 502, attempts: 3, error: "The receiver answered 502.", created: .now.addingTimeInterval(-3600)),
             ]
             state.deliveries["w1"] = [
                 WebhookDeliveryInfo(id: "d1", event: "item.updated", status: .succeeded, statusCode: 200, attempts: 1, error: nil, created: .now.addingTimeInterval(-600)),
@@ -642,6 +649,29 @@ struct RenderedWindow<Detail: View>: View {
 
     @Test func aKey() async throws {
         try await page(.keys, owner(), subpage: SettingsSubpage(id: "key:k2", title: "Lisbon zine importer"), named: "A key")
+    }
+
+    @Test func aKeyWithExtend() async throws {
+        try await page(.keys, owner(), subpage: SettingsSubpage(id: "key:k1", title: "Backup script"), named: "A key, Extend")
+    }
+
+    @Test func extendKey() async throws {
+        let host = owner()
+        let model = KeysModel(context: context(host))
+        await model.load()
+        model.beginExtend(model.keys[1])
+        try await page(.keys, host, sheet: AnyView(KeySheet(model: model)), named: "Extend Key")
+    }
+
+    @Test func extendKeyRefused() async throws {
+        let host = owner()
+        (host.ownerCalls as? FakeOwnerCalls)?.fail("change", with: .notPermitted(nil))
+        let model = KeysModel(context: context(host))
+        await model.load()
+        model.beginExtend(model.keys[1])
+        model.extensionChoice = .days(365)
+        await model.extend()
+        try await page(.keys, host, sheet: AnyView(KeySheet(model: model)), named: "Extend Key, refused")
     }
 
     @Test func aKeyThatIsGone() async throws {
@@ -759,6 +789,28 @@ struct RenderedWindow<Detail: View>: View {
 
     @Test func webhooks() async throws {
         try await page(.webhooks, owner(), named: "Webhooks")
+    }
+
+    @Test func webhooksWithoutManageKeys() async throws {
+        let host = owner()
+        host.grants = [.webhooksManage]
+        (host.ownerCalls as? FakeOwnerCalls)?.state.withLock { $0.webhooks = Array($0.webhooks.prefix(2)) }
+        try await page(.webhooks, host, named: "Webhooks, without Manage Keys")
+    }
+
+    @Test func aWebhookAnotherAppMade() async throws {
+        try await page(
+            .webhooks, owner(), subpage: SettingsSubpage(id: "webhook:w4", title: "zine.castell.studio/hooks/new"),
+            size: CGSize(width: SettingsTokens.Metric.windowWidth, height: 1100), named: "A webhook another key made")
+    }
+
+    @Test func webhooksOfEveryMakerWithOneGone() async throws {
+        let host = owner()
+        (host.ownerCalls as? FakeOwnerCalls)?.state.withLock {
+            $0.webhooks.append(
+                OwnerWebhook(id: "w5", url: "https://old.example.com/hook", events: ["item.created"], typeFilter: nil, secretTail: "0d4e", active: true, created: Self.days(90), maker: .init(kind: .key, id: "k-gone", name: nil)))
+        }
+        try await page(.webhooks, host, named: "Webhooks, a revoked key's among them")
     }
 
     @Test func noWebhooks() async throws {

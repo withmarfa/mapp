@@ -93,12 +93,36 @@ nonisolated struct NewKey: Hashable, Sendable {
     var permissions: [String]
 }
 
+/// When a key ends, as a change sets it: on a day, or never.
+nonisolated enum KeyExpiry: Hashable, Sendable {
+    case on(Date)
+    case never
+}
+
+/// Who this sign-in is, so a page can tell what it made from what another credential made.
+nonisolated struct OwnIdentity: Hashable, Sendable {
+    /// The key MAPP is signed in with where it is one; nil for a signed-in app.
+    var keyID: String?
+    /// When that key ends, where it does. A signed-in app counts as having no expiry of its own.
+    var expires: Date?
+    /// The name a signed-in app registered under, which its webhooks carry as their maker.
+    var appName: String?
+
+    /// Whether this sign-in made what `maker` made.
+    func made(_ maker: OwnerWebhook.Maker) -> Bool {
+        switch maker.kind {
+        case .key: keyID != nil && maker.id == keyID
+        case .app: keyID == nil && appName != nil && maker.name == appName
+        }
+    }
+}
+
 /// What a change to a key sends. Only narrowing is ever sent for access, so a key read before another change cannot be
-/// widened by it.
+/// widened by it. A later expiry adds no access, so a change that names one is not held to narrowing.
 nonisolated struct KeyChange: Hashable, Sendable {
     var label: String?
     var tier: KeyTier?
-    var expires: Date?
+    var expires: KeyExpiry?
     var types: [String: AccessLevel]?
     var permissions: [String]?
 }
@@ -168,6 +192,8 @@ nonisolated protocol OwnerCalls: Sendable {
     func create(_ key: NewKey) async throws(OwnerFailure) -> CreatedKey
     func change(_ id: String, _ change: KeyChange) async throws(OwnerFailure) -> KeyInfo
     func revoke(_ id: String) async throws(OwnerFailure)
+    /// Who this sign-in is: the key it is, or the app it is signed in as.
+    func identity() async throws(OwnerFailure) -> OwnIdentity
 
     func addresses() async throws(OwnerFailure) -> AddressSettings
     func check(signIn: String?, addresses: [String]?) async throws(OwnerFailure) -> AddressPlan
@@ -257,9 +283,12 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
     /// The package's server, for `Server.health()`, which the generated client does not hold. Nil where there is none.
     var server: (@Sendable () throws -> Server)?
     let client: @Sendable () throws -> Client
+    /// The name this app signs in under, which the webhooks it makes are known by.
+    let appName: String?
 
-    init(server: (@Sendable () throws -> Server)? = nil, client: @escaping @Sendable () throws -> Client) {
+    init(server: (@Sendable () throws -> Server)? = nil, appName: String? = nil, client: @escaping @Sendable () throws -> Client) {
         self.server = server
+        self.appName = appName
         self.client = client
     }
 
@@ -489,13 +518,32 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
                 label: change.label, defaultTier: change.tier.flatMap { Components.Schemas.Tier(rawValue: $0.rawValue) },
                 typePermissions: change.types.map { .init(additionalProperties: Self.levels($0)) },
                 permissions: change.permissions?.compactMap { Components.Schemas.Permission(rawValue: $0) },
-                expiresAt: change.expires.map { .value(Self.text($0)) }, narrowOnly: true)
+                expiresAt: change.expires.map { expiry in
+                    switch expiry {
+                    case .on(let date): .value(Self.text(date))
+                    case .never: .null
+                    }
+                },
+                narrowOnly: change.expires == nil ? true : nil)
             return Self.info(try await client.updateKey(path: .init(id: id), body: .json(body)).ok.body.json)
         }
     }
 
     func revoke(_ id: String) async throws(OwnerFailure) {
         try await run { client in _ = try await client.revokeKey(path: .init(id: id)).ok }
+    }
+
+    func identity() async throws(OwnerFailure) -> OwnIdentity {
+        do {
+            return try await run { client in
+                let key = try await client.getCurrentKey().ok.body.json
+                return OwnIdentity(keyID: key.id, expires: Self.date(key.expiresAt), appName: appName)
+            }
+        } catch {
+            // A signed-in app's token is not a key, and the server says so; it has no expiry of its own as a caller.
+            if case .notPermitted = error { return OwnIdentity(keyID: nil, expires: nil, appName: appName) }
+            throw error
+        }
     }
 
     // MARK: Addresses

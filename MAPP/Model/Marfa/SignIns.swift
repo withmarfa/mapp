@@ -166,6 +166,8 @@ nonisolated struct SystemSignIns: SignIns {
     /// (`schema.write`), and the read of the owner's own name for Signed In As, which `GET /profile` gives a credential
     /// only with its profile read scope. That read is no owner permission. The owner may approve less, and what is missing
     /// is told where it is needed.
+    /// The name MAPP signs in under, which the server shows for what MAPP makes, such as a webhook.
+    static let clientName = "MAPP"
     static let scopes = ["*:read", "*:write", "edge.*:read", "edge.*:write", "items.purge", "config.manage", "schema.write"] + profileScopes
 
     /// What Signed In As needs: the owner's name (`instance-claim/profile-read`).
@@ -198,7 +200,7 @@ nonisolated struct SystemSignIns: SignIns {
 
     func authorization(for connection: MarfaConnection, asking permissions: Set<InstancePermission> = []) throws -> Authorization {
         let client = Authorization.Client(
-            name: "MAPP", redirect: URL(string: scheme + ":/signed-in"), scopes: Self.scopes,
+            name: Self.clientName, redirect: URL(string: scheme + ":/signed-in"), scopes: Self.scopes,
             permissions: permissions.sorted { $0.rawValue < $1.rawValue })
         return try Authorization(server: connection.address, client: client, service: service)
     }

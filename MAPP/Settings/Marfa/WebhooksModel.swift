@@ -2,14 +2,35 @@ import Foundation
 import Marfa
 import Observation
 
-/// The Webhooks page: the webhooks this sign-in made, each with its address, the events it sends, its deliveries and
-/// Delete. A key or an app sees only its own webhooks, so these are the only ones listed; the list is grouped by maker so
-/// that a group for every app can join it once the server lists them all.
+/// The Webhooks page: each webhook with its address, the events it sends, its deliveries and Delete. A sign-in holding
+/// Manage Webhooks and Manage Keys sees every app's and key's webhooks, grouped by who made them, and may delete any;
+/// only the maker changes one or sends a delivery again. Any other sign-in sees only its own.
 @Observable @MainActor final class WebhooksModel: OwnerDraftHolding {
-    /// The webhooks one maker made.
+    /// Whether a maker still stands.
+    enum Standing: Equatable {
+        case standing
+        /// A key past its expiry.
+        case expired
+        /// A key that is gone, or an app that is no longer connected: the server has no name for it.
+        case gone
+
+        /// Where a group stands in the list: makers that stand, then expired ones, then those that are gone.
+        var rank: Int {
+            switch self {
+            case .standing: 0
+            case .expired: 1
+            case .gone: 2
+            }
+        }
+    }
+
+    /// The webhooks one maker made. This sign-in's own are one group, first, whoever's name they carry.
     struct Group: Identifiable, Equatable {
         let id: String
+        let maker: OwnerWebhook.Maker?
         let name: String?
+        let standing: Standing
+        let isOwn: Bool
         let webhooks: [OwnerWebhook]
     }
 
@@ -56,6 +77,10 @@ import Observation
     private let context: OwnerContext
 
     private(set) var webhooks: [OwnerWebhook] = []
+    /// Who MAPP is signed in as, which tells its own webhooks from the others'. Read only where the list holds others'.
+    private(set) var identity: OwnIdentity?
+    /// The keys, which tell an expired maker from one that stands. Read only where the list holds others'.
+    private var keys: [KeyInfo] = []
     private(set) var typeNames: [String: String] = [:]
     private(set) var failure: OwnerFailure?
     private(set) var isLoading = false
@@ -95,20 +120,79 @@ import Observation
 
     var canMake: Bool { context.grants().contains(.webhooksManage) }
 
-    var atCap: Bool { webhooks.count >= Self.cap }
+    var atCap: Bool { webhooks.filter(isOwn).count >= Self.cap }
 
-    /// The webhooks grouped by the credential that made them, oldest first within each group.
+    /// Whether the server lists and ends every maker's webhooks for this sign-in: it needs both permissions.
+    var seesEvery: Bool { context.grants().isSuperset(of: [.webhooksManage, .keysManage]) }
+
+    /// Whether this sign-in made `webhook`, which alone may change it or send a delivery again. Where the list holds only
+    /// this sign-in's, all of it is; where it holds every maker's, the maker is matched with who MAPP is signed in as.
+    func isOwn(_ webhook: OwnerWebhook) -> Bool {
+        guard seesEvery else { return true }
+        guard let maker = webhook.maker, let identity else { return false }
+        return identity.made(maker)
+    }
+
+    private func standing(of maker: OwnerWebhook.Maker?) -> Standing {
+        guard let maker else { return .standing }
+        guard maker.name != nil else { return .gone }
+        if maker.kind == .key, let key = keys.first(where: { $0.id == maker.id }), let ends = key.expires, ends <= .now { return .expired }
+        return .standing
+    }
+
+    /// The webhooks grouped by who made them: this sign-in's own first, always, so New Webhook… has its place; then each
+    /// app, then each key, by name, a maker that has expired or is gone last. Oldest first within a group.
     var groups: [Group] {
+        let sorted = webhooks.sorted { ($0.created ?? .distantFuture) < ($1.created ?? .distantFuture) }
+        let own = sorted.filter(isOwn)
+        let ownName = own.compactMap { $0.maker?.name }.first ?? identity?.appName
+        var groups = [Group(id: "own", maker: nil, name: ownName, standing: .standing, isOwn: true, webhooks: own)]
         var order: [String] = []
         var members: [String: [OwnerWebhook]] = [:]
-        for webhook in webhooks.sorted(by: { ($0.created ?? .distantFuture) < ($1.created ?? .distantFuture) }) {
-            let key = webhook.maker?.id ?? ""
+        for webhook in sorted where !isOwn(webhook) {
+            let key = (webhook.maker?.kind == .key ? "key:" : "app:") + (webhook.maker?.id ?? "")
             if members[key] == nil { order.append(key) }
             members[key, default: []].append(webhook)
         }
-        return order.map { key in
-            Group(id: key, name: members[key]?.compactMap { $0.maker?.name }.first, webhooks: members[key] ?? [])
+        let others = order.map { key -> Group in
+            let maker = members[key]?.first?.maker
+            return Group(
+                id: key, maker: maker, name: maker?.name, standing: standing(of: maker), isOwn: false, webhooks: members[key] ?? [])
         }
+        groups += others.sorted { lhs, rhs in
+            if lhs.standing.rank != rhs.standing.rank { return lhs.standing.rank < rhs.standing.rank }
+            if (lhs.maker?.kind == .app) != (rhs.maker?.kind == .app) { return lhs.maker?.kind == .app }
+            return (lhs.name ?? "").localizedStandardCompare(rhs.name ?? "") == .orderedAscending
+        }
+        return groups
+    }
+
+    // MARK: Who made it
+
+    /// Who made a webhook, in words that follow "Made by": the app, "the key" and its name, or what became of the maker.
+    func maker(of webhook: OwnerWebhook) -> String {
+        guard let maker = webhook.maker else { return String(localized: "this sign-in") }
+        return Self.phrase(maker: maker, standing: standing(of: maker))
+    }
+
+    static func phrase(maker: OwnerWebhook.Maker, standing: Standing) -> String {
+        switch (maker.kind, maker.name, standing) {
+        case (.key, nil, _): String(localized: "a revoked key")
+        case (.app, nil, _): String(localized: "an app that’s no longer connected")
+        case (.key, let name?, .expired): String(localized: "the key \(name) (expired)")
+        case (.key, let name?, _): String(localized: "the key \(name)")
+        case (.app, let name?, _): name
+        }
+    }
+
+    /// The name above a group: "Made by MAPP", "Made by the key Lisbon zine importer".
+    func heading(of group: Group) -> String {
+        if group.isOwn {
+            guard let name = group.name else { return String(localized: "Made by This Sign-In") }
+            return String(localized: "Made by \(name)")
+        }
+        guard let maker = group.maker else { return String(localized: "Made by This Sign-In") }
+        return String(localized: "Made by \(Self.phrase(maker: maker, standing: group.standing))")
     }
 
     // MARK: Words
@@ -152,6 +236,7 @@ import Observation
     /// Reads only the list, and answers whether it could.
     private func readList() async -> Bool {
         defer { hasLoaded = true }
+        if seesEvery { await readMakers() } else { (identity, keys) = (nil, []) }
         do {
             webhooks = try await context.calls.webhooks()
             gone = gone.filter { id in !webhooks.contains { $0.id == id } }
@@ -163,6 +248,16 @@ import Observation
             return false
         }
     }
+
+    /// Reads who MAPP is signed in as, and the keys, so the others' webhooks are told from MAPP's own and an expired maker from
+    /// one that stands. A read that fails leaves what was known: with no identity, none of a list that holds others' is MAPP's own.
+    private func readMakers() async {
+        if identity == nil { identity = try? await context.calls.identity() }
+        keys = (try? await context.calls.keys()) ?? keys
+    }
+
+    /// Whether `id` is a webhook this sign-in may change: its own, or one not read yet.
+    private func mayChange(_ id: String) -> Bool { webhook(id).map(isOwn) ?? true }
 
     /// Reads each active webhook's latest delivery, a few at a time, so the list can say which are failing. A webhook whose
     /// deliveries can't be read keeps saying it is sending.
@@ -190,6 +285,7 @@ import Observation
     // MARK: Changing a webhook
 
     private func change(_ id: String, _ change: WebhookChange) async {
+        guard mayChange(id) else { return }
         rowErrors[id] = nil
         do {
             try await apply(id, change)
@@ -202,6 +298,7 @@ import Observation
     /// another app turned on or off in between is kept. The server takes no version for a webhook, so a change in the moment
     /// between this read and the send can still be replaced.
     private func changeEvents(of id: String, _ build: (OwnerWebhook) -> [String]) async {
+        guard mayChange(id) else { return }
         rowErrors[id] = nil
         do throws(OwnerFailure) {
             let current: OwnerWebhook
@@ -282,7 +379,9 @@ import Observation
     func askToDelete(_ webhook: OwnerWebhook) {
         question = Question(
             action: .delete(webhook.id), title: String(localized: "Delete This Webhook?"),
-            message: String(localized: "\(Self.display(webhook.url)) stops sending at once, and its deliveries and signing secret are gone. This can’t be undone."),
+            message: isOwn(webhook)
+                ? String(localized: "\(Self.display(webhook.url)) stops sending at once, and its deliveries and signing secret are gone. This can’t be undone.")
+                : String(localized: "\(Self.display(webhook.url)) stops sending at once, and its deliveries and signing secret are gone. It was made by \(maker(of: webhook)). This can’t be undone."),
             confirm: String(localized: "Delete"))
     }
 
@@ -326,7 +425,7 @@ import Observation
     }
 
     func saveAddress() async {
-        guard case .address(let id)? = sheet, canSaveAddress else { return }
+        guard case .address(let id)? = sheet, canSaveAddress, mayChange(id) else { return }
         isSavingAddress = true
         defer { isSavingAddress = false }
         do {
@@ -346,10 +445,10 @@ import Observation
 
     // MARK: Redelivery
 
-    /// Whether a delivery can be sent again: only a failed one, and only while its webhook is on, as the server refuses
-    /// both other ways (`events/redeliver-inactive`).
+    /// Whether a delivery can be sent again: only a failed one of a webhook MAPP made, and only while it is on, as the server
+    /// refuses both other ways (`events/redeliver-inactive`, `events/webhook-owner-no-change`).
     func canRedeliver(_ delivery: WebhookDeliveryInfo, of webhook: OwnerWebhook) -> Bool {
-        webhook.active && delivery.status == .failed && !redelivering.contains(delivery.id)
+        isOwn(webhook) && webhook.active && delivery.status == .failed && !redelivering.contains(delivery.id)
     }
 
     /// Sends a failed delivery again to the webhook's address as it is now. The server accepts only a failed one.

@@ -3,7 +3,7 @@ import Marfa
 import SwiftUI
 
 /// The Keys page: the owner's keys and the keys apps made, each opening a page of its own, and New Key…. A key's page
-/// holds its expiry, its source, what it may reach (which can only be narrowed) and Revoke.
+/// holds its expiry (with Extend…), its source, what it may reach (which can only be narrowed) and Revoke.
 struct KeysPage: View {
     let host: any MarfaSettingsHost
     let subpage: SettingsSubpage?
@@ -126,21 +126,11 @@ private struct KeyDetail: View {
     let host: any MarfaSettingsHost
     @Environment(\.settingsPush) private var push
 
-    private static let steps = [1, 7, 30, 90, 365]
-
     private var parsed: AccessScopes.Parsed { KeyAccess.parsed(key) }
 
     private var line: String {
         let made = key.created.map { String(localized: "Made \(OwnerWording.day($0)).") }
         return [made, OwnerWording.used(key.lastUsed) + "."].compactMap { $0 }.joined(separator: " ")
-    }
-
-    /// The days from now at which the key could be made to end, that fall before it ends now.
-    private var earlier: [Int] {
-        Self.steps.filter { days in
-            guard let ends = key.expires else { return true }
-            return (Calendar.current.date(byAdding: .day, value: days, to: .now) ?? .distantFuture) < ends
-        }
     }
 
     var body: some View {
@@ -150,15 +140,7 @@ private struct KeyDetail: View {
             }
             if let failure = model.rowErrors[key.id] { OwnerProblem(title: "Not Changed", failure: failure, page: .keys, host: host) }
             SettingsSection("Key") {
-                SettingsRow("Expires", line: "A key can only be made to end sooner.") {
-                    SettingsPopUp(title: "Expires", selection: Binding { 0 } set: { days in
-                        if days > 0, let date = Calendar.current.date(byAdding: .day, value: days, to: .now) { model.askToExpire(key, on: date) }
-                    }) {
-                        Text(verbatim: key.expires.map { OwnerWording.day($0) } ?? String(localized: "Never")).tag(0)
-                        if !earlier.isEmpty { Divider() }
-                        ForEach(earlier, id: \.self) { Text(Self.title(days: $0)).tag($0) }
-                    }
-                }
+                expires
                 SettingsRow("New Items Go To", line: "The feed, or straight into the library.") {
                     SettingsPopUp(title: "New Items Go To", selection: Binding { key.tier } set: { tier in Task { await model.setTier(tier, of: key) } }) {
                         ForEach(KeyTier.allCases, id: \.self) { Text(verbatim: $0.title).tag($0) }
@@ -184,6 +166,28 @@ private struct KeyDetail: View {
             SettingsSection("Revoke") {
                 SettingsRow(verbatim: String(localized: "Revoke \(key.label)"), line: String(localized: "Anything using it stops at once.")) {
                     SettingsButton("Revoke…", role: .destructive) { model.askToRevoke(key) }
+                }
+            }
+        }
+    }
+
+    /// The expiry with Extend…, which only a sign-in holding Manage Keys may use. Without it the row says so, with Allow More….
+    @ViewBuilder private var expires: some View {
+        let ends = key.expires.map { OwnerWording.day($0) } ?? String(localized: "Never")
+        if !model.canExtend {
+            SettingsRow("Expires") { SettingsValue(verbatim: ends) }
+            OwnerProblemRow(
+                title: "Can’t Extend This Key", failure: .notPermitted(InstancePermission.keysManage.rawValue), line: KeysModel.notAllowedToExtend,
+                page: .keys, host: host)
+        } else if model.extensions(of: key).isEmpty {
+            SettingsRow("Expires", line: key.expires == nil ? "It never ends." : "MAPP’s own sign-in ends sooner, so it can’t give this key longer.") {
+                SettingsValue(verbatim: ends)
+            }
+        } else {
+            SettingsRow("Expires", line: "Extending keeps the same key, so nothing using it changes.") {
+                HStack(spacing: SettingsTokens.Metric.buttonGap) {
+                    SettingsValue(verbatim: ends)
+                    SettingsButton("Extend…") { model.beginExtend(key) }
                 }
             }
         }
@@ -218,7 +222,7 @@ private struct KeyPermissions: View {
     }
 }
 
-/// The Keys page's sheets, which the window shows in its middle: New Key, the key shown once and Rename.
+/// The Keys page's sheets, which the window shows in its middle: New Key, the key shown once, Rename and Extend.
 struct KeySheet: View {
     @Bindable var model: KeysModel
 
@@ -227,6 +231,7 @@ struct KeySheet: View {
         case .new?: NewKeySheet(model: model)
         case .shown?: ShownKeySheet(model: model)
         case .rename?: RenameKeySheet(model: model)
+        case .extend(let id)?: ExtendKeySheet(model: model, key: model.key(id))
         case nil: EmptyView()
         }
     }
@@ -385,6 +390,38 @@ private struct RenameKeySheet: View {
             Spacer(minLength: 0)
             SettingsButton("Cancel") { model.closeSheet() }
             SettingsButton("Rename") { Task { await model.rename() } }.disabled(!model.canRename).keyboardShortcut(.defaultAction)
+        }
+    }
+}
+
+private struct ExtendKeySheet: View {
+    @Bindable var model: KeysModel
+    let key: KeyInfo?
+
+    private func title(_ choice: KeysModel.Extension) -> String {
+        switch choice {
+        case .never: String(localized: "Never")
+        case .days(let days): KeyDetail.title(days: days)
+        }
+    }
+
+    var body: some View {
+        SettingsSheet(
+            title: Text("Extend Key"), line: Text("The key itself stays the same, so nothing using it needs to change.")
+        ) {
+            SettingsSection(name: nil) {
+                SettingsRow(
+                    title: Text("Expires"), line: key?.expires.map { Text("Now \(OwnerWording.day($0)).") }, error: model.extendError
+                ) {
+                    SettingsPopUp(title: "Expires", selection: $model.extensionChoice) {
+                        ForEach(key.map { model.extensions(of: $0) } ?? [], id: \.self) { Text(verbatim: title($0)).tag($0) }
+                    }
+                }
+            }
+        } buttons: {
+            Spacer(minLength: 0)
+            SettingsButton("Cancel") { model.closeSheet() }
+            SettingsButton("Extend") { Task { await model.extend() } }.disabled(model.isExtending).keyboardShortcut(.defaultAction)
         }
     }
 }

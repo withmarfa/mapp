@@ -237,7 +237,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .overview: String(localized: "MAPP isn’t allowed to read the server’s health and status.")
         case .account: ""
         case .apps: String(localized: "MAPP isn’t allowed to list, narrow or disconnect apps.")
-        case .keys: String(localized: "MAPP isn’t allowed to list, make or revoke keys.")
+        case .keys: String(localized: "MAPP isn’t allowed to list, make, extend or revoke keys.")
         case .sources: String(localized: "MAPP isn’t allowed to rename, mark or limit sources.")
         case .addresses: String(localized: "MAPP isn’t allowed to see or change the server’s addresses.")
         case .recentlyDeleted: String(localized: "MAPP isn’t allowed to list or permanently delete deleted items.")

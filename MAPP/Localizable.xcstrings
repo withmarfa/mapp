@@ -25,6 +25,9 @@
     "%lld settings are set on the machine %@ runs on." : {
 
     },
+    "%@ stops sending at once, and its deliveries and signing secret are gone. It was made by %@. This can’t be undone." : {
+
+    },
     "1 copy." : {
 
     },
@@ -43,6 +46,9 @@
     "A folder that already exists on the machine %@ runs on." : {
 
     },
+    "a revoked key" : {
+
+    },
     "A webhook sends events to an address you choose, as they happen." : {
 
     },
@@ -50,6 +56,9 @@
 
     },
     "All Events" : {
+
+    },
+    "an app that’s no longer connected" : {
 
     },
     "Another Marfa now answers at this address. Nothing was sent." : {
@@ -65,6 +74,9 @@
 
     },
     "Backups Are Incomplete" : {
+
+    },
+    "Can’t Extend This Key" : {
 
     },
     "Change Address" : {
@@ -179,16 +191,46 @@
     "%@ lists its jobs once it has started them." : {
 
     },
+    "Extend" : {
+
+    },
+    "Extend Key" : {
+
+    },
+    "Extending keeps the same key, so nothing using it changes." : {
+
+    },
+    "Extend…" : {
+
+    },
     "Heartbeat Address" : {
+
+    },
+    "It never ends." : {
 
     },
     "It was undone." : {
 
     },
+    "list, extend and revoke keys" : {
+      "extractionState" : "manual"
+    },
+    "MAPP isn’t allowed to give a key more time." : {
+
+    },
     "MAPP isn’t allowed to list, make, change or remove webhooks." : {
 
     },
+    "MAPP isn’t allowed to list, make, extend or revoke keys." : {
+
+    },
     "MAPP stopped waiting. Check again to see where it stands." : {
+
+    },
+    "MAPP’s own sign-in ends before then, so it can’t give a key longer." : {
+
+    },
+    "MAPP’s own sign-in ends sooner, so it can’t give this key longer." : {
 
     },
     "Marfa %@ is ready." : {
@@ -419,9 +461,6 @@
     "MAPP isn’t allowed to list or permanently delete deleted items." : {
 
     },
-    "MAPP isn’t allowed to list, make or revoke keys." : {
-
-    },
     "MAPP isn’t allowed to list, narrow or disconnect apps." : {
 
     },
@@ -485,10 +524,19 @@
     "Nothing listed" : {
 
     },
+    "Now %@." : {
+
+    },
     "Older" : {
 
     },
     "On the server’s own page, in a sheet." : {
+
+    },
+    "Only %@ can change it. You can end it." : {
+
+    },
+    "Other Webhooks Aren’t Listed" : {
 
     },
     "Passkey Not Renamed" : {
@@ -813,6 +861,12 @@
     "Paste and Match Style" : {
 
     },
+    "Seeing and ending the webhooks other apps and keys made needs Manage Keys." : {
+
+    },
+    "Sends No Events" : {
+
+    },
     "Set %@ Again" : {
 
     },
@@ -1053,6 +1107,15 @@
     "The backup folder may not belong to this server alone." : {
 
     },
+    "the key %@" : {
+
+    },
+    "the key %@ (expired)" : {
+
+    },
+    "The key itself stays the same, so nothing using it needs to change." : {
+
+    },
     "The last backup run failed or lost files." : {
 
     },
@@ -1075,6 +1138,9 @@
 
     },
     "The last check found no answer." : {
+
+    },
+    "The latest events sent to this address." : {
 
     },
     "The least used go first when there’s no room." : {
@@ -1222,9 +1288,6 @@
 
     },
     "list and permanently delete deleted items" : {
-      "extractionState" : "manual"
-    },
-    "list and revoke keys" : {
       "extractionState" : "manual"
     },
     "list, make and restore backups" : {
@@ -1417,6 +1480,9 @@
 
     },
     "Thinned old versions" : {
+
+    },
+    "this sign-in" : {
 
     },
     "Time Allowed" : {
@@ -1897,6 +1963,9 @@
 
     },
     "" : {
+
+    },
+    "You can see and end any webhook. Only the app or key that made one changes it." : {
 
     },
     "You were shown %@, and its clock read %@ when it confirmed." : {
@@ -6754,9 +6823,6 @@
     "%lld days ago" : {
 
     },
-    "A key can only be made to end sooner." : {
-
-    },
     "A key can only be narrowed later, so choose what it needs now." : {
 
     },
@@ -6940,9 +7006,6 @@
     "It is shown only once. Keep it where the script can read it." : {
 
     },
-    "It stops working on %@, and anything using it stops with it. Making a key last longer isn’t possible." : {
-
-    },
     "It was disconnected, here or somewhere else." : {
 
     },
@@ -7039,13 +7102,7 @@
     "Made by Apps" : {
 
     },
-    "Make It Expire" : {
-
-    },
     "Make Keys" : {
-
-    },
-    "Make “%@” expire sooner?" : {
 
     },
     "Manage Apps" : {
@@ -8358,9 +8415,6 @@
 
     },
     "Off" : {
-
-    },
-    "Only webhooks this sign-in made are listed. An app or a key sees only its own." : {
 
     },
     "PostHog host" : {

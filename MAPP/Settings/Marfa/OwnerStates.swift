@@ -75,13 +75,15 @@ struct OwnerLoading: View {
 struct OwnerProblemRow: View {
     let title: LocalizedStringKey
     let failure: OwnerFailure
+    /// The row's own words for what MAPP isn't allowed to do, where the page's one line for its permission doesn't fit.
+    var line: String?
     let page: MarfaSettingsPage
     let host: any MarfaSettingsHost
     var retry: (() -> Void)?
 
     var body: some View {
         SettingsProblemRow(
-            title: Text(title), line: Text(verbatim: OwnerWording.line(failure, on: page)),
+            title: Text(title), line: Text(verbatim: line ?? OwnerWording.line(failure, on: page)),
             symbol: isRefusal ? "lock" : "exclamationmark.triangle", tone: isRefusal ? .gray : .orange, actions: actions
         )
         .disabled(isWaiting)
