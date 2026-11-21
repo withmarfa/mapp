@@ -224,7 +224,7 @@ enum SettingsTokens {
             static let address: CGFloat = 130
             static let time: CGFloat = 150
             static let who: CGFloat = 200
-            static let setting: CGFloat = 270
+            static let setting: CGFloat = 255
             static let action: CGFloat = 88
             static let check: CGFloat = 18
         }

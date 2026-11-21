@@ -122,13 +122,7 @@ private struct TableRow<Row>: View {
                     .frame(width: CheckWidth.value)
             }
             ForEach(columns.indices, id: \.self) { index in
-                columns[index].cell(row)
-                    .settingsFont(.title)
-                    .lineLimit(columns[index].lines)
-                    .truncationMode(columns[index].truncation)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(width: columns[index].width, alignment: .leading)
-                    .frame(maxWidth: columns[index].width == nil ? .infinity : nil, alignment: .leading)
+                cell(columns[index])
             }
             if let action {
                 SettingsButton(action.title, small: true) { action.perform(row) }
@@ -142,6 +136,17 @@ private struct TableRow<Row>: View {
         .background(isSelected ? SettingsTokens.selection : (isHovered ? SettingsTokens.hover : (isBanded ? SettingsTokens.band : Color.clear)))
         .contentShape(.rect)
         .onHover { isHovered = $0 }
+    }
+
+    private func cell(_ column: SettingsTableColumn<Row>) -> some View {
+        column.cell(row)
+            .settingsFont(.title)
+            .lineLimit(column.lines)
+            .truncationMode(column.truncation)
+            // A cell that wraps grows its row rather than being cut.
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(width: column.width, alignment: .leading)
+            .frame(maxWidth: column.width == nil ? .infinity : nil, alignment: .leading)
     }
 }
 
