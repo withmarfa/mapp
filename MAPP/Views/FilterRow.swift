@@ -6,6 +6,8 @@ import SwiftUI
 struct FilterRow: View {
     @CurrentLibrary private var library
     @Bindable var browser: Browser
+    /// Where the chips start, where the place's own layout does not say.
+    var leadingInset: CGFloat?
     @State private var anchors = FilterChipAnchors()
     /// The column whose panel is open, which keeps its chip in the row while it has no value yet.
     @State private var openColumn: String?
@@ -16,7 +18,7 @@ struct FilterRow: View {
             let options = browser.tableOptions[browser.item] ?? ItemTableOptions()
             FilterChipsBar(
                 chips: chips(content: content, options: options),
-                leadingInset: browser.viewMode == .table ? ItemTable.leadingEdge : 12,
+                leadingInset: leadingInset ?? (browser.viewMode == .table ? ItemTable.leadingEdge : 12),
                 anchors: anchors,
                 open: { openValues(of: $0) },
                 remove: { remove($0) },

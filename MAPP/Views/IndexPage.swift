@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The measures of an index page, on a 4 point grid.
@@ -5,6 +6,10 @@ enum IndexMetrics {
     static let top: CGFloat = 12
     static let side: CGFloat = 16
     static let icon: CGFloat = 16
+    /// The width of the Collections and Sources pages' column.
+    static let columnWidth: CGFloat = 880
+    /// What every index page is drawn on, behind its title, tabs and table alike: the table's own ground.
+    static let backdrop = NSColor.controlBackgroundColor
 }
 
 /// The title of a tab, as the page words it.
@@ -38,6 +43,10 @@ extension IndexColumn {
 /// the table and the right sidebar read it from `IndexChoice`, so choosing one runs no row's body.
 struct IndexPage: View {
     let place: IndexPlace
+    let title: String
+    let browser: Browser
+    /// The sources collections come from, by name, for the Collections filter.
+    var sources: [String] = []
     /// The rows of the chosen tab and the search, in no order; the table orders them.
     let rows: [IndexRow]
     let tabs: [(tab: IndexTab, count: Int)]
@@ -49,22 +58,21 @@ struct IndexPage: View {
     var edit: ((SourceEditRequest) -> Void)?
     /// Set where a row's collection can be deleted, by its context menu and the Delete key.
     var delete: ((IndexRow) -> Void)?
-    /// The button at the trailing edge of the tabs.
+    /// What New does, where the page has the button.
     var newCollection: (() -> Void)?
     /// What the table says while the tab has no rows.
     let emptyTab: EmptyState<EmptyView>
 
     var body: some View {
-        VStack(spacing: 0) {
-            IndexTabBar(tabs: tabs, tab: $tab) {
-                if let newCollection {
-                    Button("New Collection", systemImage: "plus", action: newCollection)
-                        .mappButton(.secondary)
-                        .accessibilityIdentifier("NewCollection")
-                }
+        IndexScaffold(maxWidth: IndexMetrics.columnWidth, onAway: { browser.isIndexHeaderAway = $0 }) {
+            IndexPageTop(title: title, browser: browser, tabs: tabs, tab: $tab, new: newCollection)
+        } extra: {
+            if place == .collections, browser.showsFilterRow {
+                CollectionFilterRow(browser: browser, sources: sources)
             }
+        } content: { room in
             if rows.isEmpty {
-                emptyTab
+                emptyTab.padding(.top, room)
             } else {
                 IndexTable(place: place, rows: rows, choice: choice, open: open, edit: edit, delete: delete)
             }
@@ -73,7 +81,7 @@ struct IndexPage: View {
     }
 }
 
-/// The tabs of an index page, each with how many rows it holds, and at the trailing edge the page's own button.
+/// The tabs of an index page, each with how many rows it holds, and at the trailing edge the page's own buttons.
 struct IndexTabBar<Trailing: View>: View {
     let tabs: [(tab: IndexTab, count: Int)]
     @Binding var tab: IndexTab
@@ -88,7 +96,7 @@ struct IndexTabBar<Trailing: View>: View {
             trailing
         }
         .padding(.horizontal, IndexMetrics.side)
-        .padding(.top, IndexMetrics.top)
+        .padding(.top, 8)
         .padding(.bottom, 8)
     }
 }
@@ -242,7 +250,9 @@ private struct IndexTable: View {
         .tableStyle(.inset)
         .alternatingRowBackgrounds(.disabled)
         .softSelection(rows: ordered.map(\.id), hovers: true, selection: { choice.chosen })
-        .quietTableHeader()
+        .quietTableHeader(backdrop: IndexMetrics.backdrop)
+        .indexScrollsAway()
+        .scrollContentBackground(.hidden)
         .contextMenu(forSelectionType: IndexRow.ID.self) { ids in
             if let row = ordered.first(where: { ids.contains($0.id) }), ids.count == 1 {
                 Button("Open") { open(row) }

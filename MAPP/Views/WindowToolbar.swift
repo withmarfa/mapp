@@ -56,6 +56,8 @@ struct WindowToolbar: CustomizableToolbarContent {
             .sharedBackgroundVisibility(.hidden)
             .customizationBehavior(.disabled)
         }
+        // The index pages' tabs come into the toolbar once their own have scrolled away.
+        if let browser, browser.showsSidebarIndex, !hasListColumn { IndexTabsToolbarItem(browser: browser) }
         ToolbarSpacer(.flexible)
         // A hidden spacer still leaves its gap, so the fixed spacers are not hidden: each stands after a group that
         // shows and before another that does, which keeps one standard gap between groups in every state. They are
@@ -69,8 +71,13 @@ struct WindowToolbar: CustomizableToolbarContent {
         let showsDetails = !tools.showsInspector
         let showsAfterViewMode = showsActions || showsDetails
         let showsAfterViewTools = showsViewMode || showsAfterViewMode
-        if let browser, !hasListColumn {
+        if let browser, browser.showsSidebarIndex, !hasListColumn {
+            IndexToolbarItems(browser: browser)
+        }
+        if let browser, !browser.showsSidebarIndex, !hasListColumn {
             ViewToolbarItems(browser: browser, layout: .item, isHidden: opensFromCollection)
+        }
+        if let browser, !hasListColumn {
             if showsViewTools && showsAfterViewTools { ToolbarSpacer(.fixed).customizationBehavior(.disabled) }
         }
         if let browser {

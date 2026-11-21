@@ -874,6 +874,16 @@ final class Browser {
     /// Whether Add Filter… asked for its panel, which the row opens and then clears (`Browser+FilterRow`).
     var isAddFilterRequested = false
 
+    /// Whether the index page has scrolled its title and tabs out of view, which brings the tabs and their buttons into
+    /// the window's toolbar (`Browser+IndexPage`). The page reports it; nothing else sets it.
+    var isIndexHeaderAway = false
+
+    /// Whether the Items page's Edit popover is out, which puts a minus badge on each tile of the New row.
+    var isEditingNewRow = false
+
+    /// The sources the Collections page is narrowed to, by name; empty lists every collection (`Browser+IndexPage`).
+    var collectionSourceFilter: Set<String> = []
+
     /// What the gallery draws on each card in a place that is not a saved view, as its default view keeps it
     /// (`Browser+PlaceDefaults`).
     var placeCards: [SidebarItem: ViewCards] = [:]

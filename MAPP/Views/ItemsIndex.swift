@@ -35,11 +35,13 @@ struct ItemsIndex: View {
     var body: some View {
         let model = browser.itemIndex
         let searching = browser.isSearching
-        // The tabs of a search are the search's own, at most `SearchResults.limit` items worked out here; otherwise the model's.
-        let tabs = searching ? browser.searchedItemTabs(in: library) : model.tabs
+        // The tabs of a search are the search's own, at most `SearchResults.limit` items worked out here, and the
+        // filters take out what they hide; otherwise the model's.
+        let tabs = browser.itemIndexTabs(in: library)
         content(tabs: tabs, searching: searching)
             .searchStatus(browser)
-            .toolbar(removing: browser.isSearchExpanded ? .title : nil)
+            // The page has its own large title.
+            .toolbar(removing: .title)
             .onChange(of: browser.isSearchExpanded) {
                 if !browser.isSearchExpanded { browser.focusRequest = .list }
             }
@@ -52,7 +54,6 @@ struct ItemsIndex: View {
             .onChange(of: library.membershipRevision, initial: true) { browser.keepItemChoice(in: library) }
             .onDisappear { if browser.item != .allItems { model.stop() } }
             .navigationTitle(library.name(of: browser.item))
-            .navigationSubtitle(subtitle(of: tabs, searching: searching))
             .accessibilityIdentifier("ItemsIndex")
     }
 
@@ -61,18 +62,23 @@ struct ItemsIndex: View {
         // A library that has not loaded lists nothing, which says nothing about it.
         if let tabs, library.isLoaded || !tabs.all.isEmpty {
             let shown = tabs.rows(for: tab)
-            VStack(spacing: 0) {
-                IndexTabBar(
+            IndexScaffold { browser.isIndexHeaderAway = $0 } top: {
+                IndexPageTop(
+                    title: library.name(of: browser.item), browser: browser,
                     tabs: Self.place.tabs.map { (tab: $0, count: tabs.count(for: $0)) },
-                    tab: Binding { tab } set: { storedTab = $0 }
-                ) {
-                    Button("New Item", systemImage: "plus") { browser.openQuickAdd(remembered: lastType, in: library) }
-                        .mappButton(.secondary)
-                        .disabled(!QuickAdd.isAvailable(in: library))
-                        .accessibilityIdentifier("NewItem")
+                    tab: Binding { tab } set: { storedTab = $0 },
+                    new: { browser.openQuickAddFromIndex(remembered: lastType, in: library) })
+            } extra: {
+                // The filter row takes the New row's place while a filter is on.
+                if browser.showsNewRow {
+                    NewTiles(browser: browser)
+                } else if browser.showsFilterRow {
+                    FilterRow(browser: browser, leadingInset: IndexMetrics.side)
                 }
+            } content: { room in
                 if shown.isEmpty {
                     emptyState(allCount: tabs.all.count, searching: searching)
+                        .padding(.top, room)
                 } else {
                     ItemsTable(browser: browser, rows: shown, sort: sortBinding, pane: pane)
                         // A change of tab, of search or of sort starts the table at its first page.
@@ -104,14 +110,6 @@ struct ItemsIndex: View {
 
     private var sortBinding: Binding<IndexSort> {
         Binding { sort } set: { storedSort = $0 }
-    }
-
-    /// How many items the page lists: every item, or what the search found.
-    private func subtitle(of tabs: ItemIndexTabs?, searching: Bool) -> Text {
-        guard let tabs else { return Text(verbatim: "") }
-        let count = tabs.all.count
-        if searching { return Text("^[\(count) result](inflect: true)") }
-        return count == 0 ? Text("No items") : Text("^[\(count) item](inflect: true)")
     }
 
     private struct Following: Hashable {
@@ -198,7 +196,9 @@ private struct ItemsTable: View {
         .tableStyle(.inset)
         .alternatingRowBackgrounds(.disabled)
         .softSelection(rows: shown.map(\.id), hovers: true, selection: { browser.selection })
-        .quietTableHeader()
+        .quietTableHeader(backdrop: IndexMetrics.backdrop)
+        .indexScrollsAway()
+        .scrollContentBackground(.hidden)
         .background { RevealChoice(browser: browser, rows: rows, pages: $pages) }
         .remembersScroll(in: browser.listMemory)
         .focused(pane, equals: .list)

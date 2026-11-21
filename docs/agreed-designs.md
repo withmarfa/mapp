@@ -46,26 +46,6 @@ Agreed with August on 21 November 2026, after trying v0.0.55, and drawn on the P
 - It replaces the formats card above the corner. Width and text size are no longer in it: the text size control beside Aa holds them.
 - Escape, Close and a change of item close the bar, as they close the card today. A click into the page leaves it open, since the bar formats what the caret is on.
 
-## Index pages
-
-Agreed with August on 21 November 2026 and drawn on the Library tab of MAPP Pages (L1, L2, L6 and L16 to L19). The built pages are in [Views and lists](views-and-lists.md#index-pages).
-
-### Items
-
-- **At rest:** a large title, "Items", then the tabs All, Yours and From Apps, with Search, Filter and New (+) as plain symbols at the tabs' trailing end. Under the tabs, **New** as a row of tiles, each a tinted tile with the type's icon and the type's name under it (Note, Table, Task, Bookmark and Event to start), then the table. A tile opens quick add in that type.
-- **Edit** is an ordinary toolbar item, with no fill. It opens a popover of the types: the ones ticked are in New, in their order, and dragging reorders them. While it is open the tiles show minus badges. Which types New holds is a Mac setting.
-- **Scrolled:** the title, the tabs and New scroll away, and the tabs, Edit, Search, Filter and New (+) come into the toolbar. The column headings stay, with a thin line under them.
-- **Filter** shows or hides the filter row ([Filters](views-and-lists.md#filters)). The row shows only while Filter is on, with no count of items beside it. While a filter is set, the filter row takes New's place and the table keeps what the filters allow.
-- **Search** opens into a field in place, at the tabs' trailing end, and the table keeps only what matches. Opening the Search Items panel in its place is acceptable too.
-- **New Table needs columns.** A table's `columns` property is required and quick add cannot set it (`QuickAdd.unsettableRequired`), so the Table tile needs a way to choose columns before MAPP can make a table. Until then it opens quick add with the note it shows for any such type.
-
-### Collections and Sources
-
-- Both are drawn as Items is, in a column 880 points wide: the large title, the tabs and the table, with no New row.
-- **Collections** has Search, Filter and New Collection (+) at the tabs' trailing end.
-- **Sources** has only its tabs, since a library holds a few sources and they come from apps and keys.
-- Collections are not grouped by kind, though Marfa has several (any type with the `container` role).
-
 ## Settings
 
 Agreed with August on 19 and 20 November 2026. The pages are drawn on the Settings tab of MAPP Pages, and the design system holds every part (`SettingsWindow` and the components it uses). This section lists the rules and what each page holds. In the copy below, `<Marfa>` stands for the Marfa's own name.

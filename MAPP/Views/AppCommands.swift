@@ -115,6 +115,8 @@ struct AppCommands: Commands {
             command(.toggleFocus)
             Divider()
             if let place = browser?.indexPlace {
+                if let browser { IndexPageCommands(browser: browser, place: place, shortcuts: shortcuts) }
+                Divider()
                 IndexViewOptions(place: place, browser: browser)
             } else {
                 ItemViewOptions(browser: browser, modes: browser.flatMap { browser in library.map { browser.availableViewModes(in: $0) } } ?? ItemViewMode.allCases, shortcuts: shortcuts)

@@ -8752,6 +8752,15 @@
     },
     "MAPP isn’t allowed to see or change how the server is monitored." : {
 
+    },
+    "Remove %@ From New" : {
+
+    },
+    "Edit the New row" : {
+
+    },
+    "Edit New Row…" : {
+
     }
   },
   "version" : "1.1"
