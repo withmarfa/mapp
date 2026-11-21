@@ -81,10 +81,8 @@ private struct TagField: View {
                     // Not on a repeat: holding Delete to clear the text must not go on to remove the chips.
                     press.phase == .repeat || !model.query.isEmpty ? .ignored : (model.removeLastChip() ? .handled : .ignored)
                 }
-                .onKeyPress(.escape) {
-                    handle {
-                        if model.query.isEmpty { cancel() } else { model.query = "" }
-                    }
+                .onExitCommand {
+                    if model.query.isEmpty { cancel() } else { model.query = "" }
                 }
                 .accessibilityLabel(model.searchPrompt)
                 .accessibilityIdentifier("ItemTagField")
@@ -102,8 +100,7 @@ private struct TagField: View {
         }
     }
 
-    /// Takes a key for the field unless the person is composing text, where the arrows and Escape belong to the input
-    /// method.
+    /// Takes a key for the field unless the person is composing text, where the arrows belong to the input method.
     private func handle(_ action: () -> Void) -> KeyPress.Result {
         if (NSApp.keyWindow?.firstResponder as? NSTextView)?.hasMarkedText() == true { return .ignored }
         action()
