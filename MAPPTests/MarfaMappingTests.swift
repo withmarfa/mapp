@@ -447,6 +447,7 @@ struct MarfaMappingTests {
         #expect(MarfaMapping.outcome(.blocked(reason: .failingAlone)) == .blocked(.failingAlone, nil))
         #expect(MarfaMapping.outcome(.blocked(reason: .instanceChanged)) == .blocked(.instanceChanged, nil))
         #expect(MarfaMapping.outcome(.blocked(reason: .recordUnread)) == .blocked(.recordUnread, nil))
+        #expect(MarfaMapping.outcome(.blocked(reason: .serverRestored)) == .blocked(.serverRestored, nil))
         #expect(MarfaMapping.outcome(.dead) == .dead)
     }
 
