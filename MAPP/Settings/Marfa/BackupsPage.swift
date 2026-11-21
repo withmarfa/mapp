@@ -62,11 +62,12 @@ struct BackupsPage: View {
                     line: String(localized: "Added \(done.outcome.added.formatted()) items. \(done.outcome.alreadyHeld.formatted()) were already here."),
                     lead: .symbol("checkmark.circle"))
                 if !done.outcome.secretsToSet.isEmpty {
-                    let names = done.outcome.secretsToSet.map(UpkeepWording.settingName).joined(separator: ", ")
+                    let keys = done.outcome.secretsToSet
                     SettingsProblemRow(
-                        title: Text(done.outcome.secretsToSet.count == 1 ? "1 secret to set again" : "\(done.outcome.secretsToSet.count) secrets to set again"),
-                        line: Text(verbatim: names + "."),
-                        actions: [SettingsProblemAction("Show") { host.show(.overview) }])
+                        title: Text(keys.count == 1 ? "1 secret to set again" : "\(keys.count) secrets to set again"),
+                        line: Text(verbatim: UpkeepWording.secretsLine(keys, serverName: host.serverName)),
+                        actions: UpkeepWording.secretsToSet(keys).known.isEmpty || !host.grants.contains(.configManage)
+                            ? [] : [SettingsProblemAction("Show Monitoring") { host.show(.monitoring) }])
                 }
             }
         }
@@ -164,7 +165,7 @@ struct BackupsPage: View {
         switch backups?.destination {
         case .folder?: String(localized: "A Folder")
         case .objectStore?: String(localized: "An Object Store")
-        case nil: String(localized: "Nowhere")
+        case nil: backups?.reason == .noDestination ? String(localized: "Nowhere") : String(localized: "Couldn’t Check")
         }
     }
 
@@ -174,8 +175,10 @@ struct BackupsPage: View {
             verbatim: String(localized: "Last Backup"), line: taken.map { UpkeepWording.moment($0) + "." } ?? String(localized: "None yet."),
             error: model.backUpError
         ) {
-            SettingsButton(model.isBackingUp ? "Backing Up…" : "Back Up Now") { Task { await model.backUpNow(reason: backupsHealth?.reason) } }
-                .disabled(model.isBackingUp)
+            SettingsButton(model.isBackingUp ? "Backing Up…" : "Back Up Now", reserving: "Backing Up…") {
+                Task { await model.backUpNow(reason: backupsHealth?.reason) }
+            }
+            .disabled(model.isBackingUp)
         }
     }
 
@@ -255,7 +258,7 @@ struct BackupSheet: View {
             VStack(alignment: .leading, spacing: 12) {
                 SettingsSection("Not Restored", footer: "\(serverName) asks you to sign in again first.") {
                     ForEach(UpkeepWording.notRestored, id: \.title) { left in
-                        SettingsRow(verbatim: left.title, lead: .symbol(left.symbol), size: .compact)
+                        SettingsRow(verbatim: left.title, lead: .symbol(left.symbol))
                     }
                 }
                 if let error = model.sheetError {
@@ -265,7 +268,7 @@ struct BackupSheet: View {
         } buttons: {
             Spacer(minLength: 0)
             SettingsButton("Cancel") { model.close() }.disabled(model.isRestoring)
-            SettingsButton(model.isRestoring ? "Restoring…" : "Restore…") { Task { await model.restore() } }
+            SettingsButton(model.isRestoring ? "Restoring…" : "Restore…", reserving: "Restoring…") { Task { await model.restore() } }
                 .disabled(model.isRestoring).keyboardShortcut(.defaultAction)
         }
     }

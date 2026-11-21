@@ -22,8 +22,11 @@ import Observation
     private(set) var isRestarting = false
     /// Why the last check, start or switch was refused, in one line, until the next.
     private(set) var error: OwnerFailure?
-    /// Whether the update was lost track of: the server did not come back in the time MAPP waits.
+    /// Whether the update was lost track of: the server did not come back in the time MAPP waits. Until a read of the status
+    /// shows where it stands, the server may still be updating, so Update is not offered again.
     private(set) var lostTrack = false
+    /// The one task that follows an update, held so it ends with the page.
+    private var follower: Task<Void, Never>?
     private(set) var isSwitching = false
     /// Where Check Automatically is held, which needs `config.manage` to change.
     private(set) var settings: UpkeepSettings?
@@ -53,7 +56,7 @@ import Observation
     /// The release the Marfa row calls ready. An update the server put back is offered through Try Again alone, so the row
     /// does not offer it a second time.
     var ready: UpdateRelease? {
-        guard let status, status.available, undone == nil else { return nil }
+        guard let status, status.available, undone == nil, !lostTrack else { return nil }
         return status.latest
     }
 
@@ -67,6 +70,7 @@ import Observation
         do {
             status = try await context.calls.updateStatus()
             failure = nil
+            lostTrack = false
         } catch {
             let error = UpkeepWording.owned(error)
             failure = error
@@ -85,13 +89,24 @@ import Observation
 
     // MARK: Check and update
 
+    /// Whether Check for Updates can be pressed: the server runs no `release-check` job while Check Automatically is off, and it
+    /// answers 404 then.
+    var canCheck: Bool {
+        guard let status else { return false }
+        return status.checksAutomatically && !isChecking && !isUpdating
+    }
+
+    /// Whether the sign-in lacks `instance.maintain`, which Update and Check for Updates need: the page offers Allow More… first.
+    var needsMaintain: Bool { !context.grants().contains(.instanceMaintain) }
+
     func checkForUpdates() async {
-        guard !isChecking, !isUpdating else { return }
+        guard canCheck else { return }
         isChecking = true
         error = nil
         defer { isChecking = false }
         do {
             status = try await context.calls.checkForUpdates()
+            lostTrack = false
         } catch {
             let error = UpkeepWording.owned(error)
             self.error = error
@@ -102,7 +117,7 @@ import Observation
     /// Whether Update can be pressed: a newer release is ready, the server can swap its own programs and nothing is running.
     var canUpdate: Bool {
         guard let status else { return false }
-        return status.available && status.updatesItself && !isUpdating && !isChecking
+        return status.available && status.updatesItself && !isUpdating && !isChecking && !lostTrack
     }
 
     func update() async {
@@ -123,9 +138,31 @@ import Observation
         await follow()
     }
 
-    /// Reads the update until it ends. The server ends itself to start the new release, so a read that fails while it runs is
-    /// the restart, not a fault; MAPP waits `patience` reads for it and then says it lost track.
+    var isFollowing: Bool { follower != nil }
+
+    /// Follows the update to its end, as the one follower there is: a second call waits for the first.
     func follow() async {
+        if let follower {
+            await follower.value
+            return
+        }
+        let task = Task { await read() }
+        follower = task
+        await task.value
+        if follower == task { follower = nil }
+    }
+
+    /// Ends the follower, as when the page goes. The update itself carries on at the server.
+    func stop() {
+        follower?.cancel()
+        follower = nil
+        isRestarting = false
+    }
+
+    /// Reads the update until it ends. The server ends itself to start the new release, so a read that fails while it runs is
+    /// the restart, not a fault; MAPP waits `patience` reads for it and then says it lost track. The server answers a second
+    /// start with the update that runs, in the same 202, so a start is followed whichever it was.
+    private func read() async {
         var unanswered = 0
         while status?.progress != nil {
             try? await Task.sleep(for: pause)

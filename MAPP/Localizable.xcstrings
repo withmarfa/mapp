@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ on its disk" : {
+
+    },
     "%@ (Missing)" : {
 
     },
@@ -11,6 +14,15 @@
 
     },
     "%@ were changed elsewhere. MAPP read the new values; yours weren’t saved." : {
+
+    },
+    "%@ took another date" : {
+
+    },
+    "%lld other settings are set on the machine %@ runs on." : {
+
+    },
+    "%lld settings are set on the machine %@ runs on." : {
 
     },
     "1 conflicted copy" : {
@@ -31,7 +43,13 @@
     "1 file the server refused" : {
 
     },
+    "1 other setting is set on the machine %@ runs on." : {
+
+    },
     "1 removal waits" : {
+
+    },
+    "1 setting is set on the machine %@ runs on." : {
 
     },
     "A folder is made where it is kept in step, with the command line. Only folders MAPP may read are listed." : {
@@ -58,6 +76,12 @@
     "Archived, unarchived or moved to or from another state." : {
 
     },
+    "Backups are failing" : {
+
+    },
+    "Backups are incomplete" : {
+
+    },
     "Change Address" : {
 
     },
@@ -70,10 +94,16 @@
     "Changing the events or the type drops waiting deliveries that no longer match." : {
 
     },
+    "Check Again" : {
+
+    },
     "Check Automatically" : {
 
     },
     "%lld conflicted copies" : {
+
+    },
+    "Check Automatically is off, so %@ isn’t looking for updates." : {
 
     },
     "Copies" : {
@@ -167,7 +197,19 @@
     "%@ lists its jobs once it has started them." : {
 
     },
+    "Heartbeat Address" : {
+
+    },
+    "It was undone." : {
+
+    },
     "MAPP isn’t allowed to list, make, change or remove webhooks." : {
+
+    },
+    "MAPP stopped waiting. Check again to see where it stands." : {
+
+    },
+    "Marfa %@ is ready." : {
 
     },
     "Named by the sign-in that keeps each one." : {
@@ -753,6 +795,12 @@
     "PostHog Host" : {
 
     },
+    "PostHog Project Token" : {
+
+    },
+    "PostHog project token" : {
+
+    },
     "Prints a recovery code at each start." : {
 
     },
@@ -879,6 +927,9 @@
     "Set" : {
 
     },
+    "Set a Secret Again" : {
+
+    },
     "Set the address first." : {
 
     },
@@ -901,6 +952,9 @@
 
     },
     "Set on the machine %@ runs on." : {
+
+    },
+    "Show" : {
 
     },
     "Show All Tabs" : {
@@ -969,7 +1023,19 @@
     "Left out with %@" : {
 
     },
+    "Show Backups" : {
+
+    },
+    "Show Folders" : {
+
+    },
+    "Show Housekeeping" : {
+
+    },
     "Show Matches Left Out of Search" : {
+
+    },
+    "Show Monitoring" : {
 
     },
     "Show Snippets" : {
@@ -1024,6 +1090,15 @@
 
     },
     "Stop Leaving Out" : {
+
+    },
+    "Telemetry Address" : {
+
+    },
+    "Telemetry Headers" : {
+
+    },
+    "the %@" : {
 
     },
     "The backup folder may not belong to this server alone." : {
@@ -1090,6 +1165,12 @@
 
     },
     "The server met a fault lately." : {
+
+    },
+    "The server reports its backups aren’t working." : {
+
+    },
+    "The server reports the newest backup isn’t whole." : {
 
     },
     "The server takes no backup on a schedule." : {
@@ -1429,9 +1510,6 @@
 
     },
     "MAPP started to set the damaged copy aside and stopped partway. Open the library again to finish it." : {
-
-    },
-    "MAPP stopped waiting. Check for updates again to see where it stands." : {
 
     },
     "Run “marfa apps list” with the command line signed in to %@ as the owner. Use the approval date to identify the earlier MAPP approval. If you can identify it, run “marfa apps revoke <id>” with that entry’s ID." : {
@@ -1903,6 +1981,9 @@
 
     },
     "" : {
+
+    },
+    "You were shown %@, and its clock read %@ when it confirmed." : {
 
     },
     "“%@” can no longer do this. This can’t be undone: a permission can’t be given back to a key." : {
@@ -5602,9 +5683,6 @@
     "Shorten and Save" : {
       "extractionState" : "manual"
     },
-    "Show" : {
-
-    },
     "Show %@" : {
 
     },
@@ -5964,9 +6042,6 @@
     },
     "The new kind of item doesn’t have this property." : {
       "extractionState" : "manual"
-    },
-    "The newest backup isn’t whole." : {
-
     },
     "The panel closed before the view was renamed." : {
       "extractionState" : "manual"
@@ -7528,9 +7603,6 @@
     "It will have none if you replace it." : {
 
     },
-    "It wouldn’t start, so it was undone." : {
-
-    },
     "Keyboard" : {
 
     },
@@ -7996,9 +8068,6 @@
     "“%@” was attached to “%@” but isn’t in its text. It was meant for a folded section or text not yet shown." : {
 
     },
-    "%@ in files" : {
-
-    },
     "%@ is ready." : {
 
     },
@@ -8124,9 +8193,6 @@
 
     },
     "Backups can’t be kept there" : {
-
-    },
-    "Backups need attention" : {
 
     },
     "Backups of %@" : {
@@ -8526,9 +8592,6 @@
 
     },
     "PostHog host" : {
-
-    },
-    "project token" : {
 
     },
     "Read when %@ starts. Change them where it runs." : {

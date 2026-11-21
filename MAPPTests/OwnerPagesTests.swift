@@ -78,6 +78,8 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var updatesChecked = 0
         var jobs: [HousekeepingJob] = []
         var clocksConfirmed = 0
+        /// The time the server answers when the clock is confirmed; the date it was shown where nil.
+        var clockConfirmedAt: Date?
     }
 
     let state = Mutex(State())
@@ -455,9 +457,12 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         return state.withLock { $0.jobs }
     }
 
-    func confirmClock() async throws(OwnerFailure) {
+    func confirmClock() async throws(OwnerFailure) -> Date? {
         try enter("confirmClock")
-        state.withLock { $0.clocksConfirmed += 1 }
+        return state.withLock { state in
+            state.clocksConfirmed += 1
+            return state.clockConfirmedAt
+        }
     }
 
     func folders() async throws(OwnerFailure) -> FolderListing {
@@ -1642,7 +1647,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(
             MarfaSettingsPage.groups == [
                 [.overview], [.account, .apps, .keys, .addresses], [.sources], [.recentlyDeleted, .history, .fileStorage], [.webhooks, .folders],
-                [.activity, .monitoring], [.limits, .startUp],
+                [.backups, .updates, .housekeeping], [.activity, .monitoring], [.limits, .startUp],
             ])
         for page in [MarfaSettingsPage.account, .apps, .keys, .addresses] {
             #expect(SettingsPage.marfa(page).matches(page.title))

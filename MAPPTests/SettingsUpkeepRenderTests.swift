@@ -29,7 +29,7 @@ import Testing
             state.update = UpdateStatus(
                 running: "0.0.84", checksAutomatically: true, latest: UpdateRelease(version: "0.0.85", published: Self.at(hour: 9, daysAgo: 1)),
                 available: true, checkFailed: false, updatesItself: true, step: nil, progress: nil,
-                last: UpdateOutcome(result: .succeeded, release: "0.0.84", finished: Calendar.current.date(from: DateComponents(year: Calendar.current.component(.year, from: .now), month: 11, day: 12))))
+                last: UpdateOutcome(result: .succeeded, release: "0.0.84", finished: Calendar.current.date(from: DateComponents(year: Calendar.current.component(.year, from: .now), month: 11, day: 12)), finishedHasTime: false))
             state.jobs = [
                 ("backup", 3600, 14, 0, HousekeepingJob.Outcome.succeeded), ("trash-purge", 86_400, 3, 0, .succeeded),
                 ("version-thinning", 3600, 14, 0, .succeeded), ("audit-cleanup", 86_400, 3, 10, .succeeded),

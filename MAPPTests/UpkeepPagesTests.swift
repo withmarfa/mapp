@@ -147,7 +147,9 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         #expect(bench.calls.state.withLock { $0.restores.map(\.name) } == ["b"])
         #expect(model.sheet == nil)
         #expect(model.restored?.outcome.added == 18)
-        #expect(UpkeepWording.settingName("posthog_project_token") == "Posthog Project Token")
+        #expect(
+            UpkeepWording.secretsLine(["posthog_project_token"], serverName: "Castell Studio")
+                == "The PostHog project token.")
     }
 
     @Test func aRestoreCancelledAtTheSignInSheetRestoresNothingAndTheSheetStays() async {
@@ -419,7 +421,7 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         #expect(model.confirming == nil)
         #expect(bench.calls.state.withLock { $0.clocksConfirmed } == 0)
         model.askToConfirm(clock: someday)
-        await model.confirm(health: health)
+        await model.confirm(date: someday, health: health)
         #expect(bench.calls.state.withLock { $0.clocksConfirmed } == 1)
         #expect(model.confirming == nil)
         #expect(health.hasLoaded, "the hold is read again")
@@ -431,7 +433,7 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         let model = HousekeepingModel(context: bench.context)
         await model.load()
         model.askToConfirm(clock: someday)
-        await model.confirm(health: ServerHealthModel(context: bench.context))
+        await model.confirm(date: someday, health: ServerHealthModel(context: bench.context))
         #expect(model.confirmError == .notPermitted("instance.maintain"))
         #expect(bench.refreshed == 1)
         #expect(model.confirming == nil)
@@ -469,8 +471,37 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         let health = ServerHealthModel(context: bench.context)
         model.askToConfirm(clock: someday)
         model.cancelConfirming()
-        await model.confirm(health: health)
+        await model.confirm(date: someday, health: health)
         #expect(bench.calls.state.withLock { $0.clocksConfirmed } == 1)
+    }
+
+    @Test func confirmDateReadsTheHealthAgainAndAsksAboutTheDateTheClockReadsNow() async {
+        let bench = OwnerBench(grants: [.instanceRead, .instanceMaintain])
+        let later = someday.addingTimeInterval(86_400 * 3)
+        bench.calls.state.withLock {
+            $0.health?.housekeeping = HousekeepingHealth(failed: [], hold: ClockHold(clockAt: later, trustedAt: nil, endsAt: nil))
+        }
+        let model = HousekeepingModel(context: bench.context)
+        let health = ServerHealthModel(context: bench.context)
+        await model.askToConfirm(health: health)
+        #expect(model.confirming == later, "the date is the one just read, not an earlier reading")
+        bench.calls.state.withLock { $0.health?.housekeeping = HousekeepingHealth(failed: [], hold: nil) }
+        model.cancelConfirming()
+        await model.askToConfirm(health: health)
+        #expect(model.confirming == nil, "nothing is asked once the hold has gone")
+    }
+
+    @Test func aServerThatConfirmedAnotherDateThanTheOneShownSaysSo() async {
+        let bench = OwnerBench(grants: [.instanceRead, .instanceMaintain])
+        let model = HousekeepingModel(context: bench.context)
+        let health = ServerHealthModel(context: bench.context)
+        bench.calls.state.withLock { $0.clockConfirmedAt = someday.addingTimeInterval(86_400 * 2) }
+        await model.confirm(date: someday, health: health)
+        #expect(model.confirmedInstead?.shown == someday)
+        #expect(model.confirmedInstead?.confirmed == someday.addingTimeInterval(86_400 * 2))
+        bench.calls.state.withLock { $0.clockConfirmedAt = someday }
+        await model.confirm(date: someday, health: health)
+        #expect(model.confirmedInstead == nil)
     }
 
     @Test func aFolderRefusedInItsSheetLeavesNoLineOnThePage() async {
@@ -515,5 +546,111 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         #expect(model.lostTrack)
         #expect(!model.canUpdate)
         #expect(model.ready == nil)
+    }
+}
+
+@MainActor
+@Suite(.hangLimit) struct UpkeepReviewWordingTests {
+    @Test func aRestoreNamesTheSecretsMonitoringHoldsAndCountsTheOthersNeverTellingTheirKeys() {
+        let line = UpkeepWording.secretsLine(["heartbeat_url", "posthog_project_token"], serverName: "Castell Studio")
+        #expect(line == "The heartbeat address and the PostHog project token.")
+        let more = UpkeepWording.secretsLine(["heartbeat_url", "object_store_secret_key", "other_key"], serverName: "Castell Studio")
+        #expect(more == "The heartbeat address. 2 other settings are set on the machine Castell Studio runs on.")
+        let one = UpkeepWording.secretsLine(["object_store_secret_key"], serverName: "Castell Studio")
+        #expect(one == "1 setting is set on the machine Castell Studio runs on.")
+        #expect(!more.contains("_") && !one.contains("_"))
+    }
+
+    @Test func aDateWithNoTimeShowsNoTimeAndOneWithATimeShowsIt() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        let now = Date(timeIntervalSince1970: 1_795_000_000)
+        let day = try #require(ClientOwnerCalls.date("2026-11-12"))
+        #expect(!ClientOwnerCalls.hasTime("2026-11-12"))
+        #expect(ClientOwnerCalls.hasTime("2026-11-12T00:00:00.000Z"))
+        let shown = UpkeepWording.moment(day, hasTime: false, now: now, calendar: calendar)
+        #expect(shown.contains("12") && !shown.contains("11 "), "the day it names, not the evening before in a zone west of UTC")
+        #expect(!shown.contains(":"))
+        #expect(UpkeepWording.moment(now, hasTime: true, now: now, calendar: calendar).contains(":"))
+    }
+
+    @Test func aBackupStatusIsWordedOnlyFromWhatIsKnown() {
+        let failing = UpkeepWording.problems(BackupsHealth(state: .failing, lastBackup: nil))
+        let incomplete = UpkeepWording.problems(BackupsHealth(state: .incomplete, lastBackup: nil))
+        #expect(failing.map(\.title) == ["Backups are failing"])
+        #expect(incomplete.map(\.title) == ["Backups are incomplete"])
+        #expect(failing.first?.line != incomplete.first?.line)
+    }
+
+    @Test func whereBackupsGoIsNeverNowhereWhenTheServerGaveNoDetail() {
+        #expect(BackupsPage.destination(BackupsHealth(state: .ok, lastBackup: nil)) == "Couldn’t Check")
+        #expect(BackupsPage.destination(BackupsHealth(state: .off, lastBackup: nil, reason: .noDestination)) == "Nowhere")
+        #expect(BackupsPage.destination(BackupsHealth(state: .ok, lastBackup: nil, destination: .folder)) == "A Folder")
+    }
+
+    @Test func aSettingConcernIsTitledWithMonitoringsOwnName() {
+        #expect(AttentionConcern(kind: .setting, reference: "posthog_host", title: "x").shownTitle == "Set PostHog Host Again")
+    }
+}
+
+@MainActor
+@Suite(.hangLimit) struct UpdatesReviewFixTests {
+    private func ready(checks: Bool = true) -> UpdateStatus {
+        UpdateStatus(
+            running: "0.0.84", checksAutomatically: checks, latest: UpdateRelease(version: "0.0.85", published: someday), available: true,
+            checkFailed: false, updatesItself: true, step: nil, progress: nil, last: nil)
+    }
+
+    @Test func checkForUpdatesIsOffWhileCheckAutomaticallyIsOffAndAsksTheServerNothing() async {
+        let bench = OwnerBench(grants: [.instanceRead, .instanceMaintain, .configManage])
+        bench.calls.state.withLock { $0.update = ready(checks: false) }
+        let model = UpdatesModel(context: bench.context, pause: .zero)
+        await model.load()
+        #expect(!model.canCheck)
+        await model.checkForUpdates()
+        #expect(bench.calls.state.withLock { $0.updatesChecked } == 0)
+    }
+
+    @Test func withoutInstanceMaintainTheModelSaysAllowMoreIsNeededBeforeAnyCall() async {
+        let bench = OwnerBench(grants: [.instanceRead])
+        bench.calls.state.withLock { $0.update = ready() }
+        let model = UpdatesModel(context: bench.context, pause: .zero)
+        await model.load()
+        #expect(model.needsMaintain)
+        bench.grants.insert(.instanceMaintain)
+        #expect(!model.needsMaintain)
+    }
+
+    @Test func theFollowerEndsWithThePage() async {
+        let bench = OwnerBench(grants: [.instanceRead, .instanceMaintain, .configManage])
+        var running = ready()
+        running.progress = UpdateProgress(stage: .swapping, release: "0.0.85")
+        bench.calls.state.withLock { $0.update = running }
+        let model = UpdatesModel(context: bench.context, pause: .milliseconds(5))
+        let loading = Task { await model.load() }
+        #expect(await eventually { bench.calls.calls.filter { $0 == "updateStatus" }.count >= 3 })
+        #expect(model.isFollowing)
+        model.stop()
+        await loading.value
+        #expect(!model.isFollowing)
+        let reads = bench.calls.calls.filter { $0 == "updateStatus" }.count
+        try? await Task.sleep(for: .milliseconds(60))  // long enough for any follower that is still alive to read again
+        #expect(bench.calls.calls.filter { $0 == "updateStatus" }.count == reads, "no read is made after the page has gone")
+    }
+
+    @Test func anUpdateStartedWhileAnotherRunsFollowsTheOneThatRuns() async {
+        let bench = OwnerBench(grants: [.instanceRead, .instanceMaintain, .configManage])
+        var running = ready()
+        running.progress = UpdateProgress(stage: .fetching, release: "0.0.85")
+        bench.calls.state.withLock { $0.update = ready() }
+        let model = UpdatesModel(context: bench.context, pause: .zero)
+        await model.load()
+        var done = ready()
+        done.running = "0.0.85"
+        done.available = false
+        bench.calls.state.withLock { $0.updateReads = [done] }
+        await model.update()
+        #expect(model.status?.running == "0.0.85")
+        #expect(bench.calls.state.withLock { $0.updatesStarted } == 1)
     }
 }

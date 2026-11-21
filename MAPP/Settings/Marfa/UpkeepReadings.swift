@@ -85,6 +85,8 @@ nonisolated struct UpdateOutcome: Hashable, Sendable {
     var result: Result
     var release: String
     var finished: Date?
+    /// Whether the server's value carried a time of day, so the page shows one only when it is known.
+    var finishedHasTime = true
 }
 
 /// How the server stands on updates, as `GET /update` gives it.
@@ -112,6 +114,7 @@ nonisolated struct HousekeepingJob: Identifiable, Hashable, Sendable {
     let name: String
     let intervalSeconds: Int
     var lastFinished: Date?
+    var lastFinishedHasTime = true
     /// Nil until a run has finished.
     var outcome: Outcome?
 

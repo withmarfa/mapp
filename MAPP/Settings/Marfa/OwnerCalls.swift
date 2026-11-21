@@ -216,8 +216,8 @@ nonisolated protocol OwnerCalls: Sendable {
     func startUpdate() async throws(OwnerFailure) -> UpdateStatus
 
     func housekeepingJobs() async throws(OwnerFailure) -> [HousekeepingJob]
-    /// Takes the server's clock as right, so jobs that delete run again (`instance.maintain`).
-    func confirmClock() async throws(OwnerFailure)
+    /// Takes the server's clock as right, so jobs that delete run again (`instance.maintain`), and answers the time the server took.
+    func confirmClock() async throws(OwnerFailure) -> Date?
 
     func folders() async throws(OwnerFailure) -> FolderListing
     func folderReport(_ id: String) async throws(OwnerFailure) -> FolderReport
@@ -317,9 +317,13 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
 
     static func date(_ text: String?) -> Date? {
         guard let text else { return nil }
-        return try? Date(text, strategy: .iso8601.year().month().day().time(includingFractionalSeconds: true).timeZone(separator: .omitted))
-            ?? Date(text, strategy: .iso8601)
+        return (try? Date(text, strategy: .iso8601.year().month().day().time(includingFractionalSeconds: true).timeZone(separator: .omitted)))
+            ?? (try? Date(text, strategy: .iso8601))
+            ?? (try? Date(text, strategy: .iso8601.year().month().day()))
     }
+
+    /// Whether the server's text names a time of day, not only a day.
+    static func hasTime(_ text: String?) -> Bool { text?.contains("T") ?? true }
 
     private static func text(_ date: Date) -> String {
         date.formatted(.iso8601.year().month().day().time(includingFractionalSeconds: true).timeZone(separator: .omitted))

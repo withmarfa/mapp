@@ -16,6 +16,7 @@ struct UpdatesPage: View {
     var body: some View {
         content
             .task(id: host.serverAddress) { await model.load() }
+            .onDisappear { model.stop() }
             .accessibilityIdentifier("UpdatesPage")
     }
 
@@ -86,8 +87,8 @@ struct UpdatesPage: View {
                 if model.lostTrack {
                     SettingsProblemRow(
                         title: Text("\(host.serverName) hasn’t come back yet"),
-                        line: Text("MAPP stopped waiting. Check for updates again to see where it stands."),
-                        actions: [SettingsProblemAction("Check for Updates") { Task { await model.checkForUpdates() } }])
+                        line: Text("MAPP stopped waiting. Check again to see where it stands."),
+                        actions: [SettingsProblemAction("Check Again") { Task { await model.load() } }])
                 }
                 if let error = model.error {
                     OwnerProblemRow(title: "Couldn’t Do That", failure: error, page: .updates, host: host)
@@ -100,14 +101,20 @@ struct UpdatesPage: View {
         SettingsSection("Marfa") {
             SettingsRow(title: title(status), line: Text(verbatim: line(status))) {
                 HStack(spacing: 8) {
-                    SettingsButton(model.isChecking ? "Checking…" : "Check for Updates") { Task { await model.checkForUpdates() } }
-                        .disabled(model.isChecking)
+                    if model.needsMaintain {
+                        SettingsButton("Allow More…") { host.askForMore(naming: InstancePermission.instanceMaintain.rawValue) }
+                    } else {
+                        SettingsButton(model.isChecking ? "Checking…" : "Check for Updates", reserving: "Check for Updates") {
+                            Task { await model.checkForUpdates() }
+                        }
+                        .disabled(!model.canCheck)
+                    }
                     if model.ready != nil, !status.updatesItself, let step = status.step, !step.isEmpty {
                         SettingsButton(copied ? "Copied" : "Copy Steps") {
                             OwnerClipboard.copyText(step)
                             copied = true
                         }
-                    } else if model.ready != nil {
+                    } else if model.ready != nil, !model.needsMaintain {
                         SettingsButton("Update", role: .update) { Task { await model.update() } }
                             .disabled(!model.canUpdate)
                     }
@@ -138,12 +145,14 @@ struct UpdatesPage: View {
         return known ? Text("Marfa \(status.running)") : Text("Marfa")
     }
 
+    /// One sentence under the release: why it can't be checked, or how it gets updated.
     private func line(_ status: UpdateStatus) -> String {
-        if let latest = model.ready {
-            let published = latest.published.map { String(localized: "Published \(OwnerWording.when($0) ?? "").") } ?? ""
-            let how = status.updatesItself
+        if !status.checksAutomatically {
+            return String(localized: "Check Automatically is off, so \(host.serverName) isn’t looking for updates.")
+        }
+        if model.ready != nil {
+            return status.updatesItself
                 ? String(localized: "\(host.serverName) restarts to update.") : String(localized: "\(host.serverName) is updated where it runs.")
-            return [published, how].filter { !$0.isEmpty }.joined(separator: " ")
         }
         if status.checkFailed { return String(localized: "The last check found no answer.") }
         return String(localized: "What \(host.serverName) runs.")
@@ -169,11 +178,11 @@ struct UpdatesPage: View {
     }
 
     private func lastLine(_ last: UpdateOutcome) -> String {
-        let when = last.finished.map { UpkeepWording.moment($0) + "." }
+        let when = last.finished.map { UpkeepWording.moment($0, hasTime: last.finishedHasTime) + "." }
         let why: String? =
             switch last.result {
             case .succeeded: nil
-            case .putBack: String(localized: "It wouldn’t start, so it was undone.")
+            case .putBack: String(localized: "It was undone.")
             case .failed: String(localized: "It couldn’t be put in place.")
             }
         return [when, why].compactMap { $0 }.joined(separator: " ")

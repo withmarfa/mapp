@@ -50,12 +50,19 @@ struct SettingsButton: View {
     private let title: Text
     private let role: SettingsButtonRole
     private let small: Bool
+    /// A longer title the button keeps room for, so it does not change width as its title changes (Check for Updates while it reads
+    /// Checking…).
+    private let reserved: Text?
     private let action: () -> Void
 
-    init(_ title: LocalizedStringKey, role: SettingsButtonRole = .normal, small: Bool = false, action: @escaping () -> Void) {
+    init(
+        _ title: LocalizedStringKey, role: SettingsButtonRole = .normal, small: Bool = false, reserving reserved: LocalizedStringKey? = nil,
+        action: @escaping () -> Void
+    ) {
         self.title = Text(title)
         self.role = role
         self.small = small
+        self.reserved = reserved.map { Text($0) }
         self.action = action
     }
 
@@ -63,6 +70,7 @@ struct SettingsButton: View {
         self.title = title
         self.role = role
         self.small = small
+        self.reserved = nil
         self.action = action
     }
 
@@ -70,11 +78,17 @@ struct SettingsButton: View {
         self.title = Text(verbatim: title)
         self.role = role
         self.small = small
+        self.reserved = nil
         self.action = action
     }
 
     var body: some View {
-        Button(action: action) { title }
+        Button(action: action) {
+            ZStack {
+                if let reserved { reserved.hidden() }
+                title
+            }
+        }
             .buttonStyle(SettingsButtonStyle(role: role, small: small))
     }
 }

@@ -94,6 +94,7 @@ import Observation
     func beginFolder() {
         folderDraft = settings?.folder ?? ""
         sheetError = nil
+        rowError = nil
         sheet = .folder
     }
 
@@ -110,23 +111,30 @@ import Observation
     func saveFolder() async {
         guard canSaveFolder, let settings else { return }
         sheetError = nil
-        if await change(settings, .init(folder: .set(trimmedFolder)), refused: String(localized: "The server didn’t accept that folder. It must already exist on the machine it runs on."), line: { self.sheetError = $0 }) { sheet = nil }
+        if await change(
+            settings, .init(folder: .set(trimmedFolder)),
+            refused: String(localized: "The server didn’t accept that folder. It must already exist on the machine it runs on."),
+            line: { self.sheetError = $0 })
+        {
+            sheet = nil
+        }
     }
 
     func keepNowhere() async {
         guard let settings, settings.folder != nil else { return }
         rowError = nil
-        _ = await change(settings, .init(folder: .remove), refused: nil, line: { _ in })
+        _ = await change(settings, .init(folder: .remove), refused: nil, line: nil)
     }
 
     func setInterval(_ seconds: Int) async {
         guard let settings, settings.intervalSeconds != seconds else { return }
         rowError = nil
-        _ = await change(settings, .init(intervalSeconds: seconds), refused: nil, line: { _ in })
+        _ = await change(settings, .init(intervalSeconds: seconds), refused: nil, line: nil)
     }
 
-    /// Sends one change and reads the answer in. Whether it was kept.
-    private func change(_ held: UpkeepSettings, _ change: UpkeepSettingsChange, refused: String?, line: (String) -> Void) async -> Bool {
+    /// Sends one change and reads the answer in. Whether it was kept. A change made in the folder sheet says why it was refused
+    /// there (`line`) and leaves the page clear; one made from the page's own pop-ups stands on the page (`rowError`).
+    private func change(_ held: UpkeepSettings, _ change: UpkeepSettingsChange, refused: String?, line: ((String) -> Void)?) async -> Bool {
         isChanging = true
         defer { isChanging = false }
         do {
@@ -136,8 +144,7 @@ import Observation
             var said: String?
             if case .refused = error { said = refused }
             let error = UpkeepWording.owned(error)
-            rowError = error
-            line(said ?? OwnerWording.line(error, on: .backups))
+            if let line { line(said ?? OwnerWording.line(error, on: .backups)) } else { rowError = error }
             if error == .conflict || error == .instanceChanged { settings = try? await context.calls.upkeepSettings() }
             await context.learn(from: error)
             return false
@@ -178,6 +185,7 @@ import Observation
         guard !isRestoring, !isChanging else { return }
         sheet = nil
         sheetError = nil
+        rowError = nil
     }
 
     func restore() async {

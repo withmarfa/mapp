@@ -15,6 +15,7 @@ import Observation
     /// The date the server's clock reads, which the owner is asked to confirm; set while the alert is up.
     private(set) var confirming: Date?
     private(set) var isConfirming = false
+    private(set) var isAsking = false
     /// Why the date was not confirmed, in the problem row's place, until the next try.
     private(set) var confirmError: OwnerFailure?
 
@@ -46,9 +47,23 @@ import Observation
 
     // MARK: The clock
 
+    /// What the server said when the date was confirmed, where it was not the date the owner was shown.
+    private(set) var confirmedInstead: (shown: Date, confirmed: Date)?
+
+    /// Reads the hold again, so the owner is asked about the date the server's clock reads now, and asks. Nothing is asked once the
+    /// hold has gone.
+    func askToConfirm(health: ServerHealthModel) async {
+        guard !isConfirming, !isAsking else { return }
+        isAsking = true
+        defer { isAsking = false }
+        await health.load()
+        askToConfirm(clock: health.health?.housekeeping?.hold?.clockAt)
+    }
+
     func askToConfirm(clock: Date?) {
         guard let clock, !isConfirming else { return }
         confirmError = nil
+        confirmedInstead = nil
         confirming = clock
     }
 
@@ -57,17 +72,19 @@ import Observation
         confirming = nil
     }
 
-    /// Confirms the date the owner was shown, then reads the jobs and the health again so the hold goes.
-    func confirm(health: ServerHealthModel) async {
-        guard confirming != nil, !isConfirming else { return }
+    /// Confirms `date`, the one the owner was shown and agreed to, then reads the jobs and the health again so the hold goes. The
+    /// alert's own binding clears `confirming` before this runs, so the date is passed in. A server that took another date says so.
+    func confirm(date: Date, health: ServerHealthModel) async {
+        guard !isConfirming else { return }
         isConfirming = true
         confirmError = nil
-        defer {
-            isConfirming = false
-            confirming = nil
-        }
+        confirmedInstead = nil
+        confirming = nil
+        defer { isConfirming = false }
         do {
-            try await context.calls.confirmClock()
+            if let taken = try await context.calls.confirmClock(), !Calendar.current.isDate(taken, inSameDayAs: date) {
+                confirmedInstead = (date, taken)
+            }
         } catch {
             let error = UpkeepWording.owned(error)
             confirmError = error

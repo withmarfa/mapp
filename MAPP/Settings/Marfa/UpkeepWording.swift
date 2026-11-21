@@ -4,7 +4,10 @@ import Foundation
 /// settings by key and requests by path: each title and line here is MAPP's own, from what the server counts or names.
 nonisolated enum UpkeepWording {
     /// A moment as "Today, 14:00", "Yesterday, 14:00" or "12 November, 14:00" (with the year when it is not this one).
-    static func moment(_ date: Date, now: Date = .now, calendar: Calendar = .current) -> String {
+    /// A server value with no time of day (`hasTime` false) is its day alone, read as the day it names, not as a midnight in this
+    /// Mac's zone.
+    static func moment(_ date: Date, hasTime: Bool = true, now: Date = .now, calendar: Calendar = .current) -> String {
+        guard hasTime else { return dayNamed(date, now: now, calendar: calendar) }
         let time = date.formatted(.dateTime.hour().minute())
         if calendar.isDate(date, inSameDayAs: now) { return String(localized: "Today, \(time)") }
         if let yesterday = calendar.date(byAdding: .day, value: -1, to: now), calendar.isDate(date, inSameDayAs: yesterday) {
@@ -19,6 +22,14 @@ nonisolated enum UpkeepWording {
         let isRelative = calendar.isDate(date, inSameDayAs: now)
             || calendar.date(byAdding: .day, value: -1, to: now).map { calendar.isDate(date, inSameDayAs: $0) } == true
         return isRelative ? text.prefix(1).lowercased() + text.dropFirst() : text
+    }
+
+    /// The day a date-only value names, as `day` says it.
+    static func dayNamed(_ date: Date, now: Date = .now, calendar: Calendar = .current) -> String {
+        var named = calendar
+        named.timeZone = .gmt
+        let parts = named.dateComponents([.year, .month, .day], from: date)
+        return day(calendar.date(from: parts) ?? date, now: now, calendar: calendar)
     }
 
     /// A day as "Today", "Yesterday" or "12 November".
@@ -92,8 +103,15 @@ nonisolated enum UpkeepWording {
                 problems.append((String(localized: "Some stored backups are damaged"), String(localized: "\(count.formatted()) parts are altered or can’t be read.")))
             }
         }
-        if problems.isEmpty, backups.state == .failing || backups.state == .incomplete {
-            problems.append((String(localized: "Backups need attention"), String(localized: "The newest backup isn’t whole.")))
+        if problems.isEmpty {
+            switch backups.state {
+            case .failing:
+                problems.append((String(localized: "Backups are failing"), String(localized: "The server reports its backups aren’t working.")))
+            case .incomplete:
+                problems.append((String(localized: "Backups are incomplete"), String(localized: "The server reports the newest backup isn’t whole.")))
+            case .ok, .off, .unknown:
+                break
+            }
         }
         return problems
     }
@@ -107,9 +125,48 @@ nonisolated enum UpkeepWording {
         ("list.bullet.rectangle", String(localized: "Logs"), ["logs"]),
     ]
 
-    /// A setting key as a person reads it: "posthog_project_token" is "Posthog Project Token".
-    static func settingName(_ key: String) -> String {
-        key.split(separator: "_").map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
+    /// What a restore asks to set again, in one sentence: the secrets Monitoring holds by their own names, and any other setting
+    /// as a count, never by its key. `others` is how many there were.
+    static func secretsToSet(_ keys: [String]) -> (known: [MonitoringSecret], others: Int) {
+        var known: [MonitoringSecret] = []
+        var others = 0
+        for key in keys {
+            if let secret = MonitoringSecret.named(key: key) {
+                if !known.contains(secret) { known.append(secret) }
+            } else {
+                others += 1
+            }
+        }
+        return (known, others)
+    }
+
+    /// "The heartbeat address and the PostHog project token." with, for settings MAPP has no name for, "2 other settings are set on
+    /// the machine Marfa runs on."
+    static func secretsLine(_ keys: [String], serverName: String) -> String {
+        let (known, others) = secretsToSet(keys)
+        var parts: [String] = []
+        if !known.isEmpty {
+            let names = known.map { String(localized: "the \($0.removalName)") }
+            let list = names.formatted(.list(type: .and, width: .standard))
+            parts.append(String(localized: "\(list.prefix(1).uppercased() + list.dropFirst())."))
+        }
+        if others == 1 {
+            parts.append(
+                known.isEmpty
+                    ? String(localized: "1 setting is set on the machine \(serverName) runs on.")
+                    : String(localized: "1 other setting is set on the machine \(serverName) runs on."))
+        } else if others > 1 {
+            parts.append(
+                known.isEmpty
+                    ? String(localized: "\(others) settings are set on the machine \(serverName) runs on.")
+                    : String(localized: "\(others) other settings are set on the machine \(serverName) runs on."))
+        }
+        return parts.joined(separator: " ")
+    }
+
+    /// A job name the table lists no title for, as a person reads it: "event-log-cleanup" is "Event Log Cleanup".
+    private static func readable(_ name: String) -> String {
+        name.split(whereSeparator: { $0 == "_" || $0 == "-" }).map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
     }
 
     // MARK: Updates
@@ -141,7 +198,7 @@ nonisolated enum UpkeepWording {
     ]
 
     static func jobTitle(_ name: String) -> String {
-        jobs.first { $0.name == name }?.title ?? settingName(name.replacingOccurrences(of: "-", with: "_"))
+        jobs.first { $0.name == name }?.title ?? readable(name)
     }
 
     /// How often a job runs, as the table says it.

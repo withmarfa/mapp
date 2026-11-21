@@ -23,11 +23,12 @@ struct HousekeepingPage: View {
             }
             .alert(
                 model.confirming.map { String(localized: "Is it \(Self.date($0))?") } ?? "",
-                isPresented: Binding { model.confirming != nil } set: { if !$0 { model.cancelConfirming() } }
-            ) {
+                isPresented: Binding { model.confirming != nil } set: { if !$0 { model.cancelConfirming() } },
+                presenting: model.confirming
+            ) { date in
                 Button("Cancel", role: .cancel) {}
-                Button("Confirm Date") { Task { await model.confirm(health: host.health) } }
-            } message: {
+                Button("Confirm Date") { Task { await model.confirm(date: date, health: host.health) } }
+            } message: { _ in
                 Text("\(host.serverName)’s clock says so. If it’s right, clean-up starts again.")
             }
             .accessibilityIdentifier("HousekeepingPage")
@@ -55,13 +56,19 @@ struct HousekeepingPage: View {
     @ViewBuilder private var attention: some View {
         let failed = housekeeping?.failed ?? []
         let hold = housekeeping?.hold
-        if hold != nil || !failed.isEmpty || model.confirmError != nil {
+        if hold != nil || !failed.isEmpty || model.confirmError != nil || model.confirmedInstead != nil {
             SettingsSection("Needs Attention") {
                 if let hold {
                     SettingsProblemRow(
                         title: Text("Clean-up is paused"),
                         line: hold.clockAt.map { Text("\(host.serverName)’s clock jumped to \(Self.date($0)).") } ?? Text("\(host.serverName)’s clock jumped."),
                         actions: [confirmAction(hold)])
+                }
+                if let instead = model.confirmedInstead {
+                    SettingsProblemRow(
+                        title: Text("\(host.serverName) took another date"),
+                        line: Text("You were shown \(Self.date(instead.shown)), and its clock read \(Self.date(instead.confirmed)) when it confirmed."),
+                        tone: .orange, actions: [])
                 }
                 if let error = model.confirmError {
                     OwnerProblemRow(title: "Couldn’t Confirm the Date", failure: error, page: .housekeeping, host: host)
@@ -76,7 +83,7 @@ struct HousekeepingPage: View {
 
     private func confirmAction(_ hold: ClockHold) -> SettingsProblemAction {
         if host.grants.contains(.instanceMaintain) {
-            SettingsProblemAction("Confirm Date…") { model.askToConfirm(clock: hold.clockAt) }
+            SettingsProblemAction("Confirm Date…") { Task { await model.askToConfirm(health: host.health) } }
         } else {
             SettingsProblemAction("Allow More…") { host.askForMore(naming: InstancePermission.instanceMaintain.rawValue) }
         }
@@ -87,11 +94,14 @@ struct HousekeepingPage: View {
     private var columns: [SettingsTableColumn<HousekeepingJob>] {
         [
             SettingsTableColumn("Job") { Text(verbatim: UpkeepWording.jobTitle($0.name)) },
-            SettingsTableColumn("Every", width: 100) { Text(verbatim: UpkeepWording.every($0.intervalSeconds)).foregroundStyle(SettingsTokens.secondaryText) },
-            SettingsTableColumn("Last Run", width: 120) { job in
-                Text(verbatim: job.lastFinished.map { UpkeepWording.moment($0) } ?? "").foregroundStyle(SettingsTokens.secondaryText)
+            SettingsTableColumn("Every", width: SettingsTokens.Metric.columnEvery) {
+                Text(verbatim: UpkeepWording.every($0.intervalSeconds)).foregroundStyle(SettingsTokens.secondaryText)
             },
-            SettingsTableColumn("Result", width: 70) { Text(verbatim: UpkeepWording.result($0.outcome)).foregroundStyle(SettingsTokens.secondaryText) },
+            SettingsTableColumn("Last Run", width: SettingsTokens.Metric.columnLastRun) { job in
+                Text(verbatim: job.lastFinished.map { UpkeepWording.moment($0, hasTime: job.lastFinishedHasTime) } ?? "")
+                    .foregroundStyle(SettingsTokens.secondaryText)
+            },
+            SettingsTableColumn("Result", width: SettingsTokens.Metric.columnResult) { Text(verbatim: UpkeepWording.result($0.outcome)).foregroundStyle(SettingsTokens.secondaryText) },
         ]
     }
 

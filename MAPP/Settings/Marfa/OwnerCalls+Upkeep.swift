@@ -90,7 +90,7 @@ extension ClientOwnerCalls {
         let last = update.last.value.map { last in
             UpdateOutcome(
                 result: last.outcome == .succeeded ? .succeeded : (last.outcome == .rolledBack ? .putBack : .failed),
-                release: last.release, finished: date(last.finishedAt))
+                release: last.release, finished: date(last.finishedAt), finishedHasTime: hasTime(last.finishedAt))
         }
         return UpdateStatus(
             running: update.release, checksAutomatically: update.checkEnabled,
@@ -128,12 +128,13 @@ extension ClientOwnerCalls {
                     case nil: nil
                     }
                 return HousekeepingJob(
-                    name: job.name, intervalSeconds: job.intervalSeconds, lastFinished: Self.date(job.lastFinishedAt), outcome: outcome)
+                    name: job.name, intervalSeconds: job.intervalSeconds, lastFinished: Self.date(job.lastFinishedAt),
+                    lastFinishedHasTime: Self.hasTime(job.lastFinishedAt), outcome: outcome)
             }
         }
     }
 
-    func confirmClock() async throws(OwnerFailure) {
-        try await run { client in _ = try await client.confirmClock().ok }
+    func confirmClock() async throws(OwnerFailure) -> Date? {
+        try await run { client in Self.date(try await client.confirmClock().ok.body.json.confirmedAt) }
     }
 }

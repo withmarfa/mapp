@@ -76,12 +76,20 @@ struct OverviewPage: View {
             .disabled(host.isAllowingMore)
     }
 
-    /// Only the actions that exist: a key opens the Keys page where the sign-in may manage keys. The pages for the other
-    /// kinds of concern are not here yet, so those rows say what is wrong and offer nothing.
+    /// Only the actions that exist: a concern opens the page that looks after it, where the sign-in may open that page. A kind
+    /// with no page of its own says what is wrong and offers nothing.
     private func actions(for concern: AttentionConcern) -> [SettingsProblemAction] {
         switch concern.kind {
         case .key where host.grants.contains(.keysManage):
             [SettingsProblemAction("Show Keys") { host.show(.keys) }]
+        case .backup where host.grants.contains(.backupsManage):
+            [SettingsProblemAction("Show Backups") { host.show(.backups) }]
+        case .job, .clock:
+            [SettingsProblemAction("Show Housekeeping") { host.show(.housekeeping) }]
+        case .folder:
+            [SettingsProblemAction("Show Folders") { host.show(.folders) }]
+        case .setting where host.grants.contains(.configManage) && MonitoringSecret.named(key: concern.reference) != nil:
+            [SettingsProblemAction("Show Monitoring") { host.show(.monitoring) }]
         default:
             []
         }
@@ -129,9 +137,9 @@ struct OverviewPage: View {
     /// The release and, where one is ready, the update; a development build has no release, so only the update line shows.
     @ViewBuilder private var versionRow: some View {
         if let version = model.releaseVersion {
-            SettingsRow(title: Text("Marfa \(version)"), line: model.reading?.updateReady.map { Text("\($0) is ready.") }) { showUpdates }
+            SettingsRow(title: Text("Marfa \(version)"), line: model.reading?.updateReady.map { Text("Marfa \($0) is ready.") }) { showUpdates }
         } else if let ready = model.reading?.updateReady {
-            SettingsRow(title: Text("\(ready) is ready")) { showUpdates }
+            SettingsRow(title: Text("Marfa \(ready) is ready")) { showUpdates }
         }
     }
 
@@ -162,7 +170,7 @@ struct OverviewPage: View {
     }
 
     @ViewBuilder private func filesRow(_ files: HealthPart) -> some View {
-        let value = bytes(model.reading?.fileBytes).map { String(localized: "\($0) in files") } ?? Self.word(files.condition)
+        let value = bytes(model.reading?.fileBytes).map { String(localized: "\($0) on its disk") } ?? Self.word(files.condition)
         if host.grants.contains(.configManage) {
             SettingsLinkRow(
                 verbatim: String(localized: "Files"), value: value, dot: Self.dot(files.condition)
