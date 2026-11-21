@@ -143,16 +143,16 @@ struct ItemModal: View {
         }
     }
 
-    /// A capsule of glass holding buttons, filled with the accent color while the one it holds is on.
+    /// A capsule of glass holding buttons, filled gray while the one it holds is on, as every on button is.
     private func capsule<Content: View>(isOn: Bool = false, @ViewBuilder _ content: () -> Content) -> some View {
         HStack(spacing: 2) { content() }
             .buttonStyle(.borderless)
             .labelStyle(.iconOnly)
             .controlSize(.large)
-            .foregroundStyle(isOn ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+            .foregroundStyle(.primary)
             .padding(.horizontal, 8)
             .frame(minWidth: Self.buttonHeight, minHeight: Self.buttonHeight)
-            .glassEffect(isOn ? .regular.tint(.accentColor) : .regular, in: .capsule)
+            .glassEffect(isOn ? .regular.tint(.secondary) : .regular, in: .capsule)
     }
 
     /// Closes the modal and opens the item in a window of its own, once what was typed is saved.
