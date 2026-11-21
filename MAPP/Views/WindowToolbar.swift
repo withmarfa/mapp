@@ -44,14 +44,14 @@ struct WindowToolbar: CustomizableToolbarContent {
         // appear for the next. Any other page keeps no header to scroll, so its item is hidden.
         if hasListColumn || browser == nil {
             ToolbarItem(id: "scrolledTitle") {
-                ScrolledItemTitle(title: tools.scrolledTitle, subtitle: tools.scrolledSubtitle)
+                ScrolledItemTitle(title: tools.scrolledTitle, icon: tools.scrolledIcon, showsIcon: tools.hasHeaderAway, subtitle: tools.scrolledSubtitle)
             }
             .sharedBackgroundVisibility(.hidden)
             .customizationBehavior(.disabled)
             .hidden((!showsScrolledTitle && !tools.isFocused) || !tools.hasScrollingHeader || browser?.showsCollection == true)
         } else if opensFromCollection, showsScrolledTitle || tools.isFocused, tools.hasHeaderAway {
             ToolbarItem(id: "scrolledTitle", placement: .navigation) {
-                ScrolledItemTitle(title: tools.scrolledTitle, subtitle: tools.scrolledSubtitle)
+                ScrolledItemTitle(title: tools.scrolledTitle, icon: tools.scrolledIcon, showsIcon: tools.hasHeaderAway, subtitle: tools.scrolledSubtitle)
             }
             .sharedBackgroundVisibility(.hidden)
             .customizationBehavior(.disabled)
@@ -91,7 +91,9 @@ struct WindowToolbar: CustomizableToolbarContent {
             tools.moreMenu.disabled(items.isEmpty)
         }
         .hidden(!showsActions)
-        if showsActions && showsDetails { ToolbarSpacer(.fixed).customizationBehavior(.disabled) }
+        // With the right sidebar open its own toolbar holds the Details button, which would otherwise join Share and
+        // More into one capsule, so the gap stands whether Details is here or over the sidebar.
+        if showsActions { ToolbarSpacer(.fixed).customizationBehavior(.disabled) }
         ToolbarItem(id: "details") { tools.detailsButton }
             .hidden(!showsDetails)
         ExtraToolbarItems(tools: tools)
@@ -210,7 +212,12 @@ struct ToolbarTrayWatch: ViewModifier {
 
 /// The title of the item on the page, in the toolbar once the page's header has scrolled away.
 struct ScrolledItemTitle: View {
+    @Environment(\.colorScheme) private var scheme
     let title: String
+    /// The item type's icon id, drawn before the title in the type's color. A type with none gets the generic mark.
+    var icon: String?
+    /// Whether the title is showing, and so its icon.
+    var showsIcon = false
     /// A second, quieter line, as the page's Focus gives under the title.
     var subtitle: String?
 
@@ -219,10 +226,18 @@ struct ScrolledItemTitle: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(title)
-                .interfaceFont(.headline).lineLimit(1).truncationMode(.tail)
-                .accessibilityIdentifier("ScrolledItemTitle")
-                .accessibilityHidden(title.isEmpty)
+            HStack(spacing: 5) {
+                if showsIcon {
+                    TypeGlyph(id: icon)
+                        .font(.system(size: TypeMark.Size.row.metrics.icon))
+                        .foregroundStyle(TypeTone(icon: icon).color(for: scheme))
+                        .accessibilityHidden(true)
+                }
+                Text(title)
+                    .interfaceFont(.headline).lineLimit(1).truncationMode(.tail)
+                    .accessibilityIdentifier("ScrolledItemTitle")
+                    .accessibilityHidden(title.isEmpty)
+            }
             if let subtitle {
                 Text(subtitle)
                     .interfaceFont(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
@@ -287,6 +302,8 @@ struct DetailsToggle: View {
             LayoutDoneButton(details: details, editor: editor)
         } else {
             Toggle("Details", systemImage: "sidebar.right", isOn: Binding { details.isPresented } set: { details.isPresented = $0 })
+                // Gray while on, as every on button is, rather than the accent color.
+                .tint(.secondary)
                 .help("Hide Details")
                 .accessibilityIdentifier("DetailsToggle")
         }
@@ -376,6 +393,12 @@ struct ItemToolbarActions {
         if let item = focusedItem { return library.pageLayout(of: item) == .text ? item.title : item.displayTitle }
         guard let item = itemWithScrollingHeader, details.isHeaderAway(of: item.id) else { return "" }
         return library.pageLayout(of: item) == .text ? item.title : item.displayTitle
+    }
+
+    /// The icon id of the item's type, shown before the title wherever the title is shown. Nil for a type with no icon.
+    var scrolledIcon: String? {
+        let item = focusedItem ?? itemWithScrollingHeader.flatMap { details.isHeaderAway(of: $0.id) ? $0 : nil }
+        return item.flatMap { library.catalogue.icon(for: $0.type) }
     }
 
     /// The line under the title in Focus: the item's type, or for a PDF whose pages have been counted, its type and its

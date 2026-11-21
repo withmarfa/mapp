@@ -145,7 +145,7 @@ struct ItemModal: View {
         }
     }
 
-    /// A capsule of glass holding buttons, filled with the accent color while the one it holds is on. Each button is a
+    /// A capsule of glass holding buttons, filled gray while the one it holds is on, as every on button is. Each button is a
     /// square of the toolbar's button height, so one alone is a circle and a pair is a capsule with no gap between them,
     /// as the window toolbar draws them.
     private func capsule<Content: View>(isOn: Bool = false, @ViewBuilder _ content: () -> Content) -> some View {
@@ -158,8 +158,8 @@ struct ItemModal: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .labelStyle(.iconOnly)
-        .foregroundStyle(isOn ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
-        .glassEffect(isOn ? .regular.tint(.accentColor) : .regular, in: .capsule)
+        .foregroundStyle(.primary)
+        .glassEffect(isOn ? .regular.tint(.secondary) : .regular, in: .capsule)
     }
 
     /// Closes the modal and opens the item in a window of its own, once what was typed is saved.
