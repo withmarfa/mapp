@@ -15,9 +15,14 @@ enum PageKey {
     static let continuesLists = "continuesLists"
     static let foldsHeadings = "foldsHeadings"
     static let showsCodeLineNumbers = "showsCodeLineNumbers"
+    /// Which of the corner's controls an item's page shows (`PageCornerChoice`).
+    static let cornerShowsFormats = "cornerShowsFormats"
+    static let cornerShowsTextSize = "cornerShowsTextSize"
+    static let cornerShowsFocus = "cornerShowsFocus"
     static let all = [
         fullWidth, textSize, checksSpelling, readingWidth, titleLines, linkLook, showsCoordinates, LineSpacing.key, ParagraphSpacing.key,
         IndentWith.key, PasteAs.key, EditingMode.key, smartPunctuation, pairsBrackets, continuesLists, foldsHeadings, showsCodeLineNumbers,
+        cornerShowsFormats, cornerShowsTextSize, cornerShowsFocus,
     ]
 }
 
