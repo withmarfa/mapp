@@ -186,6 +186,22 @@ final class FakeItemLibrary: ItemLibrary {
         })
     }
 
+    func search(_ query: String, narrowedBy narrowing: SearchNarrowing) -> SearchResults {
+        var results = search(query, in: .everywhere)
+        results.items = results.items.filter { item in
+            narrowing.admitsType(item.type, in: catalogue) && narrowing.leftOutBy(item, in: catalogue) == nil
+        }
+        return results
+    }
+
+    func searchLeftOut(_ query: String, narrowedBy narrowing: SearchNarrowing) -> SearchResults {
+        var results = search(query, in: .everywhere)
+        results.items = Array(results.items.filter { item in
+            narrowing.admitsType(item.type, in: catalogue) && narrowing.leftOutBy(item, in: catalogue) != nil
+        }.prefix(SearchResults.leftOutLimit))
+        return results
+    }
+
     var deletedItems: [Item] { items.filter { $0.state == .trashed } }
     var deletedCount: Int { deletedItems.count }
     func count(in place: SidebarItem) -> Int { items(in: place).count }

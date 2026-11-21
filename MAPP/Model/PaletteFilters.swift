@@ -47,6 +47,14 @@ nonisolated struct PaletteFilters: Equatable, Sendable {
 
     var isEmpty: Bool { count == 0 }
 
+    /// The filters left to apply once a search has answered: the type filter goes into the search itself
+    /// (`SearchNarrowing`), so a search keeps its limit for what the type lets through.
+    var afterSearch: PaletteFilters {
+        var rest = self
+        rest.clear(.type)
+        return rest
+    }
+
     /// Takes a field's values away, and its "is not" with them.
     mutating func clear(_ field: Field) {
         switch field {

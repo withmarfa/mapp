@@ -212,6 +212,9 @@ import Observation
     private nonisolated struct SearchKey: Hashable {
         var query: String
         var scope: SearchScope
+        var narrowing = SearchNarrowing.none
+        /// Whether this asks for what the narrowing leaves out rather than what it keeps.
+        var asksLeftOut = false
 
         var isOfView: Bool {
             if case .place(.view) = scope { true } else { false }
@@ -1017,10 +1020,27 @@ import Observation
     /// a change in how the copy is filling after a search that found it incomplete, so the notice follows the
     /// latest answer.
     func search(_ query: String, in scope: SearchScope) -> SearchResults {
-        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return .none }
+        search(SearchKey(query: query.trimmingCharacters(in: .whitespacesAndNewlines), scope: scope))
+    }
+
+    /// A search of every item with what `narrowing` keeps and leaves out applied inside the copy's call, so the most
+    /// a search lists is counted after them.
+    func search(_ query: String, narrowedBy narrowing: SearchNarrowing) -> SearchResults {
+        search(SearchKey(query: query.trimmingCharacters(in: .whitespacesAndNewlines), scope: .everywhere, narrowing: narrowing))
+    }
+
+    /// What the same search finds among the items `narrowing` leaves out, at most `SearchResults.leftOutLimit` of
+    /// them, one more call to the copy with the leave-out in place of its exclusion. Nothing is found where nothing
+    /// is left out.
+    func searchLeftOut(_ query: String, narrowedBy narrowing: SearchNarrowing) -> SearchResults {
+        guard !narrowing.leaveOut.isEmpty else { return .none }
+        return search(SearchKey(
+            query: query.trimmingCharacters(in: .whitespacesAndNewlines), scope: .everywhere, narrowing: narrowing, asksLeftOut: true))
+    }
+
+    private func search(_ key: SearchKey) -> SearchResults {
+        guard !key.query.isEmpty else { return .none }
         _ = searchRevision
-        let key = SearchKey(query: query, scope: scope)
         let revision = contentRevision
         let fill = syncReport.fill
         let held = searches[key]
@@ -1029,11 +1049,18 @@ import Observation
         } ?? true
         if outdated { startSearch(key, at: revision, fill: fill) }
         let answered = held?.answered ?? false
-        let ids = answered ? held?.found.hits ?? [] : lastFound
+        // Until the answer arrives the last one stands, cut to what this narrowing admits, so a changed Type shows
+        // nothing of another type and the list does not empty and fill.
+        let ids = answered ? held?.found.hits ?? [] : key.asksLeftOut ? [] : lastFound.filter { id in
+            guard let item = records[id]?.item else { return false }
+            return key.narrowing.admitsType(item.type, in: catalogue) && key.narrowing.leftOutBy(item, in: catalogue) == nil
+        }
         var results = SearchResults(isIncomplete: held?.found.isIncomplete ?? false, isCapped: held?.found.isCapped ?? false)
         results.isPending = !answered
         for id in ids {
             guard let record = records[id], record.isHeld, record.item.state != .trashed else { continue }
+            // The copy's filter for what is left out cannot say a type's own items from its subtypes'.
+            if key.asksLeftOut, !key.narrowing.admitsType(record.item.type, in: catalogue) { continue }
             results.items.append(record.item)
             // An excerpt quotes the item as it was searched, so one for an item since edited would show text that
             // is no longer there.
@@ -1044,6 +1071,16 @@ import Observation
 
     /// The copy's way of narrowing to a place or a view, or nil where the place stands for no query: the search
     /// then covers everything, as `SearchScope.narrows` says.
+    private func target(for key: SearchKey) throws -> SearchTarget? {
+        guard key.scope == .everywhere, !key.narrowing.isEmpty else { return target(for: key.scope) }
+        let expression = key.asksLeftOut
+            ? try key.narrowing.leftOutOfSearch(in: catalogue) : try key.narrowing.kept(in: catalogue)
+        guard !expression.matchesNothing else { return nil }
+        var query = Self.searchScope
+        query.types = expression.types
+        return .items(query, filter: expression.filter, limit: key.asksLeftOut ? SearchResults.leftOutLimit : SearchResults.limit)
+    }
+
     private func target(for scope: SearchScope) -> SearchTarget {
         switch scope {
         case .everywhere:
@@ -1076,29 +1113,41 @@ import Observation
         searchOrder.removeAll { $0 == key }
         searchOrder.append(key)
         while searchOrder.count > 16 { searches[searchOrder.removeFirst()] = nil }
-        let target = target(for: key.scope)
+        let asked: Result<SearchTarget?, any Error> = Result { try target(for: key) }
         Task { [weak self, source] in
-            let found: Result<SourceSearch, any Error>
+            let found: Result<SourceSearch?, any Error>
             do {
-                found = .success(try await source.search(key.query, in: target))
+                // A narrowing that admits nothing is answered without asking the copy.
+                if let target = try asked.get() {
+                    found = .success(try await source.search(key.query, in: target))
+                } else {
+                    found = .success(nil)
+                }
             } catch {
                 found = .failure(error)
             }
             guard let self else { return }
             switch found {
-            case .success(let result):
+            case .success(let answer):
+                // Nothing is asked of a narrowing that admits nothing, so how the copy stands is the only word on
+                // whether more would match once it is whole.
+                let result = answer ?? SourceSearch(isIncomplete: syncReport.fill.map { $0.state != .complete } ?? false)
                 searches[key] = SearchRun(revision: revision, found: result, running: false, answered: true, fill: fill)
-                lastFound = result.hits
+                if !key.asksLeftOut { lastFound = result.hits }
             case .failure(let error):
                 // Only this search's own earlier answer is kept; another's hits would be shown as this one's. A failure
                 // says nothing of completeness, so the notice follows how the copy stands now.
                 var kept = searches[key].flatMap { $0.answered ? $0.found : nil } ?? SourceSearch()
                 kept.isIncomplete = syncReport.fill.map { $0.state != .complete } ?? false
                 searches[key] = SearchRun(revision: revision, found: kept, running: false, answered: true, fill: fill)
-                notices.tell(String(localized: "Can’t Search"), error.localizedDescription)
+                if !key.asksLeftOut { notices.tell(String(localized: "Can’t Search"), Self.searchFailure(error)) }
             }
             searchRevision += 1
         }
+    }
+
+    private static func searchFailure(_ error: any Error) -> String {
+        (error as? SearchNarrowing.Refusal)?.message ?? error.localizedDescription
     }
 
     // MARK: Views

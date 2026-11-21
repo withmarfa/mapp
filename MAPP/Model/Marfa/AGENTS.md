@@ -1,6 +1,6 @@
 # Marfa library
 
-`MarfaLibrary` is the `ItemLibrary` over a Marfa server, read through the `marfa-swift` package's working copy. The contract is `conformance/spec/` in `withmarfa/marfa`; check a rule there and in the package. `MAPP/Model/AGENTS.md` applies here too.
+`MarfaLibrary` is the `ItemLibrary` over a Marfa server, read through the `marfa-swift` package's working copy. The contract is `conformance/spec/` in `withmarfa/marfa`; check a rule there and in the package.
 
 ## Structure
 

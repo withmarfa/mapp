@@ -53,6 +53,22 @@ struct CommandPalette: View {
     @State private var searched = SearchResults.none
     /// What `searched` lists once the filters have narrowed it: filtered when the answer or the filters change, never by the body.
     @State private var searchedItems: [Item] = []
+    /// What the same search finds among the items left out of search, after the filters, which the last line counts.
+    @State private var leftOut = SearchResults.none
+    @State private var leftOutItems: [Item] = []
+    /// Whether Show asked for this search once with nothing left out. A new search leaves out again.
+    @State private var showsLeftOut = false
+
+    /// `filters` are the ones Search Items opens with, its filter row showing while any is set.
+    init(browser: Browser, editor: EditorController, mode: Browser.Palette, filters: PaletteFilters = PaletteFilters()) {
+        self.browser = browser
+        self.editor = editor
+        self.mode = mode
+        let state = PaletteFilterState()
+        state.filters = filters
+        _filterState = State(initialValue: state)
+        _showsFilters = State(initialValue: !filters.isEmpty)
+    }
 
     private typealias Entry = PaletteEntry
     private typealias Section = PaletteSections.Section<PaletteEntry>
@@ -88,6 +104,25 @@ struct CommandPalette: View {
     }
 
     private var isTyped: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    /// What the search keeps and leaves out: the Type filter, a type following its Include Subtypes choice, and what
+    /// this library leaves out of search.
+    private var narrowing: SearchNarrowing {
+        let filters = filterState.filters
+        let stacked = Set(browser.stackedTypes.map { TypeID($0) })
+        return SearchNarrowing(
+            types: filters.types, typesWithSubtypes: stacked.intersection(filters.types),
+            excludesTypes: filters.negated.contains(.type), leaveOut: libraries?.searchLeaveOut ?? SearchLeaveOut())
+    }
+
+    /// The search a query and its narrowing stand for, so a change of either starts the answer again.
+    private struct SearchAsk: Hashable {
+        let query: String
+        let narrowing: SearchNarrowing
+        let showsLeftOut: Bool
+    }
+
+    private var searchAsk: SearchAsk { SearchAsk(query: query, narrowing: narrowing, showsLeftOut: showsLeftOut) }
 
     /// A search is not held by `listing`: its answer arrives later, and `searched` follows it (`watchSearch`).
     private func shown() -> [Section] {
@@ -184,19 +219,24 @@ struct CommandPalette: View {
                 }
             }
         }
-        // Filtering narrows what was found, so a change of filters is not a new search.
-        .onChange(of: filterState.filters) {
+        // The Type filter is part of the search, so a change to it asks again; the others narrow what was found.
+        .onChange(of: filterState.filters) { old, new in
             highlighted = 0
             scrollTarget = nil
-            applyFilters(to: searched)
+            if old.types != new.types || old.negated.contains(.type) != new.negated.contains(.type) {
+                refreshSearch()
+            } else {
+                applyFilters(to: searched, leftOut: leftOut)
+            }
         }
         .onChange(of: query) {
             highlighted = 0
             scrollTarget = nil
+            showsLeftOut = false
             // At once, so Return before the next draw reads the answer for what was typed.
             refreshSearch()
         }
-        .task(id: query) { await watchSearch() }
+        .task(id: searchAsk) { await watchSearch() }
         // The row Actions is open for may go while it is open, as another device deletes it.
         .onChange(of: actionsFor != nil && (target == nil || target?.item.map { library.item($0) == nil } == true)) { _, isGone in
             if isGone { closeActions() }
@@ -226,15 +266,18 @@ struct CommandPalette: View {
         ZStack(alignment: .bottomTrailing) {
             Group {
                 if rows.isEmpty {
-                    Group {
-                        if Self.emptyAnswer(searching: mode == .search && isTyped, results: searched) == .stillLooking {
-                            Text("Still Looking")
-                        } else {
-                            Text("No Results")
+                    VStack(spacing: 0) {
+                        Group {
+                            if Self.emptyAnswer(searching: mode == .search && isTyped, results: searched) == .stillLooking {
+                                Text("Still Looking")
+                            } else {
+                                Text("No Results")
+                            }
                         }
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, minHeight: PaletteMetrics.emptyResultsHeight - (leftOutLine == nil ? 0 : 60))
+                        leftOutRow
                     }
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, minHeight: PaletteMetrics.emptyResultsHeight)
                 } else {
                     list(sections, chosen: chosen)
                 }
@@ -302,6 +345,7 @@ struct CommandPalette: View {
                             .id(entry.id)
                         }
                     }
+                    leftOutRow
                 }
                 .padding(.horizontal, PaletteMetrics.listInset)
             }
@@ -311,11 +355,27 @@ struct CommandPalette: View {
         }
     }
 
+    @ViewBuilder private var leftOutRow: some View {
+        if let line = leftOutLine {
+            PaletteLeftOutLine(text: line) { showsLeftOut = true }
+                .padding(.horizontal, PaletteMetrics.listInset)
+        }
+    }
+
+    /// Says how many more items matched in what is left out of search, or nil where none did.
+    private var leftOutLine: String? {
+        guard mode == .search, isTyped, !showsLeftOut, !leftOut.isPending else { return nil }
+        return SearchLeftOutLine.text(
+            for: leftOutItems, isCapped: leftOut.isCapped, narrowing: narrowing, catalogue: library.catalogue, sources: library.sources)
+    }
+
     /// The active items the filters let through, most recently edited first, and their titles. Worked out once for a
     /// basis, which holds the filters, and not for each keystroke or hover.
     private func filteredItems(_ basis: Basis) -> (items: [Item], titles: [String]) {
         if let held = listing.items, held.basis == basis { return (held.items, held.titles) }
-        let items = basis.filters.apply(to: browser.paletteIndex(in: library).recent, now: library.now())
+        let typed = narrowing
+        let recent = browser.paletteIndex(in: library).recent.filter { typed.admitsType($0.type, in: library.catalogue) }
+        let items = basis.filters.afterSearch.apply(to: recent, now: library.now())
         let titles = items.map(\.title)
         listing.items = (basis, items, titles)
         return (items, titles)
@@ -468,16 +528,35 @@ struct CommandPalette: View {
     }
 
     private func refreshSearch() {
-        setSearched(mode == .search && isTyped ? library.search(query, in: .everywhere) : .none)
+        guard mode == .search, isTyped else {
+            setSearched(.none, leftOut: .none)
+            return
+        }
+        setSearched(library.search(query, narrowedBy: askedNarrowing), leftOut: askedLeftOut)
     }
 
-    private func setSearched(_ results: SearchResults) {
+    /// The search as asked: with what is left out, unless Show asked once for everything.
+    private var askedNarrowing: SearchNarrowing {
+        var asked = narrowing
+        if showsLeftOut { asked.leaveOut = SearchLeaveOut() }
+        return asked
+    }
+
+    /// What is left out and also matches, read only while a line would say so.
+    private var askedLeftOut: SearchResults {
+        showsLeftOut ? .none : library.searchLeftOut(query, narrowedBy: narrowing)
+    }
+
+    private func setSearched(_ results: SearchResults, leftOut found: SearchResults) {
         searched = results
-        applyFilters(to: results)
+        leftOut = found
+        applyFilters(to: results, leftOut: found)
     }
 
-    private func applyFilters(to results: SearchResults) {
-        searchedItems = filterState.filters.apply(to: results.items, now: library.now())
+    private func applyFilters(to results: SearchResults, leftOut found: SearchResults) {
+        let rest = filterState.filters.afterSearch
+        searchedItems = rest.apply(to: results.items, now: library.now())
+        leftOutItems = rest.apply(to: found.items, now: library.now())
     }
 
     /// Keeps `searched` current for the query: the library's answer arrives later through its observed state, so each
@@ -485,14 +564,18 @@ struct CommandPalette: View {
     private func watchSearch() async {
         guard mode == .search, isTyped else { return }
         let words = query
+        let asked = askedNarrowing
+        let counted = showsLeftOut
+        let leaving = narrowing
         while !Task.isCancelled {
             let (changes, signal) = AsyncStream.makeStream(of: Void.self)
-            setSearched(withObservationTracking {
-                library.search(words, in: .everywhere)
+            let (results, found) = withObservationTracking {
+                (library.search(words, narrowedBy: asked), counted ? SearchResults.none : library.searchLeftOut(words, narrowedBy: leaving))
             } onChange: {
                 signal.yield()
                 signal.finish()
-            })
+            }
+            setSearched(results, leftOut: found)
             for await _ in changes { break }
         }
     }
