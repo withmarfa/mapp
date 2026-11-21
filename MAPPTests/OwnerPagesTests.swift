@@ -512,6 +512,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(AccessScopes.title(of: "core.note", names: names) == "Note")
         #expect(AccessScopes.title(of: "*", names: names) == "All Data")
         #expect(AccessScopes.title(of: "core.*", names: names) == "Core Types")
+        #expect(AccessScopes.title(of: "aic.ticket.*", names: names) == "Ticket Types")
         #expect(AccessScopes.title(of: "edge.*", names: names) == "All Links")
         #expect(AccessScopes.title(of: "app.mine", names: names) == "app.mine")
     }

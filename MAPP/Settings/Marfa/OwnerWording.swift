@@ -140,8 +140,8 @@ nonisolated enum AccessScopes {
         if pattern.hasPrefix("metadata.") { return String(localized: "Definitions: \(pattern.dropFirst(9))") }
         if pattern.hasPrefix("profile.") { return String(localized: "Profile: \(pattern.dropFirst(8))") }
         if pattern.hasSuffix(".*") {
-            let namespace = pattern.dropLast(2)
-            return String(localized: "\(namespace.prefix(1).uppercased() + namespace.dropFirst()) Types")
+            let last = pattern.dropLast(2).split(separator: ".").last.map(String.init) ?? ""
+            return String(localized: "\(last.prefix(1).uppercased() + last.dropFirst()) Types")
         }
         return pattern
     }
