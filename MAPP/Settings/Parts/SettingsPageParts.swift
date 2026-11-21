@@ -143,9 +143,9 @@ struct SettingsStateContent: View {
     var action: (title: LocalizedStringKey, perform: () -> Void)?
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             Image(systemName: symbol)
-                .font(.system(size: 26, weight: .light))
+                .font(.system(size: 29, weight: .light))
                 .foregroundStyle(SettingsTokens.tertiaryText)
                 .padding(.bottom, 6)
                 .accessibilityHidden(true)
@@ -158,7 +158,7 @@ struct SettingsStateContent: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let action {
-                SettingsButton(action.title, action: action.perform).padding(.top, 10)
+                SettingsButton(action.title, action: action.perform).padding(.top, 12)
             }
         }
         .frame(maxWidth: 420)
@@ -178,7 +178,7 @@ struct SettingsPageState: View {
         GeometryReader { space in
             SettingsStateContent(symbol: symbol, title: title, line: line, action: action)
                 .padding(.horizontal, 24)
-                .position(x: space.size.width / 2, y: (space.size.height + space.safeAreaInsets.top) / 3 - space.safeAreaInsets.top - SettingsTokens.Metric.pageStateRise)
+                .position(x: space.size.width / 2, y: (space.size.height + space.safeAreaInsets.top) / 3 - space.safeAreaInsets.top + SettingsTokens.Metric.pageStateDrop)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(SettingsTokens.page)
