@@ -44,3 +44,19 @@ nonisolated enum FillWording {
         return String(localized: "Listing items…")
     }
 }
+
+/// What the Download Everything Again row says and allows on On This Mac: while the copy fills it shows the progress in
+/// place of its usual line and cannot be started again.
+nonisolated enum DownloadAgainRow {
+    static func isFilling(_ fill: LibraryFill?, in state: MarfaConnectionState) -> Bool {
+        FillWording.shows(fill, in: state)
+    }
+
+    /// The progress while filling, else that the server must answer, else that unsent changes are kept.
+    static func line(name: String, fill: LibraryFill?, in state: MarfaConnectionState) -> String {
+        if let fill, FillWording.shows(fill, in: state) {
+            return String(localized: "Downloading library… \(FillWording.line(fill))")
+        }
+        return state == .online ? String(localized: "Changes not yet sent are kept.") : String(localized: "Needs \(name) to answer.")
+    }
+}

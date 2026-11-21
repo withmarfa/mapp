@@ -69,4 +69,22 @@ nonisolated enum SearchLeaveOutList {
     static func sourcesToAdd(_ counts: [SourceCount], leaveOut: SearchLeaveOut) -> [SourceCount] {
         counts.filter { !leaveOut.sources.contains($0.code) }
     }
+
+    /// What a person may add to the leave-out.
+    nonisolated enum Addition: Hashable, Sendable {
+        case type(TypeID)
+        case source(String)
+    }
+
+    /// Whether `addition` still lets a search be asked: the leave-out with it makes no more conditions than one filter
+    /// holds (`SearchNarrowing.maxConditions`). A type counts for each of its subtypes the copy holds, since each is
+    /// left out with it.
+    static func fits(_ addition: Addition, in leaveOut: SearchLeaveOut, catalogue: Catalogue) -> Bool {
+        var next = leaveOut
+        switch addition {
+        case .type(let type): next.types.insert(type)
+        case .source(let code): next.sources.insert(code)
+        }
+        return SearchNarrowing(leaveOut: next).leaveOutConditionCount(in: catalogue) <= SearchNarrowing.maxConditions
+    }
 }

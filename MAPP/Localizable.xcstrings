@@ -337,6 +337,9 @@
     "Leave Out a Type or Source…" : {
 
     },
+    "Leaving out more would make a search too long to run." : {
+
+    },
     "Left Out of Search" : {
 
     },
@@ -6023,6 +6026,9 @@
 
     },
     "Look After This Marfa" : {
+
+    },
+    "MAPP can’t read the owner’s name yet." : {
 
     },
     "MAPP fetches the whole library from %@ again. It keeps working while it downloads." : {

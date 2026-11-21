@@ -644,6 +644,9 @@ import os
     private(set) var grants: Set<InstancePermission> = []
     /// Whether `grants` has been read for the copy shown: a sign-in the Keychain cannot give reads as holding none.
     private(set) var grantsRead = false
+    /// Whether the kept sign-in may read the owner's name, once `grantsRead`: a sign-in made before MAPP asked for it
+    /// cannot, and Allow More… or signing in again gives it.
+    private(set) var readsProfile = false
 
     /// Every permission the Settings pages and the features behind them use: what a sign-in asks for where what it holds
     /// cannot be read.
@@ -655,11 +658,17 @@ import os
         guard let connection = configuredConnection else {
             grants = []
             grantsRead = false
+            readsProfile = false
             return
         }
         let held: Set<InstancePermission>?
+        let profile: Bool?
         do {
-            held = try await Self.offMain { [signIns] in try signIns.grants(for: connection) }
+            let read = try await Self.offMain { [signIns] in
+                (try signIns.grants(for: connection), try signIns.readsProfile(for: connection))
+            }
+            held = read.0
+            profile = read.1
         } catch {
             guard configuredConnection == connection else { return }
             grantsRead = false
@@ -667,6 +676,7 @@ import os
         }
         guard configuredConnection == connection else { return }
         grants = held ?? []
+        readsProfile = profile ?? false
         grantsRead = true
     }
 
@@ -726,6 +736,7 @@ import os
         library = nil
         grants = []
         grantsRead = false
+        readsProfile = false
     }
 
     /// What to tell of an error a step met. What a package error or the system said is never shown: the detail goes

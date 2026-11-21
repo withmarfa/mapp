@@ -23,6 +23,7 @@ struct OnThisMacPage: View {
     private var host: MarfaHost { libraries.host }
     private var name: String { LibraryDescription.name(libraries) }
     private var canAskServer: Bool { host.state == .online }
+    private var isFilling: Bool { DownloadAgainRow.isFilling(library?.syncReport.fill, in: host.state) }
 
     var body: some View {
         Group {
@@ -55,7 +56,15 @@ struct OnThisMacPage: View {
         } message: {
             Text(Self.downloadMessage(name: name, unsent: host.waitingChanges ?? 0))
         }
-        .task(id: ObjectIdentifier(library)) { await keepReading(directory: libraries.host.location.directory(for: connection)) }
+        .task(id: ObjectIdentifier(library)) {
+            let directory = libraries.host.location.directory(for: connection)
+            await StoreSize.keepSumming { await sum(directory: directory) }
+        }
+        .onChange(of: isFilling) { _, filling in
+            guard !filling else { return }
+            let directory = libraries.host.location.directory(for: connection)
+            Task { await sum(directory: directory) }
+        }
     }
 
     private var headLine: String {
@@ -192,12 +201,14 @@ struct OnThisMacPage: View {
         SettingsSection("Start Again") {
             SettingsRow(
                 title: Text("Download Everything Again"),
-                line: Text(verbatim: canAskServer ? String(localized: "Changes not yet sent are kept.") : String(localized: "Needs \(name) to answer.")),
+                line: Text(verbatim: DownloadAgainRow.line(name: name, fill: library.syncReport.fill, in: host.state)).monospacedDigit(),
                 look: canAskServer ? .normal : .off
             ) {
                 SettingsButton("Download Again…") { isConfirmingDownload = true }
+                    .disabled(isFilling)
                     .accessibilityIdentifier("DownloadAgain")
             }
+            .accessibilityIdentifier("DownloadAgainRow")
         }
     }
 
@@ -211,14 +222,12 @@ struct OnThisMacPage: View {
 
     // MARK: Reading
 
-    private func keepReading(directory: URL) async {
-        while !Task.isCancelled {
-            if !isWorking {
-                storeBytes = await StoreSize.bytes(of: directory)
-                await read()
-            }
-            do { try await Task.sleep(for: .seconds(2)) } catch { return }
-        }
+    /// The folder's size and the files' state, summed when the page appears, after each step that changes them, when a
+    /// fill ends and then at `StoreSize.interval`.
+    private func sum(directory: URL) async {
+        guard !isWorking else { return }
+        storeBytes = await StoreSize.bytes(of: directory)
+        await read()
     }
 
     private func read() async {
@@ -245,6 +254,7 @@ struct OnThisMacPage: View {
                 actionFailure = String(localized: "Couldn’t change downloaded files. Check the current limit and try again.")
             }
             await read()
+            if let connection = host.configuredConnection { storeBytes = await StoreSize.bytes(of: host.location.directory(for: connection)) }
         }
     }
 }

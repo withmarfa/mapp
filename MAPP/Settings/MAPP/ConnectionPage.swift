@@ -35,7 +35,7 @@ struct ConnectionPage: View {
         } message: {
             Text("MAPP removes its copy of \(LibraryDescription.name(libraries)) from this Mac and ends its sign-in, also on the server. Your items on the server don’t change.")
         }
-        .task(id: NameRequest(connection: host.configuredConnection, isOnline: host.state == .online)) {
+        .task(id: NameRequest(connection: host.configuredConnection, isOnline: host.state == .online, readsProfile: host.readsProfile)) {
             accountName = nil
             guard let connection = host.configuredConnection, host.state == .online else { return }
             accountName = await MarfaServerCalls(connection: connection, signIns: host.signIns).ownerName()
@@ -45,6 +45,8 @@ struct ConnectionPage: View {
     private struct NameRequest: Hashable {
         let connection: MarfaConnection?
         let isOnline: Bool
+        /// Read again once Allow More… or a new sign-in gives the read of the name.
+        let readsProfile: Bool
     }
 
     // MARK: Not connected
@@ -130,10 +132,20 @@ struct ConnectionPage: View {
 
     private func account(name: String) -> some View {
         let account = ConnectionAccount(
-            state: host.state, grants: host.grants, grantsRead: host.grantsRead, waiting: host.waitingChanges, serverName: name)
+            state: host.state, grants: host.grants, grantsRead: host.grantsRead, readsProfile: host.readsProfile,
+            waiting: host.waitingChanges, serverName: name)
         return SettingsSection("Account") {
             if let accountName {
                 SettingsRow("Signed In As") { SettingsValue(verbatim: accountName) }
+            } else if account.offersName {
+                SettingsRow("Signed In As", line: "MAPP can’t read the owner’s name yet.") {
+                    SettingsButton(settingsHost.isAllowingMore ? "Waiting…" : "Allow More…") {
+                        Task { _ = await settingsHost.allowMore([]) }
+                    }
+                    .disabled(settingsHost.isAllowingMore)
+                    .accessibilityIdentifier("AllowName")
+                }
+                .accessibilityIdentifier("SignedInAs")
             }
             if account.showsPermissions {
                 SettingsRow(title: Text("Look After This Marfa"), line: Text(verbatim: account.permissionsLine)) {

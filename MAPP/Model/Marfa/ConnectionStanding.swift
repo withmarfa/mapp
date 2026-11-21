@@ -85,23 +85,30 @@ nonisolated struct ConnectionStanding: Equatable, Sendable {
 /// What the Account section of Connection holds in each state: who is signed in, what the owner has allowed MAPP, and
 /// what waits to be sent.
 nonisolated struct ConnectionAccount: Equatable, Sendable {
-    /// The owner's permissions Connection asks for. `sign_ins.manage` is left out: it is asked for from Account only,
-    /// the first time the owner changes a password, never with the others.
-    static let asked: Set<InstancePermission> = Set(InstancePermission.allCases).subtracting([.signInsManage])
+    /// Every owner permission: what Connection counts and what Allow More… asks for, `sign_ins.manage` included, as a
+    /// key's and an app's pages count them. Only the sign-in itself leaves it out (`SystemSignIns.askedAtSignIn`).
+    static let asked: Set<InstancePermission> = Set(InstancePermission.allCases)
 
     /// The permissions MAPP holds, and how many of the `asked` ones that is; nil where the sign-in cannot be read or
     /// the server is not reached, when nothing is said.
     var held: Int?
     var total: Int { Self.asked.count }
-    /// "All 13", or nothing where some are not held.
+    /// "All 14", or nothing where some are not held.
     var holdsAll: Bool { held == total }
     var unsent: String
     var unsentLine: String?
     var showsPermissions: Bool
+    /// Signed In As cannot be told because the sign-in may not read the owner's name, as one made before MAPP asked for it
+    /// cannot; Allow More… or signing in again gives it.
+    var offersName: Bool
 
-    init(state: MarfaConnectionState, grants: Set<InstancePermission>, grantsRead: Bool, waiting: Int?, serverName: String) {
+    init(
+        state: MarfaConnectionState, grants: Set<InstancePermission>, grantsRead: Bool, readsProfile: Bool = true, waiting: Int?,
+        serverName: String
+    ) {
         let reached = state == .online || state == .connecting
         showsPermissions = reached && grantsRead
+        offersName = showsPermissions && !readsProfile
         held = showsPermissions ? grants.intersection(Self.asked).count : nil
         unsent = waiting.map { $0 > 0 ? Words.changes($0) : String(localized: "None") } ?? String(localized: "Unknown")
         switch state {
@@ -111,12 +118,12 @@ nonisolated struct ConnectionAccount: Equatable, Sendable {
         }
     }
 
-    /// "MAPP holds 5 of the owner’s 13 permissions."
+    /// "MAPP holds 5 of the owner’s 14 permissions."
     var permissionsLine: String {
         guard let held, !holdsAll else { return String(localized: "The owner’s permissions MAPP holds.") }
         return String(localized: "MAPP holds \(held) of the owner’s \(total) permissions.")
     }
 
-    /// "All 13", where every permission is held.
+    /// "All 14", where every permission is held.
     var permissionsValue: String { String(localized: "All \(total)") }
 }

@@ -78,13 +78,17 @@ struct SearchPage: View {
     }
 
     private func addMenu(in library: any ItemLibrary) -> some View {
-        let types = SearchLeaveOutList.typesToAdd(library.itemTypeCounts, leaveOut: leaveOut, catalogue: library.catalogue)
+        let catalogue = library.catalogue
+        let types = SearchLeaveOutList.typesToAdd(library.itemTypeCounts, leaveOut: leaveOut, catalogue: catalogue)
         let sources = SearchLeaveOutList.sourcesToAdd(library.sourceCounts, leaveOut: leaveOut)
+        let fitting = { (addition: SearchLeaveOutList.Addition) in SearchLeaveOutList.fits(addition, in: leaveOut, catalogue: catalogue) }
+        let crossesLimit = types.contains { !fitting(.type($0.id)) } || sources.contains { !fitting(.source($0.code)) }
         return SettingsAddMenu("Leave Out a Type or Source…") {
             if !types.isEmpty {
                 Section("Types") {
                     ForEach(types) { type in
                         Button { change { $0.types.insert(type.id) } } label: { Text(verbatim: type.label) }
+                            .disabled(!fitting(.type(type.id)))
                     }
                 }
             }
@@ -92,8 +96,13 @@ struct SearchPage: View {
                 Section("Sources") {
                     ForEach(sources) { source in
                         Button { change { $0.sources.insert(source.code) } } label: { Text(verbatim: source.name) }
+                            .disabled(!fitting(.source(source.code)))
                     }
                 }
+            }
+            if crossesLimit {
+                Divider()
+                Text("Leaving out more would make a search too long to run.")
             }
         }
         .disabled(types.isEmpty && sources.isEmpty)

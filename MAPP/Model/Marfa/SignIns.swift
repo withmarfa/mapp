@@ -22,6 +22,11 @@ nonisolated protocol SignIns: Sendable {
     /// where one is kept and cannot be read.
     func grants(for connection: MarfaConnection) throws -> Set<InstancePermission>?
 
+    /// Whether the sign-in kept for `connection` may read the owner's name (`SystemSignIns.profileScopes`): nil where none
+    /// is kept or it has ended, and a throw where one is kept and cannot be read. A sign-in made before MAPP asked for it
+    /// does not, until the owner allows more or signs in again.
+    func readsProfile(for connection: MarfaConnection) throws -> Bool?
+
     /// Starts a device sign-in, for a Mac that cannot use the browser: the person types the code on any device.
     /// `permissions` are asked for as `signInWithBrowser` asks for them.
     func startCodeSignIn(to connection: MarfaConnection, asking permissions: Set<InstancePermission>) async throws -> CodeSignIn
@@ -158,8 +163,16 @@ nonisolated struct SystemSignIns: SignIns {
     /// What the app asks the owner to approve: every item to read and write, and every edge (relationships, links
     /// and attachments), which the server grants apart from items (`edge.*`). With them the three permissions its
     /// features use: Delete Permanently (`items.purge`), This Marfa (`config.manage`) and a type's icon
-    /// (`schema.write`). The owner may approve less, and what is missing is told where it is needed.
-    static let scopes = ["*:read", "*:write", "edge.*:read", "edge.*:write", "items.purge", "config.manage", "schema.write"]
+    /// (`schema.write`), and the read of the owner's own name for Signed In As, which `GET /profile` gives a credential
+    /// only with its profile read scope. That read is no owner permission. The owner may approve less, and what is missing
+    /// is told where it is needed.
+    static let scopes = ["*:read", "*:write", "edge.*:read", "edge.*:write", "items.purge", "config.manage", "schema.write"] + profileScopes
+
+    /// What Signed In As needs: the owner's name (`instance-claim/profile-read`).
+    static let profileScopes = ["profile.name:read"]
+
+    /// Whether `scopes`, as a sign-in holds them, let it read the owner's name.
+    static func readsProfile(_ scopes: [String]) -> Bool { profileScopes.allSatisfy(scopes.contains) }
 
     /// The permissions `scopes` already asks for, which a sign-in holds unless the owner approved fewer.
     static let askedAtSignIn: Set<InstancePermission> = [.itemsPurge, .configManage, .schemaWrite]
@@ -193,6 +206,11 @@ nonisolated struct SystemSignIns: SignIns {
     func grants(for connection: MarfaConnection) throws -> Set<InstancePermission>? {
         guard let credential = try authorization(for: connection).credential() else { return nil }
         return Set(InstancePermission.allCases.filter(credential.grants))
+    }
+
+    func readsProfile(for connection: MarfaConnection) throws -> Bool? {
+        guard let credential = try authorization(for: connection).credential() else { return nil }
+        return Self.readsProfile(credential.scopes)
     }
 
     func server(for connection: MarfaConnection) throws -> Server? {

@@ -25,3 +25,21 @@ nonisolated enum StoreSize {
         ByteCountFormatter.string(fromByteCount: Int64(clamping: bytes), countStyle: .file)
     }
 }
+
+nonisolated extension StoreSize {
+    /// How often the page sums the copy's folder while it stays open: a sum walks every file, so a changing size is read
+    /// slowly and the page's own steps sum it at once.
+    static let interval: Duration = .seconds(30)
+
+    /// Runs `sum` now, then again after each `interval` until cancelled. `pause` is the wait, so a test can stand in for it.
+    static func keepSumming(
+        every interval: Duration = StoreSize.interval, pause: (Duration) async throws -> Void = { try await Task.sleep(for: $0) },
+        sum: () async -> Void
+    ) async {
+        await sum()
+        while !Task.isCancelled {
+            do { try await pause(interval) } catch { return }
+            await sum()
+        }
+    }
+}

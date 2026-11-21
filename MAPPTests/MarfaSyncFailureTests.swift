@@ -173,6 +173,22 @@ struct MarfaSyncFailureTests {
         await source.close()
     }
 
+    /// withmarfa/mapp#454: a first hydration that is filling and then stops for a server too old leaves the Settings pages
+    /// no progress to show, though the package's last fill is still on the report.
+    @Test func aFirstFillThatStopsForAServerTooOldLeavesSettingsNoProgress() async throws {
+        let tooOld = MarfaError.serverTooOld(served: "0.0.77", oldest: "0.0.78", message: "Copy streams require exactly edges=all&copy=1")
+        let (fake, source, _, _) = try await open(failing: [])
+        fake.sendUpdate(CopyUpdate(
+            reread: .parts(Reread.Parts()), connection: .needsHydration(nil), fill: FillProgress(listed: 0, expected: 5000)))
+        #expect(
+            await eventually { FillWording.shows(source.syncReport.fill, in: source.connectionState) },
+            "the fill was never shown, so the test would pass for the wrong reason")
+        fake.sendUpdate(update(.needsHydration(tooOld)))
+        #expect(await waitForConnection(source) { if case .unavailable = $0 { true } else { false } })
+        #expect(!FillWording.shows(source.syncReport.fill, in: source.connectionState), "Settings kept saying it was downloading")
+        await source.close()
+    }
+
     /// A renewal the server or the app's renewer could not finish, with the sign-in kept, is the package's
     /// `renewalRefused`: each reason has its own words, and none of the package's text.
     @Test(arguments: [

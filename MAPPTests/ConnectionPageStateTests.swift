@@ -46,7 +46,7 @@ import Testing
     @Test func accountWithEveryPermissionSaysAllOfThem() {
         let account = ConnectionAccount(state: .online, grants: Set(InstancePermission.allCases), grantsRead: true, waiting: 0, serverName: "X")
         #expect(account.showsPermissions && account.holdsAll)
-        #expect(account.permissionsValue == "All 13")
+        #expect(account.permissionsValue == "All \(InstancePermission.allCases.count)")
         #expect(account.unsent == "None")
     }
 
@@ -54,13 +54,20 @@ import Testing
         let grants: Set<InstancePermission> = [.itemsPurge, .configManage, .schemaWrite, .auditRead, .keysMint]
         let account = ConnectionAccount(state: .online, grants: grants, grantsRead: true, waiting: 0, serverName: "X")
         #expect(!account.holdsAll && account.held == 5)
-        #expect(account.permissionsLine == "MAPP holds 5 of the owner’s 13 permissions.")
+        #expect(account.permissionsLine == "MAPP holds 5 of the owner’s 14 permissions.")
     }
 
-    @Test func signInsManageIsNeverAskedForHereAndNeverCounted() {
-        #expect(!ConnectionAccount.asked.contains(.signInsManage))
+    /// One count everywhere: a key's and an app's pages say "N of 14", and Connection counts the same 14 and asks for every
+    /// one it does not hold, `sign_ins.manage` included.
+    @Test func connectionCountsAndAsksForEveryOwnerPermission() {
+        #expect(ConnectionAccount.asked == Set(InstancePermission.allCases) && ConnectionAccount.asked.count == 14)
         let account = ConnectionAccount(state: .online, grants: [.signInsManage], grantsRead: true, waiting: 0, serverName: "X")
-        #expect(account.held == 0)
+        #expect(account.held == 1 && account.total == 14)
+        let all = ConnectionAccount(state: .online, grants: Set(InstancePermission.allCases), grantsRead: true, waiting: 0, serverName: "X")
+        #expect(all.holdsAll && all.permissionsValue == "All 14")
+        let without = ConnectionAccount(
+            state: .online, grants: Set(InstancePermission.allCases).subtracting([.signInsManage]), grantsRead: true, waiting: 0, serverName: "X")
+        #expect(!without.holdsAll && without.permissionsLine == "MAPP holds 13 of the owner’s 14 permissions.")
     }
 
     @Test func notAnsweringSaysWhatWaitsAndNothingOfPermissions() {

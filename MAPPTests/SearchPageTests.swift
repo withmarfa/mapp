@@ -136,4 +136,32 @@ private func item(
             [SourceCount(code: "a", name: "A", count: 1), SourceCount(code: "b", name: "B", count: 2)], leaveOut: SearchLeaveOut(sources: ["a"]))
         #expect(sources.map(\.code) == ["b"])
     }
+
+    /// Every condition is a type or a source, and a filter holds ten: past that every search fails, so the page stops short.
+    @Test func anAdditionThatWouldMakeMoreConditionsThanASearchHoldsIsNotOffered() throws {
+        let sources = Set((0..<6).map { "source-\($0)" })
+        let leaveOut = SearchLeaveOut(sources: sources)
+        // Notes take a ticket, a project, a task and a bug with them: five types and six sources are eleven.
+        #expect(!SearchLeaveOutList.fits(.type(F.note), in: leaveOut, catalogue: F.catalogue))
+        #expect(SearchLeaveOutList.fits(.type(F.ticket), in: leaveOut, catalogue: F.catalogue), "three types and six sources are nine")
+        #expect(SearchLeaveOutList.fits(.source("seventh"), in: leaveOut, catalogue: F.catalogue))
+        let full = SearchLeaveOut(sources: Set((0..<10).map { "source-\($0)" }))
+        #expect(!SearchLeaveOutList.fits(.source("eleventh"), in: full, catalogue: F.catalogue))
+        #expect(!SearchLeaveOutList.fits(.type(F.bug), in: full, catalogue: F.catalogue))
+        // What fits is what a search can be asked with.
+        for addition in [SearchLeaveOutList.Addition.type(F.ticket), .source("seventh")] {
+            var next = leaveOut
+            if case .type(let type) = addition { next.types.insert(type) }
+            if case .source(let code) = addition { next.sources.insert(code) }
+            let narrowing = SearchNarrowing(leaveOut: next)
+            _ = try narrowing.kept(in: F.catalogue)
+            _ = try narrowing.leftOutOfSearch(in: F.catalogue)
+        }
+    }
+
+    @Test func aTypeCountsForEveryTypeTheCopyHoldsBelowIt() {
+        #expect(SearchNarrowing(leaveOut: SearchLeaveOut(types: [F.bug])).leaveOutConditionCount(in: F.catalogue) == 1)
+        #expect(SearchNarrowing(leaveOut: SearchLeaveOut(types: [F.ticket])).leaveOutConditionCount(in: F.catalogue) == 3)
+        #expect(SearchNarrowing(leaveOut: SearchLeaveOut(types: [F.ticket, F.bug], sources: ["github"])).leaveOutConditionCount(in: F.catalogue) == 4)
+    }
 }

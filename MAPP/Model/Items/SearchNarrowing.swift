@@ -76,6 +76,13 @@ nonisolated struct SearchNarrowing: Hashable, Sendable {
         }
     }
 
+    /// How many conditions a search over every item holds for the leave-out alone: one for each type left out and each
+    /// type below it that the copy holds, and one for each source. At `maxConditions` the next addition makes every
+    /// search fail, so the Search page counts them as a person adds.
+    func leaveOutConditionCount(in catalogue: Catalogue) -> Int {
+        leftOutTypes(in: catalogue).intersection(catalogue.itemTypes.keys).count + leaveOut.sources.count
+    }
+
     // MARK: Asking the copy
 
     /// The search for what is kept: the chosen types, without what is left out.
