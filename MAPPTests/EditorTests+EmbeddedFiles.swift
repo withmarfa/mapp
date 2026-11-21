@@ -440,4 +440,34 @@ extension EditorTests {
         let told = try #require(library.notices.waiting.last)
         #expect(told.message.contains("“tickets.pdf”") && told.message.contains("“Trip”"))
     }
+
+    @Test func filesAttachedThatTheFirstAttemptTouchedHiddenTextAreKeptAndGoOnTheNext() async throws {
+        let new = FakeItemLibrary.note("Trip", modified: .now)
+        let library = FakeItemLibrary(items: [new])
+        library.bodies[new.id] = "# Pack\n\nbag\n"
+        let editor = try await attachingEditor(library)
+        // The page refuses the first attempt as Inkkit does for an edit that reaches folded text, and does its work the second time.
+        _ = try await editor.webView.evaluateJavaScript(
+            """
+            (() => {
+              const real = window.editor.appendImages
+              let refused = 0
+              window.editor.appendImages = (...arguments_) => refused++ < 1
+                ? { commandError: 'hidden-text', message: 'The section was folded.' }
+                : real(...arguments_)
+              window.__refusals = () => refused
+            })()
+            """)
+
+        editor.append([Embed(link: "tickets.pdf", name: "tickets.pdf")], to: new.id)
+        #expect(try await eventuallyAsking { try await markdown(editor)?.contains("![tickets.pdf](tickets.pdf)") == true })
+        #expect(try await editor.webView.evaluateJavaScript("window.__refusals()") as? Int == 2, "it was refused once and sent again")
+        #expect(await eventually { editor.pendingEmbeds.isEmpty })
+        #expect(library.notices.waiting.isEmpty, "nothing is told as lost")
+    }
+
+    @Test func aRefusalForHiddenTextIsAskedAgainAndNotGivenUpOn() {
+        #expect(EditorController.retriesAfterPaint("hidden-text"))
+        #expect(!EditorController.retriesAfterPaint("preservation"))
+    }
 }

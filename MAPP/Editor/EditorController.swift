@@ -429,6 +429,7 @@ final class EditorController: NSObject {
         shown = shown.filter { $0.key >= generation - 8 }
         shown[generation] = Shown(id: item.id, read: body.version)
         call(function, json(body.text), String(generation), String(isEditable))
+        if function == "load" { applyEditingMode() }
         revealPendingHeading(in: item.id)
         if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle, caret: requested.caret) }
         appendPendingEmbeds()
@@ -635,6 +636,7 @@ final class EditorController: NSObject {
                 generation += 1
                 shown[generation] = Shown(id: pageItemID, read: read)
                 call("load", json(markdown), String(generation), String(isEditable))
+                applyEditingMode()
             }
             if let requested = wantsFocus { focus(requested.id, onTitle: requested.onTitle, caret: requested.caret) }
             appendPendingEmbeds()

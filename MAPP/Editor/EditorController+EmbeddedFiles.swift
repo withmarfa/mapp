@@ -92,13 +92,26 @@ extension EditorController {
             if outcome as? Bool == true {
                 take(embeds, from: pageItemID)
                 appendsAgain = true
-            } else if let refusal = (outcome as? [String: Any])?["commandError"] as? String,
-                      !Self.passingRefusals.contains(refusal) {
-                if take(embeds, from: pageItemID) { notInText(embeds, of: pageItemID) }
+            } else if let refusal = (outcome as? [String: Any])?["commandError"] as? String {
+                if Self.retriesAfterPaint(refusal) {
+                    // The page opened the folded section the images belong in; they go once it has painted.
+                    Task {
+                        try? await Task.sleep(for: Self.hiddenTextRetryDelay)
+                        appendPendingEmbeds()
+                    }
+                } else if !Self.passingRefusals.contains(refusal), take(embeds, from: pageItemID) {
+                    notInText(embeds, of: pageItemID)
+                }
             }
             if appendsAgain { appendPendingEmbeds() }
         }
     }
+
+    /// Whether a refusal means the edit touched folded or not-yet-shown text, which the page has now opened. The images
+    /// stay waiting and are sent again, never given up on.
+    nonisolated static func retriesAfterPaint(_ refusal: String) -> Bool { refusal == "hidden-text" }
+
+    nonisolated static let hiddenTextRetryDelay = Duration.milliseconds(100)
 
     /// Refusals that pass: a composition, a load that made the generation sent stale, and an import still running.
     private static let passingRefusals: Set<String> = ["composition", "stale-document", "operation-pending", "not-ready"]

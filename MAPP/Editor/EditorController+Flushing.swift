@@ -130,7 +130,7 @@ extension EditorController {
 
     /// The page's refusals to hand over its edit that pass: a composition, a picture still being imported, and a load or
     /// reload the page puts off until either ends (`stale-document`, as the flush asks for the generation last sent).
-    private static let passingFlushRefusals: Set<String> = ["composition", "operation-pending", "stale-document"]
+    private static let passingFlushRefusals: Set<String> = ["composition", "operation-pending", "stale-document", "hidden-text"]
 
     /// Whether the script ran in the page and failed there, rather than never reaching it.
     private static func ranInPage(_ error: any Error) -> Bool {

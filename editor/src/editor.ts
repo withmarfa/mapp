@@ -5,7 +5,9 @@ import {
   type EditorLabels,
   type FileReference,
   type FormatCommand as InkFormat,
+  type DisplayPreferences,
   type ShortcutName,
+  type TextInputPreferences,
   type WikiLinkReference,
   type TableCommand,
   type ReadableTextSnapshot,
@@ -25,11 +27,14 @@ import { quickLookAction } from './file-actions'
 import { ItemLinkStatus } from './links'
 import { WebPictures, webAddress, type PictureWords } from './pictures'
 
-/** A preview that could not be drawn is a diagnostic for the log, not an error in the person's edit. */
+/** A preview that could not be drawn, or an input that touched folded text and opened it, is a diagnostic for the
+ *  log, not an error in the person's edit. */
 export function isPreviewDiagnostic(error: Error): boolean {
   return (
     error instanceof InkKitError &&
-    (error.code === 'diagram-unavailable' || error.code === 'file-unavailable')
+    (error.code === 'diagram-unavailable' ||
+      error.code === 'file-unavailable' ||
+      error.code === 'hidden-text')
   )
 }
 
@@ -124,11 +129,21 @@ function shownText(source: string): string {
     .replace(/!?\[([^\]]*?)(?:\|\d+)?\](?:\([^)]*(?:\)|$)|\[[^\]]*(?:\]|$))/g, '$1')
 }
 
-export function guardedCommand<T>(action: () => T): T | { commandError: string; message: string } {
+/** Runs a command the app sent. A refusal comes back as `{ commandError, message }`, and the app decides what it means.
+ *  Where the command is `retry`, an edit that touched folded or not-yet-shown text (`hidden-text`) is run once more
+ *  after the next paint: Inkkit has opened the section by then, so the same edit goes through and the person's change
+ *  is not lost. The first answer is still the refusal, since the retry has no one to answer to. */
+export function guardedCommand<T>(
+  action: () => T,
+  { retry = false }: { retry?: boolean } = {},
+): T | { commandError: string; message: string } {
   try {
     return action()
   } catch (error) {
     if (error instanceof InkKitError) {
+      if (retry && error.code === 'hidden-text') {
+        requestAnimationFrame(() => requestAnimationFrame(() => guardedCommand(action)))
+      }
       // Inkkit tells only the caller of a refused edit, so the app is told here, where it tells the person.
       if (error.code === 'preservation') postToHost({ type: 'error', message: error.message })
       return { commandError: error.code, message: error.message }
@@ -695,9 +710,31 @@ export class ItemEditor {
     }
     this.engine.setKeymap(keys)
   }
-  setSpellcheck(spellcheck: boolean) {
-    this.engine.setTextInputPreferences({ spellcheck })
+  /** The whole of Inkkit's text input and display preferences, which each call replaces, so one call carries them
+   *  all and an option is never sent on a path of its own. A call during composition is put off until it ends. */
+  setOptions(options: { textInput: TextInputPreferences; display: DisplayPreferences }) {
+    this.options = options
+    if (this.optionsPending) return
+    const apply = () => {
+      this.optionsPending = false
+      const current = this.options
+      try {
+        this.engine.setTextInputPreferences(current.textInput)
+        this.engine.setDisplayPreferences(current.display)
+      } catch (error) {
+        if (error instanceof InkKitError && error.code === 'composition') {
+          this.optionsPending = true
+          setTimeout(apply, 50)
+          return
+        }
+        throw error
+      }
+      this.invalidateFindGeometry()
+    }
+    apply()
   }
+  private options = { textInput: {} as TextInputPreferences, display: {} as DisplayPreferences }
+  private optionsPending = false
   setFinding(finding: boolean) {
     this.finding = finding
     cancelAnimationFrame(this.findPending)
