@@ -6,8 +6,6 @@ enum IndexMetrics {
     static let top: CGFloat = 12
     static let side: CGFloat = 16
     static let icon: CGFloat = 16
-    /// The width of the Collections and Sources pages' column.
-    static let columnWidth: CGFloat = 880
     /// What every index page is drawn on, behind its title, tabs and table alike: the table's own ground.
     static let backdrop = NSColor.controlBackgroundColor
 }
@@ -64,7 +62,7 @@ struct IndexPage: View {
     let emptyTab: EmptyState<EmptyView>
 
     var body: some View {
-        IndexScaffold(maxWidth: IndexMetrics.columnWidth, onAway: { browser.isIndexHeaderAway = $0 }) {
+        IndexScaffold(onAway: { browser.isIndexHeaderAway = $0 }) {
             IndexPageTop(title: title, browser: browser, tabs: tabs, tab: $tab, new: newCollection)
         } extra: {
             if place == .collections, browser.showsFilterRow {

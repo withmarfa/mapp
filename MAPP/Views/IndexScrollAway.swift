@@ -28,8 +28,6 @@ extension EnvironmentValues {
 /// over that room, moved up by as much as the rows have scrolled. Where the page has no table, the content leaves the
 /// room itself, from the height it is handed.
 struct IndexScaffold<Top: View, Extra: View, Content: View>: View {
-    /// The widest the page is, the whole width unless a page is a column of its own.
-    var maxWidth: CGFloat = .infinity
     /// Told whether the title and tabs have scrolled out of view.
     let onAway: (Bool) -> Void
     @ViewBuilder let top: Top
@@ -42,7 +40,6 @@ struct IndexScaffold<Top: View, Extra: View, Content: View>: View {
     var body: some View {
         ZStack(alignment: .top) {
             content(blockHeight)
-                .frame(maxWidth: maxWidth)
                 .environment(\.indexScroll, IndexScrollMetrics(scroll: scroll, blockHeight: blockHeight, awayAt: topHeight, report: onAway))
             IndexHeaderBlock(scroll: scroll, height: blockHeight) {
                 VStack(spacing: 0) {
@@ -51,7 +48,6 @@ struct IndexScaffold<Top: View, Extra: View, Content: View>: View {
                 }
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { blockHeight = $0 }
             }
-            .frame(maxWidth: maxWidth)
         }
         .frame(maxWidth: .infinity)
         .background { Color(nsColor: IndexMetrics.backdrop).ignoresSafeArea() }
