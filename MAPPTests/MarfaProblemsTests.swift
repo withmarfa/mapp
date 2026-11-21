@@ -81,7 +81,8 @@ struct MarfaProblemsTests {
             (.ancestorUnavailable, .blocked(.ancestorUnavailable), [.withdraw]),
             (.conflictUnresolved, .blocked(.conflictUnresolved), [.withdraw]),
             (.failingAlone, .blocked(.failingAlone), [.tryAgain, .withdraw]),
-            (.instanceChanged, .blocked(.instanceChanged), [.tryAgain, .withdraw])
+            (.instanceChanged, .blocked(.instanceChanged), [.tryAgain, .withdraw]),
+            (.serverRestored, .blocked(.serverRestored), [.tryAgain, .withdraw])
         ]
         for (reason, kind, actions) in cases {
             let report = Self.report([Self.write("w", .blocked(reason: reason))])

@@ -16,10 +16,31 @@
     "%@ ended MAPP’s sign-in. Sign in again in Connection." : {
 
     },
+    "%@ goes from %@ to %@. This can’t be undone: a key’s access can’t be widened again, and anything using it loses what it no longer reaches." : {
+
+    },
     "%@ items" : {
 
     },
     "%@ you make show here." : {
+
+    },
+    "Address Not Added" : {
+
+    },
+    "It must sign in again with your password or a passkey. Apps and keys keep working." : {
+
+    },
+    "Key Not Copied" : {
+
+    },
+    "Key Not Made" : {
+
+    },
+    "Key Not Renamed" : {
+
+    },
+    "Passkey Not Renamed" : {
 
     },
     "%lld Lines" : {
@@ -154,10 +175,31 @@
     "Couldn’t Sign In" : {
 
     },
+    "Name: %@" : {
+
+    },
+    "Narrow “%@”?" : {
+
+    },
+    "Remove “%@” from “%@”?" : {
+
+    },
     "Custom Color" : {
 
     },
     "Show Matches Left Out of Search" : {
+
+    },
+    "Sign out “%@”?" : {
+
+    },
+    "Sign-In Address Not Changed" : {
+
+    },
+    "Source: %@" : {
+
+    },
+    "The key “%@” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key on the Keys page." : {
 
     },
     "The types and sources chosen and left out make more conditions than one search can hold." : {
@@ -754,6 +796,9 @@
     "today, %@" : {
 
     },
+    "Website Not Added" : {
+
+    },
     "Week Starts On" : {
 
     },
@@ -779,6 +824,9 @@
 
     },
     "" : {
+
+    },
+    "“%@” can no longer do this. This can’t be undone: a permission can’t be given back to a key." : {
 
     },
     "+%lld" : {
@@ -888,8 +936,14 @@
     "You closed Settings before saving the changes to this Marfa’s settings." : {
 
     },
+    "You closed Settings before this was saved." : {
+
+    },
     "You quit MAPP before saving the changes to this Marfa’s settings." : {
       "extractionState" : "manual"
+    },
+    "You quit MAPP before this was saved." : {
+
     },
     "Your items are still loading." : {
 
@@ -5552,6 +5606,570 @@
 
     },
     "Items that already hold a choice you take out keep it." : {
+
+    },
+    "%@ Types" : {
+
+    },
+    "%@ answers on it too." : {
+
+    },
+    "%@ answers on these too." : {
+
+    },
+    "%@ answers there." : {
+
+    },
+    "%@ must ask you to get it back. Keys it made that reach further stop working." : {
+
+    },
+    "%@ stops working at once and must be approved again. Its webhooks are deleted. The keys it made keep working." : {
+
+    },
+    "%lld days ago" : {
+
+    },
+    "A key can only be made to end sooner." : {
+
+    },
+    "A key can only be narrowed later, so choose what it needs now." : {
+
+    },
+    "A web page at %@." : {
+
+    },
+    "Access" : {
+
+    },
+    "Account" : {
+
+    },
+    "Add Address" : {
+
+    },
+    "Add Website" : {
+
+    },
+    "Add a Passkey…" : {
+
+    },
+    "Add a Website" : {
+
+    },
+    "Add a Website…" : {
+
+    },
+    "Add an Address" : {
+
+    },
+    "Add an Address…" : {
+
+    },
+    "Add an Exception…" : {
+
+    },
+    "Added %@." : {
+
+    },
+    "Addresses" : {
+
+    },
+    "All Data" : {
+
+    },
+    "All Links" : {
+
+    },
+    "Allowed" : {
+
+    },
+    "An IP address." : {
+
+    },
+    "An address is removed" : {
+
+    },
+    "An app." : {
+
+    },
+    "Anything using it stops at once." : {
+
+    },
+    "Anything using it stops at once. This can’t be undone." : {
+
+    },
+    "Approved %@." : {
+
+    },
+    "At least 8 characters." : {
+
+    },
+    "Browsers" : {
+
+    },
+    "Can’t Reach %@" : {
+
+    },
+    "Change Address…" : {
+
+    },
+    "Change Password" : {
+
+    },
+    "Change Settings" : {
+
+    },
+    "Change Sign-In Address" : {
+
+    },
+    "Change Types" : {
+
+    },
+    "Change…" : {
+
+    },
+    "Changing it signs out every browser." : {
+
+    },
+    "Command Line" : {
+
+    },
+    "Copied" : {
+
+    },
+    "Copy the Key Now" : {
+
+    },
+    "Couldn’t Read This Page" : {
+
+    },
+    "Couldn’t Read the Sign-Ins" : {
+
+    },
+    "Create Key" : {
+
+    },
+    "Current Password" : {
+
+    },
+    "Definitions: %@" : {
+
+    },
+    "Disconnect %@" : {
+
+    },
+    "Disconnect %@?" : {
+
+    },
+    "Email" : {
+
+    },
+    "Every Type" : {
+
+    },
+    "Every app signs out" : {
+
+    },
+    "Every browser sign-in has ended. Apps and keys keep working." : {
+
+    },
+    "Every browser signs out" : {
+
+    },
+    "Every browser signs out. Apps and keys keep working." : {
+
+    },
+    "Expires" : {
+
+    },
+    "Expires %@." : {
+
+    },
+    "Feed" : {
+
+    },
+    "From %@." : {
+
+    },
+    "In %lld Days" : {
+
+    },
+    "In 1 Year" : {
+
+    },
+    "It can’t sign in again. Browsers already signed in keep working." : {
+
+    },
+    "It changed somewhere else, so MAPP read it again. Nothing was changed." : {
+
+    },
+    "It is shown only once. Keep it where the script can read it." : {
+
+    },
+    "It stops working on %@, and anything using it stops with it. Making a key last longer isn’t possible." : {
+
+    },
+    "It was disconnected, here or somewhere else." : {
+
+    },
+    "It was removed somewhere else." : {
+
+    },
+    "It was revoked, or it expired, somewhere else." : {
+
+    },
+    "Its webhooks are deleted, and its keys keep working." : {
+
+    },
+    "It’s already allowed." : {
+
+    },
+    "It’s already an address." : {
+
+    },
+    "Keys It Made" : {
+
+    },
+    "Links: %@" : {
+
+    },
+    "Look After This Marfa" : {
+
+    },
+    "MAPP can’t reach the server. Nothing was changed." : {
+
+    },
+    "MAPP isn’t allowed to %@." : {
+
+    },
+    "MAPP isn’t allowed to %@. Choose Allow More… to change that." : {
+
+    },
+    "MAPP isn’t allowed to do this. Choose Allow More… to change that." : {
+
+    },
+    "MAPP isn’t allowed to do this: it needs “%@”." : {
+
+    },
+    "MAPP isn’t allowed to list and end your sign-ins." : {
+
+    },
+    "MAPP isn’t allowed to make keys." : {
+
+    },
+    "Made %@." : {
+
+    },
+    "Made by Apps" : {
+
+    },
+    "Make It Expire" : {
+
+    },
+    "Make Keys" : {
+
+    },
+    "Make “%@” expire sooner?" : {
+
+    },
+    "Manage Apps" : {
+
+    },
+    "Manage Backups" : {
+
+    },
+    "Manage Connectors" : {
+
+    },
+    "Manage Files" : {
+
+    },
+    "Manage Keys" : {
+
+    },
+    "Manage Sign-Ins" : {
+
+    },
+    "Manage Webhooks" : {
+
+    },
+    "Narrow %@’s access?" : {
+
+    },
+    "Never expires." : {
+
+    },
+    "Never used" : {
+
+    },
+    "New Address" : {
+
+    },
+    "New Items Go To" : {
+
+    },
+    "New Key" : {
+
+    },
+    "New Key…" : {
+
+    },
+    "New Password" : {
+
+    },
+    "No Access" : {
+
+    },
+    "No apps are connected." : {
+
+    },
+    "No Browsers" : {
+
+    },
+    "No browsers are signed in." : {
+
+    },
+    "No Owner Permissions" : {
+
+    },
+    "Not Allowed" : {
+
+    },
+    "Not Changed" : {
+
+    },
+    "Nothing answered there in time." : {
+
+    },
+    "Nothing answers there." : {
+
+    },
+    "Nothing was changed: the sign-in wasn’t confirmed." : {
+
+    },
+    "On the local network." : {
+
+    },
+    "Optional. Not used to sign in." : {
+
+    },
+    "Other Addresses" : {
+
+    },
+    "Pages on it can no longer call this Marfa." : {
+
+    },
+    "Pages on it may call %@." : {
+
+    },
+    "Pages on these sites may call %@." : {
+
+    },
+    "Passkey" : {
+
+    },
+    "Passkeys" : {
+
+    },
+    "Passkeys and Browsers" : {
+
+    },
+    "Passkeys stop working" : {
+
+    },
+    "Password" : {
+
+    },
+    "Password Changed" : {
+
+    },
+    "Permission" : {
+
+    },
+    "Profile" : {
+
+    },
+    "Profile: %@" : {
+
+    },
+    "Reaches No Items" : {
+
+    },
+    "Reaches no items." : {
+
+    },
+    "Read Server Status" : {
+
+    },
+    "Read and Edit" : {
+
+    },
+    "Read the Audit Log" : {
+
+    },
+    "Reads %@." : {
+
+    },
+    "Reads and edits %@." : {
+
+    },
+    "Remove %@?" : {
+
+    },
+    "Remove “%@”?" : {
+
+    },
+    "Remove…" : {
+
+    },
+    "Rename Key" : {
+
+    },
+    "Rename Passkey" : {
+
+    },
+    "Revoke" : {
+
+    },
+    "Revoke %@" : {
+
+    },
+    "Revoke “%@”?" : {
+
+    },
+    "Revoke…" : {
+
+    },
+    "Sign Out" : {
+
+    },
+    "Sign-In Address" : {
+
+    },
+    "Sign-Ins" : {
+
+    },
+    "Signed in %@." : {
+
+    },
+    "Signed in with your password or a passkey." : {
+
+    },
+    "Something answers there, but not this Marfa." : {
+
+    },
+    "Source, Stamped on What It Writes" : {
+
+    },
+    "Stamped on what it writes." : {
+
+    },
+    "That isn’t your current password." : {
+
+    },
+    "The command line." : {
+
+    },
+    "The feed, or straight into the library." : {
+
+    },
+    "The owner’s permissions. Most apps need none." : {
+
+    },
+    "The owner’s permissions. Most keys need none." : {
+
+    },
+    "The owner’s permissions. A key can only lose them." : {
+
+    },
+    "The server accepts this address." : {
+
+    },
+    "The server ended MAPP’s sign-in. Sign in again in Connection." : {
+
+    },
+    "The server was restored to an earlier point, and this change would put back what the restore removed. Try again to send it anyway, or undo it to keep the item as the server has it." : {
+
+    },
+    "The server’s answer couldn’t be read." : {
+
+    },
+    "The server’s link for adding a passkey couldn’t be read." : {
+
+    },
+    "The source can’t change later." : {
+
+    },
+    "They keep working when %@ is disconnected." : {
+
+    },
+    "They keep working when the app is disconnected." : {
+
+    },
+    "This App Isn’t Connected" : {
+
+    },
+    "This Key Is Gone" : {
+
+    },
+    "This Marfa stops answering there." : {
+
+    },
+    "This is a website address." : {
+
+    },
+    "Too many tries. Try again in %@." : {
+
+    },
+    "Too many tries. Try again later." : {
+
+    },
+    "Types and Links" : {
+
+    },
+    "Update and Maintain" : {
+
+    },
+    "Use an address like https://marfa.example, with no path." : {
+
+    },
+    "Used %@" : {
+
+    },
+    "Username" : {
+
+    },
+    "Websites" : {
+
+    },
+    "What %@ may read and change." : {
+
+    },
+    "What Happens" : {
+
+    },
+    "What it may read and change. It can only be narrowed." : {
+
+    },
+    "Where you sign in, and where apps connect." : {
+
+    },
+    "You can only narrow it. %@ asks you for more." : {
+
+    },
+    "You sign in with it." : {
+
+    },
+    "Your Content" : {
+
+    },
+    "Your Profile" : {
+
+    },
+    "today" : {
+
+    },
+    "yesterday" : {
 
     }
   },

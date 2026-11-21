@@ -15,6 +15,8 @@ import Observation
         var text: String?
         /// Whether this tells of changes not kept, which gather into one notice until it is shown.
         var isNotKept = false
+        /// Whether it keeps its own words, because they would be lost if it gathered with another.
+        var standsAlone = false
         /// What the person can do about it, offered beside Not Now. Nil where nothing can be done from here, and
         /// the alert only says so.
         var action: Action?
@@ -52,11 +54,16 @@ import Observation
     /// Tells the person that a change was not kept, with `reason` where it was not that the library closed, and
     /// gives back `text`, the only copy of what they typed. Changes not kept before their notice is shown gather into
     /// it, so each text reaches the clipboard with the others; one not kept after that waits behind it in a notice of
-    /// its own, so the text already on the clipboard stays there until the person answers.
-    func notKept(_ title: String, text: String?, reason: String? = nil) {
+    /// its own, so the text already on the clipboard stays there until the person answers. A notice that `standsAlone`
+    /// tells `reason` as it is, and nothing gathers into it or it into another.
+    func notKept(_ title: String, text: String?, reason: String? = nil, standsAlone: Bool = false) {
         told += 1
         let text = text?.isEmpty == false ? text : nil
-        guard let index = waiting.firstIndex(where: { $0.isNotKept && !shown.contains($0.id) }) else {
+        if standsAlone, let reason {
+            waiting.append(Notice(id: UUID(), title: title, message: reason, text: text, isNotKept: true, standsAlone: true))
+            return
+        }
+        guard let index = waiting.firstIndex(where: { $0.isNotKept && !$0.standsAlone && !shown.contains($0.id) }) else {
             waiting.append(Notice(id: UUID(), title: title, message: Self.notKeptMessage(reason: reason, text: text), text: text, isNotKept: true))
             return
         }

@@ -25,7 +25,7 @@ struct SettingsTile: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: size * 0.27, style: .continuous)
-            .fill(tone.color.gradient)
+            .fill(tone.color)
             .frame(width: size, height: size)
             .overlay {
                 Image(systemName: symbol)

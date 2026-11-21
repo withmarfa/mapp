@@ -29,17 +29,16 @@ struct MarfaPageGate<Content: View>: View {
                 line: Text(Self.notAnswering(lastAnswered)),
                 action: ("Try Again", { host.tryAgain() }))
         case .connected:
-            if host.grants.contains(page.permission) {
-                content
-            } else {
+            if let permission = page.permission, !host.grants.contains(permission) {
                 SettingsPageState(
                     symbol: "lock", title: Text("Needs a Permission"), line: Text(verbatim: page.permissionLine),
                     action: (host.isAllowingMore ? "Waiting…" : "Allow More…", {
                         let host = host
-                        let permission = page.permission
                         Task { _ = await host.allowMore([permission]) }
                     }))
                 .disabled(host.isAllowingMore)
+            } else {
+                content
             }
         }
     }
@@ -66,6 +65,10 @@ struct MarfaSettingsPageView: View {
         MarfaPageGate(page: page, host: host) {
             switch page {
             case .overview: OverviewPage(host: host)
+            case .account: AccountPage(host: host)
+            case .apps: AppsPage(host: host, subpage: subpage)
+            case .keys: KeysPage(host: host, subpage: subpage)
+            case .addresses: AddressesPage(host: host)
             case .recentlyDeleted: RecentlyDeletedPage(host: host, showsAll: subpage?.id == RecentlyDeletedPage.allDeleted.id)
             }
         }

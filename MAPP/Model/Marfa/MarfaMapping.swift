@@ -619,6 +619,7 @@ nonisolated enum MarfaMapping {
         case .failingAlone: .failingAlone
         case .instanceChanged: .instanceChanged
         case .recordUnread: .recordUnread
+        case .serverRestored: .serverRestored
         }
     }
 

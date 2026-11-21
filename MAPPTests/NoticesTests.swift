@@ -55,6 +55,17 @@ import Testing
         #expect(notices.waiting.map(\.text) == [nil, "Rest"])
     }
 
+    @Test func aNoticeThatStandsAloneKeepsItsWordsAndGathersNothing() throws {
+        let notices = Notices()
+        notices.notKept("Couldn’t Save “Trip”", text: "Book the hotel")
+        notices.notKept("Key Not Copied", text: nil, reason: "The key was made.", standsAlone: true)
+        notices.notKept("Couldn’t Save “Plan”", text: "Pack")
+        #expect(notices.waiting.map(\.title) == ["Some Changes Weren’t Saved", "Key Not Copied"])
+        #expect(notices.waiting.last?.message == "The key was made.")
+        #expect(notices.waiting.first?.text == "Book the hotel\n\nPack")
+        #expect(notices.holdsQuit)
+    }
+
     @Test func textNotKeptForAReasonIsToldWithTheReasonAndOnlyThatReasonIsShared() {
         let notices = Notices()
         notices.notKept("Couldn’t Save “Trip”", text: "Book the hotel", reason: "This item can’t be changed now.")

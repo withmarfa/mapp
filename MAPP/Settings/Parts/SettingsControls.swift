@@ -169,6 +169,18 @@ struct SettingsValue: View {
     }
 }
 
+/// A value that is set elsewhere and can't be changed here, with a small lock before it, such as a key's source.
+struct SettingsLockedValue: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: "lock").font(.system(size: 10)).foregroundStyle(SettingsTokens.tertiaryText).accessibilityHidden(true)
+            SettingsValue(verbatim: text)
+        }
+    }
+}
+
 /// The chevron at the trailing edge of a row that opens a page of its own.
 struct SettingsChevron: View {
     var body: some View {
@@ -197,6 +209,7 @@ extension View {
 struct SettingsField: View {
     let title: LocalizedStringKey
     @Binding var text: String
+    /// A hint that says something the label does not. With none, the field is empty: the label is never repeated in it.
     var prompt: String?
     var isError = false
     var isSecure = false
@@ -207,9 +220,9 @@ struct SettingsField: View {
     var body: some View {
         Group {
             if isSecure {
-                SecureField(title, text: $text, prompt: prompt.map { Text(verbatim: $0) })
+                SecureField(title, text: $text, prompt: Text(verbatim: prompt ?? ""))
             } else {
-                TextField(title, text: $text, prompt: prompt.map { Text(verbatim: $0) })
+                TextField(title, text: $text, prompt: Text(verbatim: prompt ?? ""))
             }
         }
         .labelsHidden()
@@ -219,6 +232,24 @@ struct SettingsField: View {
         .onSubmit(onSubmit)
         .frame(width: width, height: SettingsTokens.Metric.controlHeight)
         .settingsErrorRing(isError)
+    }
+}
+
+/// A value shown in a field's place that can be selected and copied but not changed, such as a key shown once. It is as
+/// tall as a field and as wide as the space it is given, and its middle is cut where it is too long.
+struct SettingsReadOnlyValue: View {
+    let text: String
+
+    var body: some View {
+        Text(verbatim: text)
+            .settingsFont(.mono)
+            .textSelection(.enabled)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity, minHeight: SettingsTokens.Metric.controlHeight, alignment: .leading)
+            .background(SettingsTokens.field, in: .rect(cornerRadius: SettingsTokens.Metric.controlRadius))
+            .overlay { RoundedRectangle(cornerRadius: SettingsTokens.Metric.controlRadius).strokeBorder(SettingsTokens.hairline) }
     }
 }
 
@@ -232,7 +263,7 @@ struct SettingsNumberField: View {
     var onSubmit: () -> Void = {}
 
     var body: some View {
-        TextField(title, text: $text, prompt: prompt.map { Text(verbatim: $0) })
+        TextField(title, text: $text, prompt: Text(verbatim: prompt ?? ""))
             .labelsHidden()
             .textFieldStyle(.roundedBorder)
             .autocorrectionDisabled()

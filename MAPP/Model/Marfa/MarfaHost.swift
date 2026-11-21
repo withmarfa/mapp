@@ -647,7 +647,7 @@ import os
 
     /// Every permission the Settings pages and the features behind them use: what a sign-in asks for where what it holds
     /// cannot be read.
-    nonisolated static let usedPermissions = SystemSignIns.askedAtSignIn.union(MarfaSettingsPage.allCases.map(\.permission))
+    nonisolated static let usedPermissions = SystemSignIns.askedAtSignIn.union(MarfaSettingsPage.allCases.compactMap(\.permission))
 
     /// Reads what the kept sign-in holds, where the main actor never waits on the Keychain. A sign-in the Keychain
     /// cannot give is not read: the grants last read stand and `grantsRead` is false, so nothing reads as holding none.

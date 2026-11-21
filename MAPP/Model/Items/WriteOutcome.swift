@@ -47,6 +47,7 @@ nonisolated enum BlockedReason: String, Hashable, Sendable, CaseIterable {
     case failingAlone = "failing_alone"
     case instanceChanged = "instance_changed"
     case recordUnread = "record_unread"
+    case serverRestored = "server_restored"
 }
 
 /// One of the contract's six verdicts on a write.

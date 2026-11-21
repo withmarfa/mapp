@@ -16,12 +16,14 @@ import Testing
     var grants: Set<InstancePermission> = Set(InstancePermission.allCases)
     var isAllowingMore = false
     var instanceSettings: InstanceSettingsModel
+    let ownerDrafts = OwnerDrafts()
     var deletedItems: [MarfaDeletedItem] = []
     var deletedCount = 0
     var deletedRetentionDays: Int? = 60
     var canDeletePermanently = true
     var openInApp: ((String) -> Void)? { nil }
     var allowed: [Set<InstancePermission>] = []
+    var ownerCalls: any OwnerCalls = FakeOwnerCalls()
 
     init(settings: InstanceSettingsModel) { instanceSettings = settings }
 
@@ -30,6 +32,7 @@ import Testing
         return .cancelled
     }
 
+    func refreshGrants() async {}
     func tryAgain() {}
     func showConnection() {}
     func client() throws -> Client { throw MarfaServerCalls.Ending.keyRefused }
@@ -45,9 +48,15 @@ import Testing
 private struct RenderedWindow<Detail: View>: View {
     let selection: SettingsPage
     var search = ""
+    var sheet: AnyView?
     let detail: Detail
 
     var body: some View {
+        windowContents
+            .settingsSheet(isPresented: sheet != nil, dismiss: {}) { if let sheet { sheet } }
+    }
+
+    private var windowContents: some View {
         HStack(spacing: 0) {
             SettingsSidebar(selection: .constant(selection), search: .constant(search))
                 .frame(width: SettingsTokens.Metric.sidebarWidth)
@@ -212,5 +221,242 @@ private struct RenderedWindow<Detail: View>: View {
     @Test func sidebarSearchWithNoMatch() async throws {
         try await SettingsRender.png(
             RenderedWindow(selection: .editor, search: "zzzz", detail: EditorPage()), size: Self.size, named: "Sidebar, search with no match")
+    }
+
+    // MARK: The owner's pages (Account, Apps, Keys, Addresses)
+
+    private static let days: (Int) -> Date = { Date.now.addingTimeInterval(-86_400 * Double($0)) }
+
+    /// The server's answers as the boards draw them, in Castell Studio.
+    private func owner(_ configure: (FakeOwnerCalls.State) -> Void = { _ in }) -> StubMarfaHost {
+        let calls = FakeOwnerCalls()
+        calls.state.withLock { state in
+            state.profile = OwnerProfile(username: "mira", emailIsReadable: true, email: "mira@castell.studio")
+            state.passkeys = [
+                OwnerPasskey(id: "p1", name: "MacBook Pro", added: Self.days(49), lastUsed: .now),
+                OwnerPasskey(id: "p2", name: "iPhone", added: Self.days(49), lastUsed: Self.days(2)),
+            ]
+            state.browsers = [
+                BrowserSignIn(id: "b1", name: "Safari on macOS", added: Self.days(3), lastUsed: .now),
+                BrowserSignIn(id: "b2", name: "Firefox on Windows", added: Self.days(19), lastUsed: Self.days(4)),
+            ]
+            state.names = ["core.task": "Tasks", "core.note": "Notes", "core.bookmark": "Bookmarks"]
+            state.apps = [
+                AppAccess(id: "g1", clientID: "mapp", kind: .app, name: "MAPP on MacBook Pro", origins: [], scopes: ["*:read", "*:write"], granted: Self.days(30), lastUsed: .now),
+                AppAccess(id: "g2", clientID: "raycast", kind: .app, name: "Raycast", origins: [], scopes: ["core.task:read", "core.task:write", "core.note:read", "core.note:write", "core.bookmark:read"], granted: Self.days(50), lastUsed: Self.days(0)),
+                AppAccess(id: "g3", clientID: "shortcuts", kind: .app, name: "Shortcuts", origins: [], scopes: ["core.task:read", "core.task:write"], granted: Self.days(40), lastUsed: Self.days(2)),
+                AppAccess(id: "g4", clientID: "marfa-cli", kind: .commandLine, name: "marfa on Mac mini", origins: [], scopes: ["*:read", "*:write"], granted: Self.days(20), lastUsed: Self.days(3)),
+            ]
+            state.keys = [
+                KeyInfo(id: "k1", label: "Backup script", source: "backup", permissions: ["backups.manage"], tier: .library, types: ["*": .read], created: Self.days(60), expires: .now.addingTimeInterval(86_400 * 3), lastUsed: .now, appClientID: nil),
+                KeyInfo(id: "k2", label: "Lisbon zine importer", source: "lisbon-zine", permissions: [], tier: .feed, types: ["core.bookmark": .write, "core.note": .read], created: Self.days(19), expires: .now.addingTimeInterval(86_400 * 88), lastUsed: .now, appClientID: nil),
+                KeyInfo(id: "k3", label: "GitHub connector", source: "github", permissions: [], tier: .feed, types: ["core.task": .write, "core.bookmark": .write], created: Self.days(40), expires: nil, lastUsed: .now.addingTimeInterval(-240), appClientID: nil),
+                KeyInfo(id: "k4", label: "Raycast capture", source: "raycast", permissions: [], tier: .feed, types: ["core.note": .write], created: Self.days(30), expires: nil, lastUsed: .now, appClientID: "raycast"),
+            ]
+            state.settings = AddressSettings(
+                instanceID: "i", signIn: "https://marfa.castell.studio",
+                addresses: ["https://marfa.castell.studio", "http://castell-studio.local", "https://100.84.12.7"],
+                websites: ["https://castell.studio"])
+        }
+        let host = StubMarfaHost(settings: InstanceSettingsModel { nil })
+        host.ownerCalls = calls
+        return host
+    }
+
+    private func page(
+        _ page: MarfaSettingsPage, _ host: StubMarfaHost, subpage: SettingsSubpage? = nil, sheet: AnyView? = nil, size: CGSize = Self.size,
+        named: String
+    ) async throws {
+        try await SettingsRender.png(
+            RenderedWindow(
+                selection: .marfa(page), sheet: sheet,
+                detail: MarfaSettingsPageView(page: page, host: host).environment(\.settingsSubpage, subpage)),
+            size: size, named: named, settle: .milliseconds(900))
+    }
+
+    private func context(_ host: StubMarfaHost) -> OwnerContext { OwnerContext(host: host) }
+
+    @Test func account() async throws {
+        try await page(.account, owner(), named: "Account")
+    }
+
+    @Test func accountChangingThePassword() async throws {
+        let host = owner()
+        let model = AccountModel(context: context(host))
+        await model.load()
+        await model.beginChangePassword()
+        model.currentPassword = "old password"
+        model.newPassword = "a new password"
+        try await page(.account, host, sheet: AnyView(AccountSheet(model: model)), named: "Account, changing the password")
+    }
+
+    @Test func accountWithAWrongPassword() async throws {
+        let host = owner()
+        let model = AccountModel(context: context(host))
+        await model.load()
+        await model.beginChangePassword()
+        model.currentPassword = "not the password"
+        model.newPassword = "a new password"
+        await model.changePassword()
+        try await page(.account, host, sheet: AnyView(AccountSheet(model: model)), named: "Account, a wrong password refused")
+    }
+
+    @Test func accountWithoutSignInsManage() async throws {
+        let host = owner()
+        host.grants = []
+        try await page(.account, host, named: "Account, without sign_ins.manage")
+    }
+
+    @Test func apps() async throws {
+        try await page(.apps, owner(), named: "Apps")
+    }
+
+    @Test func anApp() async throws {
+        try await page(.apps, owner(), subpage: SettingsSubpage(id: "app:g2", title: "Raycast"), named: "An app, Raycast")
+    }
+
+    @Test func anAppWithOwnerPermissions() async throws {
+        let host = owner()
+        (host.ownerCalls as? FakeOwnerCalls)?.state.withLock { $0.apps[1].scopes += ["backups.manage", "audit.read"] }
+        try await page(.apps, host, subpage: SettingsSubpage(id: "app:g2", title: "Raycast"), named: "An app, Raycast, with owner permissions")
+    }
+
+    @Test func anAppsOwnerPermissions() async throws {
+        let host = owner()
+        (host.ownerCalls as? FakeOwnerCalls)?.state.withLock { $0.apps[1].scopes += ["backups.manage", "audit.read"] }
+        try await page(
+            .apps, host, subpage: OwnerPermissions.subpage(of: SettingsSubpage(id: "app:g2", title: "Raycast")),
+            named: "An app's owner permissions")
+    }
+
+    @Test func appsNeedsAPermission() async throws {
+        let host = owner()
+        host.grants = [.configManage]
+        try await page(.apps, host, named: "Apps, without grants.manage")
+    }
+
+    @Test func keys() async throws {
+        try await page(.keys, owner(), named: "Keys")
+    }
+
+    @Test func keysWithoutKeysMint() async throws {
+        let host = owner()
+        host.grants = [.keysManage]
+        try await page(.keys, host, named: "Keys, without keys.mint")
+    }
+
+    @Test func aKey() async throws {
+        try await page(.keys, owner(), subpage: SettingsSubpage(id: "key:k2", title: "Lisbon zine importer"), named: "A key")
+    }
+
+    @Test func aKeyThatIsGone() async throws {
+        try await page(.keys, owner(), subpage: SettingsSubpage(id: "key:gone", title: "Old key"), named: "A key that is gone")
+    }
+
+    @Test func newKey() async throws {
+        let host = owner()
+        let model = KeysModel(context: context(host))
+        await model.load()
+        model.beginNewKey()
+        model.draft.name = "Lisbon zine importer"
+        model.draft.source = "lisbon-zine"
+        model.draft.exceptions["core.bookmark"] = .write
+        try await page(.keys, host, sheet: AnyView(KeySheet(model: model)), named: "New Key")
+    }
+
+    @Test func aKeysOwnerPermissions() async throws {
+        let host = owner()
+        (host.ownerCalls as? FakeOwnerCalls)?.state.withLock { $0.keys[0].permissions = ["backups.manage", "items.purge", "audit.read"] }
+        try await page(
+            .keys, host, subpage: OwnerPermissions.subpage(of: SettingsSubpage(id: "key:k1", title: "Backup script")),
+            named: "A key's owner permissions")
+    }
+
+    @Test func newKeyChoosingOwnerPermissions() async throws {
+        let host = owner()
+        let model = KeysModel(context: context(host))
+        await model.load()
+        model.beginNewKey()
+        model.draft.permissions = ["items.purge"]
+        model.isChoosingPermissions = true
+        try await page(.keys, host, sheet: AnyView(KeySheet(model: model)), named: "New Key, owner permissions")
+    }
+
+    /// A sheet taller than the window grows to the window's height, then scrolls between its title and its buttons.
+    @Test func newKeyInAShortWindow() async throws {
+        let host = owner()
+        let model = KeysModel(context: context(host))
+        await model.load()
+        model.beginNewKey()
+        model.isChoosingPermissions = true
+        try await page(
+            .keys, host, sheet: AnyView(KeySheet(model: model)), size: CGSize(width: SettingsTokens.Metric.windowWidth, height: 560),
+            named: "New Key, in a short window")
+    }
+
+    @Test func newKeyRefused() async throws {
+        let host = owner()
+        (host.ownerCalls as? FakeOwnerCalls)?.fail("create", with: .refused("That source is taken by another key."))
+        let model = KeysModel(context: context(host))
+        await model.load()
+        model.beginNewKey()
+        model.draft.name = "Lisbon zine importer"
+        model.draft.source = "lisbon-zine"
+        await model.make()
+        try await page(.keys, host, sheet: AnyView(KeySheet(model: model)), named: "New Key, refused")
+    }
+
+    @Test func theKeyShownOnce() async throws {
+        let host = owner()
+        let model = KeysModel(context: context(host))
+        await model.load()
+        model.beginNewKey()
+        model.draft.name = "Lisbon zine importer"
+        model.draft.source = "lisbon-zine"
+        await model.make()
+        try await page(.keys, host, sheet: AnyView(KeySheet(model: model)), named: "The key, shown once")
+    }
+
+    @Test func addresses() async throws {
+        try await page(.addresses, owner(), named: "Addresses")
+    }
+
+    @Test func addressesAddingOne() async throws {
+        let host = owner()
+        let model = AddressesModel(context: context(host))
+        await model.load()
+        model.begin(.addAddress)
+        model.input = "studio.castell.design"
+        await model.check()
+        try await page(.addresses, host, sheet: AnyView(AddressSheet(model: model, serverName: "Castell Studio")), named: "Addresses, adding one")
+    }
+
+    @Test func addressesAddingOneTheServerRefuses() async throws {
+        let host = owner()
+        let model = AddressesModel(context: context(host))
+        await model.load()
+        model.begin(.addAddress)
+        model.input = "https://castell.studio/path"
+        await model.check()
+        try await page(.addresses, host, sheet: AnyView(AddressSheet(model: model, serverName: "Castell Studio")), named: "Addresses, an address refused")
+    }
+
+    @Test func addressesChangingTheSignInAddress() async throws {
+        let host = owner()
+        (host.ownerCalls as? FakeOwnerCalls)?.state.withLock {
+            $0.reach = .answers
+            $0.requiresConfirmation = true
+            $0.consequences = [
+                .init(code: "browser_sessions_end", sentence: "Every browser signs in again at the new address. 2 are signed in.", count: 2),
+                .init(code: "passkeys_unusable", sentence: "A passkey works only where it was added. Add them again.", count: 2),
+                .init(code: "apps_sign_in_again", sentence: "MAPP included. Each signs in at the new address.", count: 4),
+            ]
+        }
+        let model = AddressesModel(context: context(host))
+        await model.load()
+        model.begin(.changeSignIn)
+        model.input = "studio.castell.design"
+        await model.check()
+        try await page(.addresses, host, sheet: AnyView(AddressSheet(model: model, serverName: "Castell Studio")), named: "Addresses, changing the sign-in address")
     }
 }

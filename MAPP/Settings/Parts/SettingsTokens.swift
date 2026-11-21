@@ -6,19 +6,20 @@ import SwiftUI
 enum SettingsTokens {
     /// The colors of a page's tile in the sidebar and of a row's lead.
     enum Tone: CaseIterable, Hashable, Sendable {
-        case gray, blue, indigo, yellow, orange, purple, teal, green, pink, red
+        case gray, blue, indigo, amber, orange, purple, teal, green, pink, red
 
+        /// The tile colors of the agreed sidebar (S9), which are not the system's: a deeper amber, indigo, green and teal.
         var color: Color {
             switch self {
-            case .gray: Color(nsColor: .systemGray)
-            case .blue: Color(nsColor: .systemBlue)
-            case .indigo: Color(nsColor: .systemIndigo)
-            case .yellow: Color(nsColor: .systemYellow)
-            case .orange: Color(nsColor: .systemOrange)
-            case .purple: Color(nsColor: .systemPurple)
-            case .teal: Color(nsColor: .systemTeal)
-            case .green: Color(nsColor: .systemGreen)
-            case .pink: Color(nsColor: .systemPink)
+            case .gray: Color(red: 142 / 255, green: 142 / 255, blue: 147 / 255)
+            case .blue: Color(red: 0, green: 122 / 255, blue: 255 / 255)
+            case .indigo: Color(red: 104 / 255, green: 102 / 255, blue: 216 / 255)
+            case .amber: Color(red: 225 / 255, green: 170 / 255, blue: 5 / 255)
+            case .orange: Color(red: 240 / 255, green: 138 / 255, blue: 0)
+            case .purple: Color(red: 166 / 255, green: 80 / 255, blue: 216 / 255)
+            case .teal: Color(red: 24 / 255, green: 163 / 255, blue: 185 / 255)
+            case .green: Color(red: 46 / 255, green: 170 / 255, blue: 75 / 255)
+            case .pink: Color(red: 232 / 255, green: 67 / 255, blue: 122 / 255)
             case .red: Color(nsColor: .systemRed)
             }
         }
@@ -99,8 +100,8 @@ enum SettingsTokens {
         static let windowHeight: CGFloat = 900
         static let windowMinWidth: CGFloat = 760
         static let windowMinHeight: CGFloat = 480
-        /// How far a page's centred state sits above a third of the pane, so its title, not the whole group, is there.
-        static let pageStateRise: CGFloat = 14
+        /// How far a page's centred state sits below a third of the pane, so its title sits where S35 draws it.
+        static let pageStateDrop: CGFloat = 9
         static let sidebarWidth: CGFloat = 240
         static let rowHeight: CGFloat = 44
         static let rowHeightWithLine: CGFloat = 56
@@ -171,6 +172,13 @@ enum SettingsTokens {
         static let sheetChangePadding: CGFloat = 8
         static let sheetChangeRadius: CGFloat = 6
         static let sheetListMaxHeight: CGFloat = 220
+        /// A sheet's width, its wide width, its side and top padding, and the room it keeps from the window's edge.
+        static let sheetWidth: CGFloat = 440
+        static let sheetWideWidth: CGFloat = 560
+        static let sheetPadding: CGFloat = 20
+        static let sheetEdgeMargin: CGFloat = 24
+        /// How far a section's name sits from the card's edge inside a sheet, which is nearer than on a page.
+        static let sheetSectionInset: CGFloat = 4
     }
 
     private static func adaptive(light: NSColor, dark: NSColor) -> Color {

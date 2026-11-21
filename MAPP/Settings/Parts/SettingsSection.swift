@@ -14,7 +14,7 @@ struct SettingsSection<Content: View, Accessory: View>: View {
     private let footer: Text?
     private let accessory: Accessory
     private let content: Content
-    @Environment(\.settingsTextScale) private var scale
+    @Environment(\.settingsSectionInset) private var inset
 
     init(
         name: Text?, line: Text? = nil, footer: Text? = nil,
@@ -42,7 +42,7 @@ struct SettingsSection<Content: View, Accessory: View>: View {
                     Spacer(minLength: 0)
                     accessory
                 }
-                .padding(.horizontal, SettingsTokens.Metric.inset)
+                .padding(.horizontal, inset)
                 .padding(.bottom, 2)
             }
             SettingsCard(content: { content })
@@ -51,7 +51,7 @@ struct SettingsSection<Content: View, Accessory: View>: View {
                     .settingsFont(.footer)
                     .foregroundStyle(SettingsTokens.secondaryText)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, SettingsTokens.Metric.inset)
+                    .padding(.horizontal, inset)
                     .padding(.top, 2)
             }
         }
