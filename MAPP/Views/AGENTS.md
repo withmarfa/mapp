@@ -30,7 +30,7 @@ Windows, panes, toolbars and commands. Settings is a window of its own, in `MAPP
 
 ## Large lists
 
-A view that lists items must not run every row's body for a change of selection or of one item. The types that keep this (`ItemList`, `SelectableList`, `GalleryCard`, `SoftSelection`, `Browser`'s cached content) say how in their doc comments. Read them before you change a list, and measure with the `Measure` plan. `ItemRow` takes only plain values (`RowContent`, a `Density`, an excerpt) that the list worked out once for each item value (`RowContents`); it reads no library, catalogue or look.
+A view that lists items must not run every row's body for a change of selection or of one item. The types that keep this (`ItemList`, `SelectableList`, `GalleryCard`, `SoftSelection`, `Browser`'s cached content) say how in their doc comments. Read them before you change a list, and measure with the `Measure` plan. `ItemRow` takes only plain values (`RowContent`, a `Density`, an excerpt) that the list worked out once for each item value (`RowContents`); it reads no library, catalogue or look. A row's picture is made by `RowPictureView`, a view of its own that only a row with a picture holds, never by the row's body.
 
 ## Code Review Rules
 

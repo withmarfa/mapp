@@ -26,6 +26,8 @@ final class RowContents {
         let showsTime: Bool
         /// The links the row was made with: they follow other items, so a change to one is seen by reading them again.
         let relations: ItemRelations
+        /// The files attached to the item, read only where the list shows pictures.
+        let attachments: [Item]
     }
 
     private var basis: Basis?
@@ -53,11 +55,15 @@ final class RowContents {
             let asked = wanted[entry.item.type] ?? { let asked = (look.relations, look.counts); wanted[entry.item.type] = asked; return asked }()
             // A linked item's title, or its coming or going, or a count's answer coming, changes this row though this item is the same.
             let relations = library.relations(of: entry.item, wanting: asked.relations, counts: asked.counts, limit: RowContent.shownLinks)
-            if let known = held[id], known.item == entry.item, known.showsTime == entry.showsTime, known.relations == relations { continue }
+            // A file is its own picture, so only another item's attachments are read.
+            let attachments = list.showsPictures ? CardAttachments.of(entry.item, in: library) : []
+            if let known = held[id], known.item == entry.item, known.showsTime == entry.showsTime, known.relations == relations,
+               known.attachments == attachments { continue }
             builds += 1
             made[id] = RowContent.make(
-                for: entry.item, look: look, catalogue: library.catalogue, list: list, relations: relations, showsTime: entry.showsTime)
-            held[id] = Held(item: entry.item, showsTime: entry.showsTime, relations: relations)
+                for: entry.item, look: look, catalogue: library.catalogue, list: list, relations: relations, attachments: attachments,
+                showsTime: entry.showsTime)
+            held[id] = Held(item: entry.item, showsTime: entry.showsTime, relations: relations, attachments: attachments)
         }
         // Every entry is held now, so more held than listed means some item is gone.
         if held.count != entries.count {
