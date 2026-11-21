@@ -32,10 +32,7 @@ struct MarfaPageGate<Content: View>: View {
             if let permission = page.permission, !host.grants.contains(permission) {
                 SettingsPageState(
                     symbol: "lock", title: Text("Needs a Permission"), line: Text(verbatim: page.permissionLine),
-                    action: (host.isAllowingMore ? "Waiting…" : "Allow More…", {
-                        let host = host
-                        Task { _ = await host.allowMore([permission]) }
-                    }))
+                    action: (host.isAllowingMore ? "Waiting…" : "Allow More…", { host.askForMore(naming: permission.rawValue) }))
                 .disabled(host.isAllowingMore)
             } else {
                 content

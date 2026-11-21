@@ -54,9 +54,9 @@ struct KeysPage: View {
         } else if let id = openKeyID {
             if let key = model.key(id) {
                 if isShowingPermissions {
-                    KeyPermissions(model: model, key: key)
+                    KeyPermissions(model: model, key: key, host: host)
                 } else {
-                    KeyDetail(model: model, key: key)
+                    KeyDetail(model: model, key: key, host: host)
                 }
             } else {
                 SettingsPageState(
@@ -123,6 +123,7 @@ nonisolated enum KeyAccess {
 private struct KeyDetail: View {
     let model: KeysModel
     let key: KeyInfo
+    let host: any MarfaSettingsHost
     @Environment(\.settingsPush) private var push
 
     private static let steps = [1, 7, 30, 90, 365]
@@ -147,7 +148,7 @@ private struct KeyDetail: View {
             SettingsHead(symbol: "key.fill", tone: .amber, title: Text(verbatim: key.label), line: Text(verbatim: line)) {
                 SettingsButton("Rename…") { model.beginRename(key) }
             }
-            if let line = model.rowErrors[key.id] { OwnerProblem(title: "Not Changed", line: line) }
+            if let failure = model.rowErrors[key.id] { OwnerProblem(title: "Not Changed", failure: failure, page: .keys, host: host) }
             SettingsSection("Key") {
                 SettingsRow("Expires", line: "A key can only be made to end sooner.") {
                     SettingsPopUp(title: "Expires", selection: Binding { 0 } set: { days in
@@ -207,11 +208,12 @@ private struct KeyDetail: View {
 private struct KeyPermissions: View {
     let model: KeysModel
     let key: KeyInfo
+    let host: any MarfaSettingsHost
 
     var body: some View {
         OwnerPermissionsList(
             held: KeyAccess.parsed(key).permissions, line: "The owner’s permissions. A key can only lose them.",
-            problem: model.rowErrors[key.id]
+            problem: model.rowErrors[key.id], page: .keys, host: host
         ) { model.askToRemove(permission: $0, from: key) }
     }
 }

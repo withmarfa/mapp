@@ -551,7 +551,7 @@ import Testing
             MarfaSourceRow(code: "rss", name: "RSS", mark: "lucide:rss", count: 156, hasChosenName: false),
             MarfaSourceRow(code: "github", name: "GitHub", mark: nil, count: 318, hasChosenName: true),
         ]
-        var refusal: String?
+        var refusal: OwnerFailure?
         var changes: [(String, MarfaSourceChange)] = []
 
         var access: SourceAccess {
@@ -590,7 +590,7 @@ import Testing
 
     @Test func aRefusedNameKeepsWhatWasTypedWithTheServersLine() async {
         let server = Server()
-        server.refusal = "A name is at most 200 characters."
+        server.refusal = .refused("A name is at most 200 characters.")
         let model = SourcesModel(access: server.access, markSets: sets)
         model.beginRename("rss")
         model.name = "Feeds"
@@ -628,10 +628,10 @@ import Testing
 
     @Test func aChangeFromTheMenuTellsItsRefusalAboveTheList() async {
         let server = Server()
-        server.refusal = "Sources are named on your server."
+        server.refusal = .refused("Sources are named on your server.")
         let model = SourcesModel(access: server.access, markSets: sets)
         await model.removeMark("rss")
-        #expect(model.listFailure == "Sources are named on your server.")
+        #expect(model.listFailure == .refused("Sources are named on your server."))
     }
 
     @Test func aNameTypedAndNotSentIsHandedBackWhenSettingsCloses() {

@@ -89,6 +89,7 @@ private struct TableRow<Row>: View {
     let isSelected: Bool
     var isBanded = false
     var inset = SettingsTokens.Metric.inset
+    var height = SettingsTokens.Metric.tableRow
     /// Where the table is a page with a checkbox column: whether this row is ticked.
     var check: Binding<Bool>?
     @State private var isHovered = false
@@ -115,7 +116,7 @@ private struct TableRow<Row>: View {
             }
         }
         .padding(.horizontal, inset)
-        .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: height, alignment: .leading)
         .background(isSelected ? SettingsTokens.selection : (isHovered ? SettingsTokens.hover : (isBanded ? SettingsTokens.band : Color.clear)))
         .contentShape(.rect)
         .onHover { isHovered = $0 }
@@ -192,7 +193,7 @@ struct SettingsPageTable<Row: Identifiable, Filter: View, Foot: View>: View {
                     ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                         TableRow(
                             row: row, columns: columns, action: nil, isSelected: selection.contains(row.id),
-                            isBanded: index.isMultiple(of: 2), inset: inset, check: checked(row.id))
+                            isBanded: index.isMultiple(of: 2), inset: inset, height: SettingsTokens.Metric.pageTableRow, check: checked(row.id))
                             .onTapGesture { checked(row.id).wrappedValue.toggle() }
                     }
                 }

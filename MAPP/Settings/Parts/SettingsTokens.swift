@@ -109,6 +109,8 @@ enum SettingsTokens {
         static let windowMinHeight: CGFloat = 480
         /// How far a page's centred state sits below a third of the pane, so its title sits where S35 draws it.
         static let pageStateDrop: CGFloat = 9
+        /// How wide a state's words may run before they wrap; a state's line is worded to fit it on one.
+        static let stateMeasure: CGFloat = 420
         static let sidebarWidth: CGFloat = 240
         static let rowHeight: CGFloat = 44
         static let rowHeightWithLine: CGFloat = 56
@@ -127,6 +129,9 @@ enum SettingsTokens {
         /// A table that is a page: its side margin, and the height of the bar above its columns and of the foot below them.
         static let pageTableInset: CGFloat = 24
         static let pageTableBar: CGFloat = 48
+        /// A table row's height: in a section, and on a page of its own, which draws them closer.
+        static let tableRow: CGFloat = 34
+        static let pageTableRow: CGFloat = 30
         static let cardRadius: CGFloat = 10
         static let controlRadius: CGFloat = 7
         static let buttonRadius: CGFloat = 9

@@ -43,7 +43,7 @@ import Observation
     private(set) var isChecking = false
     private(set) var isWriting = false
     /// One line under the page's rows after a refused change, by the address or website.
-    private(set) var rowErrors: [String: String] = [:]
+    private(set) var rowErrors: [String: OwnerFailure] = [:]
     var question: Question?
     private var checking = 0
 
@@ -245,7 +245,7 @@ import Observation
                 confirm: String(localized: "Remove"))
             removalPlan = asked
         } catch {
-            rowErrors[address] = OwnerWording.line(error)
+            rowErrors[address] = error
             await context.learn(from: error)
         }
     }
@@ -274,7 +274,7 @@ import Observation
             do {
                 self.settings = try await context.calls.apply(plan, instanceID: settings.instanceID)
             } catch {
-                rowErrors[address] = OwnerWording.line(error)
+                rowErrors[address] = error
                 await context.learn(from: error)
                 if error == .conflict { await load() }
             }
@@ -282,7 +282,7 @@ import Observation
             do {
                 self.settings = try await context.calls.setWebsites(settings.websites.filter { $0 != website }, instanceID: settings.instanceID)
             } catch {
-                rowErrors[website] = OwnerWording.line(error)
+                rowErrors[website] = error
                 await context.learn(from: error)
                 if error == .conflict { await load() }
             }

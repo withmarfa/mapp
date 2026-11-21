@@ -70,7 +70,7 @@ import Observation
     /// The key just made, shown once and dropped when the sheet closes.
     private(set) var created: CreatedKey?
     /// One line under a key's rows whose change was refused, by the key's id.
-    private(set) var rowErrors: [String: String] = [:]
+    private(set) var rowErrors: [String: OwnerFailure] = [:]
     /// The keys found gone while their page was open.
     private(set) var gone: Set<String> = []
     var question: Question?
@@ -285,7 +285,7 @@ import Observation
                 if error == .notFound {
                     markGone(id)
                 } else {
-                    rowErrors[id] = OwnerWording.line(error)
+                    rowErrors[id] = error
                 }
                 await context.learn(from: error)
             }
@@ -297,7 +297,7 @@ import Observation
         do {
             try await apply(id, change)
         } catch {
-            rowErrors[id] = OwnerWording.line(error)
+            rowErrors[id] = error
         }
     }
 

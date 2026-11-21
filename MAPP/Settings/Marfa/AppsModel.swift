@@ -30,7 +30,7 @@ import Observation
     private(set) var isLoading = false
     private(set) var hasLoaded = false
     /// One line under a row whose change was refused, by the app's id.
-    private(set) var rowErrors: [String: String] = [:]
+    private(set) var rowErrors: [String: OwnerFailure] = [:]
     var question: Question?
     /// The app an Apps page was disconnected from, so the page it was shown on can go back.
     private(set) var disconnected: String?
@@ -130,7 +130,7 @@ import Observation
 
     /// A refusal is told under the row and the page reads again, so what it shows is what the server holds.
     private func refused(_ failure: OwnerFailure, appID: String) async {
-        rowErrors[appID] = OwnerWording.line(failure)
+        rowErrors[appID] = failure
         await context.learn(from: failure)
         if failure == .conflict || failure == .notFound { await load() }
     }

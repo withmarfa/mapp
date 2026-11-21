@@ -63,7 +63,7 @@ import Observation
     /// Whether each webhook is sending, read from its latest delivery after the list shows.
     private(set) var sending: [String: Sending] = [:]
     /// One line under a webhook's rows whose change was refused, by the webhook's id.
-    private(set) var rowErrors: [String: String] = [:]
+    private(set) var rowErrors: [String: OwnerFailure] = [:]
     var question: Question?
     var sheet: Sheet?
     var draft = Draft()
@@ -81,9 +81,9 @@ import Observation
     private(set) var deleted: String?
     /// The deliveries of each webhook whose page was opened, newest first.
     private(set) var deliveries: [String: [WebhookDeliveryInfo]] = [:]
-    private(set) var deliveriesFailure: [String: String] = [:]
+    private(set) var deliveriesFailure: [String: OwnerFailure] = [:]
     /// One line under a webhook's deliveries whose redelivery was refused, by the webhook's id.
-    private(set) var deliveryErrors: [String: String] = [:]
+    private(set) var deliveryErrors: [String: OwnerFailure] = [:]
     private(set) var redelivering: Set<String> = []
     private var closedWhileMaking = false
 
@@ -182,7 +182,7 @@ import Observation
             deliveries[id] = try await context.calls.deliveries(of: id)
             deliveriesFailure[id] = nil
         } catch {
-            deliveriesFailure[id] = OwnerWording.line(error)
+            deliveriesFailure[id] = error
             await context.learn(from: error)
         }
     }
@@ -194,7 +194,7 @@ import Observation
         do {
             try await apply(id, change)
         } catch {
-            rowErrors[id] = OwnerWording.line(error)
+            rowErrors[id] = error
         }
     }
 
@@ -214,7 +214,7 @@ import Observation
             }
             try await apply(id, WebhookChange(events: build(current)))
         } catch {
-            rowErrors[id] = OwnerWording.line(error)
+            rowErrors[id] = error
         }
     }
 
@@ -304,7 +304,7 @@ import Observation
                 if error == .notFound {
                     markGone(id)
                 } else {
-                    rowErrors[id] = OwnerWording.line(error)
+                    rowErrors[id] = error
                 }
                 await context.learn(from: error)
             }
@@ -365,7 +365,7 @@ import Observation
             }
             sending[webhook.id] = nil
         } catch {
-            deliveryErrors[webhook.id] = OwnerWording.line(error)
+            deliveryErrors[webhook.id] = error
             if error == .notFound { markGone(webhook.id) }
             await context.learn(from: error)
             await loadDeliveries(of: webhook.id)

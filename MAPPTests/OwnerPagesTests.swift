@@ -507,7 +507,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         await account.load()
         bench.calls.fail("endSignIn", with: .notPermitted("sign_ins.manage"))
         await signOut(account, account.browsers[0])
-        #expect(account.rowErrors["b"]?.contains("manage the owner’s sign-ins and passkeys") == true)
+        #expect(account.rowErrors["b"] == .notPermitted("sign_ins.manage"))
         #expect(account.browsers.count == 1)
         #expect(bench.refreshed == 1, "the grants held can be stale, so they are read again")
     }
@@ -685,7 +685,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         let question = try #require(model.question)
         bench.calls.state.withLock { $0.apps[0].scopes = ["core.note:read"] }
         await model.confirm(question)
-        #expect(model.rowErrors["g1"] == OwnerWording.line(.conflict))
+        #expect(model.rowErrors["g1"] == .conflict)
         #expect(model.apps[0].scopes == ["core.note:read"], "what the server holds is what shows")
     }
 
@@ -719,7 +719,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         model.askToDisconnect(model.apps[0])
         bench.calls.fail("disconnect", with: .notPermitted("grants.manage"))
         await model.confirm(try #require(model.question))
-        #expect(model.rowErrors["g1"]?.contains("list, narrow and revoke other apps’ access") == true)
+        #expect(model.rowErrors["g1"] == .notPermitted("grants.manage"))
         #expect(bench.refreshed == 1)
         #expect(model.apps.count == 1)
     }
@@ -1098,7 +1098,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         await model.load()
         bench.calls.fail("change", with: .notPermitted("keys.manage"))
         await model.setTier(.library, of: model.keys[0])
-        #expect(model.rowErrors["k1"]?.contains("list and revoke keys") == true)
+        #expect(model.rowErrors["k1"] == .notPermitted("keys.manage"))
         #expect(bench.refreshed == 1)
         #expect(model.keys[0].tier == .feed)
     }
@@ -1361,7 +1361,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         await model.confirm(question)
         #expect(count("addresses", in: bench) == reads + 1)
         #expect(model.settings?.addresses.contains("https://newer.test") == true)
-        #expect(model.rowErrors["https://100.84.12.7"] == OwnerWording.line(.conflict))
+        #expect(model.rowErrors["https://100.84.12.7"] == .conflict)
         #expect(bench.calls.state.withLock { $0.applied.isEmpty })
     }
 
@@ -1403,7 +1403,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         bench.calls.fail("setWebsites", with: .conflict)
         await model.confirm(question)
         #expect(model.settings?.websites == ["https://castell.studio", "https://newer.test"])
-        #expect(model.rowErrors["https://castell.studio"] == OwnerWording.line(.conflict))
+        #expect(model.rowErrors["https://castell.studio"] == .conflict)
     }
 
     @Test func aCheckThatEndsAfterTheInputChangedNeverWritesTheErrorLine() async throws {
@@ -1462,6 +1462,36 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         ]
         for failure in failures { #expect(!OwnerWording.line(failure).isEmpty) }
         #expect(OwnerWording.line(.notPermitted("odd.scope")).contains("odd.scope"))
+    }
+
+    @Test func aRefusalNamesNoButtonSinceTheRowOffersItsOwn() {
+        for scope in [nil] + InstancePermission.allCases.map(\.rawValue) + ["odd.scope"] {
+            #expect(!OwnerWording.permissionLine(scope).contains("Allow More"), "\(scope ?? "none")")
+        }
+        #expect(OwnerWording.line(.notPermitted(nil)) == "MAPP isn’t allowed to do this.")
+    }
+
+    @Test func aProblemRowOffersAllowMoreForARefusalForWantOfAPermissionAndTryAgainForTheRest() {
+        for retry in [true, false] {
+            #expect(OwnerProblemRow.offer(for: .notPermitted("config.manage"), canRetry: retry) == .allowMore(scope: "config.manage"))
+            #expect(OwnerProblemRow.offer(for: .notPermitted(nil), canRetry: retry) == .allowMore(scope: nil))
+        }
+        #expect(OwnerProblemRow.offer(for: .unreachable, canRetry: true) == .tryAgain)
+        #expect(OwnerProblemRow.offer(for: .failed("No."), canRetry: false) == .nothing)
+    }
+
+    @Test func aRowThatWasRefusedAsksForTheNamedPermissionOnlyThroughTheHost() async {
+        let settings = InstanceSettingsModel { .init(id: "https://marfa.castell.studio", source: FakeInstanceConfig([:])) }
+        let host = StubMarfaHost(settings: settings)
+        host.askForMore(naming: "webhooks.manage")
+        host.askForMore(naming: nil)
+        #expect(await eventually { host.allowed == [[.webhooksManage], []] })
+    }
+
+    @Test func aPageSaysARefusalInItsOwnWordsWhereItNamesThePagesPermission() {
+        #expect(OwnerWording.line(.notPermitted("webhooks.manage"), on: .webhooks) == MarfaSettingsPage.webhooks.permissionLine)
+        #expect(OwnerWording.line(.notPermitted("keys.manage"), on: .webhooks) == OwnerWording.permissionLine("keys.manage"))
+        #expect(OwnerWording.line(.unreachable, on: .webhooks) == OwnerWording.line(.unreachable))
     }
 
     @Test func anotherMarfaAnsweringIsItsOwnFailureWithTheWordsOfTheSettingsPage() {

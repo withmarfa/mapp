@@ -175,7 +175,7 @@ struct SettingsStateContent: View {
                 SettingsButton(action.title, action: action.perform).padding(.top, 12)
             }
         }
-        .frame(maxWidth: 420)
+        .frame(maxWidth: SettingsTokens.Metric.stateMeasure)
         .accessibilityElement(children: .contain)
     }
 }

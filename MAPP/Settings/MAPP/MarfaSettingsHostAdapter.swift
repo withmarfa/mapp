@@ -60,8 +60,8 @@ enum LibraryDescription {
 
     var canChangeSources: Bool { libraries.current?.reachesServer ?? false }
 
-    func changeSource(_ code: String, _ change: MarfaSourceChange) async -> String? {
-        guard let library = libraries.current else { return SourceEditFailure.unsupported.message }
+    func changeSource(_ code: String, _ change: MarfaSourceChange) async -> OwnerFailure? {
+        guard let library = libraries.current else { return .failed(SourceEditFailure.unsupported.message) }
         let failure: SourceEditFailure? =
             switch change {
             case .rename(let name): await library.updateSource(code, name: .set(name), mark: nil)
@@ -69,7 +69,14 @@ enum LibraryDescription {
             case .setMark(let mark): await library.updateSource(code, name: nil, mark: .set(mark))
             case .removeMark: await library.updateSource(code, name: nil, mark: .clear)
             }
-        return failure?.message
+        guard let failure else { return nil }
+        return switch failure {
+        case .unreachable: .unreachable
+        case .notPermitted: .notPermitted(InstancePermission.keysManage.rawValue)
+        case .keyRefused: .signedOut
+        case .refused(let reason): .refused(reason)
+        case .unsupported, .failed: .failed(failure.message)
+        }
     }
 
     var markSets: [MarfaMarkSet] { IconSet.allCases.map { MarfaMarkSet(id: $0.rawValue, title: $0.title) } }

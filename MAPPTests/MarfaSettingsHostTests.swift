@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Marfa
 import Synchronization
@@ -203,6 +204,20 @@ import Testing
             #expect(first.permissionLine != second.permissionLine)
         }
         #expect(MarfaSettingsPage.sources.permissionLine != MarfaSettingsPage.keys.permissionLine)
+    }
+
+    @Test func everyPagesStateLineReadsOnOneLineAtTheStatesMeasure() {
+        let font = NSFont.systemFont(ofSize: 12)
+        func width(_ line: String) -> CGFloat { (line as NSString).size(withAttributes: [.font: font]).width }
+        let measure = SettingsTokens.Metric.stateMeasure
+        for page in MarfaSettingsPage.allCases where page.permission != nil {
+            #expect(width(page.permissionLine) <= measure, "\(page): \(page.permissionLine)")
+        }
+        // The generic line a page falls back to, for a permission that is not its own, fits too.
+        for permission in InstancePermission.allCases {
+            let line = OwnerWording.permissionLine(permission.rawValue)
+            #expect(width(line) <= measure, "\(line)")
+        }
     }
 
     @Test func aReadRefusedForThePagesOwnPermissionSaysTheSameAsItsGateAndAnotherOneSaysItsOwn() {

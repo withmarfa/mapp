@@ -97,9 +97,15 @@ struct OverviewPage: View {
             }
         } else if let failure = settings.failure {
             SettingsSection("This Marfa") {
-                SettingsProblemRow(
-                    title: Text("Couldn’t Read This Marfa’s Settings"), line: Text(verbatim: failure.message),
-                    actions: failure == .unsupported || failure == .notPermitted ? [] : [SettingsProblemAction("Try Again") { Task { await settings.load() } }])
+                if failure == .notPermitted {
+                    OwnerProblemRow(
+                        title: "Couldn’t Read This Marfa’s Settings", failure: .notPermitted(InstancePermission.configManage.rawValue),
+                        page: .overview, host: host)
+                } else {
+                    SettingsProblemRow(
+                        title: Text("Couldn’t Read This Marfa’s Settings"), line: Text(verbatim: failure.message),
+                        actions: failure == .unsupported ? [] : [SettingsProblemAction("Try Again") { Task { await settings.load() } }])
+                }
             }
         }
     }

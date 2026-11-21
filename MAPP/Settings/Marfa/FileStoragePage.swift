@@ -47,9 +47,9 @@ struct FileStoragePage: View {
             if let stores = storage.stores {
                 ForEach(stores.stores) { store in storeRow(store, in: stores) }
             } else if let failure = storage.failure {
-                SettingsProblemRow(
-                    title: Text("Couldn’t Read Where Files Are"), line: Text(verbatim: OwnerWording.line(failure)),
-                    actions: [SettingsProblemAction("Try Again") { Task { await storage.load() } }])
+                OwnerProblemRow(
+                    title: "Couldn’t Read Where Files Are", failure: failure, page: .fileStorage, host: host,
+                    retry: { Task { await storage.load() } })
             } else {
                 SettingsRow("Reading Where Files Are…") { ProgressView().controlSize(.small) }
             }

@@ -19,11 +19,18 @@ nonisolated enum OwnerWording {
 
     /// One line naming what MAPP isn't allowed to do, from the permission the server named.
     static func permissionLine(_ scope: String?) -> String {
-        guard let scope else { return String(localized: "MAPP isn’t allowed to do this. Choose Allow More… to change that.") }
+        guard let scope else { return String(localized: "MAPP isn’t allowed to do this.") }
         guard let permission = InstancePermission(rawValue: scope) else {
             return String(localized: "MAPP isn’t allowed to do this: it needs “\(scope)”.")
         }
-        return String(localized: "MAPP isn’t allowed to \(permission.allowedTo). Choose Allow More… to change that.")
+        return String(localized: "MAPP isn’t allowed to \(permission.allowedTo).")
+    }
+
+    /// What a failure says on `page`: the page's own words where the server named the page's permission, otherwise the
+    /// generic line.
+    static func line(_ failure: OwnerFailure, on page: MarfaSettingsPage) -> String {
+        if case .notPermitted(let scope) = failure { return permissionLine(scope, on: page) }
+        return line(failure)
     }
 
     /// The line for a page that cannot be shown for want of the permission the server named: the page's own words when the

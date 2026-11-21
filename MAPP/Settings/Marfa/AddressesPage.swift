@@ -39,12 +39,12 @@ struct AddressesPage: View {
                 ) {
                     SettingsButton("Change…") { model.begin(.changeSignIn) }
                 }
-                if let line = model.rowErrors[settings.signIn] { OwnerProblem(title: "Not Changed", line: line) }
+                if let failure = model.rowErrors[settings.signIn] { OwnerProblem(title: "Not Changed", failure: failure, page: .addresses, host: host) }
                 SettingsSection("Other Addresses", line: "\(host.serverName) answers on these too.") {
                     ForEach(model.otherAddresses, id: \.self) { address in
                         SettingsRow(
                             verbatim: AddressesModel.display(address), line: AddressesModel.kind(of: address),
-                            error: model.rowErrors[address]
+                            error: model.rowErrors[address].map { OwnerWording.line($0, on: .addresses) }
                         ) {
                             SettingsMoreMenu { Button("Remove…", role: .destructive) { Task { await model.askToRemove(address: address) } } }
                         }
@@ -53,7 +53,7 @@ struct AddressesPage: View {
                 }
                 SettingsSection("Websites", line: "Pages on these sites may call \(host.serverName).") {
                     ForEach(settings.websites, id: \.self) { website in
-                        SettingsRow(verbatim: AddressesModel.display(website), error: model.rowErrors[website]) {
+                        SettingsRow(verbatim: AddressesModel.display(website), error: model.rowErrors[website].map { OwnerWording.line($0, on: .addresses) }) {
                             SettingsMoreMenu { Button("Remove…", role: .destructive) { model.askToRemove(website: website) } }
                         }
                     }

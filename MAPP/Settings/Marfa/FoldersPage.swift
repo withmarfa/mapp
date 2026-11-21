@@ -97,7 +97,7 @@ private struct FolderDetail: View {
                 copies(report)
             } else if let failure = model.reportFailures[folder.id] {
                 SettingsHead(symbol: "folder.fill", tone: .blue, title: Text(verbatim: folder.title))
-                OwnerProblem(title: "Couldn’t Read This Folder", line: OwnerWording.line(failure))
+                OwnerProblem(title: "Couldn’t Read This Folder", failure: failure, page: .folders, host: host, retry: { Task { await model.loadReport(folder.id) } })
             } else {
                 OwnerLoading()
             }

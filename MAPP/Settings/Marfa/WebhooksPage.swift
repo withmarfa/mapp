@@ -52,7 +52,7 @@ struct WebhooksPage: View {
             OwnerLoading()
         } else if let id = openID {
             if let webhook = model.webhook(id) {
-                WebhookDetail(model: model, webhook: webhook)
+                WebhookDetail(model: model, webhook: webhook, host: host)
             } else {
                 SettingsPageState(
                     symbol: "dot.radiowaves.up.forward", title: Text("This Webhook Is Gone"),
@@ -120,6 +120,7 @@ struct WebhooksPage: View {
 private struct WebhookDetail: View {
     let model: WebhooksModel
     let webhook: OwnerWebhook
+    let host: any MarfaSettingsHost
     @State private var showsAllEvents = false
     @State private var showsAllDeliveries = false
 
@@ -153,7 +154,7 @@ private struct WebhookDetail: View {
             SettingsHead(
                 symbol: "dot.radiowaves.up.forward", tone: .pink, title: Text(verbatim: WebhooksModel.display(webhook.url)),
                 line: line.isEmpty ? nil : Text(verbatim: line))
-            if let problem = model.rowErrors[webhook.id] { OwnerProblem(title: "Not Changed", line: problem) }
+            if let failure = model.rowErrors[webhook.id] { OwnerProblem(title: "Not Changed", failure: failure, page: .webhooks, host: host) }
             SettingsSection("Webhook") {
                 SettingsRow(verbatim: String(localized: "Address"), line: webhook.url) {
                     SettingsButton("Change…") { model.beginChangeAddress(webhook) }
@@ -209,15 +210,17 @@ private struct WebhookDetail: View {
 
     @ViewBuilder private var deliveries: some View {
         let all = model.deliveries[webhook.id] ?? []
-        if let problem = model.deliveryErrors[webhook.id] { OwnerProblem(title: "Not Sent Again", line: problem) }
+        if let failure = model.deliveryErrors[webhook.id] { OwnerProblem(title: "Not Sent Again", failure: failure, page: .webhooks, host: host) }
         SettingsSection(
             name: Text("Deliveries"),
             line: webhook.active
                 ? Text("The latest events sent to this address. Only a failed one can be sent again.")
                 : Text("The latest events sent to this address. A failed one can be sent again once this webhook is on.")
         ) {
-            if let problem = model.deliveriesFailure[webhook.id], all.isEmpty {
-                SettingsRow(verbatim: String(localized: "Deliveries Couldn’t Be Read"), line: problem, lead: .tint("exclamationmark.triangle", .orange), lines: nil)
+            if let failure = model.deliveriesFailure[webhook.id], all.isEmpty {
+                OwnerProblemRow(
+                    title: "Deliveries Couldn’t Be Read", failure: failure, page: .webhooks, host: host,
+                    retry: { Task { await model.loadDeliveries(of: webhook.id) } })
             } else if all.isEmpty {
                 SettingsEmptyCard(symbol: "paperplane", title: Text("No Deliveries"), line: Text("Nothing has been sent to this address yet."))
             } else {

@@ -48,7 +48,7 @@ struct SourcesPage: View {
 
     private var list: some View {
         SettingsPageColumn {
-            if let line = model.listFailure { OwnerProblem(title: "Not Changed", line: line) }
+            if let failure = model.listFailure { OwnerProblem(title: "Not Changed", failure: failure, page: .sources, host: host) }
             SettingsSection("Sources") {
                 if model.rows.isEmpty {
                     SettingsEmptyCard(
@@ -64,7 +64,7 @@ struct SourcesPage: View {
     private func sourceRow(_ row: MarfaSourceRow) -> some View {
         SettingsRow(
             title: Text(verbatim: row.name), line: Text(verbatim: Self.naming(row)),
-            lead: .custom(AnyView(host.markGlyph(row.mark ?? "").frame(width: SettingsTokens.Metric.tile, height: SettingsTokens.Metric.tile)))
+            lead: .well(host.markGlyph(row.mark ?? ""))
         ) {
             HStack(spacing: 10) {
                 if let count = row.count { SettingsValue(verbatim: String(localized: "\(count.formatted()) items")) }

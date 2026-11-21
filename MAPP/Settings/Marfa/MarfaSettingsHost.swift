@@ -109,8 +109,8 @@ struct MarfaMarkSet: Identifiable, Hashable {
     func refreshSources() async
     /// Whether a name or mark can be changed now: with a server to keep it.
     var canChangeSources: Bool { get }
-    /// Makes one change to a source and answers the line to show where the server refused it, or nil once it took it.
-    func changeSource(_ code: String, _ change: MarfaSourceChange) async -> String?
+    /// Makes one change to a source and answers why the server refused it, or nil once it took it.
+    func changeSource(_ code: String, _ change: MarfaSourceChange) async -> OwnerFailure?
     var markSets: [MarfaMarkSet] { get }
     /// The marks in `set` whose names contain every word of `query`, best first; every mark for an empty query.
     func marks(matching query: String, in set: MarfaMarkSet) -> [String]
@@ -208,14 +208,14 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         switch self {
         case .overview: String(localized: "MAPP isn’t allowed to read this Marfa’s health and status.")
         case .account: ""
-        case .apps: String(localized: "MAPP isn’t allowed to list, narrow or disconnect the apps that reach this Marfa.")
-        case .keys: String(localized: "MAPP isn’t allowed to list, make or revoke this Marfa’s keys.")
-        case .sources: String(localized: "MAPP isn’t allowed to rename sources, change their marks or limit what they reach.")
-        case .addresses: String(localized: "MAPP isn’t allowed to see or change the addresses this Marfa answers on.")
-        case .recentlyDeleted: String(localized: "MAPP isn’t allowed to list deleted items or permanently delete them.")
-        case .history: String(localized: "MAPP isn’t allowed to see or change how long this Marfa keeps versions and logs.")
-        case .fileStorage: String(localized: "MAPP isn’t allowed to see where this Marfa keeps files or change how it reads them.")
-        case .webhooks: String(localized: "MAPP isn’t allowed to list, make, change or remove this Marfa’s webhooks.")
+        case .apps: String(localized: "MAPP isn’t allowed to list, narrow or disconnect apps.")
+        case .keys: String(localized: "MAPP isn’t allowed to list, make or revoke keys.")
+        case .sources: String(localized: "MAPP isn’t allowed to rename, mark or limit sources.")
+        case .addresses: String(localized: "MAPP isn’t allowed to see or change this Marfa’s addresses.")
+        case .recentlyDeleted: String(localized: "MAPP isn’t allowed to list or permanently delete deleted items.")
+        case .history: String(localized: "MAPP isn’t allowed to see or change version and log retention.")
+        case .fileStorage: String(localized: "MAPP isn’t allowed to see or change how this Marfa keeps files.")
+        case .webhooks: String(localized: "MAPP isn’t allowed to list, make, change or remove webhooks.")
         case .folders: ""
         }
     }

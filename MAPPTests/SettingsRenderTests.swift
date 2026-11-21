@@ -42,7 +42,7 @@ import Testing
     func show(_ page: MarfaSettingsPage) { shown.append(page) }
     func refreshSources() async {}
 
-    func changeSource(_ code: String, _ change: MarfaSourceChange) async -> String? {
+    func changeSource(_ code: String, _ change: MarfaSourceChange) async -> OwnerFailure? {
         sourceChanges.append((code, change))
         return nil
     }

@@ -1,3 +1,4 @@
+import Marfa
 import SwiftUI
 
 /// The choices a pop-up offers for a number the server holds: sensible steps, then the value held where it is none of them,
@@ -231,10 +232,7 @@ struct InstanceSettingsGate<Content: View>: View {
             if model.failure == .notPermitted, let permission = page.permission {
                 SettingsPageState(
                     symbol: Self.symbol(for: .notPermitted), title: Text(Self.title(for: .notPermitted)), line: Text(verbatim: page.permissionLine),
-                    action: (host.isAllowingMore ? "Waiting…" : "Allow More…", {
-                        let host = host
-                        Task { _ = await host.allowMore([permission]) }
-                    }))
+                    action: (host.isAllowingMore ? "Waiting…" : "Allow More…", { host.askForMore(naming: permission.rawValue) }))
                 .disabled(host.isAllowingMore)
             } else if let failure = model.failure, !model.isAvailable {
                 SettingsPageState(

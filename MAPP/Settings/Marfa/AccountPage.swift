@@ -50,7 +50,7 @@ struct AccountPage: View {
                 passwordSection
                 if model.canManageSignIns {
                     if let failure = model.listsFailure {
-                        OwnerProblem(title: "Couldn’t Read the Sign-Ins", line: OwnerWording.line(failure))
+                        OwnerProblem(title: "Couldn’t Read the Sign-Ins", failure: failure, page: .account, host: host, retry: { Task { await model.load() } })
                     } else {
                         passkeysSection
                         browsersSection
@@ -98,7 +98,7 @@ struct AccountPage: View {
             ForEach(model.passkeys) { passkey in
                 SettingsRow(
                     verbatim: passkey.name ?? Self.unnamed, line: Self.line(added: passkey.added, used: passkey.lastUsed),
-                    error: model.rowErrors[passkey.id], lead: .symbol("touchid")
+                    error: model.rowErrors[passkey.id].map { OwnerWording.line($0, on: .account) }, lead: .symbol("touchid")
                 ) {
                     SettingsMoreMenu {
                         Button("Rename…") { model.beginRename(passkey) }
@@ -120,7 +120,7 @@ struct AccountPage: View {
             ForEach(model.browsers) { browser in
                 SettingsRow(
                     verbatim: browser.name, line: Self.line(added: browser.added, used: browser.lastUsed, signedIn: true),
-                    error: model.rowErrors[browser.id], lead: .symbol("safari")
+                    error: model.rowErrors[browser.id].map { OwnerWording.line($0, on: .account) }, lead: .symbol("safari")
                 ) {
                     SettingsButton("Sign Out") { model.askToEnd(browser) }
                 }

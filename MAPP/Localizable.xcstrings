@@ -137,7 +137,7 @@
     "%@ items" : {
 
     },
-    "MAPP isn’t allowed to list, make, change or remove this Marfa’s webhooks." : {
+    "MAPP isn’t allowed to list, make, change or remove webhooks." : {
 
     },
     "Named by the sign-in that keeps each one." : {
@@ -194,28 +194,28 @@
     "Lower and Save" : {
 
     },
-    "MAPP isn’t allowed to list deleted items or permanently delete them." : {
+    "MAPP isn’t allowed to list or permanently delete deleted items." : {
 
     },
-    "MAPP isn’t allowed to list, make or revoke this Marfa’s keys." : {
+    "MAPP isn’t allowed to list, make or revoke keys." : {
 
     },
-    "MAPP isn’t allowed to list, narrow or disconnect the apps that reach this Marfa." : {
+    "MAPP isn’t allowed to list, narrow or disconnect apps." : {
 
     },
     "MAPP isn’t allowed to read this Marfa’s health and status." : {
 
     },
-    "MAPP isn’t allowed to rename sources, change their marks or limit what they reach." : {
+    "MAPP isn’t allowed to rename, mark or limit sources." : {
 
     },
-    "MAPP isn’t allowed to see or change how long this Marfa keeps versions and logs." : {
+    "MAPP isn’t allowed to see or change version and log retention." : {
 
     },
-    "MAPP isn’t allowed to see or change the addresses this Marfa answers on." : {
+    "MAPP isn’t allowed to see or change this Marfa’s addresses." : {
 
     },
-    "MAPP isn’t allowed to see where this Marfa keeps files or change how it reads them." : {
+    "MAPP isn’t allowed to see or change how this Marfa keeps files." : {
 
     },
     "MAPP removes its copy from this Mac and signs out. Webhooks it made are deleted. Your items stay." : {
@@ -6310,10 +6310,10 @@
     "MAPP can’t reach the server. Nothing was changed." : {
 
     },
-    "MAPP isn’t allowed to %@. Choose Allow More… to change that." : {
+    "MAPP isn’t allowed to %@." : {
 
     },
-    "MAPP isn’t allowed to do this. Choose Allow More… to change that." : {
+    "MAPP isn’t allowed to do this." : {
 
     },
     "MAPP isn’t allowed to do this: it needs “%@”." : {

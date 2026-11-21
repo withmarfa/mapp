@@ -7,7 +7,7 @@ import Observation
 struct SourceAccess {
     var rows: () -> [MarfaSourceRow]
     var refresh: () async -> Void
-    var change: (String, MarfaSourceChange) async -> String?
+    var change: (String, MarfaSourceChange) async -> OwnerFailure?
     var marks: (String, MarfaMarkSet) -> [String]
 }
 
@@ -32,7 +32,7 @@ struct SourceAccess {
     private(set) var failure: String?
     private(set) var hasLoaded = false
     /// Why the last change made from a source's menu was refused, shown above the list until the next one.
-    private(set) var listFailure: String?
+    private(set) var listFailure: OwnerFailure?
 
     init(access: SourceAccess, markSets: [MarfaMarkSet]) {
         self.access = access
@@ -103,7 +103,7 @@ struct SourceAccess {
         failure = nil
         defer { isWorking = false }
         if let refused = await access.change(code, change) {
-            failure = refused
+            failure = OwnerWording.line(refused, on: .sources)
         } else {
             sheet = nil
         }
