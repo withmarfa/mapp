@@ -6,24 +6,37 @@ extension View {
     /// puts between them and with one line under them, from where the first column's cells start to where the last
     /// one's end, which is where the rows' separators run. The columns still resize by their edges, reorder by dragging
     /// and sort by a click. SwiftUI cannot style the header the `NSTableView` behind a `Table` draws, so this gives the
-    /// table a header view and each column a header cell of its own. The headings are drawn over the table's own
+    /// table a header view that draws every column's heading itself. The headings are drawn over the table's own
     /// background, or over `backdrop` where the table has none, so rows that scroll under them do not show through.
-    func quietTableHeader(backdrop: NSColor = .windowBackgroundColor) -> some View {
-        background(QuietTableHeader(backdrop: backdrop))
+    ///
+    /// A table that sits directly under the toolbar passes `isUnderToolbar` to be told when its rows have scrolled past the
+    /// headings, which stay pinned, and so under the toolbar, where the caller draws a `ToolbarBand`. A table in an index
+    /// page leaves that to the page (`indexScrollsAway`).
+    func quietTableHeader(backdrop: NSColor = .windowBackgroundColor, isUnderToolbar: Binding<Bool>? = nil) -> some View {
+        background(QuietTableHeader(backdrop: backdrop, isUnderToolbar: isUnderToolbar))
     }
 }
 
 private struct QuietTableHeader: NSViewRepresentable {
     let backdrop: NSColor
+    let isUnderToolbar: Binding<Bool>?
 
     func makeNSView(context: Context) -> Probe { Probe() }
     func updateNSView(_ probe: Probe, context: Context) {
         probe.backdrop = backdrop
+        probe.isUnderToolbar = isUnderToolbar
         probe.refresh()
+    }
+
+    static func dismantleNSView(_ probe: Probe, coordinator: ()) {
+        probe.stop()
     }
 
     final class Probe: NSView {
         var backdrop = NSColor.windowBackgroundColor
+        var isUnderToolbar: Binding<Bool>?
+        private weak var followed: NSClipView?
+        private var observer: (any NSObjectProtocol)?
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
 
@@ -45,16 +58,38 @@ private struct QuietTableHeader: NSViewRepresentable {
                 table.headerView = view
             }
             (table.headerView as? QuietHeaderView)?.backdrop = backdrop
-            for column in table.tableColumns where !(column.headerCell is QuietHeaderCell) {
-                let old = column.headerCell
-                let cell = QuietHeaderCell(textCell: old.stringValue)
-                cell.font = QuietHeaderCell.headingFont
-                cell.alignment = old.alignment
-                cell.lineBreakMode = old.lineBreakMode
-                cell.truncatesLastVisibleLine = old.truncatesLastVisibleLine
-                column.headerCell = cell
-            }
             table.headerView?.needsDisplay = true
+            follow(table)
+            report(table)
+        }
+
+        func stop() {
+            if let observer { NotificationCenter.default.removeObserver(observer) }
+            observer = nil
+            followed = nil
+        }
+
+        private func follow(_ table: NSTableView) {
+            guard isUnderToolbar != nil, let clip = table.enclosingScrollView?.contentView, clip !== followed else { return }
+            stop()
+            followed = clip
+            clip.postsBoundsChangedNotifications = true
+            observer = NotificationCenter.default.addObserver(
+                forName: NSView.boundsDidChangeNotification, object: clip, queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    if let table = self?.nearestTable() { self?.report(table) }
+                }
+            }
+        }
+
+        /// The headings stay pinned under the toolbar, so the rows reach the toolbar only once they have scrolled by the
+        /// headings' height as well.
+        private func report(_ table: NSTableView) {
+            guard let isUnderToolbar, let clip = table.enclosingScrollView?.contentView else { return }
+            let scrolled = clip.bounds.origin.y + clip.contentInsets.top
+            let isUnder = scrolled > (table.headerView?.frame.height ?? 0) + 0.5
+            if isUnderToolbar.wrappedValue != isUnder { isUnderToolbar.wrappedValue = isUnder }
         }
     }
 }
@@ -66,6 +101,22 @@ private struct QuietTableHeader: NSViewRepresentable {
 private final class QuietHeaderView: NSTableHeaderView {
     /// What fills the header where the table's own background is clear.
     var backdrop = NSColor.windowBackgroundColor
+    /// The cell this view draws each column's heading with. The view makes them as it draws, because SwiftUI adds and
+    /// replaces a table's columns (and their own cells) after the view is installed, and a column that kept its own
+    /// cell would have no heading.
+    private let cells = NSMapTable<NSTableColumn, QuietHeaderCell>(keyOptions: .weakMemory, valueOptions: .strongMemory)
+
+    private func cell(for column: NSTableColumn) -> QuietHeaderCell {
+        let cell = cells.object(forKey: column) ?? QuietHeaderCell(textCell: "")
+        let source = column.headerCell
+        cell.stringValue = source.stringValue
+        cell.font = QuietHeaderCell.headingFont
+        cell.alignment = source.alignment
+        cell.lineBreakMode = source.lineBreakMode
+        cell.truncatesLastVisibleLine = source.truncatesLastVisibleLine
+        cells.setObject(cell, forKey: column)
+        return cell
+    }
 
     override func draw(_ dirtyRect: NSRect) {
         guard let table = tableView else { return }
@@ -75,7 +126,8 @@ private final class QuietHeaderView: NSTableHeaderView {
         let sorted = table.sortDescriptors.first
         for (index, column) in table.tableColumns.enumerated() {
             let frame = headerRect(ofColumn: index)
-            guard frame.intersects(dirtyRect), let cell = column.headerCell as? QuietHeaderCell else { continue }
+            guard frame.intersects(dirtyRect) else { continue }
+            let cell = cell(for: column)
             let isSorted = sorted != nil && sorted?.key == column.sortDescriptorPrototype?.key
             cell.isSorted = isSorted
             cell.draw(withFrame: frame, in: self)

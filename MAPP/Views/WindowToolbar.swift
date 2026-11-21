@@ -481,11 +481,30 @@ private struct MoreMenu: View {
     let fileURL: URL?
     let browser: Browser?
     let editor: EditorController?
+    @AppStorage(PageKey.cornerShowsFormats) private var showsFormats = true
+    @AppStorage(PageKey.cornerShowsTextSize) private var showsTextSize = true
+    @AppStorage(PageKey.cornerShowsFocus) private var showsFocus = true
+
+    private var context: ItemCommandContext {
+        ItemCommandContext(library: library, ids: ids, browser: browser, editor: editor, details: details, fileURL: fileURL)
+    }
 
     private func command(_ command: ItemCommand) -> some View {
-        ItemCommandButton(
-            command: command, context: ItemCommandContext(library: library, ids: ids, browser: browser, editor: editor, details: details, fileURL: fileURL),
-            editor: editor)
+        ItemCommandButton(command: command, context: context, editor: editor)
+    }
+
+    private var pageLayout: ItemPageLayout {
+        context.item.flatMap { library.pageLayout(of: $0) } ?? .text
+    }
+
+    /// The corner's controls the person turned off in Settings > Editor, for the page this window shows.
+    private var cornerControlsInMore: [PageCornerButton] {
+        let context = context
+        guard let details, let item = context.item, context.showsPage, !context.hidesCorner, let library = context.library else { return [] }
+        return PageCorner.inMore(
+            layout: library.pageLayout(of: item), hasReader: details.pageLook?.item == item.id,
+            canWrite: item.isWritable && editor != nil, file: details.fileViewing(of: item.id)?.kind,
+            shows: PageCornerChoice(formats: showsFormats, textSize: showsTextSize, focus: showsFocus))
     }
 
     var body: some View {
@@ -510,6 +529,16 @@ private struct MoreMenu: View {
             }
             command(.toggleSource)
             command(.toggleReader)
+            ForEach(cornerControlsInMore, id: \.self) { button in
+                switch button {
+                case .formats: command(.toggleFormats)
+                case .textSize:
+                    Menu("Text Size", systemImage: "textformat.size") { TextSizeOptions() }
+                        .disabled(!PageCorner.sizesText(layout: pageLayout, look: details?.pageLook?.mode))
+                case .focus: command(.toggleFocus)
+                case .look, .pages, .zoom: EmptyView()
+                }
+            }
             Divider()
             command(.print)
             command(.exportPDF)

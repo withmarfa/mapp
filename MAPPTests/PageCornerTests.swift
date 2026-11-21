@@ -33,6 +33,37 @@ struct PageCornerTests {
         #expect(PageCorner.buttons(layout: .file, hasReader: true) == [.focus])
     }
 
+    @Test func aControlTurnedOffLeavesTheCornerAndIsOfferedInMore() {
+        let choice = PageCornerChoice(formats: false, textSize: true, focus: false)
+        #expect(PageCorner.buttons(layout: .text, hasReader: false, shows: choice) == [.textSize])
+        #expect(PageCorner.inMore(layout: .text, hasReader: false, shows: choice) == [.formats, .focus])
+    }
+
+    @Test func everyControlOffLeavesTheCornerEmptyAndAllInMore() {
+        let none = PageCornerChoice(formats: false, textSize: false, focus: false)
+        #expect(PageCorner.buttons(layout: .text, hasReader: false, shows: none).isEmpty)
+        #expect(PageCorner.inMore(layout: .text, hasReader: false, shows: none) == [.formats, .textSize, .focus])
+    }
+
+    @Test func aControlAPageNeverHadIsNotOfferedInMore() {
+        let none = PageCornerChoice(formats: false, textSize: false, focus: false)
+        #expect(PageCorner.inMore(layout: .text, hasReader: false, canWrite: false, shows: none) == [.textSize, .focus], "no Aa on a page that cannot be written")
+        #expect(PageCorner.inMore(layout: .file, hasReader: false, shows: none) == [.focus], "no text size on a file")
+    }
+
+    @Test func thePagesOwnControlsAreNotAChoice() {
+        let none = PageCornerChoice(formats: false, textSize: false, focus: false)
+        #expect(PageCorner.buttons(layout: .file, hasReader: false, file: .pdf, shows: none) == [.pages, .zoom])
+        let web = ItemPageLayout.webPage(document: .mint(), runsScripts: false)
+        #expect(PageCorner.buttons(layout: web, hasReader: true, canWrite: false, shows: none) == [.look])
+    }
+
+    @Test func theCornerChoicesAreMacSettings() {
+        for key in [PageKey.cornerShowsFormats, PageKey.cornerShowsTextSize, PageKey.cornerShowsFocus] {
+            #expect(MacSettings.keys.contains(key))
+        }
+    }
+
     @Test func theTextSizeChangesATextPageAndAWebPagesReaderViewOnly() {
         let web = ItemPageLayout.webPage(document: .mint(), runsScripts: false)
         #expect(PageCorner.sizesText(layout: .text, look: nil))

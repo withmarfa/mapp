@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// The corner of an item's page: Aa where the page can be written, Reader or Original where a web page has a Reader
-/// view, the text size of every page of text, and Focus last on every page (`PageCorner.buttons`). It is drawn by
+/// view, the text size of every page of text, and Focus last on every page (`PageCorner.buttons`), less the controls the
+/// person turned off in Settings > Editor, which the page's More menu offers instead. It is drawn by
 /// `WindowCorner`, so Aa's formats open as a bar along the foot of the page. Each control is also a menu command and a
 /// palette entry (`ItemCommand`), and runs the same code.
 ///
@@ -13,14 +14,20 @@ struct ItemCorner: View {
     /// Nil where the window has no editor, as for a file in a window of its own.
     let editor: EditorController?
     let details: DetailsPresentation
+    @AppStorage(PageKey.cornerShowsFormats) private var showsFormats = true
+    @AppStorage(PageKey.cornerShowsTextSize) private var showsTextSize = true
+    @AppStorage(PageKey.cornerShowsFocus) private var showsFocus = true
 
     var body: some View {
         let layout = library.pageLayout(of: item)
         let fileView = details.fileViewing(of: item.id)
         let hasReader = details.pageLook?.item == item.id
+        let canWrite = item.isWritable && editor != nil
+        let choice = PageCornerChoice(formats: showsFormats, textSize: showsTextSize, focus: showsFocus)
         let buttons = PageCorner.buttons(
-            layout: layout, hasReader: hasReader, canWrite: item.isWritable && editor != nil, file: fileView?.kind)
-        let formatsEditor = buttons.contains(.formats) ? editor : nil
+            layout: layout, hasReader: hasReader, canWrite: canWrite, file: fileView?.kind, shows: choice)
+        // The bar belongs to the page, not to Aa: View > Show Formats opens it with Aa left out of the corner.
+        let formatsEditor = PageCorner.buttons(layout: layout, hasReader: hasReader, canWrite: canWrite).contains(.formats) ? editor : nil
         let isBarOpen = formatsEditor != nil && details.isFormatsOpen(on: item.id)
         let isFocused = details.isFocused(on: item.id)
         WindowCorner(isCardOpen: isBarOpen, cardPlacement: .centeredAtFoot) {

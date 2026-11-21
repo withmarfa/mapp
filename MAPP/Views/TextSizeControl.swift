@@ -9,30 +9,12 @@ struct TextSizeControl: View {
     /// Whether the size changes what the page shows; where it does not, as on a web page's original look, it is dimmed.
     var isAvailable = true
     @AppStorage(PageKey.textSize) private var textSize = PageStyle().textSize
-    @AppStorage(PageKey.fullWidth) private var fullWidth = PageStyle().fullWidth
     @Environment(\.interfaceTextSize) private var interfaceSize
 
     var body: some View {
-        let zoom = TextZoom.page
         CornerButtonGroup {
             Menu {
-                Picker("Text Size", selection: $textSize) {
-                    ForEach(PageStyle.textSizes, id: \.self) { size in Text("\(size) pt").tag(size) }
-                }
-                .pickerStyle(.inline)
-                .labelsHidden()
-                Divider()
-                Button("Make Text Bigger", systemImage: "textformat.size.larger") { zoom.apply(.bigger) }
-                    .disabled(zoom.size(after: .bigger, from: textSize) == nil)
-                Button("Make Text Smaller", systemImage: "textformat.size.smaller") { zoom.apply(.smaller) }
-                    .disabled(zoom.size(after: .smaller, from: textSize) == nil)
-                Divider()
-                Picker("Page Width", selection: $fullWidth) {
-                    Text("Standard Width").tag(false)
-                    Text("Full Width").tag(true)
-                }
-                .pickerStyle(.inline)
-                .labelsHidden()
+                TextSizeOptions()
             } label: {
                 HStack(spacing: 6) {
                     Text("\(textSize) pt").monospacedDigit()
@@ -49,5 +31,34 @@ struct TextSizeControl: View {
             .accessibilityIdentifier("PageTextSize")
         }
         .disabled(!isAvailable)
+    }
+}
+
+/// What the text size menu holds: the page's sizes with the current one ticked, Make Text Bigger and Make Text Smaller,
+/// then Standard Width and Full Width. The corner's control and the More menu's Text Size submenu (where the person has
+/// turned the control off in Settings > Editor) show the same entries.
+struct TextSizeOptions: View {
+    @AppStorage(PageKey.textSize) private var textSize = PageStyle().textSize
+    @AppStorage(PageKey.fullWidth) private var fullWidth = PageStyle().fullWidth
+
+    var body: some View {
+        let zoom = TextZoom.page
+        Picker("Text Size", selection: $textSize) {
+            ForEach(PageStyle.textSizes, id: \.self) { size in Text("\(size) pt").tag(size) }
+        }
+        .pickerStyle(.inline)
+        .labelsHidden()
+        Divider()
+        Button("Make Text Bigger", systemImage: "textformat.size.larger") { zoom.apply(.bigger) }
+            .disabled(zoom.size(after: .bigger, from: textSize) == nil)
+        Button("Make Text Smaller", systemImage: "textformat.size.smaller") { zoom.apply(.smaller) }
+            .disabled(zoom.size(after: .smaller, from: textSize) == nil)
+        Divider()
+        Picker("Page Width", selection: $fullWidth) {
+            Text("Standard Width").tag(false)
+            Text("Full Width").tag(true)
+        }
+        .pickerStyle(.inline)
+        .labelsHidden()
     }
 }
