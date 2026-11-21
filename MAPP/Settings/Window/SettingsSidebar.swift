@@ -39,6 +39,7 @@ struct SettingsSidebar: View {
             }
         }
         .listStyle(.sidebar)
+        .environment(\.sidebarRowSize, .small)
         .searchable(text: $search, placement: .sidebar, prompt: Text("Search"))
         .overlay {
             if groups.isEmpty {

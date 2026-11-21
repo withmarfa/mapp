@@ -1,7 +1,7 @@
 import SwiftUI
 
 // The trailing controls of a row. Every one is the system's: bordered buttons, menu pop-ups, switches and rounded text fields,
-// at their own regular size (small inside a table).
+// at the size the boards draw: 28 points tall, which the system calls large (22 inside a table, which it calls regular).
 
 /// What a Settings button is for. `update` is the prominent one, filled with the accent; `destructive` is the system's
 /// destructive role, which draws red text, and is never the default.
@@ -53,7 +53,8 @@ struct SettingsButton: View {
                 button.buttonStyle(.bordered)
             }
         }
-        .controlSize(small ? .small : .regular)
+        .controlSize(small ? .regular : .large)
+        .tint(role == .destructive ? SettingsTokens.errorRed : nil)
     }
 
     private var button: some View {
@@ -95,6 +96,7 @@ struct SettingsPopUp<Value: Hashable, Content: View>: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .buttonSizing(.flexible)
+            .controlSize(.large)
             .frame(width: SettingsTokens.Metric.popUpWidth)
     }
 }
@@ -108,7 +110,7 @@ struct SettingsToggle: View {
         Toggle(title, isOn: $isOn)
             .labelsHidden()
             .toggleStyle(.switch)
-            .controlSize(.small)
+            .controlSize(.mini)
     }
 }
 
@@ -211,6 +213,7 @@ struct SettingsField: View {
         }
         .labelsHidden()
         .textFieldStyle(.roundedBorder)
+        .controlSize(.large)
         .font(isMonospaced ? SettingsTokens.font(.mono, scale: scale) : nil)
         .autocorrectionDisabled()
         .focused($isFocused)
@@ -255,6 +258,7 @@ struct SettingsNumberField: View {
         TextField(title, text: $text, prompt: Text(verbatim: prompt ?? ""))
             .labelsHidden()
             .textFieldStyle(.roundedBorder)
+            .controlSize(.large)
             .autocorrectionDisabled()
             .focused($isFocused)
             .onSubmit(onSubmit)
