@@ -33,6 +33,7 @@ nonisolated extension ShortcutCommand {
     static let addAttachment = ShortcutCommand("addAttachment", in: .edit, String(localized: "Add Attachment…"), "a", [.command, .shift])
     static let searchItems = ShortcutCommand("searchItems", in: .edit, String(localized: "Search Items…"), "p", [.command, .shift])
     static let commandPalette = ShortcutCommand("commandPalette", in: .edit, String(localized: "Command Palette"), "k")
+    static let paletteActions = ShortcutCommand("paletteActions", in: .edit, String(localized: "Palette Actions"), "j")
     static let searchList = ShortcutCommand("searchList", in: .edit, String(localized: "Search List"), "f", [.command, .option])
     static let find = ShortcutCommand("find", in: .edit, String(localized: "Find…"), "f")
     static let findNext = ShortcutCommand("findNext", in: .edit, String(localized: "Find Next"), "g")
@@ -90,7 +91,7 @@ nonisolated extension ShortcutCommand {
         let commands: [ShortcutCommand] = [
             settings, newItem, newWindow, refresh, open, openAsModal, openAsFullPage, openInNewWindow, quickLook, openOriginal, openInBrowser,
             favorite, addTag, changeType, customizeLayout, versionHistory, delete, exportPDF, print,
-            addAttachment, searchItems, commandPalette, searchList, find, findNext, findPrevious, useSelectionForFind,
+            addAttachment, searchItems, commandPalette, paletteActions, searchList, find, findNext, findPrevious, useSelectionForFind,
             toggleSource, toggleReader, toggleFormats, focus, viewAsList, viewAsGallery, viewAsTable, viewAsBoard, viewAsTimeline, viewAsCalendar,
             toggleFilters, addFilter, clearFilters, today, previousPeriod, nextPeriod, showWeek, showMonthScale, toggleMonth,
             newView, editView, saveAsView, resetView, duplicateView, toggleDetails, customizeSidebar, back, forward, previousItem, nextItem,

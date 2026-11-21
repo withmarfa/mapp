@@ -13,6 +13,7 @@ Settings > Keyboard gives every menu command MAPP adds a shortcut that its perso
 - A shortcut another command holds is shown as taken: the red ring, and under the row's title "⌘K is Command Palette's." An alert offers Replace, which leaves the other command with none, or Cancel.
 - The menus bind the chosen shortcut at once (`ShortcutBindings`), and so does the palette, which prints it beside the command. The Format commands also tell the item page, which answers the same keys.
 - The default of a command is in `ShortcutCommand`'s catalogue and is the shortcut it had before the page. Only a choice is stored, so a better default reaches every command nobody changed. No default is a key the system holds (`SystemShortcuts`, which includes the View menu's Show Toolbar, ⌥⌘T) or another command's: Insert Table is ⌃⌘T for that reason, and a test fails on any clash.
+- Palette Actions (Edit menu, ⌘J) opens or shuts Actions in the command palette or Search Items while one is out, and is off the rest of the time. ⌘K opens the command palette and nothing else. The palette's bar prints whatever key the person has given it, and none if cleared.
 - The toolbar's copy of a command and a row's menu bind no key, so a key is never registered twice.
 - A command whose title or action changes with the state of the window (Show Reader or Original, Add to Favorites or Remove from Favorites) is one command with one shortcut.
 

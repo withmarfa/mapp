@@ -157,6 +157,8 @@ struct PaletteRow: View {
 struct PaletteFooter: View {
     let openTitle: String
     let onOpen: () -> Void
+    /// The key caps beside Actions, as the person has set them; nil when Palette Actions has no shortcut.
+    let actionsKeys: String?
     /// Nil where there is nothing to act on, as when nothing was found and the bar only offers New Item.
     let onActions: (() -> Void)?
 
@@ -174,8 +176,10 @@ struct PaletteFooter: View {
                 Button(action: onActions) {
                     HStack(spacing: 6) {
                         Text("Actions")
-                        ShortcutKeys("⌘K")
-                            .accessibilityHidden(true)
+                        if let actionsKeys {
+                            ShortcutKeys(actionsKeys)
+                                .accessibilityHidden(true)
+                        }
                     }
                 }
                 .accessibilityIdentifier("CommandPaletteActions")
