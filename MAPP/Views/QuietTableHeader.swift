@@ -48,8 +48,8 @@ private struct QuietTableHeader: NSViewRepresentable {
             for column in table.tableColumns where !(column.headerCell is QuietHeaderCell) {
                 let old = column.headerCell
                 let cell = QuietHeaderCell(textCell: old.stringValue)
-                cell.font = old.font
-                cell.plainFont = old.font ?? .systemFont(ofSize: NSFont.systemFontSize)
+                cell.font = QuietHeaderCell.headingFont
+                cell.textColor = .secondaryLabelColor
                 cell.alignment = old.alignment
                 cell.lineBreakMode = old.lineBreakMode
                 cell.truncatesLastVisibleLine = old.truncatesLastVisibleLine
@@ -78,7 +78,6 @@ private final class QuietHeaderView: NSTableHeaderView {
             let frame = headerRect(ofColumn: index)
             guard frame.intersects(dirtyRect), let cell = column.headerCell as? QuietHeaderCell else { continue }
             let isSorted = sorted != nil && sorted?.key == column.sortDescriptorPrototype?.key
-            cell.isSorted = isSorted
             cell.draw(withFrame: frame, in: self)
             if let sorted, isSorted {
                 cell.drawSortIndicator(withFrame: frame, in: self, ascending: sorted.ascending, priority: 0)
@@ -94,21 +93,10 @@ private final class QuietHeaderView: NSTableHeaderView {
     }
 }
 
-/// A column heading's cell, drawn without the separators and the bottom line AppKit draws with it, and in bold while
-/// its column is the one the table is sorted by.
+/// A column heading's cell, drawn without the separators and the bottom line AppKit draws with it, in the font of the
+/// New row's label (callout, medium) and the secondary color, whether or not its column is the sorted one.
 private final class QuietHeaderCell: NSTableHeaderCell {
-    /// The font a title has when its column is not the sorted one.
-    var plainFont: NSFont?
-    var isSorted = false {
-        didSet {
-            guard isSorted != oldValue, let plainFont else { return }
-            let face = isSorted ? NSFont.systemFont(ofSize: plainFont.pointSize, weight: .semibold) : plainFont
-            font = face
-            let title = NSMutableAttributedString(attributedString: attributedStringValue)
-            title.addAttribute(.font, value: face, range: NSRange(location: 0, length: title.length))
-            attributedStringValue = title
-        }
-    }
+    static let headingFont = NSFont.systemFont(ofSize: 12, weight: .medium)
     private static let bottomLine: CGFloat = 3
 
     override func draw(withFrame cellFrame: NSRect, in controlView: NSView) {
