@@ -1,4 +1,5 @@
 import AppKit
+import OSLog
 import SwiftUI
 
 extension View {
@@ -58,6 +59,10 @@ private struct QuietTableHeader: NSViewRepresentable {
                 table.headerView = view
             }
             (table.headerView as? QuietHeaderView)?.backdrop = backdrop
+            if let sv = table.enclosingScrollView {
+                let cols = table.tableColumns.map { "\(Int($0.width))[\(Int($0.minWidth))-\(Int(min($0.maxWidth, 9999)))]" }.joined(separator: ",")
+                Logger(subsystem: "tbldebug", category: "t").notice("DBG id=\(table.accessibilityIdentifier(), privacy: .public) scroll=\(Int(sv.frame.width)) clip=\(Int(sv.contentView.bounds.width)) table=\(Int(table.frame.width)) auto=\(table.columnAutoresizingStyle.rawValue) hs=\(sv.hasHorizontalScroller) cols=\(cols, privacy: .public)")
+            }
             table.headerView?.needsDisplay = true
             follow(table)
             report(table)
