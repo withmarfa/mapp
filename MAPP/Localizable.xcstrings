@@ -79,6 +79,9 @@
     "Can’t Extend This Key" : {
 
     },
+    "Can’t Extend This Key Yet" : {
+
+    },
     "Change Address" : {
 
     },
@@ -227,7 +230,10 @@
     "MAPP stopped waiting. Check again to see where it stands." : {
 
     },
-    "MAPP’s own sign-in ends before then, so it can’t give a key longer." : {
+    "Choose a date before MAPP’s sign-in ends." : {
+
+    },
+    "MAPP couldn’t read when its own sign-in ends, which limits how long a key can be given." : {
 
     },
     "MAPP’s own sign-in ends sooner, so it can’t give this key longer." : {

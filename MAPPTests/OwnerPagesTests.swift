@@ -26,8 +26,8 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var apps: [AppAccess] = []
         var names: [String: String] = [:]
         var keys: [KeyInfo] = []
-        /// Who the sign-in is: a signed-in app named MAPP, with no expiry of its own, unless a test says otherwise.
-        var identity = OwnIdentity(keyID: nil, expires: nil, appName: "MAPP")
+        /// Who the sign-in is: a signed-in app, with no expiry of its own, unless a test says otherwise.
+        var identity = OwnIdentity(keyID: nil, expires: nil)
         var settings = AddressSettings(
             instanceID: "instance-1", signIn: "https://marfa.test", addresses: ["https://marfa.test", "https://100.84.12.7"], websites: [])
         var reach = AddressPlan.Reach.notAsked
@@ -1184,10 +1184,26 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(model.extensions(of: model.keys[0]).isEmpty, "a key that never ends has nothing to extend")
     }
 
+    @Test func whenMAPPsOwnSignInEndCantBeReadNothingIsOfferedNotNeverAndNotPastIt() async {
+        let bench = bench([key(expires: .now.addingTimeInterval(Self.day * 10))])
+        bench.calls.fail("identity", with: .unreachable)
+        let model = KeysModel(context: bench.context)
+        await model.load()
+        #expect(model.failure == nil, "the keys are listed")
+        #expect(model.extensions(of: model.keys[0]).isEmpty, "unknown is not the same as no limit")
+        #expect(model.identityFailure == .unreachable, "the page shows the failure with Try Again")
+        model.beginExtend(model.keys[0])
+        #expect(model.sheet == nil, "there is nothing to extend to")
+        bench.calls.fail("identity", with: nil)
+        await model.load()
+        #expect(model.identityFailure == nil)
+        #expect(model.extensions(of: model.keys[0]) == [.days(30), .days(90), .days(365), .never])
+    }
+
     @Test func aKeyIsHeldToTheEndOfTheKeyMAPPIsSignedInWith() async {
         let bench = bench([key(expires: .now.addingTimeInterval(Self.day * 10))])
         bench.calls.state.withLock {
-            $0.identity = OwnIdentity(keyID: "me", expires: .now.addingTimeInterval(Self.day * 100), appName: "MAPP")
+            $0.identity = OwnIdentity(keyID: "me", expires: .now.addingTimeInterval(Self.day * 100))
         }
         let model = KeysModel(context: bench.context)
         await model.load()
@@ -1242,7 +1258,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(bench.refreshed == 1, "the server's answer wins over what MAPP thinks it holds")
         bench.calls.fail("change", with: .notPermitted(nil))
         await model.extend()
-        #expect(model.extendError == "MAPP’s own sign-in ends before then, so it can’t give a key longer.")
+        #expect(model.extendError == "Choose a date before MAPP’s sign-in ends.")
         bench.calls.fail("change", with: .unreachable)
         await model.extend()
         #expect(model.extendError == "MAPP can’t reach the server. Nothing was changed.")

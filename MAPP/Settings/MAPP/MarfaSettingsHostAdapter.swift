@@ -101,6 +101,10 @@ enum LibraryDescription {
 
     func markTitle(_ id: String) -> String { IconNameSearch.title(of: id) }
 
+    func typeMark(for pattern: String) -> AnyView {
+        AnyView(TypeMark(icon: libraries.current?.catalogue.itemTypes[TypeID(pattern)]?.icon, size: .side))
+    }
+
     var serverName: String { LibraryDescription.name(libraries) }
     var serverAddress: String? { host.configuredConnection?.address.absoluteString }
 
@@ -149,7 +153,7 @@ enum LibraryDescription {
 
     /// The owner's calls, made through a client that shows the system's sign-in in place where the server asks the owner to
     /// confirm it is them, and sends the call again once they have.
-    var ownerCalls: any OwnerCalls { ClientOwnerCalls(server: plainServer, appName: SystemSignIns.clientName, client: confirmingClient) }
+    var ownerCalls: any OwnerCalls { ClientOwnerCalls(server: plainServer, client: confirmingClient) }
 
     /// What Activity, Monitoring, Limits and Start-Up ask of the server, through the same client.
     var instanceCalls: any InstanceCalls { ClientInstanceCalls(client: confirmingClient) }

@@ -161,6 +161,8 @@ enum SettingsTokens {
         /// A tile's corner radius and symbol size, as shares of its side.
         static let tileRounding: CGFloat = 0.27
         static let tileGlyph: CGFloat = 0.55
+        /// A well's symbol or mark, as a share of its side: 12 points in the 24 point well.
+        static let wellGlyph: CGFloat = 0.5
         static let headTile: CGFloat = 44
         static let smallButtonHeight: CGFloat = 22
         /// A small search field at a list's trailing edge, and the button beside it that changes what it searches by.

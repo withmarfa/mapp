@@ -105,15 +105,12 @@ nonisolated struct OwnIdentity: Hashable, Sendable {
     var keyID: String?
     /// When that key ends, where it does. A signed-in app counts as having no expiry of its own.
     var expires: Date?
-    /// The name a signed-in app registered under, which its webhooks carry as their maker.
-    var appName: String?
 
-    /// Whether this sign-in made what `maker` made.
+    /// Whether this sign-in made what `maker` made, by the key's id. A signed-in app is not told from another app: the server
+    /// names the maker of an app's webhook by its client id, which neither the server nor the package tells the app about
+    /// itself, and a name is never an identity, so none of an app's makers is taken as this sign-in's.
     func made(_ maker: OwnerWebhook.Maker) -> Bool {
-        switch maker.kind {
-        case .key: keyID != nil && maker.id == keyID
-        case .app: keyID == nil && appName != nil && maker.name == appName
-        }
+        maker.kind == .key && keyID != nil && maker.id == keyID
     }
 }
 
@@ -283,12 +280,9 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
     /// The package's server, for `Server.health()`, which the generated client does not hold. Nil where there is none.
     var server: (@Sendable () throws -> Server)?
     let client: @Sendable () throws -> Client
-    /// The name this app signs in under, which the webhooks it makes are known by.
-    let appName: String?
 
-    init(server: (@Sendable () throws -> Server)? = nil, appName: String? = nil, client: @escaping @Sendable () throws -> Client) {
+    init(server: (@Sendable () throws -> Server)? = nil, client: @escaping @Sendable () throws -> Client) {
         self.server = server
-        self.appName = appName
         self.client = client
     }
 
@@ -537,11 +531,11 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
         do {
             return try await run { client in
                 let key = try await client.getCurrentKey().ok.body.json
-                return OwnIdentity(keyID: key.id, expires: Self.date(key.expiresAt), appName: appName)
+                return OwnIdentity(keyID: key.id, expires: Self.date(key.expiresAt))
             }
         } catch {
             // A signed-in app's token is not a key, and the server says so; it has no expiry of its own as a caller.
-            if case .notPermitted = error { return OwnIdentity(keyID: nil, expires: nil, appName: appName) }
+            if case .notPermitted = error { return OwnIdentity(keyID: nil, expires: nil) }
             throw error
         }
     }

@@ -153,7 +153,7 @@ private struct KeyDetail: View {
                     SettingsRow("Reaches No Items", look: .off)
                 }
                 ForEach(parsed.entries) { entry in
-                    SettingsRow(verbatim: AccessScopes.title(of: entry.pattern, names: model.typeNames), lead: .symbol("tray.full")) {
+                    SettingsRow(verbatim: AccessScopes.title(of: entry.pattern, names: model.typeNames), lead: .custom(host.typeMark(for: entry.pattern))) {
                         SettingsPopUp(title: "Access", selection: Binding { entry.level } set: { level in
                             model.askToNarrow(key, pattern: entry.pattern, to: level)
                         }) {
@@ -179,6 +179,12 @@ private struct KeyDetail: View {
             OwnerProblemRow(
                 title: "Can’t Extend This Key", failure: .notPermitted(InstancePermission.keysManage.rawValue), line: KeysModel.notAllowedToExtend,
                 page: .keys, host: host)
+        } else if let failure = model.identityFailure {
+            SettingsRow("Expires") { SettingsValue(verbatim: ends) }
+            OwnerProblemRow(
+                title: "Can’t Extend This Key Yet", failure: failure,
+                line: String(localized: "MAPP couldn’t read when its own sign-in ends, which limits how long a key can be given."), page: .keys,
+                host: host, retry: { Task { await model.load() } })
         } else if model.extensions(of: key).isEmpty {
             SettingsRow("Expires", line: key.expires == nil ? "It never ends." : "MAPP’s own sign-in ends sooner, so it can’t give this key longer.") {
                 SettingsValue(verbatim: ends)
@@ -411,9 +417,10 @@ private struct ExtendKeySheet: View {
         ) {
             SettingsSection(name: nil) {
                 SettingsRow(
-                    title: Text("Expires"), line: key?.expires.map { Text("Now \(OwnerWording.day($0)).") }, error: model.extendError
+                    title: Text("Expires"), line: key?.expires.map { Text("Now \(OwnerWording.day($0)).") }, error: model.extendError,
+                    lines: nil
                 ) {
-                    SettingsPopUp(title: "Expires", selection: $model.extensionChoice) {
+                    SettingsPopUp(title: "Expires", selection: $model.extensionChoice, isError: model.extendError != nil) {
                         ForEach(key.map { model.extensions(of: $0) } ?? [], id: \.self) { Text(verbatim: title($0)).tag($0) }
                     }
                 }

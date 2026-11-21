@@ -92,8 +92,11 @@ import Observation
     var renameDraft = ""
     private(set) var renameError: String?
     private(set) var revoked: String?
-    /// Who MAPP is signed in as, which holds a key's extension to its own expiry. Nil until read, and where it can't be.
+    /// Who MAPP is signed in as, which holds a key's extension to its own expiry. Nil until read, and where it can't be: an
+    /// expiry not known is not "no limit", so a key is extended only once this is read.
     private(set) var identity: OwnIdentity?
+    /// Why who MAPP is signed in as could not be read, while it is not known.
+    private(set) var identityFailure: OwnerFailure?
     var extensionChoice: Extension = .days(30)
     private(set) var extendError: String?
     private(set) var isExtending = false
@@ -121,10 +124,10 @@ import Observation
 
     /// What a key can be extended to now: only a later day than it ends on, and none past the day the key MAPP is signed in
     /// with ends, which the server holds it to. A key that never ends has nothing to extend, and never is offered only where
-    /// MAPP's own sign-in does not end.
+    /// MAPP's own sign-in does not end. Nothing is offered while MAPP's own sign-in is not known.
     func extensions(of key: KeyInfo, now: Date = .now) -> [Extension] {
-        guard let ends = key.expires else { return [] }
-        let ceiling = identity?.expires
+        guard let ends = key.expires, let identity else { return [] }
+        let ceiling = identity.expires
         var choices = Extension.steps.map(Extension.days).filter { choice in
             guard let date = choice.date(from: now) else { return false }
             return date > ends && (ceiling.map { date <= $0 } ?? true)
@@ -156,7 +159,12 @@ import Observation
             return
         }
         typeNames = (try? await context.calls.typeNames()) ?? typeNames
-        identity = (try? await context.calls.identity()) ?? identity
+        do {
+            identity = try await context.calls.identity()
+            identityFailure = nil
+        } catch {
+            identityFailure = identity == nil ? error : nil
+        }
     }
 
     // MARK: New key
@@ -293,7 +301,7 @@ import Observation
 
     static func extendLine(_ failure: OwnerFailure) -> String {
         switch failure {
-        case .notPermitted(nil): String(localized: "MAPP’s own sign-in ends before then, so it can’t give a key longer.")
+        case .notPermitted(nil): String(localized: "Choose a date before MAPP’s sign-in ends.")
         case .notPermitted(InstancePermission.keysManage.rawValue?): notAllowedToExtend
         default: OwnerWording.line(failure, on: .keys)
         }

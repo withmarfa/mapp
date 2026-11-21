@@ -79,6 +79,11 @@ import Observation
     private(set) var webhooks: [OwnerWebhook] = []
     /// Who MAPP is signed in as, which tells its own webhooks from the others'. Read only where the list holds others'.
     private(set) var identity: OwnIdentity?
+    /// Whether the list on show was read with every maker's webhooks in it. The grants may change under a list already read,
+    /// so what the list holds is told by this, not by the grants now.
+    private var listedEvery = false
+    /// Set where the permissions changed while a read was under way, which then reads again.
+    private var scopeChangedWhileLoading = false
     /// The keys, which tell an expired maker from one that stands. Read only where the list holds others'.
     private var keys: [KeyInfo] = []
     private(set) var typeNames: [String: String] = [:]
@@ -126,9 +131,10 @@ import Observation
     var seesEvery: Bool { context.grants().isSuperset(of: [.webhooksManage, .keysManage]) }
 
     /// Whether this sign-in made `webhook`, which alone may change it or send a delivery again. Where the list holds only
-    /// this sign-in's, all of it is; where it holds every maker's, the maker is matched with who MAPP is signed in as.
+    /// this sign-in's, all of it is; where it holds every maker's, the maker is matched with who MAPP is signed in as, by
+    /// identity (`OwnIdentity.made`).
     func isOwn(_ webhook: OwnerWebhook) -> Bool {
-        guard seesEvery else { return true }
+        guard listedEvery else { return true }
         guard let maker = webhook.maker, let identity else { return false }
         return identity.made(maker)
     }
@@ -145,7 +151,7 @@ import Observation
     var groups: [Group] {
         let sorted = webhooks.sorted { ($0.created ?? .distantFuture) < ($1.created ?? .distantFuture) }
         let own = sorted.filter(isOwn)
-        let ownName = own.compactMap { $0.maker?.name }.first ?? identity?.appName
+        let ownName = own.compactMap { $0.maker?.name }.first
         var groups = [Group(id: "own", maker: nil, name: ownName, standing: .standing, isOwn: true, webhooks: own)]
         var order: [String] = []
         var members: [String: [OwnerWebhook]] = [:]
@@ -227,18 +233,36 @@ import Observation
     func load() async {
         guard !isLoading else { return }
         isLoading = true
-        defer { isLoading = false }
-        guard await readList() else { return }
-        typeNames = (try? await context.calls.typeNames()) ?? typeNames
-        await loadSending()
+        if await readList() {
+            typeNames = (try? await context.calls.typeNames()) ?? typeNames
+            await loadSending()
+        }
+        isLoading = false
+        if scopeChangedWhileLoading {
+            scopeChangedWhileLoading = false
+            await readAgainIfScopeChanged()
+        }
     }
 
-    /// Reads only the list, and answers whether it could.
+    /// Reads only the list, and answers whether it could. Where the list holds every maker's, who MAPP is is read first: with
+    /// no answer the page shows the failure and Try Again, never a list in which MAPP's own look like another's.
     private func readList() async -> Bool {
         defer { hasLoaded = true }
-        if seesEvery { await readMakers() } else { (identity, keys) = (nil, []) }
+        let every = seesEvery
+        if every {
+            do {
+                try await readMakers()
+            } catch {
+                failure = error
+                await context.learn(from: error)
+                return false
+            }
+        } else {
+            (identity, keys) = (nil, [])
+        }
         do {
             webhooks = try await context.calls.webhooks()
+            listedEvery = every
             gone = gone.filter { id in !webhooks.contains { $0.id == id } }
             failure = nil
             return true
@@ -250,10 +274,23 @@ import Observation
     }
 
     /// Reads who MAPP is signed in as, and the keys, so the others' webhooks are told from MAPP's own and an expired maker from
-    /// one that stands. A read that fails leaves what was known: with no identity, none of a list that holds others' is MAPP's own.
-    private func readMakers() async {
-        if identity == nil { identity = try? await context.calls.identity() }
+    /// one that stands. The keys only tell an expired maker from one that stands, so a read that fails keeps what was known.
+    private func readMakers() async throws(OwnerFailure) {
+        if identity == nil { identity = try await context.calls.identity() }
         keys = (try? await context.calls.keys()) ?? keys
+    }
+
+    /// Reads the list again where the permissions changed what it holds, such as Manage Keys lost or gained: the list read
+    /// before is dropped, not shown as the new scope's.
+    func readAgainIfScopeChanged() async {
+        guard hasLoaded, seesEvery != listedEvery else { return }
+        guard !isLoading else {
+            scopeChangedWhileLoading = true
+            return
+        }
+        webhooks = []
+        sending = [:]
+        await load()
     }
 
     /// Whether `id` is a webhook this sign-in may change: its own, or one not read yet.

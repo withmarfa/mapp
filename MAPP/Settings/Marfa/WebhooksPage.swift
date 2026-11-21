@@ -29,6 +29,7 @@ struct WebhooksPage: View {
     var body: some View {
         content
             .task(id: host.serverAddress) { await model.load() }
+            .onChange(of: model.seesEvery) { Task { await model.readAgainIfScopeChanged() } }
             .onAppear { host.ownerDrafts.register(model) }
             .settingsSheet(presenting: model.sheet != nil, dismiss: { model.closeSheet() }) {
                 WebhookSheet(model: model, serverName: host.serverName)
@@ -85,7 +86,7 @@ struct WebhooksPage: View {
                             let state = model.isSending(webhook)
                             SettingsLinkRow(
                                 verbatim: WebhooksModel.display(webhook.url), line: model.summary(of: webhook),
-                                lead: .tint("dot.radiowaves.up.forward", .gray), value: Self.title(state), dot: Self.dot(state)
+                                lead: .well(symbol: "dot.radiowaves.up.forward"), value: Self.title(state), dot: Self.dot(state)
                             ) { push(Self.subpage(for: webhook)) }
                         }
                         if group.isOwn { addRow }
@@ -169,7 +170,7 @@ private struct WebhookDetail: View {
     var body: some View {
         SettingsPageColumn {
             SettingsHead(
-                symbol: "dot.radiowaves.up.forward", tone: .pink, title: Text(verbatim: WebhooksModel.display(webhook.url)),
+                wellSymbol: "dot.radiowaves.up.forward", title: Text(verbatim: WebhooksModel.display(webhook.url)),
                 line: line.isEmpty ? nil : Text(verbatim: line))
             if let failure = model.rowErrors[webhook.id] { OwnerProblem(title: "Not Changed", failure: failure, page: .webhooks, host: host) }
             if isOwn { settings } else { readOnly }

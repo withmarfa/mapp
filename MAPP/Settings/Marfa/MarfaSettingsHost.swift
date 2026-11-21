@@ -119,6 +119,9 @@ struct MarfaMarkSet: Identifiable, Hashable {
     /// The marks in `set` whose names contain every word of `query`, best first; every mark for an empty query.
     func marks(matching query: String, in set: MarfaMarkSet) -> [String]
     func markGlyph(_ id: String) -> AnyView
+    /// The mark an access row leads with for `pattern`: the type's own mark in its tone where the pattern names a type, the
+    /// neutral mark for any other pattern, at the lead column's size.
+    func typeMark(for pattern: String) -> AnyView
     func markTitle(_ id: String) -> String
 
     /// Recently Deleted.

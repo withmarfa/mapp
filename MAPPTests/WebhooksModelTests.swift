@@ -8,19 +8,25 @@ import Testing
 @Suite(.hangLimit) struct WebhooksModelTests {
     private static func hook(
         _ id: String, _ url: String = "https://build.castell.studio/hooks/marfa", type: String? = nil,
-        events: [String] = ["item.created", "item.updated"], active: Bool = true, maker: String = "maker", makerName: String? = "MAPP"
+        events: [String] = ["item.created", "item.updated"], active: Bool = true, maker: String = Self.me, makerName: String? = "MAPP"
     ) -> OwnerWebhook {
         OwnerWebhook(
             id: id, url: url, events: events, typeFilter: type, secretTail: "8f2c", active: active, created: Date(timeIntervalSince1970: 1_700_000_000),
-            maker: .init(kind: .app, id: maker, name: makerName))
+            maker: .init(kind: maker == Self.me ? .key : .app, id: maker, name: makerName))
     }
+
+    /// The key the tests sign in with, which its own webhooks name.
+    private static let me = "k-me"
 
     private static func delivery(_ id: String, _ status: WebhookDeliveryStatus, code: Int? = nil) -> WebhookDeliveryInfo {
         WebhookDeliveryInfo(id: id, event: "item.updated", status: status, statusCode: code, attempts: 1, error: nil, created: .now)
     }
 
     private func model(_ bench: OwnerBench, hooks: [OwnerWebhook] = []) -> WebhooksModel {
-        bench.calls.state.withLock { $0.webhooks = hooks }
+        bench.calls.state.withLock {
+            $0.webhooks = hooks
+            $0.identity.keyID = $0.identity.keyID ?? Self.me
+        }
         return WebhooksModel(context: bench.context)
     }
 
@@ -83,7 +89,7 @@ import Testing
 
     @Test func aSignInThatIsAKeyKnowsItsOwnByTheKeysId() async {
         let bench = OwnerBench()
-        bench.calls.state.withLock { $0.identity = OwnIdentity(keyID: "k-live", expires: nil, appName: nil) }
+        bench.calls.state.withLock { $0.identity = OwnIdentity(keyID: "k-live", expires: nil) }
         let model = model(bench, hooks: [Self.keyHook("mine", maker: "k-live", name: "Lisbon zine importer"), Self.keyHook("theirs", maker: "k-other", name: "Other")])
         await model.load()
         #expect(model.isOwn(model.webhooks[0]) && !model.isOwn(model.webhooks[1]))
@@ -99,13 +105,49 @@ import Testing
         #expect(!bench.calls.calls.contains("identity") && !bench.calls.calls.contains("keys"))
     }
 
-    @Test func whenWhoMAPPIsCantBeReadNoneOfTheOthersListIsItsOwn() async {
+    @Test func whenWhoMAPPIsCantBeReadThePageShowsTheFailureNotAListOfOnlyOthersWebhooks() async {
         let bench = OwnerBench()
         bench.calls.fail("identity", with: .unreachable)
         let model = model(bench, hooks: [Self.hook("a")])
         await model.load()
-        #expect(model.hasLoaded && model.failure == nil)
-        #expect(!model.isOwn(model.webhooks[0]))
+        #expect(model.hasLoaded && model.failure == .unreachable, "Try Again reads it again")
+        bench.calls.fail("identity", with: nil)
+        await model.load()
+        #expect(model.failure == nil && model.isOwn(model.webhooks[0]))
+    }
+
+    @Test func anotherAppWithMAPPsNameIsNotMAPPsOwnWhateverItIsCalled() async {
+        let bench = OwnerBench()
+        let model = model(bench, hooks: [Self.hook("theirs", maker: "other-client", makerName: "MAPP"), Self.hook("mine")])
+        bench.calls.state.withLock { $0.identity = OwnIdentity(keyID: nil, expires: nil) }
+        await model.load()
+        #expect(model.webhooks.allSatisfy { !model.isOwn($0) }, "an app sign-in has no identifier to match, so none is taken as its own")
+        #expect(!model.atCap)
+        let theirs = model.webhooks[0]
+        await model.setType("core.task", for: theirs)
+        await model.turnOn(theirs)
+        #expect(!bench.calls.calls.contains("changeWebhook"), "no change is sent for a webhook that might be another app's")
+    }
+
+    @Test func aWebhookOfAnotherKeyIsNotTheSignedInKeys() async {
+        let bench = OwnerBench()
+        let model = model(bench, hooks: [Self.keyHook("theirs", maker: "k-other", name: "MAPP"), Self.hook("mine")])
+        await model.load()
+        #expect(model.webhooks.map(model.isOwn) == [false, true], "a key is told by its id, never its name")
+    }
+
+    @Test func losingManageKeysDropsEveryMakersListAndReadsOnlyMAPPsOwn() async {
+        let bench = OwnerBench()
+        let model = model(bench, hooks: [Self.hook("theirs", maker: "raycast-client", makerName: "Raycast"), Self.hook("mine")])
+        await model.load()
+        #expect(model.webhooks.map(model.isOwn) == [false, true])
+        bench.calls.state.withLock { $0.webhooks = [$0.webhooks[1]] }
+        bench.grants.remove(.keysManage)
+        #expect(!model.seesEvery)
+        #expect(model.webhooks.map(model.isOwn) == [false, true], "the cached list of others' webhooks is not taken as MAPP's own")
+        await model.readAgainIfScopeChanged()
+        #expect(model.webhooks.map(\.id) == ["mine"] && model.isOwn(model.webhooks[0]))
+        #expect(model.groups.map(\.id) == ["own"])
     }
 
     @Test func anotherMakersWebhookCanNeitherBeChangedNorSentAgain() async {
@@ -411,7 +453,7 @@ import Testing
         #expect(model.webhooks[0].events == ["item.created", "item.trashed", "item.future"])
         await model.setEvent(.itemCreated, on: false, for: model.webhooks[0])
         #expect(model.webhooks[0].events == ["item.trashed", "item.future"])
-        #expect(model.webhooks[0].maker?.id == "maker", "a change keeps the maker the server's answer leaves out")
+        #expect(model.webhooks[0].maker?.id == Self.me, "a change keeps the maker the server's answer leaves out")
     }
 
     @Test func allEventsTurnsEveryEventOnOrLeavesOnlyUnknownOnes() async {

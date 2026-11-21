@@ -126,10 +126,11 @@ extension View {
     }
 }
 
-/// A pop-up of choices, 200 by 28. The system draws it.
+/// A pop-up of choices, 200 by 28. The system draws it; `isError` puts the red ring round it.
 struct SettingsPopUp<Value: Hashable, Content: View>: View {
     let title: LocalizedStringKey
     @Binding var selection: Value
+    var isError = false
     @ViewBuilder let content: Content
 
     var body: some View {
@@ -137,6 +138,7 @@ struct SettingsPopUp<Value: Hashable, Content: View>: View {
             .labelsHidden()
             .pickerStyle(.menu)
             .settingsPopUpSize()
+            .settingsErrorRing(isError)
     }
 }
 

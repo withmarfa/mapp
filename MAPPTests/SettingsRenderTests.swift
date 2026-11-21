@@ -32,6 +32,8 @@ import Testing
     var canChangeSources = true
     var sourceChanges: [(code: String, change: MarfaSourceChange)] = []
     var markSets = [MarfaMarkSet(id: "lucide", title: "Lucide")]
+    /// The icon of each type a render names, by type id.
+    var typeIcons: [String: String] = ["core.bookmark": "lucide:bookmark", "core.note": "lucide:file-text"]
 
     init(settings: InstanceSettingsModel) {
         instanceSettings = settings
@@ -58,6 +60,7 @@ import Testing
     func marks(matching query: String, in set: MarfaMarkSet) -> [String] { ["lucide:inbox", "lucide:rss", "lucide:book-open"] }
     func markGlyph(_ id: String) -> AnyView { AnyView(Image(systemName: "tray")) }
     func markTitle(_ id: String) -> String { id }
+    func typeMark(for pattern: String) -> AnyView { AnyView(TypeMark(icon: typeIcons[pattern], size: .side)) }
 
     func allowMore(_ permissions: Set<InstancePermission>) async -> MarfaAllowMoreOutcome {
         allowed.append(permissions)
@@ -528,8 +531,9 @@ struct RenderedWindow<Detail: View>: View {
                 KeyInfo(id: "k3", label: "GitHub connector", source: "github", permissions: [], tier: .feed, types: ["core.task": .write, "core.bookmark": .write], created: Self.days(40), expires: nil, lastUsed: .now.addingTimeInterval(-240), appClientID: nil),
                 KeyInfo(id: "k4", label: "Raycast capture", source: "raycast", permissions: [], tier: .feed, types: ["core.note": .write], created: Self.days(30), expires: nil, lastUsed: .now, appClientID: "raycast"),
             ]
-            state.identity = OwnIdentity(keyID: nil, expires: nil, appName: "MAPP on MacBook Pro")
-            let mapp = OwnerWebhook.Maker(kind: .app, id: "mapp", name: "MAPP on MacBook Pro")
+            // A key sign-in, since a signed-in app can't be told from another app by anything it knows about itself.
+            state.identity = OwnIdentity(keyID: "k-mapp", expires: nil)
+            let mapp = OwnerWebhook.Maker(kind: .key, id: "k-mapp", name: "MAPP on MacBook Pro")
             let raycast = OwnerWebhook.Maker(kind: .app, id: "raycast", name: "Raycast")
             let zine = OwnerWebhook.Maker(kind: .key, id: "k2", name: "Lisbon zine importer")
             state.webhooks = [
