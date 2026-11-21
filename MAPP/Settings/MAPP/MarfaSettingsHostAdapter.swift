@@ -214,10 +214,11 @@ extension OwnerDrafts {
 }
 
 extension InstanceSettingsModel {
-    /// Tells the person what they typed and did not save, as a change not kept, and drops it. Nothing typed hands over nothing.
+    /// Tells the person what they typed and did not save, as a change not kept, and drops it. Nothing typed hands over nothing,
+    /// and a change already agreed and being sent is not one that was left unsaved.
     func handOver(to notices: Notices, because reason: String) {
-        guard hasEdits else { return }
-        let lines = InstanceSetting.allCases.filter(isEdited).map { "\($0.title): \(draft[$0] ?? "")" }
+        guard hasUnsentEdits else { return }
+        let lines = InstanceSetting.allCases.filter(isUnsent).map { "\($0.title): \(draft[$0] ?? "")" }
         notices.notKept(String(localized: "Settings Not Saved"), text: lines.joined(separator: "\n"), reason: reason)
         revert()
     }

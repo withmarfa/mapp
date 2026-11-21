@@ -59,6 +59,9 @@
     "It must sign in again with your password or a passkey. Apps and keys keep working." : {
 
     },
+    "Keep less free on disk?" : {
+
+    },
     "Key Not Copied" : {
 
     },
@@ -66,6 +69,9 @@
 
     },
     "Key Not Renamed" : {
+
+    },
+    "Lower and Save" : {
 
     },
     "MAPP removes its copy from this Mac and signs out. Webhooks it made are deleted. Your items stay." : {
@@ -1024,6 +1030,9 @@
     },
     "update the server and run its housekeeping" : {
       "extractionState" : "manual"
+    },
+    "Uploads will stop below %@ free instead of below %@, which leaves the server less room to work in." : {
+
     },
     "Use Another Marfa" : {
 

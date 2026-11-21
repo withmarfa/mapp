@@ -68,12 +68,14 @@ import Testing
         #expect(model.loaded?.number(.auditRetentionDays) == 0)
     }
 
-    @Test func aSettingThatIsNotARetentionNeverAsks() async {
+    @Test func fewerCopiesAskNothingButLessFreeDiskDoes() async {
         let (model, source) = await loaded([.blobMinCopies: .number(3), .diskReserveMegabytes: .number(128)])
         model.draft[.blobMinCopies] = "1"
         model.draft[.diskReserveMegabytes] = "16"
         await model.save(Set(InstanceSetting.fileSettings))
-        #expect(model.pending == nil)
+        #expect(source.sent.isEmpty)
+        #expect(model.pending?.shortenings == [.init(setting: .diskReserveMegabytes, change: .shorter(from: 128, to: 16))])
+        if let pending = model.pending { await model.confirm(pending) }
         #expect(source.sent == [InstanceConfigPatch(values: [.blobMinCopies: .number(1), .diskReserveMegabytes: .number(16)])])
     }
 

@@ -180,17 +180,32 @@ struct InstanceStatusLine: View {
 }
 
 extension View {
-    /// The question before a shorter retention is sent: what it may remove, which can't be recovered. Keeping things as they
-    /// were puts the fields back.
+    /// The question before a shorter retention or a smaller reserve of free disk is sent: what it may remove or leave the server
+    /// without, which can't be recovered. Keeping things as they were puts the fields back.
     func instanceSettingsQuestion(_ model: InstanceSettingsModel) -> some View {
         confirmationDialog(
-            "Keep things for less time?", isPresented: Binding { model.pending != nil } set: { if !$0 { model.cancelPending() } },
+            model.pending.map(InstanceSettingsQuestion.title) ?? "", isPresented: Binding { model.pending != nil } set: { if !$0 { model.cancelPending() } },
             presenting: model.pending
         ) { pending in
-            Button("Shorten and Save", role: .destructive) { model.agree(pending) }
+            Button(InstanceSettingsQuestion.button(pending), role: .destructive) { model.agree(pending) }
         } message: { pending in
             Text(pending.shortenings.map(InstanceWording.consequence).joined(separator: "\n\n"))
         }
+    }
+}
+
+/// The words of the question, which say what is being lowered.
+enum InstanceSettingsQuestion {
+    private static func onlyReserve(_ pending: InstanceSettingsModel.Pending) -> Bool {
+        pending.shortenings.allSatisfy { $0.setting == .diskReserveMegabytes }
+    }
+
+    static func title(_ pending: InstanceSettingsModel.Pending) -> String {
+        onlyReserve(pending) ? String(localized: "Keep less free on disk?") : String(localized: "Keep things for less time?")
+    }
+
+    static func button(_ pending: InstanceSettingsModel.Pending) -> String {
+        onlyReserve(pending) ? String(localized: "Lower and Save") : String(localized: "Shorten and Save")
     }
 }
 

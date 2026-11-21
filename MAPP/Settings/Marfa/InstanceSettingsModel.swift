@@ -12,8 +12,8 @@ import Observation
         let source: any InstanceConfigSource
     }
 
-    /// A retention that may keep things for less time than the server does now, which the person agrees to before it
-    /// is sent.
+    /// A retention that may keep things for less time than the server does now, or a reserve of free disk that may be
+    /// smaller, which the person agrees to before it is sent.
     struct Shortening: Hashable, Sendable {
         enum Change: Hashable, Sendable {
             /// The server holds `from` and the person typed the shorter `to`.
@@ -59,6 +59,8 @@ import Observation
     /// Set while the person is asked to agree to a shorter retention.
     var pending: Pending?
 
+    /// The settings of a change agreed to or being sent, marked before the call so nothing in between counts them as unsent.
+    @ObservationIgnored private var sending: Set<InstanceSetting> = []
     @ObservationIgnored private var targetID: String?
     @ObservationIgnored private var generation = 0
 
@@ -94,10 +96,12 @@ import Observation
         }
     }
 
-    /// Gives the draft the server's answer again, dropping what was typed.
+    /// Gives the draft the server's answer again, dropping what was typed and any question about it. A change already on its
+    /// way keeps its text until the server answers, so a refusal can still show it.
     func revert() {
+        pending = nil
         guard let loaded else { return }
-        for setting in InstanceSetting.allCases { draft[setting] = loaded.text(setting) }
+        for setting in InstanceSetting.allCases where !sending.contains(setting) { draft[setting] = loaded.text(setting) }
         elsewhere = []
         saved = []
         serverChanged = false
@@ -110,6 +114,12 @@ import Observation
         guard let loaded, let text = draft[setting] else { return false }
         return text != loaded.text(setting)
     }
+
+    /// What was typed and is not on its way to the server: a change already agreed and being sent is not among it, so
+    /// closing Settings then does not report it as not saved. A change the server refuses is unsent again.
+    var hasUnsentEdits: Bool { InstanceSetting.allCases.contains(where: isUnsent) }
+
+    func isUnsent(_ setting: InstanceSetting) -> Bool { isEdited(setting) && !sending.contains(setting) }
 
     var hasEdits: Bool { InstanceSetting.allCases.contains(where: isEdited) }
 
@@ -154,7 +164,7 @@ import Observation
 
     /// Whether `settings` can be sent: what they hold is valid, differs from the server's, and nothing is being sent.
     func canSave(_ settings: Set<InstanceSetting>) -> Bool {
-        guard isAvailable, !isSaving, let patch = patch(for: settings), !patch.isEmpty else { return false }
+        guard isAvailable, !isSaving, pending == nil, sending.isDisjoint(with: settings), let patch = patch(for: settings), !patch.isEmpty else { return false }
         return problems.keys.allSatisfy { !settings.contains($0) }
     }
 
@@ -167,7 +177,7 @@ import Observation
     /// Sends the changes, or first asks the person to agree where one keeps things for less time.
     func save() async { await save(Set(InstanceSetting.allCases)) }
 
-    /// Sends the changes to `settings` alone.
+    /// Sends the changes to `settings` alone. While a question is open, or a change is on its way, it does nothing.
     func save(_ settings: Set<InstanceSetting>) async {
         guard canSave(settings), let patch = patch(for: settings) else { return }
         let shortenings = shortenings(of: patch)
@@ -186,6 +196,7 @@ import Observation
     /// Takes the agreement at once, so closing the dialog does not put the fields back, then sends in the background.
     @discardableResult func agree(_ agreed: Pending) -> Task<Void, Never> {
         pending = nil
+        sending.formUnion(agreed.patch.settings)
         return Task { await send(agreed.patch) }
     }
 
@@ -205,7 +216,9 @@ import Observation
     func shortenings(of patch: InstanceConfigPatch) -> [Shortening] {
         guard let loaded else { return [] }
         return InstanceSetting.allCases.compactMap { setting in
-            guard patch.settings.contains(setting), setting.isRetention else { return nil }
+            guard patch.settings.contains(setting) else { return nil }
+            if setting == .diskReserveMegabytes { return lowerReserve(patch, loaded) }
+            guard setting.isRetention else { return nil }
             let held = loaded.number(setting)
             let change: Shortening.Change
             if case .number(let to)? = patch.values[setting] {
@@ -224,7 +237,20 @@ import Observation
         }
     }
 
+    /// Keeping less free on disk asks, since a number typed on the way to a larger one (a 5 before 500) is sent when the field is
+    /// left. Where the server holds nothing, the documented default is what is lowered.
+    private func lowerReserve(_ patch: InstanceConfigPatch, _ loaded: InstanceConfig) -> Shortening? {
+        let setting = InstanceSetting.diskReserveMegabytes
+        guard let standard = setting.documentedDefault else { return nil }
+        let held = loaded.number(setting) ?? standard
+        let to: Int
+        if case .number(let typed)? = patch.values[setting] { to = typed } else { to = standard }
+        return to < held ? Shortening(setting: setting, change: .shorter(from: held, to: to)) : nil
+    }
+
     private func send(_ patch: InstanceConfigPatch) async {
+        sending.formUnion(patch.settings)
+        defer { sending.subtract(patch.settings) }
         // A patch made for the server the page was reading is never sent to another one that has replaced it.
         let before = generation
         guard let target = adopt(), generation == before, !isSaving else { return }
@@ -298,6 +324,7 @@ import Observation
         saved = []
         serverChanged = false
         pending = nil
+        sending = []
         isLoading = false
         isSaving = false
     }
@@ -360,7 +387,8 @@ nonisolated enum InstanceWording {
     static func consequence(_ shortening: InstanceSettingsModel.Shortening) -> String {
         let setting = shortening.setting
         switch shortening.change {
-        case .shorter(_, let to):
+        case .shorter(let from, let to):
+            if setting == .diskReserveMegabytes { return String(localized: "Uploads will stop below \(amount(setting, to)) free instead of below \(amount(setting, from)), which leaves the server less room to work in.") }
             return removal(setting, keeping: to)
         case .mayBeShorter(let to):
             return String(localized: "This may remove \(setting.removes) sooner than the server’s current setting.") + " " + removal(setting, keeping: to)
