@@ -33,27 +33,7 @@ struct SettingsTableSearch: View {
     @Binding var text: String
 
     var body: some View {
-        SettingsSearchPill {
-            TextField("Search", text: $text)
-                .labelsHidden()
-                .textFieldStyle(.plain)
-                .settingsFont(.small)
-        }
-    }
-}
-
-/// The small pill both search fields draw: a magnifier, then what is searched with.
-struct SettingsSearchPill<Content: View>: View {
-    @ViewBuilder let content: Content
-
-    var body: some View {
-        HStack(spacing: SettingsTokens.Metric.searchGap) {
-            Image(systemName: "magnifyingglass").settingsFont(.small).foregroundStyle(SettingsTokens.tertiaryText)
-            content
-        }
-        .padding(.horizontal, SettingsTokens.Metric.searchInset)
-        .frame(width: SettingsTokens.Metric.searchWidth, height: SettingsTokens.Metric.searchHeight)
-        .background(SettingsTokens.buttonFill, in: .rect(cornerRadius: SettingsTokens.Metric.searchRadius, style: .continuous))
+        SettingsSearchField(prompt: String(localized: "Search"), text: $text)
     }
 }
 

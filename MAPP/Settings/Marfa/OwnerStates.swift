@@ -82,7 +82,7 @@ struct OwnerProblemRow: View {
     var body: some View {
         SettingsProblemRow(
             title: Text(title), line: Text(verbatim: OwnerWording.line(failure, on: page)),
-            symbol: isRefusal ? "lock" : "exclamationmark.triangle", tone: isRefusal ? .gray : .orange, actions: actions
+            symbol: isRefusal ? "lock" : "exclamationmark.triangle", tone: isRefusal ? nil : .orange, actions: actions
         )
         .disabled(isWaiting)
     }

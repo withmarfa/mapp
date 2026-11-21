@@ -12,7 +12,7 @@ struct ListsPage: View {
             SettingsSection("Density", line: "A view or a place can set its own.") {
                 ChoiceTiles(
                     choices: Density.allCases.map { option in
-                        .init(value: option, title: Text(verbatim: option.title), picture: AnyView(SettingsRowStylePicture(isCompact: option == .compact)))
+                        .init(value: option, title: Text(verbatim: option.title), picture: AnyView(DensityPicture(density: option)))
                     },
                     selection: $density, columns: 3)
                     .accessibilityIdentifier("ListsDensity")
@@ -34,5 +34,35 @@ struct ListsPage: View {
             }
         }
         .accessibilityIdentifier("ListsPage")
+    }
+}
+
+/// A density's tile: the real list row, as the list draws it at that density, over a few sample items.
+private struct DensityPicture: View {
+    let density: Density
+
+    private var samples: [RowContent] {
+        [
+            row(String(localized: "Weekly Review"), String(localized: "Three things for next week."), String(localized: "Mon")),
+            row(String(localized: "Trip to Lisbon"), String(localized: "Flights and the hotel."), String(localized: "12 Nov")),
+            row(String(localized: "Reading List"), String(localized: "Books to start this year."), String(localized: "9 Nov")),
+            row(String(localized: "Budget"), String(localized: "Where the month went."), String(localized: "4 Nov")),
+        ]
+    }
+
+    private func row(_ title: String, _ line: String, _ date: String) -> RowContent {
+        RowContent(title: title, date: date, secondary: line, typeIcon: nil, typeLabel: "", mixesTypes: false)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(samples.prefix(density == .compact ? 4 : 2), id: \.title) { ItemRow(content: $0, density: density) }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .padding(.top, 4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(SettingsTokens.card)
+        .allowsHitTesting(false)
     }
 }

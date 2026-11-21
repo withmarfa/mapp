@@ -28,7 +28,6 @@ struct KeyboardPage: View {
                     if let shortcut = Shortcut(event: event) { model.pressed = shortcut }
                 }
             }
-            .padding(.horizontal, SettingsTokens.Metric.inset)
             if !model.hasResults {
                 SettingsEmptyCard(
                     symbol: "magnifyingglass", title: Text("No Shortcuts Found"),

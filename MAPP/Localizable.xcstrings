@@ -40,6 +40,15 @@
     "1 setting is set on the machine %@ runs on." : {
 
     },
+    "12 Nov" : {
+
+    },
+    "4 Nov" : {
+
+    },
+    "9 Nov" : {
+
+    },
     "A folder that already exists on the machine %@ runs on." : {
 
     },
@@ -65,6 +74,12 @@
 
     },
     "Backups Are Incomplete" : {
+
+    },
+    "Books to start this year." : {
+
+    },
+    "Budget" : {
 
     },
     "Change Address" : {
@@ -179,6 +194,9 @@
     "%@ lists its jobs once it has started them." : {
 
     },
+    "Flights and the hotel." : {
+
+    },
     "Heartbeat Address" : {
 
     },
@@ -192,6 +210,9 @@
 
     },
     "Marfa %@ is ready." : {
+
+    },
+    "Mon" : {
 
     },
     "Named by the sign-in that keeps each one." : {
@@ -781,6 +802,9 @@
 
     },
     "Read a file’s text" : {
+
+    },
+    "Reading List" : {
 
     },
     "Refused a reused token" : {
@@ -1419,6 +1443,9 @@
     "Thinned old versions" : {
 
     },
+    "Three things for next week." : {
+
+    },
     "Time Allowed" : {
 
     },
@@ -1722,6 +1749,9 @@
     "Tries" : {
 
     },
+    "Trip to Lisbon" : {
+
+    },
     "Type both the host and the project token." : {
 
     },
@@ -1839,6 +1869,9 @@
     "Week Starts On" : {
 
     },
+    "Weekly Review" : {
+
+    },
     "What" : {
 
     },
@@ -1870,6 +1903,9 @@
 
     },
     "Where the database is." : {
+
+    },
+    "Where the month went." : {
 
     },
     "Who" : {
