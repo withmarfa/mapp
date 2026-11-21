@@ -1,12 +1,12 @@
 import SwiftUI
 
 /// The tabs of an index page as a segmented control in the window's toolbar, which come in once the page's own tabs have
-/// scrolled away. They stand at the toolbar's leading side, before its flexible space.
+/// scrolled away. They stand in the middle of the toolbar, where the title would.
 struct IndexTabsToolbarItem: CustomizableToolbarContent {
     let browser: Browser
 
     var body: some CustomizableToolbarContent {
-        ToolbarItem(id: "indexTabs") {
+        ToolbarItem(id: "indexTabs", placement: .principal) {
             if let place = browser.indexPlace { IndexTabPicker(place: place).id(place) }
         }
         .customizationBehavior(.disabled)
@@ -26,7 +26,6 @@ struct IndexToolbarItems: CustomizableToolbarContent {
         ToolbarItem(id: "indexEdit") {
             IndexEditButton(browser: browser)
         }
-        .sharedBackgroundVisibility(.hidden)
         .customizationBehavior(.disabled)
         .hidden(browser.indexPlace != .items)
         ColumnSearch(
@@ -82,7 +81,7 @@ private struct IndexTabPicker: View {
     }
 }
 
-/// Edit: opens the list of the types the New row offers, as text with no fill of its own.
+/// Edit: opens the list of the types the New row offers, as a glass button like the toolbar's others.
 private struct IndexEditButton: View {
     @Bindable var browser: Browser
 

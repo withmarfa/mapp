@@ -7,6 +7,8 @@ import SwiftUI
 final class IndexScroll {
     /// How far the rows have scrolled from the first, never below zero.
     var offset: CGFloat = 0
+    /// The column headings' height, which the rows pass under before they reach the toolbar.
+    var headingHeight: CGFloat = 0
 }
 
 /// What the table behind an index page needs of the page above it: the height of the block it leaves room for, how far
@@ -41,6 +43,7 @@ struct IndexScaffold<Top: View, Extra: View, Content: View>: View {
         ZStack(alignment: .top) {
             content(blockHeight)
                 .environment(\.indexScroll, IndexScrollMetrics(scroll: scroll, blockHeight: blockHeight, awayAt: topHeight, report: onAway))
+            IndexToolbarBand(scroll: scroll, blockHeight: blockHeight)
             IndexHeaderBlock(scroll: scroll, height: blockHeight) {
                 VStack(spacing: 0) {
                     top.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { topHeight = $0 }
@@ -52,6 +55,20 @@ struct IndexScaffold<Top: View, Extra: View, Content: View>: View {
         .frame(maxWidth: .infinity)
         .background { Color(nsColor: IndexMetrics.backdrop).ignoresSafeArea() }
         .onChange(of: blockHeight == 0) { if blockHeight == 0 { onAway(false) } }
+    }
+}
+
+/// The blurred band over the toolbar, which the rows scroll under once the block of header and the pinned headings have
+/// gone past: the window hides its toolbar's background, so the band is MAPP's own (`ToolbarBand`), as every other
+/// scroll view's is. Its own view, so a scroll redraws it and no other.
+private struct IndexToolbarBand: View {
+    let scroll: IndexScroll
+    let blockHeight: CGFloat
+
+    var body: some View {
+        // The first row is as far below the toolbar's lower edge as the block and the headings are tall.
+        let isUnder = blockHeight > 0 && scroll.offset > blockHeight + scroll.headingHeight - 0.5
+        Color.clear.toolbarBand(isUnderToolbar: isUnder)
     }
 }
 
@@ -84,6 +101,7 @@ private struct IndexScrollsAway: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            // The band over the toolbar is `IndexToolbarBand`'s, so the system's own edge is hidden.
             .scrollEdgeEffectHidden(true, for: .top)
             .background { IndexScrollProbe(metrics: metrics) }
     }
@@ -174,7 +192,11 @@ private struct IndexScrollProbe: NSViewRepresentable {
             guard !isPlacing, let table, let scroll = table.enclosingScrollView, let container = table.headerView?.superview else { return }
             let clip = scroll.contentView
             let scrolled = max(0, clip.bounds.origin.y + clip.contentInsets.top)
-            if let model = metrics.scroll, model.offset != scrolled { model.offset = scrolled }
+            if let model = metrics.scroll {
+                if model.offset != scrolled { model.offset = scrolled }
+                let headings = table.headerView?.frame.height ?? 0
+                if model.headingHeight != headings { model.headingHeight = headings }
+            }
             let away = metrics.blockHeight > 0 && scrolled >= metrics.awayAt && metrics.awayAt > 0
             if away != isAway {
                 isAway = away
