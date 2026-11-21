@@ -20,16 +20,45 @@ struct CornerTests {
 
     // MARK: Moving the calendar
 
-    @Test func backAndForwardMoveByWholeWeeksAndTodayComesBack() {
+    @Test func backAndForwardMoveBySevenDaysFromTheWeekThatHoldsTodayAndTodayComesBack() {
         let browser = Browser()
         let now = Self.date("2026-11-04")
+        // From no day shown, a week on from the one that holds today, which begins on its Monday.
         browser.moveCalendar(by: 1, now: now, calendar: Self.calendar)
-        #expect(browser.calendarDay == Self.date("2026-11-11"))
+        #expect(browser.calendarDay == Self.calendar.startOfDay(for: Self.date("2026-11-09")))
         browser.moveCalendar(by: -1, now: now, calendar: Self.calendar)
         browser.moveCalendar(by: -1, now: now, calendar: Self.calendar)
-        #expect(browser.calendarDay == Self.date("2026-10-28"))
+        #expect(browser.calendarDay == Self.calendar.startOfDay(for: Self.date("2026-10-26")))
         browser.moveCalendar(by: nil, now: now, calendar: Self.calendar)
         #expect(browser.calendarDay == nil)
+    }
+
+    @Test func aWeekScrolledToAnyDayMovesBySevenDaysFromIt() {
+        let browser = Browser()
+        let now = Self.date("2026-11-04")
+        browser.calendarDay = Self.calendar.startOfDay(for: Self.date("2026-11-12"))
+        browser.moveCalendar(by: 1, now: now, calendar: Self.calendar)
+        #expect(browser.calendarDay == Self.calendar.startOfDay(for: Self.date("2026-11-19")))
+        browser.moveCalendar(by: -1, now: now, calendar: Self.calendar)
+        browser.moveCalendar(by: -1, now: now, calendar: Self.calendar)
+        #expect(browser.calendarDay == Self.calendar.startOfDay(for: Self.date("2026-11-05")))
+    }
+
+    @Test func aMonthShownAsAWeekStartsOnTheFirstDayOfItsWeek() {
+        let browser = Browser()
+        browser.changeCalendarScale(.month)
+        browser.calendarDay = Self.date("2026-11-19")
+        browser.changeCalendarScale(.week, calendar: Self.calendar)
+        #expect(browser.calendarDay == Self.calendar.startOfDay(for: Self.date("2026-11-16")))
+    }
+
+    @Test func aKeyThatLeavesTheWeekShowsTheWeekHoldingTheNextDay() {
+        let browser = Browser()
+        browser.showCalendarDay(Self.date("2026-11-19"), calendar: Self.calendar)
+        #expect(browser.calendarDay == Self.calendar.startOfDay(for: Self.date("2026-11-16")))
+        browser.changeCalendarScale(.month)
+        browser.showCalendarDay(Self.date("2026-12-02"), calendar: Self.calendar)
+        #expect(browser.calendarDay == Self.calendar.startOfDay(for: Self.date("2026-12-02")))
     }
 
     @Test func inAMonthBackAndForwardMoveByMonths() {
