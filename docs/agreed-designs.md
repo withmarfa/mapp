@@ -19,33 +19,6 @@ What is not built yet. The built part is in [Value components](value-components.
 
 - Where a code block's language goes, and how it changes, is open. It stays as it is.
 
-Agreed with August on 21 November 2026, after trying v0.0.55, and drawn on the Pages tab of MAPP Pages (P39 to P43).
-
-### The modal
-
-- **Its toolbar** holds, from the leading side: close, then up and down as one pair. Full page and new window, Share and More, and the right sidebar trail. The buttons are the window toolbar's size, not smaller capsules.
-- **The whole window dims behind it, its toolbar too**, and nothing behind the modal answers a click or a key, as with a sheet.
-- **No corner.** The page in a modal shows neither Aa, the text size nor Focus.
-- **More room above the title**, so a long title never runs up under the buttons.
-
-### Pictures from other websites
-
-- The banner ("N pictures from other websites aren't loaded", with Load All) sits above the title, on a web page's page and the editor's page alike.
-- Each picture that is not loaded is one quiet line in the system font: a picture symbol, its description, and the standard Load button (the design system's `Button`). It is not a box, and it never takes the page's reading font.
-- A picture whose description repeats the item's title says "Picture" in place of the description.
-
-### The text size on every text page
-
-- **The text size is one control in the corner**, before Focus, drawn as an image's size is: the size, such as "13 pt", with a chevron that opens a menu. The menu holds the page's sizes (`PageStyle.textSizes`: 11, 12, 13, 14, 16, 18, 20 and 24 points) with the chosen one ticked, then Make Text Bigger (⌘+) and Make Text Smaller (⌘−), then Standard Width and Full Width. Each entry runs the View menu's command.
-- **A page that cannot be written**, such as a saved article or an RSS entry, has the text size and Focus, and no Aa.
-- **A page that is the editor** has Aa, the text size and Focus, in that order.
-
-### A note's formats
-
-- **Aa opens the formats as one bar floating at the foot of the page**, centered on the text, and Aa becomes Close. The bar holds a style pop-up ("Body", with Title, Heading and Subheading), then every format in one row: bold, italic, strikethrough, highlight, code and link; bulleted, numbered and checklist; quote, code block and table. Only a very narrow window folds the bar.
-- It replaces the formats card above the corner. Width and text size are no longer in it: the text size control beside Aa holds them.
-- Escape, Close and a change of item close the bar, as they close the card today. A click into the page leaves it open, since the bar formats what the caret is on.
-
 ## Index pages
 
 Agreed with August on 21 November 2026 and drawn on the Library tab of MAPP Pages (L1, L2, L6 and L16 to L19). The built pages are in [Views and lists](views-and-lists.md#index-pages).

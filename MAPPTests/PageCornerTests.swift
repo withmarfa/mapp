@@ -4,19 +4,23 @@ import Testing
 import UniformTypeIdentifiers
 @testable import MAPP
 
-/// The corner of an item's page: which buttons each kind of page gets, and how Focus and the formats card follow the
+/// The corner of an item's page: which buttons each kind of page gets, and how Focus and the formats bar follow the
 /// item they were chosen on.
 @MainActor
 struct PageCornerTests {
     // MARK: Which buttons
 
-    @Test func aNoteHasFormatsThenFocus() {
-        #expect(PageCorner.buttons(layout: .text, hasReader: false) == [.formats, .focus])
+    @Test func aNoteHasFormatsThenItsTextSizeThenFocus() {
+        #expect(PageCorner.buttons(layout: .text, hasReader: false) == [.formats, .textSize, .focus])
     }
 
-    @Test func aWebPageWithAReaderViewHasTheSwitchThenFocus() {
+    @Test func aPageThatCannotBeWrittenHasNoFormats() {
+        #expect(PageCorner.buttons(layout: .text, hasReader: false, canWrite: false) == [.textSize, .focus])
+    }
+
+    @Test func aWebPageWithAReaderViewHasTheSwitchThenItsTextSizeThenFocus() {
         let layout = ItemPageLayout.webPage(document: .mint(), runsScripts: false)
-        #expect(PageCorner.buttons(layout: layout, hasReader: true) == [.look, .focus])
+        #expect(PageCorner.buttons(layout: layout, hasReader: true, canWrite: false) == [.look, .textSize, .focus])
     }
 
     @Test func aWebPageWithoutAReaderViewHasFocusAlone() {
@@ -29,10 +33,12 @@ struct PageCornerTests {
         #expect(PageCorner.buttons(layout: .file, hasReader: true) == [.focus])
     }
 
-    @Test func theCardKeepsInsideANarrowColumnButNeverShrinksPastUse() {
-        #expect(PageCorner.cardWidth(forContentWidth: 900, inset: 16) == PageCorner.cardWidth)
-        #expect(PageCorner.cardWidth(forContentWidth: 300, inset: 16) == 268)
-        #expect(PageCorner.cardWidth(forContentWidth: 100, inset: 16) == PageCorner.narrowestCard)
+    @Test func theTextSizeChangesATextPageAndAWebPagesReaderViewOnly() {
+        let web = ItemPageLayout.webPage(document: .mint(), runsScripts: false)
+        #expect(PageCorner.sizesText(layout: .text, look: nil))
+        #expect(PageCorner.sizesText(layout: web, look: .reader))
+        #expect(!PageCorner.sizesText(layout: web, look: .original), "the original page is as it was written")
+        #expect(!PageCorner.sizesText(layout: web, look: nil))
     }
 
     // MARK: Focus
@@ -92,7 +98,7 @@ struct PageCornerTests {
 
     // MARK: Escape
 
-    @Test func escapeClosesTheCardBeforeLeavingFocus() {
+    @Test func escapeClosesTheBarBeforeLeavingFocus() {
         let details = DetailsPresentation()
         let item = ItemID.mint()
         details.toggleFocus(on: item)
@@ -108,7 +114,7 @@ struct PageCornerTests {
         #expect(!details.escapeFromPage(), "with neither showing the key is the caller's")
     }
 
-    @Test func theCardBelongsToOneItem() {
+    @Test func theBarBelongsToOneItem() {
         let details = DetailsPresentation()
         let first = ItemID.mint()
         let second = ItemID.mint()
@@ -148,6 +154,26 @@ struct PageCornerTests {
             library: library, ids: [note.id], hasBrowser: true, pageItem: nil, showsPage: false, details: DetailsPresentation())
         #expect(!ItemCommand.toggleFocus.isEnabled(in: hidden))
         #expect(!ItemCommand.toggleFormats.isEnabled(in: hidden))
+    }
+
+    @Test func formatsAreOfferedOnlyWhereThePageCanBeWritten() {
+        let note = library.add("A note\n")
+        #expect(ItemCommand.toggleFormats.isEnabled(in: context(note, details: DetailsPresentation(), editable: true)))
+        #expect(!ItemCommand.toggleFormats.isEnabled(in: context(note, details: DetailsPresentation(), editable: false)))
+    }
+
+    @Test func aModalHasNeitherFormatsNorFocus() {
+        let note = library.add("A note\n")
+        let browser = Browser()
+        let command = ItemCommandContext(
+            library: library, ids: [note.id], hasBrowser: true, pageItem: note.id, details: DetailsPresentation())
+        let inModal = ItemCommandContext(
+            library: library, ids: [note.id], hasBrowser: true, pageItem: note.id, browser: browser, details: DetailsPresentation())
+        #expect(ItemCommand.toggleFormats.isEnabled(in: inModal))
+        browser.modalItem = note.id
+        #expect(ItemCommand.toggleFormats.isEnabled(in: command))
+        #expect(!ItemCommand.toggleFormats.isEnabled(in: inModal))
+        #expect(!ItemCommand.toggleFocus.isEnabled(in: inModal))
     }
 
     @Test func focusIsOfferedForAFileButFormatsAreNot() {

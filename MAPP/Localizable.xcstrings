@@ -88,6 +88,9 @@
     "Check Automatically is off, so %@ isn’t looking for updates." : {
 
     },
+    "Close Formats" : {
+
+    },
     "Copies" : {
 
     },
@@ -1045,6 +1048,9 @@
 
     },
     "Telemetry Headers" : {
+
+    },
+    "Text Style" : {
 
     },
     "the %@" : {
