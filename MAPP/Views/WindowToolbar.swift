@@ -66,7 +66,8 @@ struct WindowToolbar: CustomizableToolbarContent {
         // More act on items, not on the view.
         let editsView = browser?.showsViewPanel == true
         let showsViewTools = browser != nil && !hasListColumn && !opensFromCollection
-        let showsViewMode = browser != nil && showsItem && !editsView
+        // A full page opened from a layout has no view options, so no layout to choose.
+        let showsViewMode = browser != nil && showsItem && !editsView && !opensFromCollection
         let showsActions = showsItem && !editsView
         let showsDetails = !tools.showsInspector
         let showsAfterViewMode = showsActions || showsDetails
