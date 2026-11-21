@@ -41,6 +41,8 @@ nonisolated struct DateFormat: Hashable, Sendable, RawRepresentable {
     var time = TimeStyle.system
 
     static let key = "dateFormat"
+    /// Each entry is a stored value that could not be read, in the order it was found.
+    static let setAsideKey = "dateFormatSetAside"
     static let standard = DateFormat()
 
     init(usesWords: Bool = true, date: DateStyle = .system, time: TimeStyle = .system) {
@@ -69,8 +71,21 @@ nonisolated struct DateFormat: Hashable, Sendable, RawRepresentable {
         return (try? encoder.encode(stored)).flatMap { String(data: $0, encoding: .utf8) } ?? ""
     }
 
+    /// The stored format, or the standard where none is stored or it does not read. A value that does not read is first
+    /// set aside (`setAsideUnreadable`), never translated.
     static func stored(in defaults: UserDefaults = .standard) -> DateFormat {
-        defaults.string(forKey: key).flatMap(Self.init(rawValue:)) ?? standard
+        setAsideUnreadable(in: defaults)
+        return defaults.string(forKey: key).flatMap(Self.init(rawValue:)) ?? standard
+    }
+
+    /// Keeps a stored value that does not read, such as an older version's word, under `setAsideKey` and removes it, so
+    /// the page starts from the standard and a change writes over nothing. Run at launch, before any view writes.
+    static func setAsideUnreadable(in defaults: UserDefaults = .standard) {
+        guard let value = defaults.object(forKey: key) else { return }
+        let text = value as? String ?? String(describing: value)
+        guard Self(rawValue: text) == nil else { return }
+        defaults.set((defaults.stringArray(forKey: setAsideKey) ?? []) + [text], forKey: setAsideKey)
+        defaults.removeObject(forKey: key)
     }
 
     /// `locale` read on the chosen clock.
@@ -115,7 +130,7 @@ nonisolated enum DateDisplay {
         }
     }
 
-    private static func style(_ choice: DateFormat.DateStyle, system: Date.FormatStyle.DateStyle) -> Date.FormatStyle.DateStyle {
+    static func style(_ choice: DateFormat.DateStyle, system: Date.FormatStyle.DateStyle) -> Date.FormatStyle.DateStyle {
         switch choice {
         case .system: system
         case .numeric: .numeric
@@ -137,6 +152,16 @@ nonisolated enum DateDisplay {
         of date: Date, format: DateFormat = .standard, calendar: Calendar = .current, locale: Locale = .current
     ) -> String {
         date.formatted(Date.FormatStyle(locale: format.locale(locale), calendar: calendar, timeZone: calendar.timeZone).hour().minute())
+    }
+
+    /// The label of an hour on the clock, as a calendar's gutter has it, read on a day that has no daylight saving
+    /// change so the hour a change skips still has its label.
+    static func hourLabel(_ hour: Int, format: DateFormat = .standard, locale: Locale = .current) -> String {
+        var plain = Calendar(identifier: .gregorian)
+        plain.timeZone = .gmt
+        let date = plain.date(from: DateComponents(year: 2001, month: 1, day: 1, hour: hour))
+            ?? Date(timeIntervalSinceReferenceDate: TimeInterval(hour * 3600))
+        return date.formatted(Date.FormatStyle(locale: format.locale(locale), calendar: plain, timeZone: .gmt).hour())
     }
 
     /// A day without words: the day and month, with the year when it is not this one, unless the person chose how a

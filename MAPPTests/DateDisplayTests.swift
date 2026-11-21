@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import MAPP
 
@@ -140,6 +141,59 @@ struct DateDisplayTests {
         #expect(text(afternoon, .list, twelve).contains("2:30"))
     }
 
+    // MARK: Every place that writes a time or a date
+
+    @Test func theCalendarsHourGutterFollowsTheChosenClock() {
+        let twelve = DateFormat(time: .twelveHour)
+        let twentyFour = DateFormat(time: .twentyFourHour)
+        for identifier in ["en_GB", "en_US"] {
+            let locale = Locale(identifier: identifier)
+            #expect(DateDisplay.hourLabel(13, format: twentyFour, locale: locale) == "13")
+            #expect(DateDisplay.hourLabel(13, format: twelve, locale: locale).contains("1"))
+            #expect(!DateDisplay.hourLabel(13, format: twelve, locale: locale).contains("13"))
+        }
+        #expect(DateDisplay.hourLabel(9, format: twentyFour, locale: Locale(identifier: "en_US")) == "09")
+    }
+
+    @Test func theTimelinesNowMarkerFollowsTheChosenClock() {
+        let evening = moment(daysAgo: 0, hour: 18, minute: 5)
+        let en = Locale(identifier: "en_US")
+        #expect(DateDisplay.timeOfDay(of: evening, format: DateFormat(time: .twentyFourHour), calendar: calendar, locale: en) == "18:05")
+        #expect(DateDisplay.timeOfDay(of: evening, format: DateFormat(time: .twelveHour), calendar: calendar, locale: en).contains("6:05"))
+    }
+
+    @Test func aTimeTheClockWritesIsReadBackByTheTimeField() {
+        let evening = moment(daysAgo: 0, hour: 18, minute: 5)
+        for identifier in ["en_GB", "en_US", "en_AU"] {
+            for time in DateFormat.TimeStyle.allCases {
+                let written = DateDisplay.timeOfDay(
+                    of: evening, format: DateFormat(time: time), calendar: calendar, locale: Locale(identifier: identifier))
+                #expect(TimeOfDay.parse(written).map { [$0.hour, $0.minute] } == [18, 5], "\(identifier) \(time): \(written)")
+            }
+        }
+        #expect(TimeOfDay.parse("6:05 p.m.").map { [$0.hour, $0.minute] } == [18, 5])
+        #expect(TimeOfDay.parse("6:05\u{202F}PM").map { [$0.hour, $0.minute] } == [18, 5])
+    }
+
+    @Test func aQuickDatesDayFollowsTheChosenDateFormat() {
+        let entry = QuickDates.Entry(id: "today", title: "Today", symbol: "sun.max", date: moment(daysAgo: 0))
+        let detail = { (format: DateFormat) in
+            QuickDates.detail(of: entry, now: now, calendar: calendar, locale: locale, format: format)
+        }
+        #expect(detail(.standard).contains("Fri"))
+        #expect(detail(DateFormat(date: .numeric)) == "25/09/2026")
+        #expect(detail(DateFormat(date: .long)) == "25 September 2026")
+    }
+
+    @Test func aSettingsPageWritesItsDatesInTheChosenFormat() {
+        let aWhileAgo = moment(daysAgo: 30)
+        #expect(RecentlyDeletedPage.when(moment(daysAgo: 0), now: now, calendar: calendar, format: .standard) == "Today")
+        #expect(RecentlyDeletedPage.when(aWhileAgo, now: now, calendar: calendar, format: DateFormat(usesWords: false, date: .long)).contains("2026"))
+        let answered = moment(daysAgo: 0, hour: 14, minute: 30)
+        let twentyFour = MarfaPageGate<EmptyView>.notAnswering(answered, now: now, calendar: calendar, format: DateFormat(time: .twentyFourHour))
+        #expect(twentyFour.contains("14:30"))
+    }
+
     // MARK: What is stored
 
     @Test func aStoredChoiceIsReadBackAndAnUnknownOneIsTheStandard() throws {
@@ -158,6 +212,26 @@ struct DateDisplayTests {
         #expect(DateFormat.stored(in: defaults) == .standard)
         defaults.set("automatic", forKey: DateFormat.key)
         #expect(DateFormat.stored(in: defaults) == .standard)
+    }
+
+    @Test func aStoredValueThatDoesNotReadIsSetAsideBeforeAnythingWritesOverIt() throws {
+        let suite = "DateDisplayTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let unreadable = ["automatic", "relative", #"{"date":"weird"}"#]
+        for text in unreadable {
+            defaults.set(text, forKey: DateFormat.key)
+            DateFormat.setAsideUnreadable(in: defaults)
+            #expect(defaults.object(forKey: DateFormat.key) == nil)
+        }
+        #expect(defaults.stringArray(forKey: DateFormat.setAsideKey) == unreadable)
+        #expect(DateFormat.stored(in: defaults) == .standard)
+        // A readable value is left where it is.
+        let chosen = DateFormat(date: .long)
+        defaults.set(chosen.rawValue, forKey: DateFormat.key)
+        DateFormat.setAsideUnreadable(in: defaults)
+        #expect(defaults.string(forKey: DateFormat.key) == chosen.rawValue)
+        #expect(defaults.stringArray(forKey: DateFormat.setAsideKey)?.count == 3)
     }
 
     @Test func aFormatWithAFieldMissingStillReadsAndTheMissingFieldIsTheStandard() throws {

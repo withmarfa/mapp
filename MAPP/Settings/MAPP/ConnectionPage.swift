@@ -185,7 +185,7 @@ struct ConnectionPage: View {
         if let code = model.code {
             SettingsSection(
                 name: Text("Approve MAPP with This Code"),
-                footer: Text("Open \(code.address.absoluteString) on any device, sign in and type the code. It stops working at \(code.expiresAt.formatted(date: .omitted, time: .shortened)).")
+                footer: Text("Open \(code.address.absoluteString) on any device, sign in and type the code. It stops working at \(DateDisplay.timeOfDay(of: code.expiresAt, format: .stored())).")
             ) {
                 SettingsRow(verbatim: code.code) {
                     HStack(spacing: 8) {

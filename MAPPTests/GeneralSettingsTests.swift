@@ -111,15 +111,15 @@ struct GeneralSettingsTests {
 
     // MARK: Reopen Windows
 
-    @Test func reopeningWindowsIsOnUntilTurnedOffAndTheSystemIsToldWhichWayItIs() throws {
+    @Test func reopeningWindowsFollowsTheMacUntilChangedAndOnlyAChangeWritesTheKey() throws {
         let (defaults, done) = try defaults()
         defer { done() }
-        #expect(ReopenWindows.stored(in: defaults))
-        ReopenWindows.apply(to: defaults)
-        #expect(defaults.bool(forKey: ReopenWindows.systemKey))
+        // Unset, the answer is the Mac's own, or windows come back where it has none.
+        #expect(ReopenWindows.stored(in: defaults) == (ReopenWindows.system() ?? ReopenWindows.standard))
         defaults.set(false, forKey: ReopenWindows.key)
-        ReopenWindows.apply(to: defaults)
-        #expect(defaults.bool(forKey: ReopenWindows.systemKey) == false)
+        #expect(ReopenWindows.stored(in: defaults) == false)
+        defaults.set(true, forKey: ReopenWindows.key)
+        #expect(ReopenWindows.stored(in: defaults))
     }
 
     // MARK: Reset
@@ -137,13 +137,13 @@ struct GeneralSettingsTests {
 
         MacSettings.reset(in: defaults)
 
-        for key in MacSettings.keys where key != ReopenWindows.systemKey {
+        for key in MacSettings.keys {
             #expect(defaults.object(forKey: key) == nil, "\(key) was not reset")
         }
         #expect(defaults.object(forKey: "\(InterfaceKey.inspectorAppOpen).app.one") == nil)
         for key in kept { #expect(defaults.string(forKey: key) == "kept", "\(key) was cleared") }
-        // The system is told windows come back, which is what a reset Reopen Windows is.
-        #expect(defaults.bool(forKey: ReopenWindows.systemKey))
+        // Reopen Windows is removed, not written, so the Mac's own answer stands again.
+        #expect(ReopenWindows.stored(in: defaults) == (ReopenWindows.system() ?? ReopenWindows.standard))
     }
 
     @Test func everyKeyASettingsGroupNamesIsInTheResetList() {

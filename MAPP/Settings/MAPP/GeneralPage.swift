@@ -43,9 +43,14 @@ struct GeneralPage: View {
                     Text("Recents").tag(StartWith.place(.recents))
                     Text("All Items").tag(StartWith.place(.allItems))
                     Text("Favorites").tag(StartWith.place(.favorites))
-                    if let types = library?.itemTypeCounts, !types.isEmpty {
+                    let types = library?.itemTypeCounts ?? []
+                    if !types.isEmpty {
                         Divider()
                         ForEach(types) { Text(verbatim: $0.label).tag(StartWith.place(.itemType($0.id.rawValue))) }
+                    }
+                    if let missing = missingStart(among: types) {
+                        Divider()
+                        Text(verbatim: missing).tag(startWith)
                     }
                 }
                 .accessibilityIdentifier("StartWith")
@@ -62,6 +67,21 @@ struct GeneralPage: View {
         }
     }
 
+    /// The pop-up's line for a stored place the library does not list, or nil where the choice is one the pop-up offers.
+    private func missingStart(among types: [ItemTypeCount]) -> String? {
+        guard case .place(let place) = startWith else { return nil }
+        switch place {
+        case .inbox, .recents, .allItems, .favorites: return nil
+        case .itemType(let identifier) where types.contains(where: { $0.id.rawValue == identifier }): return nil
+        default: return missingName(MissingChoice.placeName(place))
+        }
+    }
+
+    /// With no library open nothing can be said to be missing, so the name stands alone.
+    private func missingName(_ name: String) -> String {
+        library == nil ? name : MissingChoice.label(name)
+    }
+
     // MARK: New items
 
     private var newItems: some View {
@@ -76,7 +96,7 @@ struct GeneralPage: View {
                     }
                     if !newItemType.isEmpty, !types.contains(where: { $0.id.rawValue == newItemType }) {
                         Divider()
-                        Text(verbatim: newItemType).tag(newItemType)
+                        Text(verbatim: missingName(MissingChoice.typeName(newItemType))).tag(newItemType)
                     }
                 }
                 .accessibilityIdentifier("NewItemsAre")

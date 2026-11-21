@@ -15,6 +15,22 @@ struct AppearanceSettingsTests {
 
     // MARK: Accent
 
+    @Test func theInstalledFontsAreNotAskedForWhereNoFontIsChosen() {
+        var asked = false
+        #expect(FontChoice.resolved("", among: { asked = true; return ["Helvetica"] }()) == nil)
+        #expect(!asked)
+        #expect(FontChoice.resolved("Helvetica", among: { asked = true; return ["Helvetica"] }()) == "Helvetica")
+        #expect(asked)
+    }
+
+    @Test func aMissingChoiceIsNamedOneWayWhateverItIs() {
+        #expect(MissingChoice.label("Comic Sans") == "Comic Sans (Missing)")
+        #expect(MissingChoice.typeName("core.task") == "Task")
+        #expect(MissingChoice.typeName("app.thing.reading_list") == "Reading List")
+        #expect(MissingChoice.placeName(.itemType("core.event")) == "Event")
+        #expect(MissingChoice.label(MissingChoice.placeName(.itemType("core.event"))) == "Event (Missing)")
+    }
+
     @Test func everyAccentIsReadBackAndAnythingElseIsTheSystems() throws {
         let (defaults, done) = try defaults()
         defer { done() }
@@ -27,6 +43,20 @@ struct AppearanceSettingsTests {
         for unreadable in ["", "teal", "#12", "#GGGGGG", "FF8800"] {
             defaults.set(unreadable, forKey: AppearanceKey.accent)
             #expect(AccentChoice.stored(in: defaults) == .system, "\(unreadable) is not an accent")
+        }
+    }
+
+    @Test func theOfferedAccentsAreSystemSettingsOwnInItsOrderAndEachIsDistinct() {
+        #expect(AccentChoice.Offered.allCases.map(\.rawValue) == ["blue", "purple", "pink", "red", "orange", "yellow", "green", "graphite"])
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            let colors = AccentChoice.Offered.allCases.compactMap { $0.nsColor.rgb(in: appearance) }
+            #expect(colors.count == 8)
+            for (index, first) in colors.enumerated() {
+                for second in colors[(index + 1)...] {
+                    let distance = abs(first.0 - second.0) + abs(first.1 - second.1) + abs(first.2 - second.2)
+                    #expect(distance > 0.3, "two accents read alike in \(appearance)")
+                }
+            }
         }
     }
 
@@ -43,7 +73,7 @@ struct AppearanceSettingsTests {
 
     @Test func theSystemAccentLeavesTheTintToTheSystem() {
         #expect(AccentChoice.system.nsColor == nil && AccentChoice.system.color == nil)
-        #expect(AccentChoice.offered(.green).nsColor == NSColor.systemGreen)
+        #expect(AccentChoice.Offered.green.nsColor.hexValue(in: .aqua) == "#62BA46")
     }
 
     // MARK: Theme and highlights
@@ -90,5 +120,19 @@ struct AppearanceSettingsTests {
 
     @Test func aFamilyNameCannotBreakOutOfTheFontList() {
         #expect(FontChoice.css(family: "Odd\" ; color: red", generic: "serif") == "\"Odd ; color: red\", serif")
+    }
+}
+
+private extension NSColor {
+    func rgb(in name: NSAppearance.Name) -> (Double, Double, Double)? {
+        var result: (Double, Double, Double)?
+        NSAppearance(named: name)?.performAsCurrentDrawingAppearance {
+            if let color = usingColorSpace(.sRGB) { result = (color.redComponent, color.greenComponent, color.blueComponent) }
+        }
+        return result
+    }
+
+    func hexValue(in name: NSAppearance.Name) -> String? {
+        rgb(in: name).map { String(format: "#%02X%02X%02X", Int(($0.0 * 255).rounded()), Int(($0.1 * 255).rounded()), Int(($0.2 * 255).rounded())) }
     }
 }

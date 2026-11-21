@@ -14,8 +14,10 @@ struct AppearancePage: View {
     @AppStorage(InterfaceKey.showsScrolledTitle) private var showsTitle = true
     @AppStorage(InterfaceKey.showsPageToolbarBackground) private var showsBackground = true
     @AppStorage(SidebarTypeRow.subtypeIconsKey) private var showsSubtypeIcons = false
-    @State private var families = FontChoice.installedFamilies()
-    @State private var monospacedFamilies = FontChoice.installedMonospacedFamilies()
+    /// Read when the page has appeared, since asking the system for every installed font is slow.
+    @State private var families: [String] = []
+    @State private var monospacedFamilies: [String] = []
+    @State private var hasListedFonts = false
     private var registry = ColumnWidthRegistry.shared
 
     var body: some View {
@@ -72,6 +74,12 @@ struct AppearancePage: View {
             layout
         }
         .accessibilityIdentifier("AppearancePage")
+        .task {
+            guard !hasListedFonts else { return }
+            families = FontChoice.installedFamilies()
+            monospacedFamilies = FontChoice.installedMonospacedFamilies()
+            hasListedFonts = true
+        }
     }
 
     // MARK: Color
@@ -110,6 +118,7 @@ struct AppearancePage: View {
 
     private static func name(of offered: AccentChoice.Offered) -> String {
         switch offered {
+        case .blue: String(localized: "Blue")
         case .purple: String(localized: "Purple")
         case .pink: String(localized: "Pink")
         case .red: String(localized: "Red")
@@ -144,7 +153,9 @@ struct AppearancePage: View {
             ForEach(installed, id: \.self) { Text(verbatim: $0).tag($0) }
             if !selection.wrappedValue.isEmpty, !installed.contains(selection.wrappedValue) {
                 Divider()
-                Text("\(selection.wrappedValue) (Missing)").tag(selection.wrappedValue)
+                // Until the installed fonts are listed, the chosen one cannot be said to be missing.
+                Text(verbatim: hasListedFonts ? MissingChoice.label(selection.wrappedValue) : selection.wrappedValue)
+                    .tag(selection.wrappedValue)
             }
         }
     }

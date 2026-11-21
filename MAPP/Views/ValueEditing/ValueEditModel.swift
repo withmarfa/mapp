@@ -332,7 +332,7 @@ final class ValueEditModel {
         quickDates.map {
             ValueListRow(
                 id: "quick:" + $0.id, role: .option, title: $0.title,
-                detail: QuickDates.detail(of: $0, now: library.now(), calendar: request.calendar, locale: .current), mark: .symbol($0.symbol))
+                detail: QuickDates.detail(of: $0, now: library.now(), calendar: request.calendar, locale: .current, format: .stored()), mark: .symbol($0.symbol))
         } + [ValueListRow(id: ValueEditOptions.notSetID, role: .option, title: String(localized: "Not Set"), isCurrent: value == nil)]
     }
 
@@ -870,8 +870,7 @@ final class ValueEditModel {
     /// The value's time as the person's locale writes it, or empty where the value holds none.
     var timeText: String {
         guard hasTime, let date = storedDate?.date else { return "" }
-        let calendar = request.calendar
-        return date.formatted(Date.FormatStyle(date: .omitted, time: .shortened, locale: .current, calendar: calendar, timeZone: calendar.timeZone))
+        return DateDisplay.timeOfDay(of: date, format: .stored(), calendar: request.calendar)
     }
 
     /// Writes what was typed in the time field: a time sets it on the day the value holds (today where it holds none),

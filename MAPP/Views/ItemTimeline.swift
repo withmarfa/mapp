@@ -131,7 +131,7 @@ struct ItemTimeline: View {
                                 .opacity(startsDay ? 1 : 0)
                                 .accessibilityHidden(true)
                                 .frame(width: 148, alignment: .leading)
-                            Text(date, format: .dateTime.hour().minute())
+                            Text(verbatim: DateDisplay.timeOfDay(of: date, format: dateFormat))
                                 .interfaceFont(.caption.weight(.semibold))
                                 .monospacedDigit()
                                 .foregroundStyle(.red)
@@ -203,7 +203,14 @@ struct ItemTimeline: View {
                 let named = distance.map { abs($0) <= 1 } ?? false
                 let sameYear = calendar.isDate(date, equalTo: today, toGranularity: .year)
                 let format = Date.FormatStyle().day().month(.abbreviated)
-                Text(date, format: named ? format.weekday(.wide) : sameYear ? format : format.year())
+                // A chosen way of writing a date replaces the system's short one under the day's name.
+                Group {
+                    if dateFormat.date == .system {
+                        Text(date, format: named ? format.weekday(.wide) : sameYear ? format : format.year())
+                    } else {
+                        Text(verbatim: DateDisplay.text(of: date, hasTime: false, place: .value, format: dateFormat))
+                    }
+                }
                     .interfaceFont(.caption)
                     .foregroundStyle(.secondary)
             }

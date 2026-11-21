@@ -26,6 +26,5 @@ enum MacSettings {
         for key in defaults.dictionaryRepresentation().keys where prefixes.contains(where: key.hasPrefix) {
             defaults.removeObject(forKey: key)
         }
-        ReopenWindows.apply(to: defaults)
     }
 }

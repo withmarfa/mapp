@@ -97,6 +97,7 @@ struct MAPPApp: App {
         Window("Keyboard Shortcuts", id: KeyboardShortcutsView.windowID) {
             KeyboardShortcutsView()
                 .interfaceTextStyle()
+                .appAccent()
                 .environment(shortcuts)
         }
         .windowResizability(.contentMinSize)
@@ -106,6 +107,7 @@ struct MAPPApp: App {
         #if DEBUG
         UtilityWindow(LocalizedStringKey(TuningPanel.title), id: TuningPanel.windowID) {
             TuningPanel()
+                .appAccent()
         }
         .commandsRemoved()
         .restorationBehavior(.disabled)
@@ -159,7 +161,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         #endif
         super.init()
-        ReopenWindows.apply()
+        DateFormat.setAsideUnreadable()
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -189,8 +191,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// waited for, so quitting offline is not held up; a library that cannot finish holds it up only so long. A change
     /// not kept that no window has told, as when no window is open, is told here, so its text reaches the clipboard.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-        // What decides whether the windows come back is read as the app quits.
-        ReopenWindows.apply()
         Task { [libraries] in
             // A property typed in an inspector is written, or handed back, before the library finishes its writes.
             DetailsPresentation.handOffAllProperties(in: libraries.current)

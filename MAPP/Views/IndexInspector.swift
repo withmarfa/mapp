@@ -22,6 +22,7 @@ struct IndexInspector: View {
 
 private struct IndexInspectorContent: View {
     @Environment(\.colorScheme) private var scheme
+    @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
     let row: IndexRow
     let library: any ItemLibrary
     let open: (IndexRow) -> Void
@@ -90,8 +91,8 @@ private struct IndexInspectorContent: View {
             detail("Kind", SourceCode.isApp(code) ? String(localized: "App") : String(localized: "Key"))
             detail("Code", code)
         } else if case .collection(let id) = row.place, let collection = library.item(id) {
-            detail("Created", collection.created.formatted(date: .abbreviated, time: .omitted))
-            detail("Updated", collection.modified.formatted(date: .abbreviated, time: .omitted))
+            detail("Created", DateDisplay.text(of: collection.created, hasTime: false, place: .value, format: dateFormat))
+            detail("Updated", DateDisplay.text(of: collection.modified, hasTime: false, place: .value, format: dateFormat))
             if !row.sourceName.isEmpty { detail("Source", row.sourceName) }
         }
     }

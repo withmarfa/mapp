@@ -49,20 +49,32 @@ nonisolated enum AccentChoice: Hashable, RawRepresentable {
     /// A color the person made, as `#RRGGBB`.
     case custom(String)
 
+    /// The accent colors System Settings offers, in its order, each as the Mac itself resolves it, so no two read alike.
     enum Offered: String, CaseIterable, Identifiable {
-        case purple, pink, red, orange, yellow, green, graphite
+        case blue, purple, pink, red, orange, yellow, green, graphite
 
         var id: Self { self }
 
-        var nsColor: NSColor {
+        /// The color in the light and in the dark appearance, as `#RRGGBB`.
+        private var hex: (light: String, dark: String) {
             switch self {
-            case .purple: .systemPurple
-            case .pink: .systemPink
-            case .red: .systemRed
-            case .orange: .systemOrange
-            case .yellow: .systemYellow
-            case .green: .systemGreen
-            case .graphite: .systemGray
+            case .blue: ("#007AFF", "#007AFF")
+            case .purple: ("#953D96", "#A550A7")
+            case .pink: ("#F74F9E", "#F74F9E")
+            case .red: ("#E0383E", "#FF5257")
+            case .orange: ("#F7821B", "#F7821B")
+            case .yellow: ("#FFC726", "#FFC600")
+            case .green: ("#62BA46", "#62BA46")
+            case .graphite: ("#989898", "#8C8C8C")
+            }
+        }
+
+        var nsColor: NSColor {
+            let (light, dark) = hex
+            return NSColor(name: nil) { appearance in
+                let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+                let (red, green, blue) = AccentChoice.rgb(fromHex: isDark ? dark : light) ?? (0, 0, 0)
+                return NSColor(srgbRed: red, green: green, blue: blue, alpha: 1)
             }
         }
     }
@@ -186,8 +198,9 @@ nonisolated enum FontChoice {
 
     /// The stored family where it is installed, or nil where it is not chosen or has since been uninstalled, which the
     /// page and the editor read as the default.
-    static func resolved(_ stored: String, among installed: [String]) -> String? {
-        stored.isEmpty || !installed.contains(stored) ? nil : stored
+    /// `installed` is read only where a family is chosen, since asking the system for every font is slow.
+    static func resolved(_ stored: String, among installed: @autoclosure () -> [String]) -> String? {
+        stored.isEmpty || !installed().contains(stored) ? nil : stored
     }
 
     /// A family as a CSS font list, quoted, with the generic family the page falls back to.
