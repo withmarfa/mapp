@@ -27,7 +27,7 @@ struct GeneralPage: View {
             Button("Cancel", role: .cancel) {}
             Button("Reset", role: .destructive) { resetSettings() }
         } message: {
-            Text("Every setting on this Mac goes back to how it was at first. Your items and sign-in stay.")
+            Text("Every setting on this Mac starts over. Your items and sign-in stay.")
         }
     }
 
