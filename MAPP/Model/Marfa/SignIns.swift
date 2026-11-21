@@ -160,14 +160,15 @@ extension Keychain.Failure: KeychainRefusal {}
 /// The package's sign-in, kept in the Keychain under a service of the app's own, so a Debug build never reads or
 /// replaces the installed app's sign-ins.
 nonisolated struct SystemSignIns: SignIns {
+    /// The name MAPP signs in under, which the server shows for what MAPP makes, such as a webhook.
+    static let clientName = "MAPP"
+
     /// What the app asks the owner to approve: every item to read and write, and every edge (relationships, links
     /// and attachments), which the server grants apart from items (`edge.*`). With them the three permissions its
     /// features use: Permanently Delete (`items.purge`), This Marfa (`config.manage`) and a type's icon
     /// (`schema.write`), and the read of the owner's own name for Signed In As, which `GET /profile` gives a credential
     /// only with its profile read scope. That read is no owner permission. The owner may approve less, and what is missing
     /// is told where it is needed.
-    /// The name MAPP signs in under, which the server shows for what MAPP makes, such as a webhook.
-    static let clientName = "MAPP"
     static let scopes = ["*:read", "*:write", "edge.*:read", "edge.*:write", "items.purge", "config.manage", "schema.write"] + profileScopes
 
     /// What Signed In As needs: the owner's name (`instance-claim/profile-read`).
