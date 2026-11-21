@@ -40,10 +40,12 @@ extension Browser {
     }
 
     /// Restores a window from what it kept. A snapshot that does not read, one kept in an earlier form say,
-    /// leaves the window at its default.
-    func restore(from data: Data?, in library: any ItemLibrary, order: ItemOrder) {
+    /// leaves the window at the place Settings > General > Start With names, or its default.
+    func restore(from data: Data?, in library: any ItemLibrary, order: ItemOrder, start: SidebarItem? = nil) {
         if let data, let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) {
             restore(snapshot, in: library, order: order)
+        } else if let start {
+            restore(Snapshot(place: start, selection: []), in: library, order: order)
         } else {
             selectFirstItem(in: library, order: order)
         }

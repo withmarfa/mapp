@@ -1,6 +1,6 @@
 import Foundation
 
-/// Opening an item the way Settings > Lists > Open Items In says (`ItemOpening`): in the modal over the window, as a
+/// Opening an item the way Settings > General > Open Items says (`ItemOpening`): in the modal over the window, as a
 /// full page, or in a window of its own. Every layout and the list open through here.
 extension Browser {
     /// Whether an item is open in the modal.

@@ -11,11 +11,13 @@ struct ItemCalendar: View {
     @State private var daysSeen = 0
     @State private var keyboard = CalendarKeyboard()
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
+    @AppStorage(WeekStart.key) private var weekStart = 0
 
     var body: some View {
         let _ = daysSeen
+        let _ = weekStart
         let items = browser.filteredItems(in: library)
-        let calendar = Calendar.current
+        let calendar = Calendar.mapp
         let now = library.now()
         let anchor = browser.calendarDay ?? now
         let placed = CalendarLayout.entries(for: items, looks: browser.looks(in: library), catalogue: library.catalogue, calendar: calendar)
@@ -26,12 +28,12 @@ struct ItemCalendar: View {
             switch scale {
             case .week:
                 let week = CalendarWeek.make(entries: placed.entries, around: anchor, calendar: calendar, now: now)
-                CalendarWeekView(week: week, browser: browser, keyboard: keyboard, calendar: calendar, now: now, choose: choose, open: open)
+                CalendarWeekView(week: week, browser: browser, keyboard: keyboard, calendar: calendar, format: dateFormat, now: now, choose: choose, open: open)
                     .navigationTitle(Self.title(of: week.interval, calendar: calendar))
                     .navigationSubtitle(Text("Week \(calendar.component(.weekOfYear, from: week.interval.start))").editedSubtitle(browser.hasViewChanges))
             case .month:
                 let month = CalendarMonth.make(entries: placed.entries, around: anchor, calendar: calendar, now: now)
-                CalendarMonthView(month: month, browser: browser, calendar: calendar, choose: choose, open: open)
+                CalendarMonthView(month: month, browser: browser, calendar: calendar, format: dateFormat, choose: choose, open: open)
                     .navigationTitle(Self.title(of: month.interval, calendar: calendar))
                     .navigationSubtitle(Text("^[\(month.itemCount) item](inflect: true)").editedSubtitle(browser.hasViewChanges))
             }
@@ -118,9 +120,10 @@ private final class CalendarKeyboard {
 private extension CalendarEntry {
     /// What a block says to VoiceOver beyond its title: where the event really starts and ends, whatever part of it the
     /// day shows.
-    func spoken(calendar: Calendar) -> String {
+    func spoken(calendar: Calendar, format: DateFormat) -> String {
         let style = Date.IntervalFormatStyle(
-            date: .abbreviated, time: isAllDay ? .omitted : .shortened, locale: calendar.locale ?? .current, calendar: calendar,
+            date: DateDisplay.style(format.date, system: .abbreviated), time: isAllDay ? .omitted : .shortened,
+            locale: format.locale(calendar.locale ?? .current), calendar: calendar,
             timeZone: calendar.timeZone)
         let last = isAllDay ? max(end.addingTimeInterval(-1), start) : end
         return (start..<last).formatted(style)
@@ -136,6 +139,7 @@ private struct CalendarCell<Label: View>: View {
     /// The day this one is drawn on, since an event over midnight is drawn on each.
     let day: Date
     let calendar: Calendar
+    let format: DateFormat
     let choose: (ItemID, Date) -> Void
     let open: (ItemID) -> Void
     @ViewBuilder let label: (_ isSelected: Bool) -> Label
@@ -157,7 +161,7 @@ private struct CalendarCell<Label: View>: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: entry.title))
-        .accessibilityValue(Text(verbatim: entry.spoken(calendar: calendar)))
+        .accessibilityValue(Text(verbatim: entry.spoken(calendar: calendar, format: format)))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityAction(named: Text("Open")) { open(id) }
         .accessibilityIdentifier("CalendarItem-\(id.rawValue)-\(Self.dayKey(day, calendar))")
@@ -184,17 +188,6 @@ private extension Color {
     static let calendarToday = Color.red
 }
 
-private extension Calendar {
-    /// The label of an hour on the clock, read on a day that has no daylight saving change, so the hour a change skips
-    /// still has its label.
-    func hourText(_ hour: Int) -> String {
-        var plain = Calendar(identifier: .gregorian)
-        plain.timeZone = .gmt
-        let date = plain.date(from: DateComponents(year: 2001, month: 1, day: 1, hour: hour)) ?? Date(timeIntervalSinceReferenceDate: TimeInterval(hour * 3600))
-        return date.formatted(Date.FormatStyle(locale: locale ?? .current, calendar: plain, timeZone: .gmt).hour())
-    }
-}
-
 // MARK: Week
 
 private struct CalendarWeekView: View {
@@ -202,6 +195,7 @@ private struct CalendarWeekView: View {
     let browser: Browser
     let keyboard: CalendarKeyboard
     let calendar: Calendar
+    let format: DateFormat
     let now: Date
     let choose: (ItemID, Date) -> Void
     let open: (ItemID) -> Void
@@ -265,7 +259,7 @@ private struct CalendarWeekView: View {
             ForEach(week.days) { day in
                 VStack(spacing: 2) {
                     ForEach(day.allDay) { entry in
-                        CalendarCell(browser: browser, entry: entry, day: day.date, calendar: calendar, choose: choose, open: open) { isSelected in
+                        CalendarCell(browser: browser, entry: entry, day: day.date, calendar: calendar, format: format, choose: choose, open: open) { isSelected in
                             Text(verbatim: entry.title)
                                 .interfaceFont(.system(size: 11.5, weight: .medium))
                                 .lineLimit(1)
@@ -295,7 +289,7 @@ private struct CalendarWeekView: View {
         return HStack(spacing: 0) {
             ZStack(alignment: .topTrailing) {
                 ForEach(1..<24, id: \.self) { hour in
-                    Text(calendar.hourText(hour))
+                    Text(verbatim: DateDisplay.hourLabel(hour, format: format, locale: calendar.locale ?? .current))
                         .interfaceFont(.system(size: 10.5))
                         .monospacedDigit()
                         .foregroundStyle(.secondary)
@@ -324,9 +318,9 @@ private struct CalendarWeekView: View {
                     let top = CGFloat(block.startMinute) / 60 * Self.hourHeight
                     let tall = max(CGFloat(block.endMinute - block.startMinute) / 60 * Self.hourHeight, 20)
                     let blockWidth = max(slot - 2, 8)
-                    CalendarCell(browser: browser, entry: block.entry, day: day.date, calendar: calendar, choose: choose, open: open) { isSelected in
+                    CalendarCell(browser: browser, entry: block.entry, day: day.date, calendar: calendar, format: format, choose: choose, open: open) { isSelected in
                         CalendarBlockLabel(
-                            entry: block.entry, isSelected: isSelected, calendar: calendar, width: blockWidth, height: tall - 1)
+                            entry: block.entry, isSelected: isSelected, calendar: calendar, format: format, width: blockWidth, height: tall - 1)
                             .frame(width: blockWidth, height: tall - 1, alignment: .topLeading)
                             .calendarFill(isSelected, radius: 6)
                             .shadow(color: isSelected ? .black.opacity(0.18) : .clear, radius: 3, y: 2)
@@ -375,6 +369,7 @@ private struct CalendarBlockLabel: View {
     let entry: CalendarEntry
     let isSelected: Bool
     let calendar: Calendar
+    let format: DateFormat
     let width: CGFloat
     let height: CGFloat
     @Environment(\.interfaceTextSize) private var textSize
@@ -401,7 +396,7 @@ private struct CalendarBlockLabel: View {
                 }
             }
             if showsTime {
-                Text(verbatim: DateDisplay.timeOfDay(of: entry.start, calendar: calendar))
+                Text(verbatim: DateDisplay.timeOfDay(of: entry.start, format: format, calendar: calendar))
                     .interfaceFont(.system(size: 10.5))
                     .lineLimit(1)
                     .foregroundStyle(isSelected ? Color.white.opacity(0.85) : .secondary)
@@ -428,6 +423,7 @@ private struct CalendarMonthView: View {
     let month: CalendarMonth
     let browser: Browser
     let calendar: Calendar
+    let format: DateFormat
     let choose: (ItemID, Date) -> Void
     let open: (ItemID) -> Void
 
@@ -473,7 +469,7 @@ private struct CalendarMonthView: View {
                 .padding(.horizontal, 4)
                 .background { if day.isToday { Capsule().fill(Color.calendarToday) } }
             ForEach(fitting.shown) { entry in
-                CalendarCell(browser: browser, entry: entry, day: day.date, calendar: calendar, choose: choose, open: open) { isSelected in
+                CalendarCell(browser: browser, entry: entry, day: day.date, calendar: calendar, format: format, choose: choose, open: open) { isSelected in
                     Text(verbatim: entry.title)
                         .interfaceFont(.system(size: 11))
                         .lineLimit(1)

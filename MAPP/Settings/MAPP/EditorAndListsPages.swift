@@ -8,7 +8,6 @@ struct EditorPage: View {
     @AppStorage(PageKey.textSize) private var textSize = PageStyle().textSize
     @AppStorage(PageKey.checksSpelling) private var checksSpelling = PageStyle().checksSpelling
     @AppStorage(PageKey.linkLook) private var linkLook = PageStyle().linkLook
-    @AppStorage(RemotePictureSetting.key) private var pictures = RemotePictureSetting.standard
 
     var body: some View {
         SettingsPageColumn {
@@ -68,32 +67,14 @@ struct EditorPage: View {
                     .accessibilityIdentifier("LinkLook")
                 }
             }
-            SettingsSection(
-                "Pictures",
-                footer: "An item’s text can name a picture at a web address. MAPP loads it only when you choose to, or always for items in the Inbox. Pictures you have loaded stay on this Mac until you disconnect the library."
-            ) {
-                SettingsRow("Remote Pictures") {
-                    SettingsPopUp(title: "Remote Pictures", selection: $pictures) {
-                        ForEach(RemotePictureSetting.allCases) { option in
-                            switch option {
-                            case .ask: Text("Ask").tag(option)
-                            case .always: Text("Always").tag(option)
-                            case .never: Text("Never").tag(option)
-                            }
-                        }
-                    }
-                    .accessibilityIdentifier("RemotePictures")
-                }
-            }
         }
         .accessibilityIdentifier("EditorPage")
     }
 }
 
-/// The Lists page: how much each row says, what every list shows, and where an item opens.
+/// The Lists page: how much each row says and what every list shows.
 struct ListsPage: View {
     @AppStorage(ListKey.density) private var density = Density.standard
-    @AppStorage(ListKey.openItemsIn) private var openItemsIn = ItemOpening.standard
     @AppStorage(OrderKey.sort) private var sort = ItemOrder().sort
     @AppStorage(OrderKey.groupsByDate) private var groupsByDate = ItemOrder().groupsByDate
 
@@ -120,12 +101,6 @@ struct ListsPage: View {
                         Text("Date").tag(true)
                     }
                     .accessibilityIdentifier("GroupBy")
-                }
-                SettingsRow("Open Items In") {
-                    SettingsPopUp(title: "Open Items In", selection: $openItemsIn) {
-                        ForEach(ItemOpening.allCases) { Text($0.title).tag($0) }
-                    }
-                    .accessibilityIdentifier("ListsOpenItemsIn")
                 }
             }
         }

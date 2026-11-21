@@ -5,7 +5,7 @@ Settings is a window of its own (`SettingsWindowView`, a `Window` scene, not the
 ## Structure
 
 - `Window/` is the shell: the window, the sidebar, the history behind Back and Forward (`SettingsNavigation`), and the one launcher every route opens the window through (`SettingsLauncher`; `Browser.showSettings` asks it). A page is listed in the sidebar only once it exists: add a case to `SettingsPage` (or `MarfaSettingsPage`), its group, its words for the sidebar's search, and its view in `SettingsDetail`.
-- `Parts/` is every part a page draws with: `SettingsSection`, `SettingsRow`, the trailing controls, `SettingsHead`, `SettingsProblemRow`, `SettingsPageState`, `SettingsBar`, `SettingsSizeSlider`, `ChoiceTiles`, `PatternList`, the tables and `SettingsSheet`. They name nothing of MAPP's model. A page never draws its own row, button, section or sheet.
+- `Parts/` is every part a page draws with: `SettingsSection`, `SettingsRow`, the trailing controls, `SettingsHead`, `SettingsProblemRow`, `SettingsPageState`, `SettingsBar`, `SettingsSizeSlider`, `SettingsSwatches`, `ChoiceTiles`, `PatternList`, the tables and `SettingsSheet`. They name nothing of MAPP's model. A page never draws its own row, button, section or sheet.
 - `MAPP/` is MAPP's own pages and `MAPPMarfaSettingsHost`, which lends the Marfa's half what it needs. `Marfa/` is the Marfa's pages; read its `AGENTS.md`.
 
 ## Rules
@@ -17,10 +17,12 @@ Settings is a window of its own (`SettingsWindowView`, a `Window` scene, not the
 - A row of buttons at the end of a page, such as Revert and Save, is a `SettingsBar`; buttons that act on one setting sit in its row. A page that can't be shown is a `SettingsPageState`, never a row.
 - The window keeps its sidebar (`toolbar(removing: .sidebarToggle)`). Back and Forward are the View menu's own commands (`AppCommands`); a sub-page is pushed with `settingsPush`.
 - What is typed in a page and not saved is handed over when the window closes (`MAPPMarfaSettingsHost.handOverDrafts`) and when the app quits (`Libraries.handOffDraftsAtQuit`, from `applicationShouldTerminate`, since a window's close is not posted at quit), through `Notices.notKept`.
+- A setting stored on the Mac is added to `MacSettings.keys` in the same change, or Reset MAPP's Settings misses it ([docs/settings-storage.md](../../docs/settings-storage.md#reset)).
 - `Browser` keeps nothing of Settings. Never add a Settings place to the main window.
 
 ## Code Review Rules
 
 - **Literal in a page.** Flag a color, font size or measure written in a page instead of a `SettingsTokens` value, and a row, button or section a page draws itself instead of the part.
 - **Sheet under the toolbar.** Flag a `.sheet` in Settings where `settingsSheet` stands.
+- **Setting missed by Reset.** Flag a new key in the defaults that is not in `MacSettings.keys`.
 - **Input lost on refusal.** Flag a page that clears what was typed when the server refuses it, or drops an unsaved draft when the window closes.

@@ -46,6 +46,12 @@ nonisolated struct PageStyle: Equatable {
     var readingWidth = 54
     /// How a link to another item reads in the text.
     var linkLook = LinkLook.standard
+    /// The page's accent, its highlight color and the families of its text and its code, as Settings > Appearance
+    /// chooses. A family that is empty, or no longer installed, is the page's own.
+    var accent = AccentChoice.standard
+    var highlight = HighlightChoice.standard
+    var textFont = ""
+    var codeFont = ""
 
     /// Matches the editor's three-rem minimum margins and chosen reading width.
     func horizontalInset(for width: CGFloat) -> CGFloat {
@@ -64,13 +70,17 @@ struct StoredPageStyle: DynamicProperty {
     @AppStorage(PageKey.checksSpelling) private var checksSpelling = PageStyle().checksSpelling
     @AppStorage(PageKey.readingWidth) private var readingWidth = PageStyle().readingWidth
     @AppStorage(PageKey.linkLook) private var linkLook = PageStyle().linkLook
+    @AppStorage(AppearanceKey.accent) private var accent = AccentChoice.standard
+    @AppStorage(AppearanceKey.highlights) private var highlight = HighlightChoice.standard
+    @AppStorage(AppearanceKey.textFont) private var textFont = ""
+    @AppStorage(AppearanceKey.codeFont) private var codeFont = ""
 
     init() {}
 
     var wrappedValue: PageStyle {
         PageStyle(
             fullWidth: fullWidth, textSize: textSize, checksSpelling: checksSpelling, readingWidth: readingWidth,
-            linkLook: linkLook)
+            linkLook: linkLook, accent: accent, highlight: highlight, textFont: textFont, codeFont: codeFont)
     }
 }
 

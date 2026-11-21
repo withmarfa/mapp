@@ -24,7 +24,7 @@ struct LocationPageTests {
     private static func candidates(_ item: Item, showsCoordinates: Bool = false, offersEmpty: Bool = false) -> [PropertyRow] {
         PropertyRow.candidates(
             of: item, type: catalogue.itemTypes[item.type], hidden: ["title", "body"], relationships: [], parentField: "child-of",
-            format: .automatic, tags: [], typeLabel: nil, typeIcon: nil, sourceName: nil, now: now, calendar: .current,
+            format: .standard, tags: [], typeLabel: nil, typeIcon: nil, sourceName: nil, now: now, calendar: .current,
             locale: Locale(identifier: "en_GB"), offersEmpty: offersEmpty, showsCoordinates: showsCoordinates, icon: { _ in nil },
             isPerson: { _ in false })
     }

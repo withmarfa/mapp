@@ -91,7 +91,7 @@ The page's corner is the window's bottom-right corner (`WindowCorner`, [Views an
 - **A PDF** has the page as "2 of 4" between up and down chevrons, then the same size control, then Focus. The chevrons are dimmed at the first and last page, and a one-page PDF reads "1 of 1" with both dimmed. The page follows scrolling. Typing a page number is not offered. The size is the PDF view's own: Fit fits the width, held to 10% to 400%, and a pinch becomes the chosen size. The page reads the page the view reached.
 - **A file that is still downloading, fails to load or has no pages** has Focus alone until the file is ready, and so has any file that is neither an image nor a PDF.
 - **The size belongs to one file.** Another item's page opens fitted, and an open size field goes with the item it was opened on.
-- **Menu and palette.** While an image or PDF page shows, View holds Zoom In (⌘+), Zoom Out (⌘−), Actual Size (⌘0) and Zoom to Fit, and for a PDF Next Page and Previous Page, with the same entries in the palette. These keys size the file and the text-size commands (`TextZoomCommands`) are not offered then, so a key sizes the file or the text and never both. Settings > Appearance still holds the interface's base text size. The corner's own menu binds no keys, because the View menu's commands hold them.
+- **Menu and palette.** While an image or PDF page shows, View holds Zoom In (⌘+), Zoom Out (⌘−), Actual Size (⌘0) and Zoom to Fit, and for a PDF Next Page and Previous Page, with the same entries in the palette. These keys size the file and the text-size commands (`TextZoomCommands`) are not offered then, so a key sizes the file or the text and never both. Settings > Appearance still holds the interface's text size. The corner's own menu binds no keys, because the View menu's commands hold them.
 - **Any other item's page** has Focus alone.
 
 Focus hides only the header's title and properties. The page keeps its look (a reading page stays in its reading type) and the footer, so Linked From and a collection's Contents stay, and a collection with nothing in it still shows its contents.
@@ -110,7 +110,7 @@ Version History opens as its own workspace (`VersionHistoryWorkspace`): a thread
 ## Text on the page
 
 - **Link looks** are a setting (Settings > Editor > Links, `LinkLook`), and Mark is the default. Mark is the type's icon in color, then the title with a dotted line. The others are Underline, Tinted Pill, Pill, Quiet and Text. In every look the pointer is a hand, and a link to an item that does not exist keeps its dashed line, which Mark draws as lighter dots.
-- **Highlights** are yellow. Agreed, not built: soft yellow, the accent color and a color of the person's own are settings. A pen-style highlight is dropped.
+- **Highlights** are soft yellow, or the color chosen in Settings > Appearance > Highlights: orange, green, blue, pink, purple or the accent color ([Settings](settings.md#appearance)). A color of the person's own is not offered. A pen-style highlight is dropped.
 - **Tables** in the text are a box with a gray header and lines between the columns, with lighter grips and more room above. Inkkit draws them, and MAPP sets only their spacing, grip color and header through Inkkit's tokens (`editor/src/style.css`). The header's weight is 500 today; the agreed weight is regular.
 - **A caption** under a picture is light gray, and a file's name is a link with a hover state. Agreed, not built.
 - **Every look is a setting with a default.** MAPP gives Inkkit the look it draws with.
@@ -140,7 +140,7 @@ A field's name on the page opens its menu (`FieldMenu`, drawn by `FieldMenuPrese
 
 ## Opened as a modal or a full page
 
-Built, not yet released. Where an item opens is Settings > Lists > Open Items In ([Views and lists](views-and-lists.md#opening-an-item)).
+Built, not yet released. Where an item opens is Settings > General > Open Items ([Views and lists](views-and-lists.md#opening-an-item)).
 
 - A modal is a large, solid page over the window, with the window dimmed behind it (`ItemModal`). It is 1000 points wide, centered, with 60 points above and below; the right sidebar adds its own width to the card, as far as the window has room, and the page keeps nearly its width. Customize Layout opened in it shows Done in place of the Details button. It hosts the same page the window shows, with the window's one editor, so no second editor writes the item: the page beside the list steps aside while the modal is open.
 - The modal's toolbar holds, from the leading side: up and down arrows, full page and new window, Share and More, the right sidebar (filled while it is open), and close. The up and down arrows move to the item before or after it in the list behind, and the selection follows, and Back does not stop at each item stepped over. They are dimmed at the first and last item. The right sidebar opens inside the modal.
@@ -157,7 +157,7 @@ Gaps on the page come from a 4-point step, with named gaps between the title and
 
 - Linked From and Customize Layout live in a row of actions above the title that takes no room. When it shows is in [`editor/AGENTS.md`](../editor/AGENTS.md).
 - A person's name and the status words are Marfa's. The look changes how they are drawn, not what they say.
-- Dates follow the person's Date Format choice (`dateFormat`).
+- Dates follow the Dates and Times choices in Settings > General (`dateFormat`).
 
 ## Related pages
 

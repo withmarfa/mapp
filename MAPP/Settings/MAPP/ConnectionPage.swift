@@ -26,7 +26,6 @@ struct ConnectionPage: View {
                 if let library, let files = library.downloadedFiles {
                     ConnectionDownloads(files: files).id(ObjectIdentifier(library))
                 }
-                if Reporting.carriesDestination { ErrorReportRows() }
                 disconnect(from: connection)
             }
         }
@@ -186,7 +185,7 @@ struct ConnectionPage: View {
         if let code = model.code {
             SettingsSection(
                 name: Text("Approve MAPP with This Code"),
-                footer: Text("Open \(code.address.absoluteString) on any device, sign in and type the code. It stops working at \(code.expiresAt.formatted(date: .omitted, time: .shortened)).")
+                footer: Text("Open \(code.address.absoluteString) on any device, sign in and type the code. It stops working at \(DateDisplay.timeOfDay(of: code.expiresAt, format: .stored())).")
             ) {
                 SettingsRow(verbatim: code.code) {
                     HStack(spacing: 8) {
@@ -323,23 +322,5 @@ private struct ConnectionProblem: View {
     private func copyText() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(problem.copyText, forType: .string)
-    }
-}
-
-/// The switch for reporting errors and timings to WithMarfa, shown only in a build that carries a destination for them
-/// (`Reporting.carriesDestination`). It is on until turned off, and turning it off stops reporting at once.
-private struct ErrorReportRows: View {
-    @AppStorage(Reporting.switchKey) private var sends = true
-
-    var body: some View {
-        SettingsSection(
-            "Privacy",
-            footer: "Sends errors and timings to WithMarfa to help fix problems. Never includes your items, their text, your server’s address or anything you type."
-        ) {
-            SettingsRow("Send Error Reports") {
-                SettingsToggle(title: "Send Error Reports", isOn: $sends).accessibilityIdentifier("SendErrorReports")
-            }
-        }
-        .onChange(of: sends) { _, isOn in Reporting.shared.switchChanged(to: isOn) }
     }
 }

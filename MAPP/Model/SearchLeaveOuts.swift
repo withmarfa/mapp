@@ -9,7 +9,7 @@ import Observation
 /// never removed; the servers whose entry can be read keep it, and the rest leave nothing out.
 @Observable @MainActor
 final class SearchLeaveOuts {
-    private static let defaultsKey = "searchLeaveOuts"
+    static let defaultsKey = "searchLeaveOuts"
     /// Each entry is stored data that could not be read, in the order it was found.
     static let setAsideKey = "searchLeaveOutsSetAside"
 

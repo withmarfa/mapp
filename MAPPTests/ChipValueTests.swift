@@ -65,7 +65,7 @@ struct ChipValueTests {
             id: ItemID("10000000-0000-0000-0000-000000000001"), type: TypeID("aic.ticket"), title: "Title", titleRule: .property("title"),
             properties: properties.map { Property(key: $0, value: $1) }, version: ItemVersion(1), created: .now, modified: .now)
         return PropertyRow.rows(
-            of: item, type: Self.ticket, hidden: ["title"], relationships: relationships, parentField: "child-of", format: .automatic,
+            of: item, type: Self.ticket, hidden: ["title"], relationships: relationships, parentField: "child-of", format: .standard,
             tags: tags, icon: { _ in "lucide:book-open" }, isPerson: person)
     }
 

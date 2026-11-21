@@ -153,18 +153,16 @@ nonisolated enum VersionBlocks {
     }
 
     /// A version's time as the thread writes it: the day as the lists write it ("Today", a weekday this week, "29 Oct"),
-    /// then the time. The date formats that spell a date out (short and long) are used whole.
+    /// then the time. A date format the person chose is used whole, since it spells the date out.
     static func when(
         _ date: Date, format: DateFormat, now: Date = .now, calendar: Calendar = .current, locale: Locale = .current
     ) -> String {
-        switch format {
-        case .automatic, .relative:
-            let day = DateDisplay.text(of: date, hasTime: false, place: .table, format: .automatic, now: now, calendar: calendar, locale: locale)
-            let time = date.formatted(Date.FormatStyle(date: .omitted, time: .shortened, locale: locale, calendar: calendar, timeZone: calendar.timeZone))
-            return String(localized: "\(day), \(time)")
-        case .short, .long:
+        guard format.date == .system else {
             return DateDisplay.text(of: date, hasTime: true, place: .value, format: format, now: now, calendar: calendar, locale: locale)
         }
+        let day = DateDisplay.text(of: date, hasTime: false, place: .table, format: format, now: now, calendar: calendar, locale: locale)
+        let time = DateDisplay.timeOfDay(of: date, format: format, calendar: calendar, locale: locale)
+        return String(localized: "\(day), \(time)")
     }
 }
 

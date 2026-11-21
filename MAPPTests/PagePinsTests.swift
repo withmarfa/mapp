@@ -65,7 +65,7 @@ struct PagePinsTests {
         let lead = PageHeaderLead(for: item, kind: kind ?? PageHeaderKind.of(item.type, in: catalogue), now: now)
         let candidates = PropertyRow.candidates(
             of: item, type: type, hidden: Set(["title", "body"]).union(lead.consumed), relationships: relationships, parentField: "child-of",
-            format: .automatic, tags: tags, typeLabel: type?.label, typeIcon: type?.icon, sourceName: item.source, now: now,
+            format: .standard, tags: tags, typeLabel: type?.label, typeIcon: type?.icon, sourceName: item.source, now: now,
             calendar: .current, locale: Locale(identifier: "en_GB"), offersEmpty: offersEmpty, icon: { _ in nil }, isPerson: { _ in false })
         let pins = PagePins.resolve(
             for: item, type: type, placement: placement, lead: lead, relationships: relationships, candidates: candidates,
@@ -154,12 +154,12 @@ struct PagePinsTests {
     @Test func theTypeSourceAndUpdatedAreRowsThatOnlyHaveSomethingToShowWhenTheyDo() {
         let candidates = PropertyRow.candidates(
             of: Self.item(source: "  workbench "), type: Self.catalogue.itemTypes[TypeID("aic.ticket")], hidden: ["title", "body"], relationships: [],
-            parentField: "child-of", format: .automatic, tags: [], typeLabel: "Ticket", typeIcon: nil, sourceName: nil, now: Self.now,
+            parentField: "child-of", format: .standard, tags: [], typeLabel: "Ticket", typeIcon: nil, sourceName: nil, now: Self.now,
             calendar: .current, locale: Locale(identifier: "en_GB"), icon: { _ in nil }, isPerson: { _ in false })
         #expect(candidates.prefix(3).map(\.id) == ["#type", "#source", "#updated"])
         #expect(candidates[1].value == .source("workbench"))
         let bare = PropertyRow.candidates(
-            of: Self.item(), type: nil, hidden: [], relationships: [], parentField: "child-of", format: .automatic, tags: [], typeLabel: nil,
+            of: Self.item(), type: nil, hidden: [], relationships: [], parentField: "child-of", format: .standard, tags: [], typeLabel: nil,
             typeIcon: nil, sourceName: nil, now: Self.now, calendar: .current, locale: .current, icon: { _ in nil }, isPerson: { _ in false })
         #expect(bare.map(\.id) == ["#updated"])
     }
@@ -168,7 +168,7 @@ struct PagePinsTests {
         let priority = try #require(Self.catalogue.itemTypes[TypeID("aic.ticket")]?.fields.first { $0.key == "priority" })
         let candidates = PropertyRow.candidates(
             of: Self.item(["priority": .string("high")]), type: Self.catalogue.itemTypes[TypeID("aic.ticket")], hidden: ["title", "body"],
-            relationships: [], parentField: "child-of", format: .automatic, tags: [], typeLabel: nil, typeIcon: nil, sourceName: nil,
+            relationships: [], parentField: "child-of", format: .standard, tags: [], typeLabel: nil, typeIcon: nil, sourceName: nil,
             now: Self.now, calendar: .current, locale: Locale(identifier: "en_GB"), isPriority: { $0.key == "priority" },
             icon: { _ in nil }, isPerson: { _ in false })
         let row = try #require(candidates.first { $0.id == "priority" })
@@ -179,7 +179,7 @@ struct PagePinsTests {
         #expect(options.map { $0["tone"] as? String } == [row.optionTones[0].rawValue])
         let others = PropertyRow.candidates(
             of: Self.item(["priority": .string("high")]), type: Self.catalogue.itemTypes[TypeID("aic.ticket")], hidden: ["title", "body"],
-            relationships: [], parentField: "child-of", format: .automatic, tags: [], typeLabel: nil, typeIcon: nil, sourceName: nil,
+            relationships: [], parentField: "child-of", format: .standard, tags: [], typeLabel: nil, typeIcon: nil, sourceName: nil,
             now: Self.now, calendar: .current, locale: Locale(identifier: "en_GB"), icon: { _ in nil }, isPerson: { _ in false })
         #expect(others.first { $0.id == "priority" }?.optionTones == [])
     }

@@ -154,10 +154,10 @@ private let english = Locale(identifier: "en_US")
     @Test func aVersionsTimeIsThePersonsDayAndClockTime() {
         let c = calendar()
         let now = date(2026, 11, 7, 15, in: c)
-        let today = VersionBlocks.when(date(2026, 11, 7, 9, 12, in: c), format: .automatic, now: now, calendar: c, locale: english)
+        let today = VersionBlocks.when(date(2026, 11, 7, 9, 12, in: c), format: .standard, now: now, calendar: c, locale: english)
         #expect(today == "\(String(localized: "Today")), 9:12\u{202F}AM")
         // A format that spells the date out is used whole.
-        let long = VersionBlocks.when(date(2026, 10, 29, 15, 15, in: c), format: .long, now: now, calendar: c, locale: english)
+        let long = VersionBlocks.when(date(2026, 10, 29, 15, 15, in: c), format: DateFormat(date: .long), now: now, calendar: c, locale: english)
         #expect(long.contains("2026"))
     }
 
@@ -254,7 +254,7 @@ private let english = Locale(identifier: "en_US")
             ],
             current: current, currentText: "one five four", isComplete: true, in: catalogue)
         let entry = list.entry("v2")!
-        let facts = VersionFacts.make(for: entry, after: list.older(than: entry), current: list.current!, in: catalogue, dateFormat: .automatic)
+        let facts = VersionFacts.make(for: entry, after: list.older(than: entry), current: list.current!, in: catalogue, dateFormat: .standard)
         #expect(facts.writtenBy == "MAPP")
         #expect(facts.version == 2 && facts.latest == 4)
         #expect(facts.saved == date(2026, 10, 2))
@@ -267,7 +267,7 @@ private let english = Locale(identifier: "en_US")
     @Test func theItemAsItIsHasNothingChangedSinceAndNoKnownWriter() {
         let current = item(version: 2, created: date(2026, 10, 1), modified: date(2026, 11, 6))
         let list = VersionList(snapshots: [version(1, replaced: date(2026, 11, 6))], current: current, currentText: "Text", isComplete: true, in: catalogue)
-        let facts = VersionFacts.make(for: list.current!, after: list.older(than: list.current!), current: list.current!, in: catalogue, dateFormat: .automatic)
+        let facts = VersionFacts.make(for: list.current!, after: list.older(than: list.current!), current: list.current!, in: catalogue, dateFormat: .standard)
         #expect(facts.isCurrent)
         #expect(facts.writtenBy == nil)
         #expect(facts.changedSince.isEmpty)
@@ -280,7 +280,7 @@ private let english = Locale(identifier: "en_US")
             snapshots: [version(1, body: "Text", title: "Title", type: task, extra: ["status": .string("pending")], replaced: date(2026, 11, 6))],
             current: current, currentText: "Text", isComplete: true, in: catalogue)
         let entry = list.entry("v1")!
-        let facts = VersionFacts.make(for: entry, after: nil, current: list.current!, in: catalogue, dateFormat: .automatic)
+        let facts = VersionFacts.make(for: entry, after: nil, current: list.current!, in: catalogue, dateFormat: .standard)
         #expect(facts.changedSince.map(\.label) == ["Status"])
         #expect(facts.changedSince.map(\.value) == [ItemTypeInfo.Field.label(ofOption: "done")])
     }
@@ -289,7 +289,7 @@ private let english = Locale(identifier: "en_US")
         let task = TypeChangeFixture.task
         let content = version(1, body: "Text", title: "Title", type: task, extra: ["status": .string("done")]).content(in: catalogue)
         let placement = PagePlacements().placement(of: task, in: catalogue)
-        let rows = content.pins(saved: date(2026, 10, 2), placement: placement, in: catalogue, format: .automatic)
+        let rows = content.pins(saved: date(2026, 10, 2), placement: placement, in: catalogue, format: .standard)
         // The tags, the parent and the source are not kept with a version, so they are never shown from the item as it is now.
         #expect(rows.allSatisfy { ![PagePlacement.tags, PagePlacement.source, PagePlacement.linkedFrom, PagePlacement.parent].contains($0.id) })
     }
@@ -311,11 +311,11 @@ private let english = Locale(identifier: "en_US")
             ],
             current: current, currentText: "one five four", isComplete: true, in: catalogue)
         for entry in list.entries {
-            let facts = VersionFacts.make(for: entry, after: list.older(than: entry), current: list.current!, in: catalogue, dateFormat: .automatic)
+            let facts = VersionFacts.make(for: entry, after: list.older(than: entry), current: list.current!, in: catalogue, dateFormat: .standard)
             for row in facts.changedHere + facts.changedSince { #expect(!row.value.contains("^["), "\(row.label): \(row.value)") }
         }
         let first = list.entry("v2")!
-        let facts = VersionFacts.make(for: first, after: list.older(than: first), current: list.current!, in: catalogue, dateFormat: .automatic)
+        let facts = VersionFacts.make(for: first, after: list.older(than: first), current: list.current!, in: catalogue, dateFormat: .standard)
         #expect(facts.changedHere.first?.value == "1 addition, 1 removal")
         #expect(facts.changedSince.first(where: { $0.id == "#text" })?.value == "1 change")
     }

@@ -53,7 +53,7 @@ struct GalleryTests {
         let settings = UserDefaults(suiteName: "GalleryTests.\(UUID().uuidString)")!
         settings.set(ItemOpening.fullPage.rawValue, forKey: ListKey.openItemsIn)
         let id = await browser.quickAdded("New", in: library, defaults: settings)
-        #expect(!browser.showsCollection, "with Open Items In at Full Page the new item opens in the page, not behind the grid")
+        #expect(!browser.showsCollection, "with Open Items at Full Page the new item opens in the page, not behind the grid")
         #expect(browser.selection == id.map { [$0] })
         browser.returnToCollection()
         #expect(browser.showsCollection)

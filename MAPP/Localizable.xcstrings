@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ (Missing)" : {
+
+    },
     "%lld more left out of search." : {
 
     },
@@ -28,6 +31,12 @@
     "%lld to %lld points" : {
 
     },
+    "12-Hour" : {
+
+    },
+    "24-Hour" : {
+
+    },
     "A Collection" : {
 
     },
@@ -46,7 +55,13 @@
     "A View" : {
 
     },
+    "Abbreviated" : {
+
+    },
     "About MAPP" : {
+
+    },
+    "Accent" : {
 
     },
     "Add and Open" : {
@@ -58,16 +73,28 @@
     "Add Shortcut" : {
 
     },
+    "After you quit MAPP." : {
+
+    },
     "All Deleted Items" : {
 
     },
     "Allow More…" : {
 
     },
+    "An item’s text." : {
+
+    },
     "Apps you sign in show here." : {
 
     },
     "All Types" : {
+
+    },
+    "Behind a date, a status or a tag you change." : {
+
+    },
+    "Behind highlighted text." : {
 
     },
     "At least %lld more left out of search." : {
@@ -91,6 +118,12 @@
     "Cleanup" : {
 
     },
+    "Code and Markdown marks." : {
+
+    },
+    "Code Font" : {
+
+    },
     "Collections you make show here." : {
 
     },
@@ -101,6 +134,9 @@
 
     },
     "Color" : {
+
+    },
+    "Command Palette, Search Items and Quick Add." : {
 
     },
     "Connect to a Marfa" : {
@@ -118,6 +154,9 @@
     "Couldn’t Sign In" : {
 
     },
+    "Custom Color" : {
+
+    },
     "Show Matches Left Out of Search" : {
 
     },
@@ -125,6 +164,12 @@
 
     },
     "Custom…" : {
+
+    },
+    "Dark" : {
+
+    },
+    "Dates and Times" : {
 
     },
     "Delete Permanently" : {
@@ -142,22 +187,61 @@
     "Empty…" : {
 
     },
+    "Every setting on this Mac starts over. Your items and sign-in stay." : {
+
+    },
+    "Every setting on this Mac. Your items stay." : {
+
+    },
     "Fewer Permissions Allowed" : {
       "extractionState" : "manual"
     },
     "Filter" : {
 
     },
+    "Fonts" : {
+
+    },
+    "From a list or a search." : {
+
+    },
+    "From This Window" : {
+
+    },
+    "General" : {
+
+    },
+    "Graphite" : {
+
+    },
     "Hide" : {
 
     },
+    "Highlights" : {
+
+    },
     "How wide Standard pages run. Full Width leaves it aside." : {
+
+    },
+    "In saved pages and emails." : {
+
+    },
+    "In the sidebar." : {
+
+    },
+    "Instead of the date, when it’s recent." : {
 
     },
     "Items you delete wait here before they are permanently deleted." : {
 
     },
     "Last answered %@. MAPP keeps trying." : {
+
+    },
+    "Last Used" : {
+
+    },
+    "Light" : {
 
     },
     "list and permanently delete deleted items" : {
@@ -208,7 +292,19 @@
     "MAPP shows one Marfa at a time." : {
 
     },
+    "Materials" : {
+
+    },
     "Needs a Permission" : {
+
+    },
+    "New Items" : {
+
+    },
+    "New Items Are" : {
+
+    },
+    "New windows open at these widths." : {
 
     },
     "No Marfa Open" : {
@@ -220,13 +316,34 @@
     "Nothing is waiting here." : {
 
     },
+    "Numeric" : {
+
+    },
+    "On an item’s page." : {
+
+    },
     "On the server’s own page, in your browser." : {
 
     },
     "Open Connection…" : {
 
     },
+    "Open Items" : {
+
+    },
+    "Opening" : {
+
+    },
+    "Or back to %@." : {
+
+    },
     "Other Marfas" : {
+
+    },
+    "Outside a type’s own list." : {
+
+    },
+    "Over the List" : {
 
     },
     "Overview" : {
@@ -241,6 +358,9 @@
     "Permanently deletes %@ items." : {
 
     },
+    "Pictures from Websites" : {
+
+    },
     "read the audit log" : {
       "extractionState" : "manual"
     },
@@ -248,6 +368,21 @@
       "extractionState" : "manual"
     },
     "Removes this Mac’s copy and signs MAPP out." : {
+
+    },
+    "Reopen Windows" : {
+
+    },
+    "Reset" : {
+
+    },
+    "Reset MAPP’s Settings" : {
+
+    },
+    "Reset MAPP’s Settings?" : {
+
+    },
+    "Reset…" : {
 
     },
     "see and change this Marfa’s settings" : {
@@ -265,6 +400,9 @@
     "pt" : {
 
     },
+    "Start With" : {
+
+    },
     "Switched Servers, but MAPP May Still Be Approved on the Previous One" : {
 
     },
@@ -277,7 +415,37 @@
     "MAPP dropped a sign-in it didn’t use, but couldn’t confirm that %@ ended its approval." : {
 
     },
+    "Switches, sliders and the text cursor." : {
+
+    },
+    "Symbols on Subtypes" : {
+
+    },
+    "System" : {
+
+    },
+    "System Setting" : {
+
+    },
+    "Text Font" : {
+
+    },
+    "The rest of MAPP uses the system font." : {
+
+    },
     "The server has ended MAPP’s sign-in. Sign in again in Connection." : {
+
+    },
+    "The sidebar, lists and controls." : {
+
+    },
+    "Theme" : {
+
+    },
+    "Time Format" : {
+
+    },
+    "Title When Scrolling" : {
 
     },
     "To end it, run “marfa apps list” with the command line signed in to %@ as the owner, find MAPP’s entry, then run “marfa apps revoke <id>”." : {
@@ -556,6 +724,12 @@
     "The server wouldn’t approve MAPP, so nothing changed. Check that you are signing in to the right server and account, then try again." : {
 
     },
+    "Today and Yesterday" : {
+
+    },
+    "Toolbar Background When Scrolling" : {
+
+    },
     "Translucent" : {
 
     },
@@ -580,7 +754,25 @@
     "today, %@" : {
 
     },
+    "Week Starts On" : {
+
+    },
+    "What a new window shows." : {
+
+    },
+    "What went wrong, never your items." : {
+
+    },
     "What’s New in MAPP" : {
+
+    },
+    "Where I Left Off" : {
+
+    },
+    "Window" : {
+
+    },
+    "Window Layout" : {
 
     },
     "Yellow" : {
@@ -779,9 +971,6 @@
     },
     "“%@” may remove items sooner than the server’s current setting." : {
       "extractionState" : "manual"
-    },
-    "Modal" : {
-
     },
     "Month" : {
       "extractionState" : "manual"
@@ -2053,9 +2242,6 @@
     "Back to Timeline" : {
       "extractionState" : "manual"
     },
-    "Base Text Size" : {
-
-    },
     "Block Quote" : {
 
     },
@@ -2507,16 +2693,10 @@
     "Date of Each Type" : {
       "extractionState" : "manual"
     },
-    "Dates" : {
-      "extractionState" : "manual"
-    },
     "days" : {
       "extractionState" : "manual"
     },
     "Decided" : {
-      "extractionState" : "manual"
-    },
-    "Default Column Widths" : {
       "extractionState" : "manual"
     },
     "default, %@" : {
@@ -3730,9 +3910,6 @@
     "Open Item" : {
 
     },
-    "Open Items In" : {
-
-    },
     "Open Original" : {
       "extractionState" : "manual"
     },
@@ -3791,9 +3968,6 @@
 
     },
     "Page Width" : {
-
-    },
-    "Panels" : {
 
     },
     "Parent" : {
@@ -3958,9 +4132,6 @@
     "Relationships" : {
 
     },
-    "Relative" : {
-      "extractionState" : "manual"
-    },
     "Relevance" : {
       "extractionState" : "manual"
     },
@@ -4049,9 +4220,6 @@
     },
     "Reset View" : {
 
-    },
-    "Reset Widths" : {
-      "extractionState" : "manual"
     },
     "Resize Image" : {
       "extractionState" : "manual"
@@ -4195,9 +4363,6 @@
     "Share…" : {
 
     },
-    "Short" : {
-      "extractionState" : "manual"
-    },
     "Shorten and Save" : {
       "extractionState" : "manual"
     },
@@ -4259,12 +4424,6 @@
 
     },
     "Show This Type Only" : {
-
-    },
-    "Show Title When Scrolling" : {
-
-    },
-    "Show Toolbar Background When Scrolling" : {
 
     },
     "Showing the first %lld of ^[%lld item](inflect: true)." : {
@@ -4994,9 +5153,6 @@
 
     },
     "Tomorrow" : {
-
-    },
-    "Toolbar" : {
 
     },
     "Try Again" : {

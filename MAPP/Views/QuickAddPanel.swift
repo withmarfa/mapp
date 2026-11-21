@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 /// ⌘N, the sidebar's New, Items' New Item and the palette's New commands: a panel near the top of the window for making one
 /// item. What it holds comes first (a title and text, a file, or a title alone); above the footer, chips show the
 /// details the person added, its properties and parent, and the files to attach to it. The footer chooses the
-/// kind of item and, from the plus menu, adds a file or a detail. ⌘Return adds it and opens it the way Settings > Lists > Open Items In says. Escape, Cancel or a click outside puts it away, keeping what was typed and given for the window; an empty panel also goes when the window stops being in front.
+/// kind of item and, from the plus menu, adds a file or a detail. ⌘Return adds it and opens it the way Settings > General > Open Items says. Escape, Cancel or a click outside puts it away, keeping what was typed and given for the window; an empty panel also goes when the window stops being in front.
 struct QuickAddPanel: View {
     @CurrentLibrary private var library
     @Environment(Libraries.self) private var libraries

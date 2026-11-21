@@ -15,6 +15,8 @@ extension EditorController {
         call("setReadingWidth", String(style.readingWidth))
         call("setSpellcheck", String(style.checksSpelling))
         call("setLinkStyle", json(style.linkLook.cssVariables()))
+        applyAccent()
+        applyFonts()
     }
 
     // MARK: Matching the system
@@ -23,18 +25,42 @@ extension EditorController {
         applyAccent()
     }
 
-    /// The page's accent follows the system's, or the app's own when the system leaves it to apps.
+    /// The page's accent is the one chosen in Settings, or the system's, or the app's own when the system leaves it to
+    /// apps. It is sent again when the appearance changes, since a system color resolves differently in light and dark.
     func applyAccent() {
         guard isReady else { return }
         var hex: String?
         NSApp.effectiveAppearance.performAsCurrentDrawingAppearance {
-            hex = NSColor.controlAccentColor.usingColorSpace(.sRGB).map {
-                String(format: "#%02X%02X%02X", Int(($0.redComponent * 255).rounded()),
-                       Int(($0.greenComponent * 255).rounded()), Int(($0.blueComponent * 255).rounded()))
-            }
+            hex = AccentChoice.hex(of: style.accent.nsColor ?? .controlAccentColor)
         }
         guard let hex else { return }
-        webView.evaluateJavaScript("document.documentElement.style.setProperty('--inkkit-accent-color', \(json(hex)))")
+        setProperty("--inkkit-accent-color", hex)
+        applyHighlight()
+    }
+
+    /// The color behind highlighted text, with the accent's own when the person chose that.
+    private func applyHighlight() {
+        var color: String?
+        NSApp.effectiveAppearance.performAsCurrentDrawingAppearance {
+            color = style.highlight.css(accent: style.accent.nsColor ?? .controlAccentColor)
+        }
+        setProperty("--item-highlight", color)
+    }
+
+    /// The families of the item's text and its code. One no longer installed is left out, so the page keeps its own.
+    func applyFonts() {
+        let text = FontChoice.resolved(style.textFont, among: FontChoice.installedFamilies())
+        let code = FontChoice.resolved(style.codeFont, among: FontChoice.installedMonospacedFamilies())
+        setProperty("--inkkit-font-family", text.map { FontChoice.css(family: $0, generic: "-apple-system, system-ui, sans-serif") }, onBody: true)
+        setProperty("--inkkit-monospace-font", code.map { FontChoice.css(family: $0, generic: "ui-monospace, monospace") }, onBody: true)
+    }
+
+    /// Sets a custom property on the page's root, or on its body where the page sets the same property there, and takes
+    /// it off again for nil.
+    private func setProperty(_ name: String, _ value: String?, onBody: Bool = false) {
+        let target = onBody ? "document.body" : "document.documentElement"
+        let script = value.map { "\(target).style.setProperty(\(json(name)), \(json($0)))" } ?? "\(target).style.removeProperty(\(json(name)))"
+        webView.evaluateJavaScript(script)
     }
 
     /// The page's own words, from the String Catalog.

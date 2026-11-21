@@ -1,7 +1,7 @@
 import Foundation
 
-/// Where an item opens when a person presses Return on it, double-clicks it or chooses Open, as Settings > Lists >
-/// Open Items In says. A Mac setting, one value in the defaults (`ListKey.openItemsIn`), never written to Marfa.
+/// Where an item opens when a person presses Return on it, double-clicks it or chooses Open, as Settings > General >
+/// Open Items says. A Mac setting, one value in the defaults (`ListKey.openItemsIn`), never written to Marfa.
 nonisolated enum ItemOpening: String, CaseIterable, Identifiable, Hashable, Sendable {
     /// A large page over the window, which dims what is behind it.
     case modal
@@ -17,7 +17,7 @@ nonisolated enum ItemOpening: String, CaseIterable, Identifiable, Hashable, Send
     /// The value Settings names.
     var title: String {
         switch self {
-        case .modal: String(localized: "Modal")
+        case .modal: String(localized: "Over the List")
         case .fullPage: String(localized: "Full Page")
         case .newWindow: String(localized: "New Window")
         }

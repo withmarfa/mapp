@@ -266,7 +266,8 @@ final class QuickAdd {
 
     // MARK: What is remembered
 
-    /// The defaults key for the kind last added, which a new draft starts with where its place holds no type.
+    /// The defaults key for the kind last added, which a new draft starts with where its place holds no type and the
+    /// person chose none (`NewItemType`).
     static let lastTypeKey = "quickAddLastType"
 
     /// The sidebar's types in its order, groups opened.
@@ -343,11 +344,12 @@ final class QuickAdd {
         return String(localized: "Adding will be refused: this kind of item needs \(names), which MAPP can’t fill in. Choose another kind.")
     }
 
-    /// The kind quick add opens in: the one asked for, else the one a type's own place holds, else the last used, then a
-    /// note, then any. A kind not in `offered` (a type since deleted, or one nobody can make) is passed over.
-    /// A type's place is its list, the Collections index (a collection) and Files.
+    /// The kind quick add opens in: the one asked for, else the one a type's own place holds, else the one Settings >
+    /// General > New Items names (`chosen`), else the last used, then a note, then any. A kind not in `offered` (a type
+    /// since deleted, or one nobody can make) is passed over. A type's place is its list, the Collections index (a
+    /// collection) and Files.
     static func startingType(
-        asked: String?, place: SidebarItem, remembered: String?, offered: [String], in catalogue: Catalogue
+        asked: String?, place: SidebarItem, chosen: String? = nil, remembered: String?, offered: [String], in catalogue: Catalogue
     ) -> String? {
         func choice(_ id: String?) -> String? { id.flatMap { offered.contains($0) ? $0 : nil } }
         let held: String? = switch place {
@@ -356,7 +358,7 @@ final class QuickAdd {
         case .files: TypeID.file.rawValue
         default: nil
         }
-        return choice(asked) ?? choice(held) ?? choice(remembered) ?? choice("core.note") ?? offered.first
+        return choice(asked) ?? choice(held) ?? choice(chosen) ?? choice(remembered) ?? choice("core.note") ?? offered.first
     }
 
     /// The chips the panel shows for a draft: the kind's required fields first, then what the person added in the
@@ -465,7 +467,8 @@ extension Browser {
         let types = QuickAdd.types(in: library).map(\.id.rawValue)
         if quickAdd.draft == nil {
             guard let kind = QuickAdd.startingType(
-                asked: typeID, place: item, remembered: remembered, offered: types, in: library.catalogue)
+                asked: typeID, place: item, chosen: NewItemType.stored(), remembered: remembered, offered: types,
+                in: library.catalogue)
             else { return }
             quickAdd.draft = QuickAdd.Draft(typeID: kind)
             chooseQuickAddType(kind, in: library)

@@ -94,9 +94,33 @@ private struct RenderedWindow<Detail: View>: View {
         return (libraries, bench)
     }
 
+    @Test func general() async throws {
+        try await SettingsRender.png(RenderedWindow(selection: .general, detail: GeneralPage()), size: Self.size, named: "General")
+    }
+
     @Test func appearance() async throws {
         try await SettingsRender.png(
             RenderedWindow(selection: .appearance, detail: AppearancePage()), size: Self.size, named: "Appearance")
+    }
+
+    /// The whole page, taller than the window, in place of the board's scrolled view.
+    @Test func appearanceWhole() async throws {
+        try await SettingsRender.png(
+            RenderedWindow(selection: .appearance, detail: AppearancePage()),
+            size: CGSize(width: Self.size.width, height: 1_300), named: "Appearance, whole page")
+    }
+
+    /// A font chosen once and uninstalled since, and a color of the person's own.
+    @Test func appearanceWithAMissingFontAndACustomAccent() async throws {
+        let defaults = UserDefaults.standard
+        let keys = [AppearanceKey.textFont, AppearanceKey.accent, AppearanceKey.theme]
+        defer { for key in keys { defaults.removeObject(forKey: key) } }
+        defaults.set("Uninstalled Sans", forKey: AppearanceKey.textFont)
+        defaults.set(AccentChoice.custom("#B4468C").rawValue, forKey: AppearanceKey.accent)
+        defaults.set(AppTheme.dark.rawValue, forKey: AppearanceKey.theme)
+        try await SettingsRender.png(
+            RenderedWindow(selection: .appearance, detail: AppearancePage()),
+            size: CGSize(width: Self.size.width, height: 1_300), named: "Appearance, a missing font and a custom accent")
     }
 
     @Test func lists() async throws {

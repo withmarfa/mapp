@@ -44,12 +44,14 @@ struct MarfaPageGate<Content: View>: View {
         }
     }
 
-    static func notAnswering(_ lastAnswered: Date?, now: Date = .now, calendar: Calendar = .current) -> String {
+    static func notAnswering(
+        _ lastAnswered: Date?, now: Date = .now, calendar: Calendar = .current, format: DateFormat = .stored()
+    ) -> String {
         guard let lastAnswered else { return String(localized: "MAPP keeps trying.") }
-        let time = lastAnswered.formatted(date: .omitted, time: .shortened)
+        let time = DateDisplay.timeOfDay(of: lastAnswered, format: format, calendar: calendar)
         let when = calendar.isDate(lastAnswered, inSameDayAs: now)
             ? String(localized: "today, \(time)")
-            : lastAnswered.formatted(date: .abbreviated, time: .shortened)
+            : DateDisplay.text(of: lastAnswered, place: .value, format: format, now: now, calendar: calendar)
         return String(localized: "Last answered \(when). MAPP keeps trying.")
     }
 }

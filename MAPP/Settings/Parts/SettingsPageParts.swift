@@ -7,16 +7,17 @@ struct SettingsPageColumn<Content: View>: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 26) {
+            VStack(alignment: .leading, spacing: SettingsTokens.Metric.pageSpacing) {
                 content
             }
             .frame(maxWidth: SettingsTokens.Metric.column, alignment: .leading)
             .padding(.horizontal, 24)
-            .padding(.top, 24)
-            .padding(.bottom, 40)
+            .padding(.top, SettingsTokens.Metric.pageTop)
+            .padding(.bottom, SettingsTokens.Metric.pageBottom)
             .frame(maxWidth: .infinity)
         }
         .scrollBounceBehavior(.basedOnSize)
+        .scrollEdgeEffectStyle(.soft, for: .top)
         .background(SettingsTokens.page)
     }
 }

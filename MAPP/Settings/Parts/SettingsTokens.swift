@@ -47,12 +47,29 @@ enum SettingsTokens {
     static let secondaryText = Color(nsColor: .secondaryLabelColor)
     static let tertiaryText = Color(nsColor: .tertiaryLabelColor)
     static let primaryText = Color(nsColor: .labelColor)
+    /// The swatch of a color the person makes, before they have made one.
+    static let rainbow = AngularGradient(colors: [.red, .orange, .yellow, .green, .blue, .purple, .red], center: .center)
+    /// The accent the Mac is set to, which the first swatch of a color choice shows.
+    static let systemAccent = Color(nsColor: .controlAccentColor)
     static let warning = Color(nsColor: .systemOrange)
     static let ok = Color(nsColor: .systemGreen)
     /// The one color a chosen choice's ring and a focused control's ring take: gray, never the accent.
     static let focusRing = Color.primary.opacity(0.26)
     /// The scrim behind a centered sheet.
     static let scrim = Color.black.opacity(0.18)
+
+    /// The small windows a theme's tile draws: a sidebar of short bars and a page of lines, light and dark, which are the
+    /// pictures of the choices and so do not follow the appearance the window is in.
+    enum ThemePreview {
+        static let lightPage = Color(nsColor: NSColor(white: 1, alpha: 1))
+        static let lightSidebar = Color(nsColor: NSColor(srgbRed: 233 / 255, green: 234 / 255, blue: 237 / 255, alpha: 1))
+        static let lightSidebarLine = Color(nsColor: NSColor(srgbRed: 202 / 255, green: 203 / 255, blue: 206 / 255, alpha: 1))
+        static let lightLine = Color(nsColor: NSColor(white: 222 / 255, alpha: 1))
+        static let darkPage = Color(nsColor: NSColor(white: 30 / 255, alpha: 1))
+        static let darkSidebar = Color(nsColor: NSColor(srgbRed: 44 / 255, green: 44 / 255, blue: 54 / 255, alpha: 1))
+        static let darkSidebarLine = Color(nsColor: NSColor(srgbRed: 86 / 255, green: 86 / 255, blue: 94 / 255, alpha: 1))
+        static let darkLine = Color(nsColor: NSColor(white: 75 / 255, alpha: 1))
+    }
 
     /// The interface fonts of Settings. A page asks for these by role.
     enum Role: Hashable, Sendable {
@@ -119,6 +136,28 @@ enum SettingsTokens {
         static let sidebarFieldMargin: CGFloat = 12
         static let sidebarFieldTop: CGFloat = 8
         static let sidebarFieldBottom: CGFloat = 4
+        /// A color swatch and the dot that marks the chosen one, and the space between swatches.
+        static let swatch: CGFloat = 18
+        static let swatchDot: CGFloat = 6
+        static let swatchSpacing: CGFloat = 8
+        /// How much of the system's color well shows over a swatch that stands for it: none to the eye, all to the pointer.
+        static let invisibleWell: Double = 0.02
+        /// A choice tile's picture is wider than tall, as the board draws it: 186 by 104 in the column.
+        static let choiceAspect: CGFloat = 186 / 104
+        /// A theme tile's sidebar, as a share of its width, and its bars and lines: height, spacing, how many bars the
+        /// sidebar has, the page's side and top padding, the sidebar's side padding, and the heading line's share of the width.
+        static let previewSidebar: CGFloat = 0.3
+        static let previewLine: CGFloat = 5
+        static let previewLineSpacing: CGFloat = 7
+        static let previewSidebarLines = 5
+        static let previewPadding: CGFloat = 14
+        static let previewTop: CGFloat = 22
+        static let previewSidebarPadding: CGFloat = 10
+        static let previewHeading: CGFloat = 0.55
+        /// The space between a page's sections, and above and below its column.
+        static let pageSpacing: CGFloat = 32
+        static let pageTop: CGFloat = 16
+        static let pageBottom: CGFloat = 58
         /// A count badge's side padding, smallest size and a dot badge's size.
         static let badgeInset: CGFloat = 6
         static let badgeSize: CGFloat = 18

@@ -168,11 +168,12 @@ nonisolated enum ValueEditOptions {
     }
 }
 
-/// A time of day as a person types it in the date panel: `9`, `930`, `9:30`, `21.30` or `9:30 pm`.
+/// A time of day as a person types it in the date panel, or as the clock writes it back (`DateDisplay.timeOfDay`): `9`,
+/// `930`, `9:30`, `21.30`, `9:30 pm` or `9:30 p.m.`.
 nonisolated enum TimeOfDay {
     static func parse(_ text: String) -> (hour: Int, minute: Int)? {
         let typed = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let match = typed.wholeMatch(of: /(\d{1,2})(?:[:.]?(\d{2}))?\s*(am|pm|a|p)?/),
+        guard let match = typed.wholeMatch(of: /(\d{1,2})(?:[:.]?(\d{2}))?\s*(?:([ap])\.?(?:m\.?)?)?/),
               var hour = Int(match.1) else { return nil }
         let minute = match.2.flatMap { Int($0) } ?? 0
         guard minute < 60 else { return nil }
@@ -207,8 +208,11 @@ nonisolated enum QuickDates {
     }
 
     /// The day beside a quick date, such as "Tue 3 Nov", with the year only where it is not the one of `now`, in the
-    /// order and punctuation the locale uses.
-    static func detail(of entry: Entry, now: Date, calendar: Calendar, locale: Locale) -> String {
+    /// order and punctuation the locale uses, unless the person chose how a date is written.
+    static func detail(of entry: Entry, now: Date, calendar: Calendar, locale: Locale, format: DateFormat = .standard) -> String {
+        if format.date != .system {
+            return DateDisplay.text(of: entry.date, hasTime: false, place: .value, format: format, now: now, calendar: calendar, locale: locale)
+        }
         let sameYear = calendar.isDate(entry.date, equalTo: now, toGranularity: .year)
         let formatter = DateFormatter()
         formatter.locale = locale

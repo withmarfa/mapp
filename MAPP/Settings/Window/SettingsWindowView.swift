@@ -46,12 +46,12 @@ struct SettingsWindowView: View {
         }
         .frame(minWidth: SettingsTokens.Metric.windowMinWidth, minHeight: SettingsTokens.Metric.windowMinHeight)
         .interfaceTextStyle()
+        .appAccent()
         .environment(\.settingsTextScale, InterfaceStyle.scale(for: textSize))
         .environment(libraries)
         .environment(libraries.host)
         .environment(\.library, libraries.current)
         .containerBackground(SettingsTokens.page, for: .window)
-        .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         .focusedSceneValue(\.settingsNavigation, navigation)
         .notices(libraries.host.notices) { launcher.show($0) }
         .modifier(OptionalLibraryDialogs())
@@ -83,6 +83,7 @@ struct SettingsDetail: View {
     var body: some View {
         Group {
             switch navigation.page {
+            case .general: GeneralPage()
             case .appearance: AppearancePage()
             case .lists: ListsPage()
             case .editor: EditorPage()

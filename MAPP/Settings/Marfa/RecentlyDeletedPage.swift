@@ -87,14 +87,9 @@ struct RecentlyDeletedPage: View {
         .accessibilityIdentifier("RecentlyDeletedAllPage")
     }
 
-    /// When an item was deleted: Today, Yesterday, the day of this year, or the day with its year.
-    static func when(_ date: Date?, now: Date = .now, calendar: Calendar = .current) -> String {
+    /// When an item was deleted, as a table says a day (`DateDisplay`).
+    static func when(_ date: Date?, now: Date = .now, calendar: Calendar = .current, format: DateFormat = .stored()) -> String {
         guard let date else { return "" }
-        if calendar.isDate(date, inSameDayAs: now) { return String(localized: "Today") }
-        if let yesterday = calendar.date(byAdding: .day, value: -1, to: now), calendar.isDate(date, inSameDayAs: yesterday) {
-            return String(localized: "Yesterday")
-        }
-        if calendar.isDate(date, equalTo: now, toGranularity: .year) { return date.formatted(.dateTime.day().month(.abbreviated)) }
-        return date.formatted(.dateTime.day().month(.abbreviated).year())
+        return DateDisplay.text(of: date, hasTime: false, place: .table, format: format, now: now, calendar: calendar)
     }
 }

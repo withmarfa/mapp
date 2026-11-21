@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import MAPP
 
-/// Where an item opens (Settings > Lists > Open Items In), and what the modal does with the window around it.
+/// Where an item opens (Settings > General > Open Items), and what the modal does with the window around it.
 struct ItemOpeningTests {
     /// Defaults of the test's own, so a run never reads or writes the person's.
     private func defaults(_ stored: String? = nil) -> UserDefaults {

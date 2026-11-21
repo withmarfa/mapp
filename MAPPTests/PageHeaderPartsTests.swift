@@ -18,7 +18,7 @@ struct PageHeaderPartsTests {
         library.items = [item]
         var placements = PagePlacements()
         placements.setPins([PagePlacement.tags], of: TypeID("core.bookmark"))
-        let parts = PageHeaderParts(of: item, in: library, placements: placements, dateFormat: .automatic)
+        let parts = PageHeaderParts(of: item, in: library, placements: placements, dateFormat: .standard)
         #expect(parts.kind == .reading)
         #expect(!parts.pins.pins.isEmpty, "the pins are the item's, whichever look the page is in")
     }
