@@ -117,6 +117,34 @@ test('a picture with no alt text is named for its website, whatever characters t
   })
 })
 
+test('a picture whose description repeats the item title is called Picture, in the app words, and says so again if the title changes', async () => {
+  app(() => ({ state: 'waiting' }))
+  await withItem(
+    picture,
+    async (editor) => {
+      await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
+      await settled()
+      expect(labels()).toEqual(['A picture'])
+      editor.setTitle('  a PICTURE ')
+      await vi.waitFor(() => expect(labels()).toEqual(['Image']))
+      editor.setTitle('Something else')
+      await vi.waitFor(() => expect(labels()).toEqual(['A picture']))
+    },
+    { picture: 'Image' },
+  )
+})
+
+test('a picture that repeats the title is only renamed on screen, never in the text', async () => {
+  app(() => ({ state: 'waiting' }))
+  await withItem(picture, async (editor) => {
+    await vi.waitFor(() => expect(bar.at(-1)?.count).toBe(1))
+    editor.setTitle('A picture')
+    await vi.waitFor(() => expect(labels()).toEqual(['Picture']))
+    // Null is the text as it was loaded.
+    expect(editor.markdown()).toBeNull()
+  })
+})
+
 test('choosing a waiting picture asks the app to load it, and the card becomes the picture', async () => {
   const { asked } = app((request) => (request.ask === 'chosen' ? loaded : { state: 'waiting' }))
   await withItem(picture, async () => {

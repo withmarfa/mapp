@@ -79,6 +79,7 @@ export function splitLabels(all: AppLabels): {
     quickLookNamed,
     loadAction,
     loadingNamed,
+    picture,
     picturesOff,
     loadOnePicture,
     loadPictures,
@@ -100,6 +101,7 @@ export function splitLabels(all: AppLabels): {
       quickLookNamed,
       loadAction,
       loadingNamed,
+      picture,
       picturesOff,
       loadOnePicture,
       loadPictures,
@@ -440,6 +442,10 @@ export class ItemEditor {
     }
     this.item = id
     this.pictures.setItem(id)
+  }
+  /** The title the header shows, which a waiting picture's line does not repeat as its name. */
+  setTitle(title: string) {
+    this.pictures.setTitle(title)
   }
   /** The app's Remote Pictures setting changed: pictures that waited, or were turned off, are asked about again. */
   picturesChanged() {

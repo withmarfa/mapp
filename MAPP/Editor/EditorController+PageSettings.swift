@@ -83,6 +83,7 @@ extension EditorController {
             "footnote": String(localized: "Footnote"),
             "loadAction": String(localized: "Load"),
             "loadingNamed": String(localized: "Loading %@…"),
+            "picture": String(localized: "Picture"),
             "picturesOff": String(localized: "Remote Pictures Are Off"),
             "loadOnePicture": String(localized: "Load Picture"),
             "loadPictures": String(localized: "Load Pictures"),
