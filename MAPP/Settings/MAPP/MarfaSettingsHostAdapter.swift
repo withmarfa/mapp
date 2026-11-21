@@ -149,20 +149,31 @@ enum LibraryDescription {
 
     /// The owner's calls, made through a client that shows the system's sign-in in place where the server asks the owner to
     /// confirm it is them, and sends the call again once they have.
-    var ownerCalls: any OwnerCalls {
+    var ownerCalls: any OwnerCalls { ClientOwnerCalls(server: plainServer, client: confirmingClient) }
+
+    /// What Activity, Monitoring, Limits and Start-Up ask of the server, through the same client.
+    var instanceCalls: any InstanceCalls { ClientInstanceCalls(client: confirmingClient) }
+
+    /// The package's server, for the one call the generated client does not hold (`Server.health()`).
+    private var plainServer: (@Sendable () throws -> Server)? {
+        guard let connection = host.configuredConnection else { return nil }
+        let signIns = host.signIns
+        let address = connection.address.absoluteString
+        return { try Self.server(address: address) { try MarfaServerCalls(connection: connection, signIns: signIns).server() } }
+    }
+
+    private var confirmingClient: @Sendable () throws -> Client {
         guard let connection = host.configuredConnection else {
-            return ClientOwnerCalls { throw MarfaError.signedOut(origin: "", message: "no server is set") }
+            return { throw MarfaError.signedOut(origin: "", message: "no server is set") }
         }
         let signIns = host.signIns
         let address = connection.address.absoluteString
-        return ClientOwnerCalls(
-            server: { try Self.server(address: address) { try MarfaServerCalls(connection: connection, signIns: signIns).server() } },
-            client: {
-                let calls = MarfaServerCalls(connection: connection, signIns: signIns)
-                let server = try Self.server(address: address) { try calls.server() }
-                    .confirming(from: { NSApp.keyWindow ?? NSApp.windows.first ?? NSWindow() })
-                return Client(server, timeout: calls.timeout)
-            })
+        return {
+            let calls = MarfaServerCalls(connection: connection, signIns: signIns)
+            let server = try Self.server(address: address) { try calls.server() }
+                .confirming(from: { NSApp.keyWindow ?? NSApp.windows.first ?? NSWindow() })
+            return Client(server, timeout: calls.timeout)
+        }
     }
 
     /// The package's server from `build`: an ended sign-in is the server ending it, anything else cannot be read.

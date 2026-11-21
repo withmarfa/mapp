@@ -7,6 +7,12 @@
     "%@. %@" : {
 
     },
+    "%@ was changed elsewhere. MAPP read the new value; yours wasn’t saved." : {
+
+    },
+    "%@ were changed elsewhere. MAPP read the new values; yours weren’t saved." : {
+
+    },
     "1 conflicted copy" : {
 
     },
@@ -43,6 +49,9 @@
     "All Events" : {
 
     },
+    "Another Marfa now answers at this address. Nothing was sent." : {
+
+    },
     "Answer" : {
 
     },
@@ -53,6 +62,9 @@
 
     },
     "Change this folder’s ignore patterns, limits and files with the command line: %@." : {
+
+    },
+    "Changed Elsewhere" : {
 
     },
     "Changing the events or the type drops waiting deliveries that no longer match." : {
@@ -170,7 +182,22 @@
     "%@ of %@ selected" : {
 
     },
+    "%@ lists no start-up settings." : {
+
+    },
+    "0 sets no limit." : {
+
+    },
+    "A sign-in was refused" : {
+
+    },
     "Address Not Added" : {
+
+    },
+    "Adopted the backup folder" : {
+
+    },
+    "All Activity" : {
 
     },
     "Allow More… lets MAPP read the owner’s name." : {
@@ -182,10 +209,154 @@
     "Clean-up waits until the server’s clock is right." : {
 
     },
+    "An app registered" : {
+
+    },
+    "Approved an app" : {
+
+    },
+    "At most 32 MB." : {
+
+    },
+    "Audit Log" : {
+
+    },
+    "Cancelled a bulk action" : {
+
+    },
+    "Change %@" : {
+
+    },
+    "Changed a folder" : {
+
+    },
+    "Changed a key" : {
+
+    },
+    "Changed a link" : {
+
+    },
+    "Changed a link type" : {
+
+    },
+    "Changed a source" : {
+
+    },
+    "Changed a type" : {
+
+    },
+    "Changed a type’s icon" : {
+
+    },
+    "Changed a view" : {
+
+    },
+    "Changed a webhook" : {
+
+    },
+    "Changed an item" : {
+
+    },
+    "Changed an item’s extension data" : {
+
+    },
+    "Changed table rows" : {
+
+    },
+    "Changed the password" : {
+
+    },
+    "Changed the settings" : {
+
+    },
+    "characters" : {
+
+    },
+    "Claimed this Marfa" : {
+
+    },
+    "Cleared a connector’s state" : {
+
+    },
+    "Cleared a type’s icon" : {
+
+    },
+    "Confirmed the clock" : {
+
+    },
+    "Connector Deliveries" : {
+
+    },
+    "Copied a file to another store" : {
+
+    },
     "Couldn’t be downloaded." : {
 
     },
     "It has trouble syncing." : {
+
+    },
+    "Deleted a connector" : {
+
+    },
+    "Deleted a link" : {
+
+    },
+    "Deleted a link type" : {
+
+    },
+    "Deleted a type" : {
+
+    },
+    "Deleted a view" : {
+
+    },
+    "Deleted a webhook" : {
+
+    },
+    "deliveries" : {
+
+    },
+    "Disconnected an app" : {
+
+    },
+    "Dropped a file copy" : {
+
+    },
+    "Emptied old items" : {
+
+    },
+    "Environment" : {
+
+    },
+    "Error Reports" : {
+
+    },
+    "Exported items" : {
+
+    },
+    "Fetched a file from a web address" : {
+
+    },
+    "Fetching Files" : {
+
+    },
+    "File Reading" : {
+
+    },
+    "From a key alone." : {
+
+    },
+    "From a web address, or one a chat attached." : {
+
+    },
+    "From one app or key." : {
+
+    },
+    "Headers" : {
+
+    },
+    "Heartbeat" : {
 
     },
     "It must sign in again with your password or a passkey. Apps and keys keep working." : {
@@ -242,7 +413,31 @@
     "MAPP isn’t allowed to see or change how this Marfa keeps files." : {
 
     },
+    "MAPP isn’t allowed to read this Marfa’s audit log." : {
+
+    },
+    "MAPP isn’t allowed to see or change how this Marfa is monitored." : {
+
+    },
+    "MAPP isn’t allowed to see or change this Marfa’s limits." : {
+
+    },
+    "MAPP isn’t allowed to read the settings this Marfa started with." : {
+
+    },
+    "Key Requests per Window" : {
+
+    },
+    "Largest Bulk Request" : {
+
+    },
+    "Largest Delivery" : {
+
+    },
     "MAPP removes its copy from this Mac and signs out. Webhooks it made are deleted. Your items stay." : {
+
+    },
+    "Marfa asks this address on a schedule, so a monitor notices if it stops." : {
 
     },
     "Needs more disk space." : {
@@ -261,6 +456,27 @@
 
     },
     "Nothing is waiting to be removed." : {
+
+    },
+    "Newer" : {
+
+    },
+    "Newest first" : {
+
+    },
+    "No activity fits this filter." : {
+
+    },
+    "Nothing is sent until an address is set." : {
+
+    },
+    "Nothing is sent until the host and token are set." : {
+
+    },
+    "Nothing listed" : {
+
+    },
+    "Older" : {
 
     },
     "On the server’s own page, in a sheet." : {
@@ -531,6 +747,39 @@
     "Permanently Delete…" : {
 
     },
+    "Permanently deleted an item" : {
+
+    },
+    "PostHog Host" : {
+
+    },
+    "Prints a recovery code at each start." : {
+
+    },
+    "Project Token" : {
+
+    },
+    "Proxies it believes." : {
+
+    },
+    "Queued a bulk action" : {
+
+    },
+    "Ran part of a bulk action" : {
+
+    },
+    "Rate Limits" : {
+
+    },
+    "Read a file’s text" : {
+
+    },
+    "Refused a reused token" : {
+
+    },
+    "Registered a connector" : {
+
+    },
     "Remove “%@” from “%@”?" : {
 
     },
@@ -556,6 +805,99 @@
 
     },
     "Set %@ Again" : {
+
+    },
+    "Removed a tag" : {
+
+    },
+    "Removed an item’s extension data" : {
+
+    },
+    "Removed an unused file" : {
+
+    },
+    "Removed idle app registrations" : {
+
+    },
+    "Removed old disconnected apps" : {
+
+    },
+    "Removed old revoked keys" : {
+
+    },
+    "Replaced an item’s tags" : {
+
+    },
+    "Report Errors" : {
+
+    },
+    "requests" : {
+
+    },
+    "Requests" : {
+
+    },
+    "Requests per Window" : {
+
+    },
+    "Restored an archive" : {
+
+    },
+    "Restored an item" : {
+
+    },
+    "Retired an idle app" : {
+
+    },
+    "Retired an inbound address" : {
+
+    },
+    "Reused an approval" : {
+
+    },
+    "Revoked a key" : {
+
+    },
+    "Seals stored keys. Never shown." : {
+
+    },
+    "seconds" : {
+
+    },
+    "Secrets are never shown. To change one, type it again." : {
+
+    },
+    "Send a Heartbeat" : {
+
+    },
+    "Send Telemetry" : {
+
+    },
+    "Sent a webhook delivery again" : {
+
+    },
+    "Set" : {
+
+    },
+    "Set the address first." : {
+
+    },
+    "Set the PostHog host and the project token first." : {
+
+    },
+    "Set Where %@ Runs" : {
+
+    },
+    "Setting" : {
+
+    },
+    "Settings Read When It Starts" : {
+
+    },
+    "Settled a source’s removed items" : {
+
+    },
+    "Set…" : {
 
     },
     "Set on the machine %@ runs on." : {
@@ -636,10 +978,16 @@
     "Sign In…" : {
 
     },
+    "Signed in" : {
+
+    },
     "Signed In As" : {
 
     },
     "Signed out. This Mac’s copy is kept." : {
+
+    },
+    "Signs sign-ins. Never shown." : {
 
     },
     "Some can’t be left out as well: a search can skip only so much. Stop leaving one out to make room." : {
@@ -663,6 +1011,18 @@
     "Start Again" : {
 
     },
+    "Start-Up" : {
+
+    },
+    "Started an update" : {
+
+    },
+    "Starts only the command line’s way in, for recovery." : {
+
+    },
+    "State" : {
+
+    },
     "Stop Leaving Out" : {
 
     },
@@ -670,6 +1030,24 @@
 
     },
     "The last backup run failed or lost files." : {
+
+    },
+    "Stopped syncing a folder" : {
+
+    },
+    "Struck a damaged file copy" : {
+
+    },
+    "Tagged an item" : {
+
+    },
+    "Telemetry" : {
+
+    },
+    "The address it listens on." : {
+
+    },
+    "The command line’s way in." : {
 
     },
     "The last check found no answer." : {
@@ -721,6 +1099,15 @@
 
     },
     "The server’s own check found a problem." : {
+
+    },
+    "The port it listens on." : {
+
+    },
+    "The server refused this change. Nothing was changed." : {
+
+    },
+    "The sign-in address a new Marfa starts with." : {
 
     },
     "The types and sources chosen and left out make more conditions than one search can hold." : {
@@ -1011,7 +1398,16 @@
     "They still show in their own place, in views and in Favorites." : {
 
     },
+    "Thinned old versions" : {
+
+    },
+    "Time Allowed" : {
+
+    },
     "Time Format" : {
+
+    },
+    "times" : {
 
     },
     "Title When Scrolling" : {
@@ -1132,6 +1528,18 @@
 
     },
     "Housekeeping" : {
+
+    },
+    "Issued a device code" : {
+
+    },
+    "Issued a setup code" : {
+
+    },
+    "Issued a sign-in code" : {
+
+    },
+    "Issued an access token" : {
 
     },
     "Inbox Is Empty" : {
@@ -1299,19 +1707,37 @@
     "The server wouldn’t approve MAPP, so nothing changed. Check that you are signing in to the right server and account, then try again." : {
 
     },
+    "To PostHog’s error tracking." : {
+
+    },
     "Today and Yesterday" : {
 
     },
     "Toolbar Background When Scrolling" : {
 
     },
+    "Traces, logs and metrics. Off keeps the settings." : {
+
+    },
     "Translucent" : {
+
+    },
+    "Tries" : {
+
+    },
+    "Type both the host and the project token." : {
+
+    },
+    "Type it again to change it" : {
 
     },
     "Tried %@" : {
 
     },
     "Unavailable on the server." : {
+
+    },
+    "Undid a table change" : {
 
     },
     "Unknown" : {
@@ -1371,10 +1797,25 @@
     "Uploads will stop below %@ free instead of below %@, which leaves the server less room to work in." : {
 
     },
+    "Use a number above 0, up to %@ %@." : {
+
+    },
+    "Use a number from %@ to %@ %@." : {
+
+    },
+    "Use a whole number." : {
+
+    },
     "Use Another Marfa" : {
 
     },
+    "Used a setup code" : {
+
+    },
     "Value panels open under a date, status, tags, or other value. Palettes are the command palette, Search Items, and New Item. Translucent uses the system’s popover material, and Solid uses the window color." : {
+
+    },
+    "viewers" : {
 
     },
     "Waiting for a connection." : {
@@ -1389,6 +1830,9 @@
     "Waiting to download." : {
 
     },
+    "Waiting, at Most" : {
+
+    },
     "Waiting…" : {
 
     },
@@ -1401,10 +1845,19 @@
     "Week Starts On" : {
 
     },
+    "What" : {
+
+    },
     "What a new window shows." : {
 
     },
+    "What happens in %@ is recorded here." : {
+
+    },
     "What isn’t filed yet." : {
+
+    },
+    "What It Does" : {
 
     },
     "What went wrong, never your items." : {
@@ -1413,7 +1866,22 @@
     "What’s New in MAPP" : {
 
     },
+    "Where a proxy puts the caller’s address." : {
+
+    },
+    "Where files are kept." : {
+
+    },
     "Where I Left Off" : {
+
+    },
+    "Where the database is." : {
+
+    },
+    "Who" : {
+
+    },
+    "Who Did What" : {
 
     },
     "Where and When" : {
@@ -1423,6 +1891,12 @@
 
     },
     "Window Layout" : {
+
+    },
+    "Wrote items in bulk" : {
+
+    },
+    "Wrote links in bulk" : {
 
     },
     "Yellow" : {
@@ -2836,9 +3310,6 @@
     },
     "Another item opened before MAPP finished saving this one, so your most recent typing might not be saved. Try again." : {
 
-    },
-    "Another Marfa now answers at this address. Nothing was sent, and these are its settings, not the ones you were editing." : {
-      "extractionState" : "manual"
     },
     "Apache-2.0" : {
 
@@ -7703,6 +8174,9 @@
     "Disk" : {
 
     },
+    "Added a file" : {
+
+    },
     "Events" : {
 
     },
@@ -7734,6 +8208,9 @@
 
     },
     "For" : {
+
+    },
+    "heartbeat address" : {
 
     },
     "It is shown only once. The service checks each request with it." : {
@@ -7865,6 +8342,57 @@
     "MAPP can look after part of %@" : {
 
     },
+    "Largest File Read" : {
+
+    },
+    "Largest Request" : {
+
+    },
+    "Leave a field empty to use %@’s own default." : {
+
+    },
+    "Let Tools Fetch Files" : {
+
+    },
+    "Limit Requests" : {
+
+    },
+    "Limits" : {
+
+    },
+    "Live Updates" : {
+
+    },
+    "Made a folder" : {
+
+    },
+    "Made a key" : {
+
+    },
+    "Made a link" : {
+
+    },
+    "Made a link type" : {
+
+    },
+    "Made a type" : {
+
+    },
+    "Made a view" : {
+
+    },
+    "Made a webhook" : {
+
+    },
+    "Made an inbound address" : {
+
+    },
+    "Made an item" : {
+
+    },
+    "MAPP can’t change this setting." : {
+
+    },
     "MB" : {
 
     },
@@ -7883,6 +8411,39 @@
     "Named by you." : {
 
     },
+    "Monitoring" : {
+
+    },
+    "More languages for reading text in pictures." : {
+
+    },
+    "Most connections at once." : {
+
+    },
+    "Most connections from one address." : {
+
+    },
+    "Most Text Kept" : {
+
+    },
+    "Most Viewers" : {
+
+    },
+    "Moved an item to another status" : {
+
+    },
+    "Moved an item to Recently Deleted" : {
+
+    },
+    "Moved expired feed items to Recently Deleted" : {
+
+    },
+    "Moved items to Recently Deleted" : {
+
+    },
+    "Narrowed an approval" : {
+
+    },
     "Needs Attention" : {
 
     },
@@ -7890,6 +8451,9 @@
 
     },
     "New Webhook…" : {
+
+    },
+    "No Activity Yet" : {
 
     },
     "No Answer" : {
@@ -7949,6 +8513,9 @@
     "Object Store" : {
 
     },
+    "Nothing Matches" : {
+
+    },
     "Off" : {
 
     },
@@ -7956,6 +8523,15 @@
 
     },
     "Only webhooks this sign-in made are listed. An app or a key sees only its own." : {
+
+    },
+    "PostHog host" : {
+
+    },
+    "project token" : {
+
+    },
+    "Read when %@ starts. Change them where it runs." : {
 
     },
     "Only when something changed." : {
@@ -7974,6 +8550,9 @@
 
     },
     "%lld removals wait" : {
+
+    },
+    "Remove the %@?" : {
 
     },
     "Reported %@." : {
@@ -8021,6 +8600,15 @@
     "Tags or Extra Data Changed" : {
 
     },
+    "telemetry address" : {
+
+    },
+    "telemetry headers" : {
+
+    },
+    "Telemetry is sent without these headers." : {
+
+    },
     "The folder is missing where this copy is kept" : {
 
     },
@@ -8033,10 +8621,31 @@
     "The latest events sent to this address. Only a failed one can be sent again." : {
 
     },
+    "The new address is never shown again." : {
+
+    },
+    "The new host and token are never shown again." : {
+
+    },
+    "The new value is never shown again." : {
+
+    },
+    "The PostHog host and the project token are removed together, and error reports stop." : {
+
+    },
     "The server refused this copy’s sign-in" : {
 
     },
+    "The server stops sending its heartbeat." : {
+
+    },
+    "The server stops sending telemetry." : {
+
+    },
     "The webhook “%@” was made, and its signing secret can’t be shown again. If you didn’t copy it, delete the webhook on the Webhooks page and make it again." : {
+
+    },
+    "These are its settings, not the ones you were editing." : {
 
     },
     "This copy can’t reach the server" : {

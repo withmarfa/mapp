@@ -110,3 +110,17 @@ struct OwnerProblem: View {
         }
     }
 }
+
+/// A line under a page's rows that says a change was not the person's own, such as a setting that moved somewhere else,
+/// and that the person closes.
+struct OwnerNotice: View {
+    let title: LocalizedStringKey
+    let line: String
+    let close: () -> Void
+
+    var body: some View {
+        SettingsSection(name: nil) {
+            SettingsProblemRow(title: Text(title), line: Text(verbatim: line), actions: [SettingsProblemAction("Close", perform: close)])
+        }
+    }
+}

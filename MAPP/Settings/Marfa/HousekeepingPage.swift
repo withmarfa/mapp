@@ -102,7 +102,7 @@ struct HousekeepingPage: View {
             if model.listed.isEmpty {
                 SettingsEmptyCard(symbol: "sparkles", title: Text("No Jobs Yet"), line: Text("\(host.serverName) lists its jobs once it has started them."))
             } else {
-                SettingsSectionTable(rows: model.listed, columns: columns, hasFoot: false)
+                SettingsSectionTable(rows: model.listed, columns: columns, showsCount: false)
             }
         }
     }

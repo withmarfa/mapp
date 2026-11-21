@@ -4,11 +4,19 @@ import SwiftUI
 struct SettingsTableColumn<Row> {
     let title: LocalizedStringKey
     var width: CGFloat?
+    /// How many lines a cell may take; a cell that needs more is cut, and `truncation` says where.
+    var lines = 1
+    var truncation: Text.TruncationMode = .tail
     let cell: (Row) -> AnyView
 
-    init(_ title: LocalizedStringKey, width: CGFloat? = nil, @ViewBuilder cell: @escaping (Row) -> some View) {
+    init(
+        _ title: LocalizedStringKey, width: CGFloat? = nil, lines: Int = 1, truncation: Text.TruncationMode = .tail,
+        @ViewBuilder cell: @escaping (Row) -> some View
+    ) {
         self.title = title
         self.width = width
+        self.lines = lines
+        self.truncation = truncation
         self.cell = { AnyView(cell($0)) }
     }
 }
@@ -66,7 +74,7 @@ private struct TableHeader<Row>: View {
             if hasCheck { Color.clear.frame(width: CheckWidth.value) }
             ForEach(columns.indices, id: \.self) { index in
                 Text(columns[index].title)
-                    .settingsFont(.line)
+                    .settingsFont(.tableHeader)
                     .foregroundStyle(SettingsTokens.secondaryText)
                     .frame(width: columns[index].width, alignment: .leading)
                     .frame(maxWidth: columns[index].width == nil ? .infinity : nil, alignment: .leading)
@@ -74,7 +82,7 @@ private struct TableHeader<Row>: View {
             if hasAction { Color.clear.frame(width: ActionWidth.value) }
         }
         .padding(.horizontal, inset)
-        .frame(height: 30)
+        .frame(height: SettingsTokens.Metric.tableHeader)
         .accessibilityHidden(true)
     }
 }
@@ -105,7 +113,8 @@ private struct TableRow<Row>: View {
             ForEach(columns.indices, id: \.self) { index in
                 columns[index].cell(row)
                     .settingsFont(.title)
-                    .lineLimit(1)
+                    .lineLimit(columns[index].lines)
+                    .truncationMode(columns[index].truncation)
                     .frame(width: columns[index].width, alignment: .leading)
                     .frame(maxWidth: columns[index].width == nil ? .infinity : nil, alignment: .leading)
             }
@@ -132,9 +141,8 @@ struct SettingsSectionTable<Row: Identifiable>: View {
     /// How many rows there are in all, where the table holds only a page of them.
     var total: Int?
     var showAll: (() -> Void)?
-    /// Whether the foot with the count stands under the rows. A table that is the whole of what its section lists, a few
-    /// rows that are never more, leaves it out.
-    var hasFoot = true
+    /// Whether the foot says how many; a table that is the whole of a short list has none.
+    var showsCount = true
 
     var body: some View {
         SettingsCard {
@@ -144,12 +152,14 @@ struct SettingsSectionTable<Row: Identifiable>: View {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
                     TableRow(row: row, columns: columns, action: action, isSelected: false, isBanded: index.isMultiple(of: 2))
                 }
-                if hasFoot {
+                if showsCount || showAll != nil {
                     Rectangle().fill(SettingsTokens.rule).frame(height: 1)
                     HStack {
-                        Text(count)
-                            .settingsFont(.count)
-                            .foregroundStyle(SettingsTokens.secondaryText)
+                        if showsCount {
+                            Text(count)
+                                .settingsFont(.count)
+                                .foregroundStyle(SettingsTokens.secondaryText)
+                        }
                         Spacer(minLength: 0)
                         if let showAll { SettingsButton("Show All", small: true, action: showAll) }
                     }
@@ -234,5 +244,54 @@ struct SettingsPageTable<Row: Identifiable, Filter: View, Foot: View>: View {
         } set: { on in
             if on { selection.insert(id) } else { selection.remove(id) }
         }
+    }
+}
+
+/// A read-only table that is a page of its own, as a log is: it fills the pane edge to edge, with its count on the left and its
+/// filter and search together on the right under the toolbar, then the columns, and at the foot where the page stands with its
+/// way to the next. The rows scroll between the header and the foot. `empty` stands in the rows' place where there are none.
+struct SettingsLogTable<Row: Identifiable, Filter: View, Foot: View, Empty: View>: View {
+    let rows: [Row]
+    let columns: [SettingsTableColumn<Row>]
+    let count: Text
+    @ViewBuilder let filter: Filter
+    @ViewBuilder let foot: Foot
+    @ViewBuilder let empty: Empty
+
+    private var inset: CGFloat { SettingsTokens.Metric.pageTableInset }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                count.settingsFont(.small).foregroundStyle(SettingsTokens.secondaryText)
+                Spacer(minLength: 12)
+                filter
+            }
+            .padding(.horizontal, inset)
+            .frame(height: SettingsTokens.Metric.logTableBar)
+            Rectangle().fill(SettingsTokens.rule).frame(height: 1)
+            TableHeader(columns: columns, hasAction: false, inset: inset)
+            Rectangle().fill(SettingsTokens.rule).frame(height: 1)
+            if rows.isEmpty {
+                empty.frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                            TableRow(
+                                row: row, columns: columns, action: nil, isSelected: false, isBanded: index.isMultiple(of: 2), inset: inset,
+                                height: SettingsTokens.Metric.pageTableRow)
+                        }
+                    }
+                }
+                .scrollBounceBehavior(.basedOnSize)
+            }
+            Rectangle().fill(SettingsTokens.rule).frame(height: 1)
+            HStack(spacing: 8) { foot }
+                .padding(.horizontal, inset)
+                .frame(maxWidth: .infinity, minHeight: SettingsTokens.Metric.logTableFoot, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(SettingsTokens.page)
     }
 }
