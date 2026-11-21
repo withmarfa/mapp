@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Marfa
 import MarfaAPI
@@ -71,6 +72,29 @@ enum LibraryDescription {
     func client() throws -> Client {
         guard let connection = host.configuredConnection else { throw MarfaServerCalls.Ending.keyRefused }
         return try MarfaServerCalls(connection: connection, signIns: host.signIns).client()
+    }
+
+    func refreshGrants() async { await host.refreshGrants() }
+
+    /// The owner's calls, made through a client that shows the system's sign-in in place where the server asks the owner to
+    /// confirm it is them, and sends the call again once they have.
+    var ownerCalls: any OwnerCalls {
+        guard let connection = host.configuredConnection else {
+            return ClientOwnerCalls { throw MarfaError.signedOut(origin: "", message: "no server is set") }
+        }
+        let signIns = host.signIns
+        return ClientOwnerCalls {
+            do {
+                let calls = MarfaServerCalls(connection: connection, signIns: signIns)
+                let server = try calls.server().confirming(from: { NSApp.keyWindow ?? NSApp.windows.first ?? NSWindow() })
+                return Client(server, timeout: calls.timeout)
+            } catch let ending as MarfaServerCalls.Ending {
+                switch ending {
+                case .keyRefused: throw MarfaError.signedOut(origin: connection.address.absoluteString, message: "the sign-in ended")
+                default: throw MarfaError.invalid(message: Words.signInUnreadable)
+                }
+            }
+        }
     }
 
     var openInApp: ((String) -> Void)? { nil }

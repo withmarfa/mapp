@@ -68,7 +68,7 @@ import Testing
         bench.signIns.makeUnreadable(first)
         try await host.signInAgain(via: host.scripted("again"))
         #expect(bench.signIns.asked.last == MarfaHost.usedPermissions)
-        #expect(MarfaHost.usedPermissions.isSuperset(of: MarfaSettingsPage.allCases.map(\.permission)))
+        #expect(MarfaHost.usedPermissions.isSuperset(of: MarfaSettingsPage.allCases.compactMap(\.permission)))
         #expect(host.grantsRead, "the new sign-in is readable")
         #expect(host.grants == MarfaHost.usedPermissions)
         #expect(host.notices.waiting.filter { $0.title == Words.permissionsLostTitle }.isEmpty, "what was held was never read, so nothing is said lost")

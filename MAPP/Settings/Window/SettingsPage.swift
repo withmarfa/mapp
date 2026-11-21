@@ -7,6 +7,10 @@ nonisolated enum SettingsPage: Hashable, Sendable {
     case marfa(MarfaSettingsPage)
 
     static let overview = SettingsPage.marfa(.overview)
+    static let account = SettingsPage.marfa(.account)
+    static let apps = SettingsPage.marfa(.apps)
+    static let keys = SettingsPage.marfa(.keys)
+    static let addresses = SettingsPage.marfa(.addresses)
     static let recentlyDeleted = SettingsPage.marfa(.recentlyDeleted)
 
     /// MAPP's pages as the sidebar lists them, in groups split by space.

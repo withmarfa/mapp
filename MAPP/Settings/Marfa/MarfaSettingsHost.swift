@@ -46,6 +46,10 @@ struct MarfaDeletedItem: Identifiable, Hashable {
     /// Signs in again, asking for the permissions already held and `permissions`. Cancelled, or approved with fewer than
     /// asked, nothing is added; an approval that drops a permission held before is told to the owner.
     func allowMore(_ permissions: Set<InstancePermission>) async -> MarfaAllowMoreOutcome
+    /// Reads what the sign-in holds again, where the server refused for want of a permission MAPP thought it held.
+    func refreshGrants() async
+    /// What the owner's pages (Account, Apps, Keys, Addresses) ask of the server.
+    var ownerCalls: any OwnerCalls { get }
     /// Whether an Allow More… is waiting on the owner.
     var isAllowingMore: Bool { get }
     /// Asks the server again, for a server that did not answer.
@@ -74,14 +78,18 @@ struct MarfaDeletedItem: Identifiable, Hashable {
 
 /// A page of the Marfa's half of Settings, with the owner permission it needs to open.
 nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
-    case overview, recentlyDeleted
+    case overview, account, apps, keys, addresses, recentlyDeleted
 
     /// The pages in groups, as the sidebar shows them.
-    static let groups: [[MarfaSettingsPage]] = [[.overview], [.recentlyDeleted]]
+    static let groups: [[MarfaSettingsPage]] = [[.overview], [.account, .apps, .keys, .addresses], [.recentlyDeleted]]
 
     var title: String {
         switch self {
         case .overview: String(localized: "Overview")
+        case .account: String(localized: "Account")
+        case .apps: String(localized: "Apps")
+        case .keys: String(localized: "Keys")
+        case .addresses: String(localized: "Addresses")
         case .recentlyDeleted: String(localized: "Recently Deleted")
         }
     }
@@ -89,6 +97,10 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
     var symbol: String {
         switch self {
         case .overview: "server.rack"
+        case .account: "person.crop.circle"
+        case .apps: "macwindow"
+        case .keys: "key.fill"
+        case .addresses: "globe"
         case .recentlyDeleted: "trash"
         }
     }
@@ -96,24 +108,29 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
     var tone: SettingsTokens.Tone {
         switch self {
         case .overview: .blue
+        case .account: .indigo
+        case .apps: .purple
+        case .keys: .yellow
+        case .addresses: .teal
         case .recentlyDeleted: .gray
         }
     }
 
-    /// The permission the page needs, which the owner may not have approved.
-    var permission: InstancePermission {
+    /// The permission the page needs to open, which the owner may not have approved. Account needs none to open: its
+    /// sign-ins need `sign_ins.manage`, which it asks for from Change Password and never at sign-in.
+    var permission: InstancePermission? {
         switch self {
-        case .overview: .configManage
+        case .overview, .addresses: .configManage
+        case .account: nil
+        case .apps: .grantsManage
+        case .keys: .keysManage
         case .recentlyDeleted: .itemsPurge
         }
     }
 
     /// What MAPP isn't allowed to do without it, as the page says it.
     var permissionLine: String {
-        switch self {
-        case .overview: String(localized: "MAPP isn’t allowed to see and change this Marfa’s settings.")
-        case .recentlyDeleted: String(localized: "MAPP isn’t allowed to list and permanently delete deleted items.")
-        }
+        permission.map { String(localized: "MAPP isn’t allowed to \($0.allowedTo).") } ?? ""
     }
 
     /// The titles of the rows the page holds, so the sidebar's search finds the page by them.
@@ -121,6 +138,20 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         switch self {
         case .overview:
             InstanceSetting.allCases.map(\.title) + [String(localized: "Version History"), String(localized: "This Marfa")]
+        case .account:
+            [
+                String(localized: "Username"), String(localized: "Email"), String(localized: "Password"),
+                String(localized: "Change Password"), String(localized: "Passkeys"), String(localized: "Browsers"),
+            ]
+        case .apps:
+            [String(localized: "Connected"), String(localized: "Disconnect"), String(localized: "Access"), String(localized: "Narrow")]
+        case .keys:
+            [String(localized: "New Key"), String(localized: "Revoke"), String(localized: "Expires"), String(localized: "Source")]
+        case .addresses:
+            [
+                String(localized: "Sign-In Address"), String(localized: "Other Addresses"), String(localized: "Websites"),
+                String(localized: "Add an Address"), String(localized: "Add a Website"),
+            ]
         case .recentlyDeleted:
             [String(localized: "Deleted Items"), String(localized: "Restore"), String(localized: "Delete Permanently"), String(localized: "Empty Recently Deleted")]
         }

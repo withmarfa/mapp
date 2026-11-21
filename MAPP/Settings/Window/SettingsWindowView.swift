@@ -10,6 +10,7 @@ struct SettingsWindowView: View {
     let libraries: Libraries
     @State private var host: MAPPMarfaSettingsHost
     @State private var search = ""
+    @State private var sheets = SettingsSheetPresenter()
     @AppStorage(InterfaceKey.textSize) private var textSize = InterfaceStyle.defaultTextSize
 
     init(launcher: SettingsLauncher, libraries: Libraries) {
@@ -63,6 +64,10 @@ struct SettingsWindowView: View {
                 DepartureSheet(model: libraries.marfaSettings, departure: departure)
             }
         }
+        .environment(\.settingsSheets, sheets)
+        .settingsSheet(isPresented: sheets.isPresented, dismiss: { sheets.dismiss() }) {
+            if let content = sheets.content { content }
+        }
         .background(WindowCloseWatch(frameName: "MAPPSettings") { closed() })
         .accessibilityIdentifier("SettingsWindow")
     }
@@ -93,6 +98,7 @@ struct SettingsDetail: View {
         }
         .environment(\.settingsSubpage, navigation.current.subpage)
         .environment(\.settingsPush, { navigation.push($0) })
+        .environment(\.settingsBack, { navigation.back() })
         .id(navigation.current)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("SettingsDetail")

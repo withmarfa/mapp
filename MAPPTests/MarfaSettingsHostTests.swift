@@ -45,7 +45,7 @@ import Testing
         let bench = try HostBench()
         let (adapter, _, _) = try await connected(bench)
         #expect(adapter.grants == SystemSignIns.askedAtSignIn)
-        #expect(adapter.grants.contains(MarfaSettingsPage.overview.permission))
+        #expect(adapter.grants.contains(.configManage))
         #expect(!adapter.grants.contains(.backupsManage))
     }
 
@@ -145,7 +145,8 @@ import Testing
 
     @Test func everyPermissionAPageNeedsIsNamedTheSameWayWhereItIsLost() {
         for page in MarfaSettingsPage.allCases {
-            #expect(page.permissionLine == "MAPP isn’t allowed to \(page.permission.allowedTo).")
+            guard let permission = page.permission else { continue }
+            #expect(page.permissionLine == "MAPP isn’t allowed to \(permission.allowedTo).")
         }
     }
 

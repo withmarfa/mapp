@@ -22,6 +22,7 @@ import Testing
     var canDeletePermanently = true
     var openInApp: ((String) -> Void)? { nil }
     var allowed: [Set<InstancePermission>] = []
+    var ownerCalls: any OwnerCalls = FakeOwnerCalls()
 
     init(settings: InstanceSettingsModel) { instanceSettings = settings }
 
@@ -30,6 +31,7 @@ import Testing
         return .cancelled
     }
 
+    func refreshGrants() async {}
     func tryAgain() {}
     func showConnection() {}
     func client() throws -> Client { throw MarfaServerCalls.Ending.keyRefused }

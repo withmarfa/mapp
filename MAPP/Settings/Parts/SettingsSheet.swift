@@ -42,12 +42,30 @@ struct SettingsSheet<Content: View, Buttons: View>: View {
 /// A field in a sheet, with its label above it.
 struct SettingsSheetField<Field: View>: View {
     let label: LocalizedStringKey
+    /// Why the input was refused, in one line under the field. The field takes the red ring itself.
+    var error: String?
     @ViewBuilder let field: Field
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label).settingsFont(.line).foregroundStyle(SettingsTokens.secondaryText)
             field
+            if let error {
+                Text(verbatim: error).settingsFont(.line).foregroundStyle(SettingsTokens.errorRed).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+/// A line in a sheet that says how the input stands: a dot, green where it is fine, and the words.
+struct SettingsSheetStatus: View {
+    let text: Text
+    var isMet = true
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle().fill(isMet ? SettingsTokens.ok : SettingsTokens.tertiaryText).frame(width: 7, height: 7).accessibilityHidden(true)
+            text.settingsFont(.line).foregroundStyle(SettingsTokens.secondaryText).fixedSize(horizontal: false, vertical: true)
         }
     }
 }

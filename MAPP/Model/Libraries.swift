@@ -224,8 +224,14 @@ import os
             if let address = environment["MAPP_TEST_MARFA_URL"], let connection = try? MarfaConnection(address: address),
                 let key = environment["MAPP_TEST_MARFA_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty
             {
-                let host = MarfaHost(defaults: defaults, signIns: ScriptedSignIns([connection.address: key]), location: location(root: root))
+                let signIns = ScriptedSignIns([connection.address: key])
+                let host = MarfaHost(defaults: defaults, signIns: signIns, location: location(root: root))
                 host.presetTestServer(connection)
+                // The key holds what the server says it holds, so a key without an owner's permissions shows Needs a Permission.
+                Task {
+                    await signIns.adoptScopes(for: connection)
+                    await host.refreshGrants()
+                }
                 return Libraries(host: host, defaults: defaults)
             }
             let sample = SampleLibrary.connection
