@@ -120,8 +120,6 @@ enum SettingsTokens {
         static let textInset: CGFloat = 52
         static let controlWidth: CGFloat = 200
         static let controlHeight: CGFloat = 28
-        /// The space either side of a field's text.
-        static let fieldInset: CGFloat = 8
         /// The chevrons that end a pop-up the system has no control for, sized and set to match the ones the system draws
         /// in `SettingsPopUp`: `popUpChevronPull` is how far nearer the edge they sit than a bordered button's label ends.
         static let popUpChevronSize: CGFloat = 13

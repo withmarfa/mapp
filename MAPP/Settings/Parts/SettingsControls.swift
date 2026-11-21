@@ -216,25 +216,7 @@ extension View {
     }
 }
 
-extension View {
-    /// The look of a field: the field's fill and hairline at the control height, a gray ring while it has focus. The
-    /// system's rounded-border field is 26 points tall at every control size, so the system's plain field sits in this.
-    func settingsFieldChrome(width: CGFloat?, isFocused: Bool, isError: Bool) -> some View {
-        let shape = RoundedRectangle(cornerRadius: SettingsTokens.Metric.controlRadius, style: .continuous)
-        return textFieldStyle(.plain)
-            .focusEffectDisabled()
-            .padding(.horizontal, SettingsTokens.Metric.fieldInset)
-            .frame(width: width, height: SettingsTokens.Metric.controlHeight)
-            .frame(maxWidth: width == nil ? .infinity : nil)
-            .background(SettingsTokens.field, in: shape)
-            .overlay { shape.strokeBorder(SettingsTokens.hairline) }
-            .overlay { if isFocused { shape.stroke(SettingsTokens.focusRing, lineWidth: 3).padding(-1.5).allowsHitTesting(false) } }
-            .settingsErrorRing(isError)
-    }
-}
-
-/// A text field, 28 tall and 200 wide, or as wide as the space it is given when `width` is nil. The text is the system's
-/// plain field; `isError` puts the red ring round it.
+/// A text field, 200 by 28. The system draws the field; `isError` puts the red ring round it.
 struct SettingsField: View {
     let title: LocalizedStringKey
     @Binding var text: String
@@ -245,8 +227,6 @@ struct SettingsField: View {
     var isMonospaced = false
     var width: CGFloat? = SettingsTokens.Metric.controlWidth
     var onSubmit: () -> Void = {}
-    @FocusState private var isFocused: Bool
-    @Environment(\.settingsTextScale) private var scale
 
     var body: some View {
         Group {
@@ -257,11 +237,12 @@ struct SettingsField: View {
             }
         }
         .labelsHidden()
-        .font(SettingsTokens.font(isMonospaced ? .mono : .control, scale: scale))
+        .textFieldStyle(.roundedBorder)
+        .font(isMonospaced ? SettingsTokens.font(.mono) : nil)
         .autocorrectionDisabled()
-        .focused($isFocused)
         .onSubmit(onSubmit)
-        .settingsFieldChrome(width: width, isFocused: isFocused, isError: isError)
+        .frame(width: width, height: SettingsTokens.Metric.controlHeight)
+        .settingsErrorRing(isError)
     }
 }
 
@@ -292,25 +273,24 @@ struct SettingsNumberField: View {
     var prompt: String?
     var isError = false
     var onSubmit: () -> Void = {}
-    @FocusState private var isFocused: Bool
-    @Environment(\.settingsTextScale) private var scale
 
     var body: some View {
         TextField(title, text: $text, prompt: Text(verbatim: prompt ?? ""))
             .labelsHidden()
-            .font(SettingsTokens.font(.control, scale: scale))
+            .textFieldStyle(.roundedBorder)
             .autocorrectionDisabled()
-            .focused($isFocused)
             .onSubmit(onSubmit)
-            .settingsFieldChrome(width: SettingsTokens.Metric.controlWidth, isFocused: isFocused, isError: isError)
+            .padding(.trailing, 0)
             .overlay(alignment: .trailing) {
                 Text(unit)
                     .settingsFont(.title)
                     .foregroundStyle(SettingsTokens.secondaryText)
-                    .padding(.trailing, SettingsTokens.Metric.fieldInset)
+                    .padding(.trailing, 8)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
             }
+            .frame(width: SettingsTokens.Metric.controlWidth, height: SettingsTokens.Metric.controlHeight)
+            .settingsErrorRing(isError)
     }
 }
 
