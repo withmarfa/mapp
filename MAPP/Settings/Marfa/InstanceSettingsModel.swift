@@ -134,10 +134,13 @@ import Observation
 
     /// Exactly what Save sends: the settings whose typed value differs from the server's, and the settings emptied so
     /// their defaults apply. Nil where nothing has been read.
-    var patch: InstanceConfigPatch? {
+    var patch: InstanceConfigPatch? { patch(for: Set(InstanceSetting.allCases)) }
+
+    /// What a save of `settings` alone sends: a page changes only the settings it shows, whatever another page holds typed.
+    func patch(for settings: Set<InstanceSetting>) -> InstanceConfigPatch? {
         guard let loaded else { return nil }
         var patch = InstanceConfigPatch()
-        for setting in InstanceSetting.allCases {
+        for setting in InstanceSetting.allCases where settings.contains(setting) {
             switch setting.entry(from: text(setting)) {
             case .invalid: continue
             case .unset: if loaded.values[setting] != nil { patch.clear.insert(setting) }
@@ -147,9 +150,12 @@ import Observation
         return patch
     }
 
-    var canSave: Bool {
-        guard isAvailable, !isSaving, problems.isEmpty, let patch else { return false }
-        return !patch.isEmpty
+    var canSave: Bool { canSave(Set(InstanceSetting.allCases)) }
+
+    /// Whether `settings` can be sent: what they hold is valid, differs from the server's, and nothing is being sent.
+    func canSave(_ settings: Set<InstanceSetting>) -> Bool {
+        guard isAvailable, !isSaving, let patch = patch(for: settings), !patch.isEmpty else { return false }
+        return problems.keys.allSatisfy { !settings.contains($0) }
     }
 
     private func text(_ setting: InstanceSetting) -> String {
@@ -159,8 +165,11 @@ import Observation
     // MARK: Saving
 
     /// Sends the changes, or first asks the person to agree where one keeps things for less time.
-    func save() async {
-        guard canSave, let patch else { return }
+    func save() async { await save(Set(InstanceSetting.allCases)) }
+
+    /// Sends the changes to `settings` alone.
+    func save(_ settings: Set<InstanceSetting>) async {
+        guard canSave(settings), let patch = patch(for: settings) else { return }
         let shortenings = shortenings(of: patch)
         if shortenings.isEmpty {
             await send(patch)
@@ -171,12 +180,23 @@ import Observation
 
     /// Sends what the person agreed to. It takes the question itself, since the dialog clears `pending` as it closes.
     func confirm(_ agreed: Pending) async {
-        pending = nil
-        await send(agreed.patch)
+        await agree(agreed).value
     }
 
-    func cancelPending() {
+    /// Takes the agreement at once, so closing the dialog does not put the fields back, then sends in the background.
+    @discardableResult func agree(_ agreed: Pending) -> Task<Void, Never> {
         pending = nil
+        return Task { await send(agreed.patch) }
+    }
+
+    /// The person kept things as they were: what was chosen is put back, so the field shows what the server holds.
+    func cancelPending() {
+        guard let pending, let loaded else {
+            self.pending = nil
+            return
+        }
+        for setting in pending.patch.settings { draft[setting] = loaded.text(setting) }
+        self.pending = nil
     }
 
     /// The retentions `patch` may make shorter. Only a value the server holds is compared with: an unset setting
@@ -185,7 +205,7 @@ import Observation
     func shortenings(of patch: InstanceConfigPatch) -> [Shortening] {
         guard let loaded else { return [] }
         return InstanceSetting.allCases.compactMap { setting in
-            guard patch.settings.contains(setting), setting.isNumber else { return nil }
+            guard patch.settings.contains(setting), setting.isRetention else { return nil }
             let held = loaded.number(setting)
             let change: Shortening.Change
             if case .number(let to)? = patch.values[setting] {
@@ -300,37 +320,52 @@ import Observation
 /// The words for a setting's value and for what a shorter retention may remove.
 nonisolated enum InstanceWording {
     static func days(_ count: Int) -> String {
-        String(localized: "\(count) days")
+        count == 1 ? String(localized: "1 day") : String(localized: "\(count) days")
     }
 
-    /// A number the server holds for a setting.
+    /// A number the server holds for a setting, in the unit the page shows.
     static func amount(_ setting: InstanceSetting, _ number: Int) -> String {
+        if setting.zeroMeansNoLimit && number == 0 { return String(localized: "no limit") }
         switch setting {
-        case .versionMaxVersions: String(number)
-        case .trashRetentionDays where number == 0: String(localized: "no limit")
-        default: days(number)
+        case .versionMaxVersions: return number == 1 ? String(localized: "1 version") : String(localized: "\(number) versions")
+        case .blobMinCopies: return number == 1 ? String(localized: "1 copy") : String(localized: "\(number) copies")
+        case .diskReserveMegabytes, .mcpFetchMaxMegabytes: return String(localized: "\(number) MB")
+        case .blobCleanupGraceSeconds: return seconds(number)
+        default: return days(number)
         }
+    }
+
+    static func seconds(_ count: Int) -> String {
+        if count == 0 { return String(localized: "right away") }
+        if count % 86_400 == 0 { return days(count / 86_400) }
+        if count % 3_600 == 0 { return count == 3_600 ? String(localized: "1 hour") : String(localized: "\(count / 3_600) hours") }
+        return String(localized: "\(count) seconds")
     }
 
     /// A setting's value as the server holds it, or its default where unset.
     static func value(_ config: InstanceConfig, _ setting: InstanceSetting) -> String {
-        if setting == .name { return config.name ?? String(localized: "Marfa (default)") }
-        if let number = config.number(setting) { return amount(setting, number) }
-        if setting == .versionMaxVersions { return String(localized: "default, \(setting.documentedDefault ?? 0)") }
-        return String(localized: "default, \(days(setting.documentedDefault ?? 0))")
+        switch setting.kind {
+        case .text: return config.name ?? String(localized: "Marfa (default)")
+        case .flag:
+            guard let flag = config.flag(setting) else { return String(localized: "default, on") }
+            return flag ? String(localized: "on") : String(localized: "off")
+        case .count:
+            if let number = config.number(setting) { return amount(setting, number) }
+            return String(localized: "default, \(amount(setting, setting.documentedDefault ?? 0))")
+        }
     }
 
     /// What `shortening` may remove, in plain words. Where the server's current setting is not known, it says the
-    /// change may remove items sooner than that setting.
+    /// change may remove things sooner than that setting.
     static func consequence(_ shortening: InstanceSettingsModel.Shortening) -> String {
         let setting = shortening.setting
         switch shortening.change {
         case .shorter(_, let to):
             return removal(setting, keeping: to)
         case .mayBeShorter(let to):
-            return String(localized: "“\(setting.title)” may remove items sooner than the server’s current setting.") + " " + removal(setting, keeping: to)
+            return String(localized: "This may remove \(setting.removes) sooner than the server’s current setting.") + " " + removal(setting, keeping: to)
         case .toDefault(let from):
-            return String(localized: "Emptying “\(setting.title)” goes back to the server’s own default, which MAPP can’t read. That may remove items sooner than the server’s current setting, \(amount(setting, from)). What it removes can’t be recovered.")
+            return String(localized: "Going back to the default for “\(setting.title)” uses the server’s own default, which MAPP can’t read. That may remove \(setting.removes) sooner than the server’s current setting, \(amount(setting, from)). What it removes can’t be recovered.")
         }
     }
 
@@ -340,8 +375,25 @@ nonisolated enum InstanceWording {
             String(localized: "Items deleted more than \(days(limit)) ago will be permanently deleted, with their history, the next time the server tidies up. They can’t be recovered.")
         case .versionMaxVersions:
             String(localized: "An item with more than \(limit) versions will have its oldest versions permanently deleted the next time the server tidies up.")
-        default:
+        case .versionRecentDays, .versionDailyDays, .versionWeeklyDays:
             String(localized: "“\(setting.title)” changes to \(days(limit)). Older versions of items may be permanently deleted the next time the server tidies up, so Version History will show fewer.")
+        default:
+            String(localized: "“\(setting.title)” changes to \(days(limit)). Anything older than that, in \(setting.removes), will be permanently deleted the next time the server tidies up. It can’t be recovered.")
+        }
+    }
+}
+
+nonisolated extension InstanceSetting {
+    /// What a shorter setting removes, as the object of a sentence.
+    var removes: String {
+        switch self {
+        case .trashRetentionDays: String(localized: "deleted items")
+        case .versionRecentDays, .versionDailyDays, .versionWeeklyDays, .versionMaxVersions: String(localized: "versions")
+        case .auditRetentionDays: String(localized: "activity and webhook deliveries")
+        case .eventLogRetentionDays: String(localized: "events")
+        case .rowLogRetentionDays: String(localized: "table changes")
+        case .inboundHandledRetentionDays, .inboundPendingRetentionDays: String(localized: "connector deliveries")
+        default: String(localized: "things")
         }
     }
 }

@@ -111,7 +111,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         if let pending = model.pending { await model.confirm(pending) }
         #expect(source.sent == [InstanceConfigPatch(clear: [.versionMaxVersions])])
         #expect(model.loaded?.values[.versionMaxVersions] == nil)
-        #expect(model.saved == ["Most Versions Kept per Item: default, 500"])
+        #expect(model.saved == ["At Most: default, 500 versions"])
     }
 
     @Test func whatTheContractRefusesIsRefusedBeforeAnythingIsSent() async {
@@ -145,7 +145,10 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         #expect(model.pending?.shortenings == [.init(setting: .trashRetentionDays, change: .shorter(from: 60, to: 7))])
         model.cancelPending()
         #expect(source.sent.isEmpty)
+        // Keeping things as they were puts the field back.
+        #expect(model.draft[.trashRetentionDays] == "60")
 
+        model.draft[.trashRetentionDays] = "7"
         await model.save()
         if let pending = model.pending { await model.confirm(pending) }
         #expect(source.sent == [InstanceConfigPatch(values: [.trashRetentionDays: .number(7)])])
@@ -192,7 +195,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
             .init(setting: .versionMaxVersions, change: .toDefault(from: 50)),
         ])
         let words = shortenings.map(InstanceWording.consequence)
-        #expect(words[0].contains("may remove items sooner than the server’s current setting"))
+        #expect(words[0].contains("may remove deleted items sooner than the server’s current setting"))
         #expect(words[0].contains("45 days"))
         #expect(!words[0].contains("60"))
         #expect(!words[1].contains("500"))
@@ -218,7 +221,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
     @Test func theWordsSayAnUnknownSettingMayRemoveItemsSooner() {
         let typed = InstanceSettingsModel.Shortening(setting: .trashRetentionDays, change: .mayBeShorter(to: 100))
         let words = InstanceWording.consequence(typed)
-        #expect(words.contains("may remove items sooner than the server’s current setting"))
+        #expect(words.contains("may remove deleted items sooner than the server’s current setting"))
         #expect(words.contains("100 days"))
         let known = InstanceWording.consequence(.init(setting: .trashRetentionDays, change: .shorter(from: 60, to: 7)))
         #expect(!known.contains("sooner than"))

@@ -1,6 +1,7 @@
 import Foundation
 import Marfa
 import MarfaAPI
+import SwiftUI
 
 /// How the connection stands, in the terms a Marfa page needs: whether it can show itself, and what to say if not.
 enum MarfaSettingsConnection: Equatable {
@@ -30,6 +31,38 @@ struct MarfaDeletedItem: Identifiable, Hashable {
     let id: String
     let title: String
     let deleted: Date?
+    /// The item's type, as the server names it.
+    let kind: String
+    /// The name of the source that wrote it, where it has one.
+    let source: String?
+}
+
+/// A source as the Sources page lists it: the code items carry, the name and mark the server gives it, and how many items it wrote.
+struct MarfaSourceRow: Identifiable, Hashable {
+    let code: String
+    let name: String
+    /// An icon ID such as `simple-icons:readwise`, drawn by the host.
+    let mark: String?
+    /// Nil until the server has counted.
+    let count: Int?
+    /// Whether the name was set on the source itself, so it can be taken back to the one its app or key gives.
+    let hasChosenName: Bool
+
+    var id: String { code }
+}
+
+/// One change to a source, for every app that reads it.
+enum MarfaSourceChange: Hashable {
+    case rename(String)
+    case useDefaultName
+    case setMark(String)
+    case removeMark
+}
+
+/// A set of marks the owner may choose from, such as the icons of one library.
+struct MarfaMarkSet: Identifiable, Hashable {
+    let id: String
+    let title: String
 }
 
 /// What MAPP lends the Marfa's pages: the one way they reach the app that holds them, so another app could take them
@@ -66,6 +99,24 @@ struct MarfaDeletedItem: Identifiable, Hashable {
     /// The open owner's pages that hold something typed and not kept, which the app asks when Settings closes.
     var ownerDrafts: OwnerDrafts { get }
 
+    /// Where the Overview's Needs Attention and Health are read, kept by the app so the sidebar's badge is its count.
+    var overview: OverviewModel { get }
+    /// Opens another of the Marfa's pages in this window.
+    func show(_ page: MarfaSettingsPage)
+
+    /// Sources, as the server last named and counted them (the last answer, while it cannot be reached).
+    var sources: [MarfaSourceRow] { get }
+    func refreshSources() async
+    /// Whether a name or mark can be changed now: with a server to keep it.
+    var canChangeSources: Bool { get }
+    /// Makes one change to a source and answers the line to show where the server refused it, or nil once it took it.
+    func changeSource(_ code: String, _ change: MarfaSourceChange) async -> String?
+    var markSets: [MarfaMarkSet] { get }
+    /// The marks in `set` whose names contain every word of `query`, best first; every mark for an empty query.
+    func marks(matching query: String, in set: MarfaMarkSet) -> [String]
+    func markGlyph(_ id: String) -> AnyView
+    func markTitle(_ id: String) -> String
+
     /// Recently Deleted.
     var deletedItems: [MarfaDeletedItem] { get }
     var deletedCount: Int { get }
@@ -80,10 +131,12 @@ struct MarfaDeletedItem: Identifiable, Hashable {
 
 /// A page of the Marfa's half of Settings, with the owner permission it needs to open.
 nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
-    case overview, account, apps, keys, addresses, recentlyDeleted
+    case overview, account, apps, keys, addresses, sources, recentlyDeleted, history, fileStorage
 
     /// The pages in groups, as the sidebar shows them.
-    static let groups: [[MarfaSettingsPage]] = [[.overview], [.account, .apps, .keys, .addresses], [.recentlyDeleted]]
+    static let groups: [[MarfaSettingsPage]] = [
+        [.overview], [.account, .apps, .keys, .addresses], [.sources], [.recentlyDeleted, .history, .fileStorage],
+    ]
 
     var title: String {
         switch self {
@@ -92,7 +145,10 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .apps: String(localized: "Apps")
         case .keys: String(localized: "Keys")
         case .addresses: String(localized: "Addresses")
+        case .sources: String(localized: "Sources")
         case .recentlyDeleted: String(localized: "Recently Deleted")
+        case .history: String(localized: "History")
+        case .fileStorage: String(localized: "File Storage")
         }
     }
 
@@ -103,7 +159,10 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .apps: "macwindow"
         case .keys: "key.fill"
         case .addresses: "globe"
+        case .sources: "tray.and.arrow.down.fill"
         case .recentlyDeleted: "trash"
+        case .history: "clock.arrow.circlepath"
+        case .fileStorage: "externaldrive.fill"
         }
     }
 
@@ -114,7 +173,10 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .apps: .purple
         case .keys: .amber
         case .addresses: .teal
+        case .sources: .green
         case .recentlyDeleted: .gray
+        case .history: .indigo
+        case .fileStorage: .blue
         }
     }
 
@@ -122,10 +184,11 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
     /// sign-ins need `sign_ins.manage`, which it asks for from Change Password and never at sign-in.
     var permission: InstancePermission? {
         switch self {
-        case .overview, .addresses: .configManage
+        case .overview: .instanceRead
+        case .addresses, .history, .fileStorage: .configManage
         case .account: nil
         case .apps: .grantsManage
-        case .keys: .keysManage
+        case .keys, .sources: .keysManage
         case .recentlyDeleted: .itemsPurge
         }
     }
@@ -139,7 +202,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
     var searchWords: [String] {
         switch self {
         case .overview:
-            InstanceSetting.allCases.map(\.title) + [String(localized: "Version History"), String(localized: "This Marfa")]
+            [String(localized: "Name"), String(localized: "Needs Attention"), String(localized: "This Marfa"), String(localized: "Health")]
         case .account:
             [
                 String(localized: "Username"), String(localized: "Email"), String(localized: "Password"),
@@ -154,8 +217,18 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
                 String(localized: "Sign-In Address"), String(localized: "Other Addresses"), String(localized: "Websites"),
                 String(localized: "Add an Address"), String(localized: "Add a Website"),
             ]
+        case .sources:
+            [String(localized: "Rename"), String(localized: "Change Mark"), String(localized: "Limit Sources"), String(localized: "Rules for Every App and Key")]
         case .recentlyDeleted:
-            [String(localized: "Deleted Items"), String(localized: "Restore"), String(localized: "Delete Permanently"), String(localized: "Empty Recently Deleted")]
+            [
+                String(localized: "Deleted Items"), String(localized: "Restore"), String(localized: "Delete Permanently"),
+                String(localized: "Empty Recently Deleted"), InstanceSetting.trashRetentionDays.title,
+            ]
+        case .history:
+            InstanceSetting.versionSettings.map(\.title) + InstanceSetting.logSettings.map(\.title) + [String(localized: "Versions"), String(localized: "Logs")]
+        case .fileStorage:
+            [String(localized: "Where Files Are"), String(localized: "Reading Files"), String(localized: "Files From the Web"), String(localized: "Unused Files")]
+                + InstanceSetting.fileSettings.map(\.title)
         }
     }
 }

@@ -40,6 +40,12 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var applied: [AddressPlan] = []
         var websitesSent: [[String]] = []
         var gates: [String: OwnerCallGate] = [:]
+        var concerns: [AttentionConcern] = []
+        var reading = InstanceReading()
+        var fileStores = FileStores(stores: [], fileBytes: nil, orphanCount: 0, orphanBytes: 0, firstFound: nil, orphansComplete: true)
+        var sourceLimit = SourceLimit(instanceID: "instance-1", isOn: false, types: [], sources: [], strictTypes: nil, allowlist: nil)
+        /// What each source limit write sent: the filter, or nil for turning it off.
+        var limitsSent: [(types: [String], sources: [String])?] = []
     }
 
     let state = Mutex(State())
@@ -217,6 +223,40 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
             state.websitesSent.append(websites)
             state.settings.websites = websites
             return state.settings
+        }
+    }
+
+    func attention() async throws(OwnerFailure) -> [AttentionConcern] {
+        try enter("attention")
+        return state.withLock { $0.concerns }
+    }
+
+    func reading() async throws(OwnerFailure) -> InstanceReading {
+        try enter("reading")
+        return state.withLock { $0.reading }
+    }
+
+    func fileStores() async throws(OwnerFailure) -> FileStores {
+        try enter("fileStores")
+        return state.withLock { $0.fileStores }
+    }
+
+    func sourceLimit() async throws(OwnerFailure) -> SourceLimit {
+        try enter("sourceLimit")
+        return state.withLock { $0.sourceLimit }
+    }
+
+    func setSourceLimit(_ limit: SourceLimit, to filter: (types: [String], sources: [String])?) async throws(OwnerFailure) -> SourceLimit {
+        try enter("setSourceLimit")
+        return try state.withLock { state throws(OwnerFailure) in
+            guard state.sourceLimit.instanceID == limit.instanceID, state.sourceLimit.types == limit.types,
+                state.sourceLimit.sources == limit.sources
+            else { throw .conflict }
+            state.limitsSent.append(filter)
+            state.sourceLimit.isOn = filter != nil
+            state.sourceLimit.types = filter?.types ?? []
+            state.sourceLimit.sources = filter?.sources ?? []
+            return state.sourceLimit
         }
     }
 }
@@ -1341,7 +1381,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     }
 
     @Test func theNewPagesAreInTheSidebarInTheBoardsOrder() {
-        #expect(MarfaSettingsPage.groups == [[.overview], [.account, .apps, .keys, .addresses], [.recentlyDeleted]])
+        #expect(MarfaSettingsPage.groups == [[.overview], [.account, .apps, .keys, .addresses], [.sources], [.recentlyDeleted, .history, .fileStorage]])
         for page in [MarfaSettingsPage.account, .apps, .keys, .addresses] {
             #expect(SettingsPage.marfa(page).matches(page.title))
         }

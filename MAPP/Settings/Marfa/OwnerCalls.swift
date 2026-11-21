@@ -168,6 +168,19 @@ nonisolated protocol OwnerCalls: Sendable {
     func check(signIn: String?, addresses: [String]?) async throws(OwnerFailure) -> AddressPlan
     func apply(_ plan: AddressPlan, instanceID: String?) async throws(OwnerFailure) -> AddressSettings
     func setWebsites(_ websites: [String], instanceID: String?) async throws(OwnerFailure) -> AddressSettings
+
+    /// What needs the owner's attention (`instance.read`).
+    func attention() async throws(OwnerFailure) -> [AttentionConcern]
+    /// How the server stands: its health, what it holds and whether an update is ready (`instance.read`). A part the server
+    /// does not give is left out.
+    func reading() async throws(OwnerFailure) -> InstanceReading
+    /// Where files are kept and the files nothing uses (`instance.read`).
+    func fileStores() async throws(OwnerFailure) -> FileStores
+    /// The source filter, with the instance that holds it (`config.manage`).
+    func sourceLimit() async throws(OwnerFailure) -> SourceLimit
+    /// Replaces the source filter, sending the other two levers as they were read, or turns it off with nil. A change made
+    /// elsewhere since it was read is a `conflict`.
+    func setSourceLimit(_ limit: SourceLimit, to filter: (types: [String], sources: [String])?) async throws(OwnerFailure) -> SourceLimit
 }
 
 /// What changing the addresses would do, as the server said before anything was written, with the change it said it
@@ -201,7 +214,7 @@ nonisolated struct AddressPlan: Hashable, Sendable {
 nonisolated struct ClientOwnerCalls: OwnerCalls {
     let client: @Sendable () throws -> Client
 
-    private func make() throws(OwnerFailure) -> Client {
+    func make() throws(OwnerFailure) -> Client {
         do { return try client() } catch { throw Self.failure(error) }
     }
 
@@ -240,7 +253,7 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
     /// its own.
     static let configConflict: @Sendable (String) -> OwnerFailure = { _ in .conflict }
 
-    private func run<Result>(
+    func run<Result>(
         plainConflict: (String) -> OwnerFailure = { .refused($0) }, _ call: (Client) async throws -> Result
     ) async throws(OwnerFailure) -> Result {
         let client = try make()
@@ -253,7 +266,7 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
         }
     }
 
-    private static func date(_ text: String?) -> Date? {
+    static func date(_ text: String?) -> Date? {
         guard let text else { return nil }
         return try? Date(text, strategy: .iso8601.year().month().day().time(includingFractionalSeconds: true).timeZone(separator: .omitted))
             ?? Date(text, strategy: .iso8601)

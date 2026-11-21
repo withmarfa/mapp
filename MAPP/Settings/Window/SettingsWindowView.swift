@@ -1,4 +1,5 @@
 import AppKit
+import Marfa
 import SwiftUI
 
 /// The Settings window's content: a sidebar of pages, a toolbar with Back, Forward and the page's name, and the page in
@@ -24,7 +25,10 @@ struct SettingsWindowView: View {
     var body: some View {
         NavigationSplitView {
             SettingsSidebar(
-                selection: Binding { navigation.page } set: { navigation.show($0) }, search: $search
+                selection: Binding { navigation.page } set: { navigation.show($0) }, search: $search,
+                badges: { page in
+                    page == .overview && host.overview.attentionCount > 0 ? .count(host.overview.attentionCount) : nil
+                }
             )
             .frame(minWidth: SettingsTokens.Metric.sidebarWidth, maxWidth: SettingsTokens.Metric.sidebarWidth)
             .navigationSplitViewColumnWidth(min: SettingsTokens.Metric.sidebarWidth, ideal: SettingsTokens.Metric.sidebarWidth, max: SettingsTokens.Metric.sidebarWidth)
@@ -69,6 +73,9 @@ struct SettingsWindowView: View {
             if let content = sheets.content { content }
         }
         .background(WindowCloseWatch(frameName: "MAPPSettings") { closed() })
+        .task(id: host.serverAddress) {
+            if host.connection == .connected, host.grants.contains(.instanceRead) { await host.overview.load() }
+        }
         .accessibilityIdentifier("SettingsWindow")
     }
 

@@ -24,8 +24,32 @@ import Testing
     var openInApp: ((String) -> Void)? { nil }
     var allowed: [Set<InstancePermission>] = []
     var ownerCalls: any OwnerCalls = FakeOwnerCalls()
+    var overview: OverviewModel
+    var shown: [MarfaSettingsPage] = []
+    var sources: [MarfaSourceRow] = []
+    var canChangeSources = true
+    var sourceChanges: [(code: String, change: MarfaSourceChange)] = []
+    var markSets = [MarfaMarkSet(id: "lucide", title: "Lucide")]
 
-    init(settings: InstanceSettingsModel) { instanceSettings = settings }
+    init(settings: InstanceSettingsModel) {
+        instanceSettings = settings
+        overview = OverviewModel(context: OwnerContext(calls: FakeOwnerCalls(), grants: { [] }))
+    }
+
+    /// Binds the Overview to the host's own calls and grants, as the app does.
+    func bindOverview() { overview = OverviewModel(context: OwnerContext(host: self)) }
+
+    func show(_ page: MarfaSettingsPage) { shown.append(page) }
+    func refreshSources() async {}
+
+    func changeSource(_ code: String, _ change: MarfaSourceChange) async -> String? {
+        sourceChanges.append((code, change))
+        return nil
+    }
+
+    func marks(matching query: String, in set: MarfaMarkSet) -> [String] { ["lucide:inbox", "lucide:rss", "lucide:book-open"] }
+    func markGlyph(_ id: String) -> AnyView { AnyView(Image(systemName: "tray")) }
+    func markTitle(_ id: String) -> String { id }
 
     func allowMore(_ permissions: Set<InstancePermission>) async -> MarfaAllowMoreOutcome {
         allowed.append(permissions)
@@ -57,6 +81,8 @@ struct RenderedWindow<Detail: View>: View {
     let selection: SettingsPage
     var search = ""
     var sheet: AnyView?
+    /// What the Overview's sidebar badge counts.
+    var badge: Int?
     let detail: Detail
 
     var body: some View {
@@ -66,7 +92,9 @@ struct RenderedWindow<Detail: View>: View {
 
     private var windowContents: some View {
         HStack(spacing: 0) {
-            SettingsSidebar(selection: .constant(selection), search: .constant(search))
+            SettingsSidebar(
+                selection: .constant(selection), search: .constant(search),
+                badges: { page in page == .overview ? badge.map { .count($0) } : nil })
                 .frame(width: SettingsTokens.Metric.sidebarWidth)
                 .background(Color(white: 0.93))
             VStack(spacing: 0) {
@@ -312,11 +340,36 @@ struct RenderedWindow<Detail: View>: View {
             size: Self.size, named: "On This Mac, no Marfa open")
     }
 
+    /// The host's fake server, to put concerns and readings on.
+    private func fake(_ host: StubMarfaHost) -> FakeOwnerCalls { host.ownerCalls as! FakeOwnerCalls }
+
+    private func windowed(
+        _ page: MarfaSettingsPage, host: StubMarfaHost, subpage: SettingsSubpage? = nil, sheet: AnyView? = nil, badge: Int? = nil
+    ) -> some View {
+        RenderedWindow(
+            selection: .marfa(page), sheet: sheet, badge: badge, detail: MarfaSettingsPageView(page: page, host: host).environment(\.settingsSubpage, subpage))
+    }
+
     @Test func overview() async throws {
         let host = await stub()
-        try await SettingsRender.png(
-            RenderedWindow(selection: .overview, detail: MarfaSettingsPageView(page: .overview, host: host)), size: Self.size,
-            named: "Overview")
+        fake(host).state.withLock {
+            $0.concerns = [
+                AttentionConcern(kind: .key, reference: "key-1", title: "Backup script expires on Monday", description: "Scripts using it stop working then."),
+                AttentionConcern(kind: .connector, reference: "rss", title: "RSS reports a problem", description: "kitchenjournal.co.uk/feed: Not found (404)."),
+            ]
+            $0.reading = InstanceReading(
+                version: "0.0.84", updateReady: "0.0.85", databaseBytes: 214_000_000, fileBytes: 3_400_000_000,
+                lastBackup: Calendar.current.date(bySettingHour: 14, minute: 0, second: 0, of: .now), owner: "Mira Castell")
+        }
+        host.bindOverview()
+        try await SettingsRender.png(windowed(.overview, host: host, badge: 2), size: Self.size, named: "Overview")
+    }
+
+    @Test func overviewWithoutTheOwnersPermissions() async throws {
+        let host = await stub { $0.grants = [.instanceRead, .keysManage, .itemsPurge, .grantsManage, .keysMint] }
+        fake(host).state.withLock { $0.reading = InstanceReading(version: "0.0.84", databaseBytes: 214_000_000, fileBytes: 3_400_000_000) }
+        host.bindOverview()
+        try await SettingsRender.png(windowed(.overview, host: host), size: Self.size, named: "Overview, without the owner’s permissions")
     }
 
     @Test func overviewWithARefusedWrite() async throws {
@@ -325,16 +378,69 @@ struct RenderedWindow<Detail: View>: View {
         let settings = InstanceSettingsModel { .init(id: "https://marfa.castell.studio", source: source) }
         await settings.load()
         let host = StubMarfaHost(settings: settings)
+        host.bindOverview()
         // The page reads the server's settings as it opens, so the refused save is made once that read is done.
         let refused = Task {
             try await Task.sleep(for: .milliseconds(300))
             settings.draft[.name] = "Harbour Joinery"
-            await settings.save()
+            await settings.save([.name])
         }
         try await SettingsRender.png(
-            RenderedWindow(selection: .overview, detail: MarfaSettingsPageView(page: .overview, host: host)), size: Self.size,
-            named: "Overview, a write the server refused", settle: .milliseconds(1_000))
+            windowed(.overview, host: host), size: Self.size, named: "Overview, a write the server refused", settle: .milliseconds(1_000))
         try await refused.value
+    }
+
+    private static let sourceRows = [
+        MarfaSourceRow(code: "mapp", name: "MAPP", mark: nil, count: 4_212, hasChosenName: false),
+        MarfaSourceRow(code: "github", name: "GitHub", mark: nil, count: 318, hasChosenName: true),
+        MarfaSourceRow(code: "readwise", name: "Readwise", mark: nil, count: 127, hasChosenName: false),
+        MarfaSourceRow(code: "rss", name: "RSS", mark: nil, count: 156, hasChosenName: false),
+    ]
+
+    @Test func sources() async throws {
+        let host = await stub { $0.sources = Self.sourceRows }
+        try await SettingsRender.png(windowed(.sources, host: host), size: Self.size, named: "Sources")
+    }
+
+    @Test func limitSources() async throws {
+        let host = await stub { $0.sources = Self.sourceRows }
+        fake(host).state.withLock {
+            $0.names = ["core.highlight": "Highlights", "core.bookmark": "Bookmarks"]
+            $0.sourceLimit = SourceLimit(
+                instanceID: "instance-1", isOn: true, types: ["core.highlight"], sources: ["mapp", "readwise"], strictTypes: nil, allowlist: nil)
+        }
+        try await SettingsRender.png(
+            windowed(.sources, host: host, subpage: SourcesPage.limitSources), size: Self.size, named: "Sources, Limit Sources")
+    }
+
+    @Test func history() async throws {
+        let source = FakeInstanceConfig([
+            .versionRecentDays: .number(30), .versionDailyDays: .number(90), .versionWeeklyDays: .number(365), .versionMaxVersions: .number(500),
+            .auditRetentionDays: .number(90), .eventLogRetentionDays: .number(30), .rowLogRetentionDays: .number(30),
+            .inboundHandledRetentionDays: .number(7), .inboundPendingRetentionDays: .number(30),
+        ])
+        let settings = InstanceSettingsModel { .init(id: "https://marfa.castell.studio", source: source) }
+        await settings.load()
+        try await SettingsRender.png(
+            windowed(.history, host: StubMarfaHost(settings: settings)), size: Self.size, named: "History")
+    }
+
+    @Test func fileStorage() async throws {
+        let source = FakeInstanceConfig([
+            .blobMinCopies: .number(1), .diskReserveMegabytes: .number(128), .enrichmentEnabled: .flag(true), .enrichmentOcrEnabled: .flag(true),
+            .mcpFetchEnabled: .flag(true), .mcpFetchMaxMegabytes: .number(50), .blobCleanupEnabled: .flag(true), .blobCleanupGraceSeconds: .number(86_400),
+        ])
+        let settings = InstanceSettingsModel { .init(id: "https://marfa.castell.studio", source: source) }
+        await settings.load()
+        let host = StubMarfaHost(settings: settings)
+        fake(host).state.withLock {
+            $0.fileStores = FileStores(
+                stores: [
+                    FileStoreRow(id: "a", kind: .disk, locator: "/var/lib/marfa/files", error: nil),
+                    FileStoreRow(id: "b", kind: .folder, locator: "/Volumes/Studio Backup", error: nil),
+                ], fileBytes: 3_400_000_000, orphanCount: 3, orphanBytes: 12_000_000, firstFound: .now, orphansComplete: true)
+        }
+        try await SettingsRender.png(windowed(.fileStorage, host: host), size: Self.size, named: "File Storage")
     }
 
     @Test func recentlyDeleted() async throws {
@@ -345,13 +451,17 @@ struct RenderedWindow<Detail: View>: View {
         ]
         let host = await stub {
             $0.deletedItems = titles.enumerated().map { index, title in
-                MarfaDeletedItem(id: "item-\(index)", title: title, deleted: Date.now.addingTimeInterval(-Double(index) * 86_400 * 2))
+                MarfaDeletedItem(
+                    id: "item-\(index)", title: title, deleted: Date.now.addingTimeInterval(-Double(index) * 86_400 * 2), kind: "Notes",
+                    source: "MAPP")
             }
             $0.deletedCount = 1_204
         }
         try await SettingsRender.png(
             RenderedWindow(selection: .recentlyDeleted, detail: MarfaSettingsPageView(page: .recentlyDeleted, host: host)),
             size: Self.size, named: "Recently Deleted")
+        try await SettingsRender.png(
+            windowed(.recentlyDeleted, host: host, subpage: RecentlyDeletedPage.allDeleted), size: Self.size, named: "All deleted items")
     }
 
     @Test func needsAPermission() async throws {

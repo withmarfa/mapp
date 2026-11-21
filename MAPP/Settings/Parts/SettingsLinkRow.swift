@@ -7,13 +7,15 @@ struct SettingsLinkRow: View {
     private let line: Text?
     private let lead: SettingsLead
     private let value: Text?
+    private let dot: Color?
     private let action: () -> Void
 
-    init(verbatim title: String, line: String? = nil, lead: SettingsLead = .none, value: String? = nil, action: @escaping () -> Void) {
+    init(verbatim title: String, line: String? = nil, lead: SettingsLead = .none, value: String? = nil, dot: Color? = nil, action: @escaping () -> Void) {
         self.title = Text(verbatim: title)
         self.line = line.map { Text(verbatim: $0) }
         self.lead = lead
         self.value = value.map { Text(verbatim: $0) }
+        self.dot = dot
         self.action = action
     }
 
@@ -22,7 +24,10 @@ struct SettingsLinkRow: View {
             SettingsRow(title: title, line: line, lead: lead) {
                 HStack(spacing: 8) {
                     if let value {
-                        value.settingsFont(.title).foregroundStyle(SettingsTokens.secondaryText).lineLimit(1)
+                        HStack(spacing: 6) {
+                            if let dot { Circle().fill(dot).frame(width: 7, height: 7).accessibilityHidden(true) }
+                            value.settingsFont(.title).foregroundStyle(SettingsTokens.secondaryText).lineLimit(1)
+                        }
                     }
                     SettingsChevron()
                 }
