@@ -118,7 +118,7 @@ struct SettingsRow<Trailing: View>: View {
                 leadView.frame(width: SettingsTokens.Metric.leadColumn)
             }
             HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 1) {
+                VStack(alignment: .leading, spacing: 2) {
                     title
                         .settingsFont(.title)
                         .lineLimit(1)

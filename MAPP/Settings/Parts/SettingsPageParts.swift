@@ -52,15 +52,14 @@ struct SettingsHead<Trailing: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: SettingsTokens.Metric.sectionGap) {
             if let name {
                 name.settingsFont(.sectionName).accessibilityAddTraits(.isHeader)
+                    .frame(minHeight: SettingsTokens.Metric.sectionHeader, alignment: .bottom)
                     .padding(.horizontal, SettingsTokens.Metric.inset)
-                    .padding(.bottom, 2)
             }
             card
         }
-        .containerValue(\.settingsFirstInset, name == nil ? 0 : SettingsTokens.Metric.firstHeaderInset)
     }
 
     private var card: some View {
