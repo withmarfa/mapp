@@ -37,6 +37,9 @@ import os
     /// The look each library's person chose for its types.
     let typeLooks: TypeLooks
 
+    /// What each library's person leaves out of search.
+    let searchLeaveOuts: SearchLeaveOuts
+
     /// Asks every open page for its last edit and answers whether they all handed it over. A test gives its own, since
     /// the real one waits on every page in the process, those of tests running beside it too.
     private let handOverPages: (QuitTrace, @escaping (Bool) -> Void) -> Void
@@ -55,6 +58,7 @@ import os
             ?? { trace, done in EditorController.flushAll(trace: trace, then: done) }
         sidebarLayouts = SidebarLayouts(defaults: defaults)
         typeLooks = TypeLooks(defaults: defaults)
+        searchLeaveOuts = SearchLeaveOuts(defaults: defaults)
         marfaSettings = MarfaSettingsModel(host: host)
         self.instanceSettings = instanceSettings ?? InstanceSettingsModel(provider: { [host] in host.instanceConfigTarget() })
         self.instanceSettings.onSaved = { [host] answer, settings, address in host.instanceSaved(answer, changing: settings, of: address) }
@@ -100,6 +104,9 @@ import os
     }
 
     var sidebarLayout: SidebarLayout { sidebarLayouts.layout(for: libraryKey) }
+
+    /// What the library the windows read leaves out of search.
+    var searchLeaveOut: SearchLeaveOut { searchLeaveOuts.leaveOut(for: libraryKey) }
 
     func updateSidebarLayout(_ change: (inout SidebarLayout) -> Void) {
         sidebarLayouts.update(libraryKey, change)

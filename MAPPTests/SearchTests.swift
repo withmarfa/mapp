@@ -235,9 +235,9 @@ import Testing
         _ = library.search("body", in: .place(.recents))
         #expect(await eventually { source.targets.withLock { $0.count } == 3 })
         let targets = source.targets.withLock { $0 }
-        let inbox = try #require(targets.first { if case .items(let query, _) = $0 { query.tier == .feed } else { false } })
+        let inbox = try #require(targets.first { if case .items(let query, _, _) = $0 { query.tier == .feed } else { false } })
         #expect(inbox != .items(MarfaLibrary.searchScope))
-        #expect(targets.contains { if case .items(_, let filter) = $0 { filter?.contains("tags") == true } else { false } })
+        #expect(targets.contains { if case .items(_, let filter, _) = $0 { filter?.contains("tags") == true } else { false } })
         // Recents stands for no query, so it searches everywhere.
         #expect(targets.contains(.items(MarfaLibrary.searchScope)))
     }

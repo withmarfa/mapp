@@ -64,7 +64,6 @@ Nine pages in three groups: General, Appearance and Keyboard; Editor, Lists, Lay
   - Leave Out of Search, by type and by source. It is MAPP's own setting, applied inside the search.
   - Include Archived Items and Include Inbox Items.
   - Results in Best Match or Most Recent order, and Show Snippets.
-  - Search Items itself stays as it is, and passes its Type and Source filters into the search, so nothing is lost to the 500-hit cut.
 - **On This Mac.** The copy of the library MAPP keeps on this Mac: the space it uses, opened files (a size budget and Remove Downloaded Files), export to a folder, and Download Everything Again, which keeps changes not yet sent. "Recent files only" is not offered.
 - **Connection.** As drawn, plus the "MAPP's Settings" section described under sync below.
 

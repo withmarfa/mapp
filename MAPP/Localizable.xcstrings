@@ -1,6 +1,12 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%lld more left out of search." : {
+
+    },
+    "%lld more in %@, left out of search." : {
+
+    },
     "%@ Isn’t Answering" : {
 
     },
@@ -23,6 +29,9 @@
 
     },
     "A Collection" : {
+
+    },
+    "A search can limit itself to ten types at most." : {
 
     },
     "A Marfa server’s address." : {
@@ -59,6 +68,12 @@
 
     },
     "All Types" : {
+
+    },
+    "At least %lld more left out of search." : {
+
+    },
+    "At least %lld more in %@, left out of search." : {
 
     },
     "Blue" : {
@@ -101,6 +116,12 @@
 
     },
     "Couldn’t Sign In" : {
+
+    },
+    "Show Matches Left Out of Search" : {
+
+    },
+    "The types and sources chosen and left out make more conditions than one search can hold." : {
 
     },
     "Custom…" : {

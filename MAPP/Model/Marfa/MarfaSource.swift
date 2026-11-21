@@ -419,11 +419,12 @@ nonisolated final class MarfaSource: ItemSource {
     /// Narrowed to `target` by the copy, which matches and ranks as the server does, cuts each hit's excerpt and
     /// keeps what is not in the bin out of its answer, so the limit counts items shown.
     func search(_ text: String, in target: SearchTarget) async throws -> SourceSearch {
-        let limit = SearchResults.limit
+        let limit: Int
+        if case .items(_, _, let itemLimit) = target { limit = itemLimit } else { limit = SearchResults.limit }
         let rows: Rows<SearchHit>
         do {
             switch target {
-            case .items(let itemQuery, let filter):
+            case .items(let itemQuery, let filter, _):
                 var filters = SearchFilters(
                     tier: itemQuery.tier.map(MarfaMapping.marfaTier), tags: itemQuery.tags.sorted(), filter: filter,
                     beneath: itemQuery.beneath?.rawValue)

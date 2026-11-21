@@ -102,7 +102,7 @@ import UniformTypeIdentifiers
         // The copy is asked about the Inbox by its tier alone, so it does not hide the files.
         let asked = source.targets.withLock { $0 }
         #expect(asked.allSatisfy { target in
-            if case .items(_, let filter) = target { filter == nil } else { true }
+            if case .items(_, let filter, _) = target { filter == nil } else { true }
         })
     }
 

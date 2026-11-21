@@ -54,6 +54,12 @@ protocol ItemLibrary: AnyObject, Observable {
     /// excerpt of each that has one, and whether the search may be missing items because the copy is still filling.
     /// Nothing is found for a query with no words.
     func search(_ query: String, in scope: SearchScope) -> SearchResults
+    /// The same over every item, with the types and sources `narrowing` keeps and leaves out applied inside the
+    /// search, so what it lists is counted after them rather than narrowed once listed.
+    func search(_ query: String, narrowedBy narrowing: SearchNarrowing) -> SearchResults
+    /// What that search finds among the items `narrowing` leaves out, at most `SearchResults.leftOutLimit`; nothing
+    /// where nothing is left out. A library asks the copy only when this is read.
+    func searchLeftOut(_ query: String, narrowedBy narrowing: SearchNarrowing) -> SearchResults
     func count(in place: SidebarItem) -> Int
     /// The catalogue's types that hold items, with their labels and counts, for a sidebar that lists them. The
     /// default is built from `catalogue` and `count(in:)`, so a library answers it without a view asking what kind
