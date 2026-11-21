@@ -735,8 +735,8 @@ struct CommandPalette: View {
                 add(String(localized: "Close Modal"), "xmark", in: .go) { browser.closeModal() }
             }
             if let libraries {
-                add(String(localized: "Export Looks…"), "square.and.arrow.up", in: .looks) { LooksFiles.export(from: libraries) }
-                add(String(localized: "Import Looks…"), "square.and.arrow.down", in: .looks) { LooksFiles.importLooks(into: libraries) }
+                add(String(localized: "Export Layouts…"), "square.and.arrow.up", in: .looks) { LooksFiles.export(from: libraries) }
+                add(String(localized: "Import Layouts…"), "square.and.arrow.down", in: .looks) { LooksFiles.importLooks(into: libraries) }
             }
             // An image's or a PDF's page holds ⌘+, ⌘− and ⌘0 for the file, so the text sizes are not offered then
             // (`FileViewCommand`).

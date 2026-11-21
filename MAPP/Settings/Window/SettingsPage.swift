@@ -3,7 +3,7 @@ import Foundation
 /// A page of Settings: one of MAPP's own, or one of the Marfa's. The window lists a page only once it exists, so a later
 /// piece adds its pages here and to the sidebar's groups, and nothing else.
 nonisolated enum SettingsPage: Hashable, Sendable {
-    case general, appearance, keyboard, lists, editor, search, onThisMac, connection
+    case general, appearance, keyboard, lists, editor, layouts, search, onThisMac, connection
     case marfa(MarfaSettingsPage)
 
     static let overview = SettingsPage.marfa(.overview)
@@ -14,7 +14,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
     static let recentlyDeleted = SettingsPage.marfa(.recentlyDeleted)
 
     /// MAPP's pages as the sidebar lists them, in groups split by space.
-    static let mappGroups: [[SettingsPage]] = [[.general, .appearance, .keyboard], [.editor, .lists, .search], [.onThisMac, .connection]]
+    static let mappGroups: [[SettingsPage]] = [[.general, .appearance, .keyboard], [.editor, .lists, .layouts, .search], [.onThisMac, .connection]]
     /// The Marfa's pages, in groups.
     static let marfaGroups: [[SettingsPage]] = MarfaSettingsPage.groups.map { $0.map(SettingsPage.marfa) }
 
@@ -33,6 +33,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
         case .keyboard: "keyboard"
         case .lists: "lists"
         case .editor: "editor"
+        case .layouts: "layouts"
         case .search: "search"
         case .onThisMac: "onThisMac"
         case .connection: "connection"
@@ -47,6 +48,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
         case .keyboard: String(localized: "Keyboard")
         case .lists: String(localized: "Lists")
         case .editor: String(localized: "Editor")
+        case .layouts: String(localized: "Layouts")
         case .search: String(localized: "Search")
         case .onThisMac: String(localized: "On This Mac")
         case .connection: String(localized: "Connection")
@@ -61,6 +63,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
         case .keyboard: "keyboard"
         case .lists: "list.bullet"
         case .editor: "square.and.pencil"
+        case .layouts: "rectangle.grid.1x2.fill"
         case .search: "magnifyingglass"
         case .onThisMac: "laptopcomputer"
         case .connection: "antenna.radiowaves.left.and.right"
@@ -75,6 +78,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
         case .keyboard: .indigo
         case .lists: .orange
         case .editor: .amber
+        case .layouts: .purple
         case .search: .teal
         case .onThisMac: .gray
         case .connection: .green
@@ -105,11 +109,20 @@ nonisolated enum SettingsPage: Hashable, Sendable {
                 String(localized: "Restore Defaults"), String(localized: "In Any App"),
             ] + AnyAppCommand.allCases.map(\.title) + ShortcutCommand.all.map(\.title)
         case .lists:
-            [String(localized: "Density"), String(localized: "Sort By"), String(localized: "Group By")]
+            [String(localized: "Density"), String(localized: "Sort By"), String(localized: "Group By"), String(localized: "Order")]
         case .editor:
             [
-                String(localized: "Page Width"), String(localized: "Standard Width"), String(localized: "Title Length"),
-                String(localized: "Text Size"), String(localized: "Check Spelling While Typing"), String(localized: "Links"),
+                String(localized: "Text Size"), String(localized: "Line Spacing"), String(localized: "Paragraph Spacing"),
+                String(localized: "Links to Items"), String(localized: "Page Width"), String(localized: "Standard Width"),
+                String(localized: "Title Length"), String(localized: "Edit Pages As"), String(localized: "Articles Open In"),
+                String(localized: "Check Spelling While Typing"), String(localized: "Smart Quotes and Dashes"),
+                String(localized: "Pair Brackets and Quotes"), String(localized: "Continue Lists on Return"), String(localized: "Indent With"),
+                String(localized: "Paste Formatted Text As"), String(localized: "Fold Headings"), String(localized: "Line Numbers in Code"),
+            ]
+        case .layouts:
+            [
+                String(localized: "Preview"), String(localized: "Row"), String(localized: "Facts"), String(localized: "Page"),
+                String(localized: "Restore Defaults"), String(localized: "Import…"), String(localized: "Export…"),
             ]
         case .search:
             [

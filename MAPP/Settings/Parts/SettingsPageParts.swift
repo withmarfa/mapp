@@ -26,17 +26,22 @@ struct SettingsPageColumn<Content: View>: View {
 /// on a thing's own page; on a list page that has one thing at its head, `name` puts a section's name above it.
 struct SettingsHead<Trailing: View>: View {
     private let name: Text?
-    private let symbol: String
-    private let tone: SettingsTokens.Tone
+    private let lead: AnyView
     private let title: Text
     private let line: Text?
     private let trailing: Trailing
     @Environment(\.settingsTextScale) private var scale
 
     init(name: Text? = nil, symbol: String, tone: SettingsTokens.Tone, title: Text, line: Text? = nil, @ViewBuilder trailing: () -> Trailing) {
+        self.init(
+            name: name, lead: SettingsTile(symbol: symbol, tone: tone, size: SettingsTokens.Metric.headTile), title: title, line: line,
+            trailing: trailing)
+    }
+
+    /// A head whose lead is anything that fits the large tile's place, such as a type's mark.
+    init(name: Text? = nil, lead: some View, title: Text, line: Text? = nil, @ViewBuilder trailing: () -> Trailing) {
         self.name = name
-        self.symbol = symbol
-        self.tone = tone
+        self.lead = AnyView(lead.frame(width: SettingsTokens.Metric.headTile, height: SettingsTokens.Metric.headTile))
         self.title = title
         self.line = line
         self.trailing = trailing()
@@ -56,7 +61,7 @@ struct SettingsHead<Trailing: View>: View {
     private var card: some View {
         SettingsCard {
             HStack(spacing: 14) {
-                SettingsTile(symbol: symbol, tone: tone, size: SettingsTokens.Metric.headTile)
+                lead
                 VStack(alignment: .leading, spacing: 2) {
                     title.settingsFont(.headTitle).lineLimit(1).accessibilityAddTraits(.isHeader)
                     if let line {
@@ -77,6 +82,10 @@ struct SettingsHead<Trailing: View>: View {
 extension SettingsHead where Trailing == EmptyView {
     init(name: Text? = nil, symbol: String, tone: SettingsTokens.Tone, title: Text, line: Text? = nil) {
         self.init(name: name, symbol: symbol, tone: tone, title: title, line: line, trailing: { EmptyView() })
+    }
+
+    init(name: Text? = nil, lead: some View, title: Text, line: Text? = nil) {
+        self.init(name: name, lead: lead, title: title, line: line, trailing: { EmptyView() })
     }
 }
 
@@ -199,7 +208,6 @@ struct SettingsBar<Content: View>: View {
             content
             if edge == .leading { Spacer(minLength: 0) }
         }
-        .padding(.horizontal, SettingsTokens.Metric.inset)
         // The page's spacing puts a section apart from the next; the buttons belong to the card above.
         .padding(.top, SettingsTokens.Metric.barGap - SettingsTokens.Metric.pageSpacing)
     }

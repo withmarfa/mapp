@@ -52,12 +52,15 @@ struct SettingsAddRow: View {
 }
 
 /// The last row of a card that adds one of several things, chosen from a menu, such as a type to give an exception.
+/// With `isOff` it is dimmed and opens nothing, as a list that cannot take more shows.
 struct SettingsAddMenu<Items: View>: View {
     private let title: LocalizedStringKey
+    private let isOff: Bool
     private let items: Items
 
-    init(_ title: LocalizedStringKey, @ViewBuilder items: () -> Items) {
+    init(_ title: LocalizedStringKey, isOff: Bool = false, @ViewBuilder items: () -> Items) {
         self.title = title
+        self.isOff = isOff
         self.items = items()
     }
 
@@ -71,7 +74,7 @@ struct SettingsAddMenu<Items: View>: View {
                 Spacer(minLength: 0)
             }
             .settingsFont(.title)
-            .foregroundStyle(SettingsTokens.secondaryText)
+            .foregroundStyle(isOff ? SettingsTokens.tertiaryText : SettingsTokens.secondaryText)
             .padding(.horizontal, SettingsTokens.Metric.inset)
             .frame(maxWidth: .infinity, minHeight: SettingsTokens.Metric.rowHeightCompact, alignment: .leading)
             .contentShape(.rect)
@@ -79,6 +82,7 @@ struct SettingsAddMenu<Items: View>: View {
         .menuStyle(.button)
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
+        .disabled(isOff)
         .containerValue(\.settingsRuleInset, SettingsTokens.Metric.inset)
     }
 }

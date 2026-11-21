@@ -94,6 +94,7 @@ struct SettingsDetail: View {
             case .keyboard: KeyboardPage(libraries: libraries)
             case .lists: ListsPage()
             case .editor: EditorPage()
+            case .layouts: LayoutsPage()
             case .search: SearchPage()
             case .onThisMac: OnThisMacPage(openConnection: { navigation.show(.connection) })
             case .connection: ConnectionPage(settingsHost: host)

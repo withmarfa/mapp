@@ -26,6 +26,17 @@ nonisolated enum LinkLook: String, CaseIterable, Identifiable, Sendable {
 
     var id: Self { self }
 
+    var title: String {
+        switch self {
+        case .mark: String(localized: "Mark")
+        case .underline: String(localized: "Underline")
+        case .tintedPill: String(localized: "Tinted Pill")
+        case .pill: String(localized: "Pill")
+        case .quiet: String(localized: "Quiet")
+        case .text: String(localized: "Text")
+        }
+    }
+
     /// Whether the type icon is drawn.
     var showsIcon: Bool {
         switch self {
