@@ -220,6 +220,12 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 @Suite(.hangLimit) struct AccountModelTests {
     private func model(_ bench: OwnerBench) -> AccountModel { AccountModel(context: bench.context) }
 
+    /// Signs a browser out the way the page does: it asks, and the owner agrees.
+    private func signOut(_ account: AccountModel, _ browser: BrowserSignIn) async {
+        account.askToEnd(browser)
+        if let question = account.question { await account.confirm(question) }
+    }
+
     @Test func theProfileIsShownAsTheServerHoldsIt() async {
         let bench = OwnerBench()
         let account = model(bench)
@@ -314,13 +320,13 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         let account = model(bench)
         await account.load()
         bench.calls.fail("endSignIn", with: .notPermitted("sign_ins.manage"))
-        await account.end(account.browsers[0])
+        await signOut(account, account.browsers[0])
         #expect(account.rowErrors["b"]?.contains("manage the owner’s sign-ins and passkeys") == true)
         #expect(account.browsers.count == 1)
         #expect(bench.refreshed == 1, "the grants held can be stale, so they are read again")
     }
 
-    @Test func aPasskeyIsRenamedAndRemoved() async {
+    @Test func aPasskeyIsRenamedAndRemoved() async throws {
         let bench = OwnerBench()
         bench.calls.state.withLock { $0.passkeys = [OwnerPasskey(id: "p", name: "MacBook Pro")] }
         let account = model(bench)
@@ -330,7 +336,9 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         await account.rename()
         #expect(account.passkeys[0].name == "Studio Mac")
         #expect(account.sheet == nil)
-        await account.remove(account.passkeys[0])
+        account.askToRemove(account.passkeys[0])
+        #expect(account.passkeys.count == 1, "nothing is removed before the owner agrees")
+        await account.confirm(try #require(account.question))
         #expect(account.passkeys.isEmpty)
     }
 
@@ -354,9 +362,26 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         let account = model(bench)
         await account.load()
         bench.calls.fail("endSignIn", with: .notFound)
-        await account.end(account.browsers[0])
+        await signOut(account, account.browsers[0])
         #expect(account.browsers.isEmpty)
         #expect(account.rowErrors["b"] == nil)
+    }
+
+    @Test func signingABrowserOutAsksFirstNamingTheBrowser() async throws {
+        let bench = OwnerBench()
+        bench.calls.state.withLock { $0.browsers = [BrowserSignIn(id: "b", name: "Safari on macOS")] }
+        let account = model(bench)
+        await account.load()
+        account.askToEnd(account.browsers[0])
+        let question = try #require(account.question)
+        #expect(question.title == "Sign out “Safari on macOS”?")
+        #expect(!bench.calls.calls.contains("endSignIn"), "nothing is sent before the owner agrees")
+        account.cancelQuestion()
+        #expect(account.question == nil)
+        #expect(account.browsers.count == 1)
+        await account.confirm(question)
+        #expect(bench.calls.calls.contains("endSignIn"))
+        #expect(account.browsers.isEmpty)
     }
 
     @Test func aServerThatDoesNotAnswerIsTheWholePage() async {
@@ -507,6 +532,18 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(parsed.permissions == ["keys.manage"])
     }
 
+    @Test func narrowingAGrantThatHoldsOnlyAWriteLeavesARead() async throws {
+        let scopes = ["core.note:write", "keys.manage"]
+        #expect(AccessScopes.narrowed(scopes, pattern: "core.note", to: .read) == ["core.note:read", "keys.manage"])
+        #expect(AccessScopes.narrowed(scopes, pattern: "core.note", to: .none) == ["keys.manage"])
+        let bench = bench(app(scopes: scopes))
+        let model = AppsModel(context: bench.context)
+        await model.load()
+        model.askToNarrow(model.apps[0], pattern: "core.note", to: .read)
+        await model.confirm(try #require(model.question))
+        #expect(bench.calls.state.withLock { $0.narrowed.first?.scopes } == ["core.note:read", "keys.manage"], "a read is sent, never nothing")
+    }
+
     @Test func aPatternIsNamedByTheTypeOrByWhatItReaches() {
         let names = ["core.note": "Note"]
         #expect(AccessScopes.title(of: "core.note", names: names) == "Note")
@@ -586,11 +623,106 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         let bench = bench([key()])
         let model = KeysModel(context: bench.context)
         await model.load()
-        await model.narrow(model.keys[0], pattern: "core.note", to: .write)
-        #expect(bench.calls.state.withLock { $0.changes.isEmpty }, "a wider level is never sent")
-        await model.narrow(model.keys[0], pattern: "*", to: .read)
+        model.askToNarrow(model.keys[0], pattern: "core.note", to: .write)
+        #expect(model.question == nil, "a wider level is never asked or sent")
+        #expect(bench.calls.state.withLock { $0.changes.isEmpty })
+    }
+
+    @Test func narrowingAKeyAsksFirstNamingTheChangeAndSaysItCantBeUndone() async throws {
+        let bench = bench([key()])
+        bench.calls.state.withLock { $0.names = ["core.note": "Note"] }
+        let model = KeysModel(context: bench.context)
+        await model.load()
+        model.askToNarrow(model.keys[0], pattern: "*", to: .read)
+        let question = try #require(model.question)
+        #expect(question.title == "Narrow “Importer”?")
+        #expect(question.message.contains("All Data goes from Read and Edit to Read Only."))
+        #expect(question.message.contains("can’t be undone"))
+        #expect(bench.calls.state.withLock { $0.changes.isEmpty }, "nothing is sent before the owner agrees")
+        model.cancelQuestion()
+        #expect(model.keys[0].types["*"] == .write, "Cancel leaves the key as it was")
+        await model.confirm(question)
         let sent = bench.calls.state.withLock { $0.changes }
         #expect(sent.first?.change.types == ["*": .read, "core.note": .read])
+        #expect(model.keys[0].types["*"] == .read)
+    }
+
+    @Test func narrowingAKeyHoldingOnlyAWriteSendsARead() async throws {
+        let bench = bench([key(types: ["core.note": .write])])
+        let model = KeysModel(context: bench.context)
+        await model.load()
+        model.askToNarrow(model.keys[0], pattern: "core.note", to: .read)
+        await model.confirm(try #require(model.question))
+        #expect(bench.calls.state.withLock { $0.changes.first?.change.types } == ["core.note": .read])
+    }
+
+    @Test func removingAKeysPermissionAsksFirstAndSaysItCantBeUndone() async throws {
+        let bench = bench([key()])
+        let model = KeysModel(context: bench.context)
+        await model.load()
+        model.askToRemove(permission: "items.purge", from: model.keys[0])
+        let question = try #require(model.question)
+        #expect(question.title == "Remove “Delete Permanently” from “Importer”?")
+        #expect(question.message.contains("can’t be undone"))
+        #expect(bench.calls.state.withLock { $0.changes.isEmpty }, "nothing is sent before the owner agrees")
+        model.cancelQuestion()
+        #expect(model.keys[0].permissions == ["items.purge"])
+        await model.confirm(question)
+        #expect(bench.calls.state.withLock { $0.changes.first?.change.permissions } == [])
+        #expect(model.keys[0].permissions.isEmpty)
+    }
+
+    @Test func aNewKeyRefusedForItsSourceSaysSoOnTheSourceField() async {
+        let bench = bench([])
+        let model = KeysModel(context: bench.context)
+        model.beginNewKey()
+        model.draft.name = "Lisbon zine importer"
+        model.draft.source = "lisbon-zine"
+        bench.calls.fail("create", with: .sourceHeld("Another key already has this source."))
+        await model.make()
+        #expect(model.sourceError == "Another key already has this source.")
+        #expect(model.draftError == nil)
+        #expect(model.draft.source == "lisbon-zine")
+        #expect(model.sheet == .new)
+    }
+
+    @Test func closingSettingsHandsBackTheNewKeysTypedFields() async {
+        let bench = bench([])
+        let model = KeysModel(context: bench.context)
+        let drafts = OwnerDrafts()
+        drafts.register(model)
+        #expect(drafts.takeAll().isEmpty, "no sheet open, nothing to hand back")
+        model.beginNewKey()
+        #expect(drafts.takeAll().isEmpty, "an empty sheet holds nothing")
+        model.beginNewKey()
+        model.draft.name = "Lisbon zine importer"
+        model.draft.source = "lisbon-zine"
+        #expect(
+            drafts.takeAll() == [.typed(title: "Key Not Made", text: "Name: Lisbon zine importer\nSource: lisbon-zine")])
+        #expect(model.sheet == nil)
+        #expect(drafts.takeAll().isEmpty, "what was handed back is not handed back twice")
+    }
+
+    @Test func aKeyShownWhenSettingsClosesIsToldAboutNeverHandedBack() async {
+        let bench = bench([])
+        let model = KeysModel(context: bench.context)
+        let drafts = OwnerDrafts()
+        drafts.register(model)
+        model.beginNewKey()
+        model.draft.name = "Lisbon zine importer"
+        model.draft.source = "lisbon-zine"
+        await model.make()
+        #expect(model.sheet == .shown)
+        let taken = drafts.takeAll()
+        #expect(
+            taken == [
+                .told(
+                    title: "Key Not Copied",
+                    message: "The key “Lisbon zine importer” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key on the Keys page.")
+            ])
+        #expect(!String(describing: taken).contains("marfa_k1_secret"), "the secret is never handed over")
+        #expect(model.created == nil)
+        #expect(model.sheet == nil)
     }
 
     @Test func aKeyIsMadeToExpireSoonerAfterAskingAndNeverLater() async throws {
@@ -707,6 +839,73 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(bench.calls.state.withLock { $0.applied.isEmpty })
     }
 
+    @Test func aCheckOfOneAddressNeverWritesAnother() async {
+        let (model, bench) = await model()
+        model.begin(.addAddress)
+        model.input = "a.castell.design"
+        await model.check()
+        #expect(model.canConfirm)
+        model.input = "b.castell.design"
+        #expect(!model.canConfirm, "what was checked is not what is typed")
+        #expect(model.currentPlan == nil)
+        await model.confirm()
+        #expect(bench.calls.state.withLock { $0.applied.isEmpty }, "nothing is written for an address that was not checked")
+        await model.check()
+        #expect(model.canConfirm)
+        await model.confirm()
+        #expect(model.settings?.addresses.last == "https://b.castell.design")
+        #expect(model.settings?.addresses.contains("https://a.castell.design") == false)
+    }
+
+    @Test func aCheckOfOneSignInAddressNeverMovesToAnother() async {
+        let bench = OwnerBench()
+        bench.calls.state.withLock { $0.reach = .answers; $0.requiresConfirmation = true }
+        let (model, _) = await model(bench)
+        model.begin(.changeSignIn)
+        model.input = "a.castell.design"
+        await model.check()
+        #expect(model.canConfirm)
+        model.input = "b.castell.design"
+        #expect(!model.canConfirm)
+        await model.confirm()
+        #expect(bench.calls.state.withLock { $0.applied.isEmpty })
+        #expect(model.settings?.signIn == "https://marfa.test")
+        await model.check()
+        await model.confirm()
+        #expect(model.settings?.signIn == "https://b.castell.design")
+    }
+
+    @Test func aWebsiteAlreadyAllowedIsNotAddedAgain() async {
+        let (model, bench) = await model()
+        model.begin(.addWebsite)
+        model.input = "castell.studio"
+        await model.check()
+        await model.confirm()
+        model.begin(.addWebsite)
+        model.input = "castell.studio"
+        await model.confirm()
+        #expect(bench.calls.state.withLock { $0.websitesSent.count } == 1)
+    }
+
+    @Test func closingSettingsHandsBackTheTypedAddress() async {
+        let (model, _) = await model()
+        let drafts = OwnerDrafts()
+        drafts.register(model)
+        #expect(drafts.takeAll().isEmpty)
+        model.begin(.addAddress)
+        #expect(drafts.takeAll().isEmpty, "an empty sheet holds nothing")
+        model.begin(.addAddress)
+        model.input = " studio.castell.design "
+        #expect(drafts.takeAll() == [.typed(title: "Address Not Added", text: "studio.castell.design")])
+        #expect(model.sheet == nil)
+        model.begin(.changeSignIn)
+        model.input = "studio.castell.design"
+        #expect(drafts.takeAll() == [.typed(title: "Sign-In Address Not Changed", text: "studio.castell.design")])
+        model.begin(.addWebsite)
+        model.input = "castell.studio"
+        #expect(drafts.takeAll() == [.typed(title: "Website Not Added", text: "castell.studio")])
+    }
+
     @Test func anAddressAlreadyHeldIsToldNotChecked() async {
         let (model, bench) = await model()
         model.begin(.addAddress)
@@ -817,10 +1016,24 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     @Test func everyFailureSaysSomethingInOneLine() {
         let failures: [OwnerFailure] = [
             .unreachable, .signedOut, .notPermitted("grants.manage"), .notPermitted(nil), .notPermitted("odd.scope"), .notFound,
-            .conflict, .notConfirmed, .refused("Because."), .failed("Broken."),
+            .conflict, .notConfirmed, .refused("Because."), .sourceHeld("Taken."), .failed("Broken."),
         ]
         for failure in failures { #expect(!OwnerWording.line(failure).isEmpty) }
         #expect(OwnerWording.line(.notPermitted("odd.scope")).contains("odd.scope"))
+    }
+
+    @Test func aConflictIsChangedElsewhereOnlyWhereTheCallSaysSo() {
+        func answer(_ code: String) -> MarfaError { .server(status: 409, code: code, message: "The server’s words.", details: nil, server: nil) }
+        #expect(ClientOwnerCalls.failure(answer("sign_in_address_check_failed")) == .refused("The server’s words."))
+        #expect(ClientOwnerCalls.failure(answer("sign_in_address_change_unconfirmed")) == .refused("The server’s words."))
+        #expect(ClientOwnerCalls.failure(answer("conflict")) == .refused("The server’s words."), "a 409 is not changed elsewhere by default")
+        #expect(ClientOwnerCalls.failure(answer("conflict"), plainConflict: { _ in .conflict }) == .conflict, "a grant read before it changed")
+        #expect(ClientOwnerCalls.failure(answer("conflict"), plainConflict: { .sourceHeld($0) }) == .sourceHeld("The server’s words."))
+        #expect(
+            ClientOwnerCalls.failure(MarfaError.versionConflict(message: "Stale.", server: nil), plainConflict: { .sourceHeld($0) }) == .conflict)
+        #expect(
+            ClientOwnerCalls.failure(answer("sign_in_address_check_failed"), plainConflict: { _ in .conflict }) == .refused("The server’s words."),
+            "the address refusals keep the server’s words whatever the call")
     }
 
     @Test func whenIsToldByDayAndNeverByTimeAlone() {

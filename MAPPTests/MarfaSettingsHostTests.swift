@@ -201,6 +201,55 @@ import Testing
         #expect(libraries.host.notices.waiting.filter(\.isNotKept).isEmpty, "a draft already handed over is not handed over again")
     }
 
+    @Test func closingSettingsHandsBackTheOwnerPagesDrafts() async throws {
+        let bench = try HostBench()
+        let (adapter, libraries, _) = try await connected(bench)
+        let context = OwnerContext(calls: FakeOwnerCalls(), grants: { [.keysMint, .keysManage, .configManage] })
+        let addresses = AddressesModel(context: context)
+        let keys = KeysModel(context: context)
+        adapter.ownerDrafts.register(addresses)
+        adapter.ownerDrafts.register(keys)
+        await addresses.load()
+        addresses.begin(.addAddress)
+        addresses.input = "studio.castell.design"
+        let before = libraries.host.notices.waiting.count
+        adapter.handOverDrafts()
+        let notice = try #require(libraries.host.notices.waiting.dropFirst(before).first)
+        #expect(notice.isNotKept)
+        #expect(notice.title == "Address Not Added")
+        #expect(notice.text == "studio.castell.design")
+        #expect(notice.message.contains("You closed Settings before this was saved."))
+        adapter.handOverDrafts()
+        #expect(libraries.host.notices.waiting.count == before + 1, "a second close has nothing more to hand back")
+        // A key shown once is told about, with no text to give back.
+        keys.beginNewKey()
+        keys.draft.name = "Importer"
+        keys.draft.source = "importer"
+        await keys.make()
+        adapter.handOverDrafts()
+        let told = try #require(libraries.host.notices.waiting.last { $0.title == "Key Not Copied" })
+        #expect(!told.isNotKept)
+        #expect(told.text == nil)
+        #expect(told.message.contains("“Importer” was made"))
+    }
+
+    @Test func quittingHandsBackTheOwnerPagesDrafts() async throws {
+        let bench = try HostBench()
+        let defaults = try #require(UserDefaults(suiteName: "MarfaSettingsHostTests-\(UUID().uuidString)"))
+        let libraries = Libraries(host: bench.host(), defaults: defaults, handOverPages: { $0(true) })
+        let keys = KeysModel(context: OwnerContext(calls: FakeOwnerCalls(), grants: { [.keysMint, .keysManage] }))
+        libraries.ownerDrafts.register(keys)
+        keys.beginNewKey()
+        keys.draft.name = "Importer"
+        keys.draft.source = "importer"
+        let before = libraries.host.notices.waiting.count
+        libraries.handOffDraftsAtQuit()
+        let notice = try #require(libraries.host.notices.waiting.dropFirst(before).first)
+        #expect(notice.isNotKept)
+        #expect(notice.text == "Name: Importer\nSource: importer")
+        #expect(notice.message.contains("You quit MAPP before this was saved."))
+    }
+
     @Test func aWriteTheServerRefusesKeepsWhatWasTypedWithItsReason() async throws {
         let source = FakeInstanceConfig([.name: .text("Library")])
         source.updateFailure.withLock { $0 = .refused("That name is taken.") }

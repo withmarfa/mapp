@@ -29,6 +29,7 @@ struct KeysPage: View {
     var body: some View {
         content
             .task(id: host.serverAddress) { await model.load() }
+            .onAppear { host.ownerDrafts.register(model) }
             .settingsSheet(presenting: model.sheet != nil, dismiss: { model.closeSheet() }) { KeySheet(model: model) }
             .alert(
                 model.question?.title ?? "", isPresented: Binding { model.question != nil } set: { if !$0 { model.cancelQuestion() } },
@@ -164,7 +165,7 @@ private struct KeyDetail: View {
                 ForEach(parsed.entries) { entry in
                     SettingsRow(verbatim: AccessScopes.title(of: entry.pattern, names: model.typeNames), lead: .symbol("tray.full")) {
                         SettingsPopUp(title: "Access", selection: Binding { entry.level } set: { level in
-                            Task { await model.narrow(key, pattern: entry.pattern, to: level) }
+                            model.askToNarrow(key, pattern: entry.pattern, to: level)
                         }) {
                             ForEach(AccessLevel.allCases.filter { $0 <= entry.level }, id: \.self) { Text(verbatim: $0.title).tag($0) }
                         }
@@ -173,7 +174,7 @@ private struct KeyDetail: View {
                 ForEach(parsed.permissions, id: \.self) { permission in
                     SettingsRow(verbatim: OwnerWording.title(of: permission), lead: .symbol("gearshape")) {
                         SettingsPopUp(title: "Permission", selection: Binding { true } set: { allowed in
-                            if !allowed { Task { await model.remove(permission: permission, from: key) } }
+                            if !allowed { model.askToRemove(permission: permission, from: key) }
                         }) {
                             Text("Allowed").tag(true)
                             Text("Not Allowed").tag(false)
@@ -242,8 +243,8 @@ private struct NewKeySheet: View {
                             model.draft.name = name
                         }, isError: model.draftError != nil, width: nil)
                     }
-                    SettingsSheetField(label: "Source, Stamped on What It Writes") {
-                        SettingsField(title: "Source", text: $model.draft.source, isMonospaced: true, width: nil)
+                    SettingsSheetField(label: "Source, Stamped on What It Writes", error: model.sourceError) {
+                        SettingsField(title: "Source", text: $model.draft.source, isError: model.sourceError != nil, isMonospaced: true, width: nil)
                     }
                     SettingsSection("Key") {
                         SettingsRow("Expires") {
@@ -331,17 +332,7 @@ private struct ShownKeySheet: View {
     var body: some View {
         SettingsSheet(title: Text("Copy the Key Now"), line: Text("It is shown only once. Keep it where the script can read it.")) {
             if let created = model.created {
-                SettingsSheetField(label: LocalizedStringKey(created.label)) {
-                    Text(verbatim: created.secret)
-                        .settingsFont(.mono)
-                        .textSelection(.enabled)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .padding(.horizontal, 8)
-                        .frame(maxWidth: .infinity, minHeight: SettingsTokens.Metric.controlHeight, alignment: .leading)
-                        .background(SettingsTokens.field, in: .rect(cornerRadius: SettingsTokens.Metric.controlRadius))
-                        .overlay { RoundedRectangle(cornerRadius: SettingsTokens.Metric.controlRadius).strokeBorder(SettingsTokens.hairline) }
-                }
+                SettingsSheetField(verbatim: created.label) { SettingsReadOnlyValue(text: created.secret) }
             }
         } buttons: {
             Spacer(minLength: 0)

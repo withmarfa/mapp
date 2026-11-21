@@ -235,7 +235,7 @@ The window has three areas: the sidebar, the list pane and the page. What a pers
 
 Status: Built, not yet released. Settings is a window of its own, not a place in the main window; [Settings storage](settings-storage.md#the-settings-window) says what it holds and how it is opened.
 
-Where it lives: `SettingsWindowView`, `SettingsSidebar`, `SettingsNavigation`, `SettingsLauncher`, `SettingsTokens`, `SettingsSection`, `SettingsRow`, `SettingsButton`, `SettingsHead`, `SettingsProblemRow`, `SettingsPageState`, `SettingsSheet`, `ChoiceTiles`, `PatternList`, `SettingsSectionTable` and `SettingsPageTable`, under `MAPP/Settings/`.
+Where it lives: `SettingsWindowView`, `SettingsSidebar`, `SettingsNavigation`, `SettingsLauncher`, `SettingsTokens`, `SettingsSection`, `SettingsRow`, `SettingsButton`, `SettingsHead`, `SettingsProblemRow`, `SettingsPageState`, `SettingsReadOnlyValue`, `SettingsSheet`, `ChoiceTiles`, `PatternList`, `SettingsSectionTable` and `SettingsPageTable`, under `MAPP/Settings/`.
 
 The rules every page follows, agreed with August on 19 and 20 November 2026:
 

@@ -6,7 +6,7 @@ import Observation
 /// call it. An address is added, removed or moved only after the server's own check says what it would do, and moving
 /// the sign-in address shows what changes and asks first. The instance read is named in every write, so another instance
 /// answering at the address is told, not written to.
-@Observable @MainActor final class AddressesModel {
+@Observable @MainActor final class AddressesModel: OwnerDraftHolding {
     enum Sheet: Equatable {
         case addAddress
         case addWebsite
@@ -35,7 +35,8 @@ import Observation
     private(set) var hasLoaded = false
     var sheet: Sheet?
     var input = ""
-    /// What the server said the typed change would do, for the sheet to show.
+    /// What the server last said a typed change would do. It answers the address that was typed then, so read it through
+    /// `currentPlan`.
     private(set) var plan: AddressPlan?
     /// Why the typed address can't be used, in one line; the sheet keeps what was typed.
     private(set) var inputError: String?
@@ -164,9 +165,20 @@ import Observation
         }
     }
 
-    /// Whether Add or Change can be chosen: the server checked what was typed and found nothing wrong.
+    /// What the server said about the address typed now, or nil while it has said nothing about it: an answer about an
+    /// earlier address, or about addresses that have since changed, is never read as this one's.
+    var currentPlan: AddressPlan? {
+        guard let plan, let settings, let origin = Self.origin(from: input) else { return nil }
+        switch sheet {
+        case .changeSignIn?: return plan.askedSignIn == origin ? plan : nil
+        case .addAddress?: return plan.askedAddresses == settings.addresses + [origin] ? plan : nil
+        case .addWebsite?, nil: return nil
+        }
+    }
+
+    /// Whether Add or Change can be chosen: the server checked what is typed now and found nothing wrong.
     var canConfirm: Bool {
-        guard let plan, inputError == nil, !isWriting, !isChecking else { return false }
+        guard let plan = currentPlan, inputError == nil, !isWriting, !isChecking else { return false }
         if case .notAnswering = plan.reach { return false }
         return true
     }
@@ -178,7 +190,7 @@ import Observation
         case .addWebsite:
             await commitWebsite(adding: Self.origin(from: input))
         case .addAddress, .changeSignIn:
-            guard canConfirm, let plan else { return }
+            guard canConfirm, let plan = currentPlan else { return }
             isWriting = true
             defer { isWriting = false }
             do {
@@ -189,13 +201,17 @@ import Observation
             } catch {
                 inputError = OwnerWording.line(error)
                 await context.learn(from: error)
-                if error == .conflict { await load() }
+                if error == .conflict {
+                    await load()
+                    await check()
+                    inputError = OwnerWording.line(error)
+                }
             }
         }
     }
 
     private func commitWebsite(adding origin: String?) async {
-        guard let settings, let origin, inputError == nil else { return }
+        guard let settings, let origin, inputError == nil, !settings.websites.contains(origin) else { return }
         isWriting = true
         defer { isWriting = false }
         do {
@@ -264,5 +280,22 @@ import Observation
                 await context.learn(from: error)
             }
         }
+    }
+
+    // MARK: Closing
+
+    /// The address typed in a sheet that is open, which the app gives back when Settings closes. A sheet that is writing
+    /// is not taken from: the write ends with the sheet.
+    func takeDrafts() -> [OwnerDraft] {
+        let typed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let sheet, !isWriting, !typed.isEmpty else { return [] }
+        let title =
+            switch sheet {
+            case .addAddress: String(localized: "Address Not Added")
+            case .addWebsite: String(localized: "Website Not Added")
+            case .changeSignIn: String(localized: "Sign-In Address Not Changed")
+            }
+        close()
+        return [.typed(title: title, text: typed)]
     }
 }

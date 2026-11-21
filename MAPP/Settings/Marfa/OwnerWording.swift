@@ -12,7 +12,7 @@ nonisolated enum OwnerWording {
         case .notFound: String(localized: "It was removed somewhere else.")
         case .conflict: String(localized: "It changed somewhere else, so MAPP read it again. Nothing was changed.")
         case .notConfirmed: String(localized: "Nothing was changed: the sign-in wasn’t confirmed.")
-        case .refused(let reason), .failed(let reason): reason
+        case .refused(let reason), .sourceHeld(let reason), .failed(let reason): reason
         }
     }
 
@@ -109,16 +109,25 @@ nonisolated enum AccessScopes {
         return Parsed(entries: order.map { Entry(pattern: $0, level: levels[$0] ?? .none) }, permissions: permissions)
     }
 
-    /// `scopes` with what `pattern` may do lowered to `level`, and nothing widened. Writing keeps a read beside it, as the
-    /// server lists them.
+    /// `scopes` with what `pattern` may do lowered to `level`, and nothing widened. What was written becomes a read where
+    /// the grant held no read beside it, so Read Only never sends nothing for the pattern.
     static func narrowed(_ scopes: [String], pattern: String, to level: AccessLevel) -> [String] {
-        scopes.filter { scope in
-            guard scope.hasPrefix(pattern + ":") else { return true }
-            switch (scope.dropFirst(pattern.count + 1), level) {
-            case ("write", .read), ("write", .none), ("read", .none): return false
-            default: return true
+        let read = pattern + ":read"
+        let write = pattern + ":write"
+        let held: AccessLevel = scopes.contains(write) ? .write : scopes.contains(read) ? .read : .none
+        guard level < held else { return scopes }
+        var narrowed: [String] = []
+        for scope in scopes {
+            switch scope {
+            case write:
+                if level == .read, !scopes.contains(read) { narrowed.append(read) }
+            case read:
+                if level != .none { narrowed.append(scope) }
+            default:
+                narrowed.append(scope)
             }
         }
+        return narrowed
     }
 
     static func removing(permission: String, from scopes: [String]) -> [String] {

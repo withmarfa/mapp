@@ -222,6 +222,25 @@ struct SettingsField: View {
     }
 }
 
+/// A value shown in a field's place that can be selected and copied but not changed, such as a key shown once. It is as
+/// tall as a field and as wide as the space it is given, and its middle is cut where it is too long.
+struct SettingsReadOnlyValue: View {
+    let text: String
+    var isMonospaced = true
+
+    var body: some View {
+        Text(verbatim: text)
+            .settingsFont(isMonospaced ? .mono : .title)
+            .textSelection(.enabled)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity, minHeight: SettingsTokens.Metric.controlHeight, alignment: .leading)
+            .background(SettingsTokens.field, in: .rect(cornerRadius: SettingsTokens.Metric.controlRadius))
+            .overlay { RoundedRectangle(cornerRadius: SettingsTokens.Metric.controlRadius).strokeBorder(SettingsTokens.hairline) }
+    }
+}
+
 /// A number: a field with its unit inside at the trailing edge, never minus and plus.
 struct SettingsNumberField: View {
     let title: LocalizedStringKey

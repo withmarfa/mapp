@@ -31,6 +31,9 @@ import os
     /// away.
     let instanceSettings: InstanceSettingsModel
 
+    /// The owner's pages that are open, which hold what was typed and not kept until Settings closes or the app quits.
+    let ownerDrafts = OwnerDrafts()
+
     /// What each library's person chose to show in the sidebar.
     let sidebarLayouts: SidebarLayouts
 
@@ -135,11 +138,12 @@ import os
         return true
     }
 
-    /// Hands over what was typed in This Marfa's settings and not saved, as the window does when it closes: a window's
-    /// close is not posted when the app quits, and the draft has no other home.
+    /// Hands over what was typed in Settings and not saved, as the window does when it closes: a window's close is not
+    /// posted when the app quits, and the draft has no other home.
     func handOffDraftsAtQuit() {
         instanceSettings.handOver(
             to: host.notices, because: String(localized: "You quit MAPP before saving the changes to this Marfa’s settings."))
+        ownerDrafts.handOver(to: host.notices, because: String(localized: "You quit MAPP before this was saved."))
     }
 
     /// Quitting waits at most `limit` and is cancelled if the editors or library cannot finish. A page or a title

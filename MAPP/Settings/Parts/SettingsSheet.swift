@@ -41,14 +41,27 @@ struct SettingsSheet<Content: View, Buttons: View>: View {
 
 /// A field in a sheet, with its label above it.
 struct SettingsSheetField<Field: View>: View {
-    let label: LocalizedStringKey
+    private let label: Text
     /// Why the input was refused, in one line under the field. The field takes the red ring itself.
-    var error: String?
-    @ViewBuilder let field: Field
+    private let error: String?
+    private let field: Field
+
+    init(label: LocalizedStringKey, error: String? = nil, @ViewBuilder field: () -> Field) {
+        self.label = Text(label)
+        self.error = error
+        self.field = field()
+    }
+
+    /// A label that is the person's own text, shown as it is.
+    init(verbatim label: String, error: String? = nil, @ViewBuilder field: () -> Field) {
+        self.label = Text(verbatim: label)
+        self.error = error
+        self.field = field()
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(label).settingsFont(.line).foregroundStyle(SettingsTokens.secondaryText)
+            label.settingsFont(.line).foregroundStyle(SettingsTokens.secondaryText)
             field
             if let error {
                 Text(verbatim: error).settingsFont(.line).foregroundStyle(SettingsTokens.errorRed).fixedSize(horizontal: false, vertical: true)

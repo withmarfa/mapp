@@ -14,6 +14,7 @@ struct AddressesPage: View {
     var body: some View {
         content
             .task(id: host.serverAddress) { await model.load() }
+            .onAppear { host.ownerDrafts.register(model) }
             .settingsSheet(presenting: model.sheet != nil, dismiss: { model.close() }) { AddressSheet(model: model, serverName: host.serverName) }
             .alert(
                 model.question?.title ?? "", isPresented: Binding { model.question != nil } set: { if !$0 { model.cancelQuestion() } },
@@ -104,7 +105,7 @@ struct AddressSheet: View {
                         title: "Address", text: $model.input, prompt: "https://", isError: model.inputError != nil, width: nil,
                         onSubmit: { Task { await model.confirm() } })
                 }
-                if model.sheet == .changeSignIn, let plan = model.plan, !plan.consequences.isEmpty {
+                if model.sheet == .changeSignIn, let plan = model.currentPlan, !plan.consequences.isEmpty {
                     SettingsSection("What Happens") {
                         ForEach(plan.consequences, id: \.code) { consequence in
                             SettingsRow(verbatim: Self.title(of: consequence), line: consequence.sentence, lead: .symbol(Self.symbol(consequence.code)), lines: nil)
@@ -131,8 +132,8 @@ struct AddressSheet: View {
     private var status: String? {
         guard model.inputError == nil, AddressesModel.origin(from: model.input) != nil else { return nil }
         switch model.sheet {
-        case .changeSignIn?: return model.plan?.reach == .answers ? String(localized: "\(serverName) answers there.") : nil
-        case .addAddress?: return model.plan == nil ? nil : String(localized: "The server accepts this address.")
+        case .changeSignIn?: return model.currentPlan?.reach == .answers ? String(localized: "\(serverName) answers there.") : nil
+        case .addAddress?: return model.currentPlan == nil ? nil : String(localized: "The server accepts this address.")
         case .addWebsite?: return String(localized: "This is a website address.")
         case nil: return nil
         }

@@ -137,6 +137,8 @@ nonisolated enum OwnerFailure: Error, Hashable, Sendable {
     /// The owner closed, or did not pass, the sign-in the server asked for.
     case notConfirmed
     case refused(String)
+    /// A new key's source is another key's own, in the server's words.
+    case sourceHeld(String)
     case failed(String)
 }
 
@@ -203,8 +205,9 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
         do { return try client() } catch { throw Self.failure(error) }
     }
 
-    /// What the package's error stands for, unwrapping the generated client's own wrapper.
-    static func failure(_ error: any Error) -> OwnerFailure {
+    /// What the package's error stands for, unwrapping the generated client's own wrapper. A `409` that names no cause of
+    /// its own (the codes below) is the server refusing the call, which `plainConflict` words for the call that made it.
+    static func failure(_ error: any Error, plainConflict: (String) -> OwnerFailure = { .refused($0) }) -> OwnerFailure {
         var current = error
         var found: MarfaError?
         for _ in 0..<4 {
@@ -224,16 +227,26 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
             return .notPermitted(server?.details?.object?["required_scope"]?.string)
         case .notFound: return .notFound
         case .versionConflict: return .conflict
-        case .server(let status, _, _, _, _) where status == 409: return .conflict
+        case .server(let status, let code, let message, _, _) where status == 409:
+            let refusals: Set<String> = ["sign_in_address_check_failed", "sign_in_address_change_unconfirmed"]
+            return refusals.contains(code) ? .refused(message) : plainConflict(message)
         case .validation(_, let message, _, _): return .refused(message)
         case .confirmationRequired, .appSignInRequired, .canceled: return .notConfirmed
         default: return .failed(error.localizedDescription)
         }
     }
 
-    private func run<Result>(_ call: (Client) async throws -> Result) async throws(OwnerFailure) -> Result {
+    private func run<Result>(
+        plainConflict: (String) -> OwnerFailure = { .refused($0) }, _ call: (Client) async throws -> Result
+    ) async throws(OwnerFailure) -> Result {
         let client = try make()
-        do { return try await call(client) } catch let failure as OwnerFailure { throw failure } catch { throw Self.failure(error) }
+        do {
+            return try await call(client)
+        } catch let failure as OwnerFailure {
+            throw failure
+        } catch {
+            throw Self.failure(error, plainConflict: plainConflict)
+        }
     }
 
     private static func date(_ text: String?) -> Date? {
@@ -341,7 +354,8 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
     }
 
     func narrow(_ app: AppAccess, to scopes: [String]) async throws(OwnerFailure) {
-        try await run { client in
+        // The grant's scopes changed since they were read: the only `409` this call answers.
+        try await run(plainConflict: { _ in .conflict }) { client in
             _ = try await client.narrowAppGrant(
                 path: .init(id: app.id), body: .json(.init(scopes: scopes, expectedScopes: app.scopes))
             ).ok
@@ -384,7 +398,8 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
     }
 
     func create(_ key: NewKey) async throws(OwnerFailure) -> CreatedKey {
-        try await run { client in
+        // Another key holds the source: the only `409` this call answers.
+        try await run(plainConflict: { .sourceHeld($0) }) { client in
             let body = Operations.CreateKey.Input.Body.JsonPayload(
                 label: key.label, source: key.source,
                 permissions: key.permissions.compactMap { Components.Schemas.Permission(rawValue: $0) },

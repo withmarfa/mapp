@@ -4,7 +4,7 @@ These pages stand alone, so another app can take them without MAPP. They import 
 
 ## The host
 
-- `MarfaSettingsHost` gives the package's `Client` over the current server (as `MarfaServerCalls` builds it; build no second client), the server's name and address, the connection (`opening`, `connected`, `notConnected`, `signedOut`, `notAnswering`), the permissions the sign-in holds (`Credential.grants`), `allowMore(_:)`, Try Again, the way back to Connection, an optional `openInApp` that MAPP may leave out, This Marfa's draft model and the bin. A page that needs more asks for it there, in terms of its own.
+- `MarfaSettingsHost` gives the package's `Client` over the current server (as `MarfaServerCalls` builds it; build no second client), the server's name and address, the connection (`opening`, `connected`, `notConnected`, `signedOut`, `notAnswering`), the permissions the sign-in holds (`Credential.grants`), `allowMore(_:)`, Try Again, the way back to Connection, an optional `openInApp` that MAPP may leave out, This Marfa's draft model, `ownerDrafts` (where a page's model registers to hand back what was typed when Settings closes) and the bin. A page that needs more asks for it there, in terms of its own.
 - A new page adds a case to `MarfaSettingsPage` and its view to `MarfaSettingsPageView`; what it needs from the app is added to the host first.
 
 ## Permissions and states

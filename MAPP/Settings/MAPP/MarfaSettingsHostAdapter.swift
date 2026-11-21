@@ -20,6 +20,7 @@ enum LibraryDescription {
     private let launcher: SettingsLauncher
     private(set) var isAllowingMore = false
     let instanceSettings: InstanceSettingsModel
+    var ownerDrafts: OwnerDrafts { libraries.ownerDrafts }
 
     /// `instanceSettings` is the model the app keeps for This Marfa's fields, unless a test brings its own.
     init(libraries: Libraries, launcher: SettingsLauncher, instanceSettings: InstanceSettingsModel? = nil) {
@@ -124,11 +125,25 @@ enum LibraryDescription {
 
     // MARK: Closing
 
-    /// Hands over what was typed in This Marfa's fields and not saved, as MAPP's rules say for a panel that ends any way but
+    /// Hands over what was typed in the Marfa's pages and not saved, as MAPP's rules say for a panel that ends any way but
     /// the person's own Cancel: the text goes through `Notices.notKept`, to the clipboard, and the draft is dropped.
     func handOverDrafts() {
         instanceSettings.handOver(
             to: libraries.host.notices, because: String(localized: "You closed Settings before saving the changes to this Marfa’s settings."))
+        ownerDrafts.handOver(to: libraries.host.notices, because: String(localized: "You closed Settings before this was saved."))
+    }
+}
+
+extension OwnerDrafts {
+    /// Gives back what the open owner's pages hold: typed text as a change not kept, and what can't be shown again as a
+    /// notice. A password is never among it, and nor is a key's secret.
+    func handOver(to notices: Notices, because reason: String) {
+        for draft in takeAll() {
+            switch draft {
+            case .typed(let title, let text): notices.notKept(title, text: text, reason: reason)
+            case .told(let title, let message): notices.tell(title, message)
+            }
+        }
     }
 }
 

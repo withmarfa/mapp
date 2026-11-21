@@ -16,6 +16,7 @@ import Testing
     var grants: Set<InstancePermission> = Set(InstancePermission.allCases)
     var isAllowingMore = false
     var instanceSettings: InstanceSettingsModel
+    let ownerDrafts = OwnerDrafts()
     var deletedItems: [MarfaDeletedItem] = []
     var deletedCount = 0
     var deletedRetentionDays: Int? = 60

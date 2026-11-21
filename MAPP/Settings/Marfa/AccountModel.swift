@@ -11,6 +11,20 @@ import Observation
         case renamePasskey(String)
     }
 
+    /// A removal waiting on the owner's answer.
+    struct Question: Identifiable, Equatable {
+        enum Action: Equatable {
+            case removePasskey(String)
+            case endBrowser(String)
+        }
+
+        let id = UUID()
+        let action: Action
+        let title: String
+        let message: String
+        let confirm: String
+    }
+
     static let passwordLength = 8...128
 
     private let context: OwnerContext
@@ -29,6 +43,7 @@ import Observation
     /// One line under the page's rows, such as why Add Passkey… did not open.
     private(set) var note: String?
     var sheet: Sheet?
+    var question: Question?
 
     var currentPassword = ""
     var newPassword = ""
@@ -190,7 +205,35 @@ import Observation
         renameError = nil
     }
 
-    func remove(_ passkey: OwnerPasskey) async {
+    func askToRemove(_ passkey: OwnerPasskey) {
+        let name = passkey.name ?? String(localized: "Passkey")
+        question = Question(
+            action: .removePasskey(passkey.id), title: String(localized: "Remove “\(name)”?"),
+            message: String(localized: "It can’t sign in again. Browsers already signed in keep working."), confirm: String(localized: "Remove"))
+    }
+
+    func askToEnd(_ browser: BrowserSignIn) {
+        question = Question(
+            action: .endBrowser(browser.id), title: String(localized: "Sign out “\(browser.name)”?"),
+            message: String(localized: "It must sign in again with your password or a passkey. Apps and keys keep working."),
+            confirm: String(localized: "Sign Out"))
+    }
+
+    func cancelQuestion() { question = nil }
+
+    func confirm(_ asked: Question) async {
+        question = nil
+        switch asked.action {
+        case .removePasskey(let id):
+            guard let passkey = passkeys.first(where: { $0.id == id }) else { return }
+            await remove(passkey)
+        case .endBrowser(let id):
+            guard let browser = browsers.first(where: { $0.id == id }) else { return }
+            await end(browser)
+        }
+    }
+
+    private func remove(_ passkey: OwnerPasskey) async {
         rowErrors[passkey.id] = nil
         do {
             try await context.calls.removePasskey(passkey.id)
@@ -207,7 +250,7 @@ import Observation
 
     // MARK: Browsers
 
-    func end(_ browser: BrowserSignIn) async {
+    private func end(_ browser: BrowserSignIn) async {
         rowErrors[browser.id] = nil
         do {
             try await context.calls.endSignIn(browser.id)

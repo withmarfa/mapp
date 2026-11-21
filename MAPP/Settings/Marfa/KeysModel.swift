@@ -4,7 +4,7 @@ import Observation
 
 /// The Keys page: the owner's keys and the keys apps made. A key's access can only be narrowed, a key can be made to expire
 /// sooner, and a new key is shown once. A key revoked elsewhere while its page is open is told as gone.
-@Observable @MainActor final class KeysModel {
+@Observable @MainActor final class KeysModel: OwnerDraftHolding {
     /// What the New Key sheet holds.
     struct Draft: Equatable {
         var name = ""
@@ -34,6 +34,8 @@ import Observation
         enum Action: Equatable {
             case revoke(String)
             case expire(String, Date)
+            case narrow(String, pattern: String, to: AccessLevel)
+            case removePermission(String, from: String)
         }
 
         let id = UUID()
@@ -60,6 +62,8 @@ import Observation
     var draft = Draft()
     /// Why the server refused the new key, in one line; the sheet keeps what was typed.
     private(set) var draftError: String?
+    /// Why the source was refused, in one line under the Source field.
+    private(set) var sourceError: String?
     private(set) var isMaking = false
     /// The key just made, shown once and dropped when the sheet closes.
     private(set) var created: CreatedKey?
@@ -118,6 +122,7 @@ import Observation
     func beginNewKey() {
         draft = Draft()
         draftError = nil
+        sourceError = nil
         sheet = .new
     }
 
@@ -137,6 +142,7 @@ import Observation
         isMaking = true
         defer { isMaking = false }
         draftError = nil
+        sourceError = nil
         var types: [String: AccessLevel] = ["*": draft.everyType]
         for (pattern, level) in draft.exceptions { types[pattern] = level }
         let request = NewKey(
@@ -148,7 +154,7 @@ import Observation
             sheet = .shown
             await load()
         } catch {
-            draftError = OwnerWording.line(error)
+            if case .sourceHeld(let reason) = error { sourceError = reason } else { draftError = OwnerWording.line(error) }
             await context.learn(from: error)
         }
     }
@@ -159,6 +165,7 @@ import Observation
         sheet = nil
         created = nil
         draftError = nil
+        sourceError = nil
         renameError = nil
     }
 
@@ -186,16 +193,23 @@ import Observation
         await change(key.id, KeyChange(tier: tier))
     }
 
-    /// Lowers what `pattern` may do for `key`. Only narrowing is sent.
-    func narrow(_ key: KeyInfo, pattern: String, to level: AccessLevel) async {
+    /// Asks before lowering what `pattern` may do for `key`. Only narrowing is asked, and a key cannot be widened again.
+    func askToNarrow(_ key: KeyInfo, pattern: String, to level: AccessLevel) {
         guard let held = key.types[pattern], level < held else { return }
-        var types = key.types
-        types[pattern] = level
-        await change(key.id, KeyChange(types: types))
+        let what = AccessScopes.title(of: pattern, names: typeNames)
+        question = Question(
+            action: .narrow(key.id, pattern: pattern, to: level), title: String(localized: "Narrow “\(key.label)”?"),
+            message: String(localized: "\(what) goes from \(held.title) to \(level.title). This can’t be undone: a key’s access can’t be widened again, and anything using it loses what it no longer reaches."),
+            confirm: String(localized: "Narrow"))
     }
 
-    func remove(permission: String, from key: KeyInfo) async {
-        await change(key.id, KeyChange(permissions: key.permissions.filter { $0 != permission }))
+    func askToRemove(permission: String, from key: KeyInfo) {
+        guard key.permissions.contains(permission) else { return }
+        let what = OwnerWording.title(of: permission)
+        question = Question(
+            action: .removePermission(key.id, from: permission), title: String(localized: "Remove “\(what)” from “\(key.label)”?"),
+            message: String(localized: "“\(key.label)” can no longer do this. This can’t be undone: a permission can’t be given back to a key."),
+            confirm: String(localized: "Remove"))
     }
 
     func askToExpire(_ key: KeyInfo, on date: Date) {
@@ -219,6 +233,14 @@ import Observation
         switch asked.action {
         case .expire(let id, let date):
             await change(id, KeyChange(expires: date))
+        case .narrow(let id, let pattern, let level):
+            guard let key = key(id), let held = key.types[pattern], level < held else { return }
+            var types = key.types
+            types[pattern] = level
+            await change(id, KeyChange(types: types))
+        case .removePermission(let id, let permission):
+            guard let key = key(id) else { return }
+            await change(id, KeyChange(permissions: key.permissions.filter { $0 != permission }))
         case .revoke(let id):
             rowErrors[id] = nil
             do {
@@ -263,4 +285,32 @@ import Observation
     }
 
     func isGone(_ id: String) -> Bool { gone.contains(id) }
+
+    // MARK: Closing
+
+    /// What the New Key sheet holds, which the app gives back when Settings closes. A key already made is never handed back,
+    /// as its secret is shown once and kept nowhere: the person is told it was made, and that it can be revoked.
+    func takeDrafts() -> [OwnerDraft] {
+        guard !isMaking else { return [] }
+        defer {
+            if sheet == .new || sheet == .shown { sheet = nil }
+            created = nil
+        }
+        if sheet == .shown, let created {
+            return [
+                .told(
+                    title: String(localized: "Key Not Copied"),
+                    message: String(localized: "The key “\(created.label)” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key on the Keys page."))
+            ]
+        }
+        guard sheet == .new else { return [] }
+        let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let source = draft.source.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty || !source.isEmpty else { return [] }
+        let lines = [
+            name.isEmpty ? nil : String(localized: "Name: \(name)"),
+            source.isEmpty ? nil : String(localized: "Source: \(source)"),
+        ].compactMap { $0 }
+        return [.typed(title: String(localized: "Key Not Made"), text: lines.joined(separator: "\n"))]
+    }
 }

@@ -63,6 +63,8 @@ struct MarfaDeletedItem: Identifiable, Hashable {
 
     /// The server's own settings, drafted on This Marfa's fields.
     var instanceSettings: InstanceSettingsModel { get }
+    /// The open owner's pages that hold something typed and not kept, which the app asks when Settings closes.
+    var ownerDrafts: OwnerDrafts { get }
 
     /// Recently Deleted.
     var deletedItems: [MarfaDeletedItem] { get }

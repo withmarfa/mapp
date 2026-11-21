@@ -5,7 +5,6 @@ import SwiftUI
 struct AccountPage: View {
     let host: any MarfaSettingsHost
     @State private var model: AccountModel
-    @State private var removing: OwnerPasskey?
     @Environment(\.openURL) private var openURL
 
     init(host: any MarfaSettingsHost) {
@@ -18,13 +17,13 @@ struct AccountPage: View {
             .task(id: host.serverAddress) { await model.load() }
             .settingsSheet(presenting: model.sheet != nil, dismiss: dismissSheet) { AccountSheet(model: model) }
             .alert(
-                "Remove “\(removing?.name ?? Self.unnamed)”?", isPresented: Binding { removing != nil } set: { if !$0 { removing = nil } },
-                presenting: removing
-            ) { passkey in
+                model.question?.title ?? "", isPresented: Binding { model.question != nil } set: { if !$0 { model.cancelQuestion() } },
+                presenting: model.question
+            ) { asked in
                 Button("Cancel", role: .cancel) {}
-                Button("Remove", role: .destructive) { Task { await model.remove(passkey) } }
-            } message: { _ in
-                Text("It can’t sign in again. Browsers already signed in keep working.")
+                Button(asked.confirm, role: .destructive) { Task { await model.confirm(asked) } }
+            } message: { asked in
+                Text(verbatim: asked.message)
             }
             .accessibilityIdentifier("AccountPage")
     }
@@ -102,7 +101,7 @@ struct AccountPage: View {
                 ) {
                     SettingsMoreMenu {
                         Button("Rename…") { model.beginRename(passkey) }
-                        Button("Remove…", role: .destructive) { removing = passkey }
+                        Button("Remove…", role: .destructive) { model.askToRemove(passkey) }
                     }
                 }
             }
@@ -122,7 +121,7 @@ struct AccountPage: View {
                     verbatim: browser.name, line: Self.line(added: browser.added, used: browser.lastUsed, signedIn: true),
                     error: model.rowErrors[browser.id], lead: .symbol("safari")
                 ) {
-                    SettingsButton("Sign Out") { Task { await model.end(browser) } }
+                    SettingsButton("Sign Out") { model.askToEnd(browser) }
                 }
             }
         }
@@ -176,15 +175,12 @@ private struct PasswordSheet: View {
                             title: "Current Password", text: $model.currentPassword, isError: model.currentPasswordError != nil,
                             isSecure: true, width: nil)
                     }
-                    SettingsSheetField(label: "New Password", error: model.newPasswordError) {
+                    SettingsSheetField(label: "New Password", error: model.newPasswordError ?? model.passwordLine) {
                         SettingsField(
                             title: "New Password", text: $model.newPassword, isError: model.newPasswordError != nil, isSecure: true,
                             width: nil, onSubmit: { Task { await model.changePassword() } })
                     }
                     SettingsSheetStatus(text: Text("At least 8 characters."), isMet: model.isNewPasswordLongEnough)
-                    if let line = model.passwordLine {
-                        Text(verbatim: line).settingsFont(.line).foregroundStyle(SettingsTokens.errorRed)
-                    }
                 }
             } buttons: {
                 Spacer(minLength: 0)
