@@ -466,8 +466,96 @@ extension EditorTests {
         #expect(library.notices.waiting.isEmpty, "nothing is told as lost")
     }
 
-    @Test func aRefusalForHiddenTextIsAskedAgainAndNotGivenUpOn() {
+    @Test func aRefusalForHiddenTextIsAskedAgain() {
         #expect(EditorController.retriesAfterPaint("hidden-text"))
         #expect(!EditorController.retriesAfterPaint("preservation"))
+    }
+
+    /// Makes the page refuse `function` as Inkkit does for folded text: `times` refusals, or every one when nil.
+    func refuse(_ function: String, times: Int?, in editor: EditorController) async throws {
+        _ = try await editor.webView.evaluateJavaScript(
+            """
+            (() => {
+              const real = window.editor.\(function)
+              let refused = 0
+              window.editor.\(function) = (...arguments_) => refused++ < \(times ?? 1_000_000)
+                ? { commandError: 'hidden-text', message: 'The section was folded.' }
+                : real(...arguments_)
+              window.__refusals = () => refused
+            })()
+            """)
+    }
+
+    @Test func filesAttachedThatStayInFoldedTextAreGivenUpOnAfterALimitAndNamed() async throws {
+        let new = FakeItemLibrary.note("Trip", modified: .now)
+        let library = FakeItemLibrary(items: [new])
+        library.bodies[new.id] = "# Pack\n\nbag\n"
+        let editor = try await attachingEditor(library)
+        try await refuse("appendImages", times: nil, in: editor)
+
+        editor.append([Embed(link: "tickets.pdf", name: "tickets.pdf")], to: new.id)
+        #expect(await eventually { editor.pendingEmbeds.isEmpty })
+        #expect(try await markdown(editor) == nil, "nothing reached the text")
+        let asked = try #require(try await editor.webView.evaluateJavaScript("window.__refusals()") as? Int)
+        #expect(asked == EditorController.hiddenTextRetryLimit + 1, "it asked a limited number of times")
+        try await Task.sleep(for: EditorController.hiddenTextRetryDelay * 3)
+        #expect(try await editor.webView.evaluateJavaScript("window.__refusals()") as? Int == asked, "and then stopped")
+        let told = try #require(library.notices.waiting.last)
+        #expect(told.title == "File Not in the Text")
+        #expect(told.message.contains("“tickets.pdf”") && told.message.contains("“Trip”"))
+    }
+
+    @Test func imagesDroppedIntoFoldedTextArePlacedOnTheNextAttempt() async throws {
+        let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
+        library.attaching = { AttachReport(embeds: [Embed(link: "Attachments/Photo.png", name: "Photo")]) }
+        let editor = try await attachingEditor(library)
+        try await refuse("insertImages", times: 1, in: editor)
+        #expect(editor.insertImages(Self.pasted))
+        #expect(try await eventuallyAsking { try await markdown(editor)?.contains("![Photo](Attachments/Photo.png)") == true })
+        #expect(try await editor.webView.evaluateJavaScript("window.__refusals()") as? Int == 2, "refused once and sent again")
+        #expect(library.notices.waiting.isEmpty, "nothing is told as lost")
+    }
+
+    @Test func imagesThatCannotBePlacedInFoldedTextAreNamed() async throws {
+        let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
+        library.attaching = { AttachReport(embeds: [Embed(link: "Attachments/Photo.png", name: "Photo")]) }
+        let editor = try await attachingEditor(library)
+        try await refuse("insertImages", times: nil, in: editor)
+        #expect(editor.insertImages(Self.pasted))
+        #expect(await eventually { library.notices.waiting.last != nil })
+        #expect(try await markdown(editor) == nil, "nothing reached the text")
+        #expect(try await editor.webView.evaluateJavaScript("window.__refusals()") as? Int == EditorController.hiddenTextRetryLimit + 1)
+        #expect(library.notices.waiting.last?.title == "Images Weren’t Added to the Item")
+        #expect(library.notices.waiting.last?.message == "“Photo” was attached to “Plan” but isn’t in its text. It was meant for a folded section or text not yet shown.")
+    }
+
+    @Test func imagesThePageDeclinesAreNamedToo() async throws {
+        let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
+        library.attaching = { AttachReport(embeds: [Embed(link: "Attachments/Photo.png", name: "Photo")]) }
+        let editor = try await attachingEditor(library)
+        _ = try await editor.webView.evaluateJavaScript("window.editor.insertImages = () => false; 1")
+        #expect(editor.insertImages(Self.pasted))
+        #expect(await eventually { library.notices.waiting.last != nil })
+        #expect(library.notices.waiting.last?.message.contains("“Photo” was attached to “Plan” but isn’t in its text.") == true)
+    }
+
+    @Test func textTypedIntoFoldedTextThatInkkitDroppedIsTold() async throws {
+        guard case .hiddenText = try #require(EditorMessage(body: ["type": "hiddenText"])) else {
+            Issue.record("Not the refusal message")
+            return
+        }
+        let library = FakeItemLibrary(items: [FakeItemLibrary.note("Plan", modified: .now)])
+        let editor = try await attachingEditor(library)
+        // What Inkkit's `events.error` reaches the app as, since a real fold refusal needs a person's keystrokes.
+        _ = try await editor.webView.evaluateJavaScript("window.webkit.messageHandlers.host.postMessage({ type: 'hiddenText' }); 1")
+        #expect(await eventually { library.notices.waiting.last != nil })
+        let told = try #require(library.notices.waiting.last)
+        #expect(told.title == "Text Wasn’t Added")
+        #expect(told.message == "What you typed reached a folded section, which is now open. It wasn’t added, so type it again.")
+        // Typing on into the open section tells once, not for every key.
+        _ = try await editor.webView.evaluateJavaScript("window.webkit.messageHandlers.host.postMessage({ type: 'hiddenText' }); 1")
+        _ = try await editor.webView.evaluateJavaScript("1")
+        #expect(await eventually { library.notices.told == 2 })
+        #expect(library.notices.waiting.count == 1)
     }
 }

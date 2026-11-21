@@ -64,7 +64,7 @@ private struct LayoutsList: View {
             SettingsSection("Built In", line: own.isEmpty ? "How each type shows in rows, on cards and on its own page." : nil) {
                 ForEach(builtIn) { row($0, in: catalogue) }
             }
-            SettingsBar {
+            SettingsBar(edge: .leading) {
                 SettingsButton("Import…") { LooksFiles.importLooks(into: libraries) }.accessibilityIdentifier("ImportLayouts")
                 SettingsButton("Export…") { LooksFiles.export(from: libraries) }.accessibilityIdentifier("ExportLayouts")
             }

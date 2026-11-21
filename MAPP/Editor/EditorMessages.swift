@@ -87,6 +87,8 @@ nonisolated enum EditorMessage: Sendable {
     case openItemLink(ItemID, ItemLink)
     case find(FindState)
     case diagnostic(String)
+    /// Text the person typed, pasted or dropped reached a folded section; Inkkit opened it and dropped the input.
+    case hiddenText
     case error(String)
 
     init?(body: Any) {
@@ -222,6 +224,8 @@ nonisolated enum EditorMessage: Sendable {
             ))
         case "diagnostic":
             self = .diagnostic(dict["message"] as? String ?? "")
+        case "hiddenText":
+            self = .hiddenText
         case "error":
             self = .error(dict["message"] as? String ?? "")
         default:

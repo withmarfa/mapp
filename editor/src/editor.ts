@@ -17,6 +17,7 @@ import {
   pickItem,
   postToHost,
   suggestItems,
+  type EditorMessage,
   type EmbeddedFile,
   type EmbedRequest,
   type UnavailableFile,
@@ -27,15 +28,24 @@ import { quickLookAction } from './file-actions'
 import { ItemLinkStatus } from './links'
 import { WebPictures, webAddress, type PictureWords } from './pictures'
 
-/** A preview that could not be drawn, or an input that touched folded text and opened it, is a diagnostic for the
- *  log, not an error in the person's edit. */
+/** A preview that could not be drawn is a diagnostic for the log, not an error in the person's edit. */
 export function isPreviewDiagnostic(error: Error): boolean {
   return (
     error instanceof InkKitError &&
-    (error.code === 'diagram-unavailable' ||
-      error.code === 'file-unavailable' ||
-      error.code === 'hidden-text')
+    (error.code === 'diagram-unavailable' || error.code === 'file-unavailable')
   )
+}
+
+/** What the app is told of an error Inkkit reports through `events.error`. An input the person made (typing, paste,
+ *  drop) that would change folded or not-yet-shown text is refused and dropped by Inkkit, which opens the section
+ *  and reports no more than that: the error holds none of the refused input. So the app is told only that it
+ *  happened, and tells the person, since the input cannot be replayed. */
+export function hostMessage(error: Error): EditorMessage {
+  if (error instanceof InkKitError && error.code === 'hidden-text') return { type: 'hiddenText' }
+  return {
+    type: isPreviewDiagnostic(error) ? 'diagnostic' : 'error',
+    message: error.message,
+  }
 }
 
 /** The words the app hands the page. Inkkit rejects a label it does not know, so only Inkkit's own go to it;
@@ -294,10 +304,7 @@ export class ItemEditor {
         openLink: events.openLink,
         copy: events.copy,
         error(error) {
-          postToHost({
-            type: isPreviewDiagnostic(error) ? 'diagnostic' : 'error',
-            message: error.message,
-          })
+          postToHost(hostMessage(error))
         },
       },
       {

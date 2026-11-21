@@ -81,6 +81,8 @@ final class EditorController: NSObject {
     /// Whether the page is writing some of them now, and whether to send what still waits once it has answered.
     @ObservationIgnored var isAppendingEmbeds = false
     @ObservationIgnored var appendsAgain = false
+    /// How many times in a row the page has refused the waiting images for folded text, for the limit on asking again.
+    @ObservationIgnored var hiddenTextAttempts = 0
     @ObservationIgnored var isWatchingLinks = false
     /// What each embed of the item on the page was last told to draw from, by its text, to tell the page which have
     /// changed since (`watchEmbeds`); `embedWatch` ends the watch of the item before.
@@ -713,6 +715,9 @@ final class EditorController: NSObject {
             pageFinder.update(state)
         case .diagnostic(let message):
             log.notice("preview diagnostic: \(message)")
+        case .hiddenText:
+            // Inkkit reports none of the refused input, so it can't be kept for the person: they are told it was not added.
+            library?.notices.tell(Self.hiddenTextTitle, Self.hiddenTextMessage)
         case .error(let message):
             log.error("page error: \(message)")
             library?.notices.tell(String(localized: "Editor Couldn’t Complete the Action"), message)

@@ -29,6 +29,8 @@ export interface UnavailableFile {
 export type EditorMessage =
   | { type: 'ready' }
   | { type: 'error' | 'diagnostic'; message: string }
+  /** An input the person made reached folded text, and Inkkit dropped it and opened the section. The app tells them. */
+  | { type: 'hiddenText' }
   | { type: 'changed'; markdown: string; generation: number }
   | ({ type: 'state' } & CaretState)
   /** Said once for each `load`, after the browser has drawn the document. The app ends its `item.open` signpost
