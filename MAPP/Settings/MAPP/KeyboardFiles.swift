@@ -64,8 +64,8 @@ enum KeyboardFiles {
         let done = applied == 1 ? String(localized: "One shortcut was imported.") : String(localized: "\(applied) shortcuts were imported.")
         guard skipped > 0 else { return done }
         let left = skipped == 1
-            ? String(localized: "One was skipped: MAPP no longer has its command, or another command has its keys.")
-            : String(localized: "\(skipped) were skipped: MAPP no longer has their commands, or another command has their keys.")
+            ? String(localized: "One was skipped: MAPP no longer has its command, or its keys can’t be used.")
+            : String(localized: "\(skipped) were skipped: MAPP no longer has their commands, or their keys can’t be used.")
         return done + " " + left
     }
 }

@@ -27,14 +27,21 @@ nonisolated enum AnyAppCommand: String, CaseIterable, Sendable {
 /// Registers and unregisters a hot key with the system. A test gives its own.
 @MainActor
 protocol HotKeyRegistrar {
-    func register(_ shortcut: Shortcut, for command: AnyAppCommand, action: @escaping @MainActor () -> Void)
+    /// Whether the system took the hot key. It refuses one that another app holds.
+    func register(_ shortcut: Shortcut, for command: AnyAppCommand, action: @escaping @MainActor () -> Void) -> Bool
     func unregister(_ command: AnyAppCommand)
+    /// Whether the system itself uses the keys, in System Settings > Keyboard > Keyboard Shortcuts.
+    func isTakenBySystem(_ shortcut: Shortcut) -> Bool
+    /// Stops every registered hot key from answering while a field is waiting for a key press, and starts them again.
+    func setSuspended(_ suspended: Bool)
 }
 
 /// A registrar that registers nothing, for the tests, the previews and the sample library, which never take a key from the system.
 struct NoHotKeys: HotKeyRegistrar {
-    func register(_ shortcut: Shortcut, for command: AnyAppCommand, action: @escaping @MainActor () -> Void) {}
+    func register(_ shortcut: Shortcut, for command: AnyAppCommand, action: @escaping @MainActor () -> Void) -> Bool { true }
     func unregister(_ command: AnyAppCommand) {}
+    func isTakenBySystem(_ shortcut: Shortcut) -> Bool { false }
+    func setSuspended(_ suspended: Bool) {}
 }
 
 /// The shortcuts that work in any app, while MAPP is running. Every one is off until the person sets it, and is registered
@@ -80,7 +87,7 @@ final class AnyAppShortcuts {
     func start() {
         guard !isStarted else { return }
         isStarted = true
-        for (command, shortcut) in chosen { register(shortcut, for: command) }
+        for (command, shortcut) in chosen { _ = register(shortcut, for: command) }
     }
 
     func shortcut(for command: AnyAppCommand) -> Shortcut? { chosen[command] }
@@ -95,21 +102,29 @@ final class AnyAppShortcuts {
     enum Refusal: Equatable {
         case unfit(Shortcut.Problem)
         case taken(by: AnyAppCommand)
+        /// The system's own command has the keys, which no shortcut of MAPP's can take.
+        case system(String)
+        /// The system refused the hot key when it was registered, since another app holds it.
+        case unavailable
     }
 
     func refusal(of shortcut: Shortcut, for command: AnyAppCommand) -> Refusal? {
         if let problem = shortcut.anyAppProblem { return .unfit(problem) }
         if let holder = holder(of: shortcut, besides: command) { return .taken(by: holder) }
+        if let owner = SystemShortcuts.owner(of: shortcut) { return .system(owner) }
+        if registrar.isTakenBySystem(shortcut) { return .system(String(localized: "macOS")) }
         return nil
     }
 
-    /// Sets, or with nil clears, the shortcut. A shortcut `refusal` names is not set, and the answer says why.
+    /// Sets, or with nil clears, the shortcut. A shortcut `refusal` names, or that the system will not register because
+    /// another app holds it, is not set and not kept, and the answer says why. The command keeps what it had.
     @discardableResult
     func set(_ shortcut: Shortcut?, for command: AnyAppCommand) -> Refusal? {
         if let shortcut {
             if let refusal = refusal(of: shortcut, for: command) { return refusal }
+            if chosen[command] == shortcut, isStarted { return nil }
+            if isStarted, !register(shortcut, for: command) { return .unavailable }
             chosen[command] = shortcut
-            if isStarted { register(shortcut, for: command) }
         } else {
             chosen.removeValue(forKey: command)
             if isStarted { registrar.unregister(command) }
@@ -128,10 +143,10 @@ final class AnyAppShortcuts {
     /// The shortcuts as they are, for Export.
     var current: [String: Shortcut] { Dictionary(uniqueKeysWithValues: chosen.map { ($0.key.rawValue, $0.value) }) }
 
-    /// Takes a file's shortcuts, leaving out any that is unfit or that a command before it holds, and returns how many it
-    /// took and how many it left out. A command the file does not name is cleared.
+    /// Takes a file's shortcuts, leaving out any that is unfit, that another command or the system holds, or that the
+    /// system will not register, and returns how many it took and how many it left out. A command the file does not name
+    /// keeps its shortcut.
     func apply(_ shortcuts: [String: Shortcut]) -> (applied: Int, skipped: Int) {
-        clearAll()
         var applied = 0
         var skipped = 0
         for (key, shortcut) in shortcuts.sorted(by: { $0.key < $1.key }) {
@@ -144,7 +159,11 @@ final class AnyAppShortcuts {
         return (applied, skipped)
     }
 
-    private func register(_ shortcut: Shortcut, for command: AnyAppCommand) {
+    /// Stops the hot keys from answering while a field waits for a key press, so a key such as ⌃⌘K reaches the field and
+    /// does not run its command. Called with false when the wait ends, however it ends.
+    func setSuspended(_ suspended: Bool) { registrar.setSuspended(suspended) }
+
+    private func register(_ shortcut: Shortcut, for command: AnyAppCommand) -> Bool {
         registrar.register(shortcut, for: command) { [weak self] in self?.perform(command) }
     }
 

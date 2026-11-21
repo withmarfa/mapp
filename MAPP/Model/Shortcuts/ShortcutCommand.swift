@@ -50,6 +50,16 @@ nonisolated enum SystemShortcuts {
             entry("c", .command, String(localized: "Copy")), entry("v", .command, String(localized: "Paste")),
             entry("a", .command, String(localized: "Select All")), entry("`", .command, String(localized: "Move Between Windows")),
             entry(" ", .command, String(localized: "Spotlight")),
+            entry("f", [.control, .command], String(localized: "Enter Full Screen")),
+            entry("w", [.option, .command], String(localized: "Close All")),
+            entry("m", [.option, .command], String(localized: "Minimize All")),
+            entry(" ", [.control, .command], String(localized: "Emoji & Symbols")),
+            entry("/", [.shift, .command], String(localized: "Help")),
+            entry("v", [.option, .shift, .command], String(localized: "Paste and Match Style")),
+            entry("\\", [.shift, .command], String(localized: "Show All Tabs")),
+            entry(";", .command, String(localized: "Check Document Now")),
+            entry(";", [.shift, .command], String(localized: "Show Spelling and Grammar")),
+            entry("`", [.shift, .command], String(localized: "Move Between Windows")),
         ])
     }()
 }

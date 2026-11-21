@@ -8,11 +8,22 @@ import Testing
 final class FakeHotKeys: HotKeyRegistrar {
     private(set) var registered: [AnyAppCommand: Shortcut] = [:]
     private(set) var calls: [String] = []
+    /// Keys another app holds, which the system refuses to register.
+    var heldByAnotherApp: Set<Shortcut> = []
+    /// Keys the system's own shortcuts use.
+    var systemKeys: Set<Shortcut> = []
+    private(set) var isSuspended = false
 
-    func register(_ shortcut: Shortcut, for command: AnyAppCommand, action: @escaping @MainActor () -> Void) {
+    func register(_ shortcut: Shortcut, for command: AnyAppCommand, action: @escaping @MainActor () -> Void) -> Bool {
+        guard !heldByAnotherApp.contains(shortcut) else { return false }
         registered[command] = shortcut
         calls.append("register \(command.rawValue)")
+        return true
     }
+
+    func isTakenBySystem(_ shortcut: Shortcut) -> Bool { systemKeys.contains(shortcut) }
+
+    func setSuspended(_ suspended: Bool) { isSuspended = suspended }
 
     func unregister(_ command: AnyAppCommand) {
         registered.removeValue(forKey: command)
@@ -232,6 +243,105 @@ struct ShortcutTests {
         #expect(bindings.shortcut(for: .newItem) == key("n"))
     }
 
+    @Test func anAnyAppShortcutNeverTakesAKeyTheSystemOrAMenuOwns() {
+        let hotKeys = FakeHotKeys()
+        let ours = Shortcut(key: "k", modifiers: [.command, .control], keyCode: 40)
+        hotKeys.systemKeys = [ours]
+        let (model, _, anyApp) = page(defaults(), hotKeys: hotKeys)
+        model.startRecording(.anyApp(.commandPalette))
+        model.record(key("c", .command, code: 8))
+        #expect(model.refusal?.reason == .taken(by: "Copy", canReplace: false))
+        #expect(model.error(for: .anyApp(.commandPalette)) == "⌘C is Copy’s.")
+        model.startRecording(.anyApp(.commandPalette))
+        model.record(ours)
+        #expect(model.refusal?.reason == .taken(by: "macOS", canReplace: false))
+        model.replace()
+        #expect(anyApp.shortcut(for: .commandPalette) == nil)
+        #expect(hotKeys.registered.isEmpty)
+    }
+
+    @Test func aHotKeyAnotherAppHoldsShowsOneLineAndKeepsNothingNew() {
+        let hotKeys = FakeHotKeys()
+        let held = key("j", [.command, .control], code: 38)
+        hotKeys.heldByAnotherApp = [held]
+        let (model, _, anyApp) = page(defaults(), hotKeys: hotKeys)
+        anyApp.set(key("n", [.command, .control], code: 45), for: .commandPalette)
+        model.startRecording(.anyApp(.commandPalette))
+        model.record(held)
+        #expect(model.refusal?.reason == .unavailable)
+        #expect(model.error(for: .anyApp(.commandPalette)) == "Another app already uses ⌃⌘J.")
+        #expect(anyApp.shortcut(for: .commandPalette) == key("n", [.command, .control]))
+        #expect(hotKeys.registered[.commandPalette] == key("n", [.command, .control]))
+        model.startRecording(.anyApp(.searchItems))
+        model.record(held)
+        #expect(anyApp.shortcut(for: .searchItems) == nil)
+    }
+
+    @Test func nothingIsStoredForAHotKeyTheSystemRefused() {
+        let store = defaults()
+        let hotKeys = FakeHotKeys()
+        let held = key("j", [.command, .control], code: 38)
+        hotKeys.heldByAnotherApp = [held]
+        let anyApp = AnyAppShortcuts(defaults: store, registrar: hotKeys)
+        anyApp.start()
+        #expect(anyApp.set(held, for: .newItem) == .unavailable)
+        #expect(store.data(forKey: AnyAppShortcuts.defaultsKey) == nil)
+    }
+
+    // MARK: Recording
+
+    @Test func hotKeysStopAnsweringWhileAFieldRecordsAndWhileSearchingByKeys() {
+        let hotKeys = FakeHotKeys()
+        let (model, _, _) = page(defaults(), hotKeys: hotKeys)
+        #expect(!hotKeys.isSuspended)
+        model.startRecording(.menu(.addTag))
+        #expect(hotKeys.isSuspended)
+        model.stopRecording()
+        #expect(!hotKeys.isSuspended)
+        model.startRecording(.menu(.addTag))
+        model.record(key("y", [.command, .option]))
+        #expect(!hotKeys.isSuspended)
+        model.searchesByKeys = true
+        #expect(hotKeys.isSuspended)
+        model.searchesByKeys = false
+        #expect(!hotKeys.isSuspended)
+    }
+
+    @Test func leavingThePageStopsRecordingAndSearchingByKeysAndWakesTheHotKeys() {
+        let hotKeys = FakeHotKeys()
+        let (model, _, _) = page(defaults(), hotKeys: hotKeys)
+        model.startRecording(.anyApp(.newItem))
+        model.pageDidDisappear()
+        #expect(model.recording == nil)
+        #expect(!hotKeys.isSuspended)
+        model.searchesByKeys = true
+        model.pageDidDisappear()
+        #expect(!model.searchesByKeys)
+        #expect(!hotKeys.isSuspended)
+    }
+
+    @Test func recordingTurnsSearchByKeysOffSoOnlyOneMonitorRuns() {
+        let (model, _, _) = page(defaults())
+        model.searchesByKeys = true
+        model.startRecording(.menu(.addTag))
+        #expect(!model.searchesByKeys)
+        #expect(model.recording == .menu(.addTag))
+        model.searchesByKeys = true
+        #expect(model.recording == nil)
+    }
+
+    // MARK: System keys
+
+    @Test func theSystemsOwnMenuKeysAreReserved() {
+        let reserved: [(String, ShortcutModifiers, String)] = [
+            ("f", [.control, .command], "Enter Full Screen"), ("w", [.option, .command], "Close All"),
+            (" ", [.control, .command], "Emoji & Symbols"), ("/", [.shift, .command], "Help"),
+            ("m", [.option, .command], "Minimize All"), ("v", [.option, .shift, .command], "Paste and Match Style"),
+            ("\\", [.shift, .command], "Show All Tabs")
+        ]
+        for (letter, modifiers, _) in reserved { #expect(SystemShortcuts.owner(of: key(letter, modifiers)) != nil, "\(letter)") }
+    }
+
     // MARK: Files
 
     @Test func exportedShortcutsReadBackAndApply() throws {
@@ -276,6 +386,58 @@ struct ShortcutTests {
         #expect(bindings.shortcut(for: .addTag) == nil)
         #expect(bindings.shortcut(for: .changeType) == key("y", [.command, .option]))
         #expect(bindings.shortcut(for: .commandPalette) == key("k"))
+    }
+
+    @Test func importingAnEmptyFileChangesNothingInEitherHalf() {
+        let store = defaults()
+        let hotKeys = FakeHotKeys()
+        let (_, bindings, anyApp) = page(store, hotKeys: hotKeys)
+        bindings.set(key("j", [.command, .option]), for: .refresh)
+        bindings.set(nil, for: .newItem)
+        anyApp.set(key("k", [.command, .control], code: 40), for: .commandPalette)
+        let result = bindings.apply([:])
+        let anyAppResult = anyApp.apply([:])
+        #expect(result == ShortcutBindings.Applied())
+        #expect(anyAppResult.applied == 0 && anyAppResult.skipped == 0)
+        #expect(bindings.shortcut(for: .refresh) == key("j", [.command, .option]))
+        #expect(bindings.shortcut(for: .newItem) == nil)
+        #expect(anyApp.shortcut(for: .commandPalette) == key("k", [.command, .control]))
+        #expect(hotKeys.registered[.commandPalette] != nil)
+    }
+
+    @Test func aFileNamingOneCommandChangesOnlyThatOne() {
+        let (_, bindings, anyApp) = page(defaults())
+        bindings.set(key("j", [.command, .option]), for: .refresh)
+        anyApp.set(key("k", [.command, .control], code: 40), for: .commandPalette)
+        let result = bindings.apply(["newWindow": key("y", [.command, .option])])
+        #expect(result.applied == 1 && result.skipped == 0)
+        #expect(bindings.shortcut(for: .newWindow) == key("y", [.command, .option]))
+        #expect(bindings.shortcut(for: .refresh) == key("j", [.command, .option]))
+        let anyAppResult = anyApp.apply(["newItem": key("n", [.command, .control], code: 45)])
+        #expect(anyAppResult.applied == 1 && anyAppResult.skipped == 0)
+        #expect(anyApp.shortcut(for: .newItem) != nil)
+        #expect(anyApp.shortcut(for: .commandPalette) == key("k", [.command, .control]))
+    }
+
+    @Test func aFileNeverTakesAKeyACommandItDoesNotNameHasChosen() {
+        let (_, bindings, _) = page(defaults())
+        bindings.set(key("j", [.command, .option]), for: .refresh)
+        let result = bindings.apply(["addTag": key("j", [.command, .option])])
+        #expect(result.skipped == 1)
+        #expect(bindings.shortcut(for: .refresh) == key("j", [.command, .option]))
+        #expect(bindings.shortcut(for: .addTag) == nil)
+    }
+
+    @Test func anAnyAppShortcutTheFileNamesThatTheSystemRefusesIsSkippedAndCounted() {
+        let hotKeys = FakeHotKeys()
+        hotKeys.heldByAnotherApp = [key("j", [.command, .control])]
+        let (_, _, anyApp) = page(defaults(), hotKeys: hotKeys)
+        let result = anyApp.apply([
+            "newItem": key("j", [.command, .control], code: 38), "searchItems": key("s", [.command, .control], code: 1),
+            "gone": key("g", [.command, .control], code: 5),
+        ])
+        #expect(result.applied == 1 && result.skipped == 2)
+        #expect(anyApp.shortcut(for: .newItem) == nil)
     }
 
     // MARK: Search

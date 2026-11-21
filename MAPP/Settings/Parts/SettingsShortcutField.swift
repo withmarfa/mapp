@@ -88,7 +88,16 @@ struct SettingsShortcutField: View {
                 monitor.stop()
             }
         }
-        .onDisappear { monitor.stop() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
+            if isRecording { stopRecording() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in
+            if isRecording { stopRecording() }
+        }
+        .onDisappear {
+            monitor.stop()
+            if isRecording { stopRecording() }
+        }
     }
 
     @ViewBuilder private var label: some View {
@@ -160,6 +169,11 @@ struct SettingsShortcutSearch: View {
                 monitor.stop()
             }
         }
-        .onDisappear { monitor.stop() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in byKeys = false }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { _ in byKeys = false }
+        .onDisappear {
+            monitor.stop()
+            byKeys = false
+        }
     }
 }

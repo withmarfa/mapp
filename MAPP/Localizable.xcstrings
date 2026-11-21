@@ -31,6 +31,9 @@
     "%lld to %lld points" : {
 
     },
+    "%lld were skipped: MAPP no longer has their commands, or their keys can’t be used." : {
+
+    },
     "12-Hour" : {
 
     },
@@ -82,6 +85,9 @@
     "Allow More…" : {
 
     },
+    "Another app already uses %@." : {
+
+    },
     "An item’s text." : {
 
     },
@@ -106,6 +112,9 @@
     "Blue" : {
 
     },
+    "Check Document Now" : {
+
+    },
     "choose a type’s icon and change a type’s fields" : {
       "extractionState" : "manual"
     },
@@ -116,6 +125,9 @@
 
     },
     "Cleanup" : {
+
+    },
+    "Close All" : {
 
     },
     "Code and Markdown marks." : {
@@ -154,10 +166,34 @@
     "Couldn’t Sign In" : {
 
     },
+    "Emoji & Symbols" : {
+
+    },
+    "Enter Full Screen" : {
+
+    },
+    "macOS" : {
+
+    },
+    "Minimize All" : {
+
+    },
+    "One was skipped: MAPP no longer has its command, or its keys can’t be used." : {
+
+    },
+    "Paste and Match Style" : {
+
+    },
+    "Show All Tabs" : {
+
+    },
     "Custom Color" : {
 
     },
     "Show Matches Left Out of Search" : {
+
+    },
+    "Show Spelling and Grammar" : {
 
     },
     "The types and sources chosen and left out make more conditions than one search can hold." : {
@@ -5560,9 +5596,6 @@
     "%lld shortcuts were imported." : {
 
     },
-    "%lld were skipped: MAPP no longer has their commands, or another command has their keys." : {
-
-    },
     "A new item, in the front window." : {
 
     },
@@ -5645,9 +5678,6 @@
 
     },
     "One shortcut was imported." : {
-
-    },
-    "One was skipped: MAPP no longer has its command, or another command has its keys." : {
 
     },
     "Paste" : {

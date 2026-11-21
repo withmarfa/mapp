@@ -77,6 +77,7 @@ struct KeyboardPage: View {
         } message: {
             Text(verbatim: model.refusal.map { "\($0.line) " + String(localized: "It will have none if you replace it.") } ?? "")
         }
+        .onDisappear { model.pageDidDisappear() }
         .accessibilityIdentifier("KeyboardPage")
     }
 

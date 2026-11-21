@@ -129,35 +129,33 @@ final class ShortcutBindings {
     struct Applied: Equatable {
         /// The commands the file gave a shortcut or none.
         var applied = 0
-        /// The file's commands MAPP no longer has, and the shortcuts left out because a command before it already took
-        /// the same keys or the system holds them.
+        /// The file's commands MAPP no longer has, and the shortcuts left out because another command already holds the
+        /// same keys, the system does, or they do not fit a menu. Such a command keeps what it had.
         var skipped = 0
     }
 
-    /// Takes the file's shortcuts: a command the file does not name goes back to its default, a command MAPP does not
-    /// have is skipped and counted, and a shortcut that an earlier command's, a default's or the system's already holds is
-    /// left out and counted, so what results never gives two commands one key.
+    /// Takes the file's shortcuts and leaves every command it does not name as it was. A command MAPP does not have is
+    /// skipped and counted, and a shortcut that a command the file does not name, an earlier one, or the system already
+    /// holds is left out and counted, so what results never gives two commands one key.
     func apply(_ shortcuts: [String: Shortcut?]) -> Applied {
         var result = Applied()
         let known = Set(commands.map(\.id))
         result.skipped += shortcuts.keys.filter { !known.contains($0) }.count
-        // A command the file does not name keeps its default first, so a file never takes a key from a command it knows nothing of.
         var taken: [Shortcut: String] = [:]
         for command in commands where shortcuts[command.id] == nil {
-            if let shortcut = command.defaultShortcut { taken[shortcut] = command.id }
+            if let shortcut = shortcut(for: command) { taken[shortcut] = command.id }
         }
-        var next: [String: Shortcut?] = chosen.filter { !known.contains($0.key) }
+        var next = chosen
         for command in commands {
             guard let entry = shortcuts[command.id] else { continue }
-            var wanted = entry
-            result.applied += 1
-            if let shortcut = wanted, taken[shortcut] != nil || SystemShortcuts.owner(of: shortcut) != nil || shortcut.menuProblem != nil {
-                wanted = nil
+            if let shortcut = entry, taken[shortcut] != nil || SystemShortcuts.owner(of: shortcut) != nil || shortcut.menuProblem != nil {
                 result.skipped += 1
-                result.applied -= 1
+                if let kept = self.shortcut(for: command), taken[kept] == nil { taken[kept] = command.id }
+                continue
             }
-            if let shortcut = wanted { taken[shortcut] = command.id }
-            if wanted != command.defaultShortcut { next[command.id] = .some(wanted) }
+            result.applied += 1
+            if let entry { taken[entry] = command.id }
+            if entry != command.defaultShortcut { next[command.id] = .some(entry) } else { next.removeValue(forKey: command.id) }
         }
         chosen = next
         save()
