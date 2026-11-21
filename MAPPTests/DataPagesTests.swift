@@ -396,6 +396,57 @@ import Testing
         #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
     }
 
+    @Test func anotherMarfaAnsweringAtTheWriteIsToldAndTheDraftStartsAgainFromIt() async {
+        let bench = OwnerBench(grants: [.configManage])
+        bench.calls.state.withLock {
+            $0.sourceLimit = SourceLimit(instanceID: "instance-1", isOn: true, types: ["core.note"], sources: ["rss"], strictTypes: nil, allowlist: nil)
+            $0.names = ["core.note": "Notes"]
+        }
+        let model = model(bench, sources: rows)
+        await model.load()
+        model.types = ["core.note", "core.bookmark"]
+        model.checkedSources = ["rss", "readwise"]
+        // Between the read and the write, another Marfa takes the address and refuses the write.
+        bench.calls.state.withLock { [calls = bench.calls] in
+            $0.beforeLimitWrite = {
+                calls.state.withLock {
+                    $0.sourceLimit = SourceLimit(instanceID: "instance-2", isOn: true, types: ["core.highlight"], sources: ["readwise"], strictTypes: nil, allowlist: nil)
+                    $0.names = ["core.highlight": "Highlights"]
+                    $0.beforeLimitWrite = nil
+                }
+            }
+        }
+        await model.save()
+
+        #expect(model.line == InstanceConfigFailure.instanceChanged.message)
+        #expect(model.limit?.instanceID == "instance-2")
+        #expect(model.types == ["core.highlight"])
+        #expect(model.checkedSources == ["readwise"])
+        #expect(!model.hasEdits)
+        #expect(model.typeChoices.map(\.code) == ["core.highlight"])
+        #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
+    }
+
+    @Test func anotherMarfaFoundWhenTheLimitIsReadBeforeTheWriteGetsNoWrite() async {
+        let bench = OwnerBench(grants: [.configManage])
+        let model = model(bench, sources: rows)
+        await model.load()
+        model.types = ["core.note"]
+        model.checkedSources = ["rss"]
+        bench.calls.state.withLock {
+            $0.sourceLimit = SourceLimit(instanceID: "instance-2", isOn: true, types: ["core.highlight"], sources: ["readwise"], strictTypes: nil, allowlist: nil)
+        }
+        await model.save()
+
+        #expect(model.line == InstanceConfigFailure.instanceChanged.message)
+        #expect(model.types == ["core.highlight"])
+        #expect(model.checkedSources == ["readwise"])
+        #expect(!model.hasEdits)
+        #expect(bench.calls.state.withLock { $0.limitsSent.isEmpty })
+        // Saving again sends nothing of the first instance's choice.
+        #expect(!model.canSave)
+    }
+
     @Test func aRefusalForWantOfAPermissionNamesItAndReadsTheGrantsAgain() async {
         let bench = OwnerBench(grants: [.configManage])
         let model = model(bench, sources: rows)

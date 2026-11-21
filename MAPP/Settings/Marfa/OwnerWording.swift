@@ -11,6 +11,7 @@ nonisolated enum OwnerWording {
         case .notPermitted(let scope): permissionLine(scope)
         case .notFound: String(localized: "It was removed somewhere else.")
         case .conflict: String(localized: "It changed somewhere else, so MAPP read it again. Nothing was changed.")
+        case .instanceChanged: InstanceConfigFailure.instanceChanged.message
         case .notConfirmed: String(localized: "Nothing was changed: the sign-in wasn’t confirmed.")
         case .refused(let reason), .sourceHeld(let reason), .failed(let reason): reason
         }

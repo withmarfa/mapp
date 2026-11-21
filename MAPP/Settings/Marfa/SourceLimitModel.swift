@@ -4,7 +4,9 @@ import Observation
 
 /// Limit Sources: for the types checked, every app and key reads only items from the sources checked, in lists, search, exports
 /// and webhooks. It is the server's source filter, written whole with the other two levers as they were read, so a change
-/// made elsewhere since is told and nothing is written over it. Turning it off removes the filter.
+/// made elsewhere before the write is told and not written over. Another Marfa answering at the address is told in the settings
+/// page's words and the draft starts again from it, so what was chosen for one Marfa is never written to another. Turning it
+/// off removes the filter.
 @Observable @MainActor final class SourceLimitModel: OwnerDraftHolding {
     struct Choice: Identifiable, Hashable {
         let code: String
@@ -69,8 +71,10 @@ import Observation
         }
         do {
             let read = try await context.calls.sourceLimit()
+            // Whether the person has edited is judged against the limit they were shown, not the one just read.
+            let keepsDraft = hasEdits && hasLoaded
             limit = read
-            if !hasEdits || !hasLoaded {
+            if !keepsDraft {
                 types = Set(read.types)
                 checkedSources = Set(read.sources)
             }
@@ -108,6 +112,10 @@ import Observation
             // The server guards only which instance is written, not the levers, so what was read is read again just before: a
             // lever changed elsewhere since is told, not written over.
             let current = try await context.calls.sourceLimit()
+            if let was = limit.instanceID, let now = current.instanceID, was != now {
+                await anotherMarfa()
+                return
+            }
             guard current == limit else {
                 self.limit = current
                 line = Self.changedElsewhere
@@ -124,9 +132,24 @@ import Observation
 
     /// What was typed stays; the page says why, and where the limit changed elsewhere it is read again.
     private func refused(_ failure: OwnerFailure) async {
+        if failure == .instanceChanged {
+            await anotherMarfa()
+            return
+        }
         line = failure == .conflict ? Self.changedElsewhere : OwnerWording.line(failure)
         await context.learn(from: failure)
         if failure == .conflict, let read = try? await context.calls.sourceLimit() { limit = read }
+    }
+
+    /// Another Marfa answers at the address: nothing was written, and the limit, the types and the sources are read again from
+    /// it, so what was chosen for the first is dropped rather than kept to be written to this one.
+    private func anotherMarfa() async {
+        limit = nil
+        typeNames = [:]
+        types = []
+        checkedSources = []
+        await load()
+        line = InstanceConfigFailure.instanceChanged.message
     }
 
     /// What was chosen and not saved goes back to the person when Settings closes.

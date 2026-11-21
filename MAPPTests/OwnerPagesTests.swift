@@ -46,6 +46,8 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var sourceLimit = SourceLimit(instanceID: "instance-1", isOn: false, types: [], sources: [], strictTypes: nil, allowlist: nil)
         /// What each source limit write sent: the filter, or nil for turning it off.
         var limitsSent: [(types: [String], sources: [String])?] = []
+        /// Run as a source limit write arrives, to let a test move the server under it.
+        var beforeLimitWrite: (@Sendable () -> Void)?
     }
 
     let state = Mutex(State())
@@ -248,8 +250,9 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 
     func setSourceLimit(_ limit: SourceLimit, to filter: (types: [String], sources: [String])?) async throws(OwnerFailure) -> SourceLimit {
         try enter("setSourceLimit")
+        state.withLock { $0.beforeLimitWrite }?()
         return try state.withLock { state throws(OwnerFailure) in
-            guard state.sourceLimit.instanceID == limit.instanceID else { throw .conflict }
+            guard state.sourceLimit.instanceID == limit.instanceID else { throw .instanceChanged }
             state.limitsSent.append(filter)
             state.sourceLimit.isOn = filter != nil
             state.sourceLimit.types = filter?.types ?? []
@@ -1342,10 +1345,18 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     @Test func everyFailureSaysSomethingInOneLine() {
         let failures: [OwnerFailure] = [
             .unreachable, .signedOut, .notPermitted("grants.manage"), .notPermitted(nil), .notPermitted("odd.scope"), .notFound,
-            .conflict, .notConfirmed, .refused("Because."), .sourceHeld("Taken."), .failed("Broken."),
+            .conflict, .instanceChanged, .notConfirmed, .refused("Because."), .sourceHeld("Taken."), .failed("Broken."),
         ]
         for failure in failures { #expect(!OwnerWording.line(failure).isEmpty) }
         #expect(OwnerWording.line(.notPermitted("odd.scope")).contains("odd.scope"))
+    }
+
+    @Test func anotherMarfaAnsweringIsItsOwnFailureWithTheWordsOfTheSettingsPage() {
+        #expect(ClientOwnerCalls.failure(MarfaError.instanceChanged(message: "Another instance answers.", server: nil)) == .instanceChanged)
+        #expect(
+            ClientOwnerCalls.failure(MarfaError.instanceChanged(message: "Another instance answers.", server: nil), plainConflict: { _ in .conflict })
+                == .instanceChanged)
+        #expect(OwnerWording.line(.instanceChanged) == InstanceConfigFailure.instanceChanged.message)
     }
 
     @Test func aConflictIsChangedElsewhereOnlyWhereTheCallSaysSo() {

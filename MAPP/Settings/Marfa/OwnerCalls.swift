@@ -134,6 +134,8 @@ nonisolated enum OwnerFailure: Error, Hashable, Sendable {
     case notFound
     /// What the call read has changed since.
     case conflict
+    /// Another Marfa answers at the address than the one the call was made for, and it wrote nothing.
+    case instanceChanged
     /// The owner closed, or did not pass, the sign-in the server asked for.
     case notConfirmed
     case refused(String)
@@ -240,6 +242,7 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
             return .notPermitted(server?.details?.object?["required_scope"]?.string)
         case .notFound: return .notFound
         case .versionConflict: return .conflict
+        case .instanceChanged: return .instanceChanged
         case .server(let status, let code, let message, _, _) where status == 409:
             let refusals: Set<String> = ["sign_in_address_check_failed", "sign_in_address_change_unconfirmed"]
             return refusals.contains(code) ? .refused(message) : plainConflict(message)
