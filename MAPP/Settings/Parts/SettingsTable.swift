@@ -67,9 +67,11 @@ private struct TableHeader<Row>: View {
     let columns: [SettingsTableColumn<Row>]
     let hasAction: Bool
     var inset = SettingsTokens.Metric.inset
+    var hasCheck = false
 
     var body: some View {
         HStack(spacing: 12) {
+            if hasCheck { Color.clear.frame(width: CheckWidth.value) }
             ForEach(columns.indices, id: \.self) { index in
                 Text(columns[index].title)
                     .settingsFont(.tableHeader)
@@ -86,6 +88,7 @@ private struct TableHeader<Row>: View {
 }
 
 private enum ActionWidth { static let value: CGFloat = 88 }
+private enum CheckWidth { static let value: CGFloat = 18 }
 
 private struct TableRow<Row>: View {
     let row: Row
@@ -94,11 +97,19 @@ private struct TableRow<Row>: View {
     let isSelected: Bool
     var isBanded = false
     var inset = SettingsTokens.Metric.inset
-    var height = SettingsTokens.Metric.sectionTableRow
+    var height = SettingsTokens.Metric.tableRow
+    /// Where the table is a page with a checkbox column: whether this row is ticked.
+    var check: Binding<Bool>?
     @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: 12) {
+            if let check {
+                Toggle(isOn: check) { EmptyView() }
+                    .toggleStyle(.checkbox)
+                    .labelsHidden()
+                    .frame(width: CheckWidth.value)
+            }
             ForEach(columns.indices, id: \.self) { index in
                 columns[index].cell(row)
                     .settingsFont(.title)
@@ -167,49 +178,72 @@ struct SettingsSectionTable<Row: Identifiable>: View {
     }
 }
 
-/// A table that is a page of its own: its count on the left and its filter and search together on the right, in one row
-/// under the toolbar, then the columns, with selection, and actions at the foot.
+/// A table that is a page of its own: it fills the pane edge to edge, with its count on the left and its filter and search
+/// together on the right under the toolbar, then a checkbox column and the columns, and at the foot how many are
+/// selected of how many, with the actions for the selection. The rows scroll between the header and the foot.
 struct SettingsPageTable<Row: Identifiable, Filter: View, Foot: View>: View {
     let rows: [Row]
     let columns: [SettingsTableColumn<Row>]
     let count: Text
     @Binding var selection: Set<Row.ID>
-    var action: SettingsRowAction<Row>?
     @ViewBuilder let filter: Filter
     @ViewBuilder let foot: Foot
 
+    private var inset: CGFloat { SettingsTokens.Metric.pageTableInset }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(spacing: 0) {
             HStack {
                 count.settingsFont(.small).foregroundStyle(SettingsTokens.secondaryText)
                 Spacer(minLength: 12)
                 filter
             }
-            .padding(.horizontal, SettingsTokens.Metric.inset)
-            SettingsCard {
-                VStack(spacing: 0) {
-                    TableHeader(columns: columns, hasAction: action != nil)
-                    Rectangle().fill(SettingsTokens.rule).frame(height: 1)
-                    LazyVStack(spacing: 0) {
-                        ForEach(rows) { row in
-                            TableRow(
-                                row: row, columns: columns, action: action, isSelected: selection.contains(row.id),
-                                height: SettingsTokens.Metric.pageTableRow
-                            )
-                            .onTapGesture { toggle(row.id) }
-                        }
+            .padding(.horizontal, inset)
+            .frame(height: SettingsTokens.Metric.pageTableBar)
+            Rectangle().fill(SettingsTokens.rule).frame(height: 1)
+            TableHeader(columns: columns, hasAction: false, inset: inset, hasCheck: true)
+            Rectangle().fill(SettingsTokens.rule).frame(height: 1)
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                        TableRow(
+                            row: row, columns: columns, action: nil, isSelected: selection.contains(row.id),
+                            isBanded: index.isMultiple(of: 2), inset: inset, height: SettingsTokens.Metric.pageTableRow, check: checked(row.id))
+                            .onTapGesture { checked(row.id).wrappedValue.toggle() }
                     }
-                    Rectangle().fill(SettingsTokens.rule).frame(height: 1)
-                    HStack(spacing: 8) { foot }
-                        .padding(.horizontal, SettingsTokens.Metric.inset)
-                        .frame(maxWidth: .infinity, minHeight: SettingsTokens.Metric.pageTableFoot, alignment: .leading)
                 }
             }
+            .scrollBounceBehavior(.basedOnSize)
+            Rectangle().fill(SettingsTokens.rule).frame(height: 1)
+            HStack(spacing: 8) {
+                Text(selected)
+                    .settingsFont(.count)
+                    .foregroundStyle(SettingsTokens.secondaryText)
+                Spacer(minLength: 12)
+                foot
+            }
+            .padding(.horizontal, inset)
+            .frame(maxWidth: .infinity, minHeight: SettingsTokens.Metric.pageTableBar, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(SettingsTokens.page)
     }
 
-    private func toggle(_ id: Row.ID) {
-        if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
+    private var selected: String { Self.selectedText(selection.count, of: rows.count) }
+
+    /// "2 of 1,204 selected", or "None selected".
+    static func selectedText(_ selected: Int, of total: Int) -> String {
+        selected == 0
+            ? String(localized: "None selected")
+            : String(localized: "\(selected.formatted()) of \(total.formatted()) selected")
+    }
+
+    private func checked(_ id: Row.ID) -> Binding<Bool> {
+        Binding {
+            selection.contains(id)
+        } set: { on in
+            if on { selection.insert(id) } else { selection.remove(id) }
+        }
     }
 }
 
@@ -234,7 +268,7 @@ struct SettingsLogTable<Row: Identifiable, Filter: View, Foot: View, Empty: View
                 filter
             }
             .padding(.horizontal, inset)
-            .frame(height: SettingsTokens.Metric.pageTableBar)
+            .frame(height: SettingsTokens.Metric.logTableBar)
             Rectangle().fill(SettingsTokens.rule).frame(height: 1)
             TableHeader(columns: columns, hasAction: false, inset: inset)
             Rectangle().fill(SettingsTokens.rule).frame(height: 1)
@@ -255,7 +289,7 @@ struct SettingsLogTable<Row: Identifiable, Filter: View, Foot: View, Empty: View
             Rectangle().fill(SettingsTokens.rule).frame(height: 1)
             HStack(spacing: 8) { foot }
                 .padding(.horizontal, inset)
-                .frame(maxWidth: .infinity, minHeight: SettingsTokens.Metric.pageTableFoot, alignment: .leading)
+                .frame(maxWidth: .infinity, minHeight: SettingsTokens.Metric.logTableFoot, alignment: .leading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(SettingsTokens.page)

@@ -288,7 +288,7 @@ import Testing
         bench.calls.fail("changeWebhook", with: .refused("A webhook needs at least one event."))
         await model.setEvent(.itemCreated, on: false, for: model.webhooks[0])
         #expect(model.webhooks[0].events == ["item.created"])
-        #expect(model.rowErrors["a"] == "A webhook needs at least one event.")
+        #expect(model.rowErrors["a"] == .refused("A webhook needs at least one event."))
     }
 
     @Test func allTypesSendsAnExplicitNullAndATypeSendsThatType() async {
@@ -342,7 +342,7 @@ import Testing
         await model.setEvent(.itemTrashed, on: true, for: model.webhooks[0])
         #expect(model.isGone("a"))
         #expect(model.webhook("a") == nil)
-        #expect(model.rowErrors["a"] == OwnerWording.line(.notFound))
+        #expect(model.rowErrors["a"] == .notFound)
     }
 
     @Test func aDeleteTheServerRefusesKeepsTheWebhookWithOneLine() async throws {
@@ -354,7 +354,7 @@ import Testing
         await model.confirm(try #require(model.question))
         #expect(model.webhooks.count == 1)
         #expect(model.deleted == nil)
-        #expect(model.rowErrors["a"] == OwnerWording.permissionLine("webhooks.manage"))
+        #expect(model.rowErrors["a"] == .notPermitted("webhooks.manage"))
         #expect(bench.refreshed == 1)
     }
 
@@ -388,7 +388,7 @@ import Testing
         // Another app sent the first one again between the page's read and the click.
         bench.calls.state.withLock { $0.deliveries["a"]![0].status = .succeeded }
         await model.redeliver(model.deliveries["a"]![0], of: model.webhooks[0])
-        #expect(model.deliveryErrors["a"] == "Only a failed delivery can be sent again.")
+        #expect(model.deliveryErrors["a"] == .refused("Only a failed delivery can be sent again."))
         await model.redeliver(model.deliveries["a"]![1], of: model.webhooks[0])
         #expect(model.deliveryErrors["a"] == nil)
         #expect(model.deliveries["a"]?[1].status == .pending)
@@ -402,7 +402,7 @@ import Testing
         await model.loadDeliveries(of: "a")
         bench.calls.fail("redeliver", with: .unreachable)
         await model.redeliver(model.deliveries["a"]![0], of: model.webhooks[0])
-        #expect(model.deliveryErrors["a"] == OwnerWording.line(.unreachable))
+        #expect(model.deliveryErrors["a"] == .unreachable)
         #expect(model.deliveries["a"]?[0].status == .failed)
     }
 

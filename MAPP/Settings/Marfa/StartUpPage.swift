@@ -33,7 +33,7 @@ struct StartUpPage: View {
 
     @ViewBuilder private var content: some View {
         if let failure = store.failure, store.snapshot == nil {
-            OwnerFailureState(failure: failure, host: host) { Task { await store.load() } }
+            OwnerFailureState(page: .startUp, failure: failure, host: host) { Task { await store.load() } }
         } else if let snapshot = store.snapshot {
             SettingsPageColumn {
                 SettingsSection(

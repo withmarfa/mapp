@@ -157,20 +157,43 @@ nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, Ty
     static func config(_ answer: Components.Schemas.InstanceConfig) -> InstanceConfig {
         var config = InstanceConfig()
         config.instanceID = answer.instanceId
+        func number(_ setting: InstanceSetting, _ value: Int?) { config.values[setting] = value.map { .number($0) } }
+        func megabytes(_ setting: InstanceSetting, _ bytes: Int?) {
+            config.values[setting] = bytes.map { .number(Int((Double($0) / Double(InstanceSetting.bytesPerMegabyte)).rounded())) }
+        }
+        func flag(_ setting: InstanceSetting, _ value: Bool?) { config.values[setting] = value.map { .flag($0) } }
         config.values[.name] = answer.name.map { .text($0) }
-        config.values[.trashRetentionDays] = answer.trashRetentionDays.map { .number($0) }
-        config.values[.versionRecentDays] = answer.versionRecentDays.map { .number($0) }
-        config.values[.versionDailyDays] = answer.versionDailySnapshotDays.map { .number($0) }
-        config.values[.versionWeeklyDays] = answer.versionWeeklySnapshotDays.map { .number($0) }
-        config.values[.versionMaxVersions] = answer.versionMaxVersions.map { .number($0) }
+        number(.trashRetentionDays, answer.trashRetentionDays)
+        number(.versionRecentDays, answer.versionRecentDays)
+        number(.versionDailyDays, answer.versionDailySnapshotDays)
+        number(.versionWeeklyDays, answer.versionWeeklySnapshotDays)
+        number(.versionMaxVersions, answer.versionMaxVersions)
+        number(.auditRetentionDays, answer.auditRetentionDays)
+        number(.eventLogRetentionDays, answer.eventLogRetentionDays)
+        number(.rowLogRetentionDays, answer.rowLogRetentionDays)
+        number(.inboundHandledRetentionDays, answer.inboundHandledRetentionDays)
+        number(.inboundPendingRetentionDays, answer.inboundPendingRetentionDays)
+        number(.blobMinCopies, answer.blobMinCopies)
+        megabytes(.diskReserveMegabytes, answer.diskReserveBytes)
+        flag(.enrichmentEnabled, answer.enrichmentEnabled)
+        flag(.enrichmentOcrEnabled, answer.enrichmentOcrEnabled)
+        flag(.mcpFetchEnabled, answer.mcpFetchEnabled)
+        megabytes(.mcpFetchMaxMegabytes, answer.mcpFetchMaxBytes)
+        flag(.blobCleanupEnabled, answer.blobCleanupEnabled)
+        number(.blobCleanupGraceSeconds, answer.blobCleanupGraceSeconds)
         return config
     }
 
     /// A change that names only the settings in `patch`: a field left out stays as it is, and a cleared one is removed.
     static func patch(_ patch: InstanceConfigPatch) -> Operations.UpdateConfig.Input.Body.JsonPayload {
-        func number(_ setting: InstanceSetting) -> MarfaNullable<Int>? {
+        func number(_ setting: InstanceSetting, scale: Int = 1) -> MarfaNullable<Int>? {
             if patch.clear.contains(setting) { return .null }
-            if case .number(let number)? = patch.values[setting] { return .value(number) }
+            if case .number(let number)? = patch.values[setting] { return .value(number * scale) }
+            return nil
+        }
+        func flag(_ setting: InstanceSetting) -> MarfaNullable<Bool>? {
+            if patch.clear.contains(setting) { return .null }
+            if case .flag(let flag)? = patch.values[setting] { return .value(flag) }
             return nil
         }
         var change = Operations.UpdateConfig.Input.Body.JsonPayload()
@@ -184,6 +207,19 @@ nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, Ty
         change.versionDailySnapshotDays = number(.versionDailyDays)
         change.versionWeeklySnapshotDays = number(.versionWeeklyDays)
         change.versionMaxVersions = number(.versionMaxVersions)
+        change.auditRetentionDays = number(.auditRetentionDays)
+        change.eventLogRetentionDays = number(.eventLogRetentionDays)
+        change.rowLogRetentionDays = number(.rowLogRetentionDays)
+        change.inboundHandledRetentionDays = number(.inboundHandledRetentionDays)
+        change.inboundPendingRetentionDays = number(.inboundPendingRetentionDays)
+        change.blobMinCopies = number(.blobMinCopies)
+        change.diskReserveBytes = number(.diskReserveMegabytes, scale: InstanceSetting.bytesPerMegabyte)
+        change.enrichmentEnabled = flag(.enrichmentEnabled)
+        change.enrichmentOcrEnabled = flag(.enrichmentOcrEnabled)
+        change.mcpFetchEnabled = flag(.mcpFetchEnabled)
+        change.mcpFetchMaxBytes = number(.mcpFetchMaxMegabytes, scale: InstanceSetting.bytesPerMegabyte)
+        change.blobCleanupEnabled = flag(.blobCleanupEnabled)
+        change.blobCleanupGraceSeconds = number(.blobCleanupGraceSeconds)
         return change
     }
 

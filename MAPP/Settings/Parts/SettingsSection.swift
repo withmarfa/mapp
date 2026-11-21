@@ -1,6 +1,10 @@
 import SwiftUI
 
 extension ContainerValues {
+    /// How much more room the page's column leaves above this part when it is the first on the page: a section with a name,
+    /// or a name and a line, sits lower than a head card (`SettingsTokens.Metric.firstHeaderInset`).
+    @Entry var settingsFirstInset: CGFloat = 0
+
     /// Where the rule above the next row starts: at the row's text, which sits after its lead, if it has one.
     @Entry var settingsRuleInset: CGFloat = SettingsTokens.Metric.inset
 }
@@ -54,6 +58,15 @@ struct SettingsSection<Content: View, Accessory: View>: View {
                     .padding(.horizontal, inset)
                     .padding(.top, 2)
             }
+        }
+        .containerValue(\.settingsFirstInset, firstInset)
+    }
+
+    private var firstInset: CGFloat {
+        switch (name != nil, line != nil) {
+        case (_, true): SettingsTokens.Metric.firstHeaderWithLineInset
+        case (true, false): SettingsTokens.Metric.firstHeaderInset
+        case (false, false): 0
         }
     }
 }

@@ -111,7 +111,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         if let pending = model.pending { await model.confirm(pending) }
         #expect(source.sent == [InstanceConfigPatch(clear: [.versionMaxVersions])])
         #expect(model.loaded?.values[.versionMaxVersions] == nil)
-        #expect(model.saved == ["Most Versions Kept per Item: default, 500"])
+        #expect(model.saved == ["At Most: default, 500 versions"])
     }
 
     @Test func whatTheContractRefusesIsRefusedBeforeAnythingIsSent() async {
@@ -145,7 +145,10 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         #expect(model.pending?.shortenings == [.init(setting: .trashRetentionDays, change: .shorter(from: 60, to: 7))])
         model.cancelPending()
         #expect(source.sent.isEmpty)
+        // Keeping things as they were puts the field back.
+        #expect(model.draft[.trashRetentionDays] == "60")
 
+        model.draft[.trashRetentionDays] = "7"
         await model.save()
         if let pending = model.pending { await model.confirm(pending) }
         #expect(source.sent == [InstanceConfigPatch(values: [.trashRetentionDays: .number(7)])])
@@ -155,6 +158,95 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
         await model.save()
         #expect(model.pending == nil)
         #expect(source.sent.count == 2)
+    }
+
+    @Test func revertingTheDraftTakesAwayAQuestionStillOpen() async {
+        let (model, source) = await loaded([.trashRetentionDays: .number(60)])
+        model.draft[.trashRetentionDays] = "7"
+        await model.save()
+        #expect(model.pending != nil)
+
+        model.revert()
+
+        #expect(model.pending == nil)
+        #expect(model.draft[.trashRetentionDays] == "60")
+        #expect(source.sent.isEmpty)
+    }
+
+    @Test func aSaveWhileAQuestionIsOpenChangesNeitherTheQuestionNorWhatIsSent() async {
+        let (model, source) = await loaded([.trashRetentionDays: .number(60), .versionRecentDays: .number(14)])
+        model.draft[.trashRetentionDays] = "7"
+        await model.save()
+        let asked = model.pending
+        #expect(asked != nil)
+
+        model.draft[.versionRecentDays] = "2"
+        #expect(!model.canSave([.versionRecentDays]))
+        await model.save([.versionRecentDays])
+        await model.save()
+
+        #expect(model.pending?.id == asked?.id)
+        #expect(model.pending?.shortenings.map(\.setting) == [.trashRetentionDays])
+        #expect(source.sent.isEmpty)
+    }
+
+    @Test func aChangeAgreedToAndOnItsWayIsNotAChangeLeftUnsaved() async {
+        let (model, source) = await loaded([.trashRetentionDays: .number(60)])
+        model.draft[.trashRetentionDays] = "7"
+        await model.save()
+        guard let asked = model.pending else { Issue.record("a shorter retention should ask first"); return }
+        #expect(model.hasUnsentEdits)
+
+        // Agreed, and closing Settings before the call is answered.
+        let sending = model.agree(asked)
+        #expect(!model.hasUnsentEdits)
+        #expect(!model.canSave([.trashRetentionDays]))
+        model.revert()
+        await sending.value
+
+        #expect(source.sent == [InstanceConfigPatch(values: [.trashRetentionDays: .number(7)])])
+        #expect(model.draft[.trashRetentionDays] == "7")
+        #expect(model.saved == ["Permanently Delete After: 7 days"])
+        #expect(!model.hasUnsentEdits)
+    }
+
+    @Test func aChangeAgreedToThatTheServerRefusesIsLeftUnsavedAgain() async {
+        let (model, source) = await loaded([.trashRetentionDays: .number(60)])
+        source.updateFailure.withLock { $0 = .refused("No.") }
+        model.draft[.trashRetentionDays] = "7"
+        await model.save()
+        if let asked = model.pending { await model.confirm(asked) }
+        #expect(model.failure == .refused("No."))
+        #expect(model.draft[.trashRetentionDays] == "7")
+        #expect(model.hasUnsentEdits)
+    }
+
+    @Test func keepingLessFreeOnDiskAsksFirstAndNamesTheOldAndNewValues() async {
+        // A "5" on the way to "500" is not sent as it is typed.
+        let (model, source) = await loaded([.diskReserveMegabytes: .number(500)])
+        model.draft[.diskReserveMegabytes] = "5"
+        await model.save([.diskReserveMegabytes])
+        #expect(source.sent.isEmpty)
+        #expect(model.pending?.shortenings == [.init(setting: .diskReserveMegabytes, change: .shorter(from: 500, to: 5))])
+        let words = model.pending?.shortenings.map(InstanceWording.consequence).joined() ?? ""
+        #expect(words.contains("5 MB"))
+        #expect(words.contains("500 MB"))
+        model.cancelPending()
+        #expect(model.draft[.diskReserveMegabytes] == "500")
+
+        // More free space, or the same, asks nothing.
+        model.draft[.diskReserveMegabytes] = "5000"
+        await model.save([.diskReserveMegabytes])
+        #expect(model.pending == nil)
+        #expect(source.sent == [InstanceConfigPatch(values: [.diskReserveMegabytes: .number(5000)])])
+    }
+
+    @Test func keepingLessFreeOnDiskIsComparedWithTheDocumentedDefaultWhereNothingIsSet() async {
+        #expect(await asked([:], [.diskReserveMegabytes: "5"]) == [.init(setting: .diskReserveMegabytes, change: .shorter(from: 128, to: 5))])
+        #expect(await asked([:], [.diskReserveMegabytes: "128"]).isEmpty)
+        #expect(await asked([:], [.diskReserveMegabytes: "1024"]).isEmpty)
+        #expect(await asked([.diskReserveMegabytes: .number(500)], [.diskReserveMegabytes: ""]) == [.init(setting: .diskReserveMegabytes, change: .shorter(from: 500, to: 128))])
+        #expect(await asked([.diskReserveMegabytes: .number(100)], [.diskReserveMegabytes: ""]).isEmpty)
     }
 
     /// What `save` would ask about for `typed` on a server that holds `held`.
@@ -192,7 +284,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
             .init(setting: .versionMaxVersions, change: .toDefault(from: 50)),
         ])
         let words = shortenings.map(InstanceWording.consequence)
-        #expect(words[0].contains("may remove items sooner than the server’s current setting"))
+        #expect(words[0].contains("may remove deleted items sooner than the server’s current setting"))
         #expect(words[0].contains("45 days"))
         #expect(!words[0].contains("60"))
         #expect(!words[1].contains("500"))
@@ -218,7 +310,7 @@ nonisolated final class FakeInstanceConfig: InstanceConfigSource {
     @Test func theWordsSayAnUnknownSettingMayRemoveItemsSooner() {
         let typed = InstanceSettingsModel.Shortening(setting: .trashRetentionDays, change: .mayBeShorter(to: 100))
         let words = InstanceWording.consequence(typed)
-        #expect(words.contains("may remove items sooner than the server’s current setting"))
+        #expect(words.contains("may remove deleted items sooner than the server’s current setting"))
         #expect(words.contains("100 days"))
         let known = InstanceWording.consequence(.init(setting: .trashRetentionDays, change: .shorter(from: 60, to: 7)))
         #expect(!known.contains("sooner than"))

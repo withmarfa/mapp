@@ -35,10 +35,10 @@ struct MonitoringPage: View {
 
     @ViewBuilder private var content: some View {
         if let failure = model.failure, !model.isLoaded {
-            OwnerFailureState(failure: failure, host: host) { Task { await model.load() } }
+            OwnerFailureState(page: .monitoring, failure: failure, host: host) { Task { await model.load() } }
         } else if model.isLoaded {
             SettingsPageColumn {
-                if let notice = model.notice { OwnerProblem(title: "Changed Elsewhere", line: notice, close: { model.dismissNotice() }) }
+                if let notice = model.notice { OwnerNotice(title: "Changed Elsewhere", line: notice, close: { model.dismissNotice() }) }
                 SettingsSection("Heartbeat") {
                     switchRow(
                         "Send a Heartbeat", key: "heartbeat_enabled", hasReceiver: model.heartbeatHasReceiver,

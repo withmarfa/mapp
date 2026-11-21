@@ -172,6 +172,19 @@ nonisolated protocol OwnerCalls: Sendable {
     func apply(_ plan: AddressPlan, instanceID: String?) async throws(OwnerFailure) -> AddressSettings
     func setWebsites(_ websites: [String], instanceID: String?) async throws(OwnerFailure) -> AddressSettings
 
+    /// What needs the owner's attention (`instance.read`).
+    func attention() async throws(OwnerFailure) -> [AttentionConcern]
+    /// How the server stands: its health, what it holds and whether an update is ready (`instance.read`). A part the server
+    /// does not give is left out.
+    func reading() async throws(OwnerFailure) -> InstanceReading
+    /// Where files are kept and the files nothing uses (`instance.read`).
+    func fileStores() async throws(OwnerFailure) -> FileStores
+    /// The source filter, with the instance that holds it (`config.manage`).
+    func sourceLimit() async throws(OwnerFailure) -> SourceLimit
+    /// Replaces the source filter, sending the other two levers as `limit` holds them, or turns it off with nil. The server
+    /// guards only the instance, so a caller reads the limit again just before.
+    func setSourceLimit(_ limit: SourceLimit, to filter: (types: [String], sources: [String])?) async throws(OwnerFailure) -> SourceLimit
+
     func webhooks() async throws(OwnerFailure) -> [OwnerWebhook]
     /// One webhook as the server holds it now.
     func webhook(_ id: String) async throws(OwnerFailure) -> OwnerWebhook
@@ -217,7 +230,7 @@ nonisolated struct AddressPlan: Hashable, Sendable {
 nonisolated struct ClientOwnerCalls: OwnerCalls {
     let client: @Sendable () throws -> Client
 
-    private func make() throws(OwnerFailure) -> Client {
+    func make() throws(OwnerFailure) -> Client {
         do { return try client() } catch { throw Self.failure(error) }
     }
 
@@ -353,8 +366,8 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
 
     func typeNames() async throws(OwnerFailure) -> [String: String] {
         try await run { client in
-            Dictionary(
-                try await client.listTypes().ok.body.json.data.map { ($0.value1.id, $0.value1.label ?? $0.value1.id) }, uniquingKeysWith: { first, _ in first })
+            OwnerWording.typeNames(
+                try await client.listTypes().ok.body.json.data.map { (id: $0.value1.id, label: $0.value1.label ?? $0.value1.id, parent: $0.value1.parent) })
         }
     }
 

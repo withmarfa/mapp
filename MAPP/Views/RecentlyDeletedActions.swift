@@ -16,7 +16,7 @@ struct RecentlyDeletedActions: View {
             Spacer(minLength: 0)
             Button("Restore") { library.recover(selection, undoManager: undoManager) }
                 .disabled(selection.isEmpty)
-            Button("Delete Permanently…", role: .destructive) { library.itemsToPurge = selection }
+            Button("Permanently Delete…", role: .destructive) { library.itemsToPurge = selection }
                 .disabled(selection.isEmpty || !library.reachesServer)
             Menu("More", systemImage: "ellipsis") {
                 Button("Empty Recently Deleted…", role: .destructive) {

@@ -278,7 +278,7 @@ extension LiveMarfaTests {
         }
 
         /// The bin is the server's, read online: an item deleted and sent is listed, including by a copy that never
-        /// held it, is restored from there, and is destroyed for good by Delete Permanently.
+        /// held it, is restored from there, and is destroyed for good by Permanently Delete.
         @Test(.timeLimit(.minutes(3)))
         func theBinListsRestoresAndPurgesItems() async throws {
             try await withLibrary { library, source, made in
@@ -305,7 +305,7 @@ extension LiveMarfaTests {
                 #expect(!library.deletedItems.contains { $0.id == kept })
                 #expect(library.items(in: .allItems).contains { $0.id == kept })
 
-                // Delete Permanently needs the server and takes the item out of the bin and the copy.
+                // Permanently Delete needs the server and takes the item out of the bin and the copy.
                 try #require(library.reachesServer)
                 library.deletePermanentlyOnConfirm([purged])
                 try #require(await eventually { library.item(purged) == nil })

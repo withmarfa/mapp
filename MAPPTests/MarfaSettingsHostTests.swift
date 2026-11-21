@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Marfa
 import Synchronization
@@ -193,11 +194,37 @@ import Testing
         #expect(libraries.host.notices.waiting.filter { $0.title == Words.permissionsLostTitle }.isEmpty)
     }
 
-    @Test func everyPermissionAPageNeedsIsNamedTheSameWayWhereItIsLost() {
-        for page in MarfaSettingsPage.allCases {
-            guard let permission = page.permission else { continue }
-            #expect(page.permissionLine == "MAPP isn’t allowed to \(permission.allowedTo).")
+    @Test func everyPageNamesWhatMAPPMayNotDoThereInItsOwnWords() {
+        let pages = MarfaSettingsPage.allCases.filter { $0.permission != nil }
+        for page in pages { #expect(page.permissionLine.hasPrefix("MAPP isn’t allowed to "), "\(page)") }
+        // Two pages share a line only where they share a permission; here none shares one at all.
+        let lines = pages.map(\.permissionLine)
+        #expect(Set(lines).count == lines.count)
+        for (first, second) in pages.flatMap({ first in pages.map { (first, $0) } }) where first != second && first.permission != second.permission {
+            #expect(first.permissionLine != second.permissionLine)
         }
+        #expect(MarfaSettingsPage.sources.permissionLine != MarfaSettingsPage.keys.permissionLine)
+    }
+
+    @Test func everyPagesStateLineReadsOnOneLineAtTheStatesMeasure() {
+        let font = NSFont.systemFont(ofSize: 12)
+        func width(_ line: String) -> CGFloat { (line as NSString).size(withAttributes: [.font: font]).width }
+        let measure = SettingsTokens.Metric.stateMeasure
+        for page in MarfaSettingsPage.allCases where page.permission != nil {
+            #expect(width(page.permissionLine) <= measure, "\(page): \(page.permissionLine)")
+        }
+        // The generic line a page falls back to, for a permission that is not its own, fits too.
+        for permission in InstancePermission.allCases {
+            let line = OwnerWording.permissionLine(permission.rawValue)
+            #expect(width(line) <= measure, "\(line)")
+        }
+    }
+
+    @Test func aReadRefusedForThePagesOwnPermissionSaysTheSameAsItsGateAndAnotherOneSaysItsOwn() {
+        #expect(OwnerWording.permissionLine("keys.manage", on: .sources) == MarfaSettingsPage.sources.permissionLine)
+        #expect(OwnerWording.permissionLine(nil, on: .keys) == MarfaSettingsPage.keys.permissionLine)
+        #expect(OwnerWording.permissionLine("backups.manage", on: .sources) == OwnerWording.permissionLine("backups.manage"))
+        #expect(OwnerWording.permissionLine("config.manage", on: .account) == OwnerWording.permissionLine("config.manage"))
     }
 
     @Test func allowMoreNeverAsksForSignInsManageAtSignIn() async throws {

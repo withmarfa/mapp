@@ -32,10 +32,7 @@ struct MarfaPageGate<Content: View>: View {
             if let permission = page.permission, !host.grants.contains(permission) {
                 SettingsPageState(
                     symbol: "lock", title: Text("Needs a Permission"), line: Text(verbatim: page.permissionLine),
-                    action: (host.isAllowingMore ? "Waiting…" : "Allow More…", {
-                        let host = host
-                        Task { _ = await host.allowMore([permission]) }
-                    }))
+                    action: (host.isAllowingMore ? "Waiting…" : "Allow More…", { host.askForMore(naming: permission.rawValue) }))
                 .disabled(host.isAllowingMore)
             } else {
                 content
@@ -69,11 +66,14 @@ struct MarfaSettingsPageView: View {
             case .apps: AppsPage(host: host, subpage: subpage)
             case .keys: KeysPage(host: host, subpage: subpage)
             case .addresses: AddressesPage(host: host)
+            case .sources: SourcesPage(host: host, subpage: subpage)
             case .activity: ActivityPage(host: host)
             case .monitoring: MonitoringPage(host: host)
             case .limits: LimitsPage(host: host)
             case .startUp: StartUpPage(host: host)
             case .recentlyDeleted: RecentlyDeletedPage(host: host, showsAll: subpage?.id == RecentlyDeletedPage.allDeleted.id)
+            case .history: HistoryPage(host: host)
+            case .fileStorage: FileStoragePage(host: host)
             case .webhooks: WebhooksPage(host: host, subpage: subpage)
             case .folders: FoldersPage(host: host, subpage: subpage)
             }

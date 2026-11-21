@@ -47,7 +47,7 @@ struct ActivityPage: View {
 
     @ViewBuilder private var content: some View {
         if let failure = model.failure, model.entries.isEmpty, !model.isFiltered {
-            OwnerFailureState(failure: failure, host: host) { Task { await model.reload() } }
+            OwnerFailureState(page: .activity, failure: failure, host: host) { Task { await model.reload() } }
         } else if !model.hasLoaded {
             OwnerLoading()
         } else {
@@ -79,7 +79,7 @@ struct ActivityPage: View {
                 },
                 empty: {
                     if let failure = model.failure {
-                        OwnerFailureState(failure: failure, host: host) { Task { await model.reload() } }
+                        OwnerFailureState(page: .activity, failure: failure, host: host) { Task { await model.reload() } }
                     } else if model.isFiltered {
                         SettingsStateContent(symbol: "magnifyingglass", title: Text("Nothing Matches"), line: Text("No activity fits this filter."), action: nil)
                     } else {

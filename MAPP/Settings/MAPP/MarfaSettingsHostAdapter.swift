@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import Marfa
 import MarfaAPI
+import SwiftUI
 
 /// The name of the library in use: the name a server gave itself, or its host until one has been read.
 @MainActor
@@ -30,6 +31,70 @@ enum LibraryDescription {
     }
 
     private var host: MarfaHost { libraries.host }
+
+    // MARK: Overview
+
+    @ObservationIgnored private var overviewModel: (address: String?, model: OverviewModel)?
+
+    /// What the Overview and the sidebar's badge read. It is made again for another server, since its calls are bound to one.
+    var overview: OverviewModel {
+        if let held = overviewModel, held.address == serverAddress { return held.model }
+        let model = OverviewModel(context: OwnerContext(host: self))
+        overviewModel = (serverAddress, model)
+        return model
+    }
+
+    func show(_ page: MarfaSettingsPage) { launcher.show(.marfa(page)) }
+
+    // MARK: Sources
+
+    var sources: [MarfaSourceRow] {
+        guard let library = libraries.current else { return [] }
+        return library.sources.listing(loaded: [:]).map { listed in
+            let info = library.sources.info(listed.code)
+            return MarfaSourceRow(code: listed.code, name: listed.name, mark: info.mark, count: listed.count, hasChosenName: info.hasChosenName)
+        }
+    }
+
+    func refreshSources() async { await libraries.current?.refreshSources() }
+
+    var canChangeSources: Bool { libraries.current?.reachesServer ?? false }
+
+    func changeSource(_ code: String, _ change: MarfaSourceChange) async -> OwnerFailure? {
+        guard let library = libraries.current else { return .failed(SourceEditFailure.unsupported.message) }
+        let failure: SourceEditFailure? =
+            switch change {
+            case .rename(let name): await library.updateSource(code, name: .set(name), mark: nil)
+            case .useDefaultName: await library.updateSource(code, name: .clear, mark: nil)
+            case .setMark(let mark): await library.updateSource(code, name: nil, mark: .set(mark))
+            case .removeMark: await library.updateSource(code, name: nil, mark: .clear)
+            }
+        guard let failure else { return nil }
+        return switch failure {
+        case .unreachable: .unreachable
+        case .notPermitted: .notPermitted(InstancePermission.keysManage.rawValue)
+        case .keyRefused: .signedOut
+        case .refused(let reason): .refused(reason)
+        case .unsupported, .failed: .failed(failure.message)
+        }
+    }
+
+    var markSets: [MarfaMarkSet] { IconSet.allCases.map { MarfaMarkSet(id: $0.rawValue, title: $0.title) } }
+
+    func marks(matching query: String, in set: MarfaMarkSet) -> [String] {
+        guard let iconSet = IconSet(rawValue: set.id) else { return [] }
+        return IconNameSearch.matching(query, in: iconSet.ids)
+    }
+
+    func markGlyph(_ id: String) -> AnyView {
+        AnyView(
+            Group {
+                if id.isEmpty { Image(systemName: "tray") } else { RowIconImage(icon: .type(id)) }
+            }
+            .foregroundStyle(SettingsTokens.secondaryText))
+    }
+
+    func markTitle(_ id: String) -> String { IconNameSearch.title(of: id) }
 
     var serverName: String { LibraryDescription.name(libraries) }
     var serverAddress: String? { host.configuredConnection?.address.absoluteString }
@@ -108,7 +173,12 @@ enum LibraryDescription {
     // MARK: Recently Deleted
 
     var deletedItems: [MarfaDeletedItem] {
-        libraries.current?.deletedItems.map { MarfaDeletedItem(id: $0.id.rawValue, title: $0.displayTitle, deleted: $0.modified) } ?? []
+        guard let library = libraries.current else { return [] }
+        return library.deletedItems.map { item in
+            MarfaDeletedItem(
+                id: item.id.rawValue, title: item.displayTitle, deleted: item.trashed ?? item.modified,
+                kind: library.catalogue.label(for: item.type), source: item.source.map { library.sources.name($0) })
+        }
     }
 
     var deletedCount: Int { libraries.current?.deletedCount ?? 0 }
@@ -156,10 +226,11 @@ extension OwnerDrafts {
 }
 
 extension InstanceSettingsModel {
-    /// Tells the person what they typed and did not save, as a change not kept, and drops it. Nothing typed hands over nothing.
+    /// Tells the person what they typed and did not save, as a change not kept, and drops it. Nothing typed hands over nothing,
+    /// and a change already agreed and being sent is not one that was left unsaved.
     func handOver(to notices: Notices, because reason: String) {
-        guard hasEdits else { return }
-        let lines = InstanceSetting.allCases.filter(isEdited).map { "\($0.title): \(draft[$0] ?? "")" }
+        guard hasUnsentEdits else { return }
+        let lines = InstanceSetting.allCases.filter(isUnsent).map { "\($0.title): \(draft[$0] ?? "")" }
         notices.notKept(String(localized: "Settings Not Saved"), text: lines.joined(separator: "\n"), reason: reason)
         revert()
     }

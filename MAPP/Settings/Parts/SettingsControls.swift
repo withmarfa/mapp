@@ -229,6 +229,9 @@ struct SettingsField: View {
     var isMonospaced = false
     var width: CGFloat? = SettingsTokens.Metric.controlWidth
     var onSubmit: () -> Void = {}
+    /// Run when the field loses focus, so a value typed and left is kept as one that was submitted.
+    var onEndEditing: (() -> Void)?
+    @FocusState private var isFocused: Bool
 
     var body: some View {
         Group {
@@ -242,7 +245,9 @@ struct SettingsField: View {
         .textFieldStyle(.roundedBorder)
         .font(isMonospaced ? SettingsTokens.font(.mono) : nil)
         .autocorrectionDisabled()
+        .focused($isFocused)
         .onSubmit(onSubmit)
+        .onChange(of: isFocused) { if !$1 { onEndEditing?() } }
         .frame(width: width, height: SettingsTokens.Metric.controlHeight)
         .settingsErrorRing(isError)
     }
@@ -275,8 +280,7 @@ struct SettingsNumberField: View {
     var prompt: String?
     var isError = false
     var onSubmit: () -> Void = {}
-    /// Called when the field is left, so a value is kept without Return.
-    var onEnd: () -> Void = {}
+    var onEndEditing: (() -> Void)?
     @FocusState private var isFocused: Bool
 
     var body: some View {
@@ -285,8 +289,8 @@ struct SettingsNumberField: View {
             .textFieldStyle(.roundedBorder)
             .autocorrectionDisabled()
             .focused($isFocused)
-            .onChange(of: isFocused) { if !$1 { onEnd() } }
             .onSubmit(onSubmit)
+            .onChange(of: isFocused) { if !$1 { onEndEditing?() } }
             .padding(.trailing, 0)
             .overlay(alignment: .trailing) {
                 Text(unit)

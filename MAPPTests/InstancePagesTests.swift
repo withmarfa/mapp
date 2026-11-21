@@ -736,6 +736,9 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         #expect(MarfaSettingsPage.monitoring.permission == .configManage)
         #expect(MarfaSettingsPage.limits.permission == .configManage)
         #expect(MarfaSettingsPage.startUp.permission == .instanceRead)
-        #expect(MarfaSettingsPage.activity.permissionLine == "MAPP isn’t allowed to read the audit log.")
+        #expect(MarfaSettingsPage.activity.permissionLine == "MAPP isn’t allowed to read this Marfa’s audit log.")
+        #expect(MarfaSettingsPage.monitoring.permissionLine == "MAPP isn’t allowed to see or change how this Marfa is monitored.")
+        #expect(MarfaSettingsPage.limits.permissionLine == "MAPP isn’t allowed to see or change this Marfa’s limits.")
+        #expect(MarfaSettingsPage.startUp.permissionLine == "MAPP isn’t allowed to read the settings this Marfa started with.")
     }
 }

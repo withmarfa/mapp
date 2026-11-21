@@ -44,15 +44,15 @@ struct AppsPage: View {
 
     @ViewBuilder private var content: some View {
         if let failure = model.failure {
-            OwnerFailureState(failure: failure, host: host) { Task { await model.load() } }
+            OwnerFailureState(page: .apps, failure: failure, host: host) { Task { await model.load() } }
         } else if !model.hasLoaded {
             OwnerLoading()
         } else if subpage != nil {
             if let app = openApp {
                 if isShowingPermissions {
-                    AppPermissions(model: model, app: app)
+                    AppPermissions(model: model, app: app, host: host)
                 } else {
-                    AppDetail(model: model, app: app)
+                    AppDetail(model: model, app: app, host: host)
                 }
             } else {
                 SettingsPageState(
@@ -74,7 +74,7 @@ struct AppsPage: View {
                     SettingsLinkRow(
                         verbatim: AppsModel.name(of: app),
                         line: AccessScopes.summary(AccessScopes.parse(app.scopes), names: model.typeNames),
-                        lead: .symbol(Self.symbol(app.kind)), value: OwnerWording.used(app.lastUsed)
+                        lead: .well(symbol: Self.symbol(app.kind)), value: OwnerWording.used(app.lastUsed)
                     ) { push(Self.subpage(for: app)) }
                 }
             }
@@ -94,11 +94,12 @@ struct AppsPage: View {
 private struct AppPermissions: View {
     let model: AppsModel
     let app: AppAccess
+    let host: any MarfaSettingsHost
 
     var body: some View {
         OwnerPermissionsList(
             held: AccessScopes.parse(app.scopes).permissions, line: "The owner’s permissions. An app can only lose them.",
-            problem: model.rowErrors[app.id]
+            problem: model.rowErrors[app.id], page: .apps, host: host
         ) { model.askToRemove(permission: $0, from: app) }
     }
 }
@@ -107,6 +108,7 @@ private struct AppPermissions: View {
 private struct AppDetail: View {
     let model: AppsModel
     let app: AppAccess
+    let host: any MarfaSettingsHost
     @Environment(\.settingsPush) private var push
 
     private var name: String { AppsModel.name(of: app) }
@@ -128,7 +130,7 @@ private struct AppDetail: View {
         SettingsPageColumn {
             SettingsHead(
                 symbol: AppsPage.symbol(app.kind), tone: .purple, title: Text(verbatim: name), line: Text(verbatim: kindLine))
-            if let line = model.rowErrors[app.id] { OwnerProblem(title: "Not Changed", line: line) }
+            if let failure = model.rowErrors[app.id] { OwnerProblem(title: "Not Changed", failure: failure, page: .apps, host: host) }
             SettingsSection(
                 name: Text("Access"), line: Text("What \(name) may read and change."),
                 footer: Text("You can only narrow it. \(name) asks you for more.")
