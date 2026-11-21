@@ -100,7 +100,7 @@ struct SettingsWindowTests {
     }
 
     @Test func onlyThePagesThatExistAreListed() {
-        #expect(SettingsPage.mappGroups.flatMap { $0 } == [.general, .appearance, .keyboard, .editor, .lists, .connection])
+        #expect(SettingsPage.mappGroups.flatMap { $0 } == [.general, .appearance, .keyboard, .editor, .lists, .layouts, .connection])
         #expect(SettingsPage.marfaGroups.flatMap { $0 } == [.overview, .account, .apps, .keys, .addresses, .recentlyDeleted])
     }
 

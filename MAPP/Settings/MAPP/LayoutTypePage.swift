@@ -1,0 +1,158 @@
+import SwiftUI
+
+/// One type's Layouts page: how its items read in a row, which facts follow the status, and what its page pins under the
+/// title. Every change is written to the stores that already hold it, the type's look (`TypeLooks`) and what its page
+/// shows (`PagePlacements`, the same store as Customize Layout on an item), and nothing is written to Marfa.
+struct LayoutTypePage: View {
+    let type: TypeID
+    @Environment(Libraries.self) private var libraries
+    @Environment(\.library) private var library
+    @AppStorage(PagePlacements.key) private var placements = PagePlacements()
+
+    private var catalogue: Catalogue { library?.catalogue ?? Catalogue() }
+    private var key: String { libraries.libraryKey }
+    private var info: ItemTypeInfo? { catalogue.itemTypes[type] }
+    private var choices: LayoutChoices { LayoutChoices(type: type, catalogue: catalogue) }
+    private var look: TypeLook { libraries.typeLooks.looks(in: catalogue, library: key)[type] ?? .empty }
+    private var hasChanges: Bool { libraries.typeLooks.hasChoice(for: type, in: key) || placements.hasChoice(for: type) }
+
+    var body: some View {
+        SettingsPageColumn {
+            head
+            preview
+            row
+            facts
+            page
+            SettingsBar {
+                SettingsButton("Restore Defaults") { restore() }
+                    .disabled(!hasChanges)
+                    .accessibilityIdentifier("RestoreLayout")
+            }
+        }
+        .accessibilityIdentifier("LayoutTypePage")
+    }
+
+    // MARK: Head and preview
+
+    private var head: some View {
+        let preset = LookPreset.suggested(for: type, in: catalogue)
+        let changes = libraries.typeLooks.changeCount(for: type, in: key) + (placements.hasChoice(for: type) ? 1 : 0)
+        return SettingsHead(
+            lead: TypeMark(icon: info?.icon, size: .large),
+            title: Text(verbatim: info?.plural ?? type.rawValue),
+            line: Text(verbatim: Self.startsAs(preset.startsAs, changes: changes)))
+    }
+
+    private static func startsAs(_ words: String, changes: Int) -> String {
+        switch changes {
+        case 0: String(localized: "Starts \(words.lowercased()).")
+        case 1: String(localized: "Starts \(words.lowercased()). One place changed.")
+        default: String(localized: "Starts \(words.lowercased()). \(changes) places changed.")
+        }
+    }
+
+    @ViewBuilder private var preview: some View {
+        let items = Array((library?.items(in: .itemType(type.rawValue)) ?? []).prefix(2))
+        if let library, !items.isEmpty {
+            let list = RowList(date: .look, format: DateFormat.stored(), day: Calendar.current.startOfDay(for: library.now()))
+            SettingsSection("Preview") {
+                SettingsPreview {
+                    ForEach(items) { item in
+                        ItemRow(
+                            content: RowContent.make(
+                                for: item, look: look, catalogue: catalogue, list: list,
+                                relations: library.relations(of: item, wanting: look.relations, counts: look.counts)))
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: Row
+
+    private var row: some View {
+        SettingsSection("Row") {
+            SettingsRow("Date", line: "Top right.") {
+                SettingsPopUp(title: "Date", selection: Binding { look.date } set: { date in change { $0.date = date } }) {
+                    ForEach(choices.dates, id: \.self) { Text(verbatim: choices.title(of: $0)).tag($0) }
+                }
+                .accessibilityIdentifier("LayoutDate")
+            }
+            SettingsRow("Secondary Line", line: "Under the title. Up to two.") {
+                SettingsMultiPopUp(
+                    title: "Secondary Line",
+                    options: choices.parts.map { SettingsListEntry(id: $0.word, title: choices.title(of: $0)) },
+                    selection: Binding { look.secondary.map(\.word) } set: { words in
+                        change { $0.secondary = words.compactMap { LookPart(word: $0) } }
+                    },
+                    emptyTitle: "Nothing")
+                    .accessibilityIdentifier("LayoutSecondary")
+            }
+        }
+    }
+
+    // MARK: Facts
+
+    private var facts: some View {
+        let shown = look.facts
+        return SettingsSection("Facts", line: "After the status, in this order. A row shows the first two.") {
+            SettingsOrderedList(
+                entries: Binding {
+                    shown.map { SettingsListEntry(id: $0.word, title: choices.title(of: $0)) }
+                } set: { entries in
+                    change { $0.facts = entries.compactMap { LookFact(word: $0.id) } }
+                },
+                candidates: choices.facts.filter { !shown.contains($0) }.map { SettingsListEntry(id: $0.word, title: choices.title(of: $0)) },
+                addTitle: "Add a Fact",
+                onAdd: { added in
+                    guard let fact = LookFact(word: added.id) else { return }
+                    change { $0.facts.append(fact) }
+                })
+        }
+        .accessibilityIdentifier("LayoutFacts")
+    }
+
+    // MARK: Page
+
+    private var rows: [PageLayout.Row] {
+        if let sample = library?.items(in: .itemType(type.rawValue)).first, let library {
+            return PageLayout.rows(
+                of: sample, type: info, hidden: library.hiddenPropertyKeys(of: sample),
+                relationships: library.relationships(for: sample.id), catalogue: catalogue,
+                showsCoordinates: ShowsCoordinates.stored())
+        }
+        return PageLayout.rows(ofType: type, catalogue: catalogue)
+    }
+
+    private var page: some View {
+        let rows = rows
+        let pins = placements.pins(of: type, in: catalogue)
+        let pinned = pins.compactMap { id in rows.first { $0.id == id } }
+        return SettingsSection("Page", line: "Pinned under the title. Customize Layout on an item of this type changes the same.") {
+            SettingsOrderedList(
+                entries: Binding {
+                    pinned.map { SettingsListEntry(id: $0.id, title: $0.label) }
+                } set: { entries in
+                    placements.setPins(entries.map(\.id) + pins.filter { id in !rows.contains { $0.id == id } }, of: type)
+                },
+                candidates: rows.filter { $0.id != PagePlacement.linkedFrom && !pins.contains($0.id) }
+                    .map { SettingsListEntry(id: $0.id, title: $0.label) },
+                addTitle: "Pin a Property…",
+                isFull: pins.count >= PagePlacement.pinLimit,
+                onAdd: { added in placements.pin(added.id, of: type, in: catalogue) })
+        }
+        .accessibilityIdentifier("LayoutPage")
+    }
+
+    // MARK: Writing
+
+    private func change(_ edit: (inout TypeLook) -> Void) {
+        libraries.typeLooks.change(type, in: key, catalogue: catalogue, edit)
+    }
+
+    /// Takes back this type's choices and nothing else's: its look, and what its page shows.
+    private func restore() {
+        libraries.typeLooks.restore(type, in: key)
+        placements.reset(type)
+    }
+}

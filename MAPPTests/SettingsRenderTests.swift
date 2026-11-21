@@ -45,7 +45,7 @@ import Testing
 /// the toolbar. The system's Back and Forward pill and title belong to the real window's toolbar, which an offscreen draw
 /// has no window to give, so the strip only marks where they sit and is not their size or look; the pictures taken from
 /// the running app show them as the system draws them.
-private struct RenderedWindow<Detail: View>: View {
+struct RenderedWindow<Detail: View>: View {
     let selection: SettingsPage
     var search = ""
     var sheet: AnyView?
@@ -82,7 +82,7 @@ private struct RenderedWindow<Detail: View>: View {
 /// pull request. Skipped unless `MAPP_SETTINGS_RENDERS` names a folder.
 @Suite(.enabled(if: SettingsRender.isRequested), .serialized, .hangLimit)
 @MainActor struct SettingsRenderTests {
-    private static let size = CGSize(width: SettingsTokens.Metric.windowWidth, height: SettingsTokens.Metric.windowHeight)
+    static let size = CGSize(width: SettingsTokens.Metric.windowWidth, height: SettingsTokens.Metric.windowHeight)
 
     private func stub(_ configure: (StubMarfaHost) -> Void = { _ in }) async -> StubMarfaHost {
         let source = FakeInstanceConfig([.name: .text("Castell Studio"), .trashRetentionDays: .number(60)])
@@ -189,6 +189,13 @@ private struct RenderedWindow<Detail: View>: View {
 
     @Test func editor() async throws {
         try await SettingsRender.png(RenderedWindow(selection: .editor, detail: EditorPage()), size: Self.size, named: "Editor")
+    }
+
+    /// The whole page, taller than the window, in place of the board's scrolled view.
+    @Test func editorWhole() async throws {
+        try await SettingsRender.png(
+            RenderedWindow(selection: .editor, detail: EditorPage()),
+            size: CGSize(width: Self.size.width, height: 1_500), named: "Editor, whole page")
     }
 
     @Test func connectionConnected() async throws {

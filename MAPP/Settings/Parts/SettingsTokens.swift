@@ -72,6 +72,13 @@ enum SettingsTokens {
         static let darkLine = Color(nsColor: NSColor(white: 75 / 255, alpha: 1))
     }
 
+    /// The small list a row style's tile draws: a page, a title bar and a quieter line, which follow the appearance as a list does.
+    enum RowPreview {
+        static let page = card
+        static let title = adaptive(light: NSColor(white: 0.78, alpha: 1), dark: NSColor(white: 0.46, alpha: 1))
+        static let line = adaptive(light: NSColor(white: 0.88, alpha: 1), dark: NSColor(white: 0.3, alpha: 1))
+    }
+
     /// The interface fonts of Settings. A page asks for these by role.
     enum Role: Hashable, Sendable {
         case title, line, sectionName, sectionLine, footer, control, small, mono, stateTitle, headTitle, count, sidebar, sidebarHeader, largeGlyph
@@ -163,6 +170,16 @@ enum SettingsTokens {
         static let previewTop: CGFloat = 22
         static let previewSidebarPadding: CGFloat = 10
         static let previewHeading: CGFloat = 0.55
+        /// A row style tile's bars: height, space inside a row and between rows, the page's side and top padding, and how
+        /// wide a title bar and a quieter line run, as shares of the width.
+        static let rowPreviewBar: CGFloat = 4
+        static let rowPreviewInner: CGFloat = 4
+        static let rowPreviewGap: CGFloat = 8
+        static let rowPreviewPadding: CGFloat = 16
+        static let rowPreviewTitle: CGFloat = 0.6
+        static let rowPreviewLine: CGFloat = 0.45
+        /// The space above and below the rows a preview card draws.
+        static let previewCardInset: CGFloat = 4
         /// The space between a page's sections, and above and below its column.
         static let pageSpacing: CGFloat = 32
         /// The space between a card and the row of buttons under it, which sit nearer than a section does.

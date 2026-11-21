@@ -1,8 +1,8 @@
 # Settings pages
 
-Status: General and Appearance are built. The other pages are in [Agreed designs](agreed-designs.md#settings) until they are built.
+Status: General, Appearance, Editor, Lists and Layouts are built. The other pages are in [Agreed designs](agreed-designs.md#settings) until they are built.
 
-Where it lives: `GeneralPage`, `AppearancePage`, `StartWith`, `ReopenWindows`, `NewItemType`, `WeekStart`, `DateFormat`, `DateDisplay`, `MissingChoice`, `MacSettings`, `AppTheme`, `AccentChoice`, `HighlightChoice` and `FontChoice`, under `MAPP/Settings/`, `MAPP/Model/` and `MAPP/Views/`.
+Where it lives: `GeneralPage`, `AppearancePage`, `EditorPage`, `ListsPage`, `LayoutsPage`, `LayoutTypePage`, `LayoutChoices`, `EditorOptions`, `LineSpacing`, `ParagraphSpacing`, `IndentWith`, `PasteAs`, `EditingMode`, `StartWith`, `ReopenWindows`, `NewItemType`, `WeekStart`, `DateFormat`, `DateDisplay`, `MissingChoice`, `MacSettings`, `AppTheme`, `AccentChoice`, `HighlightChoice` and `FontChoice`, under `MAPP/Settings/`, `MAPP/Model/` and `MAPP/Views/`.
 
 Every setting here is a Mac setting, kept in the defaults and never written to Marfa ([Settings storage](settings-storage.md)).
 
@@ -31,6 +31,37 @@ Every setting here is a Mac setting, kept in the defaults and never written to M
 - **Materials.** Value Panels and Palettes: Glass, Solid, and Translucent for palettes.
 - **Window.** Title When Scrolling and Toolbar Background When Scrolling (both for an item's page), and Symbols on Subtypes in the sidebar.
 - **Window Layout.** Where the sidebar and the list start in a new window, with From This Window: Reset puts the built-in widths back, and Use Current Widths keeps the widths of the front window.
+
+## Editor
+
+Every Editor setting reaches a page that is already open. The ones that are Inkkit's go to the page as one set (`EditorOptions`, sent with `window.editor.setOptions`), since each of Inkkit's two calls replaces its whole set; see [Editor page](../editor/AGENTS.md).
+
+- **Text.** Text Size (the item's own text; the interface's is in Appearance), Line Spacing and Paragraph Spacing (Tight, Standard or Relaxed, as multiples of the text size: 1.4, 1.55 and 1.8 for lines, one third, two thirds and one for paragraphs), and Links to Items (how a link to another item looks: Mark, Underline, Tinted Pill, Pill, Quiet or Text; a link to an item that doesn't exist keeps its dashed line in every look).
+- **Page.** Page Width (Standard or Full Width), Standard Width (dimmed under Full Width) and Title Length (up to 2 to 5 lines before an ellipsis).
+- **Editing.** Edit Pages As is the mode a page opens in, Formatted or Markdown Source. It applies to an item opened, never to the page already shown, which keeps the mode its Format menu switched it to. Articles Open In is Reader or Original, the same choice View > Show Original makes.
+- **Typing.** Check Spelling While Typing, Smart Quotes and Dashes (formatted text; off until turned on), Pair Brackets and Quotes (off), Continue Lists on Return (on, in formatted text and Markdown source) and Indent With (a tab, or 2, 4 or 8 spaces, in Markdown source). Indent With always sends both a kind and a width, since Tab indents in the source only once the kind is set.
+- **Pasting.** Paste Formatted Text As is Markdown (formatted, the default) or Plain Text, which inserts what is pasted exactly as typed in every mode.
+- **Display.** Fold Headings (a triangle beside each heading hides what follows) and Line Numbers in Code.
+
+## Lists
+
+Density (Standard or Compact, chosen from two small lists) is what every list takes until a saved view or a place chooses its own. Sort By and Group By are the order every list takes until a view or a place chooses its own; Group By is dimmed while the sort is by title. Lists has no setting to leave types or sources out: that belongs to Search. Open Items and Today and Yesterday are in General.
+
+## Layouts
+
+One page for how each type looks: a list of every type of the connected server (the ones its owner made first, then the built-in ones), each opening that type's page, with Import… and Export… under it. A page that is not connected shows no types. Layouts is the name people see; the code keeps its names ([Looks](looks.md), `TypeLooks`).
+
+A type's page is pushed on the list and Back returns to it. It has:
+
+- **Preview.** Up to two real items of the type, drawn as a list draws them, which follow every change below. A type with no items has none.
+- **Row.** Date (a date field of the type, Created, Edited, Happened or None) and Secondary Line (up to two of: the opening line, a field, a date field's time of day, a website, a file's kind and size, or the parent). A place offers only what the type can fill.
+- **Facts.** The values after the status, in the order a row shows them (a row shows the first two). Each has a menu to move it up or down or remove it, a handle to drag it by, and the last row adds one from what the type offers.
+- **Page.** What the item's page pins under its title (at most four), in order, the same choice as Customize Layout on an item of the type (`PagePlacements`). The last row pins another property.
+- **Restore Defaults** takes back that type's choices, for its look and for its page, and no other type's.
+
+Every change is written to the store that already holds it (`TypeLooks` for the row, `PagePlacements` for the page), so a list, a card, a table and an item's page see it at once. Only what differs from what the type's preset gives is kept, as an import keeps it, so a better preset still reaches every place nobody chose. Nothing is written to Marfa.
+
+Not built: the board's Color row (a type's color comes from its icon, which the server holds), its Card section (Picture and Facts on Cards are a gallery's own settings, kept for each view and place, and a card's words come from the type's look) and Show in Types (waits for the Types page).
 
 ## Related pages
 

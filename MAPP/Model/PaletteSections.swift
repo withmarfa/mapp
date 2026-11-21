@@ -24,7 +24,7 @@ nonisolated enum PaletteSections {
         }
     }
 
-    /// The menu a command of ⌘K belongs under, in the menu bar's order: the app menu (Settings), then File with Looks,
+    /// The menu a command of ⌘K belongs under, in the menu bar's order: the app menu (Settings), then File with Layouts,
     /// which its menu holds, and the rest. With nothing typed ⌘K lists its commands in these groups, each under the
     /// menu's own name; the View menu is split at its dividers.
     nonisolated enum CommandGroup: Int, CaseIterable, Hashable, Sendable {
@@ -43,7 +43,7 @@ nonisolated enum PaletteSections {
             case .textSize: String(localized: "Text Size")
             case .go: String(localized: "Go")
             case .help: String(localized: "Help")
-            case .looks: String(localized: "Looks")
+            case .looks: String(localized: "Layouts")
             case .settings: String(localized: "Settings")
             #if DEBUG
             case .debug: "Debug"
