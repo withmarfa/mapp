@@ -27,8 +27,8 @@ struct SettingsWindowView: View {
             SettingsSidebar(
                 selection: Binding { navigation.page } set: { navigation.show($0) }, search: $search,
                 badges: { page in
-                    if page == .overview, host.overview.attentionCount > 0 { return .count(host.overview.attentionCount) }
-                    if page == .updates, host.overview.reading?.updateReady != nil { return .count(1) }
+                    if page == .overview, host.overview.attentionCount > 0 { return host.overview.attentionCount }
+                    if page == .updates, host.overview.reading?.updateReady != nil { return 1 }
                     return nil
                 }
             )
@@ -75,6 +75,7 @@ struct SettingsWindowView: View {
             if let content = sheets.content { content }
         }
         .background(WindowCloseWatch(frameName: "MAPPSettings") { closed() })
+        .settingsClickOutsideEndsEditing()
         .task(id: host.serverAddress) {
             if host.connection == .connected, host.grants.contains(.instanceRead) { await host.overview.load() }
         }

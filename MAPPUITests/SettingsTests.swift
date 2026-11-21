@@ -71,7 +71,7 @@ final class SettingsTests: XCTestCase {
 
     func testTheSidebarSearchFindsAPageByARowAndSaysWhenNothingMatches() {
         openSettings()
-        let search = app.textFields["SettingsSearch"]
+        let search = element("SettingsSidebar").searchFields.firstMatch
         search.click()
         search.typeText("spelling")
         XCTAssertTrue(element("SettingsPage-editor").waitForExistence(timeout: 3))
