@@ -16,7 +16,7 @@ struct FileStoragePage: View {
     private let all = InstanceSetting.fileSettings
 
     var body: some View {
-        InstanceSettingsGate(host: host) {
+        InstanceSettingsGate(page: .fileStorage, host: host) {
             SettingsPageColumn {
                 whereFilesAre
                 SettingsSection("Reading Files") {
@@ -82,7 +82,7 @@ struct FileStoragePage: View {
     @ViewBuilder private var unused: some View {
         if let stores = storage.stores {
             if stores.orphanCount == 0 {
-                SettingsRow("No Files Nothing Uses", look: .off)
+                SettingsRow("No unused files", line: "Nothing is waiting to be removed.")
             } else {
                 let size = Int64(stores.orphanBytes).formatted(.byteCount(style: .file))
                 let more = stores.orphansComplete ? "" : "+"

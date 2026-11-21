@@ -1,7 +1,7 @@
 import Marfa
 import SwiftUI
 
-/// The Recently Deleted page: what the server holds in its bin, with Restore on every row, Delete Permanently and Empty.
+/// The Recently Deleted page: what the server holds in its bin, with Restore on every row, Permanently Delete and Empty.
 /// A section shows the latest page of it, and Show All opens the whole list as a page of its own.
 struct RecentlyDeletedPage: View {
     static let allDeleted = SettingsSubpage(id: "all-deleted", title: String(localized: "All Deleted Items"))
@@ -39,7 +39,7 @@ struct RecentlyDeletedPage: View {
                 Text(verbatim: Self.when(item.deleted)).foregroundStyle(SettingsTokens.secondaryText)
             })
         columns.append(
-            SettingsTableColumn("By", width: 90) { item in
+            SettingsTableColumn("By", width: 130) { item in
                 Text(verbatim: item.source ?? "").foregroundStyle(SettingsTokens.secondaryText)
             })
         return columns
@@ -101,24 +101,19 @@ struct RecentlyDeletedPage: View {
     }
 
     private var allPage: some View {
-        SettingsPageColumn {
-            SettingsPageTable(
-                rows: items, columns: columns(withType: true), count: Text("\(items.count.formatted()) items"), selection: $selection,
-                action: restore,
-                filter: { filter },
-                foot: {
-                    SettingsButton("Restore", small: true) {
-                        host.restoreDeleted(selection)
-                        selection = []
-                    }
-                    .disabled(selection.isEmpty)
-                    SettingsButton("Delete Permanently…", role: .destructive, small: true) { host.deleteDeletedPermanently(selection) }
-                        .disabled(selection.isEmpty || !host.canDeletePermanently)
-                    Spacer(minLength: 0)
-                    SettingsButton("Empty…", role: .destructive, small: true) { host.emptyDeleted() }
-                        .disabled(host.deletedCount == 0 || !host.canDeletePermanently)
-                })
-        }
+        SettingsPageTable(
+            rows: items, columns: columns(withType: true), count: Text("\((isFiltered ? items.count : host.deletedCount).formatted()) items"), selection: $selection,
+            filter: { filter },
+            foot: {
+                SettingsButton("Permanently Delete…", role: .destructive, small: true) { host.deleteDeletedPermanently(selection) }
+                    .disabled(selection.isEmpty || !host.canDeletePermanently)
+                SettingsButton("Restore", small: true) {
+                    host.restoreDeleted(selection)
+                    selection = []
+                }
+                .disabled(selection.isEmpty)
+            }
+        )
         .onChange(of: host.deletedItems.map(\.id)) { selection.formIntersection(host.deletedItems.map(\.id)) }
         .accessibilityIdentifier("RecentlyDeletedAllPage")
     }

@@ -765,7 +765,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         await model.load()
         model.askToRemove(permission: "items.purge", from: model.keys[0])
         let question = try #require(model.question)
-        #expect(question.title == "Remove “Delete Permanently” from “Importer”?")
+        #expect(question.title == "Remove “Permanently Delete” from “Importer”?")
         #expect(question.message.contains("can’t be undone"))
         #expect(bench.calls.state.withLock { $0.changes.isEmpty }, "nothing is sent before the owner agrees")
         model.cancelQuestion()

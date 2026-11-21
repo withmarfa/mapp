@@ -354,8 +354,8 @@ struct RenderedWindow<Detail: View>: View {
         let host = await stub()
         fake(host).state.withLock {
             $0.concerns = [
-                AttentionConcern(kind: .key, reference: "key-1", title: "Backup script expires on Monday", description: "Scripts using it stop working then."),
-                AttentionConcern(kind: .connector, reference: "rss", title: "RSS reports a problem", description: "kitchenjournal.co.uk/feed: Not found (404)."),
+                AttentionConcern(kind: .key, reference: "key-1", title: "Backup script expires on Monday"),
+                AttentionConcern(kind: .connector, reference: "rss", title: "RSS reports a problem"),
             ]
             $0.reading = InstanceReading(
                 version: "0.0.84", updateReady: "0.0.85", databaseBytes: 214_000_000, fileBytes: 3_400_000_000,

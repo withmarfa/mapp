@@ -8,8 +8,7 @@ extension ClientOwnerCalls {
         try await run { client in
             try await client.listAttention().ok.body.json.data.map {
                 AttentionConcern(
-                    kind: AttentionConcern.Kind(rawValue: $0.kind.rawValue) ?? .unavailable, reference: $0.reference, title: $0.title,
-                    description: $0.description)
+                    kind: AttentionConcern.Kind(rawValue: $0.kind.rawValue) ?? .unavailable, reference: $0.reference, title: $0.title)
             }
         }
     }

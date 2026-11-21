@@ -41,7 +41,7 @@ struct AccountPage: View {
 
     @ViewBuilder private var content: some View {
         if let failure = model.failure {
-            OwnerFailureState(failure: failure, host: host) { Task { await model.load() } }
+            OwnerFailureState(page: .account, failure: failure, host: host) { Task { await model.load() } }
         } else if !model.hasLoaded {
             OwnerLoading()
         } else {

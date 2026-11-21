@@ -1000,7 +1000,7 @@ extension LiveMarfaTests {
                 state = try await apply(.transition(item.id, .active))
                 #expect(state.item(titled: title)?.state == .active)
 
-                // Delete Permanently destroys an item in the bin, at the version shown, and takes it out of the copy.
+                // Permanently Delete destroys an item in the bin, at the version shown, and takes it out of the copy.
                 let again = WriteID()
                 source.submit(.transition(item.id, .trashed), as: again)
                 _ = try #require(await log.wait { $0.answer(to: again) != nil && $0.item(titled: title)?.state == .trashed })

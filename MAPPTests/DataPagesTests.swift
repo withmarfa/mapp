@@ -2,6 +2,7 @@ import Foundation
 import Marfa
 import MarfaAPI
 import Synchronization
+import SwiftUI
 import Testing
 @testable import MAPP
 
@@ -104,6 +105,15 @@ import Testing
         #expect(InstanceChoices.title(.blobCleanupGraceSeconds, 3_600) == "1 Hour")
     }
 
+    @Test func aPopUpShowsTheDefaultsValueWhereTheServerHoldsNone() {
+        #expect(InstanceChoices.shown(for: .trashRetentionDays, holding: nil) == 60)
+        #expect(InstanceChoices.title(.trashRetentionDays, 60) == "60 Days")
+        #expect(InstanceChoices.shown(for: .trashRetentionDays, holding: 14) == 14)
+        #expect(InstanceChoices.shown(for: .name, holding: nil) == nil)
+        // The menu still offers the server's default by its own item, which says what it is.
+        #expect(InstanceChoices.options(for: .trashRetentionDays, holding: 60).first?.title == "Default (60 Days)")
+    }
+
     @Test func eachPageNamesThePermissionItNeeds() {
         #expect(MarfaSettingsPage.overview.permission == .instanceRead)
         #expect(MarfaSettingsPage.history.permission == .configManage)
@@ -122,8 +132,8 @@ import Testing
         let bench = bench()
         bench.calls.state.withLock {
             $0.concerns = [
-                AttentionConcern(kind: .key, reference: "key-1", title: "Backup script expires on Monday", description: "Scripts using it stop working then."),
-                AttentionConcern(kind: .connector, reference: "rss", title: "RSS reports a problem", description: "Not found (404)."),
+                AttentionConcern(kind: .key, reference: "key-1", title: "Backup script expires on Monday"),
+                AttentionConcern(kind: .connector, reference: "rss", title: "RSS reports a problem"),
             ]
         }
         let model = OverviewModel(context: bench.context)
@@ -144,7 +154,7 @@ import Testing
     @Test func aHealthConcernMarksOnlyThePartItNames() async {
         let bench = bench()
         bench.calls.state.withLock {
-            $0.concerns = [AttentionConcern(kind: .health, reference: "disk", title: "Disk is low", description: "Only 90 MB is free.")]
+            $0.concerns = [AttentionConcern(kind: .health, reference: "disk", title: "Disk is low")]
         }
         let model = OverviewModel(context: bench.context)
         await model.load()
@@ -162,12 +172,12 @@ import Testing
     }
 
     private func health(_ reference: String, _ title: String) -> AttentionConcern {
-        AttentionConcern(kind: .health, reference: reference, title: title, description: "The check reports it.")
+        AttentionConcern(kind: .health, reference: reference, title: title)
     }
 
     @Test func aHealthCheckTheServerCouldNotMakeIsNeverShownAsWorking() async {
         let model = await overview([
-            AttentionConcern(kind: .unavailable, reference: "Health", title: "Couldn't check health", description: "The check failed or did not answer in time. Its state is unknown.")
+            AttentionConcern(kind: .unavailable, reference: "Health", title: "Couldn't check health")
         ])
         #expect(model.health(of: .database).condition == .unknown)
         #expect(model.health(of: .disk).condition == .unknown)
@@ -179,7 +189,7 @@ import Testing
 
     @Test func anotherCheckTheServerCouldNotMakeLeavesHealthAlone() async {
         let model = await overview([
-            AttentionConcern(kind: .unavailable, reference: "Connectors", title: "Couldn't check connectors", description: "Its state is unknown.")
+            AttentionConcern(kind: .unavailable, reference: "Connectors", title: "Couldn't check connectors")
         ])
         #expect(model.health(of: .database).condition == .ok)
         #expect(model.backups.state == .ok)
@@ -204,7 +214,7 @@ import Testing
         let model = await overview([
             health("file_watcher", "File watcher is down"),
             health("diskette", "Diskette is down"),
-            AttentionConcern(kind: .health, reference: "queue", title: "Queue is down", description: "The database is not answering and the disk is full."),
+            AttentionConcern(kind: .health, reference: "queue", title: "Queue is down"),
         ])
         #expect(model.health(of: .database).condition == .ok)
         #expect(model.health(of: .disk).condition == .ok)
@@ -214,24 +224,24 @@ import Testing
 
     @Test func aBackupConcernTheModelCannotPlaceIsNeverFailing() async {
         for reference in ["folder_unlocked", "folder_lock_lost", "folder_lock_restored", "folder_shared", "folder_claim_kept", "something_new"] {
-            let model = await overview([AttentionConcern(kind: .backup, reference: reference, title: "A notice", description: "Told under Needs Attention.")])
+            let model = await overview([AttentionConcern(kind: .backup, reference: reference, title: "A notice")])
             #expect(model.backups.state != .failing, "\(reference)")
             #expect(model.attentionCount == 1)
         }
-        let model = await overview([AttentionConcern(kind: .backup, reference: "store", title: "The backup folder is not there", description: "Gone.")])
+        let model = await overview([AttentionConcern(kind: .backup, reference: "store", title: "The backup folder is not there")])
         #expect(model.backups.state == .failing)
     }
 
     @Test func backupsAreOffWhenNoDestinationIsSetAndFailingWhenARunFailed() async {
         let bench = bench()
         bench.calls.state.withLock {
-            $0.concerns = [AttentionConcern(kind: .backup, reference: "no_backup_destination", title: "No backups are kept", description: "Set backup_path.")]
+            $0.concerns = [AttentionConcern(kind: .backup, reference: "no_backup_destination", title: "No backups are kept")]
         }
         let model = OverviewModel(context: bench.context)
         await model.load()
         #expect(model.backups.state == .off)
         bench.calls.state.withLock {
-            $0.concerns = [AttentionConcern(kind: .backup, reference: "run", title: "The last backup failed", description: "Disk full.")]
+            $0.concerns = [AttentionConcern(kind: .backup, reference: "run", title: "The last backup failed")]
         }
         await model.load()
         #expect(model.backups.state == .failing)
@@ -265,6 +275,57 @@ import Testing
         await model.load()
         #expect(model.reading?.updateReady == "0.0.90")
         #expect(model.reading?.owner == "mira")
+    }
+
+    @Test func aDevelopmentBuildHasNoVersionToShow() async {
+        let bench = bench()
+        bench.calls.state.withLock { $0.reading = InstanceReading(version: "0.0.0", updateReady: "0.0.90") }
+        let model = OverviewModel(context: bench.context)
+        await model.load()
+        #expect(model.releaseVersion == nil)
+        bench.calls.state.withLock { $0.reading = InstanceReading(version: "0.0.89") }
+        await model.load()
+        #expect(model.releaseVersion == "0.0.89")
+    }
+
+    @Test func aConcernIsToldByItsTitleAndALineMAPPWordsNeverTheServersMessage() {
+        let backup = AttentionConcern(kind: .backup, reference: "no_backup_destination", title: "No backups are kept")
+        #expect(backup.shownTitle == "No backups are kept")
+        #expect(backup.shownLine == "There is nowhere to keep backups.")
+        let secret = AttentionConcern(kind: .setting, reference: "object_store_secret_key", title: "Set object_store_secret_key again")
+        #expect(secret.shownTitle == "Set Object Store Secret Key Again")
+        #expect(secret.shownLine?.contains("_") == false)
+        let connector = AttentionConcern(kind: .connector, reference: "rss", title: "RSS reports problems")
+        #expect(connector.shownLine == "It reports problems.")
+        // No wording for the kind and reference: the title alone.
+        #expect(AttentionConcern(kind: .backup, reference: "something_new", title: "A new notice").shownLine == nil)
+        #expect(AttentionConcern(kind: .connector, reference: "x", title: "Something else").shownLine == nil)
+        // Every kind with wording says nothing a person can't read: no backticks, no setting keys, no request paths.
+        for kind in [AttentionConcern.Kind.health, .job, .folder, .key, .fault, .unavailable] {
+            let line = AttentionConcern(kind: kind, reference: "x_y", title: "T").shownLine ?? ""
+            #expect(!line.contains("`") && !line.contains("_") && !line.contains("PATCH"))
+        }
+    }
+
+    @Test func twoTypesThatShareALabelAreToldApartByTheirParent() {
+        let names = OwnerWording.typeNames([
+            (id: "core.task", label: "Task", parent: nil),
+            (id: "tickets.task", label: "Task", parent: "tickets.ticket"),
+            (id: "tickets.ticket", label: "Ticket", parent: nil),
+            (id: "core.note", label: "Note", parent: nil),
+            (id: "a.thing", label: "Thing", parent: nil),
+            (id: "b.thing", label: "Thing", parent: nil),
+        ])
+        #expect(names["tickets.task"] == "Task (Ticket)")
+        #expect(names["core.task"] == "Task")
+        #expect(names["core.note"] == "Note")
+        #expect(names["a.thing"] == "Thing (a.thing)")
+        #expect(Set(names.values).count == names.count)
+    }
+
+    @Test func theSelectionIsCountedInTheFootOfAPageTable() {
+        #expect(SettingsPageTable<MarfaDeletedItem, EmptyView, EmptyView>.selectedText(2, of: 1_204) == "2 of 1,204 selected")
+        #expect(SettingsPageTable<MarfaDeletedItem, EmptyView, EmptyView>.selectedText(0, of: 1_204) == "None selected")
     }
 
     @Test func theBackupsWordsAreWhatTheServerHolds() {

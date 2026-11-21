@@ -48,7 +48,7 @@ struct KeysPage: View {
 
     @ViewBuilder private var content: some View {
         if let failure = model.failure {
-            OwnerFailureState(failure: failure, host: host) { Task { await model.load() } }
+            OwnerFailureState(page: .keys, failure: failure, host: host) { Task { await model.load() } }
         } else if !model.hasLoaded {
             OwnerLoading()
         } else if let id = openKeyID {

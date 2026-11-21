@@ -13,7 +13,6 @@ nonisolated struct AttentionConcern: Identifiable, Hashable, Sendable {
     /// What the concern is about: a key's id for a key, a code for the rest.
     let reference: String
     let title: String
-    let description: String
 
     var id: String { kind.rawValue + "/" + reference }
 }

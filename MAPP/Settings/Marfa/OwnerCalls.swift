@@ -352,8 +352,8 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
 
     func typeNames() async throws(OwnerFailure) -> [String: String] {
         try await run { client in
-            Dictionary(
-                try await client.listTypes().ok.body.json.data.map { ($0.value1.id, $0.value1.label ?? $0.value1.id) }, uniquingKeysWith: { first, _ in first })
+            OwnerWording.typeNames(
+                try await client.listTypes().ok.body.json.data.map { (id: $0.value1.id, label: $0.value1.label ?? $0.value1.id, parent: $0.value1.parent) })
         }
     }
 

@@ -162,7 +162,7 @@ extension Keychain.Failure: KeychainRefusal {}
 nonisolated struct SystemSignIns: SignIns {
     /// What the app asks the owner to approve: every item to read and write, and every edge (relationships, links
     /// and attachments), which the server grants apart from items (`edge.*`). With them the three permissions its
-    /// features use: Delete Permanently (`items.purge`), This Marfa (`config.manage`) and a type's icon
+    /// features use: Permanently Delete (`items.purge`), This Marfa (`config.manage`) and a type's icon
     /// (`schema.write`), and the read of the owner's own name for Signed In As, which `GET /profile` gives a credential
     /// only with its profile read scope. That read is no owner permission. The owner may approve less, and what is missing
     /// is told where it is needed.

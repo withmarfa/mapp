@@ -47,16 +47,37 @@
     "%@ you make show here." : {
 
     },
+    "%@ is ready" : {
+
+    },
+    "%@ of %@ selected" : {
+
+    },
     "Address Not Added" : {
 
     },
     "Allow More… lets MAPP read the owner’s name." : {
 
     },
+    "Anything that uses it will stop working when it expires." : {
+
+    },
+    "Clean-up waits until the server’s clock is right." : {
+
+    },
     "Couldn’t be downloaded." : {
 
     },
+    "It has trouble syncing." : {
+
+    },
     "It must sign in again with your password or a passkey. Apps and keys keep working." : {
+
+    },
+    "It reports problems." : {
+
+    },
+    "Its last run failed." : {
 
     },
     "Keep less free on disk?" : {
@@ -74,10 +95,46 @@
     "Lower and Save" : {
 
     },
+    "MAPP isn’t allowed to list deleted items or permanently delete them." : {
+
+    },
+    "MAPP isn’t allowed to list, make or revoke this Marfa’s keys." : {
+
+    },
+    "MAPP isn’t allowed to list, narrow or disconnect the apps that reach this Marfa." : {
+
+    },
+    "MAPP isn’t allowed to read this Marfa’s health and status." : {
+
+    },
+    "MAPP isn’t allowed to rename sources, change their marks or limit what they reach." : {
+
+    },
+    "MAPP isn’t allowed to see or change how long this Marfa keeps versions and logs." : {
+
+    },
+    "MAPP isn’t allowed to see or change the addresses this Marfa answers on." : {
+
+    },
+    "MAPP isn’t allowed to see where this Marfa keeps files or change how it reads them." : {
+
+    },
     "MAPP removes its copy from this Mac and signs out. Webhooks it made are deleted. Your items stay." : {
 
     },
     "Needs more disk space." : {
+
+    },
+    "No unused files" : {
+
+    },
+    "None selected" : {
+
+    },
+    "Nothing has been heard from it for more than a day." : {
+
+    },
+    "Nothing is waiting to be removed." : {
 
     },
     "On the server’s own page, in a sheet." : {
@@ -302,6 +359,12 @@
     "Narrow “%@”?" : {
 
     },
+    "Permanently Delete" : {
+
+    },
+    "Permanently Delete…" : {
+
+    },
     "Remove “%@” from “%@”?" : {
 
     },
@@ -321,6 +384,9 @@
 
     },
     "Paste and Match Style" : {
+
+    },
+    "Set %@ Again" : {
 
     },
     "Show All Tabs" : {
@@ -404,6 +470,15 @@
     "Some can’t be left out as well: a search can skip only so much. Stop leaving one out to make room." : {
 
     },
+    "Some files are waiting for their copy in the backup destination." : {
+
+    },
+    "Some files the newest backup needs are still waiting for a copy." : {
+
+    },
+    "Some stored parts of backups are damaged." : {
+
+    },
     "Space Used" : {
 
     },
@@ -411,6 +486,12 @@
 
     },
     "Stop Leaving Out" : {
+
+    },
+    "The backup folder may not belong to this server alone." : {
+
+    },
+    "The last backup run failed or lost files." : {
 
     },
     "The least used go first when there’s no room." : {
@@ -434,6 +515,24 @@
     "Show Spelling and Grammar" : {
 
     },
+    "The server can’t read this secret, so it can’t use it until it is set again." : {
+
+    },
+    "The server didn’t answer this check, so its state is unknown." : {
+
+    },
+    "The server met a fault lately." : {
+
+    },
+    "The server takes no backup on a schedule." : {
+
+    },
+    "The server’s clock is behind." : {
+
+    },
+    "The server’s own check found a problem." : {
+
+    },
     "The types and sources chosen and left out make more conditions than one search can hold." : {
 
     },
@@ -444,9 +543,6 @@
 
     },
     "Dates and Times" : {
-
-    },
-    "Delete Permanently" : {
 
     },
     "Deleted Items" : {
@@ -708,6 +804,9 @@
 
     },
     "Theme" : {
+
+    },
+    "There is nowhere to keep backups." : {
 
     },
     "They still show in their own place, in views and in Favorites." : {
@@ -3008,10 +3107,6 @@
     },
     "Delete Items" : {
 
-    },
-    "Delete Permanently…" : {
-      "extractionState" : "manual",
-      "generatesSymbol" : false
     },
     "Delete Row" : {
 
@@ -6095,9 +6190,6 @@
     "MAPP can’t reach the server. Nothing was changed." : {
 
     },
-    "MAPP isn’t allowed to %@." : {
-
-    },
     "MAPP isn’t allowed to %@. Choose Allow More… to change that." : {
 
     },
@@ -7206,9 +7298,6 @@
 
     },
     "Needs Attention" : {
-
-    },
-    "No Files Nothing Uses" : {
 
     },
     "No Limit" : {

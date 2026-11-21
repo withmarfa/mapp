@@ -10,7 +10,7 @@ struct HistoryPage: View {
     private var all: [InstanceSetting] { InstanceSetting.versionSettings + InstanceSetting.logSettings }
 
     var body: some View {
-        InstanceSettingsGate(host: host) {
+        InstanceSettingsGate(page: .history, host: host) {
             SettingsPageColumn {
                 SettingsSection("Versions", line: "A type can keep its own.") {
                     ForEach(InstanceSetting.versionSettings, id: \.self) { setting in

@@ -30,7 +30,7 @@ struct AddressesPage: View {
 
     @ViewBuilder private var content: some View {
         if let failure = model.failure, model.settings == nil {
-            OwnerFailureState(failure: failure, host: host) { Task { await model.load() } }
+            OwnerFailureState(page: .addresses, failure: failure, host: host) { Task { await model.load() } }
         } else if let settings = model.settings {
             SettingsPageColumn {
                 SettingsHead(

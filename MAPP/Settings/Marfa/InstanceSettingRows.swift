@@ -17,6 +17,10 @@ nonisolated enum InstanceChoices {
         return [Option(value: nil, title: standard)] + steps.map { Option(value: $0, title: title(setting, $0)) }
     }
 
+    /// What the pop-up shows: the value held, or where none is, the one the server's own default gives, so the pop-up reads
+    /// "30 Days" and only the menu's item for the default says "Default (30 Days)".
+    static func shown(for setting: InstanceSetting, holding current: Int?) -> Int? { current ?? setting.documentedDefault }
+
     private static func steps(for setting: InstanceSetting) -> [Int] {
         switch setting {
         case .versionMaxVersions: return [50, 100, 250, 500, 1000]
@@ -86,17 +90,20 @@ struct InstanceChoiceRow: View {
         if case .value(.number(let number)) = setting.entry(from: model.draft[setting] ?? "") { number } else { nil }
     }
 
+    private var shown: Int? { InstanceChoices.shown(for: setting, holding: held) }
+
     var body: some View {
         let errors = InstanceRowErrors(model: model, settings: among)
         SettingsRow(title: Text(verbatim: setting.title), line: line.map { Text($0) }, error: errors.message(for: setting)) {
             SettingsPopUp(
                 title: LocalizedStringKey(setting.title),
-                selection: Binding { held } set: { choice in
+                selection: Binding { shown } set: { choice in
+                    guard choice != held else { return }
                     model.draft[setting] = choice.map { String($0) } ?? ""
                     Task { await model.save([setting]) }
                 }
             ) {
-                ForEach(InstanceChoices.options(for: setting, holding: held), id: \.self) { option in
+                ForEach(InstanceChoices.options(for: setting, holding: shown), id: \.self) { option in
                     Text(verbatim: option.title).tag(option.value)
                 }
             }
@@ -212,6 +219,8 @@ enum InstanceSettingsQuestion {
 /// A page of the server's own settings: loads them, and where they can't be shown says why instead of showing fields that
 /// would not save.
 struct InstanceSettingsGate<Content: View>: View {
+    /// The page the gate stands in, which words what MAPP isn't allowed to do there.
+    let page: MarfaSettingsPage
     let host: any MarfaSettingsHost
     @ViewBuilder let content: Content
 
@@ -219,7 +228,15 @@ struct InstanceSettingsGate<Content: View>: View {
 
     var body: some View {
         Group {
-            if let failure = model.failure, !model.isAvailable {
+            if model.failure == .notPermitted, let permission = page.permission {
+                SettingsPageState(
+                    symbol: Self.symbol(for: .notPermitted), title: Text(Self.title(for: .notPermitted)), line: Text(verbatim: page.permissionLine),
+                    action: (host.isAllowingMore ? "Waiting…" : "Allow More…", {
+                        let host = host
+                        Task { _ = await host.allowMore([permission]) }
+                    }))
+                .disabled(host.isAllowingMore)
+            } else if let failure = model.failure, !model.isAvailable {
                 SettingsPageState(
                     symbol: Self.symbol(for: failure), title: Text(Self.title(for: failure)), line: Text(verbatim: failure.message),
                     action: failure == .unsupported || failure == .notPermitted ? nil : ("Try Again", { Task { await model.load() } }))

@@ -124,6 +124,9 @@ enum SettingsTokens {
         /// in `SettingsPopUp`: `popUpChevronPull` is how far nearer the edge they sit than a bordered button's label ends.
         static let popUpChevronSize: CGFloat = 13
         static let popUpChevronPull: CGFloat = 5
+        /// A table that is a page: its side margin, and the height of the bar above its columns and of the foot below them.
+        static let pageTableInset: CGFloat = 24
+        static let pageTableBar: CGFloat = 48
         static let cardRadius: CGFloat = 10
         static let controlRadius: CGFloat = 7
         static let buttonRadius: CGFloat = 9
@@ -190,6 +193,10 @@ enum SettingsTokens {
         static let barGap: CGFloat = 14
         /// Below the toolbar: a head card sits 62 points under the window's top, as the boards draw.
         static let pageTop: CGFloat = 10
+        /// More room above the first section of a page when it opens with its name (the boards put the card 92.5 points under the
+        /// window's top), and above one that opens with its name and a line under it (105.5): a head card needs none.
+        static let firstHeaderInset: CGFloat = 5.5
+        static let firstHeaderWithLineInset: CGFloat = 2
         static let pageBottom: CGFloat = 58
         /// A count badge's side padding, smallest size and a dot badge's size.
         static let badgeInset: CGFloat = 6

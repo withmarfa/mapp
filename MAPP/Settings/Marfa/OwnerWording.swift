@@ -26,6 +26,13 @@ nonisolated enum OwnerWording {
         return String(localized: "MAPP isn’t allowed to \(permission.allowedTo). Choose Allow More… to change that.")
     }
 
+    /// The line for a page that cannot be shown for want of the permission the server named: the page's own words when the
+    /// server names the page's permission (or none), otherwise the generic line for the one it named.
+    static func permissionLine(_ scope: String?, on page: MarfaSettingsPage) -> String {
+        guard let permission = page.permission, scope == nil || scope == permission.rawValue else { return permissionLine(scope) }
+        return page.permissionLine
+    }
+
     /// How many of the owner's permissions a key, an app or a new key holds: "None", or "3 of 14".
     static func permissionCount(_ held: Int, of total: Int) -> String {
         held == 0 ? String(localized: "None") : String(localized: "\(held) of \(total)")
@@ -42,7 +49,7 @@ nonisolated enum OwnerWording {
         case .grantsManage?: String(localized: "Manage Apps")
         case .instanceMaintain?: String(localized: "Update and Maintain")
         case .instanceRead?: String(localized: "Read Server Status")
-        case .itemsPurge?: String(localized: "Delete Permanently")
+        case .itemsPurge?: String(localized: "Permanently Delete")
         case .keysManage?: String(localized: "Manage Keys")
         case .keysMint?: String(localized: "Make Keys")
         case .schemaWrite?: String(localized: "Change Types")
@@ -50,6 +57,26 @@ nonisolated enum OwnerWording {
         case .webhooksManage?: String(localized: "Manage Webhooks")
         case nil: permission
         }
+    }
+
+    /// Each type's name by its id. Where several types share a label, one with a parent is told apart by the parent's label,
+    /// "Task (Ticket)", as Search's list does; types still sharing a name after that keep their id in parentheses.
+    static func typeNames(_ types: [(id: String, label: String, parent: String?)]) -> [String: String] {
+        var labels: [String: String] = [:]
+        var parents: [String: String] = [:]
+        for type in types where labels[type.id] == nil {
+            labels[type.id] = type.label
+            parents[type.id] = type.parent
+        }
+        let shared = Set(Dictionary(grouping: labels, by: \.value).filter { $0.value.count > 1 }.keys)
+        var names = labels
+        for (id, label) in labels where shared.contains(label) {
+            if let parent = parents[id], let parentLabel = labels[parent] { names[id] = "\(label) (\(parentLabel))" }
+        }
+        for (name, group) in Dictionary(grouping: names, by: \.value) where group.count > 1 {
+            for (id, _) in group { names[id] = "\(name) (\(id))" }
+        }
+        return names
     }
 
     /// When something happened: today with the time, otherwise the day.

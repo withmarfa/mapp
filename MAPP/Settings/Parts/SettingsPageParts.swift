@@ -8,7 +8,11 @@ struct SettingsPageColumn<Content: View>: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: SettingsTokens.Metric.pageSpacing) {
-                content
+                Group(subviews: content) { subviews in
+                    ForEach(subviews.indices, id: \.self) { index in
+                        subviews[index].padding(.top, index == 0 ? subviews[index].containerValues.settingsFirstInset : 0)
+                    }
+                }
             }
             .frame(maxWidth: SettingsTokens.Metric.column, alignment: .leading)
             .padding(.horizontal, 24)
@@ -56,6 +60,7 @@ struct SettingsHead<Trailing: View>: View {
             }
             card
         }
+        .containerValue(\.settingsFirstInset, name == nil ? 0 : SettingsTokens.Metric.firstHeaderInset)
     }
 
     private var card: some View {

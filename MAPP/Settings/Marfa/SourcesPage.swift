@@ -176,7 +176,7 @@ private struct LimitSourcesPage: View {
     var body: some View {
         @Bindable var model = model
         if let failure = model.failure, model.limit == nil {
-            OwnerFailureState(failure: failure, host: host) { Task { await model.load() } }
+            OwnerFailureState(page: .sources, failure: failure, host: host) { Task { await model.load() } }
         } else if model.limit == nil {
             OwnerLoading()
         } else {

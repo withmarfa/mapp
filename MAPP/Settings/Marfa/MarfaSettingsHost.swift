@@ -193,9 +193,20 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         }
     }
 
-    /// What MAPP isn't allowed to do without it, as the page says it.
+    /// What MAPP isn't allowed to do on this page without its permission, in the page's own words from what the
+    /// permission opens there. Pages that share a permission still say different things, since each opens a different part.
     var permissionLine: String {
-        permission.map { String(localized: "MAPP isn’t allowed to \($0.allowedTo).") } ?? ""
+        switch self {
+        case .overview: String(localized: "MAPP isn’t allowed to read this Marfa’s health and status.")
+        case .account: ""
+        case .apps: String(localized: "MAPP isn’t allowed to list, narrow or disconnect the apps that reach this Marfa.")
+        case .keys: String(localized: "MAPP isn’t allowed to list, make or revoke this Marfa’s keys.")
+        case .sources: String(localized: "MAPP isn’t allowed to rename sources, change their marks or limit what they reach.")
+        case .addresses: String(localized: "MAPP isn’t allowed to see or change the addresses this Marfa answers on.")
+        case .recentlyDeleted: String(localized: "MAPP isn’t allowed to list deleted items or permanently delete them.")
+        case .history: String(localized: "MAPP isn’t allowed to see or change how long this Marfa keeps versions and logs.")
+        case .fileStorage: String(localized: "MAPP isn’t allowed to see where this Marfa keeps files or change how it reads them.")
+        }
     }
 
     /// The titles of the rows the page holds, so the sidebar's search finds the page by them.
@@ -221,7 +232,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
             [String(localized: "Rename"), String(localized: "Change Mark"), String(localized: "Limit Sources"), String(localized: "Rules for Every App and Key")]
         case .recentlyDeleted:
             [
-                String(localized: "Deleted Items"), String(localized: "Restore"), String(localized: "Delete Permanently"),
+                String(localized: "Deleted Items"), String(localized: "Restore"), String(localized: "Permanently Delete"),
                 String(localized: "Empty Recently Deleted"), InstanceSetting.trashRetentionDays.title,
             ]
         case .history:

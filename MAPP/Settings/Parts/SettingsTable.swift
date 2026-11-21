@@ -58,9 +58,12 @@ struct SettingsTableFilter<Value: Hashable, Choices: View>: View {
 private struct TableHeader<Row>: View {
     let columns: [SettingsTableColumn<Row>]
     let hasAction: Bool
+    var inset = SettingsTokens.Metric.inset
+    var hasCheck = false
 
     var body: some View {
         HStack(spacing: 12) {
+            if hasCheck { Color.clear.frame(width: CheckWidth.value) }
             ForEach(columns.indices, id: \.self) { index in
                 Text(columns[index].title)
                     .settingsFont(.line)
@@ -70,13 +73,14 @@ private struct TableHeader<Row>: View {
             }
             if hasAction { Color.clear.frame(width: ActionWidth.value) }
         }
-        .padding(.horizontal, SettingsTokens.Metric.inset)
+        .padding(.horizontal, inset)
         .frame(height: 30)
         .accessibilityHidden(true)
     }
 }
 
 private enum ActionWidth { static let value: CGFloat = 70 }
+private enum CheckWidth { static let value: CGFloat = 18 }
 
 private struct TableRow<Row>: View {
     let row: Row
@@ -84,10 +88,19 @@ private struct TableRow<Row>: View {
     let action: SettingsRowAction<Row>?
     let isSelected: Bool
     var isBanded = false
+    var inset = SettingsTokens.Metric.inset
+    /// Where the table is a page with a checkbox column: whether this row is ticked.
+    var check: Binding<Bool>?
     @State private var isHovered = false
 
     var body: some View {
         HStack(spacing: 12) {
+            if let check {
+                Toggle(isOn: check) { EmptyView() }
+                    .toggleStyle(.checkbox)
+                    .labelsHidden()
+                    .frame(width: CheckWidth.value)
+            }
             ForEach(columns.indices, id: \.self) { index in
                 columns[index].cell(row)
                     .settingsFont(.title)
@@ -101,7 +114,7 @@ private struct TableRow<Row>: View {
                     .frame(width: ActionWidth.value, alignment: .trailing)
             }
         }
-        .padding(.horizontal, SettingsTokens.Metric.inset)
+        .padding(.horizontal, inset)
         .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
         .background(isSelected ? SettingsTokens.selection : (isHovered ? SettingsTokens.hover : (isBanded ? SettingsTokens.band : Color.clear)))
         .contentShape(.rect)
@@ -149,45 +162,71 @@ struct SettingsSectionTable<Row: Identifiable>: View {
     }
 }
 
-/// A table that is a page of its own: its count on the left and its filter and search together on the right, in one row
-/// under the toolbar, then the columns, with selection, and actions at the foot.
+/// A table that is a page of its own: it fills the pane edge to edge, with its count on the left and its filter and search
+/// together on the right under the toolbar, then a checkbox column and the columns, and at the foot how many are
+/// selected of how many, with the actions for the selection. The rows scroll between the header and the foot.
 struct SettingsPageTable<Row: Identifiable, Filter: View, Foot: View>: View {
     let rows: [Row]
     let columns: [SettingsTableColumn<Row>]
     let count: Text
     @Binding var selection: Set<Row.ID>
-    var action: SettingsRowAction<Row>?
     @ViewBuilder let filter: Filter
     @ViewBuilder let foot: Foot
 
+    private var inset: CGFloat { SettingsTokens.Metric.pageTableInset }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(spacing: 0) {
             HStack {
                 count.settingsFont(.small).foregroundStyle(SettingsTokens.secondaryText)
                 Spacer(minLength: 12)
                 filter
             }
-            .padding(.horizontal, SettingsTokens.Metric.inset)
-            SettingsCard {
-                VStack(spacing: 0) {
-                    TableHeader(columns: columns, hasAction: action != nil)
-                    Rectangle().fill(SettingsTokens.rule).frame(height: 1)
-                    LazyVStack(spacing: 0) {
-                        ForEach(rows) { row in
-                            TableRow(row: row, columns: columns, action: action, isSelected: selection.contains(row.id))
-                                .onTapGesture { toggle(row.id) }
-                        }
+            .padding(.horizontal, inset)
+            .frame(height: SettingsTokens.Metric.pageTableBar)
+            Rectangle().fill(SettingsTokens.rule).frame(height: 1)
+            TableHeader(columns: columns, hasAction: false, inset: inset, hasCheck: true)
+            Rectangle().fill(SettingsTokens.rule).frame(height: 1)
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
+                        TableRow(
+                            row: row, columns: columns, action: nil, isSelected: selection.contains(row.id),
+                            isBanded: index.isMultiple(of: 2), inset: inset, check: checked(row.id))
+                            .onTapGesture { checked(row.id).wrappedValue.toggle() }
                     }
-                    Rectangle().fill(SettingsTokens.rule).frame(height: 1)
-                    HStack(spacing: 8) { foot }
-                        .padding(.horizontal, SettingsTokens.Metric.inset)
-                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 }
             }
+            .scrollBounceBehavior(.basedOnSize)
+            Rectangle().fill(SettingsTokens.rule).frame(height: 1)
+            HStack(spacing: 8) {
+                Text(selected)
+                    .settingsFont(.count)
+                    .foregroundStyle(SettingsTokens.secondaryText)
+                Spacer(minLength: 12)
+                foot
+            }
+            .padding(.horizontal, inset)
+            .frame(maxWidth: .infinity, minHeight: SettingsTokens.Metric.pageTableBar, alignment: .leading)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(SettingsTokens.page)
     }
 
-    private func toggle(_ id: Row.ID) {
-        if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
+    private var selected: String { Self.selectedText(selection.count, of: rows.count) }
+
+    /// "2 of 1,204 selected", or "None selected".
+    static func selectedText(_ selected: Int, of total: Int) -> String {
+        selected == 0
+            ? String(localized: "None selected")
+            : String(localized: "\(selected.formatted()) of \(total.formatted()) selected")
+    }
+
+    private func checked(_ id: Row.ID) -> Binding<Bool> {
+        Binding {
+            selection.contains(id)
+        } set: { on in
+            if on { selection.insert(id) } else { selection.remove(id) }
+        }
     }
 }

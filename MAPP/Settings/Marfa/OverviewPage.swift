@@ -22,7 +22,7 @@ struct OverviewPage: View {
 
     @ViewBuilder private var content: some View {
         if let failure = model.failure {
-            OwnerFailureState(failure: failure, host: host) { Task { await model.load() } }
+            OwnerFailureState(page: .overview, failure: failure, host: host) { Task { await model.load() } }
         } else if !model.hasLoaded {
             OwnerLoading()
         } else {
@@ -43,7 +43,7 @@ struct OverviewPage: View {
         let address = host.serverAddress.map { URL(string: $0).map(SettingsWording.hostName(of:)) ?? $0 }
         let tail: String? =
             if let owner = model.reading?.owner { String(localized: "Owned by \(owner).") }
-            else if let version = model.reading?.version { String(localized: "Marfa \(version).") }
+            else if let version = model.releaseVersion { String(localized: "Marfa \(version).") }
             else { nil }
         return [address.map { $0 + "." }, tail].compactMap { $0 }.joined(separator: " ")
     }
@@ -57,7 +57,7 @@ struct OverviewPage: View {
             SettingsSection("Needs Attention") {
                 if !holdsAll { permissionsRow }
                 ForEach(model.concerns) { concern in
-                    SettingsProblemRow(title: Text(verbatim: concern.title), line: Text(verbatim: concern.description), actions: actions(for: concern))
+                    SettingsProblemRow(title: Text(verbatim: concern.shownTitle), line: concern.shownLine.map { Text(verbatim: $0) }, actions: actions(for: concern))
                 }
             }
         }
@@ -93,7 +93,7 @@ struct OverviewPage: View {
         if settings.isAvailable || settings.isLoading {
             SettingsSection("This Marfa") {
                 nameRow
-                if let version = model.reading?.version { versionRow(version) }
+                versionRow
             }
         } else if let failure = settings.failure {
             SettingsSection("This Marfa") {
@@ -120,10 +120,13 @@ struct OverviewPage: View {
         }
     }
 
-    private func versionRow(_ version: String) -> some View {
-        SettingsRow(
-            title: Text("Marfa \(version)"),
-            line: model.reading?.updateReady.map { Text("\($0) is ready.") })
+    /// The release and, where one is ready, the update; a development build has no release, so only the update line shows.
+    @ViewBuilder private var versionRow: some View {
+        if let version = model.releaseVersion {
+            SettingsRow(title: Text("Marfa \(version)"), line: model.reading?.updateReady.map { Text("\($0) is ready.") })
+        } else if let ready = model.reading?.updateReady {
+            SettingsRow(title: Text("\(ready) is ready"))
+        }
     }
 
     // MARK: Health
