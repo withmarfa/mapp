@@ -210,7 +210,7 @@ private struct RenderedWindow<Detail: View>: View {
     /// A page's states against boards S26 to S30: the owner's permissions held in part or in full, the server not answering,
     /// and the sign-in ended.
     private func connection(
-        named name: String, grantsAll: Bool = false, state: MarfaConnectionState = .online, waiting: Int = 0
+        named name: String, grantsAll: Bool = false, readsName: Bool = true, state: MarfaConnectionState = .online, waiting: Int = 0
     ) async throws {
         let bench = try HostBench()
         let defaults = try #require(UserDefaults(suiteName: "SettingsRenderTests-\(UUID().uuidString)"))
@@ -220,6 +220,10 @@ private struct RenderedWindow<Detail: View>: View {
         let source = try #require(bench.servers.last)
         if grantsAll {
             bench.signIns.save("k", for: URL(string: "https://marfa.castell.studio")!, permissions: Set(InstancePermission.allCases))
+        }
+        if !readsName {
+            // A sign-in made before MAPP asked for the owner's name.
+            bench.signIns.save("k", for: URL(string: "https://marfa.castell.studio")!, permissions: SystemSignIns.askedAtSignIn, profile: false)
         }
         source.report.set(SyncReport(lastSynced: .now.addingTimeInterval(-60), waiting: waiting, queueRead: true))
         source.state.set(state)
@@ -231,6 +235,9 @@ private struct RenderedWindow<Detail: View>: View {
     }
 
     @Test func connectionWithEveryPermission() async throws { try await connection(named: "Connection", grantsAll: true) }
+    @Test func connectionWithoutTheOwnersName() async throws {
+        try await connection(named: "Connection, without the owner’s name", readsName: false)
+    }
     @Test func connectionWithoutTheOwnersPermissions() async throws { try await connection(named: "Connection, without the owner’s permissions") }
     @Test func connectionNotAnswering() async throws {
         try await connection(named: "Connection, not answering", state: .offline(reason: "refused"), waiting: 3)
