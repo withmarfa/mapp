@@ -12,6 +12,8 @@ import Observation
         var id: String { code }
     }
 
+    private static let changedElsewhere = String(localized: "The limit was changed somewhere else. Nothing was sent. Check what you chose, then save again.")
+
     private let context: OwnerContext
     private let sources: () -> [MarfaSourceRow]
 
@@ -103,7 +105,15 @@ import Observation
         line = nil
         defer { isSaving = false }
         do {
-            let written = try await context.calls.setSourceLimit(limit, to: filter)
+            // The server guards only which instance is written, not the levers, so what was read is read again just before: a
+            // lever changed elsewhere since is told, not written over.
+            let current = try await context.calls.sourceLimit()
+            guard current == limit else {
+                self.limit = current
+                line = Self.changedElsewhere
+                return
+            }
+            let written = try await context.calls.setSourceLimit(current, to: filter)
             self.limit = written
             types = Set(written.types)
             checkedSources = Set(written.sources)
@@ -114,9 +124,7 @@ import Observation
 
     /// What was typed stays; the page says why, and where the limit changed elsewhere it is read again.
     private func refused(_ failure: OwnerFailure) async {
-        line = failure == .conflict
-            ? String(localized: "The limit was changed somewhere else. Nothing was sent. Check what you chose, then save again.")
-            : OwnerWording.line(failure)
+        line = failure == .conflict ? Self.changedElsewhere : OwnerWording.line(failure)
         await context.learn(from: failure)
         if failure == .conflict, let read = try? await context.calls.sourceLimit() { limit = read }
     }

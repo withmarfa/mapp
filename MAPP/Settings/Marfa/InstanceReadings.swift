@@ -23,10 +23,9 @@ nonisolated enum Condition: String, Hashable, Sendable {
     case ok, degraded, down
 }
 
-/// How one part of the server stands, with the server's own words where it is not well.
+/// How one part of the server stands.
 nonisolated struct HealthPart: Hashable, Sendable {
     var condition: Condition
-    var note: String?
 }
 
 nonisolated struct BackupsHealth: Hashable, Sendable {
@@ -34,8 +33,6 @@ nonisolated struct BackupsHealth: Hashable, Sendable {
 
     var state: State
     var lastBackup: Date?
-    /// The server's words for why backups are off or failing.
-    var reason: String?
 }
 
 /// What the Overview reads of the server besides what needs attention. Every part is optional: a part the server did not give

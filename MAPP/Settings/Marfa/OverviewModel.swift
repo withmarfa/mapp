@@ -25,8 +25,8 @@ import Observation
 
     enum Component { case database, disk, files }
 
-    /// How a part stands, from what the server says needs attention: a health concern names the part it is about. A part with
-    /// none is working. The server's health has no operation in the package, so this is all MAPP can read.
+    /// How a part stands, from what the server says needs attention: a health concern names the part it is about, and the concern itself
+    /// is told under Needs Attention. A part with none is working. The server's health has no operation in the package, so this is all MAPP can read.
     func health(of component: Component) -> HealthPart {
         let words: [String] =
             switch component {
@@ -37,7 +37,7 @@ import Observation
         let concern = concerns.first { item in
             item.kind == .health && words.contains { item.reference.localizedCaseInsensitiveContains($0) }
         }
-        return HealthPart(condition: concern == nil ? .ok : .degraded, note: concern?.description)
+        return HealthPart(condition: concern == nil ? .ok : .degraded)
     }
 
     var backups: BackupsHealth {
@@ -49,7 +49,7 @@ import Observation
             case "incomplete", "parts_damaged": .incomplete
             default: .failing
             }
-        return BackupsHealth(state: state, lastBackup: reading?.lastBackup, reason: concern?.description)
+        return BackupsHealth(state: state, lastBackup: reading?.lastBackup)
     }
 
     func load() async {

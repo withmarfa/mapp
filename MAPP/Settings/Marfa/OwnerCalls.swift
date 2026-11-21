@@ -178,8 +178,8 @@ nonisolated protocol OwnerCalls: Sendable {
     func fileStores() async throws(OwnerFailure) -> FileStores
     /// The source filter, with the instance that holds it (`config.manage`).
     func sourceLimit() async throws(OwnerFailure) -> SourceLimit
-    /// Replaces the source filter, sending the other two levers as they were read, or turns it off with nil. A change made
-    /// elsewhere since it was read is a `conflict`.
+    /// Replaces the source filter, sending the other two levers as `limit` holds them, or turns it off with nil. The server
+    /// guards only the instance, so a caller reads the limit again just before.
     func setSourceLimit(_ limit: SourceLimit, to filter: (types: [String], sources: [String])?) async throws(OwnerFailure) -> SourceLimit
 }
 

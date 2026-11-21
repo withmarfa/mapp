@@ -88,7 +88,8 @@ import Testing
 
     @Test func theChoicesKeepAValueTheServerHoldsAndAlwaysOfferDefault() {
         let held = InstanceChoices.options(for: .versionRecentDays, holding: 45)
-        #expect(held.first == InstanceChoices.Option(value: nil, title: "Default"))
+        #expect(held.first == InstanceChoices.Option(value: nil, title: "Default (30 Days)"))
+        #expect(InstanceChoices.options(for: .name, holding: nil).first?.title == "Default")
         #expect(held.contains { $0.value == 45 && $0.title == "45 Days" })
         let values = held.dropFirst().compactMap(\.value)
         #expect(values == values.sorted())
@@ -145,7 +146,7 @@ import Testing
         }
         let model = OverviewModel(context: bench.context)
         await model.load()
-        #expect(model.health(of: .disk) == HealthPart(condition: .degraded, note: "Only 90 MB is free."))
+        #expect(model.health(of: .disk) == HealthPart(condition: .degraded))
         #expect(model.health(of: .database).condition == .ok)
         #expect(model.health(of: .files).condition == .ok)
     }
@@ -163,7 +164,6 @@ import Testing
         }
         await model.load()
         #expect(model.backups.state == .failing)
-        #expect(model.backups.reason == "Disk full.")
     }
 
     @Test func aRefusalForWantOfAPermissionShowsTheStateAndReadsTheGrantsAgain() async {

@@ -13,7 +13,8 @@ nonisolated enum InstanceChoices {
         var steps = steps(for: setting)
         if let current, !steps.contains(current) { steps.append(current) }
         steps.sort()
-        return [Option(value: nil, title: String(localized: "Default"))] + steps.map { Option(value: $0, title: title(setting, $0)) }
+        let standard = setting.documentedDefault.map { String(localized: "Default (\(title(setting, $0)))") } ?? String(localized: "Default")
+        return [Option(value: nil, title: standard)] + steps.map { Option(value: $0, title: title(setting, $0)) }
     }
 
     private static func steps(for setting: InstanceSetting) -> [Int] {

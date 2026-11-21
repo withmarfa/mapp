@@ -249,9 +249,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     func setSourceLimit(_ limit: SourceLimit, to filter: (types: [String], sources: [String])?) async throws(OwnerFailure) -> SourceLimit {
         try enter("setSourceLimit")
         return try state.withLock { state throws(OwnerFailure) in
-            guard state.sourceLimit.instanceID == limit.instanceID, state.sourceLimit.types == limit.types,
-                state.sourceLimit.sources == limit.sources
-            else { throw .conflict }
+            guard state.sourceLimit.instanceID == limit.instanceID else { throw .conflict }
             state.limitsSent.append(filter)
             state.sourceLimit.isOn = filter != nil
             state.sourceLimit.types = filter?.types ?? []

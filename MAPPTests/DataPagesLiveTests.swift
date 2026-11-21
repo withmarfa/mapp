@@ -1,0 +1,94 @@
+import Foundation
+import Marfa
+import MarfaTesting
+import Testing
+@testable import MAPP
+
+extension LiveMarfaTests {
+    /// The Overview, History, File Storage and Sources pages' calls over a real test instance. The key must hold the owner's
+    /// permissions. Every setting changed is put back as it was, or removed if it was unset, whether the test passes or not.
+    @MainActor
+    @Suite(.serialized)
+    struct DataPagesLiveTests {
+        private func connection() throws -> (MarfaConnection, MarfaServerCalls) {
+            let connection = try MarfaConnection(address: try LiveMarfa.address())
+            return (connection, MarfaServerCalls(connection: connection, signIns: ScriptedSignIns([connection.address: try LiveMarfa.key()])))
+        }
+
+        @Test(.timeLimit(.minutes(2))) func theOverviewFileStorageAndSourceLimitAreRead() async throws {
+            let (_, server) = try connection()
+            let calls = ClientOwnerCalls { try server.client() }
+            _ = try await calls.attention()
+            let reading = try await calls.reading()
+            #expect(reading.version?.isEmpty == false)
+            #expect((reading.databaseBytes ?? 0) > 0)
+            #expect(reading.owner?.isEmpty == false)
+            let stores = try await calls.fileStores()
+            #expect(stores.stores.contains { $0.kind == .disk })
+            let limit = try await calls.sourceLimit()
+            #expect(limit.instanceID?.isEmpty == false)
+        }
+
+        @Test(.timeLimit(.minutes(3))) func theHistoryAndFileStorageSettingsAreChangedOneAtATimeAndPutBack() async throws {
+            let (connection, source) = try connection()
+            let model = InstanceSettingsModel { .init(id: connection.address.absoluteString, source: source) }
+            await model.load()
+            let before = try #require(model.loaded, "the key can read the settings: \(String(describing: model.failure))")
+            var result: Result<Void, any Error> = .success(())
+            do {
+                // A longer window, a switch, a count, a size in megabytes and a wait in seconds: nothing here keeps less.
+                let changes: [(InstanceSetting, String, InstanceValue)] = [
+                    (.auditRetentionDays, "91", .number(91)), (.enrichmentOcrEnabled, "false", .flag(false)), (.mcpFetchMaxMegabytes, "40", .number(40)),
+                    (.diskReserveMegabytes, "64", .number(64)), (.blobCleanupGraceSeconds, "3600", .number(3_600)),
+                ]
+                for (setting, text, value) in changes {
+                    model.draft[setting] = text
+                    await model.save([setting])
+                    // A retention asks first, which the person answers; nothing else does.
+                    if let pending = model.pending {
+                        #expect(setting.isRetention, "\(setting) asked first")
+                        await model.confirm(pending)
+                    }
+                    #expect(model.failure == nil, "\(setting): \(String(describing: model.failure))")
+                    #expect(try await source.read().values[setting] == value, "\(setting) was kept as sent")
+                }
+                // Nothing else moved.
+                let after = try await source.read()
+                for setting in InstanceSetting.allCases where !changes.contains(where: { $0.0 == setting }) {
+                    #expect(after.values[setting] == before.values[setting], "\(setting) changed by another page's save")
+                }
+            } catch {
+                result = .failure(error)
+            }
+            var restore = InstanceConfigPatch()
+            for setting in InstanceSetting.allCases where setting != .name {
+                if let value = before.values[setting] { restore.values[setting] = value } else { restore.clear.insert(setting) }
+            }
+            let restored = try await source.update(restore, expecting: before.instanceID)
+            for setting in InstanceSetting.allCases where setting != .name { #expect(restored.values[setting] == before.values[setting]) }
+            try result.get()
+        }
+
+        @Test(.timeLimit(.minutes(2))) func aSourceLimitIsWrittenWithTheOtherLeversAndTurnedOff() async throws {
+            let (_, server) = try connection()
+            let calls = ClientOwnerCalls { try server.client() }
+            let before = try await calls.sourceLimit()
+            var result: Result<Void, any Error> = .success(())
+            do {
+                let written = try await calls.setSourceLimit(before, to: (["core.bookmark"], ["demo-seed"]))
+                #expect(written.isOn)
+                #expect(written.types == ["core.bookmark"])
+                #expect(written.sources == ["demo-seed"])
+                #expect(written.strictTypes == before.strictTypes, "the levers not changed went back as they were")
+                #expect(written.allowlist?.types == before.allowlist?.types)
+                let off = try await calls.setSourceLimit(written, to: nil)
+                #expect(!off.isOn)
+            } catch {
+                result = .failure(error)
+            }
+            let now = try await calls.sourceLimit()
+            _ = try await calls.setSourceLimit(now, to: before.isOn ? (before.types, before.sources) : nil)
+            try result.get()
+        }
+    }
+}

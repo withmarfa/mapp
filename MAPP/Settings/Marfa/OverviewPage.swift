@@ -131,16 +131,16 @@ struct OverviewPage: View {
     private var health: some View {
         SettingsSection("Health") {
             let database = model.health(of: .database)
-            SettingsRow(title: Text("Database"), line: database.note.map { Text(verbatim: $0) }, lines: nil) {
+            SettingsRow("Database") {
                 SettingsValue(verbatim: bytes(model.reading?.databaseBytes) ?? Self.word(database.condition), dot: Self.dot(database.condition))
             }
             let disk = model.health(of: .disk)
-            SettingsRow(title: Text("Disk"), line: disk.note.map { Text(verbatim: $0) }, lines: nil) {
+            SettingsRow("Disk") {
                 SettingsValue(verbatim: Self.word(disk.condition), dot: Self.dot(disk.condition))
             }
             filesRow(model.health(of: .files))
             let backups = model.backups
-            SettingsRow(title: Text("Backups"), line: backups.reason.map { Text(verbatim: $0) }, lines: nil) {
+            SettingsRow("Backups") {
                 SettingsValue(verbatim: Self.backupsWord(backups), dot: Self.dot(backups))
             }
         }
@@ -150,10 +150,10 @@ struct OverviewPage: View {
         let value = bytes(model.reading?.fileBytes).map { String(localized: "\($0) in files") } ?? Self.word(files.condition)
         if host.grants.contains(.configManage) {
             SettingsLinkRow(
-                verbatim: String(localized: "Files"), line: files.note, value: value, dot: Self.dot(files.condition)
+                verbatim: String(localized: "Files"), value: value, dot: Self.dot(files.condition)
             ) { host.show(.fileStorage) }
         } else {
-            SettingsRow(title: Text("Files"), line: files.note.map { Text(verbatim: $0) }, lines: nil) {
+            SettingsRow("Files") {
                 SettingsValue(verbatim: value, dot: Self.dot(files.condition))
             }
         }
