@@ -734,6 +734,40 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(model.keys[0].permissions.isEmpty)
     }
 
+    @Test func ownerPermissionsAreCountedNeverAllOrNothing() {
+        #expect(OwnerWording.permissionCount(0, of: 14) == "None")
+        #expect(OwnerWording.permissionCount(3, of: 14) == "3 of 14")
+        #expect(OwnerWording.permissionCount(14, of: 14) == "14 of 14")
+    }
+
+    @Test func aKeysPermissionsPageIsASubpageOfItsOwn() {
+        let key = key()
+        #expect(KeysPage.permissionsSubpage(for: key) != KeysPage.subpage(for: key))
+        #expect(KeysPage.permissionsSubpage(for: key).id.hasPrefix(KeysPage.subpage(for: key).id))
+    }
+
+    @Test func escapeInNewKeysPermissionsGoesBackToItsFieldsKeepingWhatWasChosen() {
+        let model = KeysModel(context: bench([]).context)
+        model.beginNewKey()
+        model.draft.name = "Importer"
+        model.draft.permissions = ["items.purge"]
+        model.isChoosingPermissions = true
+        model.dismissSheet()
+        #expect(model.sheet == .new && !model.isChoosingPermissions)
+        #expect(model.draft.permissions == ["items.purge"] && model.draft.name == "Importer")
+        model.dismissSheet()
+        #expect(model.sheet == nil)
+    }
+
+    @Test func aNewKeyStartsOnItsFieldsEvenAfterPermissionsWereOpen() {
+        let model = KeysModel(context: bench([]).context)
+        model.beginNewKey()
+        model.isChoosingPermissions = true
+        model.closeSheet()
+        model.beginNewKey()
+        #expect(!model.isChoosingPermissions)
+    }
+
     @Test func aNewKeyRefusedForItsSourceSaysSoOnTheSourceField() async {
         let bench = bench([])
         let model = KeysModel(context: bench.context)

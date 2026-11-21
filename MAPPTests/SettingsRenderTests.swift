@@ -263,12 +263,15 @@ private struct RenderedWindow<Detail: View>: View {
         return host
     }
 
-    private func page(_ page: MarfaSettingsPage, _ host: StubMarfaHost, subpage: SettingsSubpage? = nil, sheet: AnyView? = nil, named: String) async throws {
+    private func page(
+        _ page: MarfaSettingsPage, _ host: StubMarfaHost, subpage: SettingsSubpage? = nil, sheet: AnyView? = nil, size: CGSize = Self.size,
+        named: String
+    ) async throws {
         try await SettingsRender.png(
             RenderedWindow(
                 selection: .marfa(page), sheet: sheet,
                 detail: MarfaSettingsPageView(page: page, host: host).environment(\.settingsSubpage, subpage)),
-            size: Self.size, named: named, settle: .milliseconds(900))
+            size: size, named: named, settle: .milliseconds(900))
     }
 
     private func context(_ host: StubMarfaHost) -> OwnerContext { OwnerContext(host: host) }
@@ -345,6 +348,36 @@ private struct RenderedWindow<Detail: View>: View {
         model.draft.source = "lisbon-zine"
         model.draft.exceptions["core.bookmark"] = .write
         try await page(.keys, host, sheet: AnyView(KeySheet(model: model)), named: "New Key")
+    }
+
+    @Test func aKeysOwnerPermissions() async throws {
+        let host = owner()
+        (host.ownerCalls as? FakeOwnerCalls)?.state.withLock { $0.keys[0].permissions = ["backups.manage", "items.purge", "audit.read"] }
+        try await page(
+            .keys, host, subpage: KeysPage.permissionsSubpage(for: KeyInfo(id: "k1", label: "Backup script", source: "backup", permissions: [], tier: .library, types: [:], appClientID: nil)),
+            named: "A key's owner permissions")
+    }
+
+    @Test func newKeyChoosingOwnerPermissions() async throws {
+        let host = owner()
+        let model = KeysModel(context: context(host))
+        await model.load()
+        model.beginNewKey()
+        model.draft.permissions = ["items.purge"]
+        model.isChoosingPermissions = true
+        try await page(.keys, host, sheet: AnyView(KeySheet(model: model)), named: "New Key, owner permissions")
+    }
+
+    /// A sheet taller than the window grows to the window's height, then scrolls between its title and its buttons.
+    @Test func newKeyInAShortWindow() async throws {
+        let host = owner()
+        let model = KeysModel(context: context(host))
+        await model.load()
+        model.beginNewKey()
+        model.isChoosingPermissions = true
+        try await page(
+            .keys, host, sheet: AnyView(KeySheet(model: model)), size: CGSize(width: SettingsTokens.Metric.windowWidth, height: 560),
+            named: "New Key, in a short window")
     }
 
     @Test func newKeyRefused() async throws {

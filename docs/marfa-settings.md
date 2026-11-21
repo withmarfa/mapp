@@ -12,7 +12,7 @@ The Marfa's pages show and change what the server holds, as the owner. They stan
 | --- | --- | --- |
 | Account | none | The owner's username and email as the server holds them (read only), Change Password…, the passkeys (Rename, Remove, Add a Passkey…, which opens the server's own page) and the browsers signed in (Sign Out). |
 | Apps | `grants.manage` | The connected apps. An app's page holds its access by type, which can only be narrowed, its owner permissions, the keys it made and Disconnect. |
-| Keys | `keys.manage` | The owner's keys and the keys apps made. A key's page holds its expiry (it can only be made to end sooner), its tier, its source, its access (narrowing only) and Revoke. New Key… needs `keys.mint`. |
+| Keys | `keys.manage` | The owner's keys and the keys apps made. A key's page holds its expiry (it can only be made to end sooner), its tier, its source (set once, shown with a lock), its access by type (narrowing only), one row for its owner permissions and Revoke. New Key… needs `keys.mint`. |
 | Addresses | `config.manage` | The sign-in address, the other addresses and the websites allowed to call the server. |
 
 ## Rules
@@ -24,7 +24,8 @@ The Marfa's pages show and change what the server holds, as the owner. They stan
 - **A key is shown once.** The sheet that follows New Key holds the plaintext; closing it drops it. Copy marks the clipboard concealed and clears it after a minute if nothing else was copied.
 - **An address is checked before it is written.** The server's `POST /config/address-check` says what adding, removing or moving would do, and an answer holds only for the address typed when it was asked: typing again drops it until the new address is checked. Moving the sign-in address shows the consequences in the sheet and writes exactly what was checked; the server asks for a recent sign-in, which the package shows in place. Every write names the instance that was read.
 - **A draft is handed back when Settings closes or the app quits.** The address typed in Addresses and New Key's name and source go through `Notices.notKept`, as This Marfa's draft does (`OwnerDrafts`). A password is never kept, and a key's secret is never handed over: if the window closes while a new key is shown, MAPP says the key was made and its secret can't be shown again, so it can be revoked on the Keys page if it wasn't copied.
-- **A sheet is shown by the window.** A page hands its sheet to `SettingsSheetPresenter` (`settingsSheet(presenting:)`), which draws it in the middle of the window; what it shows is read from the page's model.
+- **Owner permissions are counted, never all or nothing.** A key's page shows one row, Look After This Marfa, with "None" or "3 of 14". With some held it opens a page of its own (pushed, Back returns) with one switch each; a switch can only be turned off, and turning it off asks first. New Key shows the same row with Choose…, which turns the sheet to a page of switches and back.
+- **A sheet is shown by the window.** A page hands its sheet to `SettingsSheetPresenter` (`settingsSheet(presenting:)`), which draws it in the middle of the whole window, not under the toolbar; what it shows is read from the page's model. A sheet grows with what it holds up to the window's height, then its content scrolls between its title and its buttons. A field's placeholder says something its label does not (the address field's "https://"), never the label again.
 
 ## Left out
 

@@ -59,6 +59,8 @@ import Observation
     private(set) var isLoading = false
     private(set) var hasLoaded = false
     var sheet: Sheet?
+    /// Whether New Key shows its owner permissions, a page of its own inside the sheet, in place of its fields.
+    var isChoosingPermissions = false
     var draft = Draft()
     /// Why the server refused the new key, in one line; the sheet keeps what was typed.
     private(set) var draftError: String?
@@ -125,6 +127,7 @@ import Observation
         draft = Draft()
         draftError = nil
         sourceError = nil
+        isChoosingPermissions = false
         sheet = .new
     }
 
@@ -181,8 +184,18 @@ import Observation
     }
 
     /// Closes the sheet; the plaintext key goes with it, as it is shown only once.
+    /// Escape: back from the owner permissions to New Key's fields, otherwise out of the sheet.
+    func dismissSheet() {
+        if isChoosingPermissions {
+            isChoosingPermissions = false
+        } else {
+            closeSheet()
+        }
+    }
+
     func closeSheet() {
         guard !isMaking else { return }
+        isChoosingPermissions = false
         sheet = nil
         created = nil
         draftError = nil

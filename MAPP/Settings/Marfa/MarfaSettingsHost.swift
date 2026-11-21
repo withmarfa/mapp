@@ -112,7 +112,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .overview: .blue
         case .account: .indigo
         case .apps: .purple
-        case .keys: .yellow
+        case .keys: .amber
         case .addresses: .teal
         case .recentlyDeleted: .gray
         }

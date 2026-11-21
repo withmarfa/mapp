@@ -115,7 +115,7 @@ struct AccountPage: View {
     private var browsersSection: some View {
         SettingsSection("Browsers", line: "Signed in with your password or a passkey.") {
             if model.browsers.isEmpty {
-                SettingsRow("No Browsers Are Signed In", look: .off)
+                SettingsEmptyCard(symbol: "safari", title: Text("No Browsers"), line: Text("No browsers are signed in."))
             }
             ForEach(model.browsers) { browser in
                 SettingsRow(

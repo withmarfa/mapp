@@ -5920,10 +5920,16 @@
     "No Access" : {
 
     },
-    "No Apps Are Connected" : {
+    "No apps are connected." : {
 
     },
-    "No Browsers Are Signed In" : {
+    "No Browsers" : {
+
+    },
+    "No browsers are signed in." : {
+
+    },
+    "No Owner Permissions" : {
 
     },
     "Not Allowed" : {
@@ -6055,7 +6061,7 @@
     "Source, Stamped on What It Writes" : {
 
     },
-    "Stamped on what it writes. It can’t change." : {
+    "Stamped on what it writes." : {
 
     },
     "That isn’t your current password." : {
@@ -6071,6 +6077,9 @@
 
     },
     "The owner’s permissions. Most keys need none." : {
+
+    },
+    "The owner’s permissions. A key can only lose them." : {
 
     },
     "The server accepts this address." : {

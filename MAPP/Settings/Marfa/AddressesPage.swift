@@ -33,14 +33,13 @@ struct AddressesPage: View {
             OwnerFailureState(failure: failure, host: host) { Task { await model.load() } }
         } else if let settings = model.settings {
             SettingsPageColumn {
-                SettingsSection("Sign-In Address") {
-                    SettingsRow(
-                        verbatim: AddressesModel.display(settings.signIn), line: String(localized: "Where you sign in, and where apps connect."),
-                        error: model.rowErrors[settings.signIn], lead: .tile("globe", .teal)
-                    ) {
-                        SettingsButton("Change…") { model.begin(.changeSignIn) }
-                    }
+                SettingsHead(
+                    name: Text("Sign-In Address"), symbol: "globe", tone: .teal, title: Text(verbatim: AddressesModel.display(settings.signIn)),
+                    line: Text("Where you sign in, and where apps connect.")
+                ) {
+                    SettingsButton("Change…") { model.begin(.changeSignIn) }
                 }
+                if let line = model.rowErrors[settings.signIn] { OwnerProblem(title: "Not Changed", line: line) }
                 SettingsSection("Other Addresses", line: "\(host.serverName) answers on these too.") {
                     ForEach(model.otherAddresses, id: \.self) { address in
                         SettingsRow(

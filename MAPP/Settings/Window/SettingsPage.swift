@@ -64,7 +64,7 @@ nonisolated enum SettingsPage: Hashable, Sendable {
         case .general: .gray
         case .appearance: .blue
         case .lists: .orange
-        case .editor: .yellow
+        case .editor: .amber
         case .connection: .green
         case .marfa(let page): page.tone
         }

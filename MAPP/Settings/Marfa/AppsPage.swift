@@ -62,7 +62,7 @@ struct AppsPage: View {
         SettingsPageColumn {
             SettingsSection("Connected") {
                 if model.apps.isEmpty {
-                    SettingsRow("No Apps Are Connected", look: .off)
+                    SettingsEmptyCard(symbol: "macwindow", title: Text("No Apps"), line: Text("No apps are connected."))
                 }
                 ForEach(model.apps) { app in
                     SettingsLinkRow(
@@ -140,7 +140,7 @@ private struct AppDetail: View {
             if let keys = model.keysMade[app.clientID], !keys.isEmpty {
                 SettingsSection(name: Text("Keys It Made"), line: Text("They keep working when \(name) is disconnected.")) {
                     ForEach(keys.sorted { ($0.lastUsed ?? .distantPast) > ($1.lastUsed ?? .distantPast) }) { key in
-                        SettingsRow(verbatim: key.label, line: OwnerWording.used(key.lastUsed) + ".", lead: .tile("key.fill", .yellow))
+                        SettingsRow(verbatim: key.label, line: OwnerWording.used(key.lastUsed) + ".", lead: .tile("key.fill", .amber))
                     }
                 }
             }

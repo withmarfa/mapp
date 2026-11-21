@@ -25,6 +25,11 @@ nonisolated enum OwnerWording {
         return String(localized: "MAPP isn’t allowed to \(permission.allowedTo). Choose Allow More… to change that.")
     }
 
+    /// How many of the owner's permissions a key, an app or a new key holds: "None", or "3 of 14".
+    static func permissionCount(_ held: Int, of total: Int) -> String {
+        held == 0 ? String(localized: "None") : String(localized: "\(held) of \(total)")
+    }
+
     /// The title of an owner permission in a list of what an app or a key may do.
     static func title(of permission: String) -> String {
         switch InstancePermission(rawValue: permission) {
