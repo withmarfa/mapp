@@ -7,7 +7,6 @@ struct ColumnWidthTests {
     @Test func builtInDefaultsAreTheAgreedWidths() {
         #expect(ColumnWidth.sidebar.defaultWidth == 230)
         #expect(ColumnWidth.list.defaultWidth == 330)
-        #expect(ColumnWidth.settings.defaultWidth == 280)
     }
 
     @Test func everyDefaultLiesInsideItsColumnsLimits() {
@@ -43,14 +42,13 @@ struct ColumnWidthTests {
         #expect(ColumnWidth.sidebar.stored(in: defaults) == 230)
         defaults.set(300.0, forKey: ColumnWidth.sidebar.key)
         defaults.set(9_999.0, forKey: ColumnWidth.list.key)
-        defaults.set("wide", forKey: ColumnWidth.settings.key)
-        #expect(ColumnWidth.sidebar.stored(in: defaults) == 300)
+        defaults.set("wide", forKey: ColumnWidth.sidebar.key)
         #expect(ColumnWidth.list.stored(in: defaults) == 480)
-        #expect(ColumnWidth.settings.stored(in: defaults) == 280)
+        #expect(ColumnWidth.sidebar.stored(in: defaults) == 230, "a stored word is not a width")
     }
 
     @Test func eachColumnHasItsOwnKeyAndResetClearsThemWithTheInterfaceKeys() {
-        #expect(Set(ColumnWidth.allCases.map(\.key)).count == 3)
+        #expect(Set(ColumnWidth.allCases.map(\.key)).count == 2)
         for column in ColumnWidth.allCases { #expect(InterfaceKey.all.contains(column.key)) }
     }
 }
@@ -80,10 +78,9 @@ struct ColumnWidthTrackerTests {
 
     @Test func eachColumnKeepsItsOwnDraggedWidth() {
         let tracker = tracker()
-        tracker.record(300, for: .settings)
-        #expect(tracker.width(of: .settings) == 300)
+        tracker.record(300, for: .sidebar)
+        #expect(tracker.width(of: .sidebar) == 300)
         #expect(tracker.width(of: .list) == 330)
-        #expect(tracker.width(of: .sidebar) == 230)
     }
 
     @Test func columnWidthsComeFromTheDividerPositions() {

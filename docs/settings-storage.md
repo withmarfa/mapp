@@ -31,9 +31,18 @@ The rules that apply to every setting are in the `AGENTS.md` files: [that today 
 
 ## The Settings window
 
-As built, Settings is a place in the sidebar, not a separate window; it is agreed to become a window of its own ([Agreed designs](agreed-designs.md#settings)), which leaves out the Settings column's width. It shows its pages in the list column (`SettingsPage`) and the chosen page in the detail column. The pages are Appearance, Lists, Editor and Sidebar ([Settings > Sidebar](views-and-lists.md#settings--sidebar)); then Library, This Marfa and Recently Deleted; then About.
+Where it lives: `SettingsWindowView`, `SettingsPage`, `SettingsNavigation`, `SettingsLauncher`, `SettingsSidebar`, `SettingsTokens` and `MarfaSettingsHost`, under `MAPP/Settings/`.
 
-The sidebar, list and Settings columns each have a default width a person can change in Settings (`ColumnWidth`): 230, 330 and 280 points, each within a range the column allows. The measurements of a page's rows and boxes are in [Views and lists](views-and-lists.md). The agreed pages and rules for the new Settings window are in [Agreed designs](agreed-designs.md#settings).
+Settings is a window of its own, opened by MAPP > Settings… (⌘,), with one instance that comes forward if it is already open and keeps the size it was left at (1200 by 900 points at first). It is a `Window` scene, not the system's `Settings` scene, which is sized to its content for a few tabs and gives no toolbar of ours or remembered, resizable frame. Every route that opens Settings names a page in the same window: the command, the sidebar's Settings shortcut, the palette's Settings commands, the connect and sign-in buttons, and the notices that offer Settings (`SettingsLauncher`). The main window keeps no Settings place, and no Settings column or width.
+
+The sidebar lists MAPP's pages, then the Marfa's: Appearance, Editor, Lists and Connection; then Overview and Recently Deleted. A page is listed once it is built, so the pages in [Agreed designs](agreed-designs.md#settings) that are not here yet (General, Keyboard, Layouts, Search, On This Mac, and the Marfa's other pages) appear as they are. Settings > Sidebar and Settings > About are gone: the sidebar is customized in place, and About is the MAPP menu's About MAPP.
+
+- **Appearance, Editor and Lists** hold what the old pages held, with the same keys in the defaults. Appearance has no Settings column width.
+- **Connection** is the old Library page: the server and how it stands, each change that needs the person, the sign-in, the other server, the downloaded files, the error reports switch and Disconnect.
+- **Overview** holds This Marfa's fields until the page is built out, and **Recently Deleted** the bin. Both are the Marfa's: each needs an owner permission (`config.manage` and `items.purge`), which the sign-in holds only if the owner approved it. Allow More… signs in again through the package, asking for MAPP's scopes, the permissions already held and the page's own, and hands the new sign-in to the open copy as Sign In Again does. Every sign-in again, by the browser or with a code, asks for the permissions already held, or for every permission the pages use where the Keychain cannot say what is held. The owner may untick permissions on the approval page, and that stands, but never silently: when a permission held before is no longer held, MAPP says so in one notice that names what it is no longer allowed to do, and the page that asked shows Needs a Permission again.
+- **The Marfa's half** (`Settings/Marfa/`) reaches MAPP only through `MarfaSettingsHost`, so another app could take its pages.
+
+The measurements of a page's rows and boxes are in [Views and lists](views-and-lists.md#settings). The agreed pages not built yet are in [Agreed designs](agreed-designs.md#settings).
 
 ## Looks
 

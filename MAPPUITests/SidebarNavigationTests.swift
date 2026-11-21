@@ -7,7 +7,7 @@ final class SidebarNavigationTests: XCTestCase {
     private var sidebar: XCUIElement { window.outlines["Sidebar"] }
     private var list: XCUIElement { window.outlines["ItemList"] }
     private var instanceName: XCUIElement { element("SidebarSettings") }
-    private var settingsPages: XCUIElement { element("SettingsPageList") }
+    private var settingsPages: XCUIElement { element("SettingsSidebar") }
 
     override func setUp() async throws {
         continueAfterFailure = false
@@ -106,19 +106,15 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertTrue(settingsPages.waitForExistence(timeout: 3))
         XCTAssertFalse(window.menuItems["Settings"].firstMatch.exists, "the cog opens Settings directly")
         XCTAssertTrue(element("SettingsPage-recentlyDeleted").exists)
-        XCTAssertTrue(element("SettingsConsole").exists)
     }
 
-    func testTheCogOpensSettingsInTheWindowAndAPlaceLeavesIt() {
+    func testTheCogOpensSettingsInAWindowOfItsOwnAndTheMainWindowStays() {
         instanceName.click()
         XCTAssertTrue(settingsPages.waitForExistence(timeout: 3))
-        XCTAssertFalse(list.exists, "the pages take the list's column")
-        XCTAssertTrue(sidebar.exists, "the sidebar stays")
-        XCTAssertEqual(app.windows.count, 1)
+        XCTAssertTrue(list.exists, "the main window keeps its list")
+        XCTAssertTrue(sidebar.exists, "and its sidebar")
+        XCTAssertEqual(app.windows.count, 2)
         attachScreenshot("SettingsFromInstanceMenu")
-        sidebarText("Inbox").click()
-        XCTAssertTrue(list.waitForExistence(timeout: 3))
-        XCTAssertFalse(settingsPages.exists)
     }
 
     func testTheNewRowOpensQuickAdd() {
@@ -147,28 +143,6 @@ final class SidebarNavigationTests: XCTestCase {
         XCTAssertTrue(sidebarText("Favorites").waitForExistence(timeout: 3))
         sidebarText("Favorites").click()
         XCTAssertTrue(note.waitForExistence(timeout: 3))
-    }
-
-    func testAPlaceHiddenFromItsMenuIsOfferedBackInSettings() {
-        sidebarText("Sources").rightClick()
-        window.menuItems["Hide from Sidebar"].click()
-        XCTAssertTrue(sidebarText("Sources").waitForNonExistence(timeout: 3))
-        XCTAssertTrue(sidebarText("Favorites").exists, "the other places stay")
-
-        app.typeKey(",", modifierFlags: .command)
-        let page = element("SettingsPage-sidebar")
-        XCTAssertTrue(page.waitForExistence(timeout: 3))
-        page.click()
-        // Sources is a row of the Library section, so its Show menu offers it back.
-        let show = element("SidebarSettingsShow-library")
-        XCTAssertTrue(show.waitForExistence(timeout: 3))
-        show.click()
-        let sources = window.menuItems["Sources"]
-        XCTAssertTrue(sources.waitForExistence(timeout: 3), "Settings lists the place that is hidden")
-        sources.click()
-        XCTAssertTrue(sidebarText("Sources").waitForExistence(timeout: 3), "the sidebar beside Settings follows at once")
-        sidebarText("Items").click()
-        XCTAssertTrue(list.waitForExistence(timeout: 3))
     }
 
     func testTheCollectionsIndexListsTheLibrarysCollections() {

@@ -16,7 +16,7 @@ final class SidebarSizeTests: XCTestCase {
             XCTAssertTrue(newItem.isHittable, "the New Item button is reachable at sidebar size \(size)")
             instance.click()
             app.menuItems["Settings"].click()
-            XCTAssertTrue(window.descendants(matching: .any).matching(identifier: "SettingsPageList").element(boundBy: 0)
+            XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "SettingsSidebar").element(boundBy: 0)
                 .waitForExistence(timeout: 3))
             app.terminate()
         }

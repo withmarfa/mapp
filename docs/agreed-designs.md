@@ -25,24 +25,12 @@ Agreed with August on 19 and 20 November 2026. The pages are drawn on the Settin
 
 ### General rules
 
-- **A window of its own.** Settings opens in its own window, not as a place in the main window's sidebar, so the Marfa's pages can one day stand alone as their own app. One sidebar lists MAPP's pages, then the Marfa's, in groups split by space, each page with a color tile, and a search field at the top. The content is a column at most 620 points wide, with more room either side as the window widens.
-- **The toolbar carries the page's name** beside Back and Forward. There is no back button beside a title.
-- **Rows.** A row is a lead, a title with one line under it (two at most), and one trailing edge. Rows are 44 points, 56 with a line, 36 for a list of words. Every input is 200 by 28 and ends on the same line. Leads sit in one 24-point column, so text starts at 52 and the divider at the text.
-- **Sections.** Every section is named; a thing's head card is the one exception. Cards are white with a hairline, never gray.
-- **Changing things.** A list of words or patterns is changed in place (double-click or Return edits a line; Add a Name or Pattern adds one; order is shown where it matters). Something new with several fields is a sheet. Sheets and alerts sit in the middle of the window, not under the toolbar. Apple's alert asks before what can't be undone. A thing with settings of its own is a page.
-- **Numbers.** A field with its unit inside, or a pop-up of sensible steps, then Custom, where steps guide the person.
-- **Problems and errors.** A problem row offers only actions that exist: Ignore and Edit… where both do, one button and a menu where there are more. An error uses the design system's red: a ring and one line under the title, never more.
-- **Buttons are gray**, the confirm button too. Blue is only for Update and for an alert's default button, unless it is destructive, as macOS draws it. Focus is a gray ring.
-- **One button size.** Every button in Settings is 28 points, except inside a table, where row buttons stay small. No button sits in a section's header.
-  - Adding something is the card's last row: + New Key…, + Add a Passkey…, + New Webhook…, + New Type…, + Add a Field….
-  - Other actions are regular buttons in a row: Last Backup with Back Up Now, and Check for Updates beside Update.
-  - The button rows under a card (Restore Defaults…, Export Shortcuts…, Import…) are regular size.
-  - Select All is an "All Events" checkbox row.
+The rules that are built (the window, the toolbar, rows, sections, changing things, numbers, problems and errors, buttons, tables, words and named values) are in [Views and lists](views-and-lists.md#settings). Two are not built yet:
+
 - **Shortcuts.** Keyboard lists every command in a white shortcut field with a clear button, with a small search at the top right of the list and Restore Defaults… at the end. A keyboard button beside the search field searches by pressing: while it is on, pressing keys finds that shortcut (⌘K finds Command Palette), and typing searches by name.
-- **Tables.** In a section, the filter pop-up and the search sit together at the trailing edge of the section's name, and Show All is in the table's foot beside the count ("8 of 1,204"). A table that is a page of its own has its count on the left and the filter and search together on the right, in one row under the toolbar, and fills the pane with columns, selection and actions at the foot. A section's table is light, with no rules between rows, a page at a time. A table's row action (Restore…, Restore) shows on every row, never only on the row under the pointer.
-- **Words.** "Permanently Delete", never "for good".
 - **A synced folder's page** shows what it holds as a tree of its folders, counted in files, which MAPP builds from the server's paths.
-- **Themes later.** Every color and font is a named value, never hard-coded, so custom themes can come later without rework. Not now: custom CSS, plugins for MAPP itself, AI providers and Vim keys.
+- **Not now:** custom CSS, plugins for MAPP itself, AI providers and Vim keys. Themes come later; every color and font is already a named value.
+- The button rows under a card (Restore Defaults…, Export Shortcuts…, Import…) are regular size, and Select All is an "All Events" checkbox row.
 
 ### MAPP's pages
 

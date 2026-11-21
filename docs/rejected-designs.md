@@ -71,7 +71,7 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 
 - **A tab bar when there is only one tab.**
 - **A Customize Sidebar button in the sidebar.** Customize from a Control-click.
-- **Settings > Sidebar.** The sidebar is customized in place only (August, 19 November 2026); the page that is built goes.
+- **Settings > Sidebar.** The sidebar is customized in place only (August, 19 November 2026); the page that was built is gone.
 - **Customizing the sidebar in a window of its own, or in a panel beside a section.**
 - **Checkboxes and a dashed Show More line while customizing.** A section's menu sets how many show.
 - **Handles at the leading edge, beside the marks.** They sit at each row's trailing edge.

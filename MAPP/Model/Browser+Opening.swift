@@ -26,7 +26,6 @@ extension Browser {
     func openSelection(as way: ItemOpening? = nil) -> Bool { open(selection, as: way) }
 
     private func presentModal(_ id: ItemID) {
-        leaveSettings()
         // A full page and the modal never show the page at once: the modal is over the layout the full page left.
         isCollectionItemPresented = false
         if selection != [id] { selection = [id] }
@@ -35,7 +34,6 @@ extension Browser {
     }
 
     private func presentFullPage(_ id: ItemID) {
-        leaveSettings()
         if selection != [id] { selection = [id] }
         modalItem = nil
         isCollectionItemPresented = true

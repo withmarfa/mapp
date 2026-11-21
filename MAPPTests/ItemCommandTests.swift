@@ -35,20 +35,6 @@ struct ItemCommandTests {
         #expect(enabled(context([note.id], page: .mint())) == [.open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow])
     }
 
-    @Test func settingsShowingLeavesNoPageForTheCommandsToAct() {
-        let note = library.add("A note\n")
-        let browser = Browser()
-        browser.sidebarItem = .recents
-        browser.showSettings()
-        let page = ItemCommandContext.pageItem(showsPage: browser.showsPage, editorHasItem: true, pageItemID: note.id)
-        #expect(page == nil)
-        #expect(enabled(context([note.id], page: page)) == [.open, .openAsModal, .openAsFullPage, .quickLook, .openInNewWindow])
-
-        browser.leaveSettings()
-        let back = ItemCommandContext.pageItem(showsPage: browser.showsPage, editorHasItem: true, pageItemID: note.id)
-        #expect(back == note.id)
-    }
-
     @Test func aPageThatIsNotReadyIsNotThere() {
         #expect(ItemCommandContext.pageItem(showsPage: true, editorHasItem: false, pageItemID: .mint()) == nil)
     }

@@ -337,11 +337,11 @@ nonisolated enum InstanceWording {
     private static func removal(_ setting: InstanceSetting, keeping limit: Int) -> String {
         switch setting {
         case .trashRetentionDays:
-            String(localized: "Items deleted more than \(days(limit)) ago will be removed for good, with their history, the next time the server tidies up. They can’t be recovered.")
+            String(localized: "Items deleted more than \(days(limit)) ago will be permanently deleted, with their history, the next time the server tidies up. They can’t be recovered.")
         case .versionMaxVersions:
-            String(localized: "An item with more than \(limit) versions will lose its oldest ones for good the next time the server tidies up.")
+            String(localized: "An item with more than \(limit) versions will have its oldest versions permanently deleted the next time the server tidies up.")
         default:
-            String(localized: "“\(setting.title)” changes to \(days(limit)). Older versions of items may be removed for good the next time the server tidies up, so Version History will show fewer.")
+            String(localized: "“\(setting.title)” changes to \(days(limit)). Older versions of items may be permanently deleted the next time the server tidies up, so Version History will show fewer.")
         }
     }
 }

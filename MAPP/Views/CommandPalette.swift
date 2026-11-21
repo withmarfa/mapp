@@ -644,9 +644,7 @@ struct CommandPalette: View {
         func historyKey(_ key: String) -> String? { returnFocus == .page ? nil : key }
 
         if library.isLoaded {
-            if browser.canSearchList {
-                add(String(localized: "Search List"), "magnifyingglass", "⌥⌘F", in: .edit) { browser.focusRequest = .search }
-            }
+            add(String(localized: "Search List"), "magnifyingglass", "⌥⌘F", in: .edit) { browser.focusRequest = .search }
             let modes = browser.showsSidebarIndex ? [] : browser.availableViewModes(in: library)
             func addLayout(_ mode: ItemViewMode, _ title: String, _ systemImage: String, _ shortcut: String) {
                 if modes.contains(mode) { add(title, systemImage, shortcut, in: .view) { browser.viewMode = mode } }
@@ -872,7 +870,7 @@ struct CommandPalette: View {
         entries.append(Entry(id: "command:" + settingsTitle, title: settingsTitle, icon: .symbol("gearshape"), shortcut: "⌘,", takesFocus: true, group: .settings) {
             browser.showSettings()
         })
-        for page in SettingsPage.allCases {
+        for page in SettingsPage.all {
             let title = String(localized: "Settings: \(page.title)")
             entries.append(Entry(id: "command:" + title, title: title, icon: .symbol(page.symbol), takesFocus: true, group: .settings) {
                 browser.showSettings(page)

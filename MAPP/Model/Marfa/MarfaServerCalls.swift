@@ -38,6 +38,11 @@ nonisolated struct MarfaServerCalls: ItemHistorySource, InstanceConfigSource, Ty
         return server
     }
 
+    /// The package's client over the server, for the Marfa's pages of Settings, which make their own calls.
+    func client() throws(Ending) -> Client {
+        Client(try server(), timeout: timeout)
+    }
+
     /// What the package's error stands for, by its own classes: away, a refused key, or what the server said.
     static func ending(_ error: any Error) -> Ending {
         guard let error = marfaError(in: error) else {

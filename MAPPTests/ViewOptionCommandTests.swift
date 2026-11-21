@@ -56,12 +56,9 @@ struct ViewOptionCommandTests {
         #expect(Self.titles(Self.browser(.gallery, in: library), library) == ["Small Cards", "Large Cards"])
     }
 
-    @Test func theListAndSettingsOfferNoViewOptionCommands() {
+    @Test func theListOffersNoViewOptionCommands() {
         let library = FakeItemLibrary(items: [Self.task("A", status: "todo")])
         #expect(Self.titles(Self.browser(.list, in: library), library).isEmpty)
-        let settings = Self.browser(.board, in: library)
-        settings.showSettings()
-        #expect(Self.titles(settings, library).isEmpty)
     }
 
     @Test func anItemPageOpenedFromATableTheBoardOrTheTimelineOffersNone() {

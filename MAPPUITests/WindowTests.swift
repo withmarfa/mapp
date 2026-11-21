@@ -123,10 +123,10 @@ final class WindowTests: XCTestCase {
         XCTAssertFalse(app.menuBars.menuItems["Recently Deleted"].firstMatch.exists, "Recently Deleted is a Settings page only")
         app.typeKey(.escape, modifierFlags: [])
         app.typeKey(",", modifierFlags: .command)
-        let page = window.descendants(matching: .any).matching(identifier: "SettingsPage-recentlyDeleted").firstMatch
+        let page = app.descendants(matching: .any).matching(identifier: "SettingsPage-recentlyDeleted").firstMatch
         XCTAssertTrue(page.waitForExistence(timeout: 3))
         page.click()
-        XCTAssertTrue(window.staticTexts["Old packing list"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Old packing list"].waitForExistence(timeout: 3))
     }
 
     /// The list's search, a field only once its button beside View Options is clicked.

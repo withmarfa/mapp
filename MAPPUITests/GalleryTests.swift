@@ -192,20 +192,13 @@ final class GalleryTests: XCTestCase {
         XCTAssertTrue(window.buttons["BackToGallery"].waitForExistence(timeout: 3))
     }
 
-    func testLeavingSettingsAnotherPlaceAndHiddenSidebarReturnToGallery() throws {
+    func testAnotherPlaceAndHiddenSidebarReturnToGallery() throws {
         choose("Gallery")
         XCTAssertTrue(gallery.waitForExistence(timeout: 3))
         let splitter = try XCTUnwrap(window.splitters.allElementsBoundByIndex.min { abs($0.frame.midX - sidebar.frame.maxX) < abs($1.frame.midX - sidebar.frame.maxX) })
         let edge = splitter.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
         edge.click(forDuration: 0.2, thenDragTo: edge.withOffset(CGVector(dx: 45, dy: 0)))
         let width = sidebar.frame.width
-        app.typeKey(",", modifierFlags: .command)
-        let settings = window.descendants(matching: .any).matching(identifier: "SettingsPageList").element(boundBy: 0)
-        XCTAssertTrue(settings.waitForExistence(timeout: 3))
-        XCTAssertFalse(gallery.exists, "Settings shows its pages in place of the gallery")
-        sidebar.staticTexts["Items"].click()
-        XCTAssertTrue(gallery.waitForExistence(timeout: 3))
-        XCTAssertEqual(sidebar.frame.width, width, accuracy: 3)
         sidebar.staticTexts["Inbox"].click()
         XCTAssertTrue(gallery.waitForExistence(timeout: 3))
         sidebar.staticTexts["Items"].click()

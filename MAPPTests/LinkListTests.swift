@@ -119,8 +119,9 @@ import Testing
         let binned = FakeItemLibrary.note("Binned", modified: .now, state: .trashed)
         let library = FakeItemLibrary(items: [live, binned])
         let browser = Browser()
+        var opened: [SettingsPage?] = []
+        browser.openSettings = { opened.append($0) }
         browser.reveal(binned, in: library, order: ItemOrder())
-        #expect(browser.showsSettings)
-        #expect(browser.settingsPage == .recentlyDeleted)
+        #expect(opened == [.recentlyDeleted])
     }
 }

@@ -27,6 +27,7 @@ What is agreed and not built yet is in [Agreed designs](agreed-designs.md). This
 | Right sidebar | MAPP | The panel beside the page that lists every property, links and history sections (`ItemInspector`). | [Item page](item-page.md) |
 | Saved view | Marfa and MAPP | A `system.view` item that holds a title, query, sort and group. MAPP adds the layout, columns, cards and density on the Mac. | [Views and lists](views-and-lists.md) |
 | Section | MAPP | A heading over rows in the sidebar: Library, Views, Types or one the person made. It sits in one tab and can hold views, collections and sources (`SidebarGroup`). | [Views and lists](views-and-lists.md) |
+| Settings window | MAPP | The window of its own that holds MAPP's settings and the Marfa's, with a sidebar of pages, Back and Forward in the toolbar and one centered column (`SettingsWindowView`). | [Settings storage](settings-storage.md) |
 | Shortcut | MAPP | A sidebar row that acts or goes somewhere, such as New or Search, and never takes the selection (`SidebarShortcut`). | [Views and lists](views-and-lists.md) |
 | Slot | MAPP | One fixed place in a look, such as Title or Date. The look's own places (date, secondary, facts) and the row's are built. | [Looks](looks.md) |
 | Source | Marfa | Where an item came from, such as a connector or an app. Marfa holds its name and mark. | [Marfa and MAPP](marfa-and-mapp.md) |

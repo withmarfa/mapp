@@ -21,7 +21,6 @@ struct SidebarNavigationTests {
         #expect(browser.item == .allItems)
         #expect(browser.viewMode == .gallery)
         #expect(browser.selection == [note.id])
-        #expect(!browser.showsSettings)
     }
 
     @Test func aSnapshotWithAnyOtherUnreadablePlaceFailsToDecode() {

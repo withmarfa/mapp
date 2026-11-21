@@ -56,7 +56,7 @@ struct SidebarTabsTests {
     }
 
     @Test func savedViewsOrderedBeforeTheBuiltInViewsInTheStoredOrderStillShowAfterThem() throws {
-        // Today's Settings > Sidebar moves the built-in views and the saved views as two lists, each appended to the order.
+        // A stored order that lists the saved views before the built-in views.
         let saved = Data(#"{"hidden":[],"order":["view:v-Reading","view:v-Open work","inbox","recents","favorites"]}"#.utf8)
         let layout = try JSONDecoder().decode(SidebarLayout.self, from: saved)
         let places = SidebarPlan(library(), layout: layout).section(.views)?.shown ?? []

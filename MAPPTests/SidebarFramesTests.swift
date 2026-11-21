@@ -80,8 +80,6 @@ struct SidebarFramesTests {
         try await move("gallery to index") { browser.sidebarItem = .sources }
         try await move("index to gallery") { browser.sidebarItem = .allItems }
         try await move("gallery to list") { browser.viewMode = .list }
-        try await move("list to settings") { browser.showSettings() }
-        try await move("settings to list") { browser.leaveSettings() }
         #endif
     }
 

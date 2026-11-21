@@ -4,7 +4,7 @@ import Observation
 /// Everything the views, the commands and the editor use of a library, so none of them knows what holds the items:
 /// `MarfaLibrary`, over a Marfa server's working copy, in the app, and `FakeItemLibrary` in tests.
 ///
-/// Deleting for good, writing a view and choosing a type's icon need the server, so a view dims them while
+/// Deleting permanently, writing a view and choosing a type's icon need the server, so a view dims them while
 /// `reachesServer` is false rather than asking.
 @MainActor
 protocol ItemLibrary: AnyObject, Observable {
@@ -305,7 +305,7 @@ extension ItemLibrary {
     func tellCannotPurge() {
         notices.tell(
             String(localized: "Can’t Delete Immediately"),
-            String(localized: "Deleting for good needs the server, which can’t be reached right now. The items are still in Recently Deleted."))
+            String(localized: "Deleting permanently needs the server, which can’t be reached right now. The items are still in Recently Deleted."))
     }
 
     /// Whether the person can give the item a title. A title is kept only as a property, so an item titled by its

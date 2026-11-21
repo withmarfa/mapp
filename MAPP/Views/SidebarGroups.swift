@@ -422,7 +422,7 @@ struct SidebarPlaceMenu: View {
     }
 }
 
-/// The palette that chooses a view's color, in the sidebar's context menu and in Settings > Sidebar. It reads and
+/// The palette that chooses a view's color, in the sidebar's context menu. It reads and
 /// writes the one layout, so both show the same color.
 struct SidebarColorPicker: View {
     @Environment(Libraries.self) private var libraries

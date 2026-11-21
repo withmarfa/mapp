@@ -18,7 +18,7 @@ extension Browser {
     }
 
     /// Whether the open place has a default view the window can change.
-    var hasDefaultView: Bool { !showsSettings && Self.hasDefaultView(item) }
+    var hasDefaultView: Bool { Self.hasDefaultView(item) }
 
     /// The layout a place opens in until the person chooses one.
     nonisolated static let naturalLayout = ItemViewMode.list

@@ -6,38 +6,29 @@ struct RootView: View {
     /// The window's browser lives here, above the library, so what the person was writing outlives a change of
     /// library, which starts the rest of the window afresh.
     @State private var browser: Browser
-    let settingsRequest: SettingsRequest
+    let settingsLauncher: SettingsLauncher
+    @Environment(\.openWindow) private var openWindow
 
     /// The browser starts holding the looks the person chose, so the first draw of a gallery, a board or a table builds
     /// once and not again when the choices arrive.
-    init(settingsRequest: SettingsRequest, libraries: Libraries) {
-        self.settingsRequest = settingsRequest
+    init(settingsLauncher: SettingsLauncher, libraries: Libraries) {
+        self.settingsLauncher = settingsLauncher
         let browser = Browser()
+        browser.openSettings = { [settingsLauncher] in settingsLauncher.show($0) }
         browser.lookChoices = libraries.typeLooks.choices(for: libraries.libraryKey)
         _browser = State(initialValue: browser)
     }
 
     var body: some View {
-        Group {
-            if browser.showsSettings && libraries.current == nil {
-                SettingsWorkspace(browser: browser)
-            } else {
-                workspace
-            }
-        }
+        workspace
         .focusedSceneValue(\.browser, browser)
-        .registersMainWindow(browser, with: settingsRequest)
         // The table, gallery and board draw each type's chosen look, which the browser holds for them to read, seeded in `init`.
         .onChange(of: libraries.typeLooks.choices(for: libraries.libraryKey)) { _, choices in
             browser.lookChoices = choices
         }
         .onAppear {
             LaunchTrace.shared.mark(.windowShown)
-            if settingsRequest.isPending {
-                settingsRequest.isPending = false
-                browser.showSettings(settingsRequest.page)
-                settingsRequest.page = nil
-            }
+            settingsLauncher.open = { openWindow(id: SettingsLauncher.windowID) }
         }
         .notices(libraries.host.notices) { browser.showSettings($0) }
     }
@@ -51,7 +42,7 @@ struct RootView: View {
                 MainView(browser: browser)
                     // The library is given to the branch that shows it, as the item window does, and not to the whole
                     // window: a view built for it keeps it until SwiftUI removes the view, and the window never has a
-                    // main view with none. Settings, shown inside the main view, reads it from here.
+                    // main view with none.
                     .environment(\.library, library)
                     // A different library is a different set of items, and the window starts afresh with it.
                     .id(ObjectIdentifier(library))
@@ -81,7 +72,7 @@ struct LibraryUnavailableView: View {
         } description: {
             Text(detail ?? String(localized: "MAPP can’t open the copy of your library on this Mac."))
         } actions: {
-            Button("Open Settings…") { browser.showSettings(.library) }
+            Button("Open Settings…") { browser.showSettings(.connection) }
                 .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier("LibraryUnavailableSettings")
         }
@@ -100,7 +91,7 @@ struct WelcomeView: View {
         } description: {
             Text("MAPP reads and writes your library on a Marfa server. Enter its address and sign in from Settings.")
         } actions: {
-            Button("Connect…") { browser.showSettings(.library) }
+            Button("Connect…") { browser.showSettings(.connection) }
                 .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier("WelcomeConnect")
         }

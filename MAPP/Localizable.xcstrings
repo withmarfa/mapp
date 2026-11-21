@@ -1,19 +1,40 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "%lld more in %@, left out of search." : {
-
-    },
     "%lld more left out of search." : {
 
     },
+    "%lld more in %@, left out of search." : {
+
+    },
+    "%@ Isn’t Answering" : {
+
+    },
+    "%@ ended MAPP’s sign-in. Sign in again in Connection." : {
+
+    },
+    "%@ items" : {
+
+    },
     "%@ you make show here." : {
+
+    },
+    "%lld Lines" : {
+
+    },
+    "%lld of %@" : {
+
+    },
+    "%lld to %lld points" : {
 
     },
     "A Collection" : {
 
     },
     "A search can limit itself to ten types at most." : {
+
+    },
+    "A Marfa server’s address." : {
 
     },
     "A Source" : {
@@ -25,6 +46,9 @@
     "A View" : {
 
     },
+    "About MAPP" : {
+
+    },
     "Add and Open" : {
 
     },
@@ -34,7 +58,10 @@
     "Add Shortcut" : {
 
     },
-    "Add Tab" : {
+    "All Deleted Items" : {
+
+    },
+    "Allow More…" : {
 
     },
     "Apps you sign in show here." : {
@@ -43,16 +70,25 @@
     "All Types" : {
 
     },
-    "At least %lld more in %@, left out of search." : {
+    "At least %lld more left out of search." : {
 
     },
-    "At least %lld more left out of search." : {
+    "At least %lld more in %@, left out of search." : {
 
     },
     "Blue" : {
 
     },
+    "choose a type’s icon and change a type’s fields" : {
+      "extractionState" : "manual"
+    },
     "Choose one item to read or edit it." : {
+
+    },
+    "Choose…" : {
+
+    },
+    "Cleanup" : {
 
     },
     "Collections you make show here." : {
@@ -67,16 +103,166 @@
     "Color" : {
 
     },
+    "Connect to a Marfa" : {
+
+    },
+    "Connect to a Marfa in Connection to see this page." : {
+
+    },
+    "Connection" : {
+
+    },
     "Couldn’t Confirm the Sign-In" : {
 
     },
     "Couldn’t Sign In" : {
 
     },
+    "Show Matches Left Out of Search" : {
+
+    },
     "The types and sources chosen and left out make more conditions than one search can hold." : {
 
     },
-    "Show Matches Left Out of Search" : {
+    "Custom…" : {
+
+    },
+    "Delete Permanently" : {
+
+    },
+    "Deleted Items" : {
+
+    },
+    "Disconnect from %@" : {
+
+    },
+    "Empty Recently Deleted" : {
+
+    },
+    "Empty…" : {
+
+    },
+    "Fewer Permissions Allowed" : {
+      "extractionState" : "manual"
+    },
+    "Filter" : {
+
+    },
+    "Hide" : {
+
+    },
+    "How wide Standard pages run. Full Width leaves it aside." : {
+
+    },
+    "Items you delete wait here before they are permanently deleted." : {
+
+    },
+    "Last answered %@. MAPP keeps trying." : {
+
+    },
+    "list and permanently delete deleted items" : {
+      "extractionState" : "manual"
+    },
+    "list and revoke keys" : {
+      "extractionState" : "manual"
+    },
+    "list, make and restore backups" : {
+      "extractionState" : "manual"
+    },
+    "list, narrow and revoke other apps’ access" : {
+      "extractionState" : "manual"
+    },
+    "make keys" : {
+      "extractionState" : "manual"
+    },
+    "manage connectors" : {
+      "extractionState" : "manual"
+    },
+    "manage files across this Marfa" : {
+      "extractionState" : "manual"
+    },
+    "manage the owner’s sign-ins and passkeys" : {
+      "extractionState" : "manual"
+    },
+    "manage webhooks" : {
+      "extractionState" : "manual"
+    },
+    "MAPP" : {
+
+    },
+    "MAPP is no longer allowed to %@. Allow it again from the page that needs it." : {
+      "extractionState" : "manual"
+    },
+    "MAPP isn’t allowed to list and permanently delete deleted items." : {
+
+    },
+    "MAPP isn’t allowed to see and change this Marfa’s settings." : {
+
+    },
+    "MAPP keeps trying." : {
+
+    },
+    "MAPP opens the server’s own page to sign in and never sees your password." : {
+
+    },
+    "MAPP shows one Marfa at a time." : {
+
+    },
+    "Needs a Permission" : {
+
+    },
+    "No Marfa Open" : {
+
+    },
+    "Nothing Is in Recently Deleted" : {
+
+    },
+    "Nothing is waiting here." : {
+
+    },
+    "On the server’s own page, in your browser." : {
+
+    },
+    "Open Connection…" : {
+
+    },
+    "Other Marfas" : {
+
+    },
+    "Overview" : {
+
+    },
+    "Palettes" : {
+
+    },
+    "Pattern" : {
+
+    },
+    "Permanently deletes %@ items." : {
+
+    },
+    "read the audit log" : {
+      "extractionState" : "manual"
+    },
+    "read the server’s health and status" : {
+      "extractionState" : "manual"
+    },
+    "Removes this Mac’s copy and signs MAPP out." : {
+
+    },
+    "see and change this Marfa’s settings" : {
+      "extractionState" : "manual"
+    },
+    "Sent once you sign in again." : {
+
+    },
+    "Settings Not Saved" : {
+
+    },
+    "Signed Out" : {
+
+    },
+    "pt" : {
 
     },
     "Switched Servers, but MAPP May Still Be Approved on the Previous One" : {
@@ -89,6 +275,9 @@
 
     },
     "MAPP dropped a sign-in it didn’t use, but couldn’t confirm that %@ ended its approval." : {
+
+    },
+    "The server has ended MAPP’s sign-in. Sign in again in Connection." : {
 
     },
     "To end it, run “marfa apps list” with the command line signed in to %@ as the owner, find MAPP’s entry, then run “marfa apps revoke <id>”." : {
@@ -268,9 +457,6 @@
     "No items match this view." : {
 
     },
-    "No sections in this tab." : {
-
-    },
     "No Window to Sign In From" : {
 
     },
@@ -284,9 +470,6 @@
 
     },
     "No Shortcuts" : {
-
-    },
-    "Or Control-click the sidebar and choose Customize Sidebar." : {
 
     },
     "Orange" : {
@@ -337,9 +520,6 @@
     "Show Formats" : {
 
     },
-    "Show Section" : {
-
-    },
     "Show %lld" : {
 
     },
@@ -376,13 +556,31 @@
     "The server wouldn’t approve MAPP, so nothing changed. Check that you are signing in to the right server and account, then try again." : {
 
     },
+    "Translucent" : {
+
+    },
+    "Unknown" : {
+
+    },
+    "Unsent Changes" : {
+
+    },
+    "update the server and run its housekeeping" : {
+      "extractionState" : "manual"
+    },
+    "Use Another Marfa" : {
+
+    },
+    "Value panels open under a date, status, tags, or other value. Palettes are the command palette, Search Items, and New Item. Translucent uses the system’s popover material, and Solid uses the window color." : {
+
+    },
+    "Waiting…" : {
+
+    },
+    "today, %@" : {
+
+    },
     "What’s New in MAPP" : {
-
-    },
-    "With one tab, the sidebar shows no tab bar." : {
-
-    },
-    "The sidebar lists the first six types and keeps the rest under Show More. New types appear in the Types section automatically." : {
 
     },
     "Yellow" : {
@@ -495,6 +693,12 @@
     "MAPP couldn’t confirm that %@ ended MAPP’s earlier approval." : {
 
     },
+    "You closed Settings before saving the changes to this Marfa’s settings." : {
+
+    },
+    "You quit MAPP before saving the changes to this Marfa’s settings." : {
+      "extractionState" : "manual"
+    },
     "Your items are still loading." : {
 
     },
@@ -507,7 +711,7 @@
     "“%@” can hold only one link of this kind, and already holds it." : {
       "extractionState" : "manual"
     },
-    "“%@” changes to %@. Older versions of items may be removed for good the next time the server tidies up, so Version History will show fewer." : {
+    "“%@” changes to %@. Older versions of items may be permanently deleted the next time the server tidies up, so Version History will show fewer." : {
       "extractionState" : "manual"
     },
     "Clear Location" : {
@@ -1728,7 +1932,7 @@
     "An item can’t be linked to itself." : {
       "extractionState" : "manual"
     },
-    "An item with more than %lld versions will lose its oldest ones for good the next time the server tidies up." : {
+    "An item with more than %lld versions will have its oldest versions permanently deleted the next time the server tidies up." : {
       "extractionState" : "manual"
     },
     "An item’s text can name a picture at a web address. MAPP loads it only when you choose to, or always for items in the Inbox. Pictures you have loaded stay on this Mac until you disconnect the library." : {
@@ -2205,9 +2409,6 @@
     "Connection Actions" : {
 
     },
-    "Console" : {
-      "extractionState" : "manual"
-    },
     "Contents" : {
       "extractionState" : "manual"
     },
@@ -2361,10 +2562,10 @@
     "Deleted items kept for" : {
       "extractionState" : "manual"
     },
-    "Deleted items stay in Recently Deleted this long, then the server removes them for good, with their history. 0 keeps them with no limit. Empty uses the server’s default, 60 days, unless whoever runs the server has set another." : {
+    "Deleted items stay in Recently Deleted this long, then the server permanently deletes them, with their history. 0 keeps them with no limit. Empty uses the server’s default." : {
       "extractionState" : "manual"
     },
-    "Deleting for good needs the server, which can’t be reached right now. The items are still in Recently Deleted." : {
+    "Deleting permanently needs the server, which can’t be reached right now. The items are still in Recently Deleted." : {
       "extractionState" : "manual"
     },
     "Descending" : {
@@ -2891,7 +3092,7 @@
     "Items About This" : {
       "extractionState" : "manual"
     },
-    "Items deleted more than %@ ago will be removed for good, with their history, the next time the server tidies up. They can’t be recovered." : {
+    "Items deleted more than %@ ago will be permanently deleted, with their history, the next time the server tidies up. They can’t be recovered." : {
       "extractionState" : "manual"
     },
     "Items listed: %llu" : {
@@ -3319,9 +3520,6 @@
     "No items match the filters." : {
 
     },
-    "No Library Is Open" : {
-
-    },
     "no limit" : {
       "extractionState" : "manual"
     },
@@ -3405,9 +3603,6 @@
     },
     "Nothing Hidden" : {
       "extractionState" : "manual"
-    },
-    "Nothing is in Recently Deleted." : {
-
     },
     "Nothing on the Page" : {
       "extractionState" : "manual"
@@ -3514,12 +3709,6 @@
         }
       }
     },
-    "Open a library to choose what its sidebar shows." : {
-
-    },
-    "Open a library to see what was deleted from it." : {
-
-    },
     "Open a window to use its column widths." : {
 
     },
@@ -3556,9 +3745,6 @@
     "Open the file in another app to view it." : {
 
     },
-    "Open the server’s console in the browser" : {
-
-    },
     "Open to view this PDF" : {
 
     },
@@ -3578,9 +3764,6 @@
       "extractionState" : "manual"
     },
     "Opens a panel to add a value" : {
-
-    },
-    "Opens in the browser" : {
 
     },
     "Opens this address" : {
@@ -3915,9 +4098,6 @@
     "Saved" : {
 
     },
-    "Saved views come from your Marfa server." : {
-
-    },
     "Saved. The server now has:" : {
       "extractionState" : "manual"
     },
@@ -4052,9 +4232,6 @@
 
     },
     "Show Formatted Text" : {
-
-    },
-    "Show Icons on Subtypes" : {
 
     },
     "Show in Finder" : {
@@ -4447,7 +4624,7 @@
     "The server has no history to show for this item. It may be new and not sent yet, deleted, or of a kind MAPP isn’t approved to read." : {
       "extractionState" : "manual"
     },
-    "The server keeps every version of an item for the first period, then one a day, then one a week, and removes older ones. Each period must be at least as long as the one before. A type can set its own policy, which wins. Empty uses the server’s defaults, 30, 90 and 365 days and 500 versions, unless whoever runs the server has set others." : {
+    "The server keeps every version for the first period, then one a day, then one a week. Each period must be at least as long as the one before. A type’s own policy wins. Empty uses the server’s defaults." : {
       "extractionState" : "manual"
     },
     "The server refused it: %@" : {
@@ -4864,9 +5041,6 @@
     },
     "Unresolved connections will be preserved." : {
       "extractionState" : "manual"
-    },
-    "Unsent changes" : {
-
     },
     "Until you decide, these changes stay on this Mac." : {
 

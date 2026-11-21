@@ -642,13 +642,11 @@ struct QuickAddTests {
         #expect(browser.quickAdd.draft?.properties.isEmpty == true)
     }
 
-    @Test func openingQuickAddLeavesSettingsAndPutsThePaletteAway() {
+    @Test func openingQuickAddPutsThePaletteAway() {
         let library = FakeItemLibrary(now: start)
         let browser = Browser()
-        browser.showSettings()
         browser.palette = .commands
         browser.openQuickAdd(in: library)
-        #expect(!browser.showsSettings)
         #expect(browser.palette == nil)
         #expect(browser.quickAdd.isPresented)
     }

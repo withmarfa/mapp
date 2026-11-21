@@ -461,7 +461,6 @@ extension Browser {
     func openQuickAdd(typeID: String? = nil, remembered: String? = nil, in library: any ItemLibrary) {
         let interval = Telemetry.begin(.navigation, "quickAdd.open")
         defer { interval.end() }
-        leaveSettings()
         palette = nil
         let types = QuickAdd.types(in: library).map(\.id.rawValue)
         if quickAdd.draft == nil {

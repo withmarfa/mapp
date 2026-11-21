@@ -529,7 +529,7 @@ import Observation
             // The window keeps showing the library while its copy is open, so an ended sign-in is told with the way
             // to Settings, where the person signs in again or disconnects the library.
             if failure.kind == .denied {
-                notices.tell(String(localized: "Signed Out of Your Marfa Server"), failure.message, action: .openSettings(.library))
+                notices.tell(String(localized: "Signed Out of Your Marfa Server"), failure.message, action: .openSettings(.connection))
             } else {
                 notices.tell(String(localized: "Can’t Read This Library"), failure.message)
             }

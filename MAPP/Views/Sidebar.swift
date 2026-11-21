@@ -210,18 +210,13 @@ private struct SidebarList: View {
     let browser: Browser
     let order: ItemOrder
 
-    /// Empty clicks leave the destination intact. Settings clears the visible selection, so choosing the previous
-    /// destination returns to its existing state. While customizing, a click chooses nothing.
+    /// Empty clicks leave the destination intact. While customizing, a click chooses nothing.
     private var selection: Binding<SidebarItem?> {
         Binding {
-            browser.showsSettings ? nil : browser.sidebarItem
+            browser.sidebarItem
         } set: { item in
             guard let item, !browser.customizesSidebar else { return }
-            if item == browser.sidebarItem {
-                browser.leaveSettings()
-            } else {
-                browser.show(item, in: library, order: order)
-            }
+            if item != browser.sidebarItem { browser.show(item, in: library, order: order) }
         }
     }
 
@@ -365,7 +360,7 @@ enum SidebarNaming: Identifiable, Equatable {
 }
 
 extension View {
-    /// The alert that names a tab or a section, for the sidebar and for Settings > Sidebar.
+    /// The alert that names a tab or a section, for the sidebar.
     func namingAlert(_ naming: Binding<SidebarNaming?>, name: Binding<String>, apply: @escaping (SidebarNaming, String) -> Void) -> some View {
         alert(naming.wrappedValue?.title ?? "", isPresented: Binding { naming.wrappedValue != nil } set: { if !$0 { naming.wrappedValue = nil } },
               presenting: naming.wrappedValue) { request in
