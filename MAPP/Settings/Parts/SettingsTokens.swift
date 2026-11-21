@@ -155,6 +155,9 @@ enum SettingsTokens {
         static let popUpWidth: CGFloat = 200
         /// The sidebar's tile.
         static let sidebarTile: CGFloat = 20
+        /// How far a sidebar section's name is moved in so that it starts where the tiles below it do; the system sets the
+        /// name a little to the left of them.
+        static let sidebarHeaderInset: CGFloat = 2.5
         /// A color swatch and the dot that marks the chosen one, and the space between swatches.
         static let swatch: CGFloat = 18
         static let swatchDot: CGFloat = 6

@@ -32,7 +32,11 @@ struct SettingsSidebar: View {
         List(selection: Binding<SettingsPage?> { selection } set: { if let page = $0 { selection = page } }) {
             ForEach(groups) { group in
                 if let name = group.name {
-                    Section(name) { rows(group.pages) }
+                    Section {
+                        rows(group.pages)
+                    } header: {
+                        Text(name).padding(.leading, SettingsTokens.Metric.sidebarHeaderInset)
+                    }
                 } else {
                     Section { rows(group.pages) }
                 }
@@ -52,7 +56,8 @@ struct SettingsSidebar: View {
     private func rows(_ pages: [SettingsPage]) -> some View {
         ForEach(pages, id: \.self) { page in
             Label {
-                Text(page.title).font(SettingsTokens.font(.sidebar, scale: scale))
+                // The system bolds a chosen row's label; the boards and System Settings keep it regular.
+                Text(page.title).font(SettingsTokens.font(.sidebar, scale: scale)).fontWeight(.regular)
             } icon: {
                 SettingsTile(symbol: page.symbol, tone: page.tone, size: SettingsTokens.Metric.sidebarTile)
             }
