@@ -19,7 +19,7 @@ struct ItemModal: View {
     private static let toolbarHeight: CGFloat = 60
     private static let pageTop: CGFloat = 64
     /// The height of a button's capsule: the window toolbar's, not smaller.
-    private static let buttonHeight: CGFloat = 34
+    private static let buttonHeight: CGFloat = 35
     private static let sidebarWidth: CGFloat = 300
     private static let corner: CGFloat = 22
     /// The page's width, which the right sidebar adds to rather than takes from, as far as the window leaves room.

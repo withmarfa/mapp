@@ -5,7 +5,8 @@ import SwiftUI
 /// goes in it. A screen supplies its buttons and, where a button opens one, a card, and the buttons stay. The card opens
 /// above the buttons at their width, or at `cardWidth` where the card is wider than they are, right-aligned, solid
 /// rather than glass; or, placed `.centeredAtFoot`, as a bar on the same line as the buttons, centered on the content and
-/// kept clear of them (`FootBarLayout`), which draws its own glass. With no buttons the corner draws nothing.
+/// kept clear of them, or above them when it is too wide to sit beside them (`FootBarLayout`); the bar draws its own
+/// glass. With no buttons the corner draws nothing.
 ///
 /// A toast rises from the foot of the same content, so the corner lifts above it while one shows.
 struct WindowCorner<Buttons: View, Card: View>: View {
@@ -61,7 +62,7 @@ struct WindowCorner<Buttons: View, Card: View>: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
         .overlay {
             if isCardOpen && cardPlacement == .centeredAtFoot {
-                FootBarLayout(leading: Self.inset, trailing: buttonsWidth + Self.inset * 2) { card.pointerStyle(.default) }
+                FootBarLayout(leading: Self.inset, trailing: buttonsWidth + Self.inset * 2, raise: CornerMetrics.height * scale + Self.inset) { card.pointerStyle(.default) }
                     .padding(.bottom, Self.inset + lift)
                     .transition(reduceMotion ? .opacity : .scale(scale: 0.96, anchor: .bottom).combined(with: .opacity))
             }
@@ -76,6 +77,8 @@ struct WindowCorner<Buttons: View, Card: View>: View {
 private struct FootBarLayout: Layout {
     var leading: CGFloat
     var trailing: CGFloat
+    /// How far the bar lifts when it cannot sit beside the buttons: their height and the gap above them.
+    var raise: CGFloat
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let ideal = subviews.first?.sizeThatFits(.unspecified) ?? .zero
@@ -84,11 +87,17 @@ private struct FootBarLayout: Layout {
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         guard let bar = subviews.first else { return }
-        let room = max(0, bounds.width - leading - trailing)
-        let width = min(bar.sizeThatFits(.unspecified).width, room)
-        let centered = bounds.midX - width / 2
-        let x = min(max(centered, bounds.minX + leading), bounds.maxX - trailing - width)
-        bar.place(at: CGPoint(x: x, y: bounds.maxY), anchor: .bottomLeading, proposal: ProposedViewSize(width: width, height: nil))
+        let ideal = bar.sizeThatFits(.unspecified).width
+        let beside = max(0, bounds.width - leading - trailing)
+        // A bar too wide to sit beside the buttons rises above them while the column has room for it, and only then scrolls.
+        let lifted = ideal > beside
+        let room = lifted ? max(0, bounds.width - leading * 2) : beside
+        let width = min(ideal, room)
+        let end = lifted ? bounds.maxX - leading : bounds.maxX - trailing
+        let x = min(max(bounds.midX - width / 2, bounds.minX + leading), end - width)
+        bar.place(
+            at: CGPoint(x: x, y: bounds.maxY - (lifted ? raise : 0)), anchor: .bottomLeading,
+            proposal: ProposedViewSize(width: width, height: nil))
     }
 }
 
