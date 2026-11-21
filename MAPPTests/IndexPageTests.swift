@@ -56,7 +56,7 @@ import Testing
 
     @Test func theItemsPageHasTheNewRowUntilAFilterTakesItsPlace() {
         let browser = Browser()
-        browser.item = .allItems
+        browser.sidebarItem = .allItems
         #expect(browser.showsNewRow)
         browser.filterRowChoice[.allItems] = true
         #expect(browser.showsFilterRow)
@@ -67,16 +67,16 @@ import Testing
 
     @Test func onlySourcesHasNoTools() {
         let browser = Browser()
-        browser.item = .sources
+        browser.sidebarItem = .sources
         #expect(!browser.indexPlaceHasTools)
-        browser.item = .collections
+        browser.sidebarItem = .collections
         #expect(browser.indexPlaceHasTools)
         #expect(!browser.showsNewRow)
     }
 
     @Test func theToolbarTakesOverOnlyOnceTheHeaderHasScrolledAway() {
         let browser = Browser()
-        browser.item = .collections
+        browser.sidebarItem = .collections
         #expect(!browser.showsIndexTools)
         browser.isIndexHeaderAway = true
         #expect(browser.showsIndexTools)
@@ -84,7 +84,7 @@ import Testing
 
     @Test func aCollectionsSourceFilterShowsTheRowAndTurningFilterOffClearsIt() {
         let browser = Browser()
-        browser.item = .collections
+        browser.sidebarItem = .collections
         #expect(!browser.showsFilterRow)
         browser.toggleCollectionSource("rss")
         #expect(browser.showsFilterRow)
