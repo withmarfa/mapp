@@ -21,11 +21,13 @@ struct SettingsWindowView: View {
     private var navigation: SettingsNavigation { launcher.navigation }
 
     var body: some View {
-        NavigationSplitView(columnVisibility: .constant(.all)) {
+        NavigationSplitView {
             SettingsSidebar(
                 selection: Binding { navigation.page } set: { navigation.show($0) }, search: $search
             )
-            .navigationSplitViewColumnWidth(SettingsTokens.Metric.sidebarWidth)
+            .frame(minWidth: SettingsTokens.Metric.sidebarWidth, maxWidth: SettingsTokens.Metric.sidebarWidth)
+            .navigationSplitViewColumnWidth(min: SettingsTokens.Metric.sidebarWidth, ideal: SettingsTokens.Metric.sidebarWidth, max: SettingsTokens.Metric.sidebarWidth)
+            .toolbar(removing: .sidebarToggle)
         } detail: {
             SettingsDetail(navigation: navigation, host: host)
                 .navigationTitle(navigation.title)
@@ -42,7 +44,6 @@ struct SettingsWindowView: View {
                     }
                 }
         }
-        .toolbar(removing: .sidebarToggle)
         .frame(minWidth: SettingsTokens.Metric.windowMinWidth, minHeight: SettingsTokens.Metric.windowMinHeight)
         .interfaceTextStyle()
         .environment(\.settingsTextScale, InterfaceStyle.scale(for: textSize))

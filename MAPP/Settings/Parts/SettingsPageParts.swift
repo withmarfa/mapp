@@ -152,7 +152,7 @@ struct SettingsStateContent: View {
     }
 }
 
-/// What a page says in place of itself: its words centered a third of the way down the space under the toolbar. It stands
+/// What a page says in place of itself: its words centered a third of the way down the pane, the toolbar's height counted. It stands
 /// for a page the person may not open, a server that is not answering, or a page with nothing to show.
 struct SettingsPageState: View {
     let symbol: String
@@ -164,7 +164,7 @@ struct SettingsPageState: View {
         GeometryReader { space in
             SettingsStateContent(symbol: symbol, title: title, line: line, action: action)
                 .padding(.horizontal, 24)
-                .position(x: space.size.width / 2, y: space.size.height / 3)
+                .position(x: space.size.width / 2, y: (space.size.height + space.safeAreaInsets.top) / 3 - space.safeAreaInsets.top)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(SettingsTokens.page)
