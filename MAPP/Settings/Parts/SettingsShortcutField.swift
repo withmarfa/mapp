@@ -52,6 +52,7 @@ struct SettingsShortcutField: View {
             .buttonStyle(.bordered)
             .buttonBorderShape(.roundedRectangle(radius: SettingsTokens.Metric.controlRadius))
             .buttonSizing(.flexible)
+            .controlSize(.large)
             .overlay(alignment: .trailing) {
                 if keys != nil, !isRecording {
                     Button(action: clear) {
