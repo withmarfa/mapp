@@ -214,13 +214,65 @@ struct CornerMenu<Content: View>: View {
     }
 }
 
-extension View {
-    /// A corner's choice of a few as the system's segmented control, its chosen segment gray rather than the accent
-    /// color, and as wide as its labels.
-    func cornerSegmented() -> some View {
-        pickerStyle(.segmented)
-            .labelsHidden()
-            .tint(.gray)
-            .fixedSize()
+/// A corner's choice of a few: one glass capsule of segments, like the corner's other buttons, with the chosen segment
+/// gray rather than the accent color. It reads to VoiceOver and the keyboard as the system's segmented control.
+struct CornerSegmented<Value: Hashable>: View {
+    let label: LocalizedStringKey
+    @Binding var selection: Value
+    let options: [Value]
+    let title: (Value) -> LocalizedStringResource
+    @Environment(\.interfaceTextSize) private var textSize
+
+    var body: some View {
+        let height = CornerMetrics.height * InterfaceStyle.scale(for: textSize)
+        HStack(spacing: 0) {
+            ForEach(options, id: \.self) { option in
+                Button { selection = option } label: { Text(title(option)) }
+                    .buttonStyle(CornerChoiceStyle(isChosen: selection == option))
+            }
+        }
+        .padding(.horizontal, 3)
+        .frame(height: height)
+        .glassEffect(.regular, in: .capsule)
+        .fixedSize()
+        .accessibilityRepresentation {
+            Picker(label, selection: $selection) {
+                ForEach(options, id: \.self) { Text(title($0)).tag($0) }
+            }
+            .pickerStyle(.segmented)
+        }
+    }
+}
+
+private struct CornerChoiceStyle: ButtonStyle {
+    let isChosen: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        Segment(configuration: configuration, isChosen: isChosen)
+    }
+
+    private struct Segment: View {
+        let configuration: Configuration
+        let isChosen: Bool
+        @State private var isHovered = false
+        @Environment(\.interfaceTextSize) private var textSize
+
+        var body: some View {
+            let scale = InterfaceStyle.scale(for: textSize)
+            configuration.label
+                .font(.system(size: 13 * scale, weight: isChosen ? .semibold : .medium))
+                .foregroundStyle(.primary)
+                .padding(.horizontal, 12 * scale)
+                .frame(maxHeight: .infinity)
+                .background(fill, in: .capsule)
+                .padding(.vertical, 3)
+                .contentShape(.capsule)
+                .onHover { isHovered = $0 }
+        }
+
+        private var fill: Color {
+            if isChosen { return CornerMetrics.onTint }
+            return .primary.opacity(configuration.isPressed ? 0.16 : isHovered ? 0.1 : 0)
+        }
     }
 }

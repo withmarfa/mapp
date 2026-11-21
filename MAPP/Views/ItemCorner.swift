@@ -39,11 +39,10 @@ struct ItemCorner: View {
                 case .textSize:
                     TextSizeControl(isAvailable: PageCorner.sizesText(layout: layout, look: details.pageLook?.mode))
                 case .look:
-                    Picker("Reader or Original", selection: Binding { details.pageLook?.mode ?? .standard } set: { details.pageLook?.choose($0) }) {
-                        Text("Reader").tag(SourceViewMode.reader)
-                        Text("Original").tag(SourceViewMode.original)
-                    }
-                    .cornerSegmented()
+                    CornerSegmented(
+                        label: "Reader or Original", selection: Binding { details.pageLook?.mode ?? .standard } set: { details.pageLook?.choose($0) },
+                        options: [SourceViewMode.reader, .original]
+                    ) { $0 == .reader ? "Reader" : "Original" }
                     .help("Reader or Original")
                     .accessibilityIdentifier("SourceViewMode")
                 case .pages:
