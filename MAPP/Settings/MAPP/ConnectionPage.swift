@@ -82,7 +82,7 @@ struct ConnectionPage: View {
             let hostName = SettingsWording.hostName(of: connection.address)
             let standing = ConnectionStanding(
                 state: host.state, status: status, lastSynced: host.lastSynced, now: .now, format: .stored())
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: SettingsTokens.Metric.cardGap) {
                 SettingsHead(
                     symbol: "server.rack", tone: .blue, title: Text(verbatim: name),
                     line: Text(verbatim: [name == hostName || standing.action != .none ? nil : hostName, standing.line].compactMap { $0 }.joined(separator: ". "))
@@ -117,7 +117,7 @@ struct ConnectionPage: View {
                 title: "Sign In…", canStart: !model.isWorking, browser: .signInAgain(usingCode: false),
                 code: .signInAgain(usingCode: true), identifier: "MarfaSignInAgain")
         case .tryAgain:
-            HStack(spacing: 8) {
+            HStack(spacing: SettingsTokens.Metric.buttonGap) {
                 if let word = standing.word { SettingsValue(verbatim: word, dot: color(of: standing.tone)) }
                 SettingsButton("Try Again") { host.refresh() }.accessibilityIdentifier("MarfaTryAgain")
             }
@@ -148,7 +148,7 @@ struct ConnectionPage: View {
             }
             if account.showsPermissions {
                 SettingsRow(title: Text("Look After This Marfa"), line: Text(verbatim: account.permissionsLine)) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: SettingsTokens.Metric.buttonGap) {
                         if account.holdsAll { SettingsValue(verbatim: account.permissionsValue) }
                         // The one Allow More… on the page: it asks for the owner's name too, which every sign-in asks for.
                         if !account.holdsAll || account.offersName {
@@ -195,7 +195,7 @@ struct ConnectionPage: View {
                 verbatim: String(localized: "Disconnect from \(LibraryDescription.name(libraries))"),
                 line: String(localized: "Removes this Mac’s copy and signs MAPP out.")
             ) {
-                HStack(spacing: 8) {
+                HStack(spacing: SettingsTokens.Metric.buttonGap) {
                     if model.isWorking { ProgressView().controlSize(.small) }
                     SettingsButton("Disconnect…", role: .destructive) { model.requestDisconnect() }
                         .disabled(model.isWorking)
@@ -212,7 +212,7 @@ struct ConnectionPage: View {
         title: LocalizedStringKey, canStart: Bool, browser: MarfaSettingsModel.SignInStep, code: MarfaSettingsModel.SignInStep,
         identifier: String
     ) -> some View {
-        HStack(spacing: 8) {
+        HStack(spacing: SettingsTokens.Metric.buttonGap) {
             if model.isWorking {
                 ProgressView().controlSize(.small)
                 if model.canCancelSignIn {
@@ -236,7 +236,7 @@ struct ConnectionPage: View {
                 footer: Text("Open \(code.address.absoluteString) on any device, sign in and type the code. It stops working at \(DateDisplay.timeOfDay(of: code.expiresAt, format: .stored())).")
             ) {
                 SettingsRow(verbatim: code.code) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: SettingsTokens.Metric.buttonGap) {
                         SettingsButton("Open Page") { NSWorkspace.shared.open(code.completeAddress ?? code.address) }
                         SettingsButton("Copy Code") {
                             NSPasteboard.general.clearContents()
@@ -253,10 +253,8 @@ struct ConnectionPage: View {
     @ViewBuilder private var noticeSection: some View {
         if let notice = model.notice {
             SettingsCard {
-                SettingsRow(
-                    verbatim: notice.title, line: notice.message, lead: .tint("exclamationmark.triangle", .orange), lines: nil
-                )
-                .accessibilityIdentifier("MarfaNotice")
+                SettingsProblemRow(title: Text(verbatim: notice.title), line: Text(verbatim: notice.message), actions: [])
+                    .accessibilityIdentifier("MarfaNotice")
             }
         }
     }
@@ -295,7 +293,7 @@ private struct ConnectionProblem: View {
             SettingsRow(verbatim: detail, size: .compact, lines: nil)
         }
         if wording.canCopyText {
-            SettingsRow(title: Text(verbatim: problem.copyText).font(SettingsTokens.font(.mono)), size: .compact)
+            SettingsRow(title: Text(verbatim: problem.copyText).monospaced(), size: .compact)
                 .textSelection(.enabled)
         }
         if let failed {

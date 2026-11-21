@@ -224,7 +224,7 @@ enum LibraryDescription {
     /// the person's own Cancel: the text goes through `Notices.notKept`, to the clipboard, and the draft is dropped.
     func handOverDrafts() {
         instanceSettings.handOver(
-            to: libraries.host.notices, because: String(localized: "You closed Settings before saving the changes to this Marfa’s settings."))
+            to: libraries.host.notices, because: String(localized: "You closed Settings before saving the changes to the server’s settings."))
         ownerDrafts.handOver(to: libraries.host.notices, because: String(localized: "You closed Settings before this was saved."))
     }
 }

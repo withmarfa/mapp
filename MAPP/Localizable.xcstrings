@@ -16,7 +16,7 @@
     "%@ were changed elsewhere. MAPP read the new values; yours weren’t saved." : {
 
     },
-    "%@ took another date" : {
+    "%@ Took Another Date" : {
 
     },
     "%lld other settings are set on the machine %@ runs on." : {
@@ -25,22 +25,10 @@
     "%lld settings are set on the machine %@ runs on." : {
 
     },
-    "1 conflicted copy" : {
-
-    },
     "1 copy." : {
 
     },
     "1 event." : {
-
-    },
-    "1 file is held back" : {
-
-    },
-    "1 file or folder can’t be read" : {
-
-    },
-    "1 file the server refused" : {
 
     },
     "1 other setting is set on the machine %@ runs on." : {
@@ -50,9 +38,6 @@
 
     },
     "1 setting is set on the machine %@ runs on." : {
-
-    },
-    "A folder is made where it is kept in step, with the command line. Only folders MAPP may read are listed." : {
 
     },
     "A folder that already exists on the machine %@ runs on." : {
@@ -76,10 +61,10 @@
     "Archived, unarchived or moved to or from another state." : {
 
     },
-    "Backups are failing" : {
+    "Backups Are Failing" : {
 
     },
-    "Backups are incomplete" : {
+    "Backups Are Incomplete" : {
 
     },
     "Change Address" : {
@@ -98,9 +83,6 @@
 
     },
     "Check Automatically" : {
-
-    },
-    "%lld conflicted copies" : {
 
     },
     "Check Automatically is off, so %@ isn’t looking for updates." : {
@@ -182,7 +164,7 @@
     "%@ ended MAPP’s sign-in. Sign in again in Connection." : {
 
     },
-    "%@ failed" : {
+    "%@ Failed" : {
 
     },
     "%@ files aren’t copied to the backup place yet." : {
@@ -216,9 +198,6 @@
 
     },
     "%@ you make show here." : {
-
-    },
-    "%@ is ready" : {
 
     },
     "%@ of %@ selected" : {
@@ -314,9 +293,6 @@
     "characters" : {
 
     },
-    "Claimed this Marfa" : {
-
-    },
     "Cleared a connector’s state" : {
 
     },
@@ -401,6 +377,21 @@
     "Heartbeat" : {
 
     },
+    "Housekeeping" : {
+
+    },
+    "Issued a device code" : {
+
+    },
+    "Issued a setup code" : {
+
+    },
+    "Issued a sign-in code" : {
+
+    },
+    "Issued an access token" : {
+
+    },
     "It must sign in again with your password or a passkey. Apps and keys keep working." : {
 
     },
@@ -434,9 +425,6 @@
     "MAPP isn’t allowed to list, narrow or disconnect apps." : {
 
     },
-    "MAPP isn’t allowed to read this Marfa’s health and status." : {
-
-    },
     "MAPP isn’t allowed to read whether a newer Marfa is ready." : {
 
     },
@@ -449,24 +437,6 @@
     "MAPP isn’t allowed to see, take or restore backups." : {
 
     },
-    "MAPP isn’t allowed to see or change this Marfa’s addresses." : {
-
-    },
-    "MAPP isn’t allowed to see or change how this Marfa keeps files." : {
-
-    },
-    "MAPP isn’t allowed to read this Marfa’s audit log." : {
-
-    },
-    "MAPP isn’t allowed to see or change how this Marfa is monitored." : {
-
-    },
-    "MAPP isn’t allowed to see or change this Marfa’s limits." : {
-
-    },
-    "MAPP isn’t allowed to read the settings this Marfa started with." : {
-
-    },
     "Key Requests per Window" : {
 
     },
@@ -477,9 +447,6 @@
 
     },
     "MAPP removes its copy from this Mac and signs out. Webhooks it made are deleted. Your items stay." : {
-
-    },
-    "Marfa asks this address on a schedule, so a monitor notices if it stops." : {
 
     },
     "Needs more disk space." : {
@@ -528,12 +495,6 @@
 
     },
     "%lld of %@" : {
-
-    },
-    "%lld to %lld points" : {
-
-    },
-    " " : {
 
     },
     "%@ on This Mac" : {
@@ -954,9 +915,6 @@
     "Set on the machine %@ runs on." : {
 
     },
-    "Show" : {
-
-    },
     "Show All Tabs" : {
 
     },
@@ -1026,16 +984,7 @@
     "Show Backups" : {
 
     },
-    "Show Folders" : {
-
-    },
-    "Show Housekeeping" : {
-
-    },
     "Show Matches Left Out of Search" : {
-
-    },
-    "Show Monitoring" : {
 
     },
     "Show Snippets" : {
@@ -1065,7 +1014,7 @@
     "Some files the newest backup needs are still waiting for a copy." : {
 
     },
-    "Some stored backups are damaged" : {
+    "Some Stored Backups Are Damaged" : {
 
     },
     "Some stored parts of backups are damaged." : {
@@ -1146,7 +1095,7 @@
     "The key “%@” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key on the Keys page." : {
 
     },
-    "The last backup didn’t finish" : {
+    "The Last Backup Didn’t Finish" : {
 
     },
     "Show Spelling and Grammar" : {
@@ -1194,10 +1143,7 @@
     "The types and sources chosen and left out make more conditions than one search can hold." : {
 
     },
-    "The update to %@ didn’t work" : {
-
-    },
-    "Custom…" : {
+    "The Update to %@ Didn’t Work" : {
 
     },
     "Dark" : {
@@ -1308,12 +1254,6 @@
     "MAPP is no longer allowed to %@. Allow it again from the page that needs it." : {
       "extractionState" : "manual"
     },
-    "MAPP isn’t allowed to list and permanently delete deleted items." : {
-
-    },
-    "MAPP isn’t allowed to see and change this Marfa’s settings." : {
-
-    },
     "MAPP keeps trying." : {
 
     },
@@ -1375,9 +1315,6 @@
 
     },
     "Palettes" : {
-
-    },
-    "Pattern" : {
 
     },
     "Paused" : {
@@ -1605,21 +1542,6 @@
     "Hour" : {
 
     },
-    "Housekeeping" : {
-
-    },
-    "Issued a device code" : {
-
-    },
-    "Issued a setup code" : {
-
-    },
-    "Issued a sign-in code" : {
-
-    },
-    "Issued an access token" : {
-
-    },
     "Inbox Is Empty" : {
 
     },
@@ -1747,9 +1669,6 @@
 
     },
     "Show Formats" : {
-
-    },
-    "Show %lld" : {
 
     },
     "Something went wrong while signing in, so nothing changed. Try again, or use a code if the browser won’t open." : {
@@ -1888,9 +1807,6 @@
 
     },
     "Used a setup code" : {
-
-    },
-    "Value panels open under a date, status, tags, or other value. Palettes are the command palette, Search Items, and New Item. Translucent uses the system’s popover material, and Solid uses the window color." : {
 
     },
     "viewers" : {
@@ -2099,9 +2015,6 @@
     "MAPP couldn’t confirm that %@ ended MAPP’s earlier approval." : {
 
     },
-    "You closed Settings before saving the changes to this Marfa’s settings." : {
-
-    },
     "You closed Settings before this was saved." : {
 
     },
@@ -2280,7 +2193,7 @@
     "%@ has an entry that isn’t finished. Finish it, or cancel it, to add the item." : {
       "extractionState" : "manual"
     },
-    "%@ hasn’t come back yet" : {
+    "%@ Hasn’t Come Back Yet" : {
 
     },
     "%@ is attached to “%@”, but it couldn’t be put in its text." : {
@@ -3358,9 +3271,6 @@
     "An item with more than %lld versions will have its oldest versions permanently deleted the next time the server tidies up." : {
       "extractionState" : "manual"
     },
-    "An item’s text can name a picture at a web address. MAPP loads it only when you choose to, or always for items in the Inbox. Pictures you have loaded stay on this Mac until you disconnect the library." : {
-
-    },
     "And %lld more changes whose text can’t be shown." : {
       "localizations" : {
         "en" : {
@@ -3438,15 +3348,6 @@
 
     },
     "Attachments" : {
-
-    },
-    "Attachments kept offline" : {
-
-    },
-    "Attachments not yet offline" : {
-
-    },
-    "Attachments stay offline and don’t count toward the limit. Removing downloads keeps attachments and files that are waiting to upload." : {
 
     },
     "Author Comment" : {
@@ -3681,9 +3582,6 @@
     "Changes Haven’t Been Sent" : {
       "extractionState" : "manual"
     },
-    "Changes text in the sidebar, lists, and controls. Text size on item pages is set in Editor." : {
-
-    },
     "Changes to “%@” weren’t sent" : {
       "extractionState" : "manual"
     },
@@ -3856,9 +3754,6 @@
     "Connected" : {
       "extractionState" : "manual"
     },
-    "Connected, up to date" : {
-
-    },
     "Connecting…" : {
       "extractionState" : "manual"
     },
@@ -3928,9 +3823,6 @@
     "Current" : {
 
     },
-    "Current limit" : {
-
-    },
     "Customize Layout in the Title Row" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3944,9 +3836,6 @@
     },
     "Customize Layout…" : {
       "extractionState" : "manual"
-    },
-    "Daily" : {
-
     },
     "Date" : {
       "extractionState" : "manual"
@@ -4077,16 +3966,7 @@
     "Divider" : {
 
     },
-    "docs.marfa.so" : {
-
-    },
     "Done" : {
-
-    },
-    "Download limit" : {
-
-    },
-    "Downloaded files" : {
 
     },
     "Downloading" : {
@@ -4252,7 +4132,7 @@
     "Files Not in the Text" : {
       "extractionState" : "manual"
     },
-    "Files are waiting for a second copy" : {
+    "Files Are Waiting for a Second Copy" : {
 
     },
     "Files may be missing from it." : {
@@ -4315,9 +4195,6 @@
     "Footnote" : {
 
     },
-    "For item pages. Lists always keep their background." : {
-
-    },
     "Format" : {
 
     },
@@ -4347,9 +4224,6 @@
     },
     "Getting the latest changes from the server." : {
       "extractionState" : "manual"
-    },
-    "github.com/withmarfa/mapp" : {
-
     },
     "Glass" : {
 
@@ -4562,9 +4436,6 @@
     "Items listed: %llu" : {
       "extractionState" : "manual"
     },
-    "Keep all downloads" : {
-
-    },
     "Keep Copy" : {
       "extractionState" : "manual"
     },
@@ -4618,9 +4489,6 @@
     },
     "Library unavailable" : {
       "extractionState" : "manual"
-    },
-    "License" : {
-
     },
     "Link" : {
 
@@ -5266,9 +5134,6 @@
     "Pending" : {
       "extractionState" : "manual"
     },
-    "Person" : {
-
-    },
     "Photo" : {
       "extractionState" : "manual"
     },
@@ -5283,9 +5148,6 @@
     },
     "Picture or Text" : {
       "extractionState" : "manual"
-    },
-    "Pictures" : {
-
     },
     "Pill" : {
       "extractionState" : "manual"
@@ -5346,9 +5208,6 @@
     },
     "Property Not Saved" : {
       "extractionState" : "manual"
-    },
-    "Published %@." : {
-
     },
     "Question" : {
       "extractionState" : "manual"
@@ -5418,9 +5277,6 @@
     },
     "Relevance" : {
       "extractionState" : "manual"
-    },
-    "Remote Pictures" : {
-
     },
     "Remote Pictures Are Off" : {
 
@@ -5556,9 +5412,6 @@
     "Row" : {
 
     },
-    "Rows" : {
-
-    },
     "Rows at a Time" : {
 
     },
@@ -5647,9 +5500,6 @@
         }
       }
     },
-    "Sends errors and timings to WithMarfa to help fix problems. Never includes your items, their text, your server’s address or anything you type." : {
-
-    },
     "Server" : {
 
     },
@@ -5682,6 +5532,9 @@
     },
     "Shorten and Save" : {
       "extractionState" : "manual"
+    },
+    "Show" : {
+
     },
     "Show %@" : {
 
@@ -5832,9 +5685,6 @@
     },
     "Sources are named on your server, so you can change one once MAPP is connected." : {
       "extractionState" : "manual"
-    },
-    "Space used" : {
-
     },
     "Standard" : {
 
@@ -6048,9 +5898,6 @@
     },
     "The panel closed before the view was saved." : {
       "extractionState" : "manual"
-    },
-    "The panels that open under a date, status, tags, or other value. Solid uses the window color instead of glass." : {
-
     },
     "The parent could not be saved." : {
 
@@ -6563,9 +6410,6 @@
     "Use a Code Instead…" : {
       "extractionState" : "manual"
     },
-    "Use a different server" : {
-
-    },
     "Use a number from %lld to %lld." : {
       "extractionState" : "manual"
     },
@@ -6597,9 +6441,6 @@
 
     },
     "Version" : {
-
-    },
-    "Version %@" : {
 
     },
     "Version %lld" : {
@@ -6700,9 +6541,6 @@
     "Week %lld" : {
       "extractionState" : "manual"
     },
-    "Weekly" : {
-
-    },
     "What you wrote is lost unless you copy it first." : {
       "extractionState" : "manual"
     },
@@ -6711,9 +6549,6 @@
     },
     "Where each column starts in a new window. Dragging a column to a new width changes only that window." : {
       "extractionState" : "manual"
-    },
-    "Wide" : {
-
     },
     "Wrap Code" : {
 
@@ -7198,9 +7033,6 @@
     "MAPP isn’t allowed to make keys." : {
 
     },
-    "MAPP isn’t allowed to read the jobs this Marfa runs by itself." : {
-
-    },
     "Made %@." : {
 
     },
@@ -7267,7 +7099,7 @@
     "No apps are connected." : {
 
     },
-    "No backups are kept" : {
+    "No Backups Are Kept" : {
 
     },
     "No Browsers" : {
@@ -7277,9 +7109,6 @@
 
     },
     "No Owner Permissions" : {
-
-    },
-    "Not Allowed" : {
 
     },
     "Not Changed" : {
@@ -7306,9 +7135,6 @@
     "Other Addresses" : {
 
     },
-    "Pages on it can no longer call this Marfa." : {
-
-    },
     "Pages on it may call %@." : {
 
     },
@@ -7331,9 +7157,6 @@
 
     },
     "Password Changed" : {
-
-    },
-    "Permission" : {
 
     },
     "Profile" : {
@@ -7411,9 +7234,6 @@
     "Signed in with your password or a passkey." : {
 
     },
-    "Something answers there, but not this Marfa." : {
-
-    },
     "Source, Stamped on What It Writes" : {
 
     },
@@ -7466,9 +7286,6 @@
 
     },
     "This Key Is Gone" : {
-
-    },
-    "This Marfa stops answering there." : {
 
     },
     "This is a website address." : {
@@ -7813,12 +7630,6 @@
     "As media" : {
 
     },
-    "Attachments Kept Offline" : {
-
-    },
-    "Attachments stay offline and don’t count toward the limit." : {
-
-    },
     "Back to Calendar" : {
 
     },
@@ -7837,25 +7648,10 @@
     "Couldn’t Import Layouts" : {
 
     },
-    "Couldn’t Read the Settings" : {
-
-    },
     "Cover" : {
 
     },
-    "Current Limit" : {
-
-    },
     "Display" : {
-
-    },
-    "Download Limit" : {
-
-    },
-    "Downloaded Files" : {
-
-    },
-    "Downloading Library…" : {
 
     },
     "Edit Pages As" : {
@@ -7919,9 +7715,6 @@
 
     },
     "Indent With" : {
-
-    },
-    "Keeps attachments and files waiting to upload." : {
 
     },
     "Layouts" : {
@@ -8044,9 +7837,6 @@
     "Up to %lld Lines" : {
 
     },
-    "Updating Library…" : {
-
-    },
     "View > Show Original switches it." : {
 
     },
@@ -8066,9 +7856,6 @@
 
     },
     "“%@” was attached to “%@” but isn’t in its text. It was meant for a folded section or text not yet shown." : {
-
-    },
-    "%@ is ready." : {
 
     },
     "%@%@ files nothing uses" : {
@@ -8189,10 +7976,10 @@
     "Backups" : {
 
     },
-    "Backups are turned off" : {
+    "Backups Are Turned Off" : {
 
     },
-    "Backups can’t be kept there" : {
+    "Backups Can’t Be Kept There" : {
 
     },
     "Backups of %@" : {
@@ -8213,7 +8000,7 @@
     "Clean-up" : {
 
     },
-    "Clean-up is paused" : {
+    "Clean-Up Is Paused" : {
 
     },
     "Connector Deliveries, Handled" : {
@@ -8223,9 +8010,6 @@
 
     },
     "Copies of Each File" : {
-
-    },
-    "Couldn’t Read This Marfa’s Settings" : {
 
     },
     "Couldn’t Read Where Files Are" : {
@@ -8259,15 +8043,6 @@
 
     },
     "Failing" : {
-
-    },
-    "%lld files are held back" : {
-
-    },
-    "%lld files or folders can’t be read" : {
-
-    },
-    "%lld files the server refused" : {
 
     },
     "Folders" : {
@@ -8405,7 +8180,7 @@
     "Logs" : {
 
     },
-    "MAPP can look after part of %@" : {
+    "MAPP Can Look After Part of %@" : {
 
     },
     "Largest File Read" : {
@@ -8585,9 +8360,6 @@
     "Off" : {
 
     },
-    "%@ on %@" : {
-
-    },
     "Only webhooks this sign-in made are listed. An app or a key sees only its own." : {
 
     },
@@ -8654,9 +8426,6 @@
     "Synced Folders" : {
 
     },
-    "Syncing is paused" : {
-
-    },
     "Table Rows Changed" : {
 
     },
@@ -8670,9 +8439,6 @@
 
     },
     "Telemetry is sent without these headers." : {
-
-    },
-    "The folder is missing where this copy is kept" : {
 
     },
     "The folder or object store isn’t taking them." : {
@@ -8696,9 +8462,6 @@
     "The PostHog host and the project token are removed together, and error reports stop." : {
 
     },
-    "The server refused this copy’s sign-in" : {
-
-    },
     "The server stops sending its heartbeat." : {
 
     },
@@ -8709,15 +8472,6 @@
 
     },
     "These are its settings, not the ones you were editing." : {
-
-    },
-    "This copy can’t reach the server" : {
-
-    },
-    "This copy isn’t watching for changes" : {
-
-    },
-    "This copy’s settings file can’t be used" : {
 
     },
     "This Folder Is Gone" : {
@@ -8886,6 +8640,117 @@
 
     },
     "Default (%@)" : {
+
+    },
+    "%@ asks this address on a schedule, so a monitor notices if it stops." : {
+
+    },
+    "%lld Conflicted Copies" : {
+
+    },
+    "%lld Files Are Held Back" : {
+
+    },
+    "%lld Files or Folders Can’t Be Read" : {
+
+    },
+    "%lld Files the Server Refused" : {
+
+    },
+    "%lld Removals Wait on %@" : {
+
+    },
+    "1 Conflicted Copy" : {
+
+    },
+    "1 File Is Held Back" : {
+
+    },
+    "1 File or Folder Can’t Be Read" : {
+
+    },
+    "1 File the Server Refused" : {
+
+    },
+    "1 Removal Waits on %@" : {
+
+    },
+    "Claimed this server" : {
+
+    },
+    "Couldn’t Read %@’s Settings" : {
+
+    },
+    "Folders are made with the command line. Only folders MAPP may read are listed." : {
+
+    },
+    "manage files across the server" : {
+
+    },
+    "MAPP isn’t allowed to read the server’s audit log." : {
+
+    },
+    "MAPP isn’t allowed to read the server’s health and status." : {
+
+    },
+    "MAPP isn’t allowed to read the settings the server started with." : {
+
+    },
+    "MAPP isn’t allowed to see or change how the server keeps files." : {
+
+    },
+    "MAPP isn’t allowed to see or change the server’s addresses." : {
+
+    },
+    "MAPP isn’t allowed to see or change the server’s limits." : {
+
+    },
+    "Pages on it can no longer call the server." : {
+
+    },
+    "see and change the server’s settings" : {
+
+    },
+    "Show Folders" : {
+
+    },
+    "Show Housekeeping" : {
+
+    },
+    "Show Monitoring" : {
+
+    },
+    "Something answers there, but not this server." : {
+
+    },
+    "Syncing Is Paused" : {
+
+    },
+    "The Folder Is Missing Where This Copy Is Kept" : {
+
+    },
+    "The Server Refused This Copy’s Sign-In" : {
+
+    },
+    "The server stops answering there." : {
+
+    },
+    "This Copy Can’t Reach the Server" : {
+
+    },
+    "This Copy Isn’t Watching for Changes" : {
+
+    },
+    "This Copy’s Settings File Can’t Be Used" : {
+
+    },
+    "You closed Settings before saving the changes to the server’s settings." : {
+
+    },
+    "MAPP isn’t allowed to read the jobs the server runs by itself." : {
+
+    },
+    "MAPP isn’t allowed to see or change how the server is monitored." : {
 
     }
   },

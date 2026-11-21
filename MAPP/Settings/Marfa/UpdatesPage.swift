@@ -77,7 +77,7 @@ struct UpdatesPage: View {
             SettingsSection("Needs Attention") {
                 if let undone {
                     SettingsProblemRow(
-                        title: Text("The update to \(undone.release) didn’t work"),
+                        title: Text("The Update to \(undone.release) Didn’t Work"),
                         line: Text(
                             undone.result == .putBack
                                 ? "\(host.serverName) is back on \(status.running), as before. Nothing was lost."
@@ -86,7 +86,7 @@ struct UpdatesPage: View {
                 }
                 if model.lostTrack {
                     SettingsProblemRow(
-                        title: Text("\(host.serverName) hasn’t come back yet"),
+                        title: Text("\(host.serverName) Hasn’t Come Back Yet"),
                         line: Text("MAPP stopped waiting. Check again to see where it stands."),
                         actions: [SettingsProblemAction("Check Again") { Task { await model.load() } }])
                 }
@@ -100,7 +100,7 @@ struct UpdatesPage: View {
     private func marfa(_ status: UpdateStatus) -> some View {
         SettingsSection("Marfa") {
             SettingsRow(title: title(status), line: Text(verbatim: line(status))) {
-                HStack(spacing: 8) {
+                HStack(spacing: SettingsTokens.Metric.buttonGap) {
                     if model.needsMaintain {
                         SettingsButton("Allow More…") { host.askForMore(naming: InstancePermission.instanceMaintain.rawValue) }
                     } else {
@@ -121,12 +121,12 @@ struct UpdatesPage: View {
                 }
             }
             if model.ready != nil, !status.updatesItself, let step = status.step, !step.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetLabelSpacing) {
                     Text("The Server’s Steps").settingsFont(.title).foregroundStyle(SettingsTokens.primaryText)
                     SettingsReadOnlyValue(text: step)
                 }
                 .padding(.horizontal, SettingsTokens.Metric.inset)
-                .padding(.vertical, 10)
+                .padding(.vertical, SettingsTokens.Metric.cardGap)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             SettingsRow("Check Automatically", line: model.status?.checksAutomatically == false ? "Turned off." : "Every few hours.") {

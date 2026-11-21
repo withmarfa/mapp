@@ -50,8 +50,13 @@ import Testing
         let problem = FolderProblem(code: .heldFile, count: 8)
         #expect(FoldersModel.condition(of: Self.copy("1", downloads: 5, problems: [problem])) == .init(title: "Needs attention", tone: .warning))
         #expect(FoldersModel.condition(of: Self.copy("1", removals: 1, problems: [problem])).title == "1 removal waits")
-        #expect(FoldersModel.title(of: problem) == "8 files are held back")
-        #expect(FoldersModel.title(of: FolderProblem(code: .conflict, count: 1)) == "1 conflicted copy")
+        #expect(FoldersModel.title(of: problem) == "8 Files Are Held Back")
+        #expect(FoldersModel.title(of: FolderProblem(code: .conflict, count: 1)) == "1 Conflicted Copy")
+    }
+
+    @Test func aCopysRemovalsThatWaitAreTitledLikeAnyProblem() {
+        #expect(FoldersModel.removalsTitle(1, signIn: "Studio Mac") == "1 Removal Waits on Studio Mac")
+        #expect(FoldersModel.removalsTitle(12, signIn: "Studio Mac") == "12 Removals Wait on Studio Mac")
     }
 
     @Test func everyProblemCodeTheServerStoresHasWords() {

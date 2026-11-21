@@ -52,7 +52,7 @@ struct FoldersPage: View {
         SettingsPageColumn {
             SettingsSection(
                 name: Text("Folders"),
-                footer: Text("A folder is made where it is kept in step, with the command line. Only folders MAPP may read are listed.")
+                footer: Text("Folders are made with the command line. Only folders MAPP may read are listed.")
             ) {
                 if model.folders.isEmpty {
                     SettingsEmptyCard(
@@ -112,7 +112,7 @@ private struct FolderDetail: View {
                 ForEach(held) { copy in
                     if copy.pausedRemovals > 0 {
                         SettingsProblemRow(
-                            title: Text("\(FoldersModel.condition(of: copy).title) on \(copy.signIn)"),
+                            title: Text(verbatim: FoldersModel.removalsTitle(copy.pausedRemovals, signIn: copy.signIn)),
                             line: Text(verbatim: FoldersModel.removalsLine), actions: [])
                     }
                     ForEach(copy.problems, id: \.code) { problem in

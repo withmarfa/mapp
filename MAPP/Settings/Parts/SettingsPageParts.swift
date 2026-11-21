@@ -15,7 +15,7 @@ struct SettingsPageColumn<Content: View>: View {
                 }
             }
             .frame(maxWidth: SettingsTokens.Metric.column, alignment: .leading)
-            .padding(.horizontal, 24)
+            .padding(.horizontal, SettingsTokens.Metric.pageSide)
             .padding(.top, SettingsTokens.Metric.pageTop)
             .padding(.bottom, SettingsTokens.Metric.pageBottom)
             .frame(maxWidth: .infinity)
@@ -123,14 +123,16 @@ struct SettingsProblemAction: Identifiable {
 struct SettingsProblemRow: View {
     let title: Text
     var line: Text?
+    /// The lead's symbol: the warning triangle, or the lock for a refusal.
+    var symbol = "exclamationmark.triangle"
     var tone: SettingsTokens.Tone = .orange
     let actions: [SettingsProblemAction]
     /// A problem's words are told whole: an explanation is never cut to two lines.
     var lines: Int? = nil
 
     var body: some View {
-        SettingsRow(title: title, line: line, lead: .tint("exclamationmark.triangle", tone), lines: lines) {
-            HStack(spacing: 8) {
+        SettingsRow(title: title, line: line, lead: .tint(symbol, tone), lines: lines) {
+            HStack(spacing: SettingsTokens.Metric.buttonGap) {
                 if actions.count <= 2 {
                     ForEach(actions) { action in
                         SettingsButton(title: action.title, role: action.isDestructive ? .destructive : .normal, action: action.perform)
@@ -155,16 +157,17 @@ struct SettingsStateContent: View {
     let title: Text
     var line: Text?
     var action: (title: LocalizedStringKey, perform: () -> Void)?
-    /// Where the words stand in a card (a list with nothing in it), which the boards draw tighter than a page's own state: the
-    /// symbol 6 points and the line 4 points nearer the title.
+    /// Where the words stand in a card (a list with nothing in it), which the boards draw tighter than a page's own state.
     var isInCard = false
 
+    private typealias Gap = SettingsTokens.Metric.State
+
     var body: some View {
-        VStack(spacing: isInCard ? 4 : 8) {
+        VStack(spacing: isInCard ? Gap.cardSpacing : Gap.spacing) {
             Image(systemName: symbol)
-                .font(.system(size: 29, weight: .light))
+                .font(.system(size: Gap.glyph, weight: .light))
                 .foregroundStyle(SettingsTokens.tertiaryText)
-                .padding(.bottom, isInCard ? 4 : 6)
+                .padding(.bottom, isInCard ? Gap.cardSymbolGap : Gap.symbolGap)
                 .accessibilityHidden(true)
             title.settingsFont(.stateTitle).multilineTextAlignment(.center)
             if let line {
@@ -175,7 +178,7 @@ struct SettingsStateContent: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             if let action {
-                SettingsButton(action.title, action: action.perform).padding(.top, isInCard ? 16 : 12)
+                SettingsButton(action.title, action: action.perform).padding(.top, isInCard ? Gap.cardActionGap : Gap.actionGap)
             }
         }
         .frame(maxWidth: SettingsTokens.Metric.stateMeasure)
@@ -194,7 +197,7 @@ struct SettingsPageState: View {
     var body: some View {
         GeometryReader { space in
             SettingsStateContent(symbol: symbol, title: title, line: line, action: action)
-                .padding(.horizontal, 24)
+                .padding(.horizontal, SettingsTokens.Metric.pageSide)
                 .position(x: space.size.width / 2, y: (space.size.height + space.safeAreaInsets.top) / 3 - space.safeAreaInsets.top + SettingsTokens.Metric.pageStateDrop)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -211,7 +214,7 @@ struct SettingsBar<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: SettingsTokens.Metric.buttonGap) {
             if edge == .trailing { Spacer(minLength: 0) }
             content
             if edge == .leading { Spacer(minLength: 0) }
@@ -231,7 +234,7 @@ struct SettingsEmptyCard: View {
 
     var body: some View {
         SettingsStateContent(symbol: symbol, title: title, line: line, action: action, isInCard: true)
-            .padding(.vertical, 28)
+            .padding(.vertical, SettingsTokens.Metric.emptyCardPadding)
             .frame(maxWidth: .infinity)
     }
 }

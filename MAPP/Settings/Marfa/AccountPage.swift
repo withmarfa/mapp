@@ -57,14 +57,15 @@ struct AccountPage: View {
                     }
                 } else {
                     SettingsSection("Passkeys and Browsers") {
-                        SettingsRow(
-                            "Sign-Ins", line: "MAPP isn’t allowed to list and end your sign-ins.", lead: .symbol("lock")
-                        ) {
-                            SettingsButton(host.isAllowingMore ? "Waiting…" : "Allow More…") {
-                                Task { await model.allowSignIns(); await model.load() }
-                            }
-                            .disabled(host.isAllowingMore)
-                        }
+                        SettingsProblemRow(
+                            title: Text("Sign-Ins"), line: Text("MAPP isn’t allowed to list and end your sign-ins."), symbol: "lock", tone: .gray,
+                            actions: [
+                                SettingsProblemAction(host.isAllowingMore ? "Waiting…" : "Allow More…") {
+                                    Task { await model.allowSignIns(); await model.load() }
+                                }
+                            ]
+                        )
+                        .disabled(host.isAllowingMore)
                     }
                 }
             }
@@ -78,7 +79,7 @@ struct AccountPage: View {
             }
             if profile.emailIsReadable {
                 SettingsRow("Email", line: "Optional. Not used to sign in.") {
-                    if let email = profile.email { SettingsValue(verbatim: email) } else { SettingsValue("None") }
+                    if let email = profile.email { SettingsValue(verbatim: email) } else { SettingsValue("Not Set") }
                 }
             }
         }
@@ -170,7 +171,7 @@ private struct PasswordSheet: View {
             SettingsSheet(
                 title: Text("Change Password"), line: Text("Every browser signs out. Apps and keys keep working.")
             ) {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFieldGap) {
                     SettingsSheetField(label: "Current Password", error: model.currentPasswordError) {
                         SettingsField(
                             title: "Current Password", text: $model.currentPassword, isError: model.currentPasswordError != nil,

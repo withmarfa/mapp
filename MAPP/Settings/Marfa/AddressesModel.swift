@@ -161,7 +161,7 @@ import Observation
     static func notAnswering(_ reason: String?) -> String {
         switch reason {
         case "timed_out": String(localized: "Nothing answered there in time.")
-        case "not_this_instance": String(localized: "Something answers there, but not this Marfa.")
+        case "not_this_instance": String(localized: "Something answers there, but not this server.")
         default: String(localized: "Nothing answers there.")
         }
     }
@@ -241,7 +241,7 @@ import Observation
             let says = asked.consequences.map(\.sentence).joined(separator: " ")
             question = Question(
                 action: .removeAddress(address), title: String(localized: "Remove \(Self.display(address))?"),
-                message: says.isEmpty ? String(localized: "This Marfa stops answering there.") : says,
+                message: says.isEmpty ? String(localized: "The server stops answering there.") : says,
                 confirm: String(localized: "Remove"))
             removalPlan = asked
         } catch {
@@ -256,7 +256,7 @@ import Observation
         rowErrors[website] = nil
         question = Question(
             action: .removeWebsite(website), title: String(localized: "Remove \(Self.display(website))?"),
-            message: String(localized: "Pages on it can no longer call this Marfa."), confirm: String(localized: "Remove"))
+            message: String(localized: "Pages on it can no longer call the server."), confirm: String(localized: "Remove"))
     }
 
     func cancelQuestion() {

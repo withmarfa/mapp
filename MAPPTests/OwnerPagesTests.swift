@@ -1356,7 +1356,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         model.begin(.changeSignIn)
         model.input = "studio.castell.design"
         await model.check()
-        #expect(model.inputError == "Something answers there, but not this Marfa.")
+        #expect(model.inputError == "Something answers there, but not this server.")
         #expect(!model.canConfirm)
     }
 
@@ -1554,7 +1554,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         await model.check()
         bench.calls.fail("setWebsites", with: .notPermitted("config.manage"))
         await model.confirm()
-        #expect(model.inputError?.contains("see and change this Marfa’s settings") == true)
+        #expect(model.inputError?.contains("see and change the server’s settings") == true)
         #expect(model.input == "castell.studio")
         #expect(bench.refreshed == 1)
     }
@@ -1608,6 +1608,17 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
                 == .instanceChanged)
         #expect(OwnerWording.line(.instanceChanged) == InstanceConfigFailure.anotherMarfaSentence)
         #expect(InstanceConfigFailure.instanceChanged.message.hasPrefix(InstanceConfigFailure.anotherMarfaSentence))
+    }
+
+    @Test func theServersSettingsFailuresAreTheOwnerPagesFailures() {
+        #expect(OwnerFailure(.unreachable) == .unreachable)
+        #expect(OwnerFailure(.keyRefused) == .signedOut)
+        #expect(OwnerFailure(.notPermitted) == .notPermitted("config.manage"))
+        #expect(OwnerFailure(.instanceChanged) == .instanceChanged)
+        #expect(OwnerFailure(.unsupported) == .unsupported)
+        #expect(OwnerFailure(.refused("Too big.")) == .refused("Too big."))
+        #expect(OwnerFailure(.failed("Broke.")) == .failed("Broke."))
+        #expect(OwnerWording.line(.unsupported) == InstanceConfigFailure.unsupported.message)
     }
 
     @Test func aConflictIsChangedElsewhereOnlyWhereTheCallSaysSo() {

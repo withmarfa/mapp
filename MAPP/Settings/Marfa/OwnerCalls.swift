@@ -137,6 +137,8 @@ nonisolated enum OwnerFailure: Error, Hashable, Sendable {
     /// Another Marfa answers at the address than the one the call was made for. Nothing was sent to it, and nothing it
     /// holds is taken as what the page showed.
     case instanceChanged
+    /// The server has no settings to read: none is set, or the library has none, as the sample does not.
+    case unsupported
     /// The owner closed, or did not pass, the sign-in the server asked for.
     case notConfirmed
     case refused(String)

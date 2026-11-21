@@ -137,8 +137,7 @@ struct SettingsShortcutSearch: View {
             .accessibilityLabel("Search by Pressing a Shortcut")
             .accessibilityAddTraits(byKeys ? .isSelected : [])
             .accessibilityIdentifier("ShortcutSearchByKeys")
-            HStack(spacing: 5) {
-                Image(systemName: "magnifyingglass").settingsFont(.small).foregroundStyle(SettingsTokens.tertiaryText)
+            SettingsSearchPill {
                 if byKeys {
                     if let pressed {
                         Text(verbatim: pressed).settingsFont(.small).foregroundStyle(SettingsTokens.primaryText)
@@ -154,9 +153,6 @@ struct SettingsShortcutSearch: View {
                         .accessibilityIdentifier("ShortcutSearch")
                 }
             }
-            .padding(.horizontal, SettingsTokens.Metric.searchInset)
-            .frame(width: SettingsTokens.Metric.searchWidth, height: SettingsTokens.Metric.searchHeight)
-            .background(SettingsTokens.buttonFill, in: .rect(cornerRadius: SettingsTokens.Metric.searchRadius, style: .continuous))
         }
         .onChange(of: byKeys, initial: true) { _, on in
             if on {

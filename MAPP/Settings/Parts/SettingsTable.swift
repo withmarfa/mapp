@@ -33,16 +33,27 @@ struct SettingsTableSearch: View {
     @Binding var text: String
 
     var body: some View {
-        HStack(spacing: 5) {
-            Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(SettingsTokens.tertiaryText)
+        SettingsSearchPill {
             TextField("Search", text: $text)
                 .labelsHidden()
                 .textFieldStyle(.plain)
                 .settingsFont(.small)
         }
-        .padding(.horizontal, 7)
-        .frame(width: 160, height: 24)
-        .background(SettingsTokens.buttonFill, in: .rect(cornerRadius: 7, style: .continuous))
+    }
+}
+
+/// The small pill both search fields draw: a magnifier, then what is searched with.
+struct SettingsSearchPill<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        HStack(spacing: SettingsTokens.Metric.searchGap) {
+            Image(systemName: "magnifyingglass").settingsFont(.small).foregroundStyle(SettingsTokens.tertiaryText)
+            content
+        }
+        .padding(.horizontal, SettingsTokens.Metric.searchInset)
+        .frame(width: SettingsTokens.Metric.searchWidth, height: SettingsTokens.Metric.searchHeight)
+        .background(SettingsTokens.buttonFill, in: .rect(cornerRadius: SettingsTokens.Metric.searchRadius, style: .continuous))
     }
 }
 
@@ -53,7 +64,7 @@ struct SettingsTableFilter<Value: Hashable, Choices: View>: View {
     @ViewBuilder let choices: Choices
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: SettingsTokens.Metric.searchSpacing) {
             Picker("Filter", selection: $choice) { choices }
                 .labelsHidden()
                 .pickerStyle(.menu)
@@ -87,8 +98,8 @@ private struct TableHeader<Row>: View {
     }
 }
 
-private enum ActionWidth { static let value: CGFloat = 88 }
-private enum CheckWidth { static let value: CGFloat = 18 }
+private enum ActionWidth { static let value: CGFloat = SettingsTokens.Metric.Column.action }
+private enum CheckWidth { static let value: CGFloat = SettingsTokens.Metric.Column.check }
 
 private struct TableRow<Row>: View {
     let row: Row
@@ -111,12 +122,7 @@ private struct TableRow<Row>: View {
                     .frame(width: CheckWidth.value)
             }
             ForEach(columns.indices, id: \.self) { index in
-                columns[index].cell(row)
-                    .settingsFont(.title)
-                    .lineLimit(columns[index].lines)
-                    .truncationMode(columns[index].truncation)
-                    .frame(width: columns[index].width, alignment: .leading)
-                    .frame(maxWidth: columns[index].width == nil ? .infinity : nil, alignment: .leading)
+                cell(columns[index])
             }
             if let action {
                 SettingsButton(action.title, small: true) { action.perform(row) }
@@ -129,6 +135,18 @@ private struct TableRow<Row>: View {
         .background(isSelected ? SettingsTokens.selection : (isHovered ? SettingsTokens.hover : (isBanded ? SettingsTokens.band : Color.clear)))
         .contentShape(.rect)
         .onHover { isHovered = $0 }
+    }
+
+    private func cell(_ column: SettingsTableColumn<Row>) -> some View {
+        column.cell(row)
+            .settingsFont(.title)
+            .lineLimit(column.lines)
+            .truncationMode(column.truncation)
+            // A cell that wraps grows its row rather than being cut, keeping the row's padding; a row of one line stays at its height.
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.vertical, SettingsTokens.Metric.tableCellPadding)
+            .frame(width: column.width, alignment: .leading)
+            .frame(maxWidth: column.width == nil ? .infinity : nil, alignment: .leading)
     }
 }
 
@@ -157,7 +175,7 @@ struct SettingsSectionTable<Row: Identifiable>: View {
                     HStack {
                         if showsCount {
                             Text(count)
-                                .settingsFont(.count)
+                                .settingsFont(.line)
                                 .foregroundStyle(SettingsTokens.secondaryText)
                         }
                         Spacer(minLength: 0)
@@ -217,7 +235,7 @@ struct SettingsPageTable<Row: Identifiable, Filter: View, Foot: View>: View {
             Rectangle().fill(SettingsTokens.rule).frame(height: 1)
             HStack(spacing: 8) {
                 Text(selected)
-                    .settingsFont(.count)
+                    .settingsFont(.line)
                     .foregroundStyle(SettingsTokens.secondaryText)
                 Spacer(minLength: 12)
                 foot

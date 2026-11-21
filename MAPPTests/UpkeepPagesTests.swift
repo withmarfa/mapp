@@ -233,8 +233,8 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
     }
 
     @Test func eachBackupProblemIsTheAppsOwnWordsFromWhatTheServerCounts() {
-        #expect(UpkeepWording.problems(BackupsHealth(state: .off, lastBackup: nil, reason: .noDestination)).map(\.title) == ["No backups are kept"])
-        #expect(UpkeepWording.problems(BackupsHealth(state: .off, lastBackup: nil, reason: .turnedOff)).map(\.title) == ["Backups are turned off"])
+        #expect(UpkeepWording.problems(BackupsHealth(state: .off, lastBackup: nil, reason: .noDestination)).map(\.title) == ["No Backups Are Kept"])
+        #expect(UpkeepWording.problems(BackupsHealth(state: .off, lastBackup: nil, reason: .turnedOff)).map(\.title) == ["Backups Are Turned Off"])
         #expect(UpkeepWording.problems(BackupsHealth(state: .ok, lastBackup: nil)).isEmpty)
         #expect(UpkeepWording.problems(BackupsHealth(state: .failing, lastBackup: nil)).count == 1, "a failing status the server gave no count for still says so")
     }
@@ -577,8 +577,8 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
     @Test func aBackupStatusIsWordedOnlyFromWhatIsKnown() {
         let failing = UpkeepWording.problems(BackupsHealth(state: .failing, lastBackup: nil))
         let incomplete = UpkeepWording.problems(BackupsHealth(state: .incomplete, lastBackup: nil))
-        #expect(failing.map(\.title) == ["Backups are failing"])
-        #expect(incomplete.map(\.title) == ["Backups are incomplete"])
+        #expect(failing.map(\.title) == ["Backups Are Failing"])
+        #expect(incomplete.map(\.title) == ["Backups Are Incomplete"])
         #expect(failing.first?.line != incomplete.first?.line)
     }
 

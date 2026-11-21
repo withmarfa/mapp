@@ -33,7 +33,7 @@ struct SettingsWell<Content: View>: View {
     var body: some View {
         RoundedRectangle(cornerRadius: SettingsTokens.Metric.controlRadius, style: .continuous)
             .fill(SettingsTokens.card)
-            .frame(width: SettingsTokens.Metric.leadColumn, height: SettingsTokens.Metric.leadColumn)
+            .frame(width: SettingsTokens.Metric.tile, height: SettingsTokens.Metric.tile)
             .overlay { RoundedRectangle(cornerRadius: SettingsTokens.Metric.controlRadius, style: .continuous).strokeBorder(SettingsTokens.hairline, lineWidth: 1) }
             .overlay { content.font(.system(size: 12)).foregroundStyle(SettingsTokens.secondaryText) }
     }
@@ -46,12 +46,12 @@ struct SettingsTile: View {
     var size: CGFloat = SettingsTokens.Metric.tile
 
     var body: some View {
-        RoundedRectangle(cornerRadius: size * 0.27, style: .continuous)
+        RoundedRectangle(cornerRadius: size * SettingsTokens.Metric.tileRounding, style: .continuous)
             .fill(tone.color)
             .frame(width: size, height: size)
             .overlay {
                 Image(systemName: symbol)
-                    .font(.system(size: size * 0.55, weight: .medium))
+                    .font(.system(size: size * SettingsTokens.Metric.tileGlyph, weight: .medium))
                     .foregroundStyle(.white)
             }
             .accessibilityHidden(true)
@@ -125,6 +125,7 @@ struct SettingsRow<Trailing: View>: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+                .padding(.vertical, size == .standard ? SettingsTokens.Metric.rowTextPadding : 0)
                 Spacer(minLength: 0)
                 trailing
                     .disabled(look == .off)
@@ -144,10 +145,10 @@ struct SettingsRow<Trailing: View>: View {
         case .tile(let symbol, let tone):
             SettingsTile(symbol: symbol, tone: tone)
         case .tint(let symbol, let tone):
-            RoundedRectangle(cornerRadius: 6.5, style: .continuous)
+            RoundedRectangle(cornerRadius: SettingsTokens.Metric.tile * SettingsTokens.Metric.tileRounding, style: .continuous)
                 .fill(tone.color.opacity(0.18))
                 .frame(width: SettingsTokens.Metric.tile, height: SettingsTokens.Metric.tile)
-                .overlay { Image(systemName: symbol).font(.system(size: 12, weight: .medium)).foregroundStyle(tone.color) }
+                .overlay { Image(systemName: symbol).font(.system(size: SettingsTokens.Metric.tile * SettingsTokens.Metric.tileGlyph, weight: .medium)).foregroundStyle(tone.color) }
                 .accessibilityHidden(true)
         case .symbol(let name):
             Image(systemName: name).font(.system(size: 14)).foregroundStyle(SettingsTokens.secondaryText).accessibilityHidden(true)

@@ -22,10 +22,10 @@ struct SettingsLinkRow: View {
     var body: some View {
         Button(action: action) {
             SettingsRow(title: title, line: line, lead: lead) {
-                HStack(spacing: 8) {
+                HStack(spacing: SettingsTokens.Metric.buttonGap) {
                     if let value {
-                        HStack(spacing: 6) {
-                            if let dot { Circle().fill(dot).frame(width: 7, height: 7).accessibilityHidden(true) }
+                        HStack(spacing: SettingsTokens.Metric.dotGap) {
+                            if let dot { SettingsStatusDot(color: dot) }
                             value.settingsFont(.title).foregroundStyle(SettingsTokens.secondaryText).lineLimit(1)
                         }
                     }

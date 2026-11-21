@@ -266,7 +266,7 @@ private struct NewKeySheet: View {
         SettingsSheet(
             title: Text("New Key"), line: Text("A key can only be narrowed later, so choose what it needs now."), isWide: true
         ) {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFormGap) {
                 SettingsSheetField(label: "Name", error: model.draftError) {
                     SettingsField(title: "Name", text: Binding { model.draft.name } set: { name in
                         if model.draft.source == KeysModel.source(from: model.draft.name) { model.draft.source = KeysModel.source(from: name) }
@@ -296,7 +296,7 @@ private struct NewKeySheet: View {
                     }
                     ForEach(exceptionPatterns, id: \.self) { pattern in
                         SettingsRow(verbatim: AccessScopes.title(of: pattern, names: model.typeNames), lead: .symbol("tray")) {
-                            HStack(spacing: 8) {
+                            HStack(spacing: SettingsTokens.Metric.buttonGap) {
                                 SettingsPopUp(title: "Access", selection: Binding { model.draft.exceptions[pattern] ?? .read } set: { model.draft.exceptions[pattern] = $0 }) {
                                     ForEach(AccessLevel.allCases.reversed(), id: \.self) { Text(verbatim: $0.title).tag($0) }
                                 }
@@ -306,7 +306,7 @@ private struct NewKeySheet: View {
                     }
                     if !model.givablePermissions.isEmpty {
                         SettingsRow("Look After This Marfa") {
-                            HStack(spacing: 8) {
+                            HStack(spacing: SettingsTokens.Metric.buttonGap) {
                                 SettingsValue(verbatim: permissionCount)
                                 SettingsButton("Choose…") { model.isChoosingPermissions = true }
                             }

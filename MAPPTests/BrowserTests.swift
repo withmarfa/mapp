@@ -60,8 +60,8 @@ struct BrowserTests {
         #expect(Set(SettingsPage.all).count == SettingsPage.all.count)
         #expect(Set(SettingsPage.all.map(\.title)).count == SettingsPage.all.count)
         #expect(SettingsPage.all.allSatisfy { !$0.symbol.isEmpty })
-        #expect(SettingsPage.mappGroups.flatMap { $0 }.allSatisfy { $0.marfaPage == nil })
-        #expect(SettingsPage.marfaGroups.flatMap { $0 }.allSatisfy { $0.marfaPage != nil })
+        #expect(SettingsPage.mappGroups.flatMap { $0 }.allSatisfy { if case .marfa = $0 { false } else { true } })
+        #expect(SettingsPage.marfaGroups.flatMap { $0 }.allSatisfy { if case .marfa = $0 { true } else { false } })
     }
 
     @Test func revealingExistingItemsKeepsReadingFocusInListAndGallery() throws {

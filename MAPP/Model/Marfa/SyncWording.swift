@@ -546,12 +546,12 @@ extension InstancePermission {
     /// What holding the permission lets MAPP do, said as the Settings pages say it after "MAPP isn’t allowed to".
     nonisolated var allowedTo: String {
         switch self {
-        case .configManage: String(localized: "see and change this Marfa’s settings")
+        case .configManage: String(localized: "see and change the server’s settings")
         case .itemsPurge: String(localized: "list and permanently delete deleted items")
         case .schemaWrite: String(localized: "choose a type’s icon and change a type’s fields")
         case .auditRead: String(localized: "read the audit log")
         case .backupsManage: String(localized: "list, make and restore backups")
-        case .blobsManage: String(localized: "manage files across this Marfa")
+        case .blobsManage: String(localized: "manage files across the server")
         case .connectorsManage: String(localized: "manage connectors")
         case .grantsManage: String(localized: "list, narrow and revoke other apps’ access")
         case .instanceMaintain: String(localized: "update the server and run its housekeeping")

@@ -178,7 +178,7 @@ import Testing
         bench.signIns.script(browser: [.success("narrower")])
         #expect(await adapter.allowMore([.backupsManage]) == .approvedFewer)
         let notice = try #require(libraries.host.notices.waiting.first { $0.title == Words.permissionsLostTitle })
-        #expect(notice.message.contains("see and change this Marfa’s settings"))
+        #expect(notice.message.contains("see and change the server’s settings"))
         #expect(notice.message.contains("choose a type’s icon and change a type’s fields"))
         #expect(!notice.message.contains("permanently delete"), "what is still held is not named")
         #expect(adapter.grants == [.itemsPurge])

@@ -102,7 +102,7 @@ struct BackupsPage: View {
                         verbatim: String(localized: "Folder"), line: String(localized: "On the machine \(host.serverName) runs on."),
                         lead: .symbol("folder")
                     ) {
-                        HStack(spacing: 8) {
+                        HStack(spacing: SettingsTokens.Metric.buttonGap) {
                             SettingsValue(verbatim: folder)
                             SettingsButton("Change…") { model.beginFolder() }
                         }
@@ -187,7 +187,7 @@ struct BackupsPage: View {
     private var columns: [SettingsTableColumn<BackupRecord>] {
         [
             SettingsTableColumn("Taken") { Text(verbatim: UpkeepWording.moment($0.taken)) },
-            SettingsTableColumn("Size", width: 90) { Text(verbatim: UpkeepWording.size($0.bytes)).foregroundStyle(SettingsTokens.secondaryText) },
+            SettingsTableColumn("Size", width: SettingsTokens.Metric.Column.day) { Text(verbatim: UpkeepWording.size($0.bytes)).foregroundStyle(SettingsTokens.secondaryText) },
         ]
     }
 
@@ -255,7 +255,7 @@ struct BackupSheet: View {
             title: Text("Restore the Backup From \(UpkeepWording.moment(backup.taken))"),
             line: Text("It adds what the backup holds and \(serverName) lacks. Items here stay as they are."), isWide: true
         ) {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFieldGap) {
                 SettingsSection("Not Restored", footer: "\(serverName) asks you to sign in again first.") {
                     ForEach(UpkeepWording.notRestored, id: \.title) { left in
                         SettingsRow(verbatim: left.title, lead: .symbol(left.symbol))

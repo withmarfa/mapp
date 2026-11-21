@@ -10,6 +10,21 @@ extension MarfaSettingsHost {
     }
 }
 
+extension OwnerFailure {
+    /// What a page says in place of itself when the server's settings could not be read.
+    init(_ failure: InstanceConfigFailure) {
+        switch failure {
+        case .unreachable: self = .unreachable
+        case .notPermitted: self = .notPermitted(InstancePermission.configManage.rawValue)
+        case .instanceChanged: self = .instanceChanged
+        case .unsupported: self = .unsupported
+        case .keyRefused: self = .signedOut
+        case .refused(let reason): self = .refused(reason)
+        case .failed(let reason): self = .failed(reason)
+        }
+    }
+}
+
 /// What the owner's pages say in place of themselves when the server could not give what they show.
 struct OwnerFailureState: View {
     /// The page the state stands in for, which words what MAPP isn't allowed to do there.
@@ -33,6 +48,12 @@ struct OwnerFailureState: View {
             SettingsPageState(
                 symbol: "person.crop.circle.badge.exclamationmark", title: Text("Signed Out"), line: Text(verbatim: OwnerWording.line(failure)),
                 action: ("Open Connection…", { host.showConnection() }))
+        case .instanceChanged:
+            SettingsPageState(
+                symbol: "exclamationmark.triangle", title: Text("Another Marfa Answers"), line: Text(verbatim: OwnerWording.line(failure)),
+                action: ("Try Again", retry))
+        case .unsupported:
+            SettingsPageState(symbol: "gearshape", title: Text("No Server Settings"), line: Text(verbatim: OwnerWording.line(failure)))
         default:
             SettingsPageState(
                 symbol: "exclamationmark.triangle", title: Text("Couldn’t Read This Page"), line: Text(verbatim: OwnerWording.line(failure)),
@@ -60,7 +81,8 @@ struct OwnerProblemRow: View {
 
     var body: some View {
         SettingsProblemRow(
-            title: Text(title), line: Text(verbatim: OwnerWording.line(failure, on: page)), actions: actions
+            title: Text(title), line: Text(verbatim: OwnerWording.line(failure, on: page)),
+            symbol: isRefusal ? "lock" : "exclamationmark.triangle", tone: isRefusal ? .gray : .orange, actions: actions
         )
         .disabled(isWaiting)
     }
@@ -79,6 +101,11 @@ struct OwnerProblemRow: View {
     }
 
     private var offer: Offer { Self.offer(for: failure, canRetry: retry != nil) }
+
+    /// A refusal for want of a permission leads with the lock, as a page that cannot be shown does.
+    private var isRefusal: Bool {
+        if case .notPermitted = failure { true } else { false }
+    }
 
     private var isWaiting: Bool {
         if case .allowMore = offer { host.isAllowingMore } else { false }

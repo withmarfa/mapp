@@ -65,8 +65,8 @@ struct OverviewPage: View {
 
     private var permissionsRow: some View {
         SettingsProblemRow(
-            title: Text("MAPP can look after part of \(host.serverName)"),
-            line: Text("It holds \(host.grants.count) of the owner’s \(InstancePermission.allCases.count) permissions."), tone: .orange,
+            title: Text("MAPP Can Look After Part of \(host.serverName)"),
+            line: Text("It holds \(host.grants.count) of the owner’s \(InstancePermission.allCases.count) permissions."),
             actions: [
                 SettingsProblemAction("Allow More…", isPrimary: true) {
                     let host = host
@@ -107,11 +107,11 @@ struct OverviewPage: View {
             SettingsSection("This Marfa") {
                 if failure == .notPermitted {
                     OwnerProblemRow(
-                        title: "Couldn’t Read This Marfa’s Settings", failure: .notPermitted(InstancePermission.configManage.rawValue),
+                        title: "Couldn’t Read \(host.serverName)’s Settings", failure: .notPermitted(InstancePermission.configManage.rawValue),
                         page: .overview, host: host)
                 } else {
                     SettingsProblemRow(
-                        title: Text("Couldn’t Read This Marfa’s Settings"), line: Text(verbatim: failure.message),
+                        title: Text("Couldn’t Read \(host.serverName)’s Settings"), line: Text(verbatim: failure.message),
                         actions: failure == .unsupported ? [] : [SettingsProblemAction("Try Again") { Task { await settings.load() } }])
                 }
             }

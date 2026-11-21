@@ -13,13 +13,13 @@ struct StartUpPage: View {
 
     private var columns: [SettingsTableColumn<StartUpSetting>] {
         [
-            SettingsTableColumn("Setting", width: 270, truncation: .middle) { setting in
+            SettingsTableColumn("Setting", width: SettingsTokens.Metric.Column.setting, truncation: .middle) { setting in
                 Text(verbatim: setting.name).settingsFont(.mono)
             },
             SettingsTableColumn("What It Does", lines: 2) { setting in
                 Text(verbatim: StartUpWording.what(setting.name)).foregroundStyle(SettingsTokens.secondaryText)
             },
-            SettingsTableColumn("State", width: 70) { setting in
+            SettingsTableColumn("State", width: SettingsTokens.Metric.Column.state) { setting in
                 Text(setting.isSet ? "Set" : "Not Set").foregroundStyle(SettingsTokens.secondaryText)
             },
         ]

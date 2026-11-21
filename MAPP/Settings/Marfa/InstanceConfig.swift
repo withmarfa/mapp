@@ -295,7 +295,7 @@ nonisolated enum InstanceConfigFailure: Error, Hashable, Sendable {
         case .instanceChanged:
             Self.anotherMarfaSentence + " " + String(localized: "These are its settings, not the ones you were editing.")
         case .unsupported:
-            String(localized: "There are no server settings to show for this library.")
+            OwnerWording.line(.unsupported)
         case .keyRefused:
             String(localized: "The server has ended MAPP’s sign-in. Sign in again in Connection.")
         case .refused(let reason), .failed(let reason):

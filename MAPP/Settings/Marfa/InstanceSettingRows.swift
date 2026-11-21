@@ -229,15 +229,8 @@ struct InstanceSettingsGate<Content: View>: View {
 
     var body: some View {
         Group {
-            if model.failure == .notPermitted, let permission = page.permission {
-                SettingsPageState(
-                    symbol: Self.symbol(for: .notPermitted), title: Text(Self.title(for: .notPermitted)), line: Text(verbatim: page.permissionLine),
-                    action: (host.isAllowingMore ? "Waiting…" : "Allow More…", { host.askForMore(naming: permission.rawValue) }))
-                .disabled(host.isAllowingMore)
-            } else if let failure = model.failure, !model.isAvailable {
-                SettingsPageState(
-                    symbol: Self.symbol(for: failure), title: Text(Self.title(for: failure)), line: Text(verbatim: failure.message),
-                    action: failure == .unsupported || failure == .notPermitted ? nil : ("Try Again", { Task { await model.load() } }))
+            if let failure = model.failure, !model.isAvailable {
+                OwnerFailureState(page: page, failure: OwnerFailure(failure), host: host) { Task { await model.load() } }
             } else if !model.isAvailable {
                 OwnerLoading()
             } else {
@@ -246,26 +239,5 @@ struct InstanceSettingsGate<Content: View>: View {
         }
         .task(id: host.serverAddress) { await model.load() }
         .instanceSettingsQuestion(model)
-    }
-
-    static func title(for failure: InstanceConfigFailure) -> String {
-        switch failure {
-        case .unsupported: String(localized: "No Server Settings")
-        case .notPermitted: String(localized: "Needs a Permission")
-        case .unreachable: String(localized: "Can’t Reach the Server")
-        case .keyRefused: String(localized: "Signed Out")
-        case .instanceChanged: String(localized: "Another Marfa Answers")
-        case .refused, .failed: String(localized: "Couldn’t Read the Settings")
-        }
-    }
-
-    static func symbol(for failure: InstanceConfigFailure) -> String {
-        switch failure {
-        case .unsupported: "gearshape"
-        case .notPermitted: "lock"
-        case .unreachable: "wifi.exclamationmark"
-        case .keyRefused: "person.crop.circle.badge.exclamationmark"
-        case .instanceChanged, .refused, .failed: "exclamationmark.triangle"
-        }
     }
 }

@@ -58,6 +58,8 @@ enum SettingsTokens {
     static let focusRing = Color.primary.opacity(0.26)
     /// The scrim behind a centered sheet.
     static let scrim = Color.black.opacity(0.18)
+    /// The shadow under a sheet.
+    static let sheetShadow = Color.black.opacity(0.22)
 
     /// The small windows a theme's tile draws: a sidebar of short bars and a page of lines, light and dark, which are the
     /// pictures of the choices and so do not follow the appearance the window is in.
@@ -81,12 +83,12 @@ enum SettingsTokens {
 
     /// The interface fonts of Settings. A page asks for these by role.
     enum Role: Hashable, Sendable {
-        case title, line, sectionName, sectionLine, footer, control, small, mono, stateTitle, headTitle, count, sidebar, sidebarHeader, largeGlyph, tableHeader
+        case title, line, sectionName, sectionLine, footer, small, mono, stateTitle, headTitle, sidebar, sidebarHeader, largeGlyph, tableHeader
     }
 
     static func font(_ role: Role, scale: CGFloat = 1) -> Font {
         switch role {
-        case .title, .control, .sidebar: .system(size: 13 * scale)
+        case .title, .sidebar: .system(size: 13 * scale)
         case .line, .sectionLine, .footer: .system(size: 11 * scale)
         case .sectionName: .system(size: 13 * scale, weight: .semibold)
         case .small: .system(size: 12 * scale)
@@ -94,7 +96,6 @@ enum SettingsTokens {
         case .stateTitle: .system(size: 13 * scale, weight: .semibold)
         case .largeGlyph: .system(size: 15 * scale)
         case .headTitle: .system(size: 15 * scale, weight: .semibold)
-        case .count: .system(size: 11 * scale)
         case .tableHeader: .system(size: 11 * scale, weight: .semibold)
         case .sidebarHeader: .system(size: 11 * scale, weight: .semibold)
         }
@@ -116,6 +117,9 @@ enum SettingsTokens {
         static let rowHeight: CGFloat = 44
         static let rowHeightWithLine: CGFloat = 56
         static let rowHeightCompact: CGFloat = 36
+        /// The space above and below a standard row's words beyond the row's own padding, which a line that wraps keeps by
+        /// growing the row: a row of one line is then exactly its height.
+        static let rowTextPadding: CGFloat = 6
         /// A card's side margin, where a row's text starts when it has no lead.
         static let inset: CGFloat = 16
         /// The lead column, in which a tile, a symbol or a mark sits; text starts after it, at 52.
@@ -133,20 +137,30 @@ enum SettingsTokens {
         /// A log table's count bar and foot, which sit closer than a table with selection and actions.
         static let logTableBar: CGFloat = 34
         static let logTableFoot: CGFloat = 44
-        /// The narrow columns of a table of jobs, which put the table's later columns at the board's proportions in a full-width
-        /// card: how often, when it last ran, and how it went.
-        static let columnEvery: CGFloat = 88
-        static let columnLastRun: CGFloat = 108
-        static let columnResult: CGFloat = 66
+        /// The words of a state: the symbol's size, and the gaps between its symbol, title, line and action, on a page and in a card.
+        enum State {
+            static let glyph: CGFloat = 29
+            static let spacing: CGFloat = 8
+            static let symbolGap: CGFloat = 6
+            static let actionGap: CGFloat = 12
+            static let cardSpacing: CGFloat = 4
+            static let cardSymbolGap: CGFloat = 4
+            static let cardActionGap: CGFloat = 16
+        }
         /// A table's header band.
         static let tableHeader: CGFloat = 30
         /// A table row's height: in a section, and on a page of its own, which draws them closer.
         static let tableRow: CGFloat = 34
         static let pageTableRow: CGFloat = 30
+        /// The space above and below a table row's cells, which a cell that wraps keeps by growing the row.
+        static let tableCellPadding: CGFloat = 7
         static let cardRadius: CGFloat = 10
         static let controlRadius: CGFloat = 7
         static let buttonRadius: CGFloat = 9
-        static let tile: CGFloat = 22
+        static let tile: CGFloat = 24
+        /// A tile's corner radius and symbol size, as shares of its side.
+        static let tileRounding: CGFloat = 0.27
+        static let tileGlyph: CGFloat = 0.55
         static let headTile: CGFloat = 44
         static let smallButtonHeight: CGFloat = 22
         /// A small search field at a list's trailing edge, and the button beside it that changes what it searches by.
@@ -155,8 +169,7 @@ enum SettingsTokens {
         static let searchRadius: CGFloat = 7
         static let searchInset: CGFloat = 7
         static let searchSpacing: CGFloat = 8
-        /// The clear button inside a shortcut field, and the space round it.
-        static let fieldClearInset: CGFloat = 8
+        static let searchGap: CGFloat = 5
         /// The sidebar's tile, rows, field and headers.
         static let sidebarTile: CGFloat = 20
         static let sidebarRowHeight: CGFloat = 28
@@ -203,6 +216,28 @@ enum SettingsTokens {
         static let rowPreviewLine: CGFloat = 0.45
         /// The space above and below the rows a preview card draws.
         static let previewCardInset: CGFloat = 4
+        /// The gap between buttons or a value and a button at a row's end, and between a head card and what sits under it.
+        static let buttonGap: CGFloat = 8
+        static let cardGap: CGFloat = 10
+        /// A page's side margin and an empty card's top and bottom padding.
+        static let pageSide: CGFloat = 24
+        static let emptyCardPadding: CGFloat = 28
+        /// A status dot, the space after it, and the small lock before a value that is set elsewhere with its glyph size.
+        static let statusDot: CGFloat = 7
+        static let dotGap: CGFloat = 6
+        static let lockGlyph: CGFloat = 10
+        /// A table's column widths, by what they hold, and its action and check columns.
+        enum Column {
+            static let state: CGFloat = 70
+            static let day: CGFloat = 90
+            static let label: CGFloat = 110
+            static let address: CGFloat = 130
+            static let time: CGFloat = 150
+            static let who: CGFloat = 200
+            static let setting: CGFloat = 255
+            static let action: CGFloat = 88
+            static let check: CGFloat = 18
+        }
         /// The space between a page's sections, and above and below its column.
         static let pageSpacing: CGFloat = 32
         /// The space between a card and the row of buttons under it, which sit nearer than a section does.
@@ -227,6 +262,18 @@ enum SettingsTokens {
         static let sheetChangePadding: CGFloat = 8
         static let sheetChangeRadius: CGFloat = 6
         static let sheetListMaxHeight: CGFloat = 220
+        /// The space round a sheet's fields: above and below them, between them (the form's gap is for a sheet with more to ask),
+        /// between its title and line, and between a field and its label. And its corners and shadow.
+        static let sheetGap: CGFloat = 16
+        static let sheetFieldGap: CGFloat = 12
+        static let sheetFormGap: CGFloat = 16
+        static let sheetHeadSpacing: CGFloat = 3
+        static let sheetLabelSpacing: CGFloat = 5
+        static let sheetRadius: CGFloat = 14
+        static let sheetShadowRadius: CGFloat = 24
+        static let sheetShadowDrop: CGFloat = 8
+        /// The most lines a copy of an unsent text shows in a sheet.
+        static let sheetTextLines = 8
         /// A sheet's width, its wide width, its side and top padding, and the room it keeps from the window's edge.
         static let sheetWidth: CGFloat = 440
         static let sheetWideWidth: CGFloat = 560
@@ -258,8 +305,8 @@ private struct SettingsFont: ViewModifier {
 }
 
 extension Text {
-    /// A command or other code inside a sentence, in the monospaced font.
-    static func settingsCode(_ code: String) -> Text { Text(verbatim: code).font(SettingsTokens.font(.mono)) }
+    /// A command or other code inside a sentence, in the monospaced version of the font round it, so it follows the text size.
+    static func settingsCode(_ code: String) -> Text { Text(verbatim: code).monospaced() }
 }
 
 extension View {
