@@ -352,26 +352,6 @@ private struct ShownKeySheet: View {
     let model: KeysModel
     @State private var copied = false
 
-    /// How long a copied key stays on the clipboard before it is taken off, if nothing else was copied since.
-    private static let clipboardLife: Duration = .seconds(60)
-
-    /// Puts the key on the clipboard marked concealed and transient, so clipboard managers do not keep it, and takes it off
-    /// again after a minute unless something else has been copied since.
-    private static func copy(_ secret: String) {
-        let pasteboard = NSPasteboard.general
-        let concealed = NSPasteboard.PasteboardType("org.nspasteboard.ConcealedType")
-        let transient = NSPasteboard.PasteboardType("org.nspasteboard.TransientType")
-        pasteboard.declareTypes([.string, concealed, transient], owner: nil)
-        pasteboard.setString(secret, forType: .string)
-        pasteboard.setData(Data(), forType: concealed)
-        pasteboard.setData(Data(), forType: transient)
-        let count = pasteboard.changeCount
-        Task {
-            try? await Task.sleep(for: clipboardLife)
-            if pasteboard.changeCount == count { pasteboard.clearContents() }
-        }
-    }
-
     var body: some View {
         SettingsSheet(title: Text("Copy the Key Now"), line: Text("It is shown only once. Keep it where the script can read it.")) {
             if let created = model.created {
@@ -381,7 +361,7 @@ private struct ShownKeySheet: View {
             Spacer(minLength: 0)
             SettingsButton(copied ? "Copied" : "Copy") {
                 guard let secret = model.created?.secret else { return }
-                Self.copy(secret)
+                OwnerClipboard.copySecret(secret)
                 copied = true
             }
             SettingsButton("Done") { model.closeSheet() }.keyboardShortcut(.defaultAction)

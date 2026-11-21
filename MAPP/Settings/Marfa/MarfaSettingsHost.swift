@@ -131,11 +131,11 @@ struct MarfaMarkSet: Identifiable, Hashable {
 
 /// A page of the Marfa's half of Settings, with the owner permission it needs to open.
 nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
-    case overview, account, apps, keys, addresses, sources, recentlyDeleted, history, fileStorage
+    case overview, account, apps, keys, addresses, sources, recentlyDeleted, history, fileStorage, webhooks, folders
 
     /// The pages in groups, as the sidebar shows them.
     static let groups: [[MarfaSettingsPage]] = [
-        [.overview], [.account, .apps, .keys, .addresses], [.sources], [.recentlyDeleted, .history, .fileStorage],
+        [.overview], [.account, .apps, .keys, .addresses], [.sources], [.recentlyDeleted, .history, .fileStorage], [.webhooks, .folders],
     ]
 
     var title: String {
@@ -149,6 +149,8 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .recentlyDeleted: String(localized: "Recently Deleted")
         case .history: String(localized: "History")
         case .fileStorage: String(localized: "File Storage")
+        case .webhooks: String(localized: "Webhooks")
+        case .folders: String(localized: "Folders")
         }
     }
 
@@ -163,6 +165,8 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .recentlyDeleted: "trash"
         case .history: "clock.arrow.circlepath"
         case .fileStorage: "externaldrive.fill"
+        case .webhooks: "dot.radiowaves.up.forward"
+        case .folders: "folder.fill"
         }
     }
 
@@ -177,11 +181,14 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .recentlyDeleted: .gray
         case .history: .indigo
         case .fileStorage: .blue
+        case .webhooks: .pink
+        case .folders: .blue
         }
     }
 
     /// The permission the page needs to open, which the owner may not have approved. Account needs none to open: its
-    /// sign-ins need `sign_ins.manage`, which it asks for from Change Password and never at sign-in.
+    /// sign-ins need `sign_ins.manage`, which it asks for from Change Password and never at sign-in. Folders needs none: a
+    /// folder is read as an item, under the access MAPP holds to every type.
     var permission: InstancePermission? {
         switch self {
         case .overview: .instanceRead
@@ -190,6 +197,8 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .apps: .grantsManage
         case .keys, .sources: .keysManage
         case .recentlyDeleted: .itemsPurge
+        case .webhooks: .webhooksManage
+        case .folders: nil
         }
     }
 
@@ -206,6 +215,8 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .recentlyDeleted: String(localized: "MAPP isn’t allowed to list deleted items or permanently delete them.")
         case .history: String(localized: "MAPP isn’t allowed to see or change how long this Marfa keeps versions and logs.")
         case .fileStorage: String(localized: "MAPP isn’t allowed to see where this Marfa keeps files or change how it reads them.")
+        case .webhooks: String(localized: "MAPP isn’t allowed to list, make, change or remove this Marfa’s webhooks.")
+        case .folders: ""
         }
     }
 
@@ -240,6 +251,13 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .fileStorage:
             [String(localized: "Where Files Are"), String(localized: "Reading Files"), String(localized: "Files From the Web"), String(localized: "Unused Files")]
                 + InstanceSetting.fileSettings.map(\.title)
+        case .webhooks:
+            [
+                String(localized: "New Webhook"), String(localized: "Events"), String(localized: "Deliveries"), String(localized: "Redeliver"),
+                String(localized: "Signing Secret"), String(localized: "Sending"),
+            ]
+        case .folders:
+            [String(localized: "Copies"), String(localized: "Needs Attention"), String(localized: "Synced Folders")]
         }
     }
 }

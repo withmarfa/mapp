@@ -183,6 +183,19 @@ nonisolated protocol OwnerCalls: Sendable {
     /// Replaces the source filter, sending the other two levers as `limit` holds them, or turns it off with nil. The server
     /// guards only the instance, so a caller reads the limit again just before.
     func setSourceLimit(_ limit: SourceLimit, to filter: (types: [String], sources: [String])?) async throws(OwnerFailure) -> SourceLimit
+
+    func webhooks() async throws(OwnerFailure) -> [OwnerWebhook]
+    /// One webhook as the server holds it now.
+    func webhook(_ id: String) async throws(OwnerFailure) -> OwnerWebhook
+    func create(_ webhook: NewWebhook) async throws(OwnerFailure) -> CreatedWebhook
+    /// Changes only what `change` names and answers the webhook as the server holds it.
+    func change(webhook id: String, _ change: WebhookChange) async throws(OwnerFailure) -> OwnerWebhook
+    func delete(webhook id: String) async throws(OwnerFailure)
+    func deliveries(of webhook: String) async throws(OwnerFailure) -> [WebhookDeliveryInfo]
+    func redeliver(_ delivery: String, of webhook: String) async throws(OwnerFailure) -> WebhookDeliveryInfo
+
+    func folders() async throws(OwnerFailure) -> FolderListing
+    func folderReport(_ id: String) async throws(OwnerFailure) -> FolderReport
 }
 
 /// What changing the addresses would do, as the server said before anything was written, with the change it said it

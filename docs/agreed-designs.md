@@ -27,7 +27,7 @@ Agreed with August on 19 and 20 November 2026. The pages are drawn on the Settin
 
 The rules that are built (the window, the toolbar, rows, sections, changing things, numbers, problems and errors, buttons, tables, words and named values) are in [Views and lists](views-and-lists.md#settings). One is not built yet:
 
-- **A synced folder's page** shows what it holds as a tree of its folders, counted in files, which MAPP builds from the server's paths.
+- **A synced folder's page** shows what it holds as a tree of its folders, counted in files, which MAPP builds from the server's paths. Not built: the package's client offers no call for a folder's settings or paths (see [The Marfa's half of Settings](marfa-settings.md#left-out)).
 - **Not now:** custom CSS, plugins for MAPP itself, AI providers and Vim keys. Themes come later; every color and font is already a named value.
 - The button rows under a card (Restore Defaults…, Export Shortcuts…, Import…) are regular size, and Select All is an "All Events" checkbox row.
 
@@ -44,9 +44,9 @@ Nine pages in three groups: General, Appearance and Keyboard; Editor, Lists, Lay
 
 Only the agreed changes are listed. A change marked "needs a server change" waits on Marfa first.
 
-- **Webhooks.** Every app's, grouped by the app that made them. The owner can end any of them (needs a server change).
+- **Webhooks.** Every app's, grouped by the app that made them. The owner can end any of them (needs a server change). The page that lists MAPP's own webhooks is built.
 - **A key.** Extend… beside the expiry date, for the owner. The secret keeps working (needs a server change).
-- **Built:** Overview, Account, Apps, Keys, Addresses, Sources, Recently Deleted, History and File Storage are in [The Marfa's half of Settings](marfa-settings.md).
+- **Built:** Overview, Account, Apps, Keys, Addresses, Sources, Recently Deleted, History, File Storage, Webhooks and a read-only Folders are in [The Marfa's half of Settings](marfa-settings.md).
 - **Start-Up.** Stays, read-only.
 - **Names.** Monitoring (was Reporting) and Limits (new).
 - **Updates.**

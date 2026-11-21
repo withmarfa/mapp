@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// A row that opens a page of its own: what it says, a value at the trailing edge and a chevron. The whole row is the
+/// A row that opens a page of its own: what it says, a value at the trailing edge (with a dot before it where it is a state) and a chevron. The whole row is the
 /// button.
 struct SettingsLinkRow: View {
     private let title: Text

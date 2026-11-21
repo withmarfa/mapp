@@ -518,6 +518,26 @@ struct RenderedWindow<Detail: View>: View {
                 KeyInfo(id: "k3", label: "GitHub connector", source: "github", permissions: [], tier: .feed, types: ["core.task": .write, "core.bookmark": .write], created: Self.days(40), expires: nil, lastUsed: .now.addingTimeInterval(-240), appClientID: nil),
                 KeyInfo(id: "k4", label: "Raycast capture", source: "raycast", permissions: [], tier: .feed, types: ["core.note": .write], created: Self.days(30), expires: nil, lastUsed: .now, appClientID: "raycast"),
             ]
+            let mapp = OwnerWebhook.Maker(kind: .app, id: "mapp", name: "MAPP on MacBook Pro")
+            let raycast = OwnerWebhook.Maker(kind: .app, id: "raycast", name: "Raycast")
+            state.webhooks = [
+                OwnerWebhook(id: "w1", url: "https://build.castell.studio/hooks/marfa", events: ["item.created", "item.updated", "item.trashed"], typeFilter: "core.task", secretTail: "8f2c", active: true, created: Self.days(48), maker: mapp),
+                OwnerWebhook(id: "w2", url: "https://hooks.ledgerly.app/marfa", events: ["item.created"], typeFilter: "core.task", secretTail: "1a9d", active: false, created: Self.days(20), maker: mapp),
+            ]
+            state.deliveries["w1"] = [
+                WebhookDeliveryInfo(id: "d1", event: "item.updated", status: .succeeded, statusCode: 200, attempts: 1, error: nil, created: .now.addingTimeInterval(-600)),
+                WebhookDeliveryInfo(id: "d2", event: "item.created", status: .failed, statusCode: 500, attempts: 3, error: "The receiver answered 500.", created: .now.addingTimeInterval(-7200)),
+                WebhookDeliveryInfo(id: "d3", event: "item.trashed", status: .succeeded, statusCode: 200, attempts: 1, error: nil, created: Self.days(1)),
+            ]
+            state.deliveries["w2"] = []
+            state.folders = [OwnerFolder(id: "f1", title: "Studio Notes"), OwnerFolder(id: "f2", title: "Client Drawings")]
+            state.reports["f1"] = FolderReport(copies: [
+                FolderCopy(id: "c1", signIn: "marfa on MacBook Pro", pendingUploads: 0, pendingDownloads: 0, pausedRemovals: 0, firstSyncWaiting: false, problems: [], ageSeconds: 70),
+                FolderCopy(id: "c2", signIn: "marfa on Mac mini", pendingUploads: 0, pendingDownloads: 3, pausedRemovals: 0, firstSyncWaiting: false, problems: [], ageSeconds: 1200),
+            ])
+            state.reports["f2"] = FolderReport(copies: [
+                FolderCopy(id: "c3", signIn: "marfa on MacBook Pro", pendingUploads: 0, pendingDownloads: 0, pausedRemovals: 12, firstSyncWaiting: false, problems: [.init(code: .heldFile, count: 8)], ageSeconds: 75),
+            ])
             state.settings = AddressSettings(
                 instanceID: "i", signIn: "https://marfa.castell.studio",
                 addresses: ["https://marfa.castell.studio", "http://castell-studio.local", "https://100.84.12.7"],
@@ -723,5 +743,77 @@ struct RenderedWindow<Detail: View>: View {
         model.input = "studio.castell.design"
         await model.check()
         try await page(.addresses, host, sheet: AnyView(AddressSheet(model: model, serverName: "Castell Studio")), named: "Addresses, changing the sign-in address")
+    }
+
+    // MARK: Webhooks and Folders
+
+    @Test func webhooks() async throws {
+        try await page(.webhooks, owner(), named: "Webhooks")
+    }
+
+    @Test func noWebhooks() async throws {
+        let host = owner()
+        (host.ownerCalls as? FakeOwnerCalls)?.state.withLock { $0.webhooks = [] }
+        try await page(.webhooks, host, named: "Webhooks, none yet")
+    }
+
+    @Test func aWebhook() async throws {
+        try await page(
+            .webhooks, owner(), subpage: SettingsSubpage(id: "webhook:w1", title: "build.castell.studio/hooks/marfa"),
+            size: CGSize(width: SettingsTokens.Metric.windowWidth, height: 1500), named: "A webhook")
+    }
+
+    @Test func newWebhook() async throws {
+        let host = owner()
+        let model = WebhooksModel(context: context(host))
+        await model.load()
+        model.beginNew()
+        model.draft.address = "https://hooks.ledgerly.app/marfa"
+        try await page(.webhooks, host, sheet: AnyView(WebhookSheet(model: model, serverName: "Castell Studio")), named: "New Webhook")
+    }
+
+    @Test func newWebhookRefused() async throws {
+        let host = owner()
+        (host.ownerCalls as? FakeOwnerCalls)?.fail("createWebhook", with: .refused("That address isn’t public, so Castell Studio won’t send to it."))
+        let model = WebhooksModel(context: context(host))
+        await model.load()
+        model.beginNew()
+        model.draft.address = "http://10.0.0.5/hook"
+        await model.make()
+        try await page(.webhooks, host, sheet: AnyView(WebhookSheet(model: model, serverName: "Castell Studio")), named: "New Webhook, refused")
+    }
+
+    @Test func theSigningSecretShownOnce() async throws {
+        let host = owner()
+        let model = WebhooksModel(context: context(host))
+        await model.load()
+        model.beginNew()
+        model.draft.address = "https://hooks.ledgerly.app/marfa"
+        await model.make()
+        try await page(.webhooks, host, sheet: AnyView(WebhookSheet(model: model, serverName: "Castell Studio")), named: "The signing secret, shown once")
+    }
+
+    @Test func webhooksWithoutWebhooksManage() async throws {
+        let host = owner()
+        host.grants = []
+        try await page(.webhooks, host, named: "Webhooks, without webhooks.manage")
+    }
+
+    @Test func folders() async throws {
+        try await page(.folders, owner(), named: "Folders")
+    }
+
+    @Test func aFolder() async throws {
+        try await page(.folders, owner(), subpage: SettingsSubpage(id: "folder:f1", title: "Studio Notes"), named: "A folder")
+    }
+
+    @Test func aFolderWithRemovalsWaiting() async throws {
+        try await page(.folders, owner(), subpage: SettingsSubpage(id: "folder:f2", title: "Client Drawings"), named: "A folder with removals waiting")
+    }
+
+    @Test func foldersTheServerRefusesToList() async throws {
+        let host = owner()
+        (host.ownerCalls as? FakeOwnerCalls)?.fail("folders", with: .notPermitted(nil))
+        try await page(.folders, host, named: "Folders, refused")
     }
 }

@@ -251,8 +251,9 @@ struct SettingsField: View {
     }
 }
 
-/// A value shown in a field's place that can be selected and copied but not changed, such as a key shown once. It is as
-/// tall as a field and as wide as the space it is given, and its middle is cut where it is too long.
+/// A value shown in a field's place that can be selected and copied but not changed, such as a key shown once. It is
+/// at least as tall as a field and as wide as the space it is given. It wraps onto as many lines as it needs, so every
+/// character of a value that is shown once is shown.
 struct SettingsReadOnlyValue: View {
     let text: String
 
@@ -260,9 +261,9 @@ struct SettingsReadOnlyValue: View {
         Text(verbatim: text)
             .settingsFont(.mono)
             .textSelection(.enabled)
-            .lineLimit(1)
-            .truncationMode(.middle)
+            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 8)
+            .padding(.vertical, 6)
             .frame(maxWidth: .infinity, minHeight: SettingsTokens.Metric.controlHeight, alignment: .leading)
             .background(SettingsTokens.field, in: .rect(cornerRadius: SettingsTokens.Metric.controlRadius))
             .overlay { RoundedRectangle(cornerRadius: SettingsTokens.Metric.controlRadius).strokeBorder(SettingsTokens.hairline) }

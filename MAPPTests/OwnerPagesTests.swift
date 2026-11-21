@@ -48,6 +48,19 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var limitsSent: [(types: [String], sources: [String])?] = []
         /// Run as a source limit write arrives, to let a test move the server under it.
         var beforeLimitWrite: (@Sendable () -> Void)?
+        var webhooks: [OwnerWebhook] = []
+        var deliveries: [String: [WebhookDeliveryInfo]] = [:]
+        var webhooksMade: [NewWebhook] = []
+        var webhookChanges: [(id: String, change: WebhookChange)] = []
+        var redelivered: [String] = []
+        var folders: [OwnerFolder] = []
+        var reports: [String: FolderReport] = [:]
+        /// How many folders the server holds, where the list it sent was cut.
+        var foldersTotal: Int?
+        /// How long a deliveries or folder-report call takes, so calls overlap and the most at once can be counted.
+        var readDelay: Duration?
+        var readsInFlight = 0
+        var mostReadsInFlight = 0
     }
 
     let state = Mutex(State())
@@ -64,6 +77,18 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 
     private func held(_ call: String) async {
         if let gate = state.withLock({ $0.gates[call] }) { await gate.wait() }
+    }
+
+    /// Takes `readDelay` while counted as in flight.
+    private func counted() async {
+        guard let delay = state.withLock({ state -> Duration? in
+            guard state.readDelay != nil else { return nil }
+            state.readsInFlight += 1
+            state.mostReadsInFlight = max(state.mostReadsInFlight, state.readsInFlight)
+            return state.readDelay
+        }) else { return }
+        try? await Task.sleep(for: delay)
+        state.withLock { $0.readsInFlight -= 1 }
     }
 
     private func enter(_ call: String) throws(OwnerFailure) {
@@ -260,6 +285,94 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
             return state.sourceLimit
         }
     }
+
+    func webhooks() async throws(OwnerFailure) -> [OwnerWebhook] {
+        try enter("webhooks")
+        await held("webhooks")
+        return state.withLock { $0.webhooks }
+    }
+
+    func webhook(_ id: String) async throws(OwnerFailure) -> OwnerWebhook {
+        try enter("getWebhook")
+        return try state.withLock { state throws(OwnerFailure) in
+            guard let webhook = state.webhooks.first(where: { $0.id == id }) else { throw .notFound }
+            return webhook
+        }
+    }
+
+    func create(_ webhook: NewWebhook) async throws(OwnerFailure) -> CreatedWebhook {
+        let failure = state.withLock { state in
+            state.calls.append("createWebhook")
+            return state.failures["createWebhook"]
+        }
+        await held("createWebhook")
+        if let failure { throw failure }
+        return state.withLock { state in
+            state.webhooksMade.append(webhook)
+            let made = OwnerWebhook(
+                id: "hook-\(state.webhooks.count + 1)", url: webhook.url, events: webhook.events, typeFilter: webhook.typeFilter,
+                secretTail: "8f2c", active: true, created: .now,
+                maker: .init(kind: .app, id: "maker", name: "MAPP"))
+            state.webhooks.append(made)
+            return CreatedWebhook(webhook: made, secret: "whsec_3fKq8Vn2Lp7Xr1Tz9Bm4Yc6Wd0Hs5Ja2e7b91c4d60a38f5e1b9c2d7a4f08e63b15d9c0a7e24f")
+        }
+    }
+
+    func change(webhook id: String, _ change: WebhookChange) async throws(OwnerFailure) -> OwnerWebhook {
+        try enter("changeWebhook")
+        return try state.withLock { state throws(OwnerFailure) in
+            guard let index = state.webhooks.firstIndex(where: { $0.id == id }) else { throw .notFound }
+            state.webhookChanges.append((id, change))
+            if let url = change.url { state.webhooks[index].url = url }
+            if let events = change.events { state.webhooks[index].events = events }
+            if let filter = change.typeFilter { state.webhooks[index].typeFilter = filter }
+            if let active = change.active { state.webhooks[index].active = active }
+            var answered = state.webhooks[index]
+            answered.maker = nil
+            return answered
+        }
+    }
+
+    func delete(webhook id: String) async throws(OwnerFailure) {
+        try enter("deleteWebhook")
+        try state.withLock { state throws(OwnerFailure) in
+            guard state.webhooks.contains(where: { $0.id == id }) else { throw .notFound }
+            state.webhooks.removeAll { $0.id == id }
+        }
+    }
+
+    func deliveries(of webhook: String) async throws(OwnerFailure) -> [WebhookDeliveryInfo] {
+        try enter("deliveries")
+        await held("deliveries")
+        await counted()
+        return state.withLock { $0.deliveries[webhook] ?? [] }
+    }
+
+    func redeliver(_ delivery: String, of webhook: String) async throws(OwnerFailure) -> WebhookDeliveryInfo {
+        try enter("redeliver")
+        return try state.withLock { state throws(OwnerFailure) in
+            guard let index = state.deliveries[webhook]?.firstIndex(where: { $0.id == delivery }) else { throw .notFound }
+            guard state.deliveries[webhook]?[index].status == .failed else { throw .refused("Only a failed delivery can be sent again.") }
+            state.redelivered.append(delivery)
+            state.deliveries[webhook]?[index].status = .pending
+            return state.deliveries[webhook]![index]
+        }
+    }
+
+    func folders() async throws(OwnerFailure) -> FolderListing {
+        try enter("folders")
+        return state.withLock { FolderListing(folders: $0.folders, total: $0.foldersTotal ?? $0.folders.count) }
+    }
+
+    func folderReport(_ id: String) async throws(OwnerFailure) -> FolderReport {
+        try enter("folderReport")
+        await held("folderReports")
+        await counted()
+        return try state.withLock { state throws(OwnerFailure) in
+            guard let report = state.reports[id] else { throw .notFound }
+            return report
+        }
+    }
 }
 
 /// What a context lends a model in a test, with the grants it holds and what Allow More… answers.
@@ -272,7 +385,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     /// What a page handed over after Settings had closed.
     var late: [OwnerDraft] = []
 
-    init(grants: Set<InstancePermission> = [.signInsManage, .grantsManage, .keysManage, .keysMint, .configManage]) {
+    init(grants: Set<InstancePermission> = [.signInsManage, .grantsManage, .keysManage, .keysMint, .configManage, .webhooksManage]) {
         self.grants = grants
     }
 
@@ -1390,7 +1503,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
     }
 
     @Test func theNewPagesAreInTheSidebarInTheBoardsOrder() {
-        #expect(MarfaSettingsPage.groups == [[.overview], [.account, .apps, .keys, .addresses], [.sources], [.recentlyDeleted, .history, .fileStorage]])
+        #expect(MarfaSettingsPage.groups == [[.overview], [.account, .apps, .keys, .addresses], [.sources], [.recentlyDeleted, .history, .fileStorage], [.webhooks, .folders]])
         for page in [MarfaSettingsPage.account, .apps, .keys, .addresses] {
             #expect(SettingsPage.marfa(page).matches(page.title))
         }
