@@ -27,12 +27,27 @@ nonisolated enum MonitoringSecret: String, CaseIterable, Hashable, Sendable, Ide
         }
     }
 
-    /// What the secret is called in a sentence about removing it.
+    /// What the secret is called as a title, where a concern asks for it to be set again.
+    var settingTitle: String {
+        switch self {
+        case .heartbeatAddress: String(localized: "Heartbeat Address")
+        case .postHogHost: String(localized: "PostHog Host")
+        case .postHogToken: String(localized: "PostHog Project Token")
+        case .telemetryAddress: String(localized: "Telemetry Address")
+        case .telemetryHeaders: String(localized: "Telemetry Headers")
+        }
+    }
+
+    /// The secret a setting key names, if Monitoring holds it.
+    static func named(key: String) -> MonitoringSecret? { allCases.first { $0.key == key } }
+
+    /// What the secret is called in a sentence, here and wherever else MAPP names this setting: removing it, and a restore that
+    /// asks for it to be set again.
     var removalName: String {
         switch self {
         case .heartbeatAddress: String(localized: "heartbeat address")
         case .postHogHost: String(localized: "PostHog host")
-        case .postHogToken: String(localized: "project token")
+        case .postHogToken: String(localized: "PostHog project token")
         case .telemetryAddress: String(localized: "telemetry address")
         case .telemetryHeaders: String(localized: "telemetry headers")
         }

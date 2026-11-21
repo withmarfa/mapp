@@ -61,6 +61,25 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var readDelay: Duration?
         var readsInFlight = 0
         var mostReadsInFlight = 0
+        var health: ServerHealth? = ServerHealth(
+            database: .ok, disk: .ok, files: .ok, backups: BackupsHealth(state: .ok, lastBackup: nil), housekeeping: HousekeepingHealth(failed: [], hold: nil))
+        var upkeep = UpkeepSettings(instanceID: "instance-1", folder: "/Volumes/Studio Backup", objectStore: false, intervalSeconds: 3600, checksForUpdates: true)
+        var upkeepChanges: [UpkeepSettingsChange] = []
+        var backups: [BackupRecord] = []
+        var backupsTaken = 0
+        var restoreAnswer = BackupRestored(leftOut: [], added: 0, alreadyHeld: 0, secretsToSet: [])
+        var restores: [BackupRecord] = []
+        var update = UpdateStatus(
+            running: "0.0.84", checksAutomatically: true, latest: nil, available: false, checkFailed: false, updatesItself: true, step: nil,
+            progress: nil, last: nil)
+        /// What each read of the update answers after the first, in order, once an update runs; the last stays.
+        var updateReads: [UpdateStatus] = []
+        var updatesStarted = 0
+        var updatesChecked = 0
+        var jobs: [HousekeepingJob] = []
+        var clocksConfirmed = 0
+        /// The time the server answers when the clock is confirmed; the date it was shown where nil.
+        var clockConfirmedAt: Date?
     }
 
     let state = Mutex(State())
@@ -356,6 +375,93 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
             state.redelivered.append(delivery)
             state.deliveries[webhook]?[index].status = .pending
             return state.deliveries[webhook]![index]
+        }
+    }
+
+    func health() async throws(OwnerFailure) -> ServerHealth {
+        try enter("health")
+        guard let health = state.withLock({ $0.health }) else { throw .unreachable }
+        return health
+    }
+
+    func upkeepSettings() async throws(OwnerFailure) -> UpkeepSettings {
+        try enter("upkeepSettings")
+        return state.withLock { $0.upkeep }
+    }
+
+    func change(_ settings: UpkeepSettings, _ change: UpkeepSettingsChange) async throws(OwnerFailure) -> UpkeepSettings {
+        try enter("changeUpkeep")
+        return state.withLock { state in
+            state.upkeepChanges.append(change)
+            switch change.folder {
+            case .set(let path)?: state.upkeep.folder = path
+            case .remove?: state.upkeep.folder = nil
+            case nil: break
+            }
+            if let seconds = change.intervalSeconds { state.upkeep.intervalSeconds = seconds }
+            if let on = change.checksForUpdates { state.upkeep.checksForUpdates = on }
+            return state.upkeep
+        }
+    }
+
+    func backups() async throws(OwnerFailure) -> [BackupRecord] {
+        try enter("backups")
+        return state.withLock { $0.backups }
+    }
+
+    func backUpNow() async throws(OwnerFailure) -> BackupTaken {
+        try enter("backUpNow")
+        return state.withLock { state in
+            state.backupsTaken += 1
+            let taken = Date.now
+            state.backups.insert(BackupRecord(instanceID: "instance-1", name: "now-\(state.backupsTaken).json", taken: taken, bytes: 1_000), at: 0)
+            return BackupTaken(taken: taken, filesLost: 0, filesWaiting: 0)
+        }
+    }
+
+    func restore(_ backup: BackupRecord) async throws(OwnerFailure) -> BackupRestored {
+        try enter("restore")
+        return state.withLock { state in
+            state.restores.append(backup)
+            return state.restoreAnswer
+        }
+    }
+
+    func updateStatus() async throws(OwnerFailure) -> UpdateStatus {
+        try enter("updateStatus")
+        return state.withLock { state in
+            if !state.updateReads.isEmpty { state.update = state.updateReads.count > 1 ? state.updateReads.removeFirst() : state.updateReads[0] }
+            return state.update
+        }
+    }
+
+    func checkForUpdates() async throws(OwnerFailure) -> UpdateStatus {
+        try enter("checkForUpdates")
+        return state.withLock { state in
+            state.updatesChecked += 1
+            return state.update
+        }
+    }
+
+    func startUpdate() async throws(OwnerFailure) -> UpdateStatus {
+        try enter("startUpdate")
+        return state.withLock { state in
+            state.updatesStarted += 1
+            state.update.progress = UpdateProgress(stage: .fetching, release: state.update.latest?.version)
+            return state.update
+        }
+    }
+
+    func housekeepingJobs() async throws(OwnerFailure) -> [HousekeepingJob] {
+        try enter("housekeepingJobs")
+        return state.withLock { $0.jobs }
+    }
+
+    func confirmClock() async throws(OwnerFailure) -> Date? {
+        try enter("confirmClock")
+        return state.withLock { state in
+            state.clocksConfirmed += 1
+            return state.clockConfirmedAt
         }
     }
 
@@ -1560,7 +1666,7 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(
             MarfaSettingsPage.groups == [
                 [.overview], [.account, .apps, .keys, .addresses], [.sources], [.recentlyDeleted, .history, .fileStorage], [.webhooks, .folders],
-                [.activity, .monitoring], [.limits, .startUp],
+                [.backups, .updates, .housekeeping], [.activity, .monitoring], [.limits, .startUp],
             ])
         for page in [MarfaSettingsPage.account, .apps, .keys, .addresses] {
             #expect(SettingsPage.marfa(page).matches(page.title))

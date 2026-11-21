@@ -76,14 +76,22 @@ struct OverviewPage: View {
             .disabled(host.isAllowingMore)
     }
 
-    /// Only the actions that exist: a concern opens the page that deals with it where the sign-in may open that page. The
-    /// other kinds of concern say what is wrong and offer nothing.
+    /// Only the actions that exist: a concern opens the page that looks after it, where the sign-in may open that page. A kind
+    /// with no page of its own says what is wrong and offers nothing.
     private func actions(for concern: AttentionConcern) -> [SettingsProblemAction] {
-        guard let page = concern.page, page.permission.map({ host.grants.contains($0) }) ?? true else { return [] }
-        let title: LocalizedStringKey = switch page {
-        case .folders: "Show Folders"
-        case .monitoring: "Show Monitoring"
-        default: "Show Keys"
+        switch concern.kind {
+        case .key where host.grants.contains(.keysManage):
+            [SettingsProblemAction("Show Keys") { host.show(.keys) }]
+        case .backup where host.grants.contains(.backupsManage):
+            [SettingsProblemAction("Show Backups") { host.show(.backups) }]
+        case .job, .clock:
+            [SettingsProblemAction("Show Housekeeping") { host.show(.housekeeping) }]
+        case .folder:
+            [SettingsProblemAction("Show Folders") { host.show(.folders) }]
+        case .setting where host.grants.contains(.configManage) && MonitoringSecret.named(key: concern.reference) != nil:
+            [SettingsProblemAction("Show Monitoring") { host.show(.monitoring) }]
+        default:
+            []
         }
         return [SettingsProblemAction(title) { host.show(page) }]
     }
@@ -130,9 +138,9 @@ struct OverviewPage: View {
     /// The release and, where one is ready, the update; a development build has no release, so only the update line shows.
     @ViewBuilder private var versionRow: some View {
         if let version = model.releaseVersion {
-            SettingsRow(title: Text("Marfa \(version)"), line: model.reading?.updateReady.map { Text("\($0) is ready.") })
+            SettingsRow(title: Text("Marfa \(version)"), line: model.reading?.updateReady.map { Text("Marfa \($0) is ready.") }) { showUpdates }
         } else if let ready = model.reading?.updateReady {
-            SettingsRow(title: Text("\(ready) is ready"))
+            SettingsRow(title: Text("Marfa \(ready) is ready")) { showUpdates }
         }
     }
 
@@ -150,14 +158,20 @@ struct OverviewPage: View {
             }
             filesRow(model.health(of: .files))
             let backups = model.backups
-            SettingsRow("Backups") {
-                SettingsValue(verbatim: Self.backupsWord(backups), dot: Self.dot(backups))
+            if host.grants.contains(.backupsManage) {
+                SettingsLinkRow(
+                    verbatim: String(localized: "Backups"), value: Self.backupsWord(backups), dot: Self.dot(backups)
+                ) { host.show(.backups) }
+            } else {
+                SettingsRow("Backups") {
+                    SettingsValue(verbatim: Self.backupsWord(backups), dot: Self.dot(backups))
+                }
             }
         }
     }
 
     @ViewBuilder private func filesRow(_ files: HealthPart) -> some View {
-        let value = bytes(model.reading?.fileBytes).map { String(localized: "\($0) in files") } ?? Self.word(files.condition)
+        let value = bytes(model.reading?.fileBytes).map { String(localized: "\($0) on its disk") } ?? Self.word(files.condition)
         if host.grants.contains(.configManage) {
             SettingsLinkRow(
                 verbatim: String(localized: "Files"), value: value, dot: Self.dot(files.condition)
@@ -166,6 +180,13 @@ struct OverviewPage: View {
             SettingsRow("Files") {
                 SettingsValue(verbatim: value, dot: Self.dot(files.condition))
             }
+        }
+    }
+
+    /// Update beside the release, where one is ready: it opens Updates, where the update is started and followed.
+    @ViewBuilder private var showUpdates: some View {
+        if model.reading?.updateReady != nil {
+            SettingsButton("Show Updates") { host.show(.updates) }
         }
     }
 

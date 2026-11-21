@@ -1,7 +1,14 @@
 import AppKit
 
-/// Where a secret shown once is copied to.
+/// Where a secret shown once, or the steps to take on the server's machine, is copied to.
 enum OwnerClipboard {
+    /// Puts plain text, which is no secret, on the clipboard.
+    @MainActor static func copyText(_ text: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(text, forType: .string)
+    }
+
     /// How long a copied secret stays on the clipboard before it is taken off, if nothing else was copied since.
     private static let life: Duration = .seconds(60)
 

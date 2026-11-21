@@ -1,6 +1,9 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%@ on its disk" : {
+
+    },
     "%@ (Missing)" : {
 
     },
@@ -13,13 +16,31 @@
     "%@ were changed elsewhere. MAPP read the new values; yours weren’t saved." : {
 
     },
+    "%@ took another date" : {
+
+    },
+    "%lld other settings are set on the machine %@ runs on." : {
+
+    },
+    "%lld settings are set on the machine %@ runs on." : {
+
+    },
     "1 copy." : {
 
     },
     "1 event." : {
 
     },
+    "1 other setting is set on the machine %@ runs on." : {
+
+    },
     "1 removal waits" : {
+
+    },
+    "1 setting is set on the machine %@ runs on." : {
+
+    },
+    "A folder that already exists on the machine %@ runs on." : {
 
     },
     "A webhook sends events to an address you choose, as they happen." : {
@@ -40,6 +61,12 @@
     "Archived, unarchived or moved to or from another state." : {
 
     },
+    "Backups are failing" : {
+
+    },
+    "Backups are incomplete" : {
+
+    },
     "Change Address" : {
 
     },
@@ -52,6 +79,15 @@
     "Changing the events or the type drops waiting deliveries that no longer match." : {
 
     },
+    "Check Again" : {
+
+    },
+    "Check Automatically" : {
+
+    },
+    "Check Automatically is off, so %@ isn’t looking for updates." : {
+
+    },
     "Copies" : {
 
     },
@@ -59,6 +95,9 @@
 
     },
     "Copy the Signing Secret Now" : {
+
+    },
+    "Couldn’t Change This" : {
 
     },
     "Couldn’t Read This Folder" : {
@@ -125,13 +164,34 @@
     "%@ ended MAPP’s sign-in. Sign in again in Connection." : {
 
     },
+    "%@ failed" : {
+
+    },
+    "%@ files aren’t copied to the backup place yet." : {
+
+    },
     "%@ goes from %@ to %@. This can’t be undone: a key’s access can’t be widened again, and anything using it loses what it no longer reaches." : {
 
     },
     "%@ items" : {
 
     },
+    "%@ lists its jobs once it has started them." : {
+
+    },
+    "Heartbeat Address" : {
+
+    },
+    "It was undone." : {
+
+    },
     "MAPP isn’t allowed to list, make, change or remove webhooks." : {
+
+    },
+    "MAPP stopped waiting. Check again to see where it stands." : {
+
+    },
+    "Marfa %@ is ready." : {
 
     },
     "Named by the sign-in that keeps each one." : {
@@ -368,10 +428,16 @@
     "MAPP isn’t allowed to list, narrow or disconnect apps." : {
 
     },
+    "MAPP isn’t allowed to read whether a newer Marfa is ready." : {
+
+    },
     "MAPP isn’t allowed to rename, mark or limit sources." : {
 
     },
     "MAPP isn’t allowed to see or change version and log retention." : {
+
+    },
+    "MAPP isn’t allowed to see, take or restore backups." : {
 
     },
     "Key Requests per Window" : {
@@ -393,6 +459,9 @@
 
     },
     "None selected" : {
+
+    },
+    "None yet." : {
 
     },
     "Nothing has been heard from it for more than a day." : {
@@ -434,16 +503,44 @@
     "%@ on This Mac" : {
 
     },
+    "%@ parts are altered or can’t be read." : {
+
+    },
+    "%@ restarts to update." : {
+
+    },
+    "%@ restarts when it is done." : {
+
+    },
+    "%@ runs %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ runs %2$@."
+          }
+        }
+      }
+    },
+    "%@ runs these by itself. Jobs that delete pause while its clock looks wrong." : {
+
+    },
     "%lld were skipped: MAPP no longer has their commands, or their keys can’t be used." : {
 
     },
     "12-Hour" : {
 
     },
+    "15 Minutes" : {
+
+    },
     "24-Hour" : {
 
     },
     "A Collection" : {
+
+    },
+    "A Folder" : {
 
     },
     "A search can limit itself to ten types at most." : {
@@ -492,6 +589,9 @@
 
     },
     "All %lld" : {
+
+    },
+    "All Backups" : {
 
     },
     "All Deleted Items" : {
@@ -554,6 +654,9 @@
     "Choose one item to read or edit it." : {
 
     },
+    "Choose where to keep backups first." : {
+
+    },
     "Choose where to save the archive." : {
 
     },
@@ -602,7 +705,13 @@
     "Couldn’t Check" : {
 
     },
+    "Couldn’t Confirm the Date" : {
+
+    },
     "Couldn’t Confirm the Sign-In" : {
+
+    },
+    "Couldn’t Do That" : {
 
     },
     "Couldn’t export." : {
@@ -650,6 +759,12 @@
     "PostHog Host" : {
 
     },
+    "PostHog Project Token" : {
+
+    },
+    "PostHog project token" : {
+
+    },
     "Prints a recovery code at each start." : {
 
     },
@@ -690,6 +805,9 @@
 
     },
     "Minimize All" : {
+
+    },
+    "Minute" : {
 
     },
     "One was skipped: MAPP no longer has its command, or its keys can’t be used." : {
@@ -773,6 +891,9 @@
     "Set" : {
 
     },
+    "Set a Secret Again" : {
+
+    },
     "Set the address first." : {
 
     },
@@ -792,6 +913,9 @@
 
     },
     "Set…" : {
+
+    },
+    "Set on the machine %@ runs on." : {
 
     },
     "Show All Tabs" : {
@@ -839,6 +963,9 @@
     "Keep All Downloads" : {
 
     },
+    "Keep Backups In" : {
+
+    },
     "Keep Opened Files" : {
 
     },
@@ -855,6 +982,9 @@
 
     },
     "Left out with %@" : {
+
+    },
+    "Show Backups" : {
 
     },
     "Show Matches Left Out of Search" : {
@@ -887,6 +1017,9 @@
     "Some files the newest backup needs are still waiting for a copy." : {
 
     },
+    "Some stored backups are damaged" : {
+
+    },
     "Some stored parts of backups are damaged." : {
 
     },
@@ -909,6 +1042,15 @@
 
     },
     "Stop Leaving Out" : {
+
+    },
+    "Telemetry Address" : {
+
+    },
+    "Telemetry Headers" : {
+
+    },
+    "the %@" : {
 
     },
     "The backup folder may not belong to this server alone." : {
@@ -935,6 +1077,9 @@
     "The command line’s way in." : {
 
     },
+    "The last check found no answer." : {
+
+    },
     "The least used go first when there’s no room." : {
 
     },
@@ -953,16 +1098,31 @@
     "The key “%@” was made, and its secret can’t be shown again. If you didn’t copy it, revoke the key on the Keys page." : {
 
     },
+    "The last backup didn’t finish" : {
+
+    },
     "Show Spelling and Grammar" : {
 
     },
     "The server can’t read this secret, so it can’t use it until it is set again." : {
 
     },
+    "The server couldn’t do that." : {
+
+    },
+    "The server didn’t accept that folder. It must already exist on the machine it runs on." : {
+
+    },
     "The server didn’t answer this check, so its state is unknown." : {
 
     },
     "The server met a fault lately." : {
+
+    },
+    "The server reports its backups aren’t working." : {
+
+    },
+    "The server reports the newest backup isn’t whole." : {
 
     },
     "The server takes no backup on a schedule." : {
@@ -986,10 +1146,16 @@
     "The types and sources chosen and left out make more conditions than one search can hold." : {
 
     },
+    "The update to %@ didn’t work" : {
+
+    },
     "Dark" : {
 
     },
     "Dates and Times" : {
+
+    },
+    "Day" : {
 
     },
     "Deleted Items" : {
@@ -1152,6 +1318,9 @@
 
     },
     "Palettes" : {
+
+    },
+    "Paused" : {
 
     },
     "Permanently deletes %@ items." : {
@@ -1373,6 +1542,9 @@
     "Home" : {
 
     },
+    "Hour" : {
+
+    },
     "Inbox Is Empty" : {
 
     },
@@ -1559,6 +1731,9 @@
     "Type it again to change it" : {
 
     },
+    "Tried %@" : {
+
+    },
     "Unavailable on the server." : {
 
     },
@@ -1604,10 +1779,16 @@
     "Webhooks" : {
 
     },
+    "Webhooks and connector addresses" : {
+
+    },
     "Up to date %@" : {
 
     },
     "Up to date just now" : {
+
+    },
+    "Update" : {
 
     },
     "update the server and run its housekeeping" : {
@@ -1700,6 +1881,9 @@
     "Who Did What" : {
 
     },
+    "Where and When" : {
+
+    },
     "Window" : {
 
     },
@@ -1716,6 +1900,9 @@
 
     },
     "" : {
+
+    },
+    "You were shown %@, and its clock read %@ when it confirmed." : {
 
     },
     "“%@” can no longer do this. This can’t be undone: a permission can’t be given back to a key." : {
@@ -1778,6 +1965,9 @@
     "No Apps" : {
 
     },
+    "No Backups Yet" : {
+
+    },
     "No Collections From Apps" : {
 
     },
@@ -1788,6 +1978,9 @@
 
     },
     "No Items Of Yours" : {
+
+    },
+    "No Jobs Yet" : {
 
     },
     "No Keys" : {
@@ -1854,6 +2047,9 @@
     },
     "Click the map to place the pin." : {
       "extractionState" : "manual"
+    },
+    "Clock" : {
+
     },
     "“%@” couldn’t be attached. %@" : {
       "extractionState" : "manual"
@@ -1969,12 +2165,18 @@
     "%@ are no longer where they were, so they were taken out of the new item. Add them again, or add the item without them." : {
       "extractionState" : "manual"
     },
+    "%@ asks you to sign in again first." : {
+
+    },
     "%@ > %@" : {
       "extractionState" : "manual",
       "generatesSymbol" : false
     },
     "%@ at %@" : {
       "extractionState" : "manual"
+    },
+    "%@ backups" : {
+
     },
     "%@ can hold %lld at most." : {
 
@@ -1994,14 +2196,30 @@
     "%@ has an entry that isn’t finished. Finish it, or cancel it, to add the item." : {
       "extractionState" : "manual"
     },
+    "%@ hasn’t come back yet" : {
+
+    },
     "%@ is attached to “%@”, but it couldn’t be put in its text." : {
       "extractionState" : "manual"
+    },
+    "%@ is back on %@, as before. Nothing was lost." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ is back on %2$@, as before. Nothing was lost."
+          }
+        }
+      }
     },
     "%@ is no longer where it was, so it was taken out of the new item. Add it again, or add the item without it." : {
       "extractionState" : "manual"
     },
     "%@ is required." : {
       "extractionState" : "manual"
+    },
+    "%@ is updated where it runs." : {
+
     },
     "%@ isn’t a valid value." : {
       "extractionState" : "manual"
@@ -2301,6 +2519,9 @@
     "1 row in %@" : {
       "extractionState" : "manual"
     },
+    "1 secret to set again" : {
+
+    },
     "look.count.tableRows" : {
       "comment" : "The number of rows in an item's table, followed by the table name.",
       "extractionState" : "manual",
@@ -2333,6 +2554,9 @@
     },
     "Subtasks" : {
       "extractionState" : "manual"
+    },
+    "Succeeded" : {
+
     },
     "%lld subtasks" : {
       "extractionState" : "manual",
@@ -2633,6 +2857,9 @@
         }
       }
     },
+    "%lld minutes" : {
+
+    },
     "%lld more" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2907,6 +3134,16 @@
     "Add “%@”" : {
 
     },
+    "Added %@ items. %@ were already here." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Added %1$@ items. %2$@ were already here."
+          }
+        }
+      }
+    },
     "Add a filter" : {
 
     },
@@ -3128,6 +3365,18 @@
     "Back" : {
 
     },
+    "Back Up" : {
+
+    },
+    "Back Up Every" : {
+
+    },
+    "Back Up Now" : {
+
+    },
+    "Back Up Now takes the first." : {
+
+    },
     "Back to Board" : {
       "extractionState" : "manual"
     },
@@ -3139,6 +3388,9 @@
     },
     "Back to Timeline" : {
       "extractionState" : "manual"
+    },
+    "Backing Up…" : {
+
     },
     "Block Quote" : {
 
@@ -3339,8 +3591,17 @@
     "Check Spelling While Typing" : {
 
     },
+    "Check for Updates" : {
+
+    },
     "Check the Address" : {
       "extractionState" : "manual"
+    },
+    "Checking" : {
+
+    },
+    "Checking…" : {
+
     },
     "Checklist" : {
 
@@ -3366,14 +3627,23 @@
     "Choose a Version" : {
       "extractionState" : "manual"
     },
+    "Choose a folder or an object store." : {
+
+    },
     "Choose an Icon" : {
       "extractionState" : "manual"
+    },
+    "Choose how often to back up." : {
+
     },
     "Choose Date" : {
       "extractionState" : "manual"
     },
     "Choose File…" : {
       "extractionState" : "manual"
+    },
+    "Choose Folder…" : {
+
     },
     "Choose Icon…" : {
       "extractionState" : "manual"
@@ -3463,6 +3733,12 @@
     "Completed" : {
       "extractionState" : "manual"
     },
+    "Confirm Date" : {
+
+    },
+    "Confirm Date…" : {
+
+    },
     "Connect to a Marfa server in Library to see and change its settings here." : {
       "extractionState" : "manual"
     },
@@ -3496,7 +3772,13 @@
     "Copy Code" : {
       "extractionState" : "manual"
     },
+    "Copy Files to Storage" : {
+
+    },
     "Copy Link" : {
+
+    },
+    "Copy Steps" : {
 
     },
     "Copy Text" : {
@@ -3690,6 +3972,9 @@
     "Done" : {
 
     },
+    "Downloading" : {
+
+    },
     "Downloading library…" : {
       "extractionState" : "manual"
     },
@@ -3849,6 +4134,12 @@
     },
     "Files Not in the Text" : {
       "extractionState" : "manual"
+    },
+    "Files are waiting for a second copy" : {
+
+    },
+    "Files may be missing from it." : {
+
     },
     "Filter By" : {
 
@@ -4088,6 +4379,12 @@
     "Invalid Value" : {
       "extractionState" : "manual"
     },
+    "Is it %@?" : {
+
+    },
+    "It adds what the backup holds and %@ lacks. Items here stay as they are." : {
+
+    },
     "is" : {
 
     },
@@ -4108,6 +4405,12 @@
     },
     "It’s already in Recently Deleted. Deleting it now erases it permanently, and you can’t undo it." : {
       "extractionState" : "manual"
+    },
+    "Job" : {
+
+    },
+    "Jobs" : {
+
     },
     "Italic" : {
 
@@ -4612,6 +4915,9 @@
     "Not Now" : {
 
     },
+    "Not Restored" : {
+
+    },
     "Not Selected" : {
       "extractionState" : "manual"
     },
@@ -4641,6 +4947,9 @@
     },
     "Now" : {
       "extractionState" : "manual"
+    },
+    "Nowhere" : {
+
     },
     "Number" : {
       "extractionState" : "manual"
@@ -4903,6 +5212,9 @@
     "Property Not Saved" : {
       "extractionState" : "manual"
     },
+    "Published %@." : {
+
+    },
     "Question" : {
       "extractionState" : "manual"
     },
@@ -5014,6 +5326,9 @@
     "Remove Mark" : {
       "extractionState" : "manual"
     },
+    "Remove Old Activity" : {
+
+    },
     "Remove Sort" : {
 
     },
@@ -5046,6 +5361,9 @@
     "Replace…" : {
 
     },
+    "Replacing" : {
+
+    },
     "Required" : {
       "extractionState" : "manual"
     },
@@ -5058,11 +5376,35 @@
     "Resize Image" : {
       "extractionState" : "manual"
     },
+    "Restarting" : {
+
+    },
+    "Restarting. MAPP reconnects when it is back." : {
+
+    },
     "Restore" : {
 
     },
     "Restore Version" : {
       "extractionState" : "manual"
+    },
+    "Restore the Backup From %@" : {
+
+    },
+    "Restored" : {
+
+    },
+    "Restored the backup from %@" : {
+
+    },
+    "Restore…" : {
+
+    },
+    "Restoring…" : {
+
+    },
+    "Result" : {
+
     },
     "Revert" : {
       "extractionState" : "manual"
@@ -5186,6 +5528,9 @@
 
     },
     "Settings…" : {
+
+    },
+    "Settling" : {
 
     },
     "Share…" : {
@@ -5395,6 +5740,9 @@
     "Tags: %@" : {
       "extractionState" : "manual"
     },
+    "Taken" : {
+
+    },
     "Task" : {
       "extractionState" : "manual"
     },
@@ -5466,6 +5814,9 @@
     },
     "The filter on %@" : {
       "extractionState" : "manual"
+    },
+    "The first is taken once there is somewhere to keep it." : {
+
     },
     "The first version." : {
 
@@ -5614,6 +5965,9 @@
     "The Server Refused the Sign-In" : {
       "extractionState" : "manual"
     },
+    "The Server’s Steps" : {
+
+    },
     "The server refused this link" : {
       "extractionState" : "manual"
     },
@@ -5707,6 +6061,9 @@
     "There are no server settings to show for this library." : {
       "extractionState" : "manual"
     },
+    "There is no server to ask." : {
+
+    },
     "These are the settings as the server last gave them." : {
       "extractionState" : "manual"
     },
@@ -5721,6 +6078,9 @@
     },
     "They’re still in that copy. To send them, install the previous build of MAPP from TestFlight and connect it to this server if it isn’t already. When it has sent them, and you’ve resolved any it can’t send, update MAPP again." : {
       "extractionState" : "manual"
+    },
+    "Thin Old Versions" : {
+
     },
     "This address includes a sign-in, so it isn’t loaded." : {
 
@@ -6002,6 +6362,9 @@
     "Undo this change?" : {
 
     },
+    "Undone" : {
+
+    },
     "Ungroup" : {
 
     },
@@ -6032,8 +6395,20 @@
     "Updated just now" : {
 
     },
+    "Updated to %@" : {
+
+    },
+    "Updates" : {
+
+    },
+    "Updating" : {
+
+    },
     "Updating library…" : {
       "extractionState" : "manual"
+    },
+    "Updating to %@" : {
+
     },
     "Use %lld characters or fewer." : {
       "extractionState" : "manual"
@@ -6058,6 +6433,9 @@
     },
     "Use Defaults" : {
       "extractionState" : "manual"
+    },
+    "Use Folder" : {
+
     },
     "Use digits only." : {
       "extractionState" : "manual"
@@ -6194,6 +6572,9 @@
       "extractionState" : "manual"
     },
     "Yesterday" : {
+
+    },
+    "Yesterday, %@" : {
 
     },
     "MAPP kept the new sign-in, but the copy of your library on this Mac can’t be opened." : {
@@ -6424,6 +6805,9 @@
     "Addresses" : {
 
     },
+    "Addresses and the name" : {
+
+    },
     "All Data" : {
 
     },
@@ -6434,6 +6818,9 @@
 
     },
     "An IP address." : {
+
+    },
+    "An Object Store" : {
 
     },
     "An address is removed" : {
@@ -6553,6 +6940,9 @@
     "It changed somewhere else, so MAPP read it again. Nothing was changed." : {
 
     },
+    "It couldn’t be put in place." : {
+
+    },
     "It is shown only once. Keep it where the script can read it." : {
 
     },
@@ -6649,6 +7039,9 @@
     "MAPP isn’t allowed to make keys." : {
 
     },
+    "MAPP isn’t allowed to read the jobs this Marfa runs by itself." : {
+
+    },
     "Made %@." : {
 
     },
@@ -6715,6 +7108,9 @@
     "No apps are connected." : {
 
     },
+    "No backups are kept" : {
+
+    },
     "No Browsers" : {
 
     },
@@ -6737,6 +7133,9 @@
 
     },
     "On the local network." : {
+
+    },
+    "On the machine %@ runs on." : {
 
     },
     "Optional. Not used to sign in." : {
@@ -6779,6 +7178,9 @@
 
     },
     "Reaches no items." : {
+
+    },
+    "Read New Files" : {
 
     },
     "Read Server Status" : {
@@ -6830,6 +7232,9 @@
 
     },
     "Sign-Ins" : {
+
+    },
+    "Sign-ins, keys and apps" : {
 
     },
     "Signed in %@." : {
@@ -6922,6 +7327,9 @@
     "What %@ may read and change." : {
 
     },
+    "What %@ runs." : {
+
+    },
     "What Happens" : {
 
     },
@@ -6970,6 +7378,9 @@
     "Show Toolbar" : {
 
     },
+    "Show Updates" : {
+
+    },
     "Clear Shortcut" : {
 
     },
@@ -6983,6 +7394,9 @@
 
     },
     "Every command goes back to its own shortcut, and the shortcuts that work in any app are turned off." : {
+
+    },
+    "Every few hours." : {
 
     },
     "Export Shortcuts" : {
@@ -7159,6 +7573,9 @@
     "4 Spaces" : {
 
     },
+    "6 Hours" : {
+
+    },
     "8 Spaces" : {
 
     },
@@ -7258,6 +7675,9 @@
     "Facts" : {
 
     },
+    "Failed" : {
+
+    },
     "File Kind and Size" : {
 
     },
@@ -7265,6 +7685,9 @@
 
     },
     "Fold Section" : {
+
+    },
+    "Folder" : {
 
     },
     "Formatted" : {
@@ -7444,9 +7867,6 @@
     "“%@” was attached to “%@” but isn’t in its text. It was meant for a folded section or text not yet shown." : {
 
     },
-    "%@ in files" : {
-
-    },
     "%@ is ready." : {
 
     },
@@ -7456,6 +7876,22 @@
     "%@’s Disk" : {
 
     },
+    "%@’s clock jumped to %@." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@’s clock jumped to %2$@."
+          }
+        }
+      }
+    },
+    "%@’s clock jumped." : {
+
+    },
+    "%@’s clock says so. If it’s right, clean-up starts again." : {
+
+    },
     "%lld Days" : {
 
     },
@@ -7463,6 +7899,9 @@
 
     },
     "%lld MB" : {
+
+    },
+    "%lld Minutes" : {
 
     },
     "%lld Seconds" : {
@@ -7481,6 +7920,9 @@
 
     },
     "%lld seconds" : {
+
+    },
+    "%lld secrets to set again" : {
 
     },
     "%lld versions" : {
@@ -7540,7 +7982,19 @@
     "Backup Folder" : {
 
     },
+    "Backup Folder Not Kept" : {
+
+    },
     "Backups" : {
+
+    },
+    "Backups are turned off" : {
+
+    },
+    "Backups can’t be kept there" : {
+
+    },
+    "Backups of %@" : {
 
     },
     "By" : {
@@ -7553,6 +8007,12 @@
 
     },
     "Chosen" : {
+
+    },
+    "Clean-up" : {
+
+    },
+    "Clean-up is paused" : {
 
     },
     "Connector Deliveries, Handled" : {
@@ -7580,6 +8040,9 @@
 
     },
     "Events" : {
+
+    },
+    "Every" : {
 
     },
     "%lld events." : {
@@ -7616,6 +8079,9 @@
 
     },
     "It was stopped, here or somewhere else." : {
+
+    },
+    "It was taken, but some files weren’t in it." : {
 
     },
     "Item Changed" : {
@@ -7702,6 +8168,15 @@
     "Last %@" : {
 
     },
+    "Last Backup" : {
+
+    },
+    "Last Run" : {
+
+    },
+    "Last Update" : {
+
+    },
     "Last at %@" : {
 
     },
@@ -7775,6 +8250,9 @@
 
     },
     "Marfa %@" : {
+
+    },
+    "Marfa %@ is ready" : {
 
     },
     "Marfa %@." : {
@@ -7879,6 +8357,9 @@
     "Not Working" : {
 
     },
+    "Not Yet" : {
+
+    },
     "Not named yet." : {
 
     },
@@ -7897,10 +8378,10 @@
     "PostHog host" : {
 
     },
-    "project token" : {
+    "Read when %@ starts. Change them where it runs." : {
 
     },
-    "Read when %@ starts. Change them where it runs." : {
+    "Only when something changed." : {
 
     },
     "Redeliver" : {
@@ -7970,6 +8451,9 @@
 
     },
     "Telemetry is sent without these headers." : {
+
+    },
+    "The folder or object store isn’t taking them." : {
 
     },
     "The latest events sent to this address. A failed one can be sent again once this webhook is on." : {
@@ -8096,6 +8580,9 @@
 
     },
     "Turn off “%@”?" : {
+
+    },
+    "Turned off." : {
 
     },
     "Turning it off drops what is waiting." : {
@@ -8240,6 +8727,9 @@
 
     },
     "Show Folders" : {
+
+    },
+    "Show Housekeeping" : {
 
     },
     "Show Monitoring" : {
