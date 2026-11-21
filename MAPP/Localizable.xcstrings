@@ -308,6 +308,9 @@
     "Shown once, when it was made." : {
 
     },
+    "Showing %lld of %lld. The rest are listed by marfa folders inventory." : {
+
+    },
     "Signing Secret" : {
 
     },
@@ -327,6 +330,9 @@
 
     },
     "The folder is missing where this copy is kept" : {
+
+    },
+    "The latest events sent to this address. A failed one can be sent again once this webhook is on." : {
 
     },
     "The latest events sent to this address. Only a failed one can be sent again." : {

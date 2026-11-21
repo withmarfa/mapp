@@ -107,7 +107,9 @@ extension LiveMarfaTests {
 
         @Test(.timeLimit(.minutes(2))) func theFoldersAreListedWithTheirReports() async throws {
             let calls = try calls()
-            for folder in try await calls.folders() {
+            let listing = try await calls.folders()
+            #expect(listing.total >= listing.folders.count)
+            for folder in listing.folders {
                 #expect(!folder.title.isEmpty)
                 let report = try await calls.folderReport(folder.id)
                 #expect(report.copies.allSatisfy { !$0.signIn.isEmpty && $0.ageSeconds >= 0 })

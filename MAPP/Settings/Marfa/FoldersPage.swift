@@ -68,6 +68,7 @@ struct FoldersPage: View {
                     ) { push(Self.subpage(for: folder)) }
                 }
             }
+            if let cut = model.cutLine { SettingsNote(verbatim: cut) }
         }
     }
 

@@ -93,6 +93,41 @@ import Testing
         #expect(model.reportFailures["a"] == .unreachable)
     }
 
+    @Test func aListTheOverviewCutSaysHowManyAreShownOfHowMany() async {
+        let bench = OwnerBench()
+        let model = model(bench, folders: [(OwnerFolder(id: "a", title: "Studio Notes"), FolderReport(copies: []))])
+        await model.load()
+        #expect(model.cutLine == nil)
+        bench.calls.state.withLock { $0.foldersTotal = 41 }
+        await model.load()
+        #expect(model.cutLine == "Showing 1 of 41. The rest are listed by marfa folders inventory.")
+    }
+
+    @Test func theReportsAreReadFourAtATimeAfterTheListShows() async throws {
+        let bench = OwnerBench()
+        let folders = (0..<9).map { OwnerFolder(id: "f\($0)", title: "Folder \($0)") }
+        let model = model(bench, folders: folders.map { ($0, FolderReport(copies: [Self.copy("c-\($0.id)", uploads: 1)])) })
+        bench.calls.state.withLock { $0.readDelay = .milliseconds(30) }
+        let loading = Task { await model.load() }
+        #expect(try await eventuallyAsking { model.hasLoaded && model.folders.count == 9 })
+        await loading.value
+        let most = bench.calls.state.withLock { $0.mostReadsInFlight }
+        #expect(most > 1 && most <= 4)
+        #expect(folders.allSatisfy { model.condition(of: $0) == .init(title: "1 to send", tone: .quiet) })
+    }
+
+    @Test func theListShowsBeforeAnyReportIsRead() async throws {
+        let bench = OwnerBench()
+        let gate = bench.calls.hold("folderReports")
+        let model = model(bench, folders: [(OwnerFolder(id: "a", title: "Studio Notes"), FolderReport(copies: []))])
+        let loading = Task { await model.load() }
+        #expect(try await eventuallyAsking { model.hasLoaded })
+        #expect(model.condition(of: model.folders[0]) == nil)
+        gate.open()
+        await loading.value
+        #expect(model.condition(of: model.folders[0]) != nil)
+    }
+
     @Test func aFolderStoppedElsewhereLeavesTheList() async {
         let bench = OwnerBench()
         let model = model(bench, folders: [(OwnerFolder(id: "a", title: "Studio Notes"), FolderReport(copies: []))])

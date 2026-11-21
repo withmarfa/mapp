@@ -12,6 +12,12 @@ nonisolated struct OwnerFolder: Identifiable, Hashable, Sendable {
     var title: String
 }
 
+/// The folders the overview lists, which it cuts at a limit, and how many the server holds.
+nonisolated struct FolderListing: Hashable, Sendable {
+    var folders: [OwnerFolder]
+    var total: Int
+}
+
 /// One problem a copy reports, by the code the server stores.
 nonisolated struct FolderProblem: Hashable, Sendable {
     enum Code: String, Hashable, Sendable, CaseIterable {
@@ -54,9 +60,11 @@ nonisolated struct FolderReport: Hashable, Sendable {
 }
 
 extension ClientOwnerCalls {
-    func folders() async throws(OwnerFailure) -> [OwnerFolder] {
+    func folders() async throws(OwnerFailure) -> FolderListing {
         try await run { client in
-            (try await client.getOverview().ok.body.json.folders ?? []).map { OwnerFolder(id: $0.id, title: $0.title) }
+            let overview = try await client.getOverview().ok.body.json
+            let folders = (overview.folders ?? []).map { OwnerFolder(id: $0.id, title: $0.title) }
+            return FolderListing(folders: folders, total: max(folders.count, overview.truncated?.additionalProperties["folders"] ?? 0))
         }
     }
 

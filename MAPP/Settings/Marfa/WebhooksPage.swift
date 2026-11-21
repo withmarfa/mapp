@@ -210,7 +210,12 @@ private struct WebhookDetail: View {
     @ViewBuilder private var deliveries: some View {
         let all = model.deliveries[webhook.id] ?? []
         if let problem = model.deliveryErrors[webhook.id] { OwnerProblem(title: "Not Sent Again", line: problem) }
-        SettingsSection(name: Text("Deliveries"), line: Text("The latest events sent to this address. Only a failed one can be sent again.")) {
+        SettingsSection(
+            name: Text("Deliveries"),
+            line: webhook.active
+                ? Text("The latest events sent to this address. Only a failed one can be sent again.")
+                : Text("The latest events sent to this address. A failed one can be sent again once this webhook is on.")
+        ) {
             if let problem = model.deliveriesFailure[webhook.id], all.isEmpty {
                 SettingsRow(verbatim: String(localized: "Deliveries Couldn’t Be Read"), line: problem, lead: .tint("exclamationmark.triangle", .orange), lines: nil)
             } else if all.isEmpty {
@@ -224,7 +229,7 @@ private struct WebhookDetail: View {
                         SettingsTableColumn("Answer", width: 110) { Text(verbatim: Self.answer($0)) },
                     ],
                     action: SettingsRowAction(
-                        title: "Redeliver", isEnabled: { $0.status == .failed && !model.redelivering.contains($0.id) },
+                        title: "Redeliver", isEnabled: { model.canRedeliver($0, of: webhook) },
                         perform: { delivery in Task { await model.redeliver(delivery, of: webhook) } }),
                     total: all.count, showAll: showsAllDeliveries || all.count <= Self.firstDeliveries ? nil : { showsAllDeliveries = true })
             }

@@ -154,6 +154,112 @@ import Testing
         #expect(model.created == nil)
     }
 
+    @Test func closingSettingsWhileTheSecretShowsDuringTheReloadAfterTheCreateTellsAndDropsTheSecret() async throws {
+        let bench = OwnerBench()
+        let model = model(bench)
+        await model.load()
+        let gate = bench.calls.hold("webhooks")
+        model.beginNew()
+        model.draft.address = "https://hooks.ledgerly.app/marfa"
+        let making = Task { await model.make() }
+        #expect(try await eventuallyAsking { model.sheet == .secret })
+        let drafts = model.takeDrafts()
+        gate.open()
+        await making.value
+        #expect(drafts.count == 1, "the secret was made and is told about, not forgotten")
+        if case .told(let title, let message)? = drafts.first {
+            #expect(title == "Signing Secret Not Copied")
+            #expect(!message.contains("whsec_"))
+        } else {
+            Issue.record("told")
+        }
+        #expect(model.created == nil)
+        #expect(model.sheet == nil)
+        #expect(bench.late.isEmpty, "nothing is told twice")
+    }
+
+    @Test func theListShowsOnceItIsReadAndEachWebhooksSendingFillsInAfterwards() async throws {
+        let bench = OwnerBench()
+        bench.calls.state.withLock { $0.deliveries["a"] = [Self.delivery("d1", .failed, code: 500)] }
+        let model = model(bench, hooks: [Self.hook("a")])
+        let gate = bench.calls.hold("deliveries")
+        let loading = Task { await model.load() }
+        #expect(try await eventuallyAsking { model.hasLoaded })
+        #expect(model.webhooks.count == 1)
+        #expect(model.isSending(model.webhooks[0]) == .sending, "until its deliveries are read")
+        gate.open()
+        await loading.value
+        #expect(model.isSending(model.webhooks[0]) == .failing)
+    }
+
+    @Test func deliveriesAreReadFourAtATimeAndAllOfThemAreRead() async {
+        let bench = OwnerBench()
+        let hooks = (0..<10).map { Self.hook("h\($0)") }
+        bench.calls.state.withLock { state in
+            state.readDelay = .milliseconds(30)
+            for hook in hooks { state.deliveries[hook.id] = [Self.delivery("d-\(hook.id)", .failed, code: 500)] }
+        }
+        let model = model(bench, hooks: hooks)
+        await model.load()
+        let most = bench.calls.state.withLock { $0.mostReadsInFlight }
+        #expect(most > 1, "they run together")
+        #expect(most <= 4, "with a small bound")
+        #expect(hooks.allSatisfy { model.isSending(model.webhook($0.id)!) == .failing })
+    }
+
+    @Test func aNewWebhookDoesNotWaitForTheDeliveriesOfTheOthers() async throws {
+        let bench = OwnerBench()
+        let model = model(bench, hooks: [Self.hook("a")])
+        await model.load()
+        let gate = bench.calls.hold("deliveries")
+        model.beginNew()
+        model.draft.address = "https://hooks.ledgerly.app/marfa"
+        await model.make()
+        #expect(model.sheet == .secret)
+        #expect(model.webhooks.count == 2, "the list is read again")
+        gate.open()
+    }
+
+    @Test func aDeliveryCanBeSentAgainOnlyWhenItFailedAndItsWebhookIsOn() async {
+        let bench = OwnerBench()
+        bench.calls.state.withLock {
+            $0.deliveries["on"] = [Self.delivery("d1", .failed, code: 500), Self.delivery("d2", .succeeded, code: 200)]
+            $0.deliveries["off"] = [Self.delivery("d3", .failed, code: 500)]
+        }
+        let model = model(bench, hooks: [Self.hook("on"), Self.hook("off", active: false)])
+        await model.load()
+        await model.loadDeliveries(of: "on")
+        await model.loadDeliveries(of: "off")
+        #expect(model.canRedeliver(model.deliveries["on"]![0], of: model.webhooks[0]))
+        #expect(!model.canRedeliver(model.deliveries["on"]![1], of: model.webhooks[0]))
+        #expect(!model.canRedeliver(model.deliveries["off"]![0], of: model.webhooks[1]), "an off webhook sends nothing")
+        await model.redeliver(model.deliveries["off"]![0], of: model.webhooks[1])
+        #expect(!bench.calls.calls.contains("redeliver"))
+    }
+
+    @Test func anEventChangeIsBuiltOnTheWebhookAsTheServerHoldsItNow() async {
+        let bench = OwnerBench()
+        let model = model(bench, hooks: [Self.hook("a", events: ["item.created"])])
+        await model.load()
+        // Another app turned an event on after the page read the list.
+        bench.calls.state.withLock { $0.webhooks[0].events = ["item.created", "edge.created"] }
+        await model.setEvent(.itemTrashed, on: true, for: model.webhooks[0])
+        #expect(Set(model.webhooks[0].events) == ["item.created", "edge.created", "item.trashed"])
+        bench.calls.state.withLock { $0.webhooks[0].events.append("item.updated") }
+        await model.setAllEvents(on: false, for: model.webhooks[0])
+        #expect(model.webhooks[0].events.isEmpty || model.webhooks[0].events.allSatisfy { WebhookEvent(rawValue: $0) == nil })
+    }
+
+    @Test func anEventChangeToAWebhookGoneSinceTheLastReadIsToldAsGone() async {
+        let bench = OwnerBench()
+        let model = model(bench, hooks: [Self.hook("a")])
+        await model.load()
+        bench.calls.state.withLock { $0.webhooks = [] }
+        await model.setEvent(.itemTrashed, on: true, for: model.webhooks[0])
+        #expect(model.isGone("a"))
+        #expect(!bench.calls.calls.contains("changeWebhook"), "nothing is sent for a webhook that is not there")
+    }
+
     @Test func turningAnEventOnOrOffSendsEveryEventAndKeepsOnesThisBuildDoesNotKnow() async {
         let bench = OwnerBench()
         let model = model(bench, hooks: [Self.hook("a", events: ["item.created", "item.future"])])
@@ -268,14 +374,16 @@ import Testing
         #expect(model.sheet == nil)
     }
 
-    @Test func aFailedDeliveryIsSentAgainAndOtherDeliveriesAreRefusedWithOneLine() async {
+    @Test func aFailedDeliveryIsSentAgainAndOneTheServerNowRefusesIsToldWithOneLine() async {
         let bench = OwnerBench()
         bench.calls.state.withLock {
-            $0.deliveries["a"] = [Self.delivery("d2", .succeeded, code: 200), Self.delivery("d1", .failed, code: 500)]
+            $0.deliveries["a"] = [Self.delivery("d2", .failed, code: 500), Self.delivery("d1", .failed, code: 500)]
         }
         let model = model(bench, hooks: [Self.hook("a")])
         await model.load()
         await model.loadDeliveries(of: "a")
+        // Another app sent the first one again between the page's read and the click.
+        bench.calls.state.withLock { $0.deliveries["a"]![0].status = .succeeded }
         await model.redeliver(model.deliveries["a"]![0], of: model.webhooks[0])
         #expect(model.deliveryErrors["a"] == "Only a failed delivery can be sent again.")
         await model.redeliver(model.deliveries["a"]![1], of: model.webhooks[0])

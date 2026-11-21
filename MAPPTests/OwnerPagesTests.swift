@@ -47,6 +47,12 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var redelivered: [String] = []
         var folders: [OwnerFolder] = []
         var reports: [String: FolderReport] = [:]
+        /// How many folders the server holds, where the list it sent was cut.
+        var foldersTotal: Int?
+        /// How long a deliveries or folder-report call takes, so calls overlap and the most at once can be counted.
+        var readDelay: Duration?
+        var readsInFlight = 0
+        var mostReadsInFlight = 0
     }
 
     let state = Mutex(State())
@@ -63,6 +69,18 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 
     private func held(_ call: String) async {
         if let gate = state.withLock({ $0.gates[call] }) { await gate.wait() }
+    }
+
+    /// Takes `readDelay` while counted as in flight.
+    private func counted() async {
+        guard let delay = state.withLock({ state -> Duration? in
+            guard state.readDelay != nil else { return nil }
+            state.readsInFlight += 1
+            state.mostReadsInFlight = max(state.mostReadsInFlight, state.readsInFlight)
+            return state.readDelay
+        }) else { return }
+        try? await Task.sleep(for: delay)
+        state.withLock { $0.readsInFlight -= 1 }
     }
 
     private func enter(_ call: String) throws(OwnerFailure) {
@@ -229,7 +247,16 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 
     func webhooks() async throws(OwnerFailure) -> [OwnerWebhook] {
         try enter("webhooks")
+        await held("webhooks")
         return state.withLock { $0.webhooks }
+    }
+
+    func webhook(_ id: String) async throws(OwnerFailure) -> OwnerWebhook {
+        try enter("getWebhook")
+        return try state.withLock { state throws(OwnerFailure) in
+            guard let webhook = state.webhooks.first(where: { $0.id == id }) else { throw .notFound }
+            return webhook
+        }
     }
 
     func create(_ webhook: NewWebhook) async throws(OwnerFailure) -> CreatedWebhook {
@@ -275,6 +302,8 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
 
     func deliveries(of webhook: String) async throws(OwnerFailure) -> [WebhookDeliveryInfo] {
         try enter("deliveries")
+        await held("deliveries")
+        await counted()
         return state.withLock { $0.deliveries[webhook] ?? [] }
     }
 
@@ -289,13 +318,15 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         }
     }
 
-    func folders() async throws(OwnerFailure) -> [OwnerFolder] {
+    func folders() async throws(OwnerFailure) -> FolderListing {
         try enter("folders")
-        return state.withLock { $0.folders }
+        return state.withLock { FolderListing(folders: $0.folders, total: $0.foldersTotal ?? $0.folders.count) }
     }
 
     func folderReport(_ id: String) async throws(OwnerFailure) -> FolderReport {
         try enter("folderReport")
+        await held("folderReports")
+        await counted()
         return try state.withLock { state throws(OwnerFailure) in
             guard let report = state.reports[id] else { throw .notFound }
             return report

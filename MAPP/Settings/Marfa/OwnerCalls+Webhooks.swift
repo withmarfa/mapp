@@ -140,6 +140,14 @@ extension ClientOwnerCalls {
         }
     }
 
+    func webhook(_ id: String) async throws(OwnerFailure) -> OwnerWebhook {
+        try await run { client in
+            let read = try await client.getWebhook(path: .init(id: id)).ok.body.json
+            let maker = read.value2.maker
+            return Self.webhook(read.value1, maker: .init(kind: maker.kind == .app ? .app : .key, id: maker.id, name: maker.name))
+        }
+    }
+
     func create(_ webhook: NewWebhook) async throws(OwnerFailure) -> CreatedWebhook {
         try await run { client in
             let body = Operations.CreateWebhook.Input.Body.JsonPayload(

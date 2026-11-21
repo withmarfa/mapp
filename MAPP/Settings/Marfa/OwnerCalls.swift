@@ -170,6 +170,8 @@ nonisolated protocol OwnerCalls: Sendable {
     func setWebsites(_ websites: [String], instanceID: String?) async throws(OwnerFailure) -> AddressSettings
 
     func webhooks() async throws(OwnerFailure) -> [OwnerWebhook]
+    /// One webhook as the server holds it now.
+    func webhook(_ id: String) async throws(OwnerFailure) -> OwnerWebhook
     func create(_ webhook: NewWebhook) async throws(OwnerFailure) -> CreatedWebhook
     /// Changes only what `change` names and answers the webhook as the server holds it.
     func change(webhook id: String, _ change: WebhookChange) async throws(OwnerFailure) -> OwnerWebhook
@@ -177,7 +179,7 @@ nonisolated protocol OwnerCalls: Sendable {
     func deliveries(of webhook: String) async throws(OwnerFailure) -> [WebhookDeliveryInfo]
     func redeliver(_ delivery: String, of webhook: String) async throws(OwnerFailure) -> WebhookDeliveryInfo
 
-    func folders() async throws(OwnerFailure) -> [OwnerFolder]
+    func folders() async throws(OwnerFailure) -> FolderListing
     func folderReport(_ id: String) async throws(OwnerFailure) -> FolderReport
 }
 

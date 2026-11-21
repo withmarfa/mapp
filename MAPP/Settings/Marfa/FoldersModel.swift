@@ -17,6 +17,8 @@ import Observation
     private let context: OwnerContext
 
     private(set) var folders: [OwnerFolder] = []
+    /// How many folders the server holds, which is more than `folders` where the overview cut its list.
+    private(set) var total = 0
     private(set) var reports: [String: FolderReport] = [:]
     /// Why a folder's report could not be read, by the folder's id.
     private(set) var reportFailures: [String: OwnerFailure] = [:]
@@ -30,33 +32,57 @@ import Observation
 
     func folder(_ id: String) -> OwnerFolder? { folders.first { $0.id == id } }
 
+    /// Reads the list, which the page shows at once, then each folder's report a few at a time.
     func load() async {
         guard !isLoading else { return }
         isLoading = true
-        defer {
-            isLoading = false
-            hasLoaded = true
-        }
+        defer { isLoading = false }
         do {
-            folders = try await context.calls.folders()
+            let listing = try await context.calls.folders()
+            folders = listing.folders
+            total = listing.total
             failure = nil
+            hasLoaded = true
         } catch {
             failure = error
+            hasLoaded = true
             await context.learn(from: error)
             return
         }
-        for folder in folders { await loadReport(folder.id) }
+        let calls = context.calls
+        await readEach(
+            of: folders.map(\.id),
+            read: { id -> Result<FolderReport, OwnerFailure> in
+                do throws(OwnerFailure) { return .success(try await calls.folderReport(id)) } catch { return .failure(error) }
+            },
+            take: { id, answer in await take(answer, for: id) })
     }
 
     func loadReport(_ id: String) async {
-        do {
-            reports[id] = try await context.calls.folderReport(id)
-            reportFailures[id] = nil
+        do throws(OwnerFailure) {
+            await take(.success(try await context.calls.folderReport(id)), for: id)
         } catch {
+            await take(.failure(error), for: id)
+        }
+    }
+
+    private func take(_ answer: Result<FolderReport, OwnerFailure>, for id: String) async {
+        switch answer {
+        case .success(let report):
+            reports[id] = report
+            reportFailures[id] = nil
+        case .failure(let error):
             reportFailures[id] = error
             if error == .notFound { folders.removeAll { $0.id == id } }
             await context.learn(from: error)
         }
+    }
+
+    /// Where the list was cut, how many are shown and where the rest are listed; nil when it holds them all.
+    var cutLine: String? {
+        guard total > folders.count else { return nil }
+        let shown = folders.count
+        return String(localized: "Showing \(shown) of \(total). The rest are listed by marfa folders inventory.")
     }
 
     // MARK: Words

@@ -139,33 +139,42 @@ import Observation
 
     // MARK: Reading
 
+    /// Reads the list, which the page shows at once, then what each webhook says about itself.
     func load() async {
         guard !isLoading else { return }
         isLoading = true
-        defer {
-            isLoading = false
-            hasLoaded = true
-        }
-        do {
-            webhooks = try await context.calls.webhooks()
-            gone = gone.filter { id in !webhooks.contains { $0.id == id } }
-            failure = nil
-        } catch {
-            failure = error
-            await context.learn(from: error)
-            return
-        }
+        defer { isLoading = false }
+        guard await readList() else { return }
         typeNames = (try? await context.calls.typeNames()) ?? typeNames
         await loadSending()
     }
 
-    /// Reads each active webhook's latest delivery, so the list can say which are failing. A webhook whose deliveries can't
-    /// be read keeps saying it is sending.
-    private func loadSending() async {
-        for webhook in webhooks where webhook.active {
-            guard let latest = try? await context.calls.deliveries(of: webhook.id).first else { continue }
-            sending[webhook.id] = latest.status == .failed ? .failing : .sending
+    /// Reads only the list, and answers whether it could.
+    private func readList() async -> Bool {
+        defer { hasLoaded = true }
+        do {
+            webhooks = try await context.calls.webhooks()
+            gone = gone.filter { id in !webhooks.contains { $0.id == id } }
+            failure = nil
+            return true
+        } catch {
+            failure = error
+            await context.learn(from: error)
+            return false
         }
+    }
+
+    /// Reads each active webhook's latest delivery, a few at a time, so the list can say which are failing. A webhook whose
+    /// deliveries can't be read keeps saying it is sending.
+    private func loadSending() async {
+        let calls = context.calls
+        await readEach(
+            of: webhooks.filter(\.active).map(\.id),
+            read: { id in try? await calls.deliveries(of: id).first },
+            take: { id, latest in
+                guard let latest else { return }
+                sending[id] = latest.status == .failed ? .failing : .sending
+            })
     }
 
     func loadDeliveries(of id: String) async {
@@ -184,6 +193,26 @@ import Observation
         rowErrors[id] = nil
         do {
             try await apply(id, change)
+        } catch {
+            rowErrors[id] = OwnerWording.line(error)
+        }
+    }
+
+    /// Changes the events from the webhook as the server holds it just now, not as the page last read it, so an event
+    /// another app turned on or off in between is kept. The server takes no version for a webhook, so a change in the moment
+    /// between this read and the send can still be replaced.
+    private func changeEvents(of id: String, _ build: (OwnerWebhook) -> [String]) async {
+        rowErrors[id] = nil
+        do throws(OwnerFailure) {
+            let current: OwnerWebhook
+            do throws(OwnerFailure) {
+                current = try await context.calls.webhook(id)
+            } catch {
+                if error == .notFound { markGone(id) }
+                await context.learn(from: error)
+                throw error
+            }
+            try await apply(id, WebhookChange(events: build(current)))
         } catch {
             rowErrors[id] = OwnerWording.line(error)
         }
@@ -214,14 +243,18 @@ import Observation
 
     /// Turns one event on or off. The webhook keeps every event this build doesn't know, which another app may have set.
     func setEvent(_ event: WebhookEvent, on: Bool, for webhook: OwnerWebhook) async {
-        var events = webhook.events.filter { $0 != event.rawValue }
-        if on { events.append(event.rawValue) }
-        await change(webhook.id, WebhookChange(events: Self.ordered(events)))
+        await changeEvents(of: webhook.id) { current in
+            var events = current.events.filter { $0 != event.rawValue }
+            if on { events.append(event.rawValue) }
+            return Self.ordered(events)
+        }
     }
 
     func setAllEvents(on: Bool, for webhook: OwnerWebhook) async {
-        let unknown = webhook.events.filter { WebhookEvent(rawValue: $0) == nil }
-        await change(webhook.id, WebhookChange(events: on ? Self.ordered(WebhookEvent.allCases.map(\.rawValue) + unknown) : unknown))
+        await changeEvents(of: webhook.id) { current in
+            let unknown = current.events.filter { WebhookEvent(rawValue: $0) == nil }
+            return on ? Self.ordered(WebhookEvent.allCases.map(\.rawValue) + unknown) : unknown
+        }
     }
 
     /// Events in the order the page lists them, with any this build doesn't know after them.
@@ -313,9 +346,15 @@ import Observation
 
     // MARK: Redelivery
 
+    /// Whether a delivery can be sent again: only a failed one, and only while its webhook is on, as the server refuses
+    /// both other ways (`events/redeliver-inactive`).
+    func canRedeliver(_ delivery: WebhookDeliveryInfo, of webhook: OwnerWebhook) -> Bool {
+        webhook.active && delivery.status == .failed && !redelivering.contains(delivery.id)
+    }
+
     /// Sends a failed delivery again to the webhook's address as it is now. The server accepts only a failed one.
     func redeliver(_ delivery: WebhookDeliveryInfo, of webhook: OwnerWebhook) async {
-        guard !redelivering.contains(delivery.id) else { return }
+        guard canRedeliver(delivery, of: webhook) else { return }
         redelivering.insert(delivery.id)
         defer { redelivering.remove(delivery.id) }
         deliveryErrors[webhook.id] = nil
@@ -348,23 +387,15 @@ import Observation
     func make() async {
         guard canMakeDraft else { return }
         isMaking = true
-        defer { isMaking = false }
         draftError = nil
         let request = NewWebhook(
             url: Self.normalized(draft.address), events: WebhookEvent.allCases.map(\.rawValue).filter(draft.events.contains),
             typeFilter: draft.type)
+        let made: CreatedWebhook
         do {
-            let made = try await context.calls.create(request)
-            if closedWhileMaking {
-                closedWhileMaking = false
-                sheet = nil
-                context.lateDraft(Self.notCopied(made.webhook.url))
-            } else {
-                created = made
-                sheet = .secret
-            }
-            await load()
+            made = try await context.calls.create(request)
         } catch {
+            isMaking = false
             if closedWhileMaking {
                 closedWhileMaking = false
                 sheet = nil
@@ -372,7 +403,19 @@ import Observation
             }
             draftError = OwnerWording.line(error)
             await context.learn(from: error)
+            return
         }
+        // The call has answered, so a close from here on finds the secret on show and tells about it.
+        isMaking = false
+        if closedWhileMaking {
+            closedWhileMaking = false
+            sheet = nil
+            context.lateDraft(Self.notCopied(made.webhook.url))
+        } else {
+            created = made
+            sheet = .secret
+        }
+        _ = await readList()
     }
 
     /// The notice for a webhook made whose signing secret was never copied: it can't be shown again.
