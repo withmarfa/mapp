@@ -315,6 +315,20 @@ private struct RenderedWindow<Detail: View>: View {
         try await page(.apps, owner(), subpage: SettingsSubpage(id: "app:g2", title: "Raycast"), named: "An app, Raycast")
     }
 
+    @Test func anAppWithOwnerPermissions() async throws {
+        let host = owner()
+        (host.ownerCalls as? FakeOwnerCalls)?.state.withLock { $0.apps[1].scopes += ["backups.manage", "audit.read"] }
+        try await page(.apps, host, subpage: SettingsSubpage(id: "app:g2", title: "Raycast"), named: "An app, Raycast, with owner permissions")
+    }
+
+    @Test func anAppsOwnerPermissions() async throws {
+        let host = owner()
+        (host.ownerCalls as? FakeOwnerCalls)?.state.withLock { $0.apps[1].scopes += ["backups.manage", "audit.read"] }
+        try await page(
+            .apps, host, subpage: OwnerPermissions.subpage(of: SettingsSubpage(id: "app:g2", title: "Raycast")),
+            named: "An app's owner permissions")
+    }
+
     @Test func appsNeedsAPermission() async throws {
         let host = owner()
         host.grants = [.configManage]
@@ -354,7 +368,7 @@ private struct RenderedWindow<Detail: View>: View {
         let host = owner()
         (host.ownerCalls as? FakeOwnerCalls)?.state.withLock { $0.keys[0].permissions = ["backups.manage", "items.purge", "audit.read"] }
         try await page(
-            .keys, host, subpage: KeysPage.permissionsSubpage(for: KeyInfo(id: "k1", label: "Backup script", source: "backup", permissions: [], tier: .library, types: [:], appClientID: nil)),
+            .keys, host, subpage: OwnerPermissions.subpage(of: SettingsSubpage(id: "key:k1", title: "Backup script")),
             named: "A key's owner permissions")
     }
 

@@ -21,20 +21,12 @@ struct KeysPage: View {
         SettingsSubpage(id: "key:" + key.id, title: key.label)
     }
 
-    /// A key's owner permissions, a page of their own that Back returns from.
-    static func permissionsSubpage(for key: KeyInfo) -> SettingsSubpage {
-        SettingsSubpage(id: "key:" + key.id + permissionsSuffix, title: String(localized: "Look After This Marfa"))
-    }
-
-    private static let permissionsSuffix = "/permissions"
-
     private var openKeyID: String? {
         guard let id = subpage?.id, id.hasPrefix("key:") else { return nil }
-        let rest = String(id.dropFirst(4))
-        return rest.hasSuffix(Self.permissionsSuffix) ? String(rest.dropLast(Self.permissionsSuffix.count)) : rest
+        return OwnerPermissions.owner(of: String(id.dropFirst(4))).base
     }
 
-    private var isShowingPermissions: Bool { subpage?.id.hasSuffix(Self.permissionsSuffix) == true }
+    private var isShowingPermissions: Bool { subpage.map { OwnerPermissions.owner(of: $0.id).isList } ?? false }
 
     var body: some View {
         content
@@ -196,16 +188,9 @@ private struct KeyDetail: View {
         }
     }
 
-    /// One row for every owner permission the key holds, which opens the page that lists them.
-    @ViewBuilder private var ownerPermissions: some View {
-        let line = String(localized: "The owner’s permissions. Most keys need none.")
-        let count = OwnerWording.permissionCount(parsed.permissions.count, of: InstancePermission.allCases.count)
-        if parsed.permissions.isEmpty {
-            SettingsRow("Look After This Marfa", line: "The owner’s permissions. Most keys need none.") { SettingsValue(verbatim: count) }
-        } else {
-            SettingsLinkRow(verbatim: String(localized: "Look After This Marfa"), line: line, value: count) {
-                push(KeysPage.permissionsSubpage(for: key))
-            }
+    private var ownerPermissions: some View {
+        OwnerPermissionsRow(held: parsed.permissions.count, line: String(localized: "The owner’s permissions. Most keys need none.")) {
+            push(OwnerPermissions.subpage(of: KeysPage.subpage(for: key)))
         }
     }
 
@@ -218,28 +203,16 @@ private struct KeyDetail: View {
     }
 }
 
-/// A key's owner permissions, one switch each. A key can only lose a permission, so only what it holds is listed, and
-/// turning one off asks first.
+/// A key's owner permissions, the page the counted row opens.
 private struct KeyPermissions: View {
     let model: KeysModel
     let key: KeyInfo
 
     var body: some View {
-        SettingsPageColumn {
-            if let line = model.rowErrors[key.id] { OwnerProblem(title: "Not Changed", line: line) }
-            SettingsSection(name: Text("Look After This Marfa"), line: Text("The owner’s permissions. A key can only lose them.")) {
-                if key.permissions.isEmpty {
-                    SettingsRow("No Owner Permissions", look: .off)
-                }
-                ForEach(KeyAccess.parsed(key).permissions, id: \.self) { permission in
-                    SettingsRow(verbatim: OwnerWording.title(of: permission)) {
-                        SettingsToggle(title: "Allowed", isOn: Binding { key.permissions.contains(permission) } set: { on in
-                            if !on { model.askToRemove(permission: permission, from: key) }
-                        })
-                    }
-                }
-            }
-        }
+        OwnerPermissionsList(
+            held: KeyAccess.parsed(key).permissions, line: "The owner’s permissions. A key can only lose them.",
+            problem: model.rowErrors[key.id]
+        ) { model.askToRemove(permission: $0, from: key) }
     }
 }
 

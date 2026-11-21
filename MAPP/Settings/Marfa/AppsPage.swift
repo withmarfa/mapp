@@ -21,8 +21,10 @@ struct AppsPage: View {
 
     private var openApp: AppAccess? {
         guard let id = subpage?.id, id.hasPrefix("app:") else { return nil }
-        return model.app(String(id.dropFirst(4)))
+        return model.app(OwnerPermissions.owner(of: String(id.dropFirst(4))).base)
     }
+
+    private var isShowingPermissions: Bool { subpage.map { OwnerPermissions.owner(of: $0.id).isList } ?? false }
 
     var body: some View {
         content
@@ -47,7 +49,11 @@ struct AppsPage: View {
             OwnerLoading()
         } else if subpage != nil {
             if let app = openApp {
-                AppDetail(model: model, app: app)
+                if isShowingPermissions {
+                    AppPermissions(model: model, app: app)
+                } else {
+                    AppDetail(model: model, app: app)
+                }
             } else {
                 SettingsPageState(
                     symbol: "macwindow", title: Text("This App Isn’t Connected"),
@@ -84,10 +90,24 @@ struct AppsPage: View {
     }
 }
 
+/// An app's owner permissions, the page the counted row opens.
+private struct AppPermissions: View {
+    let model: AppsModel
+    let app: AppAccess
+
+    var body: some View {
+        OwnerPermissionsList(
+            held: AccessScopes.parse(app.scopes).permissions, line: "The owner’s permissions. An app can only lose them.",
+            problem: model.rowErrors[app.id]
+        ) { model.askToRemove(permission: $0, from: app) }
+    }
+}
+
 /// One app's page.
 private struct AppDetail: View {
     let model: AppsModel
     let app: AppAccess
+    @Environment(\.settingsPush) private var push
 
     private var name: String { AppsModel.name(of: app) }
     private var parsed: AccessScopes.Parsed { AccessScopes.parse(app.scopes) }
@@ -123,18 +143,8 @@ private struct AppDetail: View {
                         }
                     }
                 }
-            }
-            SettingsSection("Look After This Marfa", line: "The owner’s permissions. Most apps need none.") {
-                if parsed.permissions.isEmpty {
-                    SettingsRow("Permissions") { SettingsValue("None") }
-                }
-                ForEach(parsed.permissions, id: \.self) { permission in
-                    SettingsRow(verbatim: OwnerWording.title(of: permission)) {
-                        SettingsPopUp(title: "Permission", selection: Binding { true } set: { if !$0 { model.askToRemove(permission: permission, from: app) } }) {
-                            Text("Allowed").tag(true)
-                            Text("Not Allowed").tag(false)
-                        }
-                    }
+                OwnerPermissionsRow(held: parsed.permissions.count, line: String(localized: "The owner’s permissions. Most apps need none.")) {
+                    push(OwnerPermissions.subpage(of: AppsPage.subpage(for: app)))
                 }
             }
             if let keys = model.keysMade[app.clientID], !keys.isEmpty {

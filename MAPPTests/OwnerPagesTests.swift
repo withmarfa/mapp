@@ -740,10 +740,15 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(OwnerWording.permissionCount(14, of: 14) == "14 of 14")
     }
 
-    @Test func aKeysPermissionsPageIsASubpageOfItsOwn() {
-        let key = key()
-        #expect(KeysPage.permissionsSubpage(for: key) != KeysPage.subpage(for: key))
-        #expect(KeysPage.permissionsSubpage(for: key).id.hasPrefix(KeysPage.subpage(for: key).id))
+    @Test func theOwnerPermissionsOfAKeyAndAnAppAreASubpageOfTheirOwn() {
+        let key = KeysPage.subpage(for: key())
+        let page = OwnerPermissions.subpage(of: key)
+        #expect(page != key)
+        let found = OwnerPermissions.owner(of: String(page.id.dropFirst(4)))
+        #expect(found.isList)
+        #expect("key:" + found.base == key.id)
+        #expect(!OwnerPermissions.owner(of: String(key.id.dropFirst(4))).isList)
+        #expect(OwnerPermissions.owner(of: "g2").base == "g2")
     }
 
     @Test func escapeInNewKeysPermissionsGoesBackToItsFieldsKeepingWhatWasChosen() {
