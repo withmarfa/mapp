@@ -66,7 +66,7 @@ struct HousekeepingPage: View {
                 }
                 if let instead = model.confirmedInstead {
                     SettingsProblemRow(
-                        title: Text("\(host.serverName) took another date"),
+                        title: Text("\(host.serverName) Took Another Date"),
                         line: Text("You were shown \(Self.date(instead.shown)), and its clock read \(Self.date(instead.confirmed)) when it confirmed."),
                         actions: [])
                 }

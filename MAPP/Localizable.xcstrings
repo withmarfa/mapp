@@ -16,7 +16,7 @@
     "%@ were changed elsewhere. MAPP read the new values; yours weren’t saved." : {
 
     },
-    "%@ took another date" : {
+    "%@ Took Another Date" : {
 
     },
     "%lld other settings are set on the machine %@ runs on." : {
