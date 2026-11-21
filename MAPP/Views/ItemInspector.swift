@@ -73,10 +73,10 @@ struct ItemInspectorHost: View {
             } else if selectedID != nil {
                 // The library has not read the chosen item yet.
                 if library.isLoaded && library.syncReport.phase == .current { Color.clear } else { InspectorReadingView() }
-            } else if let browser, !browser.items(in: library).isEmpty {
+            } else if let browser, browser.viewMode != .list, !browser.items(in: library).isEmpty {
                 InspectorPromptView(prompt: .forItems(in: browser.viewMode))
             } else {
-                // A place with no items says so in the main area.
+                // A place with no items says so in the main area, and so does the list layout's page column.
                 Color.clear
             }
         }
