@@ -20,17 +20,19 @@ struct ItemCalendar: View {
         let calendar = Calendar.mapp
         let now = library.now()
         let anchor = browser.calendarDay ?? now
+        let firstShown = CalendarLayout.firstDayShown(browser.calendarDay, now: now, calendar: calendar)
         let placed = CalendarLayout.entries(for: items, looks: browser.looks(in: library), catalogue: library.catalogue, calendar: calendar)
         let scale = browser.calendarScale
-        let visible = CalendarLayout.interval(of: scale, containing: anchor, calendar: calendar)
+        let visible = scale == .week
+            ? DateInterval(start: firstShown, end: calendar.date(byAdding: .day, value: 7, to: firstShown) ?? firstShown)
+            : CalendarLayout.interval(of: scale, containing: anchor, calendar: calendar)
 
         Group {
             switch scale {
             case .week:
-                let week = CalendarWeek.make(entries: placed.entries, around: anchor, calendar: calendar, now: now)
-                CalendarWeekView(week: week, browser: browser, keyboard: keyboard, calendar: calendar, format: dateFormat, now: now, choose: choose, open: open)
-                    .navigationTitle(Self.title(of: week.interval, calendar: calendar))
-                    .navigationSubtitle(Text("Week \(calendar.component(.weekOfYear, from: week.interval.start))").editedSubtitle(browser.hasViewChanges))
+                CalendarWeekView(
+                    entries: placed.entries, firstDay: firstShown, browser: browser, keyboard: keyboard, calendar: calendar,
+                    format: dateFormat, now: now, choose: choose, open: open)
             case .month:
                 let month = CalendarMonth.make(entries: placed.entries, around: anchor, calendar: calendar, now: now)
                 CalendarMonthView(month: month, browser: browser, calendar: calendar, format: dateFormat, choose: choose, open: open)
@@ -54,7 +56,7 @@ struct ItemCalendar: View {
             }
             guard let next = CalendarNavigation.move(from: from, direction, in: placed.entries, visible: visible, calendar: calendar)
             else { return .ignored }
-            if !visible.contains(next.day) { browser.calendarDay = next.day }
+            if !visible.contains(next.day) { browser.showCalendarDay(next.day, calendar: calendar) }
             choose(next.id, next.day)
             keyboard.reveal = next
             return .handled
@@ -110,14 +112,20 @@ struct ItemCalendar: View {
 /// the chosen event was chosen on and the part of the week on screen are plain, and only the small watcher that scrolls
 /// reads `reveal`.
 @Observable
-private final class CalendarKeyboard {
+final class CalendarKeyboard {
     @ObservationIgnored var day: Date?
+    /// The part of the hours grid in view, in the grid's own points from its top, below the pinned heading.
     @ObservationIgnored var viewport = CGRect.zero
+    /// How far the week has scrolled down, in the scroll view's own measure.
+    @ObservationIgnored var offsetY: CGFloat = 0
     /// The event a key has just moved to, for the week to bring into view.
     var reveal: CalendarNavigation.Spot?
+
+    /// Where to scroll so that `gridY`, a point down the hours grid, is at the top of what is in view.
+    func offset(forGridY gridY: CGFloat) -> CGFloat { offsetY + gridY - viewport.minY }
 }
 
-private extension CalendarEntry {
+extension CalendarEntry {
     /// What a block says to VoiceOver beyond its title: where the event really starts and ends, whatever part of it the
     /// day shows.
     func spoken(calendar: Calendar, format: DateFormat) -> String {
@@ -132,7 +140,7 @@ private extension CalendarEntry {
 
 /// One item as a control: it answers a click and a double click, and reads the selection itself, so a selection that
 /// moves runs these small bodies and not the calendar's.
-private struct CalendarCell<Label: View>: View {
+struct CalendarCell<Label: View>: View {
     @Environment(\.undoManager) private var undoManager
     let browser: Browser
     let entry: CalendarEntry
@@ -168,14 +176,14 @@ private struct CalendarCell<Label: View>: View {
     }
 }
 
-private extension CalendarCell {
+extension CalendarCell {
     static func dayKey(_ day: Date, _ calendar: Calendar) -> String {
         let parts = calendar.dateComponents([.year, .month, .day], from: day)
         return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }
 }
 
-private extension View {
+extension View {
     /// The quiet fill of an item, or the accent for the chosen one.
     func calendarFill(_ isSelected: Bool, radius: CGFloat) -> some View {
         background(
@@ -184,237 +192,8 @@ private extension View {
     }
 }
 
-private extension Color {
+extension Color {
     static let calendarToday = Color.red
-}
-
-// MARK: Week
-
-private struct CalendarWeekView: View {
-    let week: CalendarWeek
-    let browser: Browser
-    let keyboard: CalendarKeyboard
-    let calendar: Calendar
-    let format: DateFormat
-    let now: Date
-    let choose: (ItemID, Date) -> Void
-    let open: (ItemID) -> Void
-
-    fileprivate static let hourHeight: CGFloat = 59
-    private static let margin: CGFloat = 56
-    /// The hour the day opens scrolled to, a little above the working day's first hour.
-    private static let workday = 8
-    @State private var position = ScrollPosition()
-
-    var body: some View {
-        VStack(spacing: 0) {
-            header
-            allDay
-            ScrollView { grid }
-                .scrollPosition($position)
-                .onScrollGeometryChange(for: CGRect.self) { $0.visibleRect } action: { _, visible in keyboard.viewport = visible }
-                .background(CalendarReveal(keyboard: keyboard, week: week, position: $position))
-                .scrollBounceBehavior(.basedOnSize)
-                .task {
-                    // The grid has no size on the first pass, so scroll once it has been laid out.
-                    try? await Task.sleep(for: .milliseconds(100))
-                    position.scrollTo(y: CGFloat(Self.workday) * Self.hourHeight - 12)
-                }
-        }
-        .accessibilityLabel("Week")
-    }
-
-    private var header: some View {
-        HStack(spacing: 0) {
-            Color.clear.frame(width: Self.margin)
-            ForEach(week.days) { day in
-                HStack(spacing: 6) {
-                    Text(day.date, format: .dateTime.weekday(.abbreviated))
-                        .interfaceFont(.system(size: 12))
-                        .foregroundStyle(day.isToday ? Color.calendarToday : .secondary)
-                    Text(day.date, format: .dateTime.day())
-                        .interfaceFont(.system(size: 14, weight: day.isToday ? .semibold : .medium))
-                        .monospacedDigit()
-                        .foregroundStyle(day.isToday ? Color.white : .primary)
-                        .frame(minWidth: 24, minHeight: 24)
-                        .background { if day.isToday { Circle().fill(Color.calendarToday) } }
-                }
-                .padding(.horizontal, 8)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityElement(children: .combine)
-            }
-        }
-        .frame(height: 40)
-        .overlay(alignment: .bottom) { Rectangle().fill(.separator).frame(height: 0.5) }
-    }
-
-    private var allDay: some View {
-        HStack(spacing: 0) {
-            Text("All day")
-                .interfaceFont(.system(size: 10.5))
-                .foregroundStyle(.secondary)
-                .padding(.trailing, 8)
-                .frame(width: Self.margin, alignment: .trailing)
-                .frame(maxHeight: .infinity, alignment: .center)
-            ForEach(week.days) { day in
-                VStack(spacing: 2) {
-                    ForEach(day.allDay) { entry in
-                        CalendarCell(browser: browser, entry: entry, day: day.date, calendar: calendar, format: format, choose: choose, open: open) { isSelected in
-                            Text(verbatim: entry.title)
-                                .interfaceFont(.system(size: 11.5, weight: .medium))
-                                .lineLimit(1)
-                                .foregroundStyle(isSelected ? Color.white : .primary)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .calendarFill(isSelected, radius: 5)
-                        }
-                    }
-                }
-                .padding(.horizontal, 2)
-                .padding(.vertical, 3)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                .background(day.isWeekend ? Color.primary.opacity(0.03) : .clear)
-                .overlay(alignment: .leading) { Rectangle().fill(.separator).frame(width: 0.5) }
-            }
-        }
-        .frame(minHeight: 28)
-        .fixedSize(horizontal: false, vertical: true)
-        .overlay(alignment: .bottom) { Rectangle().fill(.separator).frame(height: 0.5) }
-        .accessibilityLabel("All day")
-    }
-
-    private var grid: some View {
-        let height = Self.hourHeight * 24
-        return HStack(spacing: 0) {
-            ZStack(alignment: .topTrailing) {
-                ForEach(1..<24, id: \.self) { hour in
-                    Text(verbatim: DateDisplay.hourLabel(hour, format: format, locale: calendar.locale ?? .current))
-                        .interfaceFont(.system(size: 10.5))
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                        .padding(.trailing, 8)
-                        .offset(y: CGFloat(hour) * Self.hourHeight - 7)
-                }
-            }
-            .frame(width: Self.margin, height: height, alignment: .topTrailing)
-            .accessibilityHidden(true)
-            ForEach(week.days) { day in
-                column(day, height: height)
-            }
-        }
-        .frame(height: height)
-    }
-
-    private func column(_ day: CalendarWeek.Day, height: CGFloat) -> some View {
-        GeometryReader { proxy in
-            let width = proxy.size.width
-            ZStack(alignment: .topLeading) {
-                ForEach(0..<24, id: \.self) { hour in
-                    Rectangle().fill(.separator).frame(height: 0.5).offset(y: CGFloat(hour) * Self.hourHeight)
-                }
-                ForEach(day.blocks) { block in
-                    let slot = (width - 6) / CGFloat(block.columns)
-                    let top = CGFloat(block.startMinute) / 60 * Self.hourHeight
-                    let tall = max(CGFloat(block.endMinute - block.startMinute) / 60 * Self.hourHeight, 20)
-                    let blockWidth = max(slot - 2, 8)
-                    CalendarCell(browser: browser, entry: block.entry, day: day.date, calendar: calendar, format: format, choose: choose, open: open) { isSelected in
-                        CalendarBlockLabel(
-                            entry: block.entry, isSelected: isSelected, calendar: calendar, format: format, width: blockWidth, height: tall - 1)
-                            .frame(width: blockWidth, height: tall - 1, alignment: .topLeading)
-                            .calendarFill(isSelected, radius: 6)
-                            .shadow(color: isSelected ? .black.opacity(0.18) : .clear, radius: 3, y: 2)
-                    }
-                    .offset(x: 3 + slot * CGFloat(block.column), y: top)
-                }
-                if let line = week.nowMinute(now: now, calendar: calendar), line.day == day.date {
-                    NowLine().offset(y: CGFloat(line.minute) / 60 * Self.hourHeight)
-                }
-            }
-            .frame(width: width, height: height, alignment: .topLeading)
-        }
-        .background(day.isWeekend ? Color.primary.opacity(0.03) : .clear)
-        .overlay(alignment: .leading) { Rectangle().fill(.separator).frame(width: 0.5) }
-        .clipped()
-    }
-}
-
-/// Scrolls the week to the event a key has moved to, when it is not in view. It alone reads `reveal`.
-private struct CalendarReveal: View {
-    let keyboard: CalendarKeyboard
-    let week: CalendarWeek
-    @Binding var position: ScrollPosition
-
-    var body: some View {
-        Color.clear.onChange(of: keyboard.reveal) { _, spot in
-            guard let spot,
-                let block = week.days.first(where: { $0.date == spot.day })?.blocks.first(where: { $0.entry.id == spot.id })
-            else { return }
-            let hour = CalendarWeekView.hourHeight
-            let top = CGFloat(block.startMinute) / 60 * hour
-            let bottom = top + max(CGFloat(block.endMinute - block.startMinute) / 60 * hour, 20)
-            let shown = keyboard.viewport
-            if top < shown.minY + 8 {
-                position.scrollTo(y: max(top - 12, 0))
-            } else if bottom > shown.maxY - 8 {
-                position.scrollTo(y: bottom + 12 - shown.height)
-            }
-        }
-    }
-}
-
-/// What a block says: its title on up to two lines, by word and ending in an ellipsis where it is cut, and its start
-/// where there is room left after the title (`CalendarLayout.blockLabel`).
-private struct CalendarBlockLabel: View {
-    let entry: CalendarEntry
-    let isSelected: Bool
-    let calendar: Calendar
-    let format: DateFormat
-    let width: CGFloat
-    let height: CGFloat
-    @Environment(\.interfaceTextSize) private var textSize
-
-    var body: some View {
-        let scale = InterfaceStyle.scale(for: textSize)
-        let font = NSFont.systemFont(ofSize: 11.5 * scale, weight: .medium)
-        // A narrow block gives its sides up to the title.
-        let side: CGFloat = width < 60 * scale ? 3 : 6
-        let plan = CalendarLayout.blockLabel(height: height, width: width - side * 2, scale: scale)
-        let showsTime = plan.showsTime
-        // A point is kept back so a line that measures as fitting is not cut by the text's own rounding.
-        let lines = CalendarLayout.titleLines(
-            entry.title, lines: plan.titleLines, fitting: width - side * 2 - 1
-        ) { ($0 as NSString).size(withAttributes: [.font: font]).width }
-        VStack(alignment: .leading, spacing: 1) {
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                    Text(verbatim: line)
-                        .interfaceFont(.system(size: 11.5, weight: .medium))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .foregroundStyle(isSelected ? Color.white : .primary)
-                }
-            }
-            if showsTime {
-                Text(verbatim: DateDisplay.timeOfDay(of: entry.start, format: format, calendar: calendar))
-                    .interfaceFont(.system(size: 10.5))
-                    .lineLimit(1)
-                    .foregroundStyle(isSelected ? Color.white.opacity(0.85) : .secondary)
-            }
-        }
-        .padding(EdgeInsets(top: 3 * scale, leading: side, bottom: 3 * scale, trailing: side))
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-}
-
-/// The present moment: a red line across today's column, which the minute moves.
-private struct NowLine: View {
-    var body: some View {
-        Rectangle().fill(Color.calendarToday).frame(height: 1)
-            .overlay(alignment: .leading) { Circle().fill(Color.calendarToday).frame(width: 7, height: 7).offset(x: -3) }
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
-    }
 }
 
 // MARK: Month

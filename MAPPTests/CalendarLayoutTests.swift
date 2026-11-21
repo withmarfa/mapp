@@ -61,9 +61,11 @@ struct CalendarLayoutTests {
         ItemDate.instant(date(text, calendar(zone: zone)))
     }
 
+    /// The week that holds `day`, from the calendar's first weekday.
     private static func week(_ items: [Item], around day: String, _ calendar: Calendar) -> CalendarWeek {
         CalendarWeek.make(
-            entries: entries(items, calendar).entries, around: date(day, calendar), calendar: calendar,
+            entries: entries(items, calendar).entries,
+            startingOn: CalendarLayout.firstDay(ofWeekHolding: date(day, calendar), calendar: calendar), calendar: calendar,
             now: date("2026-11-04T12:00:00", calendar))
     }
 
@@ -247,7 +249,8 @@ struct CalendarLayoutTests {
         #expect(holding.count == 1)
         #expect(calendar.isDate(try #require(holding.first).date, inSameDayAs: when))
         #expect(holding.first?.isInMonth == true)
-        let week = CalendarWeek.make(entries: entries, around: when, calendar: calendar, now: when)
+        let week = CalendarWeek.make(
+            entries: entries, startingOn: CalendarLayout.firstDay(ofWeekHolding: when, calendar: calendar), calendar: calendar, now: when)
         #expect(week.days.count == 7)
         #expect(week.days.filter { !$0.blocks.isEmpty }.count == 1)
     }
@@ -270,18 +273,71 @@ struct CalendarLayoutTests {
         #expect(days.filter(\.isInMonth).count == 30)
     }
 
-    @Test func theMonthCardMarksOnlyTheWeekTheCalendarShows() throws {
+    @Test func theMonthCardMarksTheSevenDaysTheCalendarShows() {
         let calendar = Self.calendar(firstWeekday: 2)
         let month = Self.month([], around: "2026-11-19", calendar)
-        func firstDay(of span: DateInterval) throws -> Int {
-            let row = try #require(month.row(startingIn: span))
-            return calendar.component(.day, from: month.weeks[row][0].date)
+        func marked(from day: String) -> [[Int]] {
+            let start = Self.date(day, calendar)
+            let span = DateInterval(start: start, end: calendar.date(byAdding: .day, value: 7, to: start)!)
+            return zip(month.weeks, month.marked(in: span)).map { week, marks in
+                zip(week, marks).filter { $0.1 }.map { calendar.component(.day, from: $0.0.date) }
+            }.filter { !$0.isEmpty }
         }
-        let week = CalendarLayout.interval(of: .week, containing: Self.date("2026-11-19T12:00:00", calendar), calendar: calendar)
-        #expect(try firstDay(of: week) == 16)
-        // A span ends where the next week begins, and that week is not in it.
-        let before = DateInterval(start: Self.date("2026-11-09T00:00:00", calendar), end: week.start)
-        #expect(try firstDay(of: before) == 9)
+        // A week from its first day marks one row.
+        #expect(marked(from: "2026-11-16") == [[16, 17, 18, 19, 20, 21, 22]])
+        // A week that begins on a Thursday marks the end of one row and the start of the next.
+        #expect(marked(from: "2026-11-19") == [[19, 20, 21, 22], [23, 24, 25]])
+    }
+
+    @Test func theAllDayRowIsWantedOnlyWhereAShownDayHasAWholeDayItem() {
+        let calendar = Self.calendar()
+        let studio = Self.item("studio", ["starts_at": .string("2026-11-05"), "all_day": .bool(true)])
+        let meeting = Self.timed("meeting", "2026-11-04T10:00:00", "2026-11-04T11:00:00")
+        let week = Self.week([studio, meeting], around: "2026-11-04", calendar)
+        #expect(CalendarWeek.showsAllDay(week.days))
+        #expect(!CalendarWeek.showsAllDay(week.days.filter { calendar.component(.day, from: $0.date) != 5 }))
+        #expect(!CalendarWeek.showsAllDay(Self.week([meeting], around: "2026-11-04", calendar).days))
+        #expect(!CalendarWeek.showsAllDay([CalendarWeek.Day]()))
+    }
+
+    @Test func aMultiDayItemMakesTheAllDayRowWanted() {
+        let calendar = Self.calendar()
+        let trip = Self.item("trip", ["starts_at": .string("2026-11-03"), "ends_at": .string("2026-11-06"), "all_day": .bool(true)])
+        let week = Self.week([trip], around: "2026-11-04", calendar)
+        #expect(CalendarWeek.showsAllDay(week.days))
+        #expect(week.days.filter { !$0.allDay.isEmpty }.count >= 2)
+    }
+
+    @Test func aTallerBlockGivesTheRestOfItsRoomToMoreTitleLines() {
+        // At the standard height nothing changes: two lines and the time.
+        #expect(CalendarLayout.blockLabel(height: 58, width: 80, scale: 1) == (2, true))
+        // An hour at 160 points: the two lines and the time, then more lines of the title.
+        let tall = CalendarLayout.blockLabel(height: 159, width: 80, scale: 1)
+        #expect(tall.showsTime && tall.titleLines > 2)
+        // A block too narrow for the time drops it and keeps its lines.
+        let narrow = CalendarLayout.blockLabel(height: 159, width: 24, scale: 1)
+        #expect(!narrow.showsTime && narrow.titleLines >= tall.titleLines)
+    }
+
+    @Test func blocksAreSetSideBySideByTheRoomTheirHeightNeeds() {
+        // At the standard height a 5 minute event takes 30 minutes of room; at 160 points an hour, 12; at 24, 74.
+        #expect(CalendarHourHeight.shortestBlock(at: CalendarHourHeight.standard) == CalendarLayout.shortestBlock)
+        #expect(CalendarHourHeight.shortestBlock(at: 160) == 12)
+        #expect(CalendarHourHeight.shortestBlock(at: 24) == 74)
+        let calendar = Self.calendar()
+        let items = [
+            Self.timed("brief", "2026-11-04T10:00:00", "2026-11-04T10:05:00"),
+            Self.timed("next", "2026-11-04T10:20:00", "2026-11-04T11:00:00"),
+        ]
+        let entries = Self.entries(items, calendar).entries
+        func columns(shortest: Int) -> Set<Int> {
+            let week = CalendarWeek.make(
+                entries: entries, startingOn: Self.date("2026-11-02", calendar), calendar: calendar,
+                now: Self.date("2026-11-04T12:00:00", calendar), shortestBlock: shortest)
+            return Set(week.days[2].blocks.map(\.column))
+        }
+        #expect(columns(shortest: 12) == [0])
+        #expect(columns(shortest: 74) == [0, 1])
     }
 
     @Test func aBlockGivesItsTitleTwoLinesBeforeTheTime() {
@@ -289,8 +345,8 @@ struct CalendarLayoutTests {
         #expect(CalendarLayout.blockLabel(height: 58, width: 80, scale: 1) == (2, true))
         #expect(CalendarLayout.blockLabel(height: 43, width: 80, scale: 1) == (2, false))
         #expect(CalendarLayout.blockLabel(height: 28, width: 80, scale: 1) == (1, false))
-        // A block too narrow for the time drops it first.
-        #expect(CalendarLayout.blockLabel(height: 58, width: 24, scale: 1) == (2, false))
+        // A block too narrow for the time drops it, and gives that room to a third line of the title.
+        #expect(CalendarLayout.blockLabel(height: 58, width: 24, scale: 1) == (3, false))
     }
 
     @Test func aTitleBreaksAtWordsAndNeverInsideOne() {
