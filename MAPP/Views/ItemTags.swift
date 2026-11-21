@@ -31,27 +31,8 @@ extension ItemLibrary {
     }
 }
 
-/// The inspector's Tags section: the item's tags, each with a button that removes it. The Tags heading's plus opens
-/// the value editor under it, where tags are added. An item that can't be changed lists its tags without the buttons.
-struct ItemTagsSection: View {
-    let tags: [String]
-    let isEditable: Bool
-    let onRemove: (String) -> Void
-
-    var body: some View {
-        if !tags.isEmpty {
-            TagFlowLayout(spacing: 6) {
-                ForEach(tags, id: \.self) { tag in
-                    TagChip(tag: tag, onRemove: isEditable ? { onRemove(tag) } : nil)
-                }
-            }
-            .accessibilityIdentifier("ItemTags")
-        }
-    }
-}
-
 /// One tag as the page draws it, with the button that removes it.
-private struct TagChip: View {
+struct TagChip: View {
     let tag: String
     /// Nil for a tag that can't be removed.
     let onRemove: (() -> Void)?

@@ -2,7 +2,7 @@
 
 Status: Built in v0.0.43. Opening an item as a modal or a full page, and the page's corner (Focus, Aa on a page that can be written, the text size, Reader or Original, an image's size, a PDF's page and size), are built, not yet released.
 
-Where it lives: `ItemPageHeader`, `PagePinsView` and `PageChip` for the header; `PropertyRow`, `PagePlacements`, `PageLayout` and `PagePins` for what the page shows; `ItemInspector` for the right sidebar; `ItemLayoutPanel` for arranging; `ValueEditing/` for editing a value; `FieldMenu`, `FieldMenuPresenter` and `FieldEditSheet` for a field's menu; `VersionHistoryWorkspace` for history; `PageCorner`, `ItemCorner`, `TextSizeControl` and `FormatsBar` for the corner; `FileViewing`, `FilePagesControl`, `FileZoomControl` and `FileViewCommand` for an image's and a PDF's size and page. The web part of the header is `editor/src/header.ts`.
+Where it lives: `ItemPageHeader`, `PagePinsView` and `PageChip` for the header; `PropertyRow`, `PagePlacements`, `PageLayout` and `PagePins` for what the page shows; `ItemInspector`, `InspectorTagsContent`, `InspectorPromptView` and `InspectorPrompt` for the right sidebar; `ItemLayoutPanel` for arranging; `ValueEditing/` for editing a value; `FieldMenu`, `FieldMenuPresenter` and `FieldEditSheet` for a field's menu; `VersionHistoryWorkspace` for history; `PageCorner`, `ItemCorner`, `TextSizeControl` and `FormatsBar` for the corner; `FileViewing`, `FilePagesControl`, `FileZoomControl` and `FileViewCommand` for an image's and a PDF's size and page. The web part of the header is `editor/src/header.ts`.
 
 The item page shows one item: its title, its pinned properties, its text and its property block. It is the same for every type, and each type decides only which properties go where.
 
@@ -56,6 +56,8 @@ The right sidebar (`ItemInspector`) always lists every property, in sections: De
 - Copy in the sidebar is a few words, never several lines of guidance. A button's copy stays tight, such as "Restore Version".
 - Pop-up arrows are gray, not blue.
 - Chips sit in the same white box as the rows: the Tags section's tags and the chips of a property's value draw inside their section's box (`InspectorBox`), never loose on the sidebar's background.
+- Adding a tag happens in the Tags box itself (`InspectorTagsContent`): the heading's plus, or a click in the box, puts the text cursor after the item's tag chips. The tags that match what is typed list under the box, with Create "<text>" where none is the text; Return adds the highlighted one, and the field stays ready for the next. Escape clears the text, and again ends it; a click elsewhere, another item or hiding the sidebar ends it too and adds a tag typed and not yet added, or keeps one the library refuses on the clipboard and tells the person. The item page's Tags row still opens the value panel.
+- With nothing chosen the sidebar is one quiet line (`InspectorPromptView`), worded for what the place lists: an item, an event in the calendar layout, a collection or a source. A place with no items leaves it blank, several rows chosen say how many, and an item still being read shows a small progress indicator only after half a second.
 - Agreed, not built: a place is a name and an arrow with no extra copy, and bento cells may sit among the sections.
 
 ## Customize Layout
