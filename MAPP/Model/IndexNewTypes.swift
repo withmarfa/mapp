@@ -7,8 +7,8 @@ import Foundation
 nonisolated enum NewRowTypes {
     static let key = "indexNewTypes"
 
-    /// What the row holds until the person edits it: a note, a table, a task, a bookmark and an event.
-    static let starting = ["core.note", "core.table", "core.task", "core.bookmark", "core.event"]
+    /// What the row holds until the person edits it: a note, a table, a task, a bookmark, an event, a person and a place.
+    static let starting = ["core.note", "core.table", "core.task", "core.bookmark", "core.event", "core.entity.person", "core.entity.place"]
 
     /// The list a kept string holds, or nil where none is kept.
     static func decode(_ kept: String?) -> [String]? {
@@ -17,7 +17,7 @@ nonisolated enum NewRowTypes {
 
     static func encode(_ ids: [String]) -> String { ids.joined(separator: ",") }
 
-    /// The types the row shows, in order: the kept list, or the starting five, less any that `offered` lacks (a type
+    /// The types the row shows, in order: the kept list, or the starting seven, less any that `offered` lacks (a type
     /// the library does not have, or no one can make) and any repeat.
     static func shown(_ offered: [ItemTypeOption], kept: String?) -> [ItemTypeOption] {
         var seen = Set<String>()
@@ -35,7 +35,7 @@ nonisolated enum NewRowTypes {
     }
 
     /// The kept string with `id` put in at the end of the row, or taken out where it is in. The row as shown is the
-    /// start, so a first change keeps the starting five less what it removes.
+    /// start, so a first change keeps the starting seven less what it removes.
     static func toggled(_ id: String, row: [ItemTypeOption]) -> String {
         let ids = row.map(\.id.rawValue)
         return encode(ids.contains(id) ? ids.filter { $0 != id } : ids + [id])

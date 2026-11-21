@@ -35,6 +35,7 @@ struct NewTiles: View {
             .scrollClipDisabled()
             .padding(.vertical, -6)
         }
+        .padding(.top, NewRowMetrics.gapAboveLabel)
         .padding(.bottom, 12)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("NewTiles")
@@ -53,9 +54,9 @@ struct NewTiles: View {
                     .frame(width: 20, height: 20)
                     .foregroundStyle(tone.ink(looks, for: scheme))
                 Text(verbatim: type.label)
-                    .font(.callout)
+                    .font(.callout.weight(.medium))
                     .lineLimit(1)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(tone.ink(looks, for: scheme))
             }
             .padding(.horizontal, 8)
             .frame(width: Self.width, height: Self.height)
@@ -83,6 +84,11 @@ struct NewTiles: View {
         }
         .accessibilityIdentifier("NewTile.\(type.id.rawValue)")
     }
+}
+
+private enum NewRowMetrics {
+    /// The space between the tabs and the row's label.
+    static let gapAboveLabel: CGFloat = 12
 }
 
 /// What Edit opens: the types a new item can be, those in the New row first, ticked, in the row's order and draggable

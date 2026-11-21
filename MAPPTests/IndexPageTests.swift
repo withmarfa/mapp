@@ -10,15 +10,15 @@ import Testing
     }
 
     private var offered: [ItemTypeOption] {
-        types("core.note", "core.task", "core.bookmark", "core.event", "core.person", "core.table")
+        types("core.note", "core.task", "core.bookmark", "core.event", "core.entity.person", "core.entity.place", "core.table", "core.file")
     }
 
     // MARK: New row
 
     @Test func theRowStartsWithTheStartingTypesTheLibraryHas() {
-        // The row is in the starting order, whatever order the library lists its types in, and holds no person.
+        // The row is in the starting order, whatever order the library lists its types in.
         let shown = NewRowTypes.shown(offered, kept: nil)
-        #expect(shown.map(\.id.rawValue) == ["core.note", "core.table", "core.task", "core.bookmark", "core.event"])
+        #expect(shown.map(\.id.rawValue) == ["core.note", "core.table", "core.task", "core.bookmark", "core.event", "core.entity.person", "core.entity.place"])
         #expect(NewRowTypes.shown(types("core.task"), kept: nil).map(\.id.rawValue) == ["core.task"])
     }
 
@@ -32,7 +32,7 @@ import Testing
     @Test func theEditListHoldsTheRowFirstThenTheOthers() {
         let listed = NewRowTypes.listed(offered, kept: "core.event,core.note")
         #expect(listed.inRow.map(\.id.rawValue) == ["core.event", "core.note"])
-        #expect(listed.others.map(\.id.rawValue) == ["core.task", "core.bookmark", "core.person", "core.table"])
+        #expect(listed.others.map(\.id.rawValue) == ["core.task", "core.bookmark", "core.entity.person", "core.entity.place", "core.table", "core.file"])
     }
 
     @Test func tickingAddsAtTheEndAndUntickingRemoves() {
@@ -41,9 +41,9 @@ import Testing
         #expect(NewRowTypes.toggled("core.note", row: row) == "core.task")
     }
 
-    @Test func aFirstChangeKeepsTheStartingFiveLessWhatItRemoves() {
+    @Test func aFirstChangeKeepsTheStartingSevenLessWhatItRemoves() {
         let row = NewRowTypes.shown(offered, kept: nil)
-        #expect(NewRowTypes.toggled("core.task", row: row) == "core.note,core.table,core.bookmark,core.event")
+        #expect(NewRowTypes.toggled("core.task", row: row) == "core.note,core.table,core.bookmark,core.event,core.entity.person,core.entity.place")
     }
 
     @Test func draggingMovesTheEntryToTheDropPlace() {
