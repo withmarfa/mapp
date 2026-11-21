@@ -89,7 +89,10 @@ struct SettingsWindowTests {
         #expect(SettingsPage.general.matches("Open Items"))
         #expect(!SettingsPage.lists.matches("Open Items"), "Open Items moved to General")
         #expect(!SettingsPage.editor.matches("Remote Pictures"), "Pictures from Websites moved to General")
-        #expect(SettingsPage.overview.matches("Version"))
+        #expect(SettingsPage.overview.matches("Health"))
+        #expect(SettingsPage.history.matches("Version"))
+        #expect(SettingsPage.fileStorage.matches("Unused"))
+        #expect(SettingsPage.recentlyDeleted.matches("Permanently Delete After"))
         #expect(!SettingsPage.lists.matches("Palettes"))
         #expect(SettingsPage.lists.matches("  "), "an empty search keeps every page")
     }
@@ -101,11 +104,11 @@ struct SettingsWindowTests {
 
     @Test func onlyThePagesThatExistAreListed() {
         #expect(SettingsPage.mappGroups.flatMap { $0 } == [.general, .appearance, .keyboard, .editor, .lists, .layouts, .search, .onThisMac, .connection])
-        #expect(SettingsPage.marfaGroups.flatMap { $0 } == [.overview, .account, .apps, .keys, .addresses, .recentlyDeleted, .webhooks, .folders])
+        #expect(SettingsPage.marfaGroups.flatMap { $0 } == [.overview, .account, .apps, .keys, .addresses, .sources, .recentlyDeleted, .history, .fileStorage, .webhooks, .folders])
     }
 
     @Test func theMarfasPagesNameThePermissionTheyNeed() {
-        #expect(MarfaSettingsPage.overview.permission == .configManage)
+        #expect(MarfaSettingsPage.overview.permission == .instanceRead, "Overview opens with what the sign-in may read, and leaves the rest out")
         #expect(MarfaSettingsPage.recentlyDeleted.permission == .itemsPurge)
         #expect(MarfaSettingsPage.account.permission == nil, "Account opens without one and asks for sign_ins.manage from Change Password")
         #expect(MarfaSettingsPage.apps.permission == .grantsManage)

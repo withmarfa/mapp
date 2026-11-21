@@ -39,7 +39,7 @@ import Observation
     private(set) var isLoading = false
     private(set) var hasLoaded = false
     /// One line under a passkey or a browser whose change was refused, by its id.
-    private(set) var rowErrors: [String: String] = [:]
+    private(set) var rowErrors: [String: OwnerFailure] = [:]
     /// One line under the page's rows, such as why Add Passkey… did not open.
     private(set) var note: String?
     var sheet: Sheet?
@@ -242,7 +242,7 @@ import Observation
             if error == .notFound {
                 passkeys.removeAll { $0.id == passkey.id }
             } else {
-                rowErrors[passkey.id] = OwnerWording.line(error)
+                rowErrors[passkey.id] = error
             }
             await context.learn(from: error)
         }
@@ -259,7 +259,7 @@ import Observation
             if error == .notFound {
                 browsers.removeAll { $0.id == browser.id }
             } else {
-                rowErrors[browser.id] = OwnerWording.line(error)
+                rowErrors[browser.id] = error
             }
             await context.learn(from: error)
         }

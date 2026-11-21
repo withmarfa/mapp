@@ -1,8 +1,8 @@
 import Foundation
 
-/// A setting of the Marfa server itself that This Marfa lets the person read and change: its name, how long deleted
-/// items stay, and how long it keeps the versions of an item. Only plain settings that take effect at once are
-/// here; the enforcement levers and the settings that need a receiver set up by whoever runs the server are not.
+/// A setting of the Marfa server itself that the Marfa's pages read and change: its name, how long it keeps deleted items,
+/// versions and logs, and how it keeps files. Only plain settings that take effect at once are here; the enforcement
+/// levers and the settings that need a receiver set up by whoever runs the server are not.
 nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
     case name
     case trashRetentionDays
@@ -10,18 +10,49 @@ nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
     case versionDailyDays
     case versionWeeklyDays
     case versionMaxVersions
+    case auditRetentionDays
+    case eventLogRetentionDays
+    case rowLogRetentionDays
+    case inboundHandledRetentionDays
+    case inboundPendingRetentionDays
+    case blobMinCopies
+    case diskReserveMegabytes
+    case enrichmentEnabled
+    case enrichmentOcrEnabled
+    case mcpFetchEnabled
+    case mcpFetchMaxMegabytes
+    case blobCleanupEnabled
+    case blobCleanupGraceSeconds
 
     /// Every name the contract allows is at most this many characters (Unicode scalars), after trimming.
     static let nameLimit = 200
+    /// What a megabyte is for the two settings the server counts in bytes: the unit its own defaults (128 and 50) are whole in.
+    static let bytesPerMegabyte = 1_048_576
 
-    var isNumber: Bool { self != .name }
+    enum Kind: Hashable, Sendable { case text, count, flag }
 
-    /// The numbers the contract accepts. A day count of 0 is allowed, and a version count must be at least 1.
+    var kind: Kind {
+        switch self {
+        case .name: .text
+        case .enrichmentEnabled, .enrichmentOcrEnabled, .mcpFetchEnabled, .blobCleanupEnabled: .flag
+        default: .count
+        }
+    }
+
+    var isNumber: Bool { kind == .count }
+
+    /// The numbers the contract accepts, in the unit the page shows. A day count of 0 is allowed.
     var range: ClosedRange<Int> {
         switch self {
-        case .name: 0...0
-        case .trashRetentionDays, .versionRecentDays, .versionDailyDays, .versionWeeklyDays: 0...36500
+        case .name, .enrichmentEnabled, .enrichmentOcrEnabled, .mcpFetchEnabled, .blobCleanupEnabled: 0...0
+        case .trashRetentionDays, .versionRecentDays, .versionDailyDays, .versionWeeklyDays, .auditRetentionDays, .eventLogRetentionDays,
+            .rowLogRetentionDays, .inboundHandledRetentionDays, .inboundPendingRetentionDays:
+            0...36500
         case .versionMaxVersions: 1...9_007_199_254_740_991
+        case .blobMinCopies: 1...1_000_000
+        case .diskReserveMegabytes: 0...(1_099_511_627_776 / Self.bytesPerMegabyte)
+        case .mcpFetchMaxMegabytes: 1...(1_099_511_627_776 / Self.bytesPerMegabyte)
+        case .blobCleanupGraceSeconds: 0...31_536_000
         }
     }
 
@@ -30,14 +61,36 @@ nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
     /// compared with: whether a change keeps things for less time is judged only against a value the server holds.
     var documentedDefault: Int? {
         switch self {
-        case .name: nil
+        case .name, .enrichmentEnabled, .enrichmentOcrEnabled, .mcpFetchEnabled, .blobCleanupEnabled: nil
         case .trashRetentionDays: 60
         case .versionRecentDays: 30
         case .versionDailyDays: 90
         case .versionWeeklyDays: 365
         case .versionMaxVersions: 500
+        case .auditRetentionDays: 90
+        case .eventLogRetentionDays: 30
+        case .rowLogRetentionDays: 30
+        case .inboundHandledRetentionDays: 7
+        case .inboundPendingRetentionDays: 30
+        case .blobMinCopies: 1
+        case .diskReserveMegabytes: 128
+        case .mcpFetchMaxMegabytes: 50
+        case .blobCleanupGraceSeconds: 86_400
         }
     }
+
+    /// What a switch is while the setting is unset: the documented default, which is on for every switch.
+    var documentedFlag: Bool { true }
+
+    /// The settings each page shows, in the order it shows them.
+    static let versionSettings: [InstanceSetting] = [.versionRecentDays, .versionDailyDays, .versionWeeklyDays, .versionMaxVersions]
+    static let logSettings: [InstanceSetting] = [
+        .auditRetentionDays, .eventLogRetentionDays, .rowLogRetentionDays, .inboundHandledRetentionDays, .inboundPendingRetentionDays,
+    ]
+    static let fileSettings: [InstanceSetting] = [
+        .blobMinCopies, .diskReserveMegabytes, .enrichmentEnabled, .enrichmentOcrEnabled, .mcpFetchEnabled, .mcpFetchMaxMegabytes,
+        .blobCleanupEnabled, .blobCleanupGraceSeconds,
+    ]
 
     /// The settings whose windows must not decrease, in order: recent, then daily, then weekly.
     static let versionWindows: [InstanceSetting] = [.versionRecentDays, .versionDailyDays, .versionWeeklyDays]
@@ -45,28 +98,61 @@ nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
     var title: String {
         switch self {
         case .name: String(localized: "Name")
-        case .trashRetentionDays: String(localized: "Deleted Items Kept For")
-        case .versionRecentDays: String(localized: "All Versions Kept For")
-        case .versionDailyDays: String(localized: "One Version a Day Kept For")
-        case .versionWeeklyDays: String(localized: "One Version a Week Kept For")
-        case .versionMaxVersions: String(localized: "Most Versions Kept per Item")
+        case .trashRetentionDays: String(localized: "Permanently Delete After")
+        case .versionRecentDays: String(localized: "Keep Every Version For")
+        case .versionDailyDays: String(localized: "Then One a Day Up To")
+        case .versionWeeklyDays: String(localized: "Then One a Week Up To")
+        case .versionMaxVersions: String(localized: "At Most")
+        case .auditRetentionDays: String(localized: "Activity")
+        case .eventLogRetentionDays: String(localized: "Events")
+        case .rowLogRetentionDays: String(localized: "Table Changes")
+        case .inboundHandledRetentionDays: String(localized: "Connector Deliveries, Handled")
+        case .inboundPendingRetentionDays: String(localized: "Connector Deliveries, Waiting")
+        case .blobMinCopies: String(localized: "Copies of Each File")
+        case .diskReserveMegabytes: String(localized: "Keep Free on Disk")
+        case .enrichmentEnabled: String(localized: "Read Text in Files")
+        case .enrichmentOcrEnabled: String(localized: "Read Text in Pictures")
+        case .mcpFetchEnabled: String(localized: "Let Chats Save Files")
+        case .mcpFetchMaxMegabytes: String(localized: "Largest File")
+        case .blobCleanupEnabled: String(localized: "Remove Unused Files")
+        case .blobCleanupGraceSeconds: String(localized: "After")
         }
     }
 
-    /// The value that keeps things for the least time, which no other value can undercut. Zero days of trash keeps
-    /// deleted items with no age limit, so its least is a day.
-    var shortestKept: Int { self == .trashRetentionDays ? 1 : range.lowerBound }
-
-    /// Whether `value` is so long that nothing a server could be set to keeps more: no limit for trash, and the
-    /// largest the contract takes for every other setting.
-    func isUnlimited(_ value: Int) -> Bool {
-        (self == .trashRetentionDays && value == 0) || value >= range.upperBound
+    /// Whether a shorter value removes something that cannot be recovered, so the person agrees to it first.
+    var isRetention: Bool {
+        switch self {
+        case .trashRetentionDays, .versionRecentDays, .versionDailyDays, .versionWeeklyDays, .versionMaxVersions, .auditRetentionDays,
+            .eventLogRetentionDays, .rowLogRetentionDays, .inboundHandledRetentionDays, .inboundPendingRetentionDays:
+            true
+        default: false
+        }
     }
 
-    /// Whether `value` reaches further than `other` in what it keeps. Zero days of trash keeps deleted items with no
-    /// age limit, so it is the furthest; a zero version window is empty, so it is the least.
+    /// Whether 0 keeps things with no age limit, so it is the furthest a setting can reach.
+    var zeroMeansNoLimit: Bool {
+        switch self {
+        case .trashRetentionDays, .auditRetentionDays, .eventLogRetentionDays, .rowLogRetentionDays, .inboundHandledRetentionDays,
+            .inboundPendingRetentionDays:
+            true
+        default: false
+        }
+    }
+
+    /// The value that keeps things for the least time, which no other value can undercut. Zero days with no limit keeps
+    /// things with no age limit, so its least is a day.
+    var shortestKept: Int { zeroMeansNoLimit ? 1 : range.lowerBound }
+
+    /// Whether `value` is so long that nothing a server could be set to keeps more: no limit where zero means it, and the
+    /// largest the contract takes for every other setting.
+    func isUnlimited(_ value: Int) -> Bool {
+        (zeroMeansNoLimit && value == 0) || value >= range.upperBound
+    }
+
+    /// Whether `value` reaches further than `other` in what it keeps. Zero where it means no limit is the furthest; a zero
+    /// version window is empty, so it is the least.
     func keepsLonger(_ value: Int, than other: Int) -> Bool {
-        if self == .trashRetentionDays {
+        if zeroMeansNoLimit {
             if value == 0 { return other != 0 }
             if other == 0 { return false }
         }
@@ -77,6 +163,7 @@ nonisolated enum InstanceSetting: String, CaseIterable, Hashable, Sendable {
 nonisolated enum InstanceValue: Hashable, Sendable {
     case text(String)
     case number(Int)
+    case flag(Bool)
 }
 
 /// The settings a server has set. A setting it has not set is absent, which means its default applies.
@@ -90,6 +177,11 @@ nonisolated struct InstanceConfig: Hashable, Sendable {
         return nil
     }
 
+    func flag(_ setting: InstanceSetting) -> Bool? {
+        if case .flag(let flag)? = values[setting] { return flag }
+        return nil
+    }
+
     var name: String? {
         if case .text(let text)? = values[.name] { return text }
         return nil
@@ -100,6 +192,7 @@ nonisolated struct InstanceConfig: Hashable, Sendable {
         switch values[setting] {
         case .text(let text)?: text
         case .number(let number)?: String(number)
+        case .flag(let flag)?: flag ? "true" : "false"
         case nil: ""
         }
     }
@@ -152,6 +245,13 @@ nonisolated extension InstanceSetting {
     /// characters with no control or text-direction characters, checked before it is trimmed as the server does.
     func entry(from text: String) -> InstanceEntry {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if kind == .flag {
+            switch trimmed {
+            case "true": return .value(.flag(true))
+            case "false": return .value(.flag(false))
+            default: return .unset
+            }
+        }
         if isNumber {
             guard !trimmed.isEmpty else { return .unset }
             guard trimmed.allSatisfy({ $0.isASCII && $0.isNumber }) else { return .invalid(.notWhole) }

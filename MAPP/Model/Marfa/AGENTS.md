@@ -45,7 +45,7 @@
 - A type's field change (`MarfaServerCalls`) is never queued. `PUT /types/{id}` has no version, so `TypeDefinitionEdit` rereads the type first.
 - Source names, marks and counts are server-only: `MarfaLibrary.sources` holds the last answer in memory (a source shows its code until the server has named it, and keeps the last answer offline). Its doc comment says when it is read and where the counts come from.
 - This Marfa changes settings with `PATCH /config` carrying only the changed fields (`null` removes one) and the instance it read in `X-Marfa-Instance-Id`. Never send `PUT`, `instance_id` in the body, or an unchanged field.
-- Delete Permanently is `purge`, never queued, offered only while the server can be reached, run after earlier writes, at the version the person was shown.
+- Permanently Delete is `purge`, never queued, offered only while the server can be reached, run after earlier writes, at the version the person was shown.
 - Saved views (`system.view`) are written through the package's `createView`, `changeView` and `deleteView`, never queued or as items, each on the version the window read.
 - A Marfa folder (`system.folder`) places no item. Do not use the package's folder calls.
 

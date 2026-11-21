@@ -97,84 +97,6 @@
     "Event" : {
 
     },
-    "Events" : {
-
-    },
-    "%lld events." : {
-
-    },
-    "Failed, %lld" : {
-
-    },
-    "Failing" : {
-
-    },
-    "%lld files are held back" : {
-
-    },
-    "%lld files or folders can’t be read" : {
-
-    },
-    "%lld files the server refused" : {
-
-    },
-    "Folders" : {
-
-    },
-    "For" : {
-
-    },
-    "It is shown only once. The service checks each request with it." : {
-
-    },
-    "%@ stops sending at once, and its deliveries and signing secret are gone. This can’t be undone." : {
-
-    },
-    "It stops sending at once." : {
-
-    },
-    "It was deleted, here or somewhere else." : {
-
-    },
-    "It was stopped, here or somewhere else." : {
-
-    },
-    "Item Changed" : {
-
-    },
-    "Item Created" : {
-
-    },
-    "Item Deleted" : {
-
-    },
-    "Item Permanently Deleted" : {
-
-    },
-    "Item Restored" : {
-
-    },
-    "Item State Changed" : {
-
-    },
-    "Made by %@" : {
-
-    },
-    "Made by %@, %@." : {
-
-    },
-    "Made by %@." : {
-
-    },
-    "Made by This Sign-In" : {
-
-    },
-    "%lld More" : {
-
-    },
-    "%lld More Events" : {
-
-    },
     "%@, with %lld subtypes" : {
       "localizations" : {
         "en" : {
@@ -215,175 +137,19 @@
     "%@ items" : {
 
     },
+    "MAPP isn’t allowed to list, make, change or remove webhooks." : {
+
+    },
     "Named by the sign-in that keeps each one." : {
 
     },
-    "Needs Attention" : {
-
-    },
-    "New Webhook" : {
-
-    },
-    "New Webhook…" : {
-
-    },
-    "No Answer" : {
-
-    },
-    "No Copies" : {
-
-    },
-    "No copies" : {
-
-    },
-    "No copies yet." : {
-
-    },
-    "No Deliveries" : {
-
-    },
-    "No Folders" : {
-
-    },
-    "No sign-in has reported keeping this folder yet." : {
-
-    },
-    "No Webhooks" : {
-
-    },
-    "Not Sent" : {
-
-    },
-    "Not Sent Again" : {
-
-    },
-    "Nothing has been sent to this address yet." : {
-
-    },
-    "Nothing is kept in step with a folder yet." : {
-
-    },
-    "Off" : {
-
-    },
-    "%@ on %@" : {
-
-    },
-    "Only webhooks this sign-in made are listed. An app or a key sees only its own." : {
-
-    },
-    "Redeliver" : {
-
-    },
-    "Relationship Added" : {
-
-    },
-    "Relationship Changed" : {
-
-    },
-    "Relationship Removed" : {
-
-    },
-    "%lld removals wait" : {
-
-    },
-    "Reported %@." : {
-
-    },
-    "Reported by %@. Review it where that copy runs." : {
-
-    },
-    "Review them where it runs." : {
-
-    },
-    "Send" : {
-
-    },
-    "Sending" : {
-
-    },
-    "%@ sends a request to an address you choose." : {
-
-    },
-    "Sent only while this sign-in may read the server’s status." : {
-
-    },
-    "Shown once, when it was made." : {
-
-    },
-    "Showing %lld of %lld. The rest are listed by marfa folders inventory." : {
-
-    },
-    "Signing Secret" : {
-
-    },
-    "Signing Secret Not Copied" : {
-
-    },
-    "Synced Folders" : {
-
-    },
-    "Syncing is paused" : {
-
-    },
-    "Table Rows Changed" : {
-
-    },
-    "Tags or Extra Data Changed" : {
-
-    },
-    "The folder is missing where this copy is kept" : {
-
-    },
-    "The latest events sent to this address. A failed one can be sent again once this webhook is on." : {
-
-    },
-    "The latest events sent to this address. Only a failed one can be sent again." : {
-
-    },
-    "The server refused this copy’s sign-in" : {
-
-    },
-    "The webhook “%@” was made, and its signing secret can’t be shown again. If you didn’t copy it, delete the webhook on the Webhooks page and make it again." : {
-
-    },
-    "This copy can’t reach the server" : {
-
-    },
-    "This copy isn’t watching for changes" : {
-
-    },
-    "This copy’s settings file can’t be used" : {
-
-    },
-    "This Folder Is Gone" : {
-
-    },
-    "This sign-in holds %lld webhooks, the most the server allows." : {
-
-    },
-    "This Webhook Is Gone" : {
-
-    },
-    "%lld to receive" : {
-
-    },
-    "%lld to send" : {
-
-    },
-    "Today, %@" : {
-
-    },
-    "Turn Off" : {
-
-    },
-    "Turn off “%@”?" : {
-
-    },
-    "Turning it off drops what is waiting." : {
-
-    },
     "%@ you make show here." : {
+
+    },
+    "%@ is ready" : {
+
+    },
+    "%@ of %@ selected" : {
 
     },
     "Address Not Added" : {
@@ -392,10 +158,28 @@
     "Allow More… lets MAPP read the owner’s name." : {
 
     },
+    "Anything that uses it will stop working when it expires." : {
+
+    },
+    "Clean-up waits until the server’s clock is right." : {
+
+    },
     "Couldn’t be downloaded." : {
 
     },
+    "It has trouble syncing." : {
+
+    },
     "It must sign in again with your password or a passkey. Apps and keys keep working." : {
+
+    },
+    "It reports problems." : {
+
+    },
+    "Its last run failed." : {
+
+    },
+    "Keep less free on disk?" : {
 
     },
     "Key Not Copied" : {
@@ -407,10 +191,49 @@
     "Key Not Renamed" : {
 
     },
+    "Lower and Save" : {
+
+    },
+    "MAPP isn’t allowed to list or permanently delete deleted items." : {
+
+    },
+    "MAPP isn’t allowed to list, make or revoke keys." : {
+
+    },
+    "MAPP isn’t allowed to list, narrow or disconnect apps." : {
+
+    },
+    "MAPP isn’t allowed to read this Marfa’s health and status." : {
+
+    },
+    "MAPP isn’t allowed to rename, mark or limit sources." : {
+
+    },
+    "MAPP isn’t allowed to see or change version and log retention." : {
+
+    },
+    "MAPP isn’t allowed to see or change this Marfa’s addresses." : {
+
+    },
+    "MAPP isn’t allowed to see or change how this Marfa keeps files." : {
+
+    },
     "MAPP removes its copy from this Mac and signs out. Webhooks it made are deleted. Your items stay." : {
 
     },
     "Needs more disk space." : {
+
+    },
+    "No unused files" : {
+
+    },
+    "None selected" : {
+
+    },
+    "Nothing has been heard from it for more than a day." : {
+
+    },
+    "Nothing is waiting to be removed." : {
 
     },
     "On the server’s own page, in a sheet." : {
@@ -596,6 +419,9 @@
     "Connection" : {
 
     },
+    "Couldn’t Check" : {
+
+    },
     "Couldn’t Confirm the Sign-In" : {
 
     },
@@ -632,6 +458,12 @@
     "Narrow “%@”?" : {
 
     },
+    "Permanently Delete" : {
+
+    },
+    "Permanently Delete…" : {
+
+    },
     "Remove “%@” from “%@”?" : {
 
     },
@@ -651,6 +483,9 @@
 
     },
     "Paste and Match Style" : {
+
+    },
+    "Set %@ Again" : {
 
     },
     "Show All Tabs" : {
@@ -734,6 +569,15 @@
     "Some can’t be left out as well: a search can skip only so much. Stop leaving one out to make room." : {
 
     },
+    "Some files are waiting for their copy in the backup destination." : {
+
+    },
+    "Some files the newest backup needs are still waiting for a copy." : {
+
+    },
+    "Some stored parts of backups are damaged." : {
+
+    },
     "Space Used" : {
 
     },
@@ -741,6 +585,12 @@
 
     },
     "Stop Leaving Out" : {
+
+    },
+    "The backup folder may not belong to this server alone." : {
+
+    },
+    "The last backup run failed or lost files." : {
 
     },
     "The least used go first when there’s no room." : {
@@ -764,6 +614,24 @@
     "Show Spelling and Grammar" : {
 
     },
+    "The server can’t read this secret, so it can’t use it until it is set again." : {
+
+    },
+    "The server didn’t answer this check, so its state is unknown." : {
+
+    },
+    "The server met a fault lately." : {
+
+    },
+    "The server takes no backup on a schedule." : {
+
+    },
+    "The server’s clock is behind." : {
+
+    },
+    "The server’s own check found a problem." : {
+
+    },
     "The types and sources chosen and left out make more conditions than one search can hold." : {
 
     },
@@ -774,9 +642,6 @@
 
     },
     "Dates and Times" : {
-
-    },
-    "Delete Permanently" : {
 
     },
     "Deleted Items" : {
@@ -1038,6 +903,9 @@
 
     },
     "Theme" : {
+
+    },
+    "There is nowhere to keep backups." : {
 
     },
     "They still show in their own place, in views and in Favorites." : {
@@ -1381,6 +1249,9 @@
     },
     "update the server and run its housekeeping" : {
       "extractionState" : "manual"
+    },
+    "Uploads will stop below %@ free instead of below %@, which leaves the server less room to work in." : {
+
     },
     "Use Another Marfa" : {
 
@@ -3356,10 +3227,6 @@
     },
     "Delete Items" : {
 
-    },
-    "Delete Permanently…" : {
-      "extractionState" : "manual",
-      "generatesSymbol" : false
     },
     "Delete Row" : {
 
@@ -6446,10 +6313,7 @@
     "MAPP isn’t allowed to %@." : {
 
     },
-    "MAPP isn’t allowed to %@. Choose Allow More… to change that." : {
-
-    },
-    "MAPP isn’t allowed to do this. Choose Allow More… to change that." : {
+    "MAPP isn’t allowed to do this." : {
 
     },
     "MAPP isn’t allowed to do this: it needs “%@”." : {
@@ -7007,9 +6871,6 @@
     "After the status, in this order. A row shows the first two." : {
 
     },
-    "All Versions Kept For" : {
-
-    },
     "An item’s own text." : {
 
     },
@@ -7083,12 +6944,6 @@
 
     },
     "Current Limit" : {
-
-    },
-    "Deleted Items Kept For" : {
-
-    },
-    "Deleted items stay in Recently Deleted this long, then the server permanently deletes them, with their history. 0 keeps them with no limit. Empty uses the default." : {
 
     },
     "Display" : {
@@ -7190,9 +7045,6 @@
     "Markdown" : {
 
     },
-    "Most Versions Kept per Item" : {
-
-    },
     "No Library Open" : {
 
     },
@@ -7206,12 +7058,6 @@
 
     },
     "Number of Members" : {
-
-    },
-    "One Version a Day Kept For" : {
-
-    },
-    "One Version a Week Kept For" : {
 
     },
     "Opening Line" : {
@@ -7233,9 +7079,6 @@
 
     },
     "Pinned under the title. Customize Layout on an item of this type changes the same." : {
-
-    },
-    "Reading the Server’s Settings…" : {
 
     },
     "Relaxed" : {
@@ -7272,9 +7115,6 @@
 
     },
     "The owner’s permissions. An app can only lose them." : {
-
-    },
-    "The server keeps every version for the first period, then one a day, then one a week. Each period is at least as long as the one before. A type’s own policy wins. Empty uses the defaults." : {
 
     },
     "Tight" : {
@@ -7320,6 +7160,624 @@
 
     },
     "“%@” was attached to “%@” but isn’t in its text. It was meant for a folded section or text not yet shown." : {
+
+    },
+    "%@ in files" : {
+
+    },
+    "%@ is ready." : {
+
+    },
+    "%@%@ files nothing uses" : {
+
+    },
+    "%@’s Disk" : {
+
+    },
+    "%lld Days" : {
+
+    },
+    "%lld Hours" : {
+
+    },
+    "%lld MB" : {
+
+    },
+    "%lld Seconds" : {
+
+    },
+    "%lld Versions" : {
+
+    },
+    "%lld Years" : {
+
+    },
+    "%lld copies" : {
+
+    },
+    "%lld hours" : {
+
+    },
+    "%lld seconds" : {
+
+    },
+    "%lld versions" : {
+
+    },
+    "1 Day" : {
+
+    },
+    "1 Hour" : {
+
+    },
+    "1 Version" : {
+
+    },
+    "1 Year" : {
+
+    },
+    "1 copy" : {
+
+    },
+    "1 day" : {
+
+    },
+    "1 hour" : {
+
+    },
+    "1 version" : {
+
+    },
+    "A copy of each file" : {
+
+    },
+    "A key can set its own instead." : {
+
+    },
+    "A new source is left out until you check it." : {
+
+    },
+    "A source appears here once an app or key has written an item." : {
+
+    },
+    "A type can keep its own." : {
+
+    },
+    "Activity" : {
+
+    },
+    "After" : {
+
+    },
+    "And webhook deliveries." : {
+
+    },
+    "At Most" : {
+
+    },
+    "Backup Folder" : {
+
+    },
+    "Backups" : {
+
+    },
+    "By" : {
+
+    },
+    "Change Mark" : {
+
+    },
+    "Change Mark…" : {
+
+    },
+    "Chosen" : {
+
+    },
+    "Connector Deliveries, Handled" : {
+
+    },
+    "Connector Deliveries, Waiting" : {
+
+    },
+    "Copies of Each File" : {
+
+    },
+    "Couldn’t Read This Marfa’s Settings" : {
+
+    },
+    "Couldn’t Read Where Files Are" : {
+
+    },
+    "Database" : {
+
+    },
+    "Default" : {
+
+    },
+    "Disk" : {
+
+    },
+    "Events" : {
+
+    },
+    "%lld events." : {
+
+    },
+    "Failed, %lld" : {
+
+    },
+    "Every source is read again." : {
+
+    },
+    "Failing" : {
+
+    },
+    "%lld files are held back" : {
+
+    },
+    "%lld files or folders can’t be read" : {
+
+    },
+    "%lld files the server refused" : {
+
+    },
+    "Folders" : {
+
+    },
+    "For" : {
+
+    },
+    "It is shown only once. The service checks each request with it." : {
+
+    },
+    "%@ stops sending at once, and its deliveries and signing secret are gone. This can’t be undone." : {
+
+    },
+    "It stops sending at once." : {
+
+    },
+    "It was deleted, here or somewhere else." : {
+
+    },
+    "It was stopped, here or somewhere else." : {
+
+    },
+    "Item Changed" : {
+
+    },
+    "Item Created" : {
+
+    },
+    "Item Deleted" : {
+
+    },
+    "Item Permanently Deleted" : {
+
+    },
+    "Item Restored" : {
+
+    },
+    "Item State Changed" : {
+
+    },
+    "Made by %@" : {
+
+    },
+    "Made by %@, %@." : {
+
+    },
+    "Made by %@." : {
+
+    },
+    "Made by This Sign-In" : {
+
+    },
+    "%lld More" : {
+
+    },
+    "%lld More Events" : {
+
+    },
+    "File Storage" : {
+
+    },
+    "Files From the Web" : {
+
+    },
+    "For one item." : {
+
+    },
+    "For these types, every app and key reads only items from the checked sources: lists, search, exports and webhooks. MAPP too." : {
+
+    },
+    "Found %@" : {
+
+    },
+    "Going back to the default for “%@” uses the server’s own default, which MAPP can’t read. That may remove %@ sooner than the server’s current setting, %@. What it removes can’t be recovered." : {
+
+    },
+    "Health" : {
+
+    },
+    "History" : {
+
+    },
+    "How long a file is left alone before it is removed." : {
+
+    },
+    "Incomplete" : {
+
+    },
+    "It holds %lld of the owner’s %lld permissions." : {
+
+    },
+    "Items wait here first, so they can come back." : {
+
+    },
+    "Keep Every Version For" : {
+
+    },
+    "Keep Free on Disk" : {
+
+    },
+    "Largest File" : {
+
+    },
+    "Last %@" : {
+
+    },
+    "Last at %@" : {
+
+    },
+    "Let Chats Save Files" : {
+
+    },
+    "Limit Sources" : {
+
+    },
+    "Limit Sources Not Saved" : {
+
+    },
+    "Logs" : {
+
+    },
+    "MAPP can look after part of %@" : {
+
+    },
+    "MB" : {
+
+    },
+    "Marfa %@" : {
+
+    },
+    "Marfa %@." : {
+
+    },
+    "Named by its app or key." : {
+
+    },
+    "Named by you." : {
+
+    },
+    "Needs Attention" : {
+
+    },
+    "New Webhook" : {
+
+    },
+    "New Webhook…" : {
+
+    },
+    "No Answer" : {
+
+    },
+    "No Copies" : {
+
+    },
+    "No copies" : {
+
+    },
+    "No copies yet." : {
+
+    },
+    "No Deliveries" : {
+
+    },
+    "No Folders" : {
+
+    },
+    "No sign-in has reported keeping this folder yet." : {
+
+    },
+    "No Webhooks" : {
+
+    },
+    "Not Sent" : {
+
+    },
+    "Not Sent Again" : {
+
+    },
+    "Nothing has been sent to this address yet." : {
+
+    },
+    "Nothing is kept in step with a folder yet." : {
+
+    },
+    "No Limit" : {
+
+    },
+    "No Marks Match" : {
+
+    },
+    "No Sources Yet" : {
+
+    },
+    "Not Working" : {
+
+    },
+    "Not named yet." : {
+
+    },
+    "Object Store" : {
+
+    },
+    "Off" : {
+
+    },
+    "%@ on %@" : {
+
+    },
+    "Only webhooks this sign-in made are listed. An app or a key sees only its own." : {
+
+    },
+    "Redeliver" : {
+
+    },
+    "Relationship Added" : {
+
+    },
+    "Relationship Changed" : {
+
+    },
+    "Relationship Removed" : {
+
+    },
+    "%lld removals wait" : {
+
+    },
+    "Reported %@." : {
+
+    },
+    "Reported by %@. Review it where that copy runs." : {
+
+    },
+    "Review them where it runs." : {
+
+    },
+    "Send" : {
+
+    },
+    "Sending" : {
+
+    },
+    "%@ sends a request to an address you choose." : {
+
+    },
+    "Sent only while this sign-in may read the server’s status." : {
+
+    },
+    "Shown once, when it was made." : {
+
+    },
+    "Showing %lld of %lld. The rest are listed by marfa folders inventory." : {
+
+    },
+    "Signing Secret" : {
+
+    },
+    "Signing Secret Not Copied" : {
+
+    },
+    "Synced Folders" : {
+
+    },
+    "Syncing is paused" : {
+
+    },
+    "Table Rows Changed" : {
+
+    },
+    "Tags or Extra Data Changed" : {
+
+    },
+    "The folder is missing where this copy is kept" : {
+
+    },
+    "The latest events sent to this address. A failed one can be sent again once this webhook is on." : {
+
+    },
+    "The latest events sent to this address. Only a failed one can be sent again." : {
+
+    },
+    "The server refused this copy’s sign-in" : {
+
+    },
+    "The webhook “%@” was made, and its signing secret can’t be shown again. If you didn’t copy it, delete the webhook on the Webhooks page and make it again." : {
+
+    },
+    "This copy can’t reach the server" : {
+
+    },
+    "This copy isn’t watching for changes" : {
+
+    },
+    "This copy’s settings file can’t be used" : {
+
+    },
+    "This Folder Is Gone" : {
+
+    },
+    "This sign-in holds %lld webhooks, the most the server allows." : {
+
+    },
+    "This Webhook Is Gone" : {
+
+    },
+    "%lld to receive" : {
+
+    },
+    "%lld to send" : {
+
+    },
+    "Today, %@" : {
+
+    },
+    "On" : {
+
+    },
+    "Only items from the sources you name are read." : {
+
+    },
+    "Owned by %@." : {
+
+    },
+    "Permanently Delete After" : {
+
+    },
+    "Read Text in Files" : {
+
+    },
+    "Read Text in Pictures" : {
+
+    },
+    "Reading Files" : {
+
+    },
+    "Reading Sources…" : {
+
+    },
+    "Reading Where Files Are…" : {
+
+    },
+    "Remove Unused Files" : {
+
+    },
+    "Right Away" : {
+
+    },
+    "Rules for Every App and Key" : {
+
+    },
+    "Show Keys" : {
+
+    },
+    "So a change to a table can be undone." : {
+
+    },
+    "So search finds words in PDFs and documents." : {
+
+    },
+    "So search finds words in pictures." : {
+
+    },
+    "Source Name Not Kept" : {
+
+    },
+    "Table Changes" : {
+
+    },
+    "The limit was changed somewhere else. Nothing was sent. Check what you chose, then save again." : {
+
+    },
+    "The mark shows in every app that uses %@." : {
+
+    },
+    "The name shows in every app that uses %@." : {
+
+    },
+    "Then One a Day Up To" : {
+
+    },
+    "Then One a Week Up To" : {
+
+    },
+    "This may remove %@ sooner than the server’s current setting." : {
+
+    },
+    "Turn Off" : {
+
+    },
+    "Turn off “%@”?" : {
+
+    },
+    "Turning it off drops what is waiting." : {
+
+    },
+    "Turn Off Limit Sources" : {
+
+    },
+    "Types with no limit read every source." : {
+
+    },
+    "Unused Files" : {
+
+    },
+    "Uploads stop below this." : {
+
+    },
+    "Versions" : {
+
+    },
+    "What apps and the sign-in page show." : {
+
+    },
+    "What apps catch up on after being away." : {
+
+    },
+    "When a chat asks %@ to save a link." : {
+
+    },
+    "Where Files Are" : {
+
+    },
+    "Working" : {
+
+    },
+    "activity and webhook deliveries" : {
+
+    },
+    "connector deliveries" : {
+
+    },
+    "default, on" : {
+
+    },
+    "deleted items" : {
+
+    },
+    "events" : {
+
+    },
+    "off" : {
+
+    },
+    "on" : {
+
+    },
+    "right away" : {
+
+    },
+    "table changes" : {
+
+    },
+    "things" : {
+
+    },
+    "“%@” changes to %@. Anything older than that, in %@, will be permanently deleted the next time the server tidies up. It can’t be recovered." : {
+
+    },
+    "Default (%@)" : {
 
     }
   },

@@ -11,11 +11,31 @@ enum SettingsLead {
     case symbol(String)
     /// A type's or a source's mark, drawn as a plain symbol is.
     case mark(Image)
+    /// An app, a source or a connector: a white tile with a hairline, holding a symbol or a mark in the secondary color.
+    case well(AnyView)
     /// Anything else the row needs in the column, such as an app's picture.
     case custom(AnyView)
 
+    /// A well holding one symbol.
+    static func well(symbol: String) -> SettingsLead {
+        .well(AnyView(Image(systemName: symbol)))
+    }
+
     var isNone: Bool {
         if case .none = self { true } else { false }
+    }
+}
+
+/// The hairline tile an app, a source or a connector takes in a row's lead column, around what stands for it.
+struct SettingsWell<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: SettingsTokens.Metric.controlRadius, style: .continuous)
+            .fill(SettingsTokens.card)
+            .frame(width: SettingsTokens.Metric.leadColumn, height: SettingsTokens.Metric.leadColumn)
+            .overlay { RoundedRectangle(cornerRadius: SettingsTokens.Metric.controlRadius, style: .continuous).strokeBorder(SettingsTokens.hairline, lineWidth: 1) }
+            .overlay { content.font(.system(size: 12)).foregroundStyle(SettingsTokens.secondaryText) }
     }
 }
 
@@ -133,6 +153,8 @@ struct SettingsRow<Trailing: View>: View {
             Image(systemName: name).font(.system(size: 14)).foregroundStyle(SettingsTokens.secondaryText).accessibilityHidden(true)
         case .mark(let image):
             image.font(.system(size: 14)).foregroundStyle(SettingsTokens.secondaryText).accessibilityHidden(true)
+        case .well(let view):
+            SettingsWell { view }.accessibilityHidden(true)
         case .custom(let view):
             view
         }

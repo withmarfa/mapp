@@ -38,12 +38,14 @@ struct OwnerPermissionsRow: View {
 struct OwnerPermissionsList: View {
     let held: [String]
     let line: LocalizedStringKey
-    let problem: String?
+    let problem: OwnerFailure?
+    let page: MarfaSettingsPage
+    let host: any MarfaSettingsHost
     let remove: (String) -> Void
 
     var body: some View {
         SettingsPageColumn {
-            if let problem { OwnerProblem(title: "Not Changed", line: problem) }
+            if let problem { OwnerProblem(title: "Not Changed", failure: problem, page: page, host: host) }
             SettingsSection(name: Text("Look After This Marfa"), line: Text(line)) {
                 if held.isEmpty {
                     SettingsRow("No Owner Permissions", look: .off)
