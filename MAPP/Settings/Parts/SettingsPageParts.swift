@@ -164,7 +164,7 @@ struct SettingsPageState: View {
         GeometryReader { space in
             SettingsStateContent(symbol: symbol, title: title, line: line, action: action)
                 .padding(.horizontal, 24)
-                .position(x: space.size.width / 2, y: (space.size.height + space.safeAreaInsets.top) / 3 - space.safeAreaInsets.top)
+                .position(x: space.size.width / 2, y: (space.size.height + space.safeAreaInsets.top) / 3 - space.safeAreaInsets.top - SettingsTokens.Metric.pageStateRise)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(SettingsTokens.page)
@@ -198,5 +198,14 @@ struct SettingsEmptyCard: View {
                 .padding(.vertical, 28)
                 .frame(maxWidth: .infinity)
         }
+    }
+}
+
+/// Words both halves of Settings use.
+enum SettingsWording {
+    /// A server's address without its scheme, with its port where it has one.
+    static func hostName(of address: URL) -> String {
+        guard let host = address.host(percentEncoded: false) else { return address.absoluteString }
+        return address.port.map { "\(host):\($0)" } ?? host
     }
 }

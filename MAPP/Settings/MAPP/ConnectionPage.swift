@@ -66,7 +66,7 @@ struct ConnectionPage: View {
         SyncStatusReading(host: host) { status in
             let words = standing(status)
             let name = LibraryDescription.name(libraries)
-            let host = ConnectionHeadWording.hostName(of: connection.address)
+            let host = SettingsWording.hostName(of: connection.address)
             VStack(alignment: .leading, spacing: 10) {
                 SettingsHead(
                     symbol: "server.rack", tone: .blue, title: Text(verbatim: name),
@@ -235,12 +235,6 @@ struct ConnectionPage: View {
 
 /// The words of the Connection head's line.
 enum ConnectionHeadWording {
-    /// The server's address without its scheme, with its port where it has one.
-    static func hostName(of address: URL) -> String {
-        guard let host = address.host(percentEncoded: false) else { return address.absoluteString }
-        return address.port.map { "\(host):\($0)" } ?? host
-    }
-
     /// "Up to date 2 minutes ago", or "Up to date" before the first sync has finished.
     static func upToDate(since synced: Date?, now: Date, locale: Locale = .current) -> String {
         guard let synced else { return String(localized: "Up to date") }

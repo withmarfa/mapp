@@ -114,8 +114,8 @@ struct SettingsWindowTests {
     }
 
     @Test func theConnectionHeadNamesTheServerWithoutItsSchemeAndSaysWhenItWasUpToDate() throws {
-        #expect(ConnectionHeadWording.hostName(of: try #require(URL(string: "https://marfa.castell.studio"))) == "marfa.castell.studio")
-        #expect(ConnectionHeadWording.hostName(of: try #require(URL(string: "http://localhost:8080/"))) == "localhost:8080")
+        #expect(SettingsWording.hostName(of: try #require(URL(string: "https://marfa.castell.studio"))) == "marfa.castell.studio")
+        #expect(SettingsWording.hostName(of: try #require(URL(string: "http://localhost:8080/"))) == "localhost:8080")
 
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let english = Locale(identifier: "en_GB")

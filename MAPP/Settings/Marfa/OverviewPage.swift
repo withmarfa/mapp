@@ -31,7 +31,7 @@ struct OverviewPage: View {
             SettingsPageColumn {
                 SettingsHead(
                     symbol: MarfaSettingsPage.overview.symbol, tone: MarfaSettingsPage.overview.tone,
-                    title: Text(verbatim: host.serverName), line: host.serverAddress.map { Text(verbatim: $0) })
+                    title: Text(verbatim: host.serverName), line: host.serverAddress.map { Text(verbatim: URL(string: $0).map(SettingsWording.hostName(of:)) ?? $0) })
                 if model.isAvailable {
                     ThisMarfaFields(model: model)
                 } else {

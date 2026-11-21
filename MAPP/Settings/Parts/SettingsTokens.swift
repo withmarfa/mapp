@@ -82,6 +82,8 @@ enum SettingsTokens {
         static let windowHeight: CGFloat = 900
         static let windowMinWidth: CGFloat = 760
         static let windowMinHeight: CGFloat = 480
+        /// How far a page's centred state sits above a third of the pane, so its title, not the whole group, is there.
+        static let pageStateRise: CGFloat = 14
         static let sidebarWidth: CGFloat = 240
         static let rowHeight: CGFloat = 44
         static let rowHeightWithLine: CGFloat = 56
