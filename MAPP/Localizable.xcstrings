@@ -6647,9 +6647,6 @@
     "After the status, in this order. A row shows the first two." : {
 
     },
-    "All Versions Kept For" : {
-
-    },
     "An item’s own text." : {
 
     },
@@ -6729,12 +6726,6 @@
 
     },
     "Current Limit" : {
-
-    },
-    "Deleted Items Kept For" : {
-
-    },
-    "Deleted items stay in Recently Deleted this long, then the server permanently deletes them, with their history. 0 keeps them with no limit. Empty uses the default." : {
 
     },
     "Display" : {
@@ -6845,9 +6836,6 @@
     "Markdown" : {
 
     },
-    "Most Versions Kept per Item" : {
-
-    },
     "No Library Open" : {
 
     },
@@ -6861,12 +6849,6 @@
 
     },
     "Number of Members" : {
-
-    },
-    "One Version a Day Kept For" : {
-
-    },
-    "One Version a Week Kept For" : {
 
     },
     "Opening Line" : {
@@ -6891,9 +6873,6 @@
 
     },
     "Reading Downloaded Files…" : {
-
-    },
-    "Reading the Server’s Settings…" : {
 
     },
     "Relaxed" : {
@@ -6933,9 +6912,6 @@
 
     },
     "The owner’s permissions. An app can only lose them." : {
-
-    },
-    "The server keeps every version for the first period, then one a day, then one a week. Each period is at least as long as the one before. A type’s own policy wins. Empty uses the defaults." : {
 
     },
     "Tight" : {
@@ -6990,6 +6966,396 @@
 
     },
     "“%@” was attached to “%@” but isn’t in its text. It was meant for a folded section or text not yet shown." : {
+
+    },
+    "%@ in files" : {
+
+    },
+    "%@ is ready." : {
+
+    },
+    "%@%@ files nothing uses" : {
+
+    },
+    "%@’s Disk" : {
+
+    },
+    "%lld Days" : {
+
+    },
+    "%lld Hours" : {
+
+    },
+    "%lld MB" : {
+
+    },
+    "%lld Seconds" : {
+
+    },
+    "%lld Versions" : {
+
+    },
+    "%lld Years" : {
+
+    },
+    "%lld copies" : {
+
+    },
+    "%lld hours" : {
+
+    },
+    "%lld seconds" : {
+
+    },
+    "%lld versions" : {
+
+    },
+    "1 Day" : {
+
+    },
+    "1 Hour" : {
+
+    },
+    "1 Version" : {
+
+    },
+    "1 Year" : {
+
+    },
+    "1 copy" : {
+
+    },
+    "1 day" : {
+
+    },
+    "1 hour" : {
+
+    },
+    "1 version" : {
+
+    },
+    "A copy of each file" : {
+
+    },
+    "A key can set its own instead." : {
+
+    },
+    "A new source is left out until you check it." : {
+
+    },
+    "A source appears here once an app or key has written an item." : {
+
+    },
+    "A type can keep its own." : {
+
+    },
+    "Activity" : {
+
+    },
+    "After" : {
+
+    },
+    "And webhook deliveries." : {
+
+    },
+    "At Most" : {
+
+    },
+    "Backup Folder" : {
+
+    },
+    "Backups" : {
+
+    },
+    "By" : {
+
+    },
+    "Change Mark" : {
+
+    },
+    "Change Mark…" : {
+
+    },
+    "Chosen" : {
+
+    },
+    "Connector Deliveries, Handled" : {
+
+    },
+    "Connector Deliveries, Waiting" : {
+
+    },
+    "Copies of Each File" : {
+
+    },
+    "Couldn’t Read This Marfa’s Settings" : {
+
+    },
+    "Couldn’t Read Where Files Are" : {
+
+    },
+    "Database" : {
+
+    },
+    "Default" : {
+
+    },
+    "Disk" : {
+
+    },
+    "Events" : {
+
+    },
+    "Every source is read again." : {
+
+    },
+    "Failing" : {
+
+    },
+    "File Storage" : {
+
+    },
+    "Files From the Web" : {
+
+    },
+    "For one item." : {
+
+    },
+    "For these types, every app and key reads only items from the checked sources: lists, search, exports and webhooks. MAPP too." : {
+
+    },
+    "Found %@" : {
+
+    },
+    "Going back to the default for “%@” uses the server’s own default, which MAPP can’t read. That may remove %@ sooner than the server’s current setting, %@. What it removes can’t be recovered." : {
+
+    },
+    "Health" : {
+
+    },
+    "History" : {
+
+    },
+    "How long a file is left alone before it is removed." : {
+
+    },
+    "Incomplete" : {
+
+    },
+    "It holds %lld of the owner’s %lld permissions." : {
+
+    },
+    "Items wait here first, so they can come back." : {
+
+    },
+    "Keep Every Version For" : {
+
+    },
+    "Keep Free on Disk" : {
+
+    },
+    "Largest File" : {
+
+    },
+    "Last %@" : {
+
+    },
+    "Last at %@" : {
+
+    },
+    "Let Chats Save Files" : {
+
+    },
+    "Limit Sources" : {
+
+    },
+    "Limit Sources Not Saved" : {
+
+    },
+    "Logs" : {
+
+    },
+    "MAPP can look after part of %@" : {
+
+    },
+    "MB" : {
+
+    },
+    "Marfa %@" : {
+
+    },
+    "Marfa %@." : {
+
+    },
+    "Named by its app or key." : {
+
+    },
+    "Named by you." : {
+
+    },
+    "Needs Attention" : {
+
+    },
+    "No Files Nothing Uses" : {
+
+    },
+    "No Limit" : {
+
+    },
+    "No Marks Match" : {
+
+    },
+    "No Sources Yet" : {
+
+    },
+    "Not Working" : {
+
+    },
+    "Not named yet." : {
+
+    },
+    "Object Store" : {
+
+    },
+    "Off" : {
+
+    },
+    "On" : {
+
+    },
+    "Only items from the sources you name are read." : {
+
+    },
+    "Owned by %@." : {
+
+    },
+    "Permanently Delete After" : {
+
+    },
+    "Read Text in Files" : {
+
+    },
+    "Read Text in Pictures" : {
+
+    },
+    "Reading Files" : {
+
+    },
+    "Reading Sources…" : {
+
+    },
+    "Reading Where Files Are…" : {
+
+    },
+    "Remove Unused Files" : {
+
+    },
+    "Right Away" : {
+
+    },
+    "Rules for Every App and Key" : {
+
+    },
+    "Show Keys" : {
+
+    },
+    "So a change to a table can be undone." : {
+
+    },
+    "So search finds words in PDFs and documents." : {
+
+    },
+    "So search finds words in pictures." : {
+
+    },
+    "Source Name Not Kept" : {
+
+    },
+    "Table Changes" : {
+
+    },
+    "The limit was changed somewhere else. Nothing was sent. Check what you chose, then save again." : {
+
+    },
+    "The mark shows in every app that uses %@." : {
+
+    },
+    "The name shows in every app that uses %@." : {
+
+    },
+    "Then One a Day Up To" : {
+
+    },
+    "Then One a Week Up To" : {
+
+    },
+    "This may remove %@ sooner than the server’s current setting." : {
+
+    },
+    "Turn Off" : {
+
+    },
+    "Turn Off Limit Sources" : {
+
+    },
+    "Types with no limit read every source." : {
+
+    },
+    "Unused Files" : {
+
+    },
+    "Uploads stop below this." : {
+
+    },
+    "Versions" : {
+
+    },
+    "What apps and the sign-in page show." : {
+
+    },
+    "What apps catch up on after being away." : {
+
+    },
+    "When a chat asks %@ to save a link." : {
+
+    },
+    "Where Files Are" : {
+
+    },
+    "Working" : {
+
+    },
+    "activity and webhook deliveries" : {
+
+    },
+    "connector deliveries" : {
+
+    },
+    "default, on" : {
+
+    },
+    "deleted items" : {
+
+    },
+    "events" : {
+
+    },
+    "off" : {
+
+    },
+    "on" : {
+
+    },
+    "right away" : {
+
+    },
+    "table changes" : {
+
+    },
+    "things" : {
+
+    },
+    "“%@” changes to %@. Anything older than that, in %@, will be permanently deleted the next time the server tidies up. It can’t be recovered." : {
 
     }
   },

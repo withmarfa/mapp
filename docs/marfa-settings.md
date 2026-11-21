@@ -1,8 +1,8 @@
 # The Marfa's half of Settings
 
-Status: Account, Apps, Keys and Addresses are built, beside Overview and Recently Deleted.
+Status: Overview, Account, Apps, Keys, Addresses, Sources, Recently Deleted, History and File Storage are built.
 
-Where it lives: `MarfaSettingsPage`, `MarfaSettingsHost`, `OwnerCalls`, `ClientOwnerCalls`, `AccountModel`, `AppsModel`, `KeysModel`, `AddressesModel`, `OwnerDrafts`, `OwnerPermissions`, `AccountPage`, `AppsPage`, `KeysPage` and `AddressesPage` under `MAPP/Settings/Marfa/`.
+Where it lives: `MarfaSettingsPage`, `MarfaSettingsHost`, `OwnerCalls`, `ClientOwnerCalls`, `AccountModel`, `AppsModel`, `KeysModel`, `AddressesModel`, `OverviewModel`, `SourcesModel`, `SourceLimitModel`, `FileStorageModel`, `InstanceSettingsModel`, `OwnerDrafts`, `OwnerPermissions`, `OverviewPage`, `AccountPage`, `AppsPage`, `KeysPage`, `AddressesPage`, `SourcesPage`, `RecentlyDeletedPage`, `HistoryPage` and `FileStoragePage` under `MAPP/Settings/Marfa/`.
 
 The Marfa's pages show and change what the server holds, as the owner. They stand alone: they reach only the parts and the host protocol ([Agreed designs](agreed-designs.md#settings), `MAPP/Settings/Marfa/AGENTS.md`). Every call needs the server and is never queued. A page opens only when the sign-in holds its permission; the server's answer wins over what MAPP thinks it holds, so a call refused with `403 forbidden` names the permission the server says is missing, and the grants are read again.
 
@@ -10,10 +10,15 @@ The Marfa's pages show and change what the server holds, as the owner. They stan
 
 | Page | Permission to open | What it holds |
 | --- | --- | --- |
+| Overview | `instance.read` | The Marfa's head card, what needs attention, its name and release, and how it stands. A part the sign-in may not read is left out. |
 | Account | none | The owner's username and email as the server holds them (read only), Change Password…, the passkeys (Rename, Remove, Add a Passkey…, which opens the server's own page) and the browsers signed in (Sign Out). |
 | Apps | `grants.manage` | The connected apps. An app's page holds its access by type, which can only be narrowed, one row for its owner permissions (the same part as a key's), the keys it made and Disconnect. |
 | Keys | `keys.manage` | The owner's keys and the keys apps made. A key's page holds its expiry (it can only be made to end sooner), its tier, its source (set once, shown with a lock), its access by type (narrowing only), one row for its owner permissions and Revoke. New Key… needs `keys.mint`. |
 | Addresses | `config.manage` | The sign-in address, the other addresses and the websites allowed to call the server. |
+| Sources | `keys.manage` | The sources that hold items, each with its name and mark, which can be renamed or given another mark for every app, and Limit Sources, which needs `config.manage` as well. |
+| Recently Deleted | `items.purge` | What the server holds in its bin, Restore, Delete Permanently and Empty, and how long items wait (needs `config.manage` as well). |
+| History | `config.manage` | How long and how many versions of an item the server keeps, and how long it keeps its logs. |
+| File Storage | `config.manage` | Where files are kept, how many copies, the free space kept, reading text in files, fetching files from the web and removing files nothing uses. |
 
 ## Rules
 
@@ -27,8 +32,19 @@ The Marfa's pages show and change what the server holds, as the owner. They stan
 - **Owner permissions are counted, never all or nothing.** A key's page and an app's page each show one row (`OwnerPermissionsRow`), Look After This Marfa, with "None" or "3 of 14". With some held it opens a page of its own (pushed, Back returns) with one switch each; a switch can only be turned off, and turning it off asks first. New Key shows the same row with Choose…, which turns the sheet to a page of switches and back.
 - **A sheet is shown by the window.** A page hands its sheet to `SettingsSheetPresenter` (`settingsSheet(presenting:)`), which draws it in the middle of the whole window, not under the toolbar; what it shows is read from the page's model. A sheet grows with what it holds up to the window's height, then its content scrolls between its title and its buttons. A field's placeholder says something its label does not (the address field's "https://"), never the label again.
 
+- **The server's own settings are sent at once, one page at a time.** History, File Storage, Recently Deleted's wait and the Overview's name are `InstanceSettingsModel` settings, sent by `PATCH /config` with only the setting changed and the instance read. A pop-up or switch sends when it changes; a number or the name sends on Return or when the field is left. A page saves only the settings it shows, so what another page holds typed is not sent by it. A setting the server does not hold shows Default in a pop-up, which removes it.
+- **Keeping things for less time asks first.** A retention that is shorter than the one the server holds (or may be, where the server holds none MAPP can read) asks, names what it removes and says it can't be recovered. Keeping things as they were puts the pop-up back. Zero days is no limit where the contract says so (deleted items, activity, events, table changes and connector deliveries) and an empty window for versions.
+- **Overview reads what the package offers.** `GET /health` is not in the package's client, so a health part is marked from `GET /attention` (a health concern names the part it is about) and the Database and Files sizes come from `GET /metrics`. The server does not give free disk space, so Disk says Working or what the server says is wrong.
+- **Needs Attention shows only the action that exists.** A key concern offers Show Keys where the sign-in may manage keys; the others say what is wrong and offer nothing until their pages exist. MAPP's own row, "MAPP can look after part of <Marfa>", with Allow More…, comes first while fewer than all 14 owner permissions are held. The sidebar's badge counts the server's concerns only.
+- **Sources are written to the server for every app.** A rename or mark needs the server and is never queued; a refusal keeps what was typed in the sheet. Limit Sources is the server's source filter (`enforcement.source_filter`): written whole with the other two levers as they were read, so a change made elsewhere since is told and nothing is written over it. Types are checked, then sources; a limit that names types and no source waits, since it would hide every item of those types from every app.
+
 ## Left out
 
 - Name and picture, which MAPP does not ask to change, and Add Passkey's list refresh after the browser returns.
 - Extending a key, which waits on a server release.
+- Overview: Update beside the release, which waits on the Updates page, and the Backups row's link, which waits on the Backups page. Files links to File Storage.
+- Sources: the Who May Write rule (`enforcement.source_allowlist`) and a source's own page.
+- File Storage: Show… for the files nothing uses (a list of them has no use without their names) and the object store's secrets.
+- History: the webhook deliveries are kept as long as activity (`audit_retention_days`), so they have no row of their own.
+- Recently Deleted: the colored type mark on each row.
 - Apps' Tidying settings, the Private Addresses switch and Raycast's own settings item, which need server or settings-model work.
