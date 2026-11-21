@@ -46,9 +46,16 @@ extension ClientOwnerCalls {
 
     func backups() async throws(OwnerFailure) -> [BackupRecord] {
         try await run { client in
-            try await client.listBackups().ok.body.json.data
-                .map { BackupRecord(instanceID: $0.instanceId, name: $0.name, taken: $0.createdAt, bytes: $0.sizeBytes) }
-                .sorted { $0.taken > $1.taken }
+            do {
+                return try await client.listBackups().ok.body.json.data
+                    .map { BackupRecord(instanceID: $0.instanceId, name: $0.name, taken: $0.createdAt, bytes: $0.sizeBytes) }
+                    .sorted { $0.taken > $1.taken }
+            } catch {
+                // A server with nowhere to keep backups refuses the list (`no_backup_destination`): there are none, which the
+                // page says as it says an empty list, with the way to choose a place.
+                if case .server(_, "no_backup_destination", _, _, _)? = Self.marfaError(error) { return [] }
+                throw error
+            }
         }
     }
 

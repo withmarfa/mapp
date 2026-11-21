@@ -68,6 +68,7 @@ import Observation
             status = try await context.calls.updateStatus()
             failure = nil
         } catch {
+            let error = UpkeepWording.owned(error)
             failure = error
             await context.learn(from: error)
             return
@@ -92,6 +93,7 @@ import Observation
         do {
             status = try await context.calls.checkForUpdates()
         } catch {
+            let error = UpkeepWording.owned(error)
             self.error = error
             await context.learn(from: error)
         }
@@ -111,6 +113,7 @@ import Observation
         do {
             status = try await context.calls.startUpdate()
         } catch {
+            let error = UpkeepWording.owned(error)
             isStarting = false
             self.error = error
             await context.learn(from: error)
@@ -132,6 +135,7 @@ import Observation
                 isRestarting = false
                 unanswered = 0
             } catch {
+                let error = UpkeepWording.owned(error)
                 if case .notPermitted = error {
                     self.error = error
                     await context.learn(from: error)
@@ -161,6 +165,7 @@ import Observation
             self.settings = try await context.calls.change(settings, .init(checksForUpdates: on))
             status?.checksAutomatically = on
         } catch {
+            let error = UpkeepWording.owned(error)
             self.error = error
             await context.learn(from: error)
         }

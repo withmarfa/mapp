@@ -53,6 +53,7 @@ import Observation
             backups = try await context.calls.backups()
             failure = nil
         } catch {
+            let error = UpkeepWording.owned(error)
             failure = error
             await context.learn(from: error)
             return
@@ -65,6 +66,7 @@ import Observation
             settings = try await context.calls.upkeepSettings()
             settingsFailure = nil
         } catch {
+            let error = UpkeepWording.owned(error)
             settings = nil
             settingsFailure = error
             await context.learn(from: error)
@@ -111,31 +113,34 @@ import Observation
     func saveFolder() async {
         guard canSaveFolder, let settings else { return }
         sheetError = nil
-        if await change(settings, .init(folder: .set(trimmedFolder)), line: { self.sheetError = $0 }) { sheet = nil }
+        if await change(settings, .init(folder: .set(trimmedFolder)), refused: String(localized: "The server didn’t accept that folder. It must already exist on the machine it runs on."), line: { self.sheetError = $0 }) { sheet = nil }
     }
 
     func keepNowhere() async {
         guard let settings, settings.folder != nil else { return }
         rowError = nil
-        _ = await change(settings, .init(folder: .remove), line: { _ in })
+        _ = await change(settings, .init(folder: .remove), refused: nil, line: { _ in })
     }
 
     func setInterval(_ seconds: Int) async {
         guard let settings, settings.intervalSeconds != seconds else { return }
         rowError = nil
-        _ = await change(settings, .init(intervalSeconds: seconds), line: { _ in })
+        _ = await change(settings, .init(intervalSeconds: seconds), refused: nil, line: { _ in })
     }
 
     /// Sends one change and reads the answer in. Whether it was kept.
-    private func change(_ held: UpkeepSettings, _ change: UpkeepSettingsChange, line: (String) -> Void) async -> Bool {
+    private func change(_ held: UpkeepSettings, _ change: UpkeepSettingsChange, refused: String?, line: (String) -> Void) async -> Bool {
         isChanging = true
         defer { isChanging = false }
         do {
             settings = try await context.calls.change(held, change)
             return true
         } catch {
+            var said: String?
+            if case .refused = error { said = refused }
+            let error = UpkeepWording.owned(error)
             rowError = error
-            line(OwnerWording.line(error, on: .backups))
+            line(said ?? OwnerWording.line(error, on: .backups))
             if error == .conflict || error == .instanceChanged { settings = try? await context.calls.upkeepSettings() }
             await context.learn(from: error)
             return false
@@ -158,6 +163,7 @@ import Observation
             if taken.filesLost > 0 { backUpError = String(localized: "It was taken, but some files weren’t in it.") }
             backups = (try? await context.calls.backups()) ?? backups
         } catch {
+            let error = UpkeepWording.owned(error)
             backUpError = OwnerWording.line(error, on: .backups)
             await context.learn(from: error)
         }
@@ -188,6 +194,7 @@ import Observation
             sheet = nil
             backups = (try? await context.calls.backups()) ?? backups
         } catch {
+            let error = UpkeepWording.owned(error)
             // The sheet stays, so the owner can try again; a cancelled sign-in restores nothing.
             sheetError = OwnerWording.line(error, on: .backups)
             await context.learn(from: error)

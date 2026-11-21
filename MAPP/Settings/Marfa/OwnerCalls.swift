@@ -264,20 +264,21 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
         do { return try client() } catch { throw Self.failure(error) }
     }
 
+    /// The package's error inside what the generated client threw, which wraps it.
+    static func marfaError(_ error: any Error) -> MarfaError? {
+        var current = error
+        for _ in 0..<4 {
+            if let known = current as? MarfaError { return known }
+            guard let wrapped = current as? ClientError else { return nil }
+            current = wrapped.underlyingError
+        }
+        return nil
+    }
+
     /// What the package's error stands for, unwrapping the generated client's own wrapper. A `409` that names no cause of
     /// its own (the codes below) is the server refusing the call, which `plainConflict` words for the call that made it.
     static func failure(_ error: any Error, plainConflict: (String) -> OwnerFailure = { .refused($0) }) -> OwnerFailure {
-        var current = error
-        var found: MarfaError?
-        for _ in 0..<4 {
-            if let known = current as? MarfaError {
-                found = known
-                break
-            }
-            guard let wrapped = current as? ClientError else { break }
-            current = wrapped.underlyingError
-        }
-        guard let error = found else { return .failed(String(localized: "The server’s answer couldn’t be read.")) }
+        guard let error = marfaError(error) else { return .failed(String(localized: "The server’s answer couldn’t be read.")) }
         if error.isOffline { return .unreachable }
         if error.isKeyRefusal { return .signedOut }
         switch error {

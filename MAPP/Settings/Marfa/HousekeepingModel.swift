@@ -33,6 +33,7 @@ import Observation
             jobs = try await context.calls.housekeepingJobs()
             failure = nil
         } catch {
+            let error = UpkeepWording.owned(error)
             failure = error
             await context.learn(from: error)
         }
@@ -68,6 +69,7 @@ import Observation
         do {
             try await context.calls.confirmClock()
         } catch {
+            let error = UpkeepWording.owned(error)
             confirmError = error
             await context.learn(from: error)
             return

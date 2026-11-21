@@ -30,6 +30,17 @@ nonisolated enum UpkeepWording {
         return OwnerWording.day(date, now: now, calendar: calendar)
     }
 
+    // MARK: Failures
+
+    /// A failure in MAPP's own words: a refusal or fault carries the server's text, which names settings by key and requests by
+    /// path, so it is never shown.
+    static func owned(_ failure: OwnerFailure) -> OwnerFailure {
+        switch failure {
+        case .refused, .failed, .sourceHeld: .failed(String(localized: "The server couldn’t do that."))
+        default: failure
+        }
+    }
+
     // MARK: Backups
 
     /// What a backup's size reads as in the table.

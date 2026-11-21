@@ -192,7 +192,7 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         await model.saveFolder()
         #expect(model.sheet == .folder)
         #expect(model.folderDraft == "/Volumes/Gone")
-        #expect(model.sheetError == "That folder does not exist.")
+        #expect(model.sheetError == "The server didn’t accept that folder. It must already exist on the machine it runs on.", "never the server's own text")
         #expect(model.takeDrafts() == [.typed(title: "Backup Folder Not Kept", text: "/Volumes/Gone")])
     }
 
@@ -207,6 +207,19 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
             bench.calls.state.withLock { $0.upkeepChanges }
                 == [UpkeepSettingsChange(intervalSeconds: 86_400), UpkeepSettingsChange(folder: .remove)])
         #expect(model.place == .nowhere)
+    }
+
+    @Test func anyRefusalOrFaultTheServerWordsItselfIsToldInTheAppsWordsNotTheServers() async {
+        let bench = bench()
+        bench.calls.fail("backups", with: .failed("ENOENT /var/lib/marfa/backups"))
+        let model = BackupsModel(context: bench.context)
+        await model.load()
+        #expect(model.failure == .failed("The server couldn’t do that."))
+        bench.calls.fail("backups", with: nil)
+        bench.calls.fail("backUpNow", with: .refused("backup_path /x is not a directory"))
+        await model.load()
+        await model.backUpNow(reason: nil)
+        #expect(model.backUpError == "The server couldn’t do that.")
     }
 
     @Test func anObjectStoreIsShownAndNeverChangedFromHere() async {
