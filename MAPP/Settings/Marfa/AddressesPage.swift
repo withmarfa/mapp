@@ -98,7 +98,7 @@ struct AddressSheet: View {
 
     var body: some View {
         SettingsSheet(title: title, line: line, isWide: model.sheet == .changeSignIn) {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFieldGap) {
                 SettingsSheetField(label: model.sheet == .changeSignIn ? "New Address" : "Address", error: model.inputError) {
                     SettingsField(
                         title: "Address", text: $model.input, prompt: "https://", isError: model.inputError != nil, width: nil,

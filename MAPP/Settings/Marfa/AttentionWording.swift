@@ -10,6 +10,16 @@ nonisolated extension AttentionConcern {
         return name.isEmpty ? title : String(localized: "Set \(name) Again")
     }
 
+    /// The page that deals with the concern, where MAPP has one: a key's, a folder's, or a secret that Monitoring holds.
+    var page: MarfaSettingsPage? {
+        switch kind {
+        case .key: .keys
+        case .folder: .folders
+        case .setting where MonitoringSecret.allCases.contains { $0.key == reference }: .monitoring
+        default: nil
+        }
+    }
+
     var shownLine: String? {
         switch kind {
         case .health:

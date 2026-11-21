@@ -20,16 +20,16 @@ struct ActivityPage: View {
 
     private var columns: [SettingsTableColumn<ActivityEntry>] {
         [
-            SettingsTableColumn("When", width: 90) { entry in
+            SettingsTableColumn("When", width: SettingsTokens.Metric.Column.day) { entry in
                 Text(verbatim: ActivityWording.when(entry.date)).foregroundStyle(SettingsTokens.secondaryText)
             },
-            SettingsTableColumn("Who", width: 200) { entry in
+            SettingsTableColumn("Who", width: SettingsTokens.Metric.Column.who) { entry in
                 Text(verbatim: entry.who ?? String(localized: "Unknown")).foregroundStyle(SettingsTokens.secondaryText)
             },
             SettingsTableColumn("What") { entry in
                 Text(verbatim: ActivityWording.what(entry.action)).foregroundStyle(SettingsTokens.secondaryText)
             },
-            SettingsTableColumn("Address", width: 130) { entry in
+            SettingsTableColumn("Address", width: SettingsTokens.Metric.Column.address) { entry in
                 Text(verbatim: entry.address ?? "").foregroundStyle(SettingsTokens.secondaryText)
             },
         ]
@@ -62,9 +62,9 @@ struct ActivityPage: View {
                 },
                 foot: {
                     if let failure = model.failure, !model.entries.isEmpty {
-                        Text(verbatim: OwnerWording.line(failure)).settingsFont(.count).foregroundStyle(SettingsTokens.errorRed)
+                        Text(verbatim: OwnerWording.line(failure)).settingsFont(.line).foregroundStyle(SettingsTokens.errorRed)
                     } else if let range = model.range {
-                        Text(verbatim: range).settingsFont(.count).foregroundStyle(SettingsTokens.secondaryText)
+                        Text(verbatim: range).settingsFont(.line).foregroundStyle(SettingsTokens.secondaryText)
                     }
                     Spacer(minLength: 0)
                     if model.isLoading { ProgressView().controlSize(.small) }

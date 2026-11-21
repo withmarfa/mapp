@@ -227,9 +227,9 @@ private struct WebhookDetail: View {
                 SettingsSectionTable(
                     rows: showsAllDeliveries ? all : Array(all.prefix(Self.firstDeliveries)),
                     columns: [
-                        SettingsTableColumn<WebhookDeliveryInfo>("When", width: 150) { Text(verbatim: Self.when($0.created)) },
+                        SettingsTableColumn<WebhookDeliveryInfo>("When", width: SettingsTokens.Metric.Column.time) { Text(verbatim: Self.when($0.created)) },
                         SettingsTableColumn("Event") { Text(verbatim: WebhookEvent(rawValue: $0.event)?.title ?? $0.event) },
-                        SettingsTableColumn("Answer", width: 110) { Text(verbatim: Self.answer($0)) },
+                        SettingsTableColumn("Answer", width: SettingsTokens.Metric.Column.label) { Text(verbatim: Self.answer($0)) },
                     ],
                     action: SettingsRowAction(
                         title: "Redeliver", isEnabled: { model.canRedeliver($0, of: webhook) },
@@ -293,7 +293,7 @@ private struct NewWebhookSheet: View {
         SettingsSheet(
             title: Text("New Webhook"), line: Text("\(serverName) sends a request to an address you choose."), isWide: true
         ) {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFormGap) {
                 SettingsSheetField(label: "Address", error: model.draftError) {
                     SettingsField(
                         title: "Address", text: $model.draft.address, prompt: "https://", isError: model.draftError != nil,

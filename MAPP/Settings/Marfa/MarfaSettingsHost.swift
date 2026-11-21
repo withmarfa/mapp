@@ -221,21 +221,21 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
     /// permission opens there. Pages that share a permission still say different things, since each opens a different part.
     var permissionLine: String {
         switch self {
-        case .overview: String(localized: "MAPP isn’t allowed to read this Marfa’s health and status.")
+        case .overview: String(localized: "MAPP isn’t allowed to read the server’s health and status.")
         case .account: ""
         case .apps: String(localized: "MAPP isn’t allowed to list, narrow or disconnect apps.")
         case .keys: String(localized: "MAPP isn’t allowed to list, make or revoke keys.")
         case .sources: String(localized: "MAPP isn’t allowed to rename, mark or limit sources.")
-        case .addresses: String(localized: "MAPP isn’t allowed to see or change this Marfa’s addresses.")
+        case .addresses: String(localized: "MAPP isn’t allowed to see or change the server’s addresses.")
         case .recentlyDeleted: String(localized: "MAPP isn’t allowed to list or permanently delete deleted items.")
         case .history: String(localized: "MAPP isn’t allowed to see or change version and log retention.")
-        case .fileStorage: String(localized: "MAPP isn’t allowed to see or change how this Marfa keeps files.")
+        case .fileStorage: String(localized: "MAPP isn’t allowed to see or change how the server keeps files.")
         case .webhooks: String(localized: "MAPP isn’t allowed to list, make, change or remove webhooks.")
         case .folders: ""
-        case .activity: String(localized: "MAPP isn’t allowed to read this Marfa’s audit log.")
-        case .monitoring: String(localized: "MAPP isn’t allowed to see or change how this Marfa is monitored.")
-        case .limits: String(localized: "MAPP isn’t allowed to see or change this Marfa’s limits.")
-        case .startUp: String(localized: "MAPP isn’t allowed to read the settings this Marfa started with.")
+        case .activity: String(localized: "MAPP isn’t allowed to read the server’s audit log.")
+        case .monitoring: String(localized: "MAPP isn’t allowed to see or change how the server is monitored.")
+        case .limits: String(localized: "MAPP isn’t allowed to see or change the server’s limits.")
+        case .startUp: String(localized: "MAPP isn’t allowed to read the settings the server started with.")
         }
     }
 

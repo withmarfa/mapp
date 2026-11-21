@@ -32,14 +32,14 @@ struct RecentlyDeletedPage: View {
     private func columns(withType: Bool) -> [SettingsTableColumn<MarfaDeletedItem>] {
         var columns = [SettingsTableColumn<MarfaDeletedItem>("Item") { Text(verbatim: $0.title) }]
         if withType {
-            columns.append(SettingsTableColumn("Type", width: 110) { Text(verbatim: $0.kind).foregroundStyle(SettingsTokens.secondaryText) })
+            columns.append(SettingsTableColumn("Type", width: SettingsTokens.Metric.Column.label) { Text(verbatim: $0.kind).foregroundStyle(SettingsTokens.secondaryText) })
         }
         columns.append(
-            SettingsTableColumn("Deleted", width: 90) { item in
+            SettingsTableColumn("Deleted", width: SettingsTokens.Metric.Column.day) { item in
                 Text(verbatim: Self.when(item.deleted)).foregroundStyle(SettingsTokens.secondaryText)
             })
         columns.append(
-            SettingsTableColumn("By", width: 130) { item in
+            SettingsTableColumn("By", width: SettingsTokens.Metric.Column.address) { item in
                 Text(verbatim: item.source ?? "").foregroundStyle(SettingsTokens.secondaryText)
             })
         return columns

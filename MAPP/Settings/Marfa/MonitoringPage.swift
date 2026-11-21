@@ -42,7 +42,7 @@ struct MonitoringPage: View {
                 SettingsSection("Heartbeat") {
                     switchRow(
                         "Send a Heartbeat", key: "heartbeat_enabled", hasReceiver: model.heartbeatHasReceiver,
-                        line: "Marfa asks this address on a schedule, so a monitor notices if it stops.",
+                        line: "\(host.serverName) asks this address on a schedule, so a monitor notices if it stops.",
                         idle: "Nothing is sent until an address is set.")
                     secretRow(.heartbeatAddress)
                 }
@@ -78,7 +78,7 @@ struct MonitoringPage: View {
     private func secretRow(_ secret: MonitoringSecret) -> some View {
         let isSet = model.isSet(secret)
         return SettingsRow(verbatim: secret.title, error: model.line(secret.key)) {
-            HStack(spacing: 8) {
+            HStack(spacing: SettingsTokens.Metric.buttonGap) {
                 SettingsValue(isSet ? "Set" : "Not Set")
                 SettingsButton(isSet ? "Change…" : "Set…") { model.begin(secret) }
                     .accessibilityIdentifier("Monitoring-" + secret.rawValue)
@@ -102,7 +102,7 @@ struct MonitoringSecretSheetView: View {
     var body: some View {
         if let sheet = model.sheet {
             SettingsSheet(title: title(sheet), line: line(sheet).map { Text(verbatim: $0) }) {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFieldGap) {
                     ForEach(sheet.fields) { field in
                         SettingsSheetField(
                             verbatim: field.title, error: field == sheet.fields.last ? sheet.error : nil

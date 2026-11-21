@@ -29,11 +29,6 @@ nonisolated enum SettingsPage: Hashable, Sendable {
 
     static var all: [SettingsPage] { (mappGroups + marfaGroups).flatMap { $0 } }
 
-    /// Whether the page is one of the Marfa's, which stands on the server and needs a permission.
-    var marfaPage: MarfaSettingsPage? {
-        if case .marfa(let page) = self { page } else { nil }
-    }
-
     /// A name for tests and accessibility, which never changes with the language.
     var key: String {
         switch self {

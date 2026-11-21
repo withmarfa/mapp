@@ -144,23 +144,20 @@ struct SettingsToggle: View {
 struct SettingsValue: View {
     private let text: Text
     private let dot: Color?
-    private let isSecondary: Bool
 
     init(_ text: LocalizedStringKey, dot: Color? = nil) {
         self.text = Text(text)
         self.dot = dot
-        isSecondary = true
     }
 
     init(verbatim text: String, dot: Color? = nil) {
         self.text = Text(verbatim: text)
         self.dot = dot
-        isSecondary = true
     }
 
     var body: some View {
-        HStack(spacing: 6) {
-            if let dot { Circle().fill(dot).frame(width: 7, height: 7).accessibilityHidden(true) }
+        HStack(spacing: SettingsTokens.Metric.dotGap) {
+            if let dot { SettingsStatusDot(color: dot) }
             text
                 .settingsFont(.title)
                 .foregroundStyle(SettingsTokens.secondaryText)
@@ -171,13 +168,22 @@ struct SettingsValue: View {
     }
 }
 
+/// The small dot before a value or a status line: its color says how it stands.
+struct SettingsStatusDot: View {
+    let color: Color
+
+    var body: some View {
+        Circle().fill(color).frame(width: SettingsTokens.Metric.statusDot, height: SettingsTokens.Metric.statusDot).accessibilityHidden(true)
+    }
+}
+
 /// A value that is set elsewhere and can't be changed here, with a small lock before it, such as a key's source.
 struct SettingsLockedValue: View {
     let text: String
 
     var body: some View {
-        HStack(spacing: 5) {
-            Image(systemName: "lock").font(.system(size: 10)).foregroundStyle(SettingsTokens.tertiaryText).accessibilityHidden(true)
+        HStack(spacing: SettingsTokens.Metric.dotGap) {
+            Image(systemName: "lock").font(.system(size: SettingsTokens.Metric.lockGlyph)).foregroundStyle(SettingsTokens.tertiaryText).accessibilityHidden(true)
             SettingsValue(verbatim: text)
         }
     }
@@ -232,6 +238,7 @@ struct SettingsField: View {
     /// Run when the field loses focus, so a value typed and left is kept as one that was submitted.
     var onEndEditing: (() -> Void)?
     @FocusState private var isFocused: Bool
+    @Environment(\.settingsTextScale) private var scale
 
     var body: some View {
         Group {
@@ -243,7 +250,7 @@ struct SettingsField: View {
         }
         .labelsHidden()
         .textFieldStyle(.roundedBorder)
-        .font(isMonospaced ? SettingsTokens.font(.mono) : nil)
+        .font(isMonospaced ? SettingsTokens.font(.mono, scale: scale) : nil)
         .autocorrectionDisabled()
         .focused($isFocused)
         .onSubmit(onSubmit)
@@ -302,61 +309,6 @@ struct SettingsNumberField: View {
             }
             .frame(width: SettingsTokens.Metric.controlWidth, height: SettingsTokens.Metric.controlHeight)
             .settingsErrorRing(isError)
-    }
-}
-
-/// A number chosen from sensible steps, then Custom…, which turns the pop-up into a field with its unit inside. `none`
-/// names a value that means no limit.
-struct SettingsStepsPopUp: View {
-    struct Step: Hashable {
-        let value: Int
-        let title: String
-    }
-
-    let title: LocalizedStringKey
-    let steps: [Step]
-    let unit: LocalizedStringKey
-    @Binding var value: Int
-    var none: Step?
-
-    @State private var isCustom = false
-    @State private var typed = ""
-
-    private var isStep: Bool { steps.contains { $0.value == value } || none?.value == value }
-
-    var body: some View {
-        if isCustom || !isStep {
-            SettingsNumberField(title: title, text: $typed, unit: unit, onSubmit: commit)
-                .onAppear { typed = String(value) }
-                .onSubmit(commit)
-        } else {
-            Picker(title, selection: Binding { value } set: { chosen in
-                if chosen == Self.custom {
-                    typed = String(value)
-                    isCustom = true
-                } else {
-                    value = chosen
-                }
-            }) {
-                ForEach(steps, id: \.self) { Text($0.title).tag($0.value) }
-                if let none {
-                    Divider()
-                    Text(none.title).tag(none.value)
-                }
-                Divider()
-                Text("Custom…").tag(Self.custom)
-            }
-            .labelsHidden()
-            .pickerStyle(.menu)
-            .settingsPopUpSize()
-        }
-    }
-
-    private static let custom = Int.min
-
-    private func commit() {
-        if let number = Int(typed.trimmingCharacters(in: .whitespaces)) { value = number }
-        isCustom = false
     }
 }
 

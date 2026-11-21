@@ -81,7 +81,7 @@ struct DepartureSheet: View {
                         VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetChangeSpacing) {
                             Text(text.content.plainText)
                                 .textSelection(.enabled)
-                                .lineLimit(8)
+                                .lineLimit(SettingsTokens.Metric.sheetTextLines)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                             SettingsButton("Copy Text", small: true) { copy(text.content.plainText) }
                         }

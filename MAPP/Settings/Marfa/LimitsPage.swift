@@ -71,7 +71,7 @@ struct LimitsPage: View {
                 title: LocalizedStringKey(limit.title), text: text, unit: LocalizedStringKey(limit.unit.title),
                 isError: model.hasProblem(limit), onSubmit: { Task { await model.commit(limit) } },
                 onEndEditing: { Task { await model.commit(limit) } })
-            .disabled(model.saving.contains(limit.key))
+            .disabled(model.saving.contains(limit.key) || !model.isEnabled(limit))
             .accessibilityIdentifier("Limit-" + limit.key)
         }
     }

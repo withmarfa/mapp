@@ -66,7 +66,7 @@ struct SourcesPage: View {
             title: Text(verbatim: row.name), line: Text(verbatim: Self.naming(row)),
             lead: .well(host.markGlyph(row.mark ?? ""))
         ) {
-            HStack(spacing: 10) {
+            HStack(spacing: SettingsTokens.Metric.buttonGap) {
                 if let count = row.count { SettingsValue(verbatim: String(localized: "\(count.formatted()) items")) }
                 SettingsMoreMenu {
                     Button("Rename…") { model.beginRename(row.code) }
@@ -130,7 +130,7 @@ private struct SourceSheet: View {
         return SettingsSheet(
             title: Text("Choose a Mark"), line: Text("The mark shows in every app that uses \(host.serverName)."), isWide: true
         ) {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: SettingsTokens.Metric.sheetFieldGap) {
                 if model.markSets.count > 1 {
                     SettingsPopUp(title: "Icon Set", selection: $model.markSet) {
                         ForEach(model.markSets) { Text(verbatim: $0.title).tag($0) }

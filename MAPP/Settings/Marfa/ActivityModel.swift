@@ -70,7 +70,7 @@ nonisolated enum ActivityWording {
         "key.create": String(localized: "Made a key"),
         "key.update": String(localized: "Changed a key"),
         "key.revoke": String(localized: "Revoked a key"),
-        "owner.claimed": String(localized: "Claimed this Marfa"),
+        "owner.claimed": String(localized: "Claimed this server"),
         "instance.update.started": String(localized: "Started an update"),
         "instance.clock.confirmed": String(localized: "Confirmed the clock"),
         "config.update": String(localized: "Changed the settings"),

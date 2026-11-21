@@ -66,7 +66,7 @@ struct OverviewPage: View {
     private var permissionsRow: some View {
         SettingsProblemRow(
             title: Text("MAPP can look after part of \(host.serverName)"),
-            line: Text("It holds \(host.grants.count) of the owner’s \(InstancePermission.allCases.count) permissions."), tone: .orange,
+            line: Text("It holds \(host.grants.count) of the owner’s \(InstancePermission.allCases.count) permissions."),
             actions: [
                 SettingsProblemAction("Allow More…", isPrimary: true) {
                     let host = host
@@ -76,15 +76,16 @@ struct OverviewPage: View {
             .disabled(host.isAllowingMore)
     }
 
-    /// Only the actions that exist: a key opens the Keys page where the sign-in may manage keys. The pages for the other
-    /// kinds of concern are not here yet, so those rows say what is wrong and offer nothing.
+    /// Only the actions that exist: a concern opens the page that deals with it where the sign-in may open that page. The
+    /// other kinds of concern say what is wrong and offer nothing.
     private func actions(for concern: AttentionConcern) -> [SettingsProblemAction] {
-        switch concern.kind {
-        case .key where host.grants.contains(.keysManage):
-            [SettingsProblemAction("Show Keys") { host.show(.keys) }]
-        default:
-            []
+        guard let page = concern.page, page.permission.map({ host.grants.contains($0) }) ?? true else { return [] }
+        let title: LocalizedStringKey = switch page {
+        case .folders: "Show Folders"
+        case .monitoring: "Show Monitoring"
+        default: "Show Keys"
         }
+        return [SettingsProblemAction(title) { host.show(page) }]
     }
 
     // MARK: This Marfa
@@ -99,11 +100,11 @@ struct OverviewPage: View {
             SettingsSection("This Marfa") {
                 if failure == .notPermitted {
                     OwnerProblemRow(
-                        title: "Couldn’t Read This Marfa’s Settings", failure: .notPermitted(InstancePermission.configManage.rawValue),
+                        title: "Couldn’t Read \(host.serverName)’s Settings", failure: .notPermitted(InstancePermission.configManage.rawValue),
                         page: .overview, host: host)
                 } else {
                     SettingsProblemRow(
-                        title: Text("Couldn’t Read This Marfa’s Settings"), line: Text(verbatim: failure.message),
+                        title: Text("Couldn’t Read \(host.serverName)’s Settings"), line: Text(verbatim: failure.message),
                         actions: failure == .unsupported ? [] : [SettingsProblemAction("Try Again") { Task { await settings.load() } }])
                 }
             }

@@ -15,7 +15,7 @@ struct SettingsPageColumn<Content: View>: View {
                 }
             }
             .frame(maxWidth: SettingsTokens.Metric.column, alignment: .leading)
-            .padding(.horizontal, 24)
+            .padding(.horizontal, SettingsTokens.Metric.pageSide)
             .padding(.top, SettingsTokens.Metric.pageTop)
             .padding(.bottom, SettingsTokens.Metric.pageBottom)
             .frame(maxWidth: .infinity)
@@ -123,14 +123,16 @@ struct SettingsProblemAction: Identifiable {
 struct SettingsProblemRow: View {
     let title: Text
     var line: Text?
+    /// The lead's symbol: the warning triangle, or the lock for a refusal.
+    var symbol = "exclamationmark.triangle"
     var tone: SettingsTokens.Tone = .orange
     let actions: [SettingsProblemAction]
     /// A problem's words are told whole: an explanation is never cut to two lines.
     var lines: Int? = nil
 
     var body: some View {
-        SettingsRow(title: title, line: line, lead: .tint("exclamationmark.triangle", tone), lines: lines) {
-            HStack(spacing: 8) {
+        SettingsRow(title: title, line: line, lead: .tint(symbol, tone), lines: lines) {
+            HStack(spacing: SettingsTokens.Metric.buttonGap) {
                 if actions.count <= 2 {
                     ForEach(actions) { action in
                         SettingsButton(title: action.title, role: action.isDestructive ? .destructive : .normal, action: action.perform)
@@ -191,7 +193,7 @@ struct SettingsPageState: View {
     var body: some View {
         GeometryReader { space in
             SettingsStateContent(symbol: symbol, title: title, line: line, action: action)
-                .padding(.horizontal, 24)
+                .padding(.horizontal, SettingsTokens.Metric.pageSide)
                 .position(x: space.size.width / 2, y: (space.size.height + space.safeAreaInsets.top) / 3 - space.safeAreaInsets.top + SettingsTokens.Metric.pageStateDrop)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -208,7 +210,7 @@ struct SettingsBar<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: SettingsTokens.Metric.buttonGap) {
             if edge == .trailing { Spacer(minLength: 0) }
             content
             if edge == .leading { Spacer(minLength: 0) }
@@ -228,7 +230,7 @@ struct SettingsEmptyCard: View {
 
     var body: some View {
         SettingsStateContent(symbol: symbol, title: title, line: line, action: action)
-            .padding(.vertical, 28)
+            .padding(.vertical, SettingsTokens.Metric.emptyCardPadding)
             .frame(maxWidth: .infinity)
     }
 }

@@ -87,7 +87,7 @@ struct SettingsSidebar: View {
                 switch badges(page) {
                 case .count(let count)?:
                     Text("\(count)")
-                        .font(SettingsTokens.font(.count, scale: scale))
+                        .font(SettingsTokens.font(.line, scale: scale))
                         .foregroundStyle(.white)
                         .padding(.horizontal, SettingsTokens.Metric.badgeInset)
                         .frame(minWidth: SettingsTokens.Metric.badgeSize, minHeight: SettingsTokens.Metric.badgeSize)

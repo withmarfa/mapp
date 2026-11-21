@@ -129,6 +129,11 @@ import Observation
         }
     }
 
+    /// The title of a copy's removals that wait, which its row in Needs Attention gives.
+    static func removalsTitle(_ count: Int, signIn: String) -> String {
+        count == 1 ? String(localized: "1 Removal Waits on \(signIn)") : String(localized: "\(count) Removals Wait on \(signIn)")
+    }
+
     /// Whether a copy is listed under a folder's Needs Attention.
     static func needsAttention(_ copy: FolderCopy) -> Bool { copy.pausedRemovals > 0 || !copy.problems.isEmpty }
 
@@ -144,16 +149,16 @@ import Observation
     static func title(of problem: FolderProblem) -> String {
         let count = problem.count
         switch problem.code {
-        case .conflict: return count == 1 ? String(localized: "1 conflicted copy") : String(localized: "\(count) conflicted copies")
-        case .refused: return count == 1 ? String(localized: "1 file the server refused") : String(localized: "\(count) files the server refused")
-        case .credentialRefused: return String(localized: "The server refused this copy’s sign-in")
-        case .unreadable: return count == 1 ? String(localized: "1 file or folder can’t be read") : String(localized: "\(count) files or folders can’t be read")
-        case .heldFile: return count == 1 ? String(localized: "1 file is held back") : String(localized: "\(count) files are held back")
-        case .unavailable: return String(localized: "This copy can’t reach the server")
-        case .rootGone: return String(localized: "The folder is missing where this copy is kept")
-        case .settingsInvalid: return String(localized: "This copy’s settings file can’t be used")
-        case .unwatched: return String(localized: "This copy isn’t watching for changes")
-        case .paused: return String(localized: "Syncing is paused")
+        case .conflict: return count == 1 ? String(localized: "1 Conflicted Copy") : String(localized: "\(count) Conflicted Copies")
+        case .refused: return count == 1 ? String(localized: "1 File the Server Refused") : String(localized: "\(count) Files the Server Refused")
+        case .credentialRefused: return String(localized: "The Server Refused This Copy’s Sign-In")
+        case .unreadable: return count == 1 ? String(localized: "1 File or Folder Can’t Be Read") : String(localized: "\(count) Files or Folders Can’t Be Read")
+        case .heldFile: return count == 1 ? String(localized: "1 File Is Held Back") : String(localized: "\(count) Files Are Held Back")
+        case .unavailable: return String(localized: "This Copy Can’t Reach the Server")
+        case .rootGone: return String(localized: "The Folder Is Missing Where This Copy Is Kept")
+        case .settingsInvalid: return String(localized: "This Copy’s Settings File Can’t Be Used")
+        case .unwatched: return String(localized: "This Copy Isn’t Watching for Changes")
+        case .paused: return String(localized: "Syncing Is Paused")
         }
     }
 

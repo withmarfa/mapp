@@ -166,7 +166,7 @@ struct AppearancePage: View {
         SettingsSection("Window Layout", footer: "New windows open at these widths.") {
             ForEach(ColumnWidth.allCases) { ColumnWidthRow(column: $0) }
             SettingsRow("From This Window", line: "Or back to \(ColumnWidth.allCases.map { Int($0.defaultWidth).formatted() }.formatted(.list(type: .and))).") {
-                HStack(spacing: 8) {
+                HStack(spacing: SettingsTokens.Metric.buttonGap) {
                     SettingsButton("Reset") {
                         for column in ColumnWidth.allCases { UserDefaults.standard.removeObject(forKey: column.key) }
                     }

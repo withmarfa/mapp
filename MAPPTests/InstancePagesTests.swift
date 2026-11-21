@@ -375,6 +375,24 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         #expect(!model.isOn("rate_limit_enabled"))
     }
 
+    @Test func aLimitThatDependsOnASwitchIsOffWhileTheSwitchIs() async {
+        let calls = FakeInstanceCalls()
+        let model = limitsModel(calls)
+        await model.load()
+        #expect(model.isOn(LimitSetting.rateLimitSwitch))
+        #expect(model.isEnabled(.requestsPerWindow))
+        await model.setSwitch(LimitSetting.rateLimitSwitch, false)
+        for limit in [LimitSetting.requestsPerWindow, .keyRequestsPerWindow, .window, .deliveriesPerWindow] {
+            #expect(!model.isEnabled(limit), "\(limit.title) is off with Limit Requests")
+        }
+        #expect(model.isEnabled(.largestRequest))
+        #expect(model.isEnabled(.largestFetch) == model.isOn(LimitSetting.fetchSwitch))
+        await model.setSwitch(LimitSetting.fetchSwitch, false)
+        #expect(!model.isEnabled(.largestFetch))
+        #expect(!model.isEnabled(.fetchTime))
+        #expect(model.isEnabled(.mostViewers))
+    }
+
     @Test func whatWasTypedAndNotSentIsHandedBackWhenSettingsCloses() async {
         let model = limitsModel()
         await model.load()
@@ -736,9 +754,9 @@ nonisolated final class FakeInstanceCalls: InstanceCalls {
         #expect(MarfaSettingsPage.monitoring.permission == .configManage)
         #expect(MarfaSettingsPage.limits.permission == .configManage)
         #expect(MarfaSettingsPage.startUp.permission == .instanceRead)
-        #expect(MarfaSettingsPage.activity.permissionLine == "MAPP isn’t allowed to read this Marfa’s audit log.")
-        #expect(MarfaSettingsPage.monitoring.permissionLine == "MAPP isn’t allowed to see or change how this Marfa is monitored.")
-        #expect(MarfaSettingsPage.limits.permissionLine == "MAPP isn’t allowed to see or change this Marfa’s limits.")
-        #expect(MarfaSettingsPage.startUp.permissionLine == "MAPP isn’t allowed to read the settings this Marfa started with.")
+        #expect(MarfaSettingsPage.activity.permissionLine == "MAPP isn’t allowed to read the server’s audit log.")
+        #expect(MarfaSettingsPage.monitoring.permissionLine == "MAPP isn’t allowed to see or change how the server is monitored.")
+        #expect(MarfaSettingsPage.limits.permissionLine == "MAPP isn’t allowed to see or change the server’s limits.")
+        #expect(MarfaSettingsPage.startUp.permissionLine == "MAPP isn’t allowed to read the settings the server started with.")
     }
 }

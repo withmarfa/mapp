@@ -97,7 +97,7 @@ struct OnThisMacPage: View {
                     }
                     attachments(state)
                     SettingsRow("Opened Files", line: "Fetched again when you open them.") {
-                        HStack(spacing: 8) {
+                        HStack(spacing: SettingsTokens.Metric.buttonGap) {
                             SettingsValue(verbatim: state.bytes.map(StoreSize.text) ?? String(localized: "Unavailable"))
                             SettingsButton("Clear") { change { try await source.removeDownloadedFiles() } }
                                 .disabled(isWorking)
@@ -152,7 +152,7 @@ struct OnThisMacPage: View {
             SettingsRow(
                 title: Text("Export Everything"), line: Text(verbatim: line), error: exportFailure, look: canAskServer ? .normal : .off
             ) {
-                HStack(spacing: 8) {
+                HStack(spacing: SettingsTokens.Metric.buttonGap) {
                     if isExporting { ProgressView().controlSize(.small) }
                     SettingsButton("Export…") { chooseFolder(for: connection) }
                         .disabled(isExporting)
