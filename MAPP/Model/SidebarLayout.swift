@@ -102,15 +102,13 @@ nonisolated enum SidebarPlace: Hashable, Sendable {
         }
     }
 
-    /// A view's mark takes the color the person chose for it, or this one: the built-in views have their own, and a
-    /// saved view is gray. Nil for a place that is not a view.
+    /// A mark takes the color the person chose for it, or gray. Every place with a symbol of its own has one: the
+    /// views, the three indexes, and a collection or a source in a section the person made. A type draws its own mark,
+    /// and the two blocks that hold rows have none.
     var defaultTone: TypeTone? {
         switch self {
-        case .inbox: .blue
-        case .recents: .gray
-        case .favorites: .yellow
-        case .view: .gray
-        default: nil
+        case .type, .types, .views: nil
+        default: .gray
         }
     }
 

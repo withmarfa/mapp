@@ -384,7 +384,7 @@ struct SidebarPlaceRow: View, Equatable {
                 label.badge(data.count > 0 ? Text(data.count, format: .number).monospacedDigit() : nil)
             }
         }
-        .contextMenu { SidebarPlaceMenu(data: data, groups: groups, browser: browser) }
+        .sidebarPlaceMenu(data: data, groups: groups, browser: browser)
         .accessibilityIdentifier(identifier)
     }
 
@@ -392,74 +392,6 @@ struct SidebarPlaceRow: View, Equatable {
 
     private var identifier: String {
         if case .view(let id) = data.place { "SidebarView-\(id.rawValue)" } else { "SidebarPlace-\(data.place.key)" }
-    }
-}
-
-/// A place's context menu: a view's own commands and its color, where it goes, and Hide from Sidebar.
-struct SidebarPlaceMenu: View {
-    @Environment(Libraries.self) private var libraries
-    let data: SidebarPlaceRowData
-    let groups: [SidebarGroupChoice]
-    let browser: Browser
-
-    var body: some View {
-        if case .view(let id) = data.place {
-            SavedViewRowMenu(view: id, browser: browser)
-            Divider()
-        }
-        if data.place.defaultTone != nil { SidebarColorPicker(place: data.place) }
-        if !groups.isEmpty {
-            Menu("Move to Section") {
-                ForEach(groups) { group in
-                    Button(group.name) { libraries.updateSidebarLayout { $0.put(data.place, in: group.id) } }
-                }
-            }
-        }
-        Divider()
-        SidebarHideButtons(place: data.place)
-        Divider()
-        SidebarCustomizeButton(browser: browser)
-    }
-}
-
-/// The palette that chooses a view's color, in the sidebar's context menu. It reads and
-/// writes the one layout, so both show the same color.
-struct SidebarColorPicker: View {
-    @Environment(Libraries.self) private var libraries
-    @Environment(\.colorScheme) private var scheme
-    let place: SidebarPlace
-
-    var body: some View {
-        Picker("Color", selection: Binding {
-            libraries.sidebarLayout.color(of: place)
-        } set: { tone in
-            libraries.updateSidebarLayout { $0.setColor(tone, of: place) }
-        }) {
-            ForEach(TypeTone.allCases, id: \.self) { tone in
-                Label(tone.name, systemImage: "circle.fill")
-                    .tint(tone.color(for: scheme))
-                    .tag(tone)
-            }
-        }
-        .pickerStyle(.palette)
-    }
-}
-
-extension TypeTone {
-    /// What the color is called, for the palette's help and for VoiceOver.
-    var name: String {
-        switch self {
-        case .blue: String(localized: "Blue")
-        case .green: String(localized: "Green")
-        case .orange: String(localized: "Orange")
-        case .red: String(localized: "Red")
-        case .purple: String(localized: "Purple")
-        case .teal: String(localized: "Teal")
-        case .yellow: String(localized: "Yellow")
-        case .pink: String(localized: "Pink")
-        case .indigo: String(localized: "Indigo")
-        case .gray: String(localized: "Gray")
-        }
     }
 }
 

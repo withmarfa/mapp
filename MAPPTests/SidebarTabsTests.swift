@@ -367,7 +367,13 @@ struct SidebarTabsTests {
         let view = SidebarPlace.view(ItemID("v-Reading"))
         var layout = SidebarLayout()
         #expect(layout.color(of: view) == .gray)
-        #expect(layout.color(of: .inbox) == .blue && layout.color(of: .favorites) == .yellow)
+        for place in [SidebarPlace.inbox, .recents, .favorites, .all, .sources, .collections, .collection(ItemID("c-One")), .source("rss")] {
+            #expect(layout.color(of: place) == .gray && place.defaultTone == .gray)
+        }
+        #expect(SidebarPlace.type("core.note").defaultTone == nil)
+        layout.setColor(.blue, of: .all)
+        #expect(layout.color(of: .all) == .blue)
+        layout.setColor(nil, of: .all)
         layout.setColor(.purple, of: view)
         #expect(layout.color(of: view) == .purple)
         let stored = try JSONDecoder().decode(SidebarLayout.self, from: JSONEncoder().encode(layout))
@@ -386,6 +392,12 @@ struct SidebarTabsTests {
         SidebarLayouts(defaults: defaults).update("marfa:one") { $0.setColor(.teal, of: view) }
         #expect(SidebarLayouts(defaults: defaults).layout(for: "marfa:one").color(of: view) == .teal)
         #expect(SidebarLayouts(defaults: defaults).layout(for: "marfa:two").color(of: view) == .gray)
+    }
+
+    @Test func aColorChosenBeforeGrayBecameTheDefaultStays() throws {
+        let saved = Data(#"{"colors":{"inbox":"blue","favorites":"pink"}}"#.utf8)
+        let layout = try JSONDecoder().decode(SidebarLayout.self, from: saved)
+        #expect(layout.color(of: .inbox) == .blue && layout.color(of: .favorites) == .pink && layout.color(of: .recents) == .gray)
     }
 
     @Test func anUnknownStoredColorReadsAsTheViewsOwn() throws {
