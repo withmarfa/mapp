@@ -94,6 +94,7 @@ struct SettingsPopUp<Value: Hashable, Content: View>: View {
         Picker(title, selection: $selection) { content }
             .labelsHidden()
             .pickerStyle(.menu)
+            .buttonSizing(.flexible)
             .frame(width: SettingsTokens.Metric.popUpWidth)
     }
 }
