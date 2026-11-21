@@ -126,7 +126,7 @@ private struct AppDetail: View {
             }
             SettingsSection("Look After This Marfa", line: "The owner’s permissions. Most apps need none.") {
                 if parsed.permissions.isEmpty {
-                    SettingsRow("None", look: .off)
+                    SettingsRow("Permissions") { SettingsValue("None") }
                 }
                 ForEach(parsed.permissions, id: \.self) { permission in
                     SettingsRow(verbatim: OwnerWording.title(of: permission)) {
