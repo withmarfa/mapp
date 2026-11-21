@@ -206,6 +206,8 @@ enum SettingsTokens {
         /// alone sits nearer its card than the section above it, and a name with a line starts higher.
         static let sectionHeader: CGFloat = 22
         static let sectionGap: CGFloat = 8
+        /// How far a density preview's rule between rows stops short of the row's edges, as the list's own separators do.
+        static let listRuleInset: CGFloat = 10
         /// The space between a card and the row of buttons under it, which sit nearer than a section does.
         static let barGap: CGFloat = 14
         /// Below the toolbar: a head card sits 62 points under the window's top, as the boards draw.
