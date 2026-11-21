@@ -117,7 +117,7 @@ struct EditorPage: View {
                 }
                 .accessibilityIdentifier("EditingMode")
             }
-            SettingsRow("Articles Open In", line: "View > Show Original switches it.") {
+            SettingsRow("Articles Open In", line: "The View menu switches it.") {
                 SettingsPopUp(title: "Articles Open In", selection: $articlesOpenIn) {
                     Text("Reader").tag(SourceViewMode.reader)
                     Text("Original").tag(SourceViewMode.original)
