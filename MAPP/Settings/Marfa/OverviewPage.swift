@@ -168,13 +168,14 @@ struct OverviewPage: View {
         case .ok: String(localized: "Working")
         case .degraded: String(localized: "Needs Attention")
         case .down: String(localized: "Not Working")
+        case .unknown: String(localized: "Couldn’t Check")
         }
     }
 
     static func dot(_ condition: Condition) -> Color {
         switch condition {
         case .ok: SettingsTokens.ok
-        case .degraded: SettingsTokens.warning
+        case .degraded, .unknown: SettingsTokens.warning
         case .down: SettingsTokens.errorRed
         }
     }
@@ -182,7 +183,7 @@ struct OverviewPage: View {
     static func dot(_ backups: BackupsHealth) -> Color {
         switch backups.state {
         case .ok: SettingsTokens.ok
-        case .incomplete, .off: SettingsTokens.warning
+        case .incomplete, .off, .unknown: SettingsTokens.warning
         case .failing: SettingsTokens.errorRed
         }
     }
@@ -190,6 +191,7 @@ struct OverviewPage: View {
     static func backupsWord(_ backups: BackupsHealth, now: Date = .now, calendar: Calendar = .current) -> String {
         switch backups.state {
         case .off: return String(localized: "Off")
+        case .unknown: return String(localized: "Couldn’t Check")
         case .failing: return String(localized: "Failing")
         case .incomplete: return String(localized: "Incomplete")
         case .ok:

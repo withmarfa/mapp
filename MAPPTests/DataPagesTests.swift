@@ -151,6 +151,75 @@ import Testing
         #expect(model.health(of: .files).condition == .ok)
     }
 
+    private func overview(_ concerns: [AttentionConcern]) async -> OverviewModel {
+        let bench = bench()
+        bench.calls.state.withLock { $0.concerns = concerns }
+        let model = OverviewModel(context: bench.context)
+        await model.load()
+        return model
+    }
+
+    private func health(_ reference: String, _ title: String) -> AttentionConcern {
+        AttentionConcern(kind: .health, reference: reference, title: title, description: "The check reports it.")
+    }
+
+    @Test func aHealthCheckTheServerCouldNotMakeIsNeverShownAsWorking() async {
+        let model = await overview([
+            AttentionConcern(kind: .unavailable, reference: "Health", title: "Couldn't check health", description: "The check failed or did not answer in time. Its state is unknown.")
+        ])
+        #expect(model.health(of: .database).condition == .unknown)
+        #expect(model.health(of: .disk).condition == .unknown)
+        #expect(model.health(of: .files).condition == .unknown)
+        #expect(model.backups.state == .unknown)
+        #expect(OverviewPage.backupsWord(model.backups) == "Couldn’t Check")
+        #expect(OverviewPage.word(.unknown) == "Couldn’t Check")
+    }
+
+    @Test func anotherCheckTheServerCouldNotMakeLeavesHealthAlone() async {
+        let model = await overview([
+            AttentionConcern(kind: .unavailable, reference: "Connectors", title: "Couldn't check connectors", description: "Its state is unknown.")
+        ])
+        #expect(model.health(of: .database).condition == .ok)
+        #expect(model.backups.state == .ok)
+    }
+
+    @Test func eachPartTakesTheConcernsThatNameItsOwnComponent() async {
+        let model = await overview([
+            health("database_write", "Database write is degraded"),
+            health("blob_storage", "Blob storage is down"),
+        ])
+        #expect(model.health(of: .database).condition == .degraded)
+        #expect(model.health(of: .files).condition == .down)
+        #expect(model.health(of: .disk).condition == .ok)
+    }
+
+    @Test func aDownPartIsNotWorkingAndTheWorseOfTwoConcernsWins() async {
+        let model = await overview([health("database", "Database is degraded"), health("database_write", "Database write is down")])
+        #expect(model.health(of: .database).condition == .down)
+    }
+
+    @Test func aHealthConcernIsNeverMatchedByItsWords() async {
+        let model = await overview([
+            health("file_watcher", "File watcher is down"),
+            health("diskette", "Diskette is down"),
+            AttentionConcern(kind: .health, reference: "queue", title: "Queue is down", description: "The database is not answering and the disk is full."),
+        ])
+        #expect(model.health(of: .database).condition == .ok)
+        #expect(model.health(of: .disk).condition == .ok)
+        #expect(model.health(of: .files).condition == .ok)
+        #expect(model.concerns.count == 3)
+    }
+
+    @Test func aBackupConcernTheModelCannotPlaceIsNeverFailing() async {
+        for reference in ["folder_unlocked", "folder_lock_lost", "folder_lock_restored", "folder_shared", "folder_claim_kept", "something_new"] {
+            let model = await overview([AttentionConcern(kind: .backup, reference: reference, title: "A notice", description: "Told under Needs Attention.")])
+            #expect(model.backups.state != .failing, "\(reference)")
+            #expect(model.attentionCount == 1)
+        }
+        let model = await overview([AttentionConcern(kind: .backup, reference: "store", title: "The backup folder is not there", description: "Gone.")])
+        #expect(model.backups.state == .failing)
+    }
+
     @Test func backupsAreOffWhenNoDestinationIsSetAndFailingWhenARunFailed() async {
         let bench = bench()
         bench.calls.state.withLock {

@@ -18,9 +18,9 @@ nonisolated struct AttentionConcern: Identifiable, Hashable, Sendable {
     var id: String { kind.rawValue + "/" + reference }
 }
 
-/// How a part of the server stands, as `GET /health` words it.
+/// How a part of the server stands, as `GET /health` words it, or `unknown` where the server could not check.
 nonisolated enum Condition: String, Hashable, Sendable {
-    case ok, degraded, down
+    case ok, degraded, down, unknown
 }
 
 /// How one part of the server stands.
@@ -29,7 +29,7 @@ nonisolated struct HealthPart: Hashable, Sendable {
 }
 
 nonisolated struct BackupsHealth: Hashable, Sendable {
-    enum State: String, Hashable, Sendable { case ok, incomplete, failing, off }
+    enum State: String, Hashable, Sendable { case ok, incomplete, failing, off, unknown }
 
     var state: State
     var lastBackup: Date?

@@ -25,30 +25,38 @@ import Observation
 
     enum Component { case database, disk, files }
 
-    /// How a part stands, from what the server says needs attention: a health concern names the part it is about, and the concern itself
-    /// is told under Needs Attention. A part with none is working. The server's health has no operation in the package, so this is all MAPP can read.
+    /// How a part stands, from what the server says needs attention. A health concern names its component exactly
+    /// (`database` and `database_write` are Database, `disk` is Disk, `blob_storage` is Files), and is down where the server's
+    /// own title says so ("<part> is down"); one the model cannot place shows on no row and stays under Needs Attention. Where
+    /// the server could not check health, no part is shown as working.
     func health(of component: Component) -> HealthPart {
-        let words: [String] =
+        let references: Set<String> =
             switch component {
-            case .database: ["database"]
+            case .database: ["database", "database_write"]
             case .disk: ["disk"]
-            case .files: ["blob", "file"]
+            case .files: ["blob_storage"]
             }
-        let concern = concerns.first { item in
-            item.kind == .health && words.contains { item.reference.localizedCaseInsensitiveContains($0) }
-        }
-        return HealthPart(condition: concern == nil ? .ok : .degraded)
+        let named = concerns.filter { $0.kind == .health && references.contains($0.reference) }
+        if named.contains(where: { $0.title.hasSuffix(" is down") }) { return HealthPart(condition: .down) }
+        if !named.isEmpty { return HealthPart(condition: .degraded) }
+        return HealthPart(condition: healthUnavailable ? .unknown : .ok)
     }
 
+    /// Whether the server reported that it could not check health: an `unavailable` concern names the check as "Health".
+    private var healthUnavailable: Bool {
+        concerns.contains { $0.kind == .unavailable && $0.reference == "Health" }
+    }
+
+    /// The backups row, from the backup concerns the model can place. A folder notice or a reference it does not know is told
+    /// under Needs Attention and never makes the row "Failing": that word is for a failed store or run.
     var backups: BackupsHealth {
-        let concern = concerns.first { $0.kind == .backup }
+        let references = Set(concerns.filter { $0.kind == .backup }.map(\.reference))
         let state: BackupsHealth.State =
-            switch concern?.reference {
-            case nil: .ok
-            case "no_backup_destination", "turned_off": .off
-            case "incomplete", "parts_damaged": .incomplete
-            default: .failing
-            }
+            if !references.isDisjoint(with: ["store", "run"]) { .failing }
+            else if !references.isDisjoint(with: ["incomplete", "parts_damaged"]) { .incomplete }
+            else if !references.isDisjoint(with: ["no_backup_destination", "turned_off"]) { .off }
+            else if healthUnavailable { .unknown }
+            else { .ok }
         return BackupsHealth(state: state, lastBackup: reading?.lastBackup)
     }
 
