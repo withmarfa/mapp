@@ -14,7 +14,7 @@ struct ListsPage: View {
                     choices: Density.allCases.map { option in
                         .init(value: option, title: Text(verbatim: option.title), picture: AnyView(DensityPicture(density: option)))
                     },
-                    selection: $density, columns: 3)
+                    selection: $density)
                     .accessibilityIdentifier("ListsDensity")
             }
             SettingsSection("Order") {
@@ -37,26 +37,42 @@ struct ListsPage: View {
     }
 }
 
-/// A density's tile: the real list row, as the list draws it at that density, over a few sample items.
+/// A density's tile: the real list row, as the list draws it at that density, over a few sample items of different
+/// types. Standard shows a picture on its first row, drawn for the tile; nothing is read from the library or the network.
 private struct DensityPicture: View {
     let density: Density
 
+    private static let note = "lucide:sticky-note"
+    private static let task = "lucide:square-check-big"
+    private static let bookmark = "lucide:bookmark"
+    private static let event = "lucide:calendar"
+
     private var samples: [RowContent] {
         [
-            row(String(localized: "Weekly Review"), String(localized: "Three things for next week."), String(localized: "Mon")),
-            row(String(localized: "Trip to Lisbon"), String(localized: "Flights and the hotel."), String(localized: "12 Nov")),
-            row(String(localized: "Reading List"), String(localized: "Books to start this year."), String(localized: "9 Nov")),
-            row(String(localized: "Budget"), String(localized: "Where the month went."), String(localized: "4 Nov")),
+            row(Self.note, String(localized: "Note"), String(localized: "Trip to Lisbon"), String(localized: "Flights and the hotel."), String(localized: "12 Nov")),
+            row(
+                Self.task, String(localized: "Task"), String(localized: "Weekly Review"), String(localized: "Three things for next week."), String(localized: "Mon"),
+                status: String(localized: "In Progress")),
+            row(Self.bookmark, String(localized: "Bookmark"), String(localized: "Reading List"), String(localized: "Books to start this year."), String(localized: "9 Nov")),
+            row(Self.note, String(localized: "Note"), String(localized: "Budget"), String(localized: "Where the month went."), String(localized: "4 Nov")),
+            row(Self.event, String(localized: "Event"), String(localized: "Dinner with Sam"), nil, String(localized: "3 Nov")),
+            row(Self.task, String(localized: "Task"), String(localized: "Renew passport"), nil, String(localized: "2 Nov")),
         ]
     }
 
-    private func row(_ title: String, _ line: String, _ date: String) -> RowContent {
-        RowContent(title: title, date: date, secondary: line, typeIcon: nil, typeLabel: "", mixesTypes: false)
+    /// What the list makes of an item of a type: the type's chip first, then its status.
+    private func row(_ icon: String, _ type: String, _ title: String, _ line: String?, _ date: String, status: String? = nil) -> RowContent {
+        var content = RowContent(title: title, date: date, secondary: line, typeIcon: icon, typeLabel: type, mixesTypes: true)
+        content.chips = [.type(icon: icon, label: type)] + (status.map { [.status(.inProgress, label: $0)] } ?? [])
+        return content
     }
 
     var body: some View {
+        let isCompact = density == .compact
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(samples.prefix(density == .compact ? 4 : 2), id: \.title) { ItemRow(content: $0, density: density) }
+            ForEach(Array(samples.prefix(isCompact ? 6 : 3).enumerated()), id: \.offset) { index, content in
+                ItemRow(content: content, density: density, showsSample: !isCompact && index == 0)
+            }
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 10)
