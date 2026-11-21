@@ -1,5 +1,4 @@
 import AppKit
-import OSLog
 import SwiftUI
 
 extension View {
@@ -8,7 +7,8 @@ extension View {
     /// one's end, which is where the rows' separators run. The columns still resize by their edges, reorder by dragging
     /// and sort by a click. SwiftUI cannot style the header the `NSTableView` behind a `Table` draws, so this gives the
     /// table a header view that draws every column's heading itself. The headings are drawn over the table's own
-    /// background, or over `backdrop` where the table has none, so rows that scroll under them do not show through.
+    /// background, or over `backdrop` where the table has none, so rows that scroll under them do not show through. The
+    /// same view keeps the table as wide as its page (see `Probe.fit`).
     ///
     /// A table that sits directly under the toolbar passes `isUnderToolbar` to be told when its rows have scrolled past the
     /// headings, which stay pinned, and so under the toolbar, where the caller draws a `ToolbarBand`. A table in an index
@@ -59,13 +59,31 @@ private struct QuietTableHeader: NSViewRepresentable {
                 table.headerView = view
             }
             (table.headerView as? QuietHeaderView)?.backdrop = backdrop
-            if let sv = table.enclosingScrollView {
-                let cols = table.tableColumns.map { "\(Int($0.width))[\(Int($0.minWidth))-\(Int(min($0.maxWidth, 9999)))]" }.joined(separator: ",")
-                Logger(subsystem: "tbldebug", category: "t").notice("DBG id=\(table.accessibilityIdentifier(), privacy: .public) scroll=\(Int(sv.frame.width)) clip=\(Int(sv.contentView.bounds.width)) table=\(Int(table.frame.width)) auto=\(table.columnAutoresizingStyle.rawValue) hs=\(sv.hasHorizontalScroller) cols=\(cols, privacy: .public)")
-            }
+            if let scrollView = table.enclosingScrollView { fit(table, in: scrollView) }
             table.headerView?.needsDisplay = true
             follow(table)
             report(table)
+        }
+
+        /// The width and columns the table was last fitted to.
+        private var fittedTo: String?
+
+        /// Makes the table as wide as the page it sits in, and keeps it so as that width changes. A page whose scroll view
+        /// runs under the right-hand inspector gets the inspector's width as a safe area that SwiftUI does not carry into
+        /// the scroll view's insets, so the table would keep the width it had before the inspector opened or closed. And
+        /// a table starts at its columns' ideal widths, which can add up to more than the page. Fitting the columns to the
+        /// available width gives the last the remainder, within every column's minimum and maximum, so the table scrolls
+        /// sideways only where the minimums do not fit. A fit waits for the mouse to be up, so it does not undo a column
+        /// a person is dragging, and happens again only when the width or the columns change.
+        private func fit(_ table: NSTableView, in scrollView: NSScrollView) {
+            let safeRight = scrollView.safeAreaInsets.right
+            if abs(scrollView.contentInsets.right - safeRight) > 0.5 { scrollView.contentInsets.right = safeRight }
+            let insets = scrollView.contentInsets
+            let width = scrollView.contentView.bounds.width - insets.left - insets.right
+            let key = "\(Int(width))|" + table.tableColumns.map(\.identifier.rawValue).joined(separator: ",")
+            guard key != fittedTo, NSEvent.pressedMouseButtons == 0 else { return }
+            fittedTo = key
+            table.sizeToFit()
         }
 
         func stop() {
@@ -101,8 +119,9 @@ private struct QuietTableHeader: NSViewRepresentable {
 
 /// The header AppKit draws grays out while its window is not the key one, puts a line between the columns and runs its
 /// bottom line the width of the table. This one fills with the table's own background and no material, so the heading
-/// looks the same whichever window is key and hides the rows that scroll under it. It draws each column's title through `QuietHeaderCell`, the sort arrow of the column the table is sorted by,
-/// and one line under the columns, from where the first column starts to where the last ends.
+/// looks the same whichever window is key and hides the rows that scroll under it. It draws each column's title and,
+/// after it, the sort mark of the column the table is sorted by, through `QuietHeaderCell`, and one line under the
+/// columns, from where the first column starts to where the rows' separators end.
 private final class QuietHeaderView: NSTableHeaderView {
     /// What fills the header where the table's own background is clear.
     var backdrop = NSColor.windowBackgroundColor
@@ -134,16 +153,21 @@ private final class QuietHeaderView: NSTableHeaderView {
             guard frame.intersects(dirtyRect) else { continue }
             let cell = cell(for: column)
             let isSorted = sorted != nil && sorted?.key == column.sortDescriptorPrototype?.key
-            cell.isSorted = isSorted
+            cell.sortDirection = isSorted ? sorted.map { $0.ascending ? .ascending : .descending } : nil
             cell.draw(withFrame: frame, in: self)
-            if let sorted, isSorted {
-                cell.drawSortIndicator(withFrame: frame, in: self, ascending: sorted.ascending, priority: 0)
-            }
         }
         guard let first = table.tableColumns.indices.first, let last = table.tableColumns.indices.last else { return }
-        // A column keeps 6 points between its edge and its cell's content at the outer edges of the table.
-        let start = headerRect(ofColumn: first).minX + 6
-        let end = headerRect(ofColumn: last).maxX - 6
+        // A row's separator runs the row's width less the table's inset and 6 points at each end, which is neither
+        // where the first column starts nor where the last one ends: a last column that has reached its widest stops
+        // short of the row, and one fitted to the page can run past it. So the line ends where the rows' separators do,
+        // and at the last column's edge only while no row shows.
+        let tableInset = headerRect(ofColumn: first).minX
+        let start = tableInset + 6
+        var end = headerRect(ofColumn: last).maxX - 6
+        let visible = table.rows(in: table.visibleRect)
+        if visible.length > 0, let row = table.rowView(atRow: visible.location, makeIfNecessary: false) {
+            end = row.frame.maxX - (tableInset - row.frame.minX) - 6
+        }
         let thickness = 1 / (window?.backingScaleFactor ?? 2)
         NSColor.separatorColor.setFill()
         NSRect(x: start, y: isFlipped ? bounds.maxY - thickness : bounds.minY, width: end - start, height: thickness).fill()
@@ -151,29 +175,54 @@ private final class QuietHeaderView: NSTableHeaderView {
 }
 
 /// A column heading's cell, drawn without the separators and the bottom line AppKit draws with it, in the font of the
-/// New row's label (callout, medium) and the secondary color, whether or not its column is the sorted one.
+/// New row's label (callout, medium) and the secondary color, whether or not its column is the sorted one. The sort
+/// indicator follows the title, wherever the column aligns it, so every table's reads the same.
 private final class QuietHeaderCell: NSTableHeaderCell {
     static let headingFont = NSFont.systemFont(ofSize: 12, weight: .medium)
     private static let bottomLine: CGFloat = 3
+    /// The room a column keeps between its edge and its content, which a heading shares with its cells.
+    private static let edge: CGFloat = 6
+    /// The room a right-aligned heading keeps after its title, which is the room its column's numbers keep after theirs
+    /// (`IndexMetrics.countRoom`) on top of the column's own.
+    static let trailingRoom: CGFloat = 20
+    private static let indicatorGap: CGFloat = 3
+    private static let indicatorFont = NSFont.systemFont(ofSize: 9, weight: .semibold)
 
-    /// Whether the table is sorted by this column, which keeps its arrow clear of the title.
-    var isSorted = false
+    enum Direction { case ascending, descending }
 
-    /// AppKit draws a header cell's title in its own white whatever `textColor` and `attributedStringValue` say, so the cell draws
-    /// the title itself, in its font and the secondary color, level with where AppKit puts it.
+    /// Which way the table is sorted by this column, if it is.
+    var sortDirection: Direction?
+
+    /// The mark after the title, which AppKit draws at the cell's far edge instead.
+    private func indicator() -> NSImage? {
+        guard let sortDirection else { return nil }
+        let name = sortDirection == .ascending ? "chevron.up" : "chevron.down"
+        let configuration = NSImage.SymbolConfiguration(pointSize: Self.indicatorFont.pointSize, weight: .semibold)
+            .applying(.init(paletteColors: [.secondaryLabelColor]))
+        return NSImage(systemSymbolName: name, accessibilityDescription: nil)?.withSymbolConfiguration(configuration)
+    }
+
+    /// AppKit draws a header cell's title in its own white whatever `textColor` and `attributedStringValue` say, so the
+    /// cell draws the title itself, in its font and the secondary color, level with where AppKit puts it.
     override func drawInterior(withFrame cellFrame: NSRect, in controlView: NSView) {
         let style = NSMutableParagraphStyle()
-        style.alignment = alignment
         style.lineBreakMode = .byTruncatingTail
         let title = NSAttributedString(
             string: stringValue,
             attributes: [.font: Self.headingFont, .foregroundColor: NSColor.secondaryLabelColor, .paragraphStyle: style])
         let area = titleRect(forBounds: cellFrame)
-        let height = title.size().height
-        // The 6 points a column keeps between its edge and its content, so a heading starts where its cells' content does.
-        let left = cellFrame.minX + 6
-        let right = isSorted ? sortIndicatorRect(forBounds: cellFrame).minX : cellFrame.maxX - 6
-        title.draw(in: NSRect(x: left, y: area.midY - height / 2, width: max(0, right - left), height: height))
+        let size = title.size()
+        let mark = indicator()
+        let markWidth = mark.map { $0.size.width + Self.indicatorGap } ?? 0
+        let available = max(0, cellFrame.width - Self.edge - (alignment == .right ? Self.trailingRoom : Self.edge))
+        let titleWidth = min(ceil(size.width), max(0, available - markWidth))
+        let total = titleWidth + markWidth
+        let left = alignment == .right ? cellFrame.maxX - Self.trailingRoom - total : cellFrame.minX + Self.edge
+        title.draw(in: NSRect(x: left, y: area.midY - size.height / 2, width: titleWidth, height: size.height))
+        if let mark {
+            let origin = NSPoint(x: left + titleWidth + Self.indicatorGap, y: area.midY - mark.size.height / 2)
+            mark.draw(in: NSRect(origin: origin, size: mark.size), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+        }
     }
 
     override func draw(withFrame cellFrame: NSRect, in controlView: NSView) {

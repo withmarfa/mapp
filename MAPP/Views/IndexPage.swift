@@ -6,6 +6,9 @@ enum IndexMetrics {
     static let top: CGFloat = 12
     static let side: CGFloat = 16
     static let icon: CGFloat = 16
+    /// The room after a count's digits, so the numbers and their heading sit clear of the next column's. The heading of a
+    /// right-aligned column keeps the same room (`QuietHeaderCell.trailingRoom`).
+    static let countRoom: CGFloat = 10
     /// What every index page is drawn on, behind its title, tabs and table alike: the table's own ground.
     static let backdrop = NSColor.controlBackgroundColor
 }
@@ -237,8 +240,9 @@ private struct IndexTable: View {
             .width(min: 140, ideal: 280)
             TableColumn(IndexColumn.count.title(in: place), value: \.count) { row in
                 Text(row.count, format: .number).monospacedDigit().tableCellRoom(alignment: .trailing)
+                    .padding(.trailing, IndexMetrics.countRoom)
             }
-            .width(min: 60, ideal: 80, max: 120)
+            .width(min: 76, ideal: 96, max: 140)
             .alignment(.numeric)
             TableColumn(IndexColumn.latest.title(in: place), value: \.latestOrOldest) { row in
                 IndexLatest(date: row.latest).foregroundStyle(.secondary).tableCellRoom()
