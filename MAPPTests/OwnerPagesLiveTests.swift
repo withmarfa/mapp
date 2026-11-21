@@ -64,5 +64,57 @@ extension LiveMarfaTests {
             #expect(try await calls.keys().contains { $0.id == made.id } == false)
             try result.get()
         }
+
+        @Test(.timeLimit(.minutes(2))) func aWebhookIsMadeChangedAndDeletedAndItsSecretIsShownOnce() async throws {
+            let calls = try calls()
+            let tag = UUID().uuidString.prefix(8).lowercased()
+            let made = try await calls.create(
+                NewWebhook(url: "https://example.com/mapptest-\(tag)", events: ["item.created", "item.updated"], typeFilter: "core.note"))
+            var result: Result<Void, any Error> = .success(())
+            do {
+                #expect(made.secret.count >= 32)
+                #expect(made.webhook.secretTail == String(made.secret.suffix(4)))
+                let listed = try #require(try await calls.webhooks().first { $0.id == made.webhook.id })
+                #expect(listed.secretTail == made.webhook.secretTail, "a read holds only the last four characters")
+                #expect(listed.typeFilter == "core.note")
+                #expect(listed.maker?.id.isEmpty == false)
+                let events = try await calls.change(webhook: made.webhook.id, WebhookChange(events: ["item.created"]))
+                #expect(events.events == ["item.created"])
+                #expect(events.url == made.webhook.url, "a change names only what it sends")
+                let allTypes = try await calls.change(webhook: made.webhook.id, WebhookChange(typeFilter: .some(nil)))
+                #expect(allTypes.typeFilter == nil)
+                let off = try await calls.change(webhook: made.webhook.id, WebhookChange(active: false))
+                #expect(!off.active)
+                await #expect(throws: OwnerFailure.self) {
+                    _ = try await calls.change(webhook: made.webhook.id, WebhookChange(events: []))
+                }
+                _ = try await calls.deliveries(of: made.webhook.id)
+            } catch {
+                result = .failure(error)
+            }
+            try await calls.delete(webhook: made.webhook.id)
+            await #expect(throws: OwnerFailure.notFound) { try await calls.delete(webhook: made.webhook.id) }
+            #expect(try await calls.webhooks().contains { $0.id == made.webhook.id } == false)
+            try result.get()
+        }
+
+        @Test(.timeLimit(.minutes(2))) func aWebhookTheServerRefusesIsToldWithItsReason() async throws {
+            let calls = try calls()
+            await #expect(throws: OwnerFailure.self) {
+                _ = try await calls.create(NewWebhook(url: "ftp://example.com/hook", events: ["item.created"], typeFilter: nil))
+            }
+        }
+
+        @Test(.timeLimit(.minutes(2))) func theFoldersAreListedWithTheirReports() async throws {
+            let calls = try calls()
+            let listing = try await calls.folders()
+            #expect(listing.total >= listing.folders.count)
+            for folder in listing.folders {
+                #expect(!folder.title.isEmpty)
+                let report = try await calls.folderReport(folder.id)
+                #expect(report.copies.allSatisfy { !$0.signIn.isEmpty && $0.ageSeconds >= 0 })
+            }
+            await #expect(throws: OwnerFailure.notFound) { _ = try await calls.folderReport("00000000-0000-7000-8000-000000000000") }
+        }
     }
 }

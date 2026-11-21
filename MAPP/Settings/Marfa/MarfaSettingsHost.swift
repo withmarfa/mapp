@@ -80,10 +80,10 @@ struct MarfaDeletedItem: Identifiable, Hashable {
 
 /// A page of the Marfa's half of Settings, with the owner permission it needs to open.
 nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
-    case overview, account, apps, keys, addresses, recentlyDeleted
+    case overview, account, apps, keys, addresses, recentlyDeleted, webhooks, folders
 
     /// The pages in groups, as the sidebar shows them.
-    static let groups: [[MarfaSettingsPage]] = [[.overview], [.account, .apps, .keys, .addresses], [.recentlyDeleted]]
+    static let groups: [[MarfaSettingsPage]] = [[.overview], [.account, .apps, .keys, .addresses], [.recentlyDeleted], [.webhooks, .folders]]
 
     var title: String {
         switch self {
@@ -93,6 +93,8 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .keys: String(localized: "Keys")
         case .addresses: String(localized: "Addresses")
         case .recentlyDeleted: String(localized: "Recently Deleted")
+        case .webhooks: String(localized: "Webhooks")
+        case .folders: String(localized: "Folders")
         }
     }
 
@@ -104,6 +106,8 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .keys: "key.fill"
         case .addresses: "globe"
         case .recentlyDeleted: "trash"
+        case .webhooks: "dot.radiowaves.up.forward"
+        case .folders: "folder.fill"
         }
     }
 
@@ -115,11 +119,14 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .keys: .amber
         case .addresses: .teal
         case .recentlyDeleted: .gray
+        case .webhooks: .pink
+        case .folders: .blue
         }
     }
 
     /// The permission the page needs to open, which the owner may not have approved. Account needs none to open: its
-    /// sign-ins need `sign_ins.manage`, which it asks for from Change Password and never at sign-in.
+    /// sign-ins need `sign_ins.manage`, which it asks for from Change Password and never at sign-in. Folders needs none: a
+    /// folder is read as an item, under the access MAPP holds to every type.
     var permission: InstancePermission? {
         switch self {
         case .overview, .addresses: .configManage
@@ -127,6 +134,8 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .apps: .grantsManage
         case .keys: .keysManage
         case .recentlyDeleted: .itemsPurge
+        case .webhooks: .webhooksManage
+        case .folders: nil
         }
     }
 
@@ -156,6 +165,13 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
             ]
         case .recentlyDeleted:
             [String(localized: "Deleted Items"), String(localized: "Restore"), String(localized: "Delete Permanently"), String(localized: "Empty Recently Deleted")]
+        case .webhooks:
+            [
+                String(localized: "New Webhook"), String(localized: "Events"), String(localized: "Deliveries"), String(localized: "Redeliver"),
+                String(localized: "Signing Secret"), String(localized: "Sending"),
+            ]
+        case .folders:
+            [String(localized: "Copies"), String(localized: "Needs Attention"), String(localized: "Synced Folders")]
         }
     }
 }

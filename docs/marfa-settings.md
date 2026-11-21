@@ -1,8 +1,8 @@
 # The Marfa's half of Settings
 
-Status: Account, Apps, Keys and Addresses are built, beside Overview and Recently Deleted.
+Status: Account, Apps, Keys, Addresses, Webhooks and Folders are built, beside Overview and Recently Deleted. Folders only reads.
 
-Where it lives: `MarfaSettingsPage`, `MarfaSettingsHost`, `OwnerCalls`, `ClientOwnerCalls`, `AccountModel`, `AppsModel`, `KeysModel`, `AddressesModel`, `OwnerDrafts`, `OwnerPermissions`, `AccountPage`, `AppsPage`, `KeysPage` and `AddressesPage` under `MAPP/Settings/Marfa/`.
+Where it lives: `MarfaSettingsPage`, `MarfaSettingsHost`, `OwnerCalls`, `ClientOwnerCalls`, `AccountModel`, `AppsModel`, `KeysModel`, `AddressesModel`, `WebhooksModel`, `FoldersModel`, `OwnerDrafts`, `OwnerPermissions`, `AccountPage`, `AppsPage`, `KeysPage`, `AddressesPage`, `WebhooksPage` and `FoldersPage` under `MAPP/Settings/Marfa/`.
 
 The Marfa's pages show and change what the server holds, as the owner. They stand alone: they reach only the parts and the host protocol ([Agreed designs](agreed-designs.md#settings), `MAPP/Settings/Marfa/AGENTS.md`). Every call needs the server and is never queued. A page opens only when the sign-in holds its permission; the server's answer wins over what MAPP thinks it holds, so a call refused with `403 forbidden` names the permission the server says is missing, and the grants are read again.
 
@@ -14,6 +14,8 @@ The Marfa's pages show and change what the server holds, as the owner. They stan
 | Apps | `grants.manage` | The connected apps. An app's page holds its access by type, which can only be narrowed, one row for its owner permissions (the same part as a key's), the keys it made and Disconnect. |
 | Keys | `keys.manage` | The owner's keys and the keys apps made. A key's page holds its expiry (it can only be made to end sooner), its tier, its source (set once, shown with a lock), its access by type (narrowing only), one row for its owner permissions and Revoke. New Key… needs `keys.mint`. |
 | Addresses | `config.manage` | The sign-in address, the other addresses and the websites allowed to call the server. |
+| Webhooks | `webhooks.manage` | The webhooks this sign-in made. A webhook's page holds its address, what it is for (a type or every type), Sending, the events it sends (All Events and one each), its deliveries with Redeliver on every row, and Delete. New Webhook… is a sheet. |
+| Folders | none: a folder is read as an item, under the access MAPP holds to every type | The synced folders the server lists, each with the copies that keep it (named by the sign-in that reports them), how each stands and what needs attention. |
 
 ## Rules
 
@@ -27,8 +29,15 @@ The Marfa's pages show and change what the server holds, as the owner. They stan
 - **Owner permissions are counted, never all or nothing.** A key's page and an app's page each show one row (`OwnerPermissionsRow`), Look After This Marfa, with "None" or "3 of 14". With some held it opens a page of its own (pushed, Back returns) with one switch each; a switch can only be turned off, and turning it off asks first. New Key shows the same row with Choose…, which turns the sheet to a page of switches and back.
 - **A sheet is shown by the window.** A page hands its sheet to `SettingsSheetPresenter` (`settingsSheet(presenting:)`), which draws it in the middle of the whole window, not under the toolbar; what it shows is read from the page's model. A sheet grows with what it holds up to the window's height, then its content scrolls between its title and its buttons. A field's placeholder says something its label does not (the address field's "https://"), never the label again.
 
+- **A webhook's signing secret is shown once.** The sheet that follows New Webhook holds it, and closing the sheet drops it. Copy marks the clipboard concealed and clears it after a minute if nothing else was copied (`OwnerClipboard`, which a key's secret uses too). If the window closes while it shows, MAPP says which webhook was made and that its secret can't be shown again, so the webhook can be deleted and made again. The page reads back only the last four characters.
+- **A page shows its list before the rest is read.** Webhooks and Folders show the list as soon as it is read, then fill in each webhook's Sending and each folder's standing, four reads at a time. Making a webhook never waits on them.
+- **A webhook sees only its maker's.** A key or an app reads only the webhooks it made, so the list is MAPP's own, grouped by maker (`WebhooksModel.groups`) so a group per app can join when the server lists them all. Turning Sending off asks first and names what it drops (the deliveries waiting). A change to the address, the events or the type is sent alone, with no version: the server changes each in place, and a webhook found gone is told as gone. A change to the events is built on the webhook read again just before it is sent, so an event another app turned on or off since the page was read is kept. That narrows the window and does not close it: with no version to send, a change made between the read and the send can still be replaced (withmarfa/marfa#3408 asks for one). Redeliver is shown on every delivery and enabled only on a failed one of a webhook that is on (`events/redeliver-inactive`); a refusal from the server, such as a delivery older than the audit retention, is shown as a line under the table.
+- **A folder is read, not changed, here.** The package's client holds only the folder status call; reading and changing a folder's settings and files, and listing its paths, are the working copy's, which keeps no `system.*` rows and which MAPP does not use for folders. The list comes from the server's overview (at most 30 folders, by title; where it cut the list, the page says "Showing 30 of N" and that `marfa folders inventory` lists the rest) and each folder's copies from its status report. The report holds counts and problem codes and no file names. Removals that wait are decided on the machine that holds the copy, so the page says where to look and offers no action.
+
 ## Left out
 
 - Name and picture, which MAPP does not ask to change, and Add Passkey's list refresh after the browser returns.
 - Extending a key, which waits on a server release.
 - Apps' Tidying settings, the Private Addresses switch and Raycast's own settings item, which need server or settings-model work.
+- Webhooks of every app and key, grouped by maker, and ending any of them: they wait on a server release. A webhook's signing secret can't be changed: the server changes it only by making a new webhook.
+- Folders: renaming, the tree of what a folder holds, the ignore and include patterns, the removal and addition limits, Read Every File Every, Stop Syncing and a button for removals that wait. Each needs the server's folder doors (`GET /folders`, `PATCH /folders/{id}` and `POST /folders/{id}/revoke`) or the paths of the `in-folder` edges, none of which the package's client offers. Read Every File Every is the copy's own setting, never the server's.

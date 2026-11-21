@@ -4,6 +4,177 @@
     "%@ (Missing)" : {
 
     },
+    "%@. %@" : {
+
+    },
+    "1 conflicted copy" : {
+
+    },
+    "1 copy." : {
+
+    },
+    "1 event." : {
+
+    },
+    "1 file is held back" : {
+
+    },
+    "1 file or folder can’t be read" : {
+
+    },
+    "1 file the server refused" : {
+
+    },
+    "1 removal waits" : {
+
+    },
+    "A folder is made where it is kept in step, with the command line. Only folders MAPP may read are listed." : {
+
+    },
+    "A webhook sends events to an address you choose, as they happen." : {
+
+    },
+    "Address: %@" : {
+
+    },
+    "All Events" : {
+
+    },
+    "Answer" : {
+
+    },
+    "Archived, unarchived or moved to or from another state." : {
+
+    },
+    "Change Address" : {
+
+    },
+    "Change this folder’s ignore patterns, limits and files with the command line: %@." : {
+
+    },
+    "Changing the events or the type drops waiting deliveries that no longer match." : {
+
+    },
+    "%lld conflicted copies" : {
+
+    },
+    "Copies" : {
+
+    },
+    "%lld copies." : {
+
+    },
+    "Copy the Signing Secret Now" : {
+
+    },
+    "Couldn’t Read This Folder" : {
+
+    },
+    "Create Webhook" : {
+
+    },
+    "Delete This Webhook" : {
+
+    },
+    "Delete This Webhook?" : {
+
+    },
+    "Delivered" : {
+
+    },
+    "Deliveries" : {
+
+    },
+    "Deliveries Couldn’t Be Read" : {
+
+    },
+    "Deliveries waiting for the old address are dropped." : {
+
+    },
+    "Deliveries waiting to be sent are dropped, and nothing more is sent until you turn it on." : {
+
+    },
+    "Event" : {
+
+    },
+    "Events" : {
+
+    },
+    "%lld events." : {
+
+    },
+    "Failed, %lld" : {
+
+    },
+    "Failing" : {
+
+    },
+    "%lld files are held back" : {
+
+    },
+    "%lld files or folders can’t be read" : {
+
+    },
+    "%lld files the server refused" : {
+
+    },
+    "Folders" : {
+
+    },
+    "For" : {
+
+    },
+    "It is shown only once. The service checks each request with it." : {
+
+    },
+    "%@ stops sending at once, and its deliveries and signing secret are gone. This can’t be undone." : {
+
+    },
+    "It stops sending at once." : {
+
+    },
+    "It was deleted, here or somewhere else." : {
+
+    },
+    "It was stopped, here or somewhere else." : {
+
+    },
+    "Item Changed" : {
+
+    },
+    "Item Created" : {
+
+    },
+    "Item Deleted" : {
+
+    },
+    "Item Permanently Deleted" : {
+
+    },
+    "Item Restored" : {
+
+    },
+    "Item State Changed" : {
+
+    },
+    "Made by %@" : {
+
+    },
+    "Made by %@, %@." : {
+
+    },
+    "Made by %@." : {
+
+    },
+    "Made by This Sign-In" : {
+
+    },
+    "%lld More" : {
+
+    },
+    "%lld More Events" : {
+
+    },
     "%@, with %lld subtypes" : {
       "localizations" : {
         "en" : {
@@ -42,6 +213,174 @@
 
     },
     "%@ items" : {
+
+    },
+    "Named by the sign-in that keeps each one." : {
+
+    },
+    "Needs Attention" : {
+
+    },
+    "New Webhook" : {
+
+    },
+    "New Webhook…" : {
+
+    },
+    "No Answer" : {
+
+    },
+    "No Copies" : {
+
+    },
+    "No copies" : {
+
+    },
+    "No copies yet." : {
+
+    },
+    "No Deliveries" : {
+
+    },
+    "No Folders" : {
+
+    },
+    "No sign-in has reported keeping this folder yet." : {
+
+    },
+    "No Webhooks" : {
+
+    },
+    "Not Sent" : {
+
+    },
+    "Not Sent Again" : {
+
+    },
+    "Nothing has been sent to this address yet." : {
+
+    },
+    "Nothing is kept in step with a folder yet." : {
+
+    },
+    "Off" : {
+
+    },
+    "%@ on %@" : {
+
+    },
+    "Only webhooks this sign-in made are listed. An app or a key sees only its own." : {
+
+    },
+    "Redeliver" : {
+
+    },
+    "Relationship Added" : {
+
+    },
+    "Relationship Changed" : {
+
+    },
+    "Relationship Removed" : {
+
+    },
+    "%lld removals wait" : {
+
+    },
+    "Reported %@." : {
+
+    },
+    "Reported by %@. Review it where that copy runs." : {
+
+    },
+    "Review them where it runs." : {
+
+    },
+    "Send" : {
+
+    },
+    "Sending" : {
+
+    },
+    "%@ sends a request to an address you choose." : {
+
+    },
+    "Sent only while this sign-in may read the server’s status." : {
+
+    },
+    "Shown once, when it was made." : {
+
+    },
+    "Showing %lld of %lld. The rest are listed by marfa folders inventory." : {
+
+    },
+    "Signing Secret" : {
+
+    },
+    "Signing Secret Not Copied" : {
+
+    },
+    "Synced Folders" : {
+
+    },
+    "Syncing is paused" : {
+
+    },
+    "Table Rows Changed" : {
+
+    },
+    "Tags or Extra Data Changed" : {
+
+    },
+    "The folder is missing where this copy is kept" : {
+
+    },
+    "The latest events sent to this address. A failed one can be sent again once this webhook is on." : {
+
+    },
+    "The latest events sent to this address. Only a failed one can be sent again." : {
+
+    },
+    "The server refused this copy’s sign-in" : {
+
+    },
+    "The webhook “%@” was made, and its signing secret can’t be shown again. If you didn’t copy it, delete the webhook on the Webhooks page and make it again." : {
+
+    },
+    "This copy can’t reach the server" : {
+
+    },
+    "This copy isn’t watching for changes" : {
+
+    },
+    "This copy’s settings file can’t be used" : {
+
+    },
+    "This Folder Is Gone" : {
+
+    },
+    "This sign-in holds %lld webhooks, the most the server allows." : {
+
+    },
+    "This Webhook Is Gone" : {
+
+    },
+    "%lld to receive" : {
+
+    },
+    "%lld to send" : {
+
+    },
+    "Today, %@" : {
+
+    },
+    "Turn Off" : {
+
+    },
+    "Turn off “%@”?" : {
+
+    },
+    "Turning it off drops what is waiting." : {
 
     },
     "%@ you make show here." : {
@@ -1011,6 +1350,27 @@
 
     },
     "Up to date" : {
+
+    },
+    "Waiting" : {
+
+    },
+    "%lld waiting" : {
+
+    },
+    "Waiting to start" : {
+
+    },
+    "Webhook" : {
+
+    },
+    "Webhook Address Not Changed" : {
+
+    },
+    "Webhook Not Made" : {
+
+    },
+    "Webhooks" : {
 
     },
     "Up to date %@" : {
@@ -6695,9 +7055,6 @@
     "Attachments Kept Offline" : {
 
     },
-    "Attachments Not Yet Offline" : {
-
-    },
     "Attachments stay offline and don’t count toward the limit." : {
 
     },
@@ -6717,9 +7074,6 @@
 
     },
     "Couldn’t Import Layouts" : {
-
-    },
-    "Couldn’t Read Downloaded Files" : {
 
     },
     "Couldn’t Read the Settings" : {
@@ -6756,9 +7110,6 @@
 
     },
     "Export Layouts…" : {
-
-    },
-    "Export…" : {
 
     },
     "Facts" : {
@@ -6809,9 +7160,6 @@
     "Indent With" : {
 
     },
-    "Keep All Downloads" : {
-
-    },
     "Keeps attachments and files waiting to upload." : {
 
     },
@@ -6837,9 +7185,6 @@
 
     },
     "MAPP Layouts" : {
-
-    },
-    "MAPP will try again." : {
 
     },
     "Markdown" : {
@@ -6890,9 +7235,6 @@
     "Pinned under the title. Customize Layout on an item of this type changes the same." : {
 
     },
-    "Reading Downloaded Files…" : {
-
-    },
     "Reading the Server’s Settings…" : {
 
     },
@@ -6909,9 +7251,6 @@
 
     },
     "Smart Quotes and Dashes" : {
-
-    },
-    "Space Used" : {
 
     },
     "Square" : {
@@ -6957,15 +7296,6 @@
 
     },
     "Up to %lld Lines" : {
-
-    },
-    "Up to date" : {
-
-    },
-    "Up to date %@" : {
-
-    },
-    "Up to date just now" : {
 
     },
     "Updating Library…" : {

@@ -76,7 +76,7 @@ private struct TableHeader<Row>: View {
     }
 }
 
-private enum ActionWidth { static let value: CGFloat = 70 }
+private enum ActionWidth { static let value: CGFloat = 88 }
 
 private struct TableRow<Row>: View {
     let row: Row

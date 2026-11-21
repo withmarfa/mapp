@@ -234,6 +234,11 @@ private struct SettingsFont: ViewModifier {
     }
 }
 
+extension Text {
+    /// A command or other code inside a sentence, in the monospaced font.
+    static func settingsCode(_ code: String) -> Text { Text(verbatim: code).font(SettingsTokens.font(.mono)) }
+}
+
 extension View {
     /// Sets the interface font for `role`, at the person's text size.
     func settingsFont(_ role: SettingsTokens.Role) -> some View { modifier(SettingsFont(role: role)) }

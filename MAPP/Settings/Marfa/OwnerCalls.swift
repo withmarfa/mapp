@@ -168,6 +168,19 @@ nonisolated protocol OwnerCalls: Sendable {
     func check(signIn: String?, addresses: [String]?) async throws(OwnerFailure) -> AddressPlan
     func apply(_ plan: AddressPlan, instanceID: String?) async throws(OwnerFailure) -> AddressSettings
     func setWebsites(_ websites: [String], instanceID: String?) async throws(OwnerFailure) -> AddressSettings
+
+    func webhooks() async throws(OwnerFailure) -> [OwnerWebhook]
+    /// One webhook as the server holds it now.
+    func webhook(_ id: String) async throws(OwnerFailure) -> OwnerWebhook
+    func create(_ webhook: NewWebhook) async throws(OwnerFailure) -> CreatedWebhook
+    /// Changes only what `change` names and answers the webhook as the server holds it.
+    func change(webhook id: String, _ change: WebhookChange) async throws(OwnerFailure) -> OwnerWebhook
+    func delete(webhook id: String) async throws(OwnerFailure)
+    func deliveries(of webhook: String) async throws(OwnerFailure) -> [WebhookDeliveryInfo]
+    func redeliver(_ delivery: String, of webhook: String) async throws(OwnerFailure) -> WebhookDeliveryInfo
+
+    func folders() async throws(OwnerFailure) -> FolderListing
+    func folderReport(_ id: String) async throws(OwnerFailure) -> FolderReport
 }
 
 /// What changing the addresses would do, as the server said before anything was written, with the change it said it
@@ -240,7 +253,7 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
     /// its own.
     static let configConflict: @Sendable (String) -> OwnerFailure = { _ in .conflict }
 
-    private func run<Result>(
+    func run<Result>(
         plainConflict: (String) -> OwnerFailure = { .refused($0) }, _ call: (Client) async throws -> Result
     ) async throws(OwnerFailure) -> Result {
         let client = try make()
@@ -253,7 +266,7 @@ nonisolated struct ClientOwnerCalls: OwnerCalls {
         }
     }
 
-    private static func date(_ text: String?) -> Date? {
+    static func date(_ text: String?) -> Date? {
         guard let text else { return nil }
         return try? Date(text, strategy: .iso8601.year().month().day().time(includingFractionalSeconds: true).timeZone(separator: .omitted))
             ?? Date(text, strategy: .iso8601)
