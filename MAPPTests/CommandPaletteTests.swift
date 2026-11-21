@@ -89,17 +89,17 @@ struct CommandPaletteTests {
 
     @Test func beforeTypingTheCommandsSitInTheirMenusInTheMenuBarsOrderAndEmptyGroupsAreDropped() {
         // Go, View, Settings, Looks, File, Edit, File: given out of order, listed in the menu bar's order, which opens
-        // with the app menu and holds Looks in the File menu.
+        // with the app menu and holds Layouts in the File menu.
         let groups: [PaletteSections.CommandGroup] = [.go, .view, .settings, .looks, .file, .edit, .file, .sortAndGroup]
         let sections = PaletteSections.forCommands(picks: [], typed: false, groups: groups, recentCount: 0)
         #expect(sections.map(\.kind) == [.group(.settings), .group(.file), .group(.looks), .group(.edit), .group(.view), .group(.sortAndGroup), .group(.go)])
         #expect(sections[1].rows == [.fixed(4), .fixed(6)], "a group keeps its commands in the order given")
-        #expect(sections.map(\.kind.title) == ["Settings", "File", "Looks", "Edit", "View", "Sort and Group", "Go"])
+        #expect(sections.map(\.kind.title) == ["Settings", "File", "Layouts", "Edit", "View", "Sort and Group", "Go"])
     }
 
     @Test func theGroupsFollowTheMenuBarFromTheAppMenuToDebug() {
         let titles = PaletteSections.CommandGroup.allCases.map(\.title)
-        #expect(titles.prefix(9) == ["Settings", "File", "Looks", "Edit", "Format", "View", "Sort and Group", "Text Size", "Go"])
+        #expect(titles.prefix(9) == ["Settings", "File", "Layouts", "Edit", "Format", "View", "Sort and Group", "Text Size", "Go"])
         #if DEBUG
         #expect(titles.last == "Debug", "Debug comes last")
         #endif

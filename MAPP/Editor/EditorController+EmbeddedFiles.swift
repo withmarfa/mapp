@@ -19,31 +19,57 @@ extension EditorController {
             let report = files.isEmpty ? AttachReport() : await library.attach(files, to: pageItemID)
             // The images are kept either way; they go into the item only if it is still the one on the page.
             let placed = self.pageItemID == pageItemID && isEditable
-            Self.reportUnplaced(
-                skipped: skipped, failed: report.failed, attached: report.embeds.count,
-                unplaced: placed ? [] : report.embeds.map(\.name), in: library.item(pageItemID)?.title ?? "", to: library
-            )
-            guard placed else { return }
-            let images = report.embeds.map { ["src": $0.link, "alt": $0.name] }
-            guard !images.isEmpty else { return }
-            if let point {
-                call("insertImages", json(images), String(Double(point.x)), String(Double(point.y)), String(Double(height)))
-            } else {
-                call("insertImages", json(images))
+            let embeds = report.embeds
+            var notPlaced: [String] = []
+            if placed, !embeds.isEmpty,
+                await !place(embeds.map { ["src": $0.link, "alt": $0.name] }, at: point, height: height, in: pageItemID) {
+                notPlaced = embeds.map(\.name)
             }
+            Self.reportUnplaced(
+                skipped: skipped, failed: report.failed, attached: embeds.count,
+                unplaced: placed ? [] : embeds.map(\.name), refused: notPlaced,
+                in: library.item(pageItemID)?.title ?? "", to: library
+            )
         }
         return true
     }
 
+    /// Asks the page to put the images in, and again after the next paint while it refuses them for folded text,
+    /// which Inkkit has opened by then, up to `hiddenTextRetryLimit` times. False when they were not placed.
+    private func place(_ images: [[String: String]], at point: CGPoint?, height: CGFloat, in id: ItemID) async -> Bool {
+        let arguments: [String: Any] = [
+            "images": images, "x": point.map { Double($0.x) } ?? NSNull(), "y": point.map { Double($0.y) } ?? NSNull(),
+            "height": Double(height),
+        ]
+        for attempt in 0...Self.hiddenTextRetryLimit {
+            guard pageItemID == id, isEditable else { return false }
+            let outcome: Any?
+            do {
+                outcome = try await webView.callAsyncJavaScript(
+                    "return window.editor.insertImages(images, x, y, height)", arguments: arguments, in: nil, contentWorld: .page)
+            } catch {
+                Telemetry.logger(.editor).error("insertImages: \(error.localizedDescription)")
+                return false
+            }
+            if outcome as? Bool == true { return true }
+            guard let refusal = (outcome as? [String: Any])?["commandError"] as? String, Self.retriesAfterPaint(refusal),
+                attempt < Self.hiddenTextRetryLimit
+            else { return false }
+            try? await Task.sleep(for: Self.hiddenTextRetryDelay)
+        }
+        return false
+    }
+
     private static func reportUnplaced(
-        skipped: [String], failed: [(name: String, reason: String)], attached: Int, unplaced: [String], in title: String,
-        to library: any ItemLibrary
+        skipped: [String], failed: [(name: String, reason: String)], attached: Int, unplaced: [String], refused: [String] = [],
+        in title: String, to library: any ItemLibrary
     ) {
-        guard !skipped.isEmpty || !failed.isEmpty || !unplaced.isEmpty else { return }
+        guard !skipped.isEmpty || !failed.isEmpty || !unplaced.isEmpty || !refused.isEmpty else { return }
         let largest = Int64(PastedImages.largestImage).formatted(.byteCount(style: .memory))
         let lines = skipped.map { String(localized: "“\($0)” is larger than \(largest) or can’t be read.") }
             + failed.map { String(localized: "“\($0.name)” couldn’t be attached. \($0.reason)") }
             + unplaced.map { String(localized: "“\($0)” was attached to “\(title)” but isn’t in its text, because the item was no longer open for editing.") }
+            + refused.map { String(localized: "“\($0)” was attached to “\(title)” but isn’t in its text. It was meant for a folded section or text not yet shown.") }
         let title = if skipped.isEmpty && failed.isEmpty {
             String(localized: "Images Weren’t Added to the Item")
         } else if attached == 0 {
@@ -53,6 +79,10 @@ extension EditorController {
         }
         library.notices.tell(title, lines.joined(separator: "\n"))
     }
+
+    nonisolated static let hiddenTextTitle = String(localized: "Text Wasn’t Added")
+    nonisolated static let hiddenTextMessage = String(
+        localized: "What you typed reached a folded section, which is now open. It wasn’t added, so type it again.")
 
     /// How long the page waits for Marfa to bind an embed not yet bound, as one just pasted is once its text is saved.
     nonisolated static let embedWait = Duration.seconds(10)
@@ -90,15 +120,36 @@ extension EditorController {
             }
             isAppendingEmbeds = false
             if outcome as? Bool == true {
+                hiddenTextAttempts = 0
                 take(embeds, from: pageItemID)
                 appendsAgain = true
-            } else if let refusal = (outcome as? [String: Any])?["commandError"] as? String,
-                      !Self.passingRefusals.contains(refusal) {
-                if take(embeds, from: pageItemID) { notInText(embeds, of: pageItemID) }
+            } else if let refusal = (outcome as? [String: Any])?["commandError"] as? String {
+                if Self.retriesAfterPaint(refusal) {
+                    hiddenTextAttempts += 1
+                    if hiddenTextAttempts <= Self.hiddenTextRetryLimit {
+                        // The page opened the folded section the images belong in; they go once it has painted.
+                        Task {
+                            try? await Task.sleep(for: Self.hiddenTextRetryDelay)
+                            appendPendingEmbeds()
+                        }
+                    } else {
+                        hiddenTextAttempts = 0
+                        if take(embeds, from: pageItemID) { notInText(embeds, of: pageItemID) }
+                    }
+                } else if !Self.passingRefusals.contains(refusal), take(embeds, from: pageItemID) {
+                    notInText(embeds, of: pageItemID)
+                }
             }
             if appendsAgain { appendPendingEmbeds() }
         }
     }
+
+    /// Whether a refusal means the edit touched folded or not-yet-shown text, which the page has now opened. The images
+    /// are sent again after the next paint, up to `hiddenTextRetryLimit` times, and then named as not in the text.
+    nonisolated static func retriesAfterPaint(_ refusal: String) -> Bool { refusal == "hidden-text" }
+
+    nonisolated static let hiddenTextRetryDelay = Duration.milliseconds(100)
+    nonisolated static let hiddenTextRetryLimit = 10
 
     /// Refusals that pass: a composition, a load that made the generation sent stale, and an import still running.
     private static let passingRefusals: Set<String> = ["composition", "stale-document", "operation-pending", "not-ready"]
@@ -242,3 +293,4 @@ extension EditorController {
         call("picturesChanged")
     }
 }
+

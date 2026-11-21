@@ -10,7 +10,12 @@ import {
 import { ItemHeader, type HeaderIcons, type HeaderModel } from './header'
 import { LinkStyle } from './link-style'
 import { showSymbol, showSymbolButton } from './symbol'
-import { InkKitError, normalizeLinkAddress } from '@aicayzer/inkkit'
+import {
+  InkKitError,
+  normalizeLinkAddress,
+  type DisplayPreferences,
+  type TextInputPreferences,
+} from '@aicayzer/inkkit'
 import '@aicayzer/inkkit/style.css'
 import './style.css'
 
@@ -66,7 +71,9 @@ declare global {
       setHeader(model: HeaderModel | null): void
       setHeaderIcons(icons: HeaderIcons): void
       setLinkStyle(variables: Record<string, string>): void
-      setSpellcheck(spellcheck: boolean): void
+      setOptions(options: { textInput: TextInputPreferences; display: DisplayPreferences }): void
+      setLineSpacing(multiple: number): void
+      setParagraphSpacing(multiple: number): void
     }
   }
 }
@@ -238,6 +245,13 @@ function setPageProperty(name: string, value: string): void {
   editor.invalidateFindGeometry()
 }
 
+function setBodyProperty(name: string, value: string): void {
+  const style = document.body.style
+  if (style.getPropertyValue(name) === value) return
+  style.setProperty(name, value)
+  editor.invalidateFindGeometry()
+}
+
 window.editor = {
   load: (markdown, nextGeneration, editable) => {
     generation = nextGeneration
@@ -255,7 +269,7 @@ window.editor = {
   markdown: () => editor.markdown(),
   flush: (expected) => guardedCommand(() => editor.flush(expected)),
   format: (command, arg, expected) =>
-    guardedCommand(() => editor.format(command, arg ?? undefined, expected)),
+    guardedCommand(() => editor.format(command, arg ?? undefined, expected), { retry: true }),
   focus: () => {
     header.cancelTitleFocus()
     editor.focus()
@@ -324,7 +338,11 @@ window.editor = {
   },
   // Text measures use rem, so the reading width scales with its text.
   setTextSize: (points) => setPageProperty('font-size', `${points}px`),
-  setSpellcheck: (spellcheck) => editor.setSpellcheck(spellcheck),
+  setOptions: (options) => editor.setOptions(options),
+  // Both are set on the body, where the page's own stylesheet sets the same Inkkit properties.
+  setLineSpacing: (multiple) => setBodyProperty('--inkkit-line-height', String(multiple)),
+  setParagraphSpacing: (multiple) =>
+    setBodyProperty('--inkkit-paragraph-spacing', `calc(var(--inkkit-font-size) * ${multiple})`),
   setReadingWidth: (ems) => setPageProperty('--reading-width', `${ems}rem`),
   // Padding and corners move the text, so the find marks are measured again.
   setLinkStyle: (variables) => {

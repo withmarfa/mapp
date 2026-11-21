@@ -13,10 +13,18 @@ extension EditorController {
         call("setFullWidth", String(style.fullWidth))
         call("setTextSize", String(style.textSize))
         call("setReadingWidth", String(style.readingWidth))
-        call("setSpellcheck", String(style.checksSpelling))
+        call("setOptions", json(EditorOptions(style)))
+        call("setLineSpacing", String(style.lineSpacing.multiple))
+        call("setParagraphSpacing", String(style.paragraphSpacing.multiple))
         call("setLinkStyle", json(style.linkLook.cssVariables()))
         applyAccent()
         applyFonts()
+    }
+
+    /// An item opened newly takes the mode Settings > Editor names, whatever the last item was switched to. A reload of the
+    /// item already shown keeps the person's own switch.
+    func applyEditingMode() {
+        setSourceMode(style.editingMode == .source)
     }
 
     // MARK: Matching the system
@@ -93,6 +101,8 @@ extension EditorController {
             "sourceEditor": String(localized: "Markdown Source"),
             "copyCode": String(localized: "Copy"),
             "codeWrap": String(localized: "Wrap Code"),
+            "foldHeading": String(localized: "Fold Section"),
+            "unfoldHeading": String(localized: "Unfold Section"),
             "codeLanguage": String(localized: "Code Language"),
             "codeLanguageSearch": String(localized: "Search Languages"),
             "codeAuto": String(localized: "Automatic"),

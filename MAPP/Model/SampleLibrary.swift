@@ -134,7 +134,7 @@ nonisolated enum SampleLibrary {
                     ]]),
             ], titleField: "title", bodyField: "body"),
         ItemType(
-            id: "core.entity.person", label: "Person", description: "Someone you know.",
+            id: "core.entity.person", label: "Person", plural: "People", description: "Someone you know.",
             fields: [
                 TypeField(name: "title", type: "string", required: true, declaredBy: "core.entity"),
                 TypeField(name: "job_title", type: "string", declaredBy: "core.entity.person"),
@@ -156,7 +156,7 @@ nonisolated enum SampleLibrary {
                     ]]),
             ], titleField: "title"),
         ItemType(
-            id: "core.media", label: "Media", description: "Something to read, watch or play.",
+            id: "core.media", label: "Media", plural: "Media", description: "Something to read, watch or play.",
             fields: [
                 TypeField(name: "title", type: "string", required: true, declaredBy: "core.media"),
                 TypeField(

@@ -9,6 +9,7 @@
   --inkkit-rule-color: color-mix(in srgb, CanvasText 14%, transparent);
   --inkkit-code-background: color-mix(in srgb, CanvasText 7%, transparent);
   --inkkit-monospace-font: ui-monospace, 'SF Mono', Menlo, monospace;
+  --inkkit-code-line-number: var(--label-secondary);
   /* No diagram variable is set here: diagrams draw with Pele and Inkkit's own tokens. */
   /* The header's system colors: the label levels and the separator a pin is drawn in, the placeholder text color,
      red, and the blue of a status in progress. */

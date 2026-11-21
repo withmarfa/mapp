@@ -6,6 +6,7 @@ import { pickItem, suggestItems } from '../src/bridge'
 import {
   ItemEditor,
   caretOffset,
+  hostMessage,
   isPreviewDiagnostic,
   guardedCommand,
   splitLabels,
@@ -362,11 +363,26 @@ test('a rejected replacement poisons its batch rather than applying shifted late
     expect(editor.snapshot().text).toBe('two one\n')
   }))
 
+test('an input refused for folded text is told to the app as itself, with none of the input', () => {
+  expect(hostMessage(new InkKitError('hidden-text', 'The edit was not applied.'))).toEqual({
+    type: 'hiddenText',
+  })
+  expect(hostMessage(new InkKitError('file-unavailable', 'Preview unavailable'))).toEqual({
+    type: 'diagnostic',
+    message: 'Preview unavailable',
+  })
+  expect(hostMessage(new InkKitError('preservation', 'Refused'))).toEqual({
+    type: 'error',
+    message: 'Refused',
+  })
+})
+
 test('preview fallbacks remain diagnostic and expected command rejections stay local', async () => {
   expect(isPreviewDiagnostic(new InkKitError('file-unavailable', 'Preview unavailable'))).toBe(true)
   expect(isPreviewDiagnostic(new InkKitError('diagram-unavailable', 'Bad diagram'))).toBe(true)
   expect(isPreviewDiagnostic(new InkKitError('preservation', 'Refused'))).toBe(false)
   expect(isPreviewDiagnostic(new Error('Preview unavailable'))).toBe(false)
+  expect(isPreviewDiagnostic(new InkKitError('hidden-text', 'Folded'))).toBe(false)
   await withEditor('one\n', (editor) => {
     const snapshot = editor.readableSnapshot(1)
     editor.findReplace(0, 3, 'two', 1)

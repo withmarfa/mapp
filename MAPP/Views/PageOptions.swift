@@ -10,7 +10,15 @@ enum PageKey {
     static let linkLook = LinkLook.key
     /// Whether a Location's latitude and longitude show as rows of their own. Off, they are drawn by the Location row alone.
     static let showsCoordinates = "showsCoordinates"
-    static let all = [fullWidth, textSize, checksSpelling, readingWidth, titleLines, linkLook, showsCoordinates]
+    static let smartPunctuation = "smartPunctuation"
+    static let pairsBrackets = "pairsBrackets"
+    static let continuesLists = "continuesLists"
+    static let foldsHeadings = "foldsHeadings"
+    static let showsCodeLineNumbers = "showsCodeLineNumbers"
+    static let all = [
+        fullWidth, textSize, checksSpelling, readingWidth, titleLines, linkLook, showsCoordinates, LineSpacing.key, ParagraphSpacing.key,
+        IndentWith.key, PasteAs.key, EditingMode.key, smartPunctuation, pairsBrackets, continuesLists, foldsHeadings, showsCodeLineNumbers,
+    ]
 }
 
 /// Reads the Show Coordinates setting where the page's rows are made, which are not views.
@@ -41,6 +49,18 @@ nonisolated struct PageStyle: Equatable {
     /// The body text's size in points; headings, spacing and the reading width scale with it.
     var textSize = 13
     var checksSpelling = true
+    var lineSpacing = LineSpacing.standard
+    var paragraphSpacing = ParagraphSpacing.standard
+    /// Curly quotes and dashes as the person types in formatted text. Off until the person turns it on.
+    var smartPunctuation = false
+    var pairsBrackets = false
+    var continuesLists = true
+    var indentWith = IndentWith.tab
+    var pasteAs = PasteAs.formatted
+    /// What an item's text opens as; the Format menu switches one page on its own.
+    var editingMode = EditingMode.formatted
+    var foldsHeadings = false
+    var showsCodeLineNumbers = false
     /// How wide the text runs when not full width, in ems of the item's text, so it holds about as many words
     /// whatever the text size.
     var readingWidth = 54
@@ -70,6 +90,16 @@ struct StoredPageStyle: DynamicProperty {
     @AppStorage(PageKey.checksSpelling) private var checksSpelling = PageStyle().checksSpelling
     @AppStorage(PageKey.readingWidth) private var readingWidth = PageStyle().readingWidth
     @AppStorage(PageKey.linkLook) private var linkLook = PageStyle().linkLook
+    @AppStorage(LineSpacing.key) private var lineSpacing = PageStyle().lineSpacing
+    @AppStorage(ParagraphSpacing.key) private var paragraphSpacing = PageStyle().paragraphSpacing
+    @AppStorage(PageKey.smartPunctuation) private var smartPunctuation = PageStyle().smartPunctuation
+    @AppStorage(PageKey.pairsBrackets) private var pairsBrackets = PageStyle().pairsBrackets
+    @AppStorage(PageKey.continuesLists) private var continuesLists = PageStyle().continuesLists
+    @AppStorage(IndentWith.key) private var indentWith = PageStyle().indentWith
+    @AppStorage(PasteAs.key) private var pasteAs = PageStyle().pasteAs
+    @AppStorage(EditingMode.key) private var editingMode = PageStyle().editingMode
+    @AppStorage(PageKey.foldsHeadings) private var foldsHeadings = PageStyle().foldsHeadings
+    @AppStorage(PageKey.showsCodeLineNumbers) private var showsCodeLineNumbers = PageStyle().showsCodeLineNumbers
     @AppStorage(AppearanceKey.accent) private var accent = AccentChoice.standard
     @AppStorage(AppearanceKey.highlights) private var highlight = HighlightChoice.standard
     @AppStorage(AppearanceKey.textFont) private var textFont = ""
@@ -79,8 +109,11 @@ struct StoredPageStyle: DynamicProperty {
 
     var wrappedValue: PageStyle {
         PageStyle(
-            fullWidth: fullWidth, textSize: textSize, checksSpelling: checksSpelling, readingWidth: readingWidth,
-            linkLook: linkLook, accent: accent, highlight: highlight, textFont: textFont, codeFont: codeFont)
+            fullWidth: fullWidth, textSize: textSize, checksSpelling: checksSpelling, lineSpacing: lineSpacing,
+            paragraphSpacing: paragraphSpacing, smartPunctuation: smartPunctuation, pairsBrackets: pairsBrackets,
+            continuesLists: continuesLists, indentWith: indentWith, pasteAs: pasteAs, editingMode: editingMode,
+            foldsHeadings: foldsHeadings, showsCodeLineNumbers: showsCodeLineNumbers, readingWidth: readingWidth, linkLook: linkLook,
+            accent: accent, highlight: highlight, textFont: textFont, codeFont: codeFont)
     }
 }
 

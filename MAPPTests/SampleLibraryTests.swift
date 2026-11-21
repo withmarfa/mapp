@@ -16,6 +16,12 @@ import Testing
         return (library, source)
     }
 
+    @Test func theSampleNamesAListOfPeopleAndOfMediaInTheirOwnPlurals() {
+        let catalogue = SampleLibrary.catalogue
+        #expect(catalogue.plural(for: TypeID("core.entity.person")) == "People")
+        #expect(catalogue.plural(for: TypeID("core.media")) == "Media")
+    }
+
     @Test func aPreviewLeavesOutTheLineTheNameCameFromAndJoinsTheRestWithSpaces() {
         func display(_ properties: JSONObject) -> ItemDisplay {
             SampleLibrary.display(ItemDisplayInput(type: "core.note", properties: properties))

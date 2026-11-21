@@ -43,9 +43,6 @@
     "Passkey Not Renamed" : {
 
     },
-    "%lld Lines" : {
-
-    },
     "%lld of %@" : {
 
     },
@@ -296,9 +293,6 @@
 
     },
     "Highlights" : {
-
-    },
-    "How wide Standard pages run. Full Width leaves it aside." : {
 
     },
     "In saved pages and emails." : {
@@ -999,26 +993,14 @@
     "Click the map to place the pin." : {
       "extractionState" : "manual"
     },
-    "“%@” could not be read. No looks were changed." : {
-
-    },
     "“%@” couldn’t be attached. %@" : {
       "extractionState" : "manual"
-    },
-    "Couldn’t Export Looks" : {
-
-    },
-    "Couldn’t Import Looks" : {
-
     },
     "Drag the pin to move it." : {
       "extractionState" : "manual"
     },
     "Edit Location" : {
       "extractionState" : "manual"
-    },
-    "Export Looks…" : {
-
     },
     "“%@” has changed since, and can’t go back to its type." : {
       "extractionState" : "manual"
@@ -1029,14 +1011,8 @@
     "Go to Today" : {
       "extractionState" : "manual"
     },
-    "Import Looks…" : {
-
-    },
     "“%@” is larger than %@ or can’t be read." : {
       "extractionState" : "manual"
-    },
-    "“%@” is not a looks file that MAPP can read. No looks were changed." : {
-
     },
     "“%@” isn’t a time, so the time wasn’t changed." : {
 
@@ -1044,17 +1020,8 @@
     "“%@” isn’t part of this list. Remove it to save the list." : {
       "extractionState" : "manual"
     },
-    "Looks" : {
-
-    },
-    "Looks can be imported once the library has loaded." : {
-
-    },
     "Map" : {
       "extractionState" : "manual"
-    },
-    "MAPP Looks" : {
-
     },
     "“%@” may remove items sooner than the server’s current setting." : {
       "extractionState" : "manual"
@@ -1109,9 +1076,6 @@
     },
     "The location couldn’t be saved." : {
       "extractionState" : "manual"
-    },
-    "The looks could not be written to “%@”. Choose another place and try again." : {
-
     },
     "These coordinates are not a place on Earth, so they cannot be shown on the map." : {
       "extractionState" : "manual"
@@ -3281,9 +3245,6 @@
     "Important" : {
 
     },
-    "In Every List" : {
-
-    },
     "In Progress" : {
       "extractionState" : "manual"
     },
@@ -4049,9 +4010,6 @@
 
     },
     "Page" : {
-
-    },
-    "Page Layout" : {
 
     },
     "Page Width" : {
@@ -6392,6 +6350,393 @@
 
     },
     "“%@” was made by a newer version of MAPP. Update MAPP to import it. No shortcuts were changed." : {
+
+    },
+    "%@ in %@" : {
+
+    },
+    "%@, with %lld changes." : {
+
+    },
+    "%@, with one change." : {
+
+    },
+    "%@." : {
+
+    },
+    "%lld set" : {
+
+    },
+    "2 Spaces" : {
+
+    },
+    "4 Spaces" : {
+
+    },
+    "8 Spaces" : {
+
+    },
+    "A" : {
+
+    },
+    "A page can switch on its own." : {
+
+    },
+    "A triangle beside each heading hides what follows." : {
+
+    },
+    "A view or a place can set its own." : {
+
+    },
+    "Add a Fact" : {
+
+    },
+    "After the status, in this order. A row shows the first two." : {
+
+    },
+    "All Versions Kept For" : {
+
+    },
+    "An item’s own text." : {
+
+    },
+    "Another Marfa Answers" : {
+
+    },
+    "Approve MAPP with This Code" : {
+
+    },
+    "Articles Open In" : {
+
+    },
+    "As a clip" : {
+
+    },
+    "As a message" : {
+
+    },
+    "As a note" : {
+
+    },
+    "As a person" : {
+
+    },
+    "As a place" : {
+
+    },
+    "As a quote" : {
+
+    },
+    "As a record" : {
+
+    },
+    "As a task" : {
+
+    },
+    "As an event" : {
+
+    },
+    "As media" : {
+
+    },
+    "Attachments Kept Offline" : {
+
+    },
+    "Attachments Not Yet Offline" : {
+
+    },
+    "Attachments stay offline and don’t count toward the limit." : {
+
+    },
+    "Back to Calendar" : {
+
+    },
+    "Built In" : {
+
+    },
+    "Children" : {
+
+    },
+    "Continue Lists on Return" : {
+
+    },
+    "Couldn’t Export Layouts" : {
+
+    },
+    "Couldn’t Import Layouts" : {
+
+    },
+    "Couldn’t Read Downloaded Files" : {
+
+    },
+    "Couldn’t Read the Settings" : {
+
+    },
+    "Cover" : {
+
+    },
+    "Current Limit" : {
+
+    },
+    "Deleted Items Kept For" : {
+
+    },
+    "Deleted items stay in Recently Deleted this long, then the server permanently deletes them, with their history. 0 keeps them with no limit. Empty uses the default." : {
+
+    },
+    "Display" : {
+
+    },
+    "Download Limit" : {
+
+    },
+    "Downloaded Files" : {
+
+    },
+    "Downloading Library…" : {
+
+    },
+    "Edit Pages As" : {
+
+    },
+    "Editing" : {
+
+    },
+    "Export Layouts…" : {
+
+    },
+    "Export…" : {
+
+    },
+    "Facts" : {
+
+    },
+    "File Kind and Size" : {
+
+    },
+    "Fold Headings" : {
+
+    },
+    "Fold Section" : {
+
+    },
+    "Formatted" : {
+
+    },
+    "From a web page or another app." : {
+
+    },
+    "Group By" : {
+
+    },
+    "How each type shows in rows, on cards and on its own page." : {
+
+    },
+    "How wide a line of text grows." : {
+
+    },
+    "Import Layouts…" : {
+
+    },
+    "Import…" : {
+
+    },
+    "In Collection" : {
+
+    },
+    "In Markdown Source too." : {
+
+    },
+    "In Markdown Source." : {
+
+    },
+    "In formatted text." : {
+
+    },
+    "Indent With" : {
+
+    },
+    "Keep All Downloads" : {
+
+    },
+    "Keeps attachments and files waiting to upload." : {
+
+    },
+    "Layouts" : {
+
+    },
+    "Layouts are shown once a Marfa is connected." : {
+
+    },
+    "Layouts can be imported once the library has loaded." : {
+
+    },
+    "Line Numbers in Code" : {
+
+    },
+    "Line Spacing" : {
+
+    },
+    "Links to Items" : {
+
+    },
+    "Longer titles are cut short." : {
+
+    },
+    "MAPP Layouts" : {
+
+    },
+    "MAPP will try again." : {
+
+    },
+    "Markdown" : {
+
+    },
+    "Most Versions Kept per Item" : {
+
+    },
+    "No Library Open" : {
+
+    },
+    "No Server Settings" : {
+
+    },
+    "Nothing" : {
+
+    },
+    "Number of Children" : {
+
+    },
+    "Number of Members" : {
+
+    },
+    "One Version a Day Kept For" : {
+
+    },
+    "One Version a Week Kept For" : {
+
+    },
+    "Opening Line" : {
+
+    },
+    "Pair Brackets and Quotes" : {
+
+    },
+    "Paragraph Spacing" : {
+
+    },
+    "Paste Formatted Text As" : {
+
+    },
+    "Pasting" : {
+
+    },
+    "Pin a Property…" : {
+
+    },
+    "Pinned under the title. Customize Layout on an item of this type changes the same." : {
+
+    },
+    "Reading Downloaded Files…" : {
+
+    },
+    "Reading the Server’s Settings…" : {
+
+    },
+    "Relaxed" : {
+
+    },
+    "Rows of %@" : {
+
+    },
+    "Secondary Line" : {
+
+    },
+    "Shape" : {
+
+    },
+    "Smart Quotes and Dashes" : {
+
+    },
+    "Space Used" : {
+
+    },
+    "Square" : {
+
+    },
+    "Starts %@." : {
+
+    },
+    "Starts %@. %lld places changed." : {
+
+    },
+    "Starts %@. One place changed." : {
+
+    },
+    "Text Wasn’t Added" : {
+
+    },
+    "The layouts could not be written to “%@”. Choose another place and try again." : {
+
+    },
+    "The owner’s permissions. An app can only lose them." : {
+
+    },
+    "The server keeps every version for the first period, then one a day, then one a week. Each period is at least as long as the one before. A type’s own policy wins. Empty uses the defaults." : {
+
+    },
+    "Tight" : {
+
+    },
+    "Time of %@" : {
+
+    },
+    "Top right." : {
+
+    },
+    "Typing" : {
+
+    },
+    "Under the title. Up to two." : {
+
+    },
+    "Unfold Section" : {
+
+    },
+    "Up to %lld Lines" : {
+
+    },
+    "Up to date" : {
+
+    },
+    "Up to date %@" : {
+
+    },
+    "Up to date just now" : {
+
+    },
+    "Updating Library…" : {
+
+    },
+    "View > Show Original switches it." : {
+
+    },
+    "Website" : {
+
+    },
+    "What you typed reached a folded section, which is now open. It wasn’t added, so type it again." : {
+
+    },
+    "Your Types" : {
+
+    },
+    "“%@” could not be read. No layouts were changed." : {
+
+    },
+    "“%@” is not a layouts file that MAPP can read. No layouts were changed." : {
+
+    },
+    "“%@” was attached to “%@” but isn’t in its text. It was meant for a folded section or text not yet shown." : {
 
     }
   },

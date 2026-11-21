@@ -75,6 +75,48 @@ final class TypeLooks {
         catalogue.looks(choices: choices(for: library))
     }
 
+    // MARK: Choosing
+
+    /// Whether the person has chosen any place of `type`'s look on `library`.
+    func hasChoice(for type: TypeID, in library: String) -> Bool {
+        chosen[library]?[type.rawValue] != nil
+    }
+
+    /// How many of `type`'s three places (date, line under the title, facts) the person chose.
+    func changeCount(for type: TypeID, in library: String) -> Int {
+        guard let choice = chosen[library]?[type.rawValue] else { return 0 }
+        return [choice.date != nil, choice.secondary != nil, choice.facts != nil].filter { $0 }.count
+    }
+
+    /// Changes `type`'s look as `change` does, and keeps only the places that now differ from what this Mac works out
+    /// without a choice (the preset, and what the types above chose), as Import does: a place changed back to what the type
+    /// would show anyway is no choice, so a later better preset still reaches it. Only `type`'s own choice is written; the
+    /// choices of its children are left as they were, and a child that took this place from it follows the change.
+    func change(_ type: TypeID, in library: String, catalogue: Catalogue, _ change: (inout TypeLook) -> Void) {
+        var resolver = TypeLookResolver(catalogue: catalogue, choices: choices(for: library))
+        var look = resolver.look(of: type)
+        let before = look
+        change(&look)
+        guard look != before else { return }
+        let baseline = resolver.baseline(of: type)
+        let choice = TypeLookChoice(
+            date: look.date == baseline.date ? nil : look.date,
+            secondary: look.secondary == baseline.secondary ? nil : look.secondary,
+            facts: look.facts == baseline.facts ? nil : look.facts)
+        var types = chosen[library] ?? [:]
+        types[type.rawValue] = choice.isEmpty ? nil : choice
+        chosen[library] = types.isEmpty ? nil : types
+        save()
+    }
+
+    /// Takes back every choice for `type`, so it shows what its preset and the types above it give. Other types' choices
+    /// stay.
+    func restore(_ type: TypeID, in library: String) {
+        guard var types = chosen[library], types.removeValue(forKey: type.rawValue) != nil else { return }
+        chosen[library] = types.isEmpty ? nil : types
+        save()
+    }
+
     // MARK: Export and import
 
     /// Every look of the catalogue's types on `library`, chosen or worked out, and the looks kept for types the server

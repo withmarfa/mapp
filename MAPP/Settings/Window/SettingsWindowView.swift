@@ -94,6 +94,7 @@ struct SettingsDetail: View {
             case .keyboard: KeyboardPage(libraries: libraries)
             case .lists: ListsPage()
             case .editor: EditorPage()
+            case .layouts: LayoutsPage()
             case .connection: ConnectionPage()
             case .marfa(let page): MarfaSettingsPageView(page: page, host: host)
             }
