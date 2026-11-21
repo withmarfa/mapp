@@ -129,9 +129,9 @@ struct OverviewPage: View {
     /// The release and, where one is ready, the update; a development build has no release, so only the update line shows.
     @ViewBuilder private var versionRow: some View {
         if let version = model.releaseVersion {
-            SettingsRow(title: Text("Marfa \(version)"), line: model.reading?.updateReady.map { Text("\($0) is ready.") })
+            SettingsRow(title: Text("Marfa \(version)"), line: model.reading?.updateReady.map { Text("\($0) is ready.") }) { showUpdates }
         } else if let ready = model.reading?.updateReady {
-            SettingsRow(title: Text("\(ready) is ready"))
+            SettingsRow(title: Text("\(ready) is ready")) { showUpdates }
         }
     }
 
@@ -149,8 +149,14 @@ struct OverviewPage: View {
             }
             filesRow(model.health(of: .files))
             let backups = model.backups
-            SettingsRow("Backups") {
-                SettingsValue(verbatim: Self.backupsWord(backups), dot: Self.dot(backups))
+            if host.grants.contains(.backupsManage) {
+                SettingsLinkRow(
+                    verbatim: String(localized: "Backups"), value: Self.backupsWord(backups), dot: Self.dot(backups)
+                ) { host.show(.backups) }
+            } else {
+                SettingsRow("Backups") {
+                    SettingsValue(verbatim: Self.backupsWord(backups), dot: Self.dot(backups))
+                }
             }
         }
     }
@@ -165,6 +171,13 @@ struct OverviewPage: View {
             SettingsRow("Files") {
                 SettingsValue(verbatim: value, dot: Self.dot(files.condition))
             }
+        }
+    }
+
+    /// Update beside the release, where one is ready: it opens Updates, where the update is started and followed.
+    @ViewBuilder private var showUpdates: some View {
+        if model.reading?.updateReady != nil {
+            SettingsButton("Show Updates") { host.show(.updates) }
         }
     }
 

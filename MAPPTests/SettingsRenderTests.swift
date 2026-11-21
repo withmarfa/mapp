@@ -90,6 +90,8 @@ struct RenderedWindow<Detail: View>: View {
     var sheet: AnyView?
     /// What the Overview's sidebar badge counts.
     var badge: Int?
+    /// Whether Updates carries its badge, as it does while a release is ready.
+    var updatesBadge = false
     let detail: Detail
 
     var body: some View {
@@ -101,7 +103,7 @@ struct RenderedWindow<Detail: View>: View {
         HStack(spacing: 0) {
             SettingsSidebar(
                 selection: .constant(selection), search: .constant(search),
-                badges: { page in page == .overview ? badge.map { .count($0) } : nil })
+                badges: { page in page == .updates && updatesBadge ? .count(1) : (page == .overview ? badge.map { .count($0) } : nil) })
                 .frame(width: SettingsTokens.Metric.sidebarWidth)
                 .background(Color(white: 0.93))
             VStack(spacing: 0) {

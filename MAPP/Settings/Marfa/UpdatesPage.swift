@@ -102,18 +102,18 @@ struct UpdatesPage: View {
                 HStack(spacing: 8) {
                     SettingsButton(model.isChecking ? "Checking…" : "Check for Updates") { Task { await model.checkForUpdates() } }
                         .disabled(model.isChecking)
-                    if status.available, !status.updatesItself, let step = status.step, !step.isEmpty {
+                    if model.ready != nil, !status.updatesItself, let step = status.step, !step.isEmpty {
                         SettingsButton(copied ? "Copied" : "Copy Steps") {
                             OwnerClipboard.copyText(step)
                             copied = true
                         }
-                    } else if status.available {
+                    } else if model.ready != nil {
                         SettingsButton("Update", role: .update) { Task { await model.update() } }
                             .disabled(!model.canUpdate)
                     }
                 }
             }
-            if status.available, !status.updatesItself, let step = status.step, !step.isEmpty {
+            if model.ready != nil, !status.updatesItself, let step = status.step, !step.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("The Server’s Steps").settingsFont(.title).foregroundStyle(SettingsTokens.primaryText)
                     SettingsReadOnlyValue(text: step)
@@ -134,12 +134,12 @@ struct UpdatesPage: View {
 
     private func title(_ status: UpdateStatus) -> Text {
         let known = status.running != OverviewModel.developmentVersion
-        if status.available, let latest = status.latest { return Text("Marfa \(latest.version) is ready") }
+        if let latest = model.ready { return Text("Marfa \(latest.version) is ready") }
         return known ? Text("Marfa \(status.running)") : Text("Marfa")
     }
 
     private func line(_ status: UpdateStatus) -> String {
-        if status.available, let latest = status.latest {
+        if let latest = model.ready {
             let published = latest.published.map { String(localized: "Published \(OwnerWording.when($0) ?? "").") } ?? ""
             let how = status.updatesItself
                 ? String(localized: "\(host.serverName) restarts to update.") : String(localized: "\(host.serverName) is updated where it runs.")

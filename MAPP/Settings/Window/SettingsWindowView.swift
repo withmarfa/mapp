@@ -27,7 +27,9 @@ struct SettingsWindowView: View {
             SettingsSidebar(
                 selection: Binding { navigation.page } set: { navigation.show($0) }, search: $search,
                 badges: { page in
-                    page == .overview && host.overview.attentionCount > 0 ? .count(host.overview.attentionCount) : nil
+                    if page == .overview, host.overview.attentionCount > 0 { return .count(host.overview.attentionCount) }
+                    if page == .updates, host.overview.reading?.updateReady != nil { return .count(1) }
+                    return nil
                 }
             )
             .frame(minWidth: SettingsTokens.Metric.sidebarWidth, maxWidth: SettingsTokens.Metric.sidebarWidth)

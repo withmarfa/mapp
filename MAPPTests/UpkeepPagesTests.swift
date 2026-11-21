@@ -283,6 +283,7 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         let model = UpdatesModel(context: bench.context, pause: .milliseconds(5))
         let loading = Task { await model.load() }
         #expect(await eventually { model.status?.progress?.stage == .swapping })
+        #expect(model.hasLoaded, "an update under way is shown at once")
         #expect(model.isUpdating)
         #expect(model.standing(of: .fetching) == .done)
         #expect(model.standing(of: .swapping) == .now)
@@ -310,6 +311,7 @@ nonisolated private func record(_ name: String, hoursAgo: Int = 0) -> BackupReco
         await model.load()
         #expect(model.undone?.release == "0.0.85")
         #expect(model.canUpdate, "Try Again starts it again")
+        #expect(model.ready == nil, "and the Marfa row offers no second Update")
         var done = status
         done.running = "0.0.85"
         done.last = UpdateOutcome(result: .succeeded, release: "0.0.85", finished: someday)

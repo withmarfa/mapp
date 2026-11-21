@@ -13,10 +13,11 @@ struct BackupsPage: View {
     @State private var selection: Set<String> = []
     @Environment(\.settingsPush) private var push
 
-    init(host: any MarfaSettingsHost, showsAll: Bool) {
+    /// `model` is the page's own unless a render brings one that holds a state the page cannot be driven into offscreen.
+    init(host: any MarfaSettingsHost, showsAll: Bool, model: BackupsModel? = nil) {
         self.host = host
         self.showsAll = showsAll
-        _model = State(initialValue: BackupsModel(context: OwnerContext(host: host)))
+        _model = State(initialValue: model ?? BackupsModel(context: OwnerContext(host: host)))
     }
 
     private var backupsHealth: BackupsHealth? { host.health.health?.backups }
@@ -217,7 +218,7 @@ struct BackupsPage: View {
     }
 }
 
-private struct BackupSheet: View {
+struct BackupSheet: View {
     @Bindable var model: BackupsModel
     let serverName: String
 

@@ -50,6 +50,13 @@ import Observation
         return last
     }
 
+    /// The release the Marfa row calls ready. An update the server put back is offered through Try Again alone, so the row
+    /// does not offer it a second time.
+    var ready: UpdateRelease? {
+        guard let status, status.available, undone == nil else { return nil }
+        return status.latest
+    }
+
     func load() async {
         guard !isLoading else { return }
         isLoading = true
@@ -65,6 +72,8 @@ import Observation
             await context.learn(from: error)
             return
         }
+        // An update already under way is shown at once, then followed to its end.
+        hasLoaded = true
         if status?.progress != nil { await follow() }
         guard context.grants().contains(.configManage) else {
             settings = nil
