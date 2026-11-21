@@ -1,6 +1,27 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Choose a collection to see what’s in it." : {
+
+    },
+    "Choose a source to see what it sends." : {
+
+    },
+    "Choose an event to see its details." : {
+
+    },
+    "Choose an item to see its details." : {
+
+    },
+    "Reading Item" : {
+
+    },
+    "Tag Not Added" : {
+
+    },
+    "The tag could not be added." : {
+
+    },
     "%@ on its disk" : {
 
     },

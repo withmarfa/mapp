@@ -68,12 +68,15 @@ struct ItemInspectorHost: View {
                     onHeading: { editor?.revealHeading(at: $0) }
                 )
                 .id(id)
-            } else if let browser, browser.showsItemsIndex, browser.selection.count > 1 {
-                // Items has no page beside the sidebar to say how many rows are chosen.
+            } else if let browser, browser.selection.count > 1 {
                 EmptyState(title: Text("^[\(browser.selection.count) item](inflect: true) selected"), detail: nil, actions: { EmptyView() })
+            } else if selectedID != nil {
+                // The library has not read the chosen item yet.
+                if library.isLoaded && library.syncReport.phase == .current { Color.clear } else { InspectorReadingView() }
+            } else if let browser, !browser.items(in: library).isEmpty {
+                InspectorPromptView(prompt: .forItems(in: browser.viewMode))
             } else {
-                // Where a page sits beside the sidebar it says that nothing, or many, are selected; Items and the other
-                // indexes have none, and their table shows that nothing is chosen.
+                // A place with no items says so in the main area.
                 Color.clear
             }
         }
