@@ -68,6 +68,9 @@ final class EditorController: NSObject {
     @ObservationIgnored var onEscape: () -> Void = {}
     /// A link in the page names this item, which the window opens as choosing it in the list does.
     @ObservationIgnored var onOpenItem: (ItemID) -> Void = { _ in }
+    /// A link in the item's text names this item. A window that opens items as Settings > General > Open Items says
+    /// sets this; without it the link opens as any other (`onOpenItem`).
+    @ObservationIgnored var onFollowItemLink: ((ItemID) -> Void)?
     /// A link in the page names no item the window can open, which is told only by a beep: nothing is made.
     @ObservationIgnored var onUnopenableLink: () -> Void = { NSSound.beep() }
     /// Asks the person which of several items an ambiguous link means, in place of the menu at the pointer. The
@@ -383,7 +386,7 @@ final class EditorController: NSObject {
 
     /// A rect in the page's window, which starts below whatever covers the web view's top, in the container's
     /// coordinates.
-    private func containerRect(_ rect: CGRect, viewportHeight: Double) -> CGRect {
+    func containerRect(_ rect: CGRect, viewportHeight: Double) -> CGRect {
         let covered = max(0, webView.bounds.height - viewportHeight)
         let top = rect.minY + covered
         let inWebView = webView.isFlipped
@@ -690,7 +693,7 @@ final class EditorController: NSObject {
             onHeaderEvent(.showLinked)
         case .openLink(let href):
             // The page has already refused what Inkkit's `canOpenLink` does not allow.
-            if let url = URL(string: href) { NSWorkspace.shared.open(url) }
+            openAddress(href)
         case .openItem(let id):
             onOpenItem(id)
         case .copy(let text):
@@ -706,6 +709,8 @@ final class EditorController: NSObject {
             quickLookEmbed(reference, in: item)
         case .openItemLink(let item, let link):
             Task { await openItemLink(link, from: item) }
+        case .linkMenu(let item, let generation, let target, let point, let viewportHeight):
+            showLinkMenu(for: target, in: item, generation: generation, at: point, viewportHeight: viewportHeight)
         case .embedMenu(let embed):
             menuEmbed = embed
         case .rowMenu(let row):

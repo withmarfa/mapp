@@ -66,9 +66,11 @@ extension EditorController {
         }
     }
 
+    /// Shows the item a link names: a heading of the item on the page scrolls to it, any other item opens as a link in
+    /// the text does.
     private func show(_ id: ItemID, heading: String?) {
         pendingHeading = heading.map { (id, $0) }
-        if id == pageItemID { revealPendingHeading(in: id) } else { onOpenItem(id) }
+        if id == pageItemID { revealPendingHeading(in: id) } else { (onFollowItemLink ?? onOpenItem)(id) }
     }
 
     /// A menu at the pointer naming each item a link could mean, by title.

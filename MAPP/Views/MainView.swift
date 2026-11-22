@@ -341,6 +341,9 @@ struct MainView: View {
             editor.onOpenItem = { [browser, library, order] id in
                 if let item = library.item(id) { browser.open(linked: item, in: library, order: order) }
             }
+            editor.onFollowItemLink = { [browser, library, order] id in
+                if let item = library.item(id) { browser.follow(link: item, in: library, order: order) }
+            }
             editor.onShowRefusedTitle = { [browser, library, order] id in
                 if let item = library.item(id) { browser.reveal(item, in: library, order: order) }
             }
