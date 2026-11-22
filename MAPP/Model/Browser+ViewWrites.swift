@@ -246,7 +246,8 @@ extension Browser {
         case .success(let view):
             if update.change.group != nil, let replaced = update.view.group { replacedGroups[id, default: [:]][replaced.field] = replaced }
             if choices(in: place) != sent { rewritingViews.insert(id) }
-            // The window keeps what it shows: the view is the window's only where the view can hold it all.
+            // The window takes each setting this write did not send and the person has not changed, so another
+            // app's merge is shown and the next write does not send the older value back.
             seed(view, catalogue: library.catalogue, keepingWindow: true, sent: update.change)
             tellUnkept(update.unkept, of: id, in: library)
         case .failure(let failure):
