@@ -217,7 +217,7 @@ final class Browser {
     }
     /// What the next palette starts with typed, as ⌘K's "Search Items for" hands its words on.
     var paletteSeed = ""
-    /// Counts the ⌘K pressed while a palette is out, which opens or shuts its Actions.
+    /// Counts the ⌘J (Palette Actions) pressed while a palette is out, which opens or shuts its Actions.
     var paletteActionsRequests = 0
 
     /// Whether a floating panel, the palette or quick add, is out over the window, which the views beneath it

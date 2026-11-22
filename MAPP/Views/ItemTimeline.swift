@@ -149,7 +149,7 @@ struct ItemTimeline: View {
         }
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
-        .softSelection(rows: groups.flatMap { $0.rows.map(\.id.rawValue) }, hovers: true, selection: { browser.selection })
+        .softSelection(rows: groups.flatMap { $0.rows.map(\.id.rawValue) }, hovers: true, inert: inertRows(groups, contents: contents, now: now), selection: { browser.selection })
         .focused(pane, equals: .list)
         .takesKeyboardOnClick { browser.focusRequest = .list }
         .accessibilityLabel("Timeline")
@@ -160,6 +160,25 @@ struct ItemTimeline: View {
             browser.open(ids)
         }
         .onKeyPress(.return) { browser.openSelection() ? .handled : .ignored }
+    }
+
+    /// The places in the list of the rows that are not items: the Earlier heading and the line for now. An item with no
+    /// content yet makes no row, so it takes no place.
+    private func inertRows(_ groups: [ItemTimelineGroup], contents: [ItemID: RowContent], now: Date) -> Set<Int> {
+        var inert: Set<Int> = []
+        var place = 0
+        for group in groups {
+            for line in lines(of: group, now: now) {
+                switch line {
+                case .row(let row, _, _):
+                    if contents[row.id] != nil { place += 1 }
+                case .earlier, .now:
+                    inert.insert(place)
+                    place += 1
+                }
+            }
+        }
+        return inert
     }
 
     /// The row's date is its time, so the row itself says no second date.

@@ -19,6 +19,10 @@ import WebKit
 
     private let plain = "<html><body><p>Some words in a document that says nothing about how it looks.</p></body></html>"
 
+    @Test func aWebPageOpensInOriginalUntilThePersonChoosesAnotherLook() {
+        #expect(SourceViewMode.standard == .original)
+    }
+
     // MARK: The column
 
     @Test func theTextColumnFollowsThePagesWidthSetting() {

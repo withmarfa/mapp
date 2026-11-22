@@ -3886,6 +3886,9 @@
     "Command Palette" : {
 
     },
+    "Palette Actions" : {
+
+    },
     "Commands" : {
 
     },
@@ -7993,7 +7996,7 @@
     "Up to %lld Lines" : {
 
     },
-    "View > Show Original switches it." : {
+    "The View menu switches it." : {
 
     },
     "Website" : {

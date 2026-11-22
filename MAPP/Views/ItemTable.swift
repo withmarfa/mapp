@@ -99,7 +99,7 @@ struct ItemTable: View {
         }
         .tableStyle(.inset)
         .onChange(of: browser.panelIsOut) { _, isOut in if isOut { hover.clear() } }
-        .softSelection(rows: pages.shownIDs + collapsed.sorted(), hovers: true, selection: { browser.selection })
+        .softSelection(rows: pages.shownIDs + collapsed.sorted(), hovers: true, inert: pages.headerPlaces(collapsed: collapsed), selection: { browser.selection })
         .quietTableHeader(isUnderToolbar: $isUnderToolbar)
         .scrollEdgeEffectHidden(true, for: .top)
         .toolbarBand(isUnderToolbar: isUnderToolbar)
@@ -350,40 +350,48 @@ extension ItemTableColumn {
 }
 
 /// A group's header row: its mark and name, how many it holds, and a chevron that folds it away. The name starts at the
-/// table's left edge, where the rows' marks do, and the chevron hangs in the margin to its left.
+/// table's left edge, where the rows' marks do, and the chevron hangs in the margin to its left. Only the chevron is
+/// a control, so only it reacts to the pointer; the rest of the row is a heading and does nothing.
 private struct ItemTableGroupHeader: View {
     let group: ItemTableGroup
     let column: ItemTableColumn
     let isCollapsed: Bool
     let toggle: () -> Void
+    @State private var isOverChevron = false
 
     private static let gap: CGFloat = 2
     private static let chevronWidth: CGFloat = 10
 
     var body: some View {
-        Button(action: toggle) {
-            HStack(spacing: Self.gap) {
+        HStack(spacing: Self.gap) {
+            Button(action: toggle) {
                 Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(isOverChevron ? .secondary : .tertiary)
                     .rotationEffect(.degrees(isCollapsed ? 0 : 90))
                     .frame(width: Self.chevronWidth)
-                ItemTableCategory(column: column, value: group.value, title: group.title, isGroup: true)
-                    .fontWeight(.semibold)
-                Text(group.rows.count, format: .number)
-                    .foregroundStyle(.secondary)
-                    .monospacedDigit()
-                Spacer(minLength: 0)
+                    .background {
+                        RoundedRectangle(cornerRadius: 5)
+                            .fill(.primary.opacity(isOverChevron ? 0.047 : 0))
+                            .padding(-5)
+                    }
+                    .contentShape(.rect.inset(by: -5))
             }
-            // The cell starts at the inset style's margin, so the chevron's width and gap bring the name back to it.
-            .padding(.leading, -(Self.chevronWidth + Self.gap))
-            .contentShape(.rect)
+            .buttonStyle(.plain)
+            .onHover { isOverChevron = $0 }
+            .accessibilityLabel(Text("\(group.title), \(group.rows.count)"))
+            .accessibilityValue(isCollapsed ? Text("Collapsed") : Text("Expanded"))
+            .accessibilityHint(isCollapsed ? Text("Shows the group’s items") : Text("Hides the group’s items"))
+            ItemTableCategory(column: column, value: group.value, title: group.title, isGroup: true)
+                .fontWeight(.semibold)
+            Text(group.rows.count, format: .number)
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+            Spacer(minLength: 0)
         }
-        .buttonStyle(.plain)
+        // The cell starts at the inset style's margin, so the chevron's width and gap bring the name back to it.
+        .padding(.leading, -(Self.chevronWidth + Self.gap))
         .interfaceFont(.body)
-        .accessibilityLabel(Text("\(group.title), \(group.rows.count)"))
-        .accessibilityValue(isCollapsed ? Text("Collapsed") : Text("Expanded"))
-        .accessibilityHint(isCollapsed ? Text("Shows the group’s items") : Text("Hides the group’s items"))
     }
 }
 
@@ -412,6 +420,20 @@ private struct Pages {
 
     var shownIDs: [String] {
         (slice.rows + groups.flatMap(\.slice.rows)).map(\.id.rawValue)
+    }
+
+    /// Where the groups' header rows fall among the table's rows: each group's header, then its rows unless it is
+    /// folded, then its Load More row while it has more to show.
+    func headerPlaces(collapsed: Set<String>) -> Set<Int> {
+        var places: Set<Int> = []
+        var place = 0
+        for page in groups {
+            places.insert(place)
+            place += 1
+            if collapsed.contains(page.group.id) { continue }
+            place += page.slice.rows.count + (page.slice.remaining > 0 ? 1 : 0)
+        }
+        return places
     }
 }
 

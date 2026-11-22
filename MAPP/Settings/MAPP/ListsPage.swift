@@ -72,6 +72,13 @@ private struct DensityPicture: View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Array(samples.prefix(isCompact ? 6 : 3).enumerated()), id: \.offset) { index, content in
                 ItemRow(content: content, density: density, showsSample: !isCompact && index == 0)
+                    .overlay(alignment: .top) {
+                        if index > 0 {
+                            Rectangle()
+                                .fill(SettingsTokens.rule)
+                                .frame(height: 1)
+                        }
+                    }
             }
             Spacer(minLength: 0)
         }

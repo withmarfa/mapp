@@ -101,8 +101,11 @@ struct AppCommands: Commands {
         CommandGroup(after: .textEditing) {
             palette("Search Items…", systemImage: "magnifyingglass", .search)
                 .shortcut(.searchItems, shortcuts)
-            palette("Command Palette", systemImage: "command", .commands, asksActionsWhenOut: true)
+            palette("Command Palette", systemImage: "command", .commands)
                 .shortcut(.commandPalette, shortcuts)
+            Button("Palette Actions", systemImage: "ellipsis.circle") { browser?.paletteActionsRequests += 1 }
+                .disabled(browser?.palette == nil)
+                .shortcut(.paletteActions, shortcuts)
         }
 
         // The dividers here are drawn whether or not the views between them render anything, and the system adds its
@@ -234,16 +237,11 @@ extension AppCommands {
         return library.map { browser.canGoForward(in: $0) } ?? false
     }
 
-    /// Opens a palette over the window in front, or puts it away if that palette is already out. ⌘K, with either palette
-    /// out, opens Actions for the chosen row instead.
-    private func palette(_ title: LocalizedStringKey, systemImage: String, _ palette: Browser.Palette, asksActionsWhenOut: Bool = false) -> some View {
+    /// Opens a palette over the window in front, or puts it away if that palette is already out.
+    private func palette(_ title: LocalizedStringKey, systemImage: String, _ palette: Browser.Palette) -> some View {
         Button(title, systemImage: systemImage) {
             guard let browser else { return }
-            if asksActionsWhenOut, browser.palette != nil {
-                browser.paletteActionsRequests += 1
-            } else {
-                browser.palette = browser.palette == palette ? nil : palette
-            }
+            browser.palette = browser.palette == palette ? nil : palette
         }
         .disabled(browser == nil)
     }

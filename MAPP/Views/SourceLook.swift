@@ -12,7 +12,7 @@ nonisolated enum SourceViewMode: String, CaseIterable, Identifiable, Sendable {
     /// One choice for every such item, kept like the page's other settings: a person who reads articles in one look
     /// wants the next article in it too, as Readwise Reader keeps the look a person last chose.
     static let key = "sourceViewMode"
-    static let standard = SourceViewMode.reader
+    static let standard = SourceViewMode.original
 }
 
 /// How an HTML document from a source is to look, applied by the app's own script after the document has loaded (so it
