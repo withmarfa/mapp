@@ -246,7 +246,7 @@ private func catalogue() -> Catalogue {
             tables: .init(additionalProperties: [:]), version: 7,
             displayHints: .init(titleField: "title", bodyField: "notes", icon: "lucide:book"), linkField: "isbn")
         return .init(
-            value1: definition, value2: .init(provenance: .init(origin: .user), ownRoles: [.container]))
+            value1: definition, value2: .init(provenance: .init(origin: .registered), ownRoles: [.container]))
     }
 
     private func plan(_ edit: FieldEdit) throws -> FieldEditPlan {
@@ -321,7 +321,7 @@ private func catalogue() -> Catalogue {
             fields: .init(additionalProperties: ["genre": Definition(_type: .string, label: "Genre")]),
             tables: .init(additionalProperties: [:]), version: 1,
             displayHints: .init(titleField: "title"), linkField: nil)
-        let above = TypeDefinitionEdit.Listed(value1: parent, value2: .init(provenance: .init(origin: .user), ownRoles: []))
+        let above = TypeDefinitionEdit.Listed(value1: parent, value2: .init(provenance: .init(origin: .registered), ownRoles: []))
         let edit = try plan(.remove(key: "genre"))
         await #expect(throws: TypeSchemaFailure.changedOnServer) {
             try await TypeDefinitionEdit.run(edit, read: { [listed(), above] }, replace: { _ in replaced += 1 })
