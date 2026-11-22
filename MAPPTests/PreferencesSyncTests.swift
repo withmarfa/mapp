@@ -422,6 +422,41 @@ import Testing
         #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
         #expect(await one.updates.isEmpty)
     }
+
+    @Test func aDroppedSettingThePersonChangesAndThenClearsIsDeletedFromTheMarfa() async throws {
+        let look = PreferenceUnit.row(.types, setting: "look", key: "core.note")
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([look: #""later""#])
+        let looks = TypeLooks(defaults: defaults)
+        let sync = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(50), build: "1") { looks.reload() }
+        sync.attach(copy, library: "marfa:https://one", name: { nil })
+        await sync.flush()
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[look] == #""later""#)
+        defaults.set(Data(#"{"marfa:https://one":{"core.note":{"date":"created"}}}"#.utf8), forKey: TypeLooks.defaultsKey)
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[look] == #"{"date":"created"}"#)
+        defaults.set(Data(#"{"marfa:https://one":{}}"#.utf8), forKey: TypeLooks.defaultsKey)
+        await sync.flush()
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[look] == nil)
+    }
+
+    @Test func removedSettingsStayRemovedOnceTheBinIsEmptied() async throws {
+        defaults.set("dark", forKey: AppearanceKey.theme)
+        let copy = FakePreferencesCopy()
+        let sync = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(50)) {}
+        sync.attach(copy, library: "marfa:https://one", name: { nil })
+        await sync.flush()
+        let first = try #require(await copy.activeIDs.first)
+        try await sync.remove()
+        await sync.flush()
+        #expect(sync.standing == .off(.removed))
+        await copy.forget(first)
+        await sync.flush()
+        #expect(sync.standing == .off(.removed))
+        #expect(await copy.creates == 1)
+    }
 }
 
 @MainActor @Suite(.hangLimit) struct PreferencesWiringTests {

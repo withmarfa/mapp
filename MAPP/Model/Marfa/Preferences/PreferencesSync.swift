@@ -140,6 +140,11 @@ final class PreferencesSync {
         for held in try await copy.items() { try await copy.remove(held.id) }
         item = nil
         standing = .off(.removed)
+        if let instance = try await copy.readiness().instance {
+            var record = Record.read(defaults)
+            record.marfas[instance]?.removed = true
+            record.save(defaults)
+        }
     }
 
     /// Keeps this Mac's settings in the Marfa again after they were removed: the next item is made from them, even
@@ -221,8 +226,13 @@ final class PreferencesSync {
                     // Two Macs made an item at once: the one made first is used from now on.
                     guard let adopted = try await adopt(originals, local: local, in: copy, generation: generation) else { return }
                     record.marfas[instance] = adopted
+                } else if adopted.removed == true {
+                    item = nil
+                    return standing = .off(.removed)
                 } else if try await copy.isBinned(adopted.item) {
                     guard generation == self.generation else { return }
+                    record.marfas[instance]?.removed = true
+                    record.save(defaults)
                     item = nil
                     return standing = .off(.removed)
                 } else {
@@ -373,7 +383,10 @@ final class PreferencesSync {
         // that reads it runs here.
         let retrying = adopted.frozenBuild == build ? [] : Set(adopted.frozen.keys)
         var mine = switched ? base : local.units
-        for (unit, frozen) in adopted.frozen where !switched && mine[unit] == frozen.left { mine[unit] = base[unit] }
+        for (unit, frozen) in adopted.frozen where !switched {
+            // The person's own change to a dropped setting is theirs to send, so it is no longer held.
+            if mine[unit] == frozen.left { mine[unit] = base[unit] } else { adopted.frozen[unit] = nil }
+        }
         mine.merge(setAsideUnreadable(remote, base: base)) { _, unreadable in unreadable }
         var seen = remote
         for unit in holding { seen[unit] = base[unit] }
@@ -519,6 +532,8 @@ final class PreferencesSync {
             var frozen: [PreferenceUnit: Frozen] = [:]
             /// The MAPP that judged `frozen`; another tries those settings again.
             var frozenBuild: String?
+            /// Set once this Mac removed the item or saw it in the bin, so an emptied bin does not bring it back.
+            var removed: Bool?
 
             init(item: String, base: PreferenceUnits, frozenBuild: String? = nil) {
                 self.item = item
