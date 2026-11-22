@@ -66,8 +66,7 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 
 ## Buttons and messages
 
-- **Capsule buttons, black buttons and the Mac's push buttons.** Every button MAPP draws is a rounded rectangle; see [Components](components.md).
-- **A large 36-point button size.** There are two sizes, 22 and 28 points. Settings uses the system's regular size, and small inside a table.
+- **Black buttons, the Mac's push buttons, and a capsule at every size.** The shape follows the size; see [Components](components.md#buttons).
 - **Buttons in a section's header in Settings.** Adding is the card's last row; other actions are regular buttons in a row.
 - **Run Now or Restore on one table row only, the row under the pointer.** One button on one row reads as special. A row action shows on every row.
 - **Sheets and alerts placed under the toolbar**, AppKit's default sheet position (August, 20 November 2026). They sit in the middle of the window.
@@ -97,7 +96,7 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 - **Gray cards in Settings**, as System Settings draws them. Cards are white with a hairline.
 - **A back button beside a Settings page's title.** Back and Forward sit in the toolbar, beside the page's name.
 - **A Settings page split by a segmented control**, such as a folder's Settings, Contents and Copies.
-- **Minus and plus buttons for a number.** A field with its unit inside, or a pop-up of steps.
+- **Minus and plus buttons for a number.** A short field with its unit after it, or a pop-up of steps.
 - **A list of words or patterns as one text field.** Each line is edited in place.
 - **A Paper theme.** Theme is System, Light or Dark.
 - **Types and sources left out of Items, Inbox and Recents.** Those are only the views a library starts with. Leaving things out belongs to Search.
@@ -155,7 +154,10 @@ Do not try one of these again in the same form. If a new case needs one, say wha
 
 ## Reversed
 
-Turned down or agreed once, then changed by August on 21 November 2026. What replaces each is agreed now; see [Agreed designs](agreed-designs.md).
+Turned down or agreed once, then changed by August on 21 and 22 November 2026. What replaces each is agreed now; see [Agreed designs](agreed-designs.md).
+
+- **Every button a rounded rectangle, at 22 and 28 points** (17 November 2026). Reversed on 22 November 2026: a 28-point button is a capsule and a 24-point one a rounded rectangle, as macOS draws its own controls.
+- **No 36-point button size.** Reversed on 22 November 2026: the first-run window's one action is 36 points, a capsule.
 
 - **A Filter button beside an index page's tabs**, which shows or hides the filter row.
 - **New (+) in the toolbar**, on an index page that has scrolled.

@@ -29,6 +29,18 @@ Agreed with August on 21 November 2026, drawn as the Next boards of MAPP Pages. 
 - **Built, not yet released:** one Properties list for a view or place, shared by every layout, replacing the table's Columns and falling back to each type's look; Edit Layouts… in the window, opening Settings > Layouts at the type; and the timeline's row as agreed.
 - **Fixes:** MAPP keeping another app's group order and hidden groups, a board's cards following the sort, and no Sort on the timeline or the calendar are built, not yet released.
 
+## Buttons
+
+Agreed with August on 22 November 2026 (MAPP Pages, Foundations F7 to F10; the design system's Button, PopUp and Settings components). The rule is in [Components](components.md#buttons); this is what the build changes.
+
+- **`MappButtonStyle`:** the corner radius follows the size, a capsule at 28 points and 7-point corners at the small size, which grows from 22 to 24 points. Keyboard focus follows the shape.
+- **Pop-up and menu buttons** are gray with no outline: two arrows for a value, one for a menu of commands.
+- **Symbols:** a gray circle on its own, such as More (…) and Add (+) at a row's end; plain on a header row and inside a banner, the toast, a chip or a field. A symbol scales with its button's size and is never semibold, the menu chevron included.
+- **Search fields** are the system's: white, with a hairline edge, a capsule.
+- **Tabs** on an index page are a choice of one: the chosen tab is a capsule.
+- **Settings:** a section's filter pop-up and search are 28 points, the filter plain. Inputs at a row's end are 160 points wide. A row's trailing edge holds one control; a value it acts on goes in the row's line. A number's unit sits after its field. Rows with a mark get their own section. Show All in a table's footer has no fill. A sheet's confirm button is blue.
+- **First run:** each step's one action is 36 points, a capsule.
+
 ## Pages
 
 - Where a code block's language goes, and how it changes, is open. It stays as it is.
