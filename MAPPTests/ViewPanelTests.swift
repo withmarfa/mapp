@@ -392,6 +392,27 @@ struct ViewPanelTests {
         #expect(again.tableOptions[again.item]?.filter.clauses.first == FilterClause(field: Self.status, op: .isNot, values: ["in_progress"]))
     }
 
+    /// The view saying a chip another way is not another app's change: a later write of the sort leaves the chip as the
+    /// person made it, while a filter another app changes is shown.
+    @Test func aRewrittenChipStaysAsMadeThroughALaterWriteAndAnotherAppsFilterShows() async {
+        let (browser, library, _) = Self.opened()
+        let priority = ViewDraft.columnID(of: "properties.priority") ?? "field.priority"
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo", "done"]) }
+        await Self.change(browser) { browser.setFilter(priority, values: ["high"]) }
+        let made = FilterClause(field: Self.status, op: .is, values: ["done", "todo"])
+        await Self.change(browser) { browser.tableOptions[browser.item]?.sort = [ItemTableComparator(column: .title)] }
+        #expect(Self.held(library)?.sort == [LibraryViewSort(field: "title", ascending: true)])
+        #expect(browser.tableOptions[browser.item]?.filter.clauses.first == made)
+        #expect(!browser.hasViewChanges)
+
+        library.changedElsewhere = { $0.query.filter = #"properties.priority eq "low""# }
+        await Self.change(browser) { browser.tableOptions[browser.item]?.sort = [ItemTableComparator(column: .title, order: .reverse)] }
+        #expect(Self.held(library)?.query.filter == #"properties.priority eq "low""#)
+        #expect(browser.tableOptions[browser.item]?.filter.clauses == [FilterClause(field: priority, op: .is, values: ["low"])])
+        #expect(Self.held(library)?.sort == [LibraryViewSort(field: "title", ascending: false)])
+        #expect(!browser.hasViewChanges)
+    }
+
     @Test func aRelativeDateIsKeptInTheWindowAndNeverWrittenToTheView() async {
         let (browser, library, _) = Self.opened()
         await Self.change(browser) {

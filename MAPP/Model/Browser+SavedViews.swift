@@ -10,6 +10,8 @@ extension Browser {
     struct ViewSeed: Hashable {
         let version: Int64
         var options: ItemTableOptions
+        /// The filters as the view says them, which `options` may say in the window's own form (`writeChoices`).
+        let viewFilter: FilterState
         let timelineDate: String?
         let types: [String]?
         /// What to read the view's items with while the window's filters differ from these (`previewQuery`); nil where
@@ -47,7 +49,7 @@ extension Browser {
         let mac = earlier?.mac ?? ViewLayouts.stored(in: defaults).settings(for: view.id) ?? ViewMacSettings()
         let types = ViewDraft.seededTypes(of: view.query, catalogue: catalogue)
         viewSeeds[view.id] = ViewSeed(
-            version: view.version, options: options, timelineDate: timelineDate, types: types,
+            version: view.version, options: options, viewFilter: options.filter, timelineDate: timelineDate, types: types,
             preview: ViewDraft.previewQuery(of: view.query, seededTypes: types, catalogue: catalogue), mac: mac)
         guard !keepingWindow else {
             if let earlier { follow(ViewChoices(options: options, timelineDate: timelineDate), in: place, over: earlier, sent: sent) }
@@ -70,6 +72,8 @@ extension Browser {
         if sent.sort != nil { parts.remove(.sort) }
         if sent.group != nil { parts.remove(.grouping) }
         if sent.query != nil { parts.remove(.filters) }
+        // Filters the view says as before, though in other words than the window's, are not another app's change.
+        if returned.options.filter.isSame(as: earlier.viewFilter) { parts.remove(.filters) }
         parts = parts.intersection(choices(in: place).parts(differingFrom: returned, dated: dated))
         guard !parts.isEmpty else { return }
         put(returned, in: place, only: parts)

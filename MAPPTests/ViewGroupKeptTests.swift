@@ -311,7 +311,7 @@ struct ViewGroupKeptTests {
         #expect(held.query.filter == filter)
         #expect(browser.tableOptions[browser.item]?.grouping == .column("field.priority"))
         #expect(browser.tableOptions[browser.item]?.sort?.map(\.column.id) == ["title"])
-        #expect(browser.tableOptions[browser.item]?.filters == ["field.priority": ["high"]])
+        #expect(browser.tableOptions[browser.item]?.filter.clauses == [FilterClause(field: "field.priority", op: .is, values: ["high"])])
         #expect(!browser.hasViewChanges)
 
         // A later change writes only itself.

@@ -32,12 +32,9 @@ struct BrowserViewSeedTests {
     /// Takes the window's layout to be the one the view was saved in, so that the layout alone is no change.
     private static func take(_ layout: ItemViewMode, in browser: Browser) {
         let id = view().id
-        guard let seed = browser.viewSeeds[id] else { return }
-        var mac = seed.mac
-        mac.layout = layout
-        browser.viewSeeds[id] = Browser.ViewSeed(
-            version: seed.version, options: seed.options, timelineDate: seed.timelineDate, types: seed.types,
-            preview: seed.preview, mac: mac)
+        guard var seed = browser.viewSeeds[id] else { return }
+        seed.mac.layout = layout
+        browser.viewSeeds[id] = seed
     }
 
     @Test func aViewOpensWithItsOwnOrderAndGrouping() {
