@@ -1,8 +1,9 @@
+import Marfa
 import SwiftUI
 
-/// The Webhooks page: the webhooks this sign-in made, each opening a page of its own with its address, the events it
-/// sends, its deliveries (a failed one can be sent again) and Delete. New Webhook… makes one, and shows its signing secret
-/// once.
+/// The Webhooks page: every webhook the server lists for this sign-in, grouped by who made it, each opening a page of its
+/// own with its address, the events it sends, its deliveries and Delete. MAPP's own can be changed and a failed delivery sent
+/// again; another maker's can only be read and deleted. New Webhook… makes one, and shows its signing secret once.
 struct WebhooksPage: View {
     let host: any MarfaSettingsHost
     let subpage: SettingsSubpage?
@@ -28,6 +29,7 @@ struct WebhooksPage: View {
     var body: some View {
         content
             .task(id: host.serverAddress) { await model.load() }
+            .onChange(of: model.seesEvery) { Task { await model.readAgainIfScopeChanged() } }
             .onAppear { host.ownerDrafts.register(model) }
             .settingsSheet(presenting: model.sheet != nil, dismiss: { model.closeSheet() }) {
                 WebhookSheet(model: model, serverName: host.serverName)
@@ -65,29 +67,42 @@ struct WebhooksPage: View {
 
     private var list: some View {
         SettingsPageColumn {
-            if model.groups.isEmpty {
+            if model.webhooks.isEmpty {
                 SettingsSection(name: Text("Webhooks")) {
                     SettingsEmptyCard(
                         symbol: "dot.radiowaves.up.forward", title: Text("No Webhooks"),
                         line: Text("A webhook sends events to an address you choose, as they happen."))
                     addRow
                 }
-            }
-            ForEach(Array(model.groups.enumerated()), id: \.element.id) { index, group in
-                SettingsSection(
-                    name: group.name.map { Text("Made by \($0)") } ?? Text("Made by This Sign-In"),
-                    footer: index == model.groups.count - 1 ? Text("Only webhooks this sign-in made are listed. An app or a key sees only its own.") : nil
-                ) {
-                    ForEach(group.webhooks) { webhook in
-                        let state = model.isSending(webhook)
-                        SettingsLinkRow(
-                            verbatim: WebhooksModel.display(webhook.url), line: model.summary(of: webhook),
-                            lead: .tint("dot.radiowaves.up.forward", .gray), value: Self.title(state), dot: Self.dot(state)
-                        ) { push(Self.subpage(for: webhook)) }
+            } else {
+                let groups = model.groups.filter { $0.isOwn || !$0.webhooks.isEmpty }
+                ForEach(Array(groups.enumerated()), id: \.element.id) { index, group in
+                    SettingsSection(
+                        name: Text(verbatim: model.heading(of: group)),
+                        footer: index == groups.count - 1 && model.seesEvery
+                            ? Text("You can see and end any webhook. Only the app or key that made one changes it.") : nil
+                    ) {
+                        ForEach(group.webhooks) { webhook in
+                            let state = model.isSending(webhook)
+                            SettingsLinkRow(
+                                verbatim: WebhooksModel.display(webhook.url), line: model.summary(of: webhook),
+                                lead: .well(symbol: "dot.radiowaves.up.forward"), value: Self.title(state), dot: Self.dot(state)
+                            ) { push(Self.subpage(for: webhook)) }
+                        }
+                        if group.isOwn { addRow }
                     }
-                    if index == 0 { addRow }
                 }
             }
+            if !model.seesEvery && model.canMake { othersNeedKeys }
+        }
+    }
+
+    /// Without Manage Keys the list holds MAPP's own only, and says what the others need.
+    private var othersNeedKeys: some View {
+        SettingsSection(name: nil) {
+            OwnerProblemRow(
+                title: "Other Webhooks Aren’t Listed", failure: .notPermitted(InstancePermission.keysManage.rawValue),
+                line: String(localized: "Seeing and ending the webhooks other apps and keys made needs Manage Keys."), page: .webhooks, host: host)
         }
     }
 
@@ -127,11 +142,14 @@ private struct WebhookDetail: View {
     private static let firstEvents = 6
     private static let firstDeliveries = 10
 
+    private var isOwn: Bool { model.isOwn(webhook) }
+
     private var line: String {
         let day = webhook.created.map { OwnerWording.day($0) }
-        switch (webhook.maker?.name, day) {
-        case (let name?, let day?): return String(localized: "Made by \(name), \(day).")
-        case (let name?, nil): return String(localized: "Made by \(name).")
+        let maker = webhook.maker == nil ? nil : model.maker(of: webhook)
+        switch (maker, day) {
+        case (let maker?, let day?): return String(localized: "Made by \(maker), \(day).")
+        case (let maker?, nil): return String(localized: "Made by \(maker).")
         case (nil, let day?): return String(localized: "Made \(day).")
         case (nil, nil): return ""
         }
@@ -152,9 +170,22 @@ private struct WebhookDetail: View {
     var body: some View {
         SettingsPageColumn {
             SettingsHead(
-                symbol: "dot.radiowaves.up.forward", tone: .pink, title: Text(verbatim: WebhooksModel.display(webhook.url)),
+                wellSymbol: "dot.radiowaves.up.forward", title: Text(verbatim: WebhooksModel.display(webhook.url)),
                 line: line.isEmpty ? nil : Text(verbatim: line))
             if let failure = model.rowErrors[webhook.id] { OwnerProblem(title: "Not Changed", failure: failure, page: .webhooks, host: host) }
+            if isOwn { settings } else { readOnly }
+            deliveries
+            SettingsSection("Delete") {
+                SettingsRow(verbatim: String(localized: "Delete This Webhook"), line: String(localized: "It stops sending at once.")) {
+                    SettingsButton("Delete…", role: .destructive) { model.askToDelete(webhook) }
+                }
+            }
+        }
+        .task(id: webhook.id) { await model.loadDeliveries(of: webhook.id) }
+    }
+
+    /// A webhook MAPP made: its address, what it is for, Sending and the events can all be changed.
+    @ViewBuilder private var settings: some View {
             SettingsSection("Webhook") {
                 SettingsRow(verbatim: String(localized: "Address"), line: webhook.url) {
                     SettingsButton("Change…") { model.beginChangeAddress(webhook) }
@@ -198,14 +229,28 @@ private struct WebhookDetail: View {
                     SettingsShowMoreRow(title: Text("\(WebhookEvent.allCases.count - Self.firstEvents) More")) { showsAllEvents = true }
                 }
             }
-            deliveries
-            SettingsSection("Delete") {
-                SettingsRow(verbatim: String(localized: "Delete This Webhook"), line: String(localized: "It stops sending at once.")) {
-                    SettingsButton("Delete…", role: .destructive) { model.askToDelete(webhook) }
-                }
+    }
+
+    /// A webhook another app or key made: MAPP shows what it holds and can end it, and changes nothing, as the server
+    /// leaves a change to the maker.
+    @ViewBuilder private var readOnly: some View {
+        SettingsSection(name: Text("Webhook"), line: Text("Only \(model.maker(of: webhook)) can change it. You can end it.")) {
+            SettingsRow(verbatim: String(localized: "Address"), line: webhook.url)
+            SettingsRow("For") { SettingsValue(verbatim: model.typeTitle(webhook.typeFilter)) }
+            SettingsRow("Sending") {
+                let state = model.isSending(webhook)
+                SettingsValue(verbatim: WebhooksPage.title(state), dot: WebhooksPage.dot(state))
+            }
+            SettingsRow("Signing Secret") { SettingsValue(verbatim: "••••" + webhook.secretTail) }
+        }
+        SettingsSection("Events") {
+            if webhook.events.isEmpty {
+                SettingsRow("Sends No Events", look: .off)
+            }
+            ForEach(WebhooksModel.ordered(webhook.events), id: \.self) { name in
+                SettingsRow(verbatim: WebhookEvent(rawValue: name)?.title ?? name, size: .compact)
             }
         }
-        .task(id: webhook.id) { await model.loadDeliveries(of: webhook.id) }
     }
 
     @ViewBuilder private var deliveries: some View {
@@ -213,9 +258,11 @@ private struct WebhookDetail: View {
         if let failure = model.deliveryErrors[webhook.id] { OwnerProblem(title: "Not Sent Again", failure: failure, page: .webhooks, host: host) }
         SettingsSection(
             name: Text("Deliveries"),
-            line: webhook.active
-                ? Text("The latest events sent to this address. Only a failed one can be sent again.")
-                : Text("The latest events sent to this address. A failed one can be sent again once this webhook is on.")
+            line: !isOwn
+                ? Text("The latest events sent to this address.")
+                : webhook.active
+                    ? Text("The latest events sent to this address. Only a failed one can be sent again.")
+                    : Text("The latest events sent to this address. A failed one can be sent again once this webhook is on.")
         ) {
             if let failure = model.deliveriesFailure[webhook.id], all.isEmpty {
                 OwnerProblemRow(
@@ -231,9 +278,11 @@ private struct WebhookDetail: View {
                         SettingsTableColumn("Event") { Text(verbatim: WebhookEvent(rawValue: $0.event)?.title ?? $0.event) },
                         SettingsTableColumn("Answer", width: SettingsTokens.Metric.Column.label) { Text(verbatim: Self.answer($0)) },
                     ],
-                    action: SettingsRowAction(
-                        title: "Redeliver", isEnabled: { model.canRedeliver($0, of: webhook) },
-                        perform: { delivery in Task { await model.redeliver(delivery, of: webhook) } }),
+                    action: isOwn
+                        ? SettingsRowAction(
+                            title: "Redeliver", isEnabled: { model.canRedeliver($0, of: webhook) },
+                            perform: { delivery in Task { await model.redeliver(delivery, of: webhook) } })
+                        : nil,
                     total: all.count, showAll: showsAllDeliveries || all.count <= Self.firstDeliveries ? nil : { showsAllDeliveries = true })
             }
         }

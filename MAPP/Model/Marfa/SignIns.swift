@@ -160,6 +160,9 @@ extension Keychain.Failure: KeychainRefusal {}
 /// The package's sign-in, kept in the Keychain under a service of the app's own, so a Debug build never reads or
 /// replaces the installed app's sign-ins.
 nonisolated struct SystemSignIns: SignIns {
+    /// The name MAPP signs in under, which the server shows for what MAPP makes, such as a webhook.
+    static let clientName = "MAPP"
+
     /// What the app asks the owner to approve: every item to read and write, and every edge (relationships, links
     /// and attachments), which the server grants apart from items (`edge.*`). With them the three permissions its
     /// features use: Permanently Delete (`items.purge`), This Marfa (`config.manage`) and a type's icon
@@ -198,7 +201,7 @@ nonisolated struct SystemSignIns: SignIns {
 
     func authorization(for connection: MarfaConnection, asking permissions: Set<InstancePermission> = []) throws -> Authorization {
         let client = Authorization.Client(
-            name: "MAPP", redirect: URL(string: scheme + ":/signed-in"), scopes: Self.scopes,
+            name: Self.clientName, redirect: URL(string: scheme + ":/signed-in"), scopes: Self.scopes,
             permissions: permissions.sorted { $0.rawValue < $1.rawValue })
         return try Authorization(server: connection.address, client: client, service: service)
     }

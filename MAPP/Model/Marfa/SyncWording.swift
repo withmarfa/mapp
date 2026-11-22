@@ -556,7 +556,7 @@ extension InstancePermission {
         case .grantsManage: String(localized: "list, narrow and revoke other apps’ access")
         case .instanceMaintain: String(localized: "update the server and run its housekeeping")
         case .instanceRead: String(localized: "read the server’s health and status")
-        case .keysManage: String(localized: "list and revoke keys")
+        case .keysManage: String(localized: "list, extend and revoke keys")
         case .keysMint: String(localized: "make keys")
         case .signInsManage: String(localized: "manage the owner’s sign-ins and passkeys")
         case .webhooksManage: String(localized: "manage webhooks")

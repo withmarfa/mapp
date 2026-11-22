@@ -44,9 +44,7 @@ Nine pages in three groups: General, Appearance and Keyboard; Editor, Lists, Lay
 
 Only the agreed changes are listed. A change marked "needs a server change" waits on Marfa first.
 
-- **Webhooks.** Every app's, grouped by the app that made them. The owner can end any of them (needs a server change). The page that lists MAPP's own webhooks is built.
-- **A key.** Extend… beside the expiry date, for the owner. The secret keeps working (needs a server change).
-- **Built:** Overview, Account, Apps, Keys, Addresses, Sources, Recently Deleted, History, File Storage, Webhooks, a read-only Folders, Backups, Updates, Housekeeping, Activity, Monitoring (was Reporting), Limits (new) and Start-Up (read-only) are in [The Marfa's half of Settings](marfa-settings.md).
+- **Built:** Overview, Account, Apps, Keys (with Extend… beside the expiry date, which keeps the secret), Addresses, Sources, Recently Deleted, History, File Storage, Webhooks (every app's, grouped by who made them, any of which the owner can end), a read-only Folders, Backups, Updates, Housekeeping, Activity, Monitoring (was Reporting), Limits (new) and Start-Up (read-only) are in [The Marfa's half of Settings](marfa-settings.md).
 - **Plugins, Connectors and Types** are drawn and agreed separately, and wait on server work.
 
 ### Settings sync through Marfa

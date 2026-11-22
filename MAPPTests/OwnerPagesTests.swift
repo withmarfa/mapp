@@ -26,6 +26,8 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         var apps: [AppAccess] = []
         var names: [String: String] = [:]
         var keys: [KeyInfo] = []
+        /// Who the sign-in is: a signed-in app, with no expiry of its own, unless a test says otherwise.
+        var identity = OwnIdentity(keyID: nil, expires: nil)
         var settings = AddressSettings(
             instanceID: "instance-1", signIn: "https://marfa.test", addresses: ["https://marfa.test", "https://100.84.12.7"], websites: [])
         var reach = AddressPlan.Reach.notAsked
@@ -221,7 +223,11 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
             state.changes.append((id, change))
             if let label = change.label { state.keys[index].label = label }
             if let tier = change.tier { state.keys[index].tier = tier }
-            if let expires = change.expires { state.keys[index].expires = expires }
+            switch change.expires {
+            case .on(let date)?: state.keys[index].expires = date
+            case .never?: state.keys[index].expires = nil
+            case nil: break
+            }
             if let types = change.types { state.keys[index].types = types }
             if let permissions = change.permissions { state.keys[index].permissions = permissions }
             return state.keys[index]
@@ -234,6 +240,11 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
             guard state.keys.contains(where: { $0.id == id }) else { throw .notFound }
             state.keys.removeAll { $0.id == id }
         }
+    }
+
+    func identity() async throws(OwnerFailure) -> OwnIdentity {
+        try enter("identity")
+        return state.withLock { $0.identity }
     }
 
     func addresses() async throws(OwnerFailure) -> AddressSettings {
@@ -1159,19 +1170,133 @@ nonisolated final class FakeOwnerCalls: OwnerCalls {
         #expect(drafts.takeAll().isEmpty, "a blank name is nothing to keep")
     }
 
-    @Test func aKeyIsMadeToExpireSoonerAfterAskingAndNeverLater() async throws {
-        let ends = Date.now.addingTimeInterval(86_400 * 30)
+    // MARK: Extend
+
+    private static let day: TimeInterval = 86_400
+
+    @Test func aKeyOffersOnlyDaysLaterThanItsOwnEndAndNeverWhereMAPPsSignInDoesNotEnd() async {
+        let bench = bench([key(expires: .now.addingTimeInterval(Self.day * 10))])
+        let model = KeysModel(context: bench.context)
+        await model.load()
+        #expect(model.extensions(of: model.keys[0]) == [.days(30), .days(90), .days(365), .never], "7 days is sooner than it ends")
+        bench.calls.state.withLock { $0.keys[0].expires = nil }
+        await model.load()
+        #expect(model.extensions(of: model.keys[0]).isEmpty, "a key that never ends has nothing to extend")
+    }
+
+    @Test func whenMAPPsOwnSignInEndCantBeReadNothingIsOfferedNotNeverAndNotPastIt() async {
+        let bench = bench([key(expires: .now.addingTimeInterval(Self.day * 10))])
+        bench.calls.fail("identity", with: .unreachable)
+        let model = KeysModel(context: bench.context)
+        await model.load()
+        #expect(model.failure == nil, "the keys are listed")
+        #expect(model.extensions(of: model.keys[0]).isEmpty, "unknown is not the same as no limit")
+        #expect(model.identityFailure == .unreachable, "the page shows the failure with Try Again")
+        model.beginExtend(model.keys[0])
+        #expect(model.sheet == nil, "there is nothing to extend to")
+        bench.calls.fail("identity", with: nil)
+        await model.load()
+        #expect(model.identityFailure == nil)
+        #expect(model.extensions(of: model.keys[0]) == [.days(30), .days(90), .days(365), .never])
+    }
+
+    @Test func aKeyIsHeldToTheEndOfTheKeyMAPPIsSignedInWith() async {
+        let bench = bench([key(expires: .now.addingTimeInterval(Self.day * 10))])
+        bench.calls.state.withLock {
+            $0.identity = OwnIdentity(keyID: "me", expires: .now.addingTimeInterval(Self.day * 100))
+        }
+        let model = KeysModel(context: bench.context)
+        await model.load()
+        #expect(model.extensions(of: model.keys[0]) == [.days(30), .days(90)], "none past the caller's own end, and never is past every end")
+        bench.calls.state.withLock { $0.keys[0].expires = .now.addingTimeInterval(Self.day * 100) }
+        await model.load()
+        #expect(model.extensions(of: model.keys[0]).isEmpty)
+    }
+
+    @Test func extendingSendsOnlyALaterDateAndKeepsTheKey() async throws {
+        let ends = Date.now.addingTimeInterval(Self.day * 10)
         let bench = bench([key(expires: ends)])
         let model = KeysModel(context: bench.context)
         await model.load()
-        model.askToExpire(model.keys[0], on: ends.addingTimeInterval(86_400))
-        #expect(model.question == nil, "a later date is not offered")
-        let sooner = ends.addingTimeInterval(-86_400 * 10)
-        model.askToExpire(model.keys[0], on: sooner)
-        let question = try #require(model.question)
-        #expect(!bench.calls.calls.contains("change"))
-        await model.confirm(question)
-        #expect(model.keys[0].expires == sooner)
+        model.beginExtend(model.keys[0])
+        #expect(model.sheet == .extend("k1"))
+        #expect(model.extensionChoice == .days(30), "the first choice is the nearest later one")
+        model.extensionChoice = .days(90)
+        await model.extend()
+        let sent = bench.calls.state.withLock { $0.changes }
+        #expect(sent.count == 1)
+        let want = try #require(KeysModel.Extension.days(90).date())
+        guard case .on(let sentDate)? = sent[0].change.expires else { Issue.record("an expiry is sent"); return }
+        #expect(abs(sentDate.timeIntervalSince(want)) < 5)
+        #expect(sent[0].change == KeyChange(expires: .on(sentDate)), "nothing but the expiry is sent")
+        #expect(model.sheet == nil)
+        #expect((model.keys[0].expires ?? .distantPast) > ends)
+        #expect(model.keys[0].source == "importer" && model.keys[0].permissions == ["items.purge"], "the key itself is unchanged")
+    }
+
+    @Test func extendingToNeverClearsTheEnd() async {
+        let bench = bench([key(expires: .now.addingTimeInterval(Self.day * 10))])
+        let model = KeysModel(context: bench.context)
+        await model.load()
+        model.beginExtend(model.keys[0])
+        model.extensionChoice = .never
+        await model.extend()
+        #expect(bench.calls.state.withLock { $0.changes.map(\.change.expires) } == [.never])
+        #expect(model.keys[0].expires == nil)
+    }
+
+    @Test func aRefusedExtensionKeepsTheSheetAndTheChoiceWithOneLine() async {
+        let bench = bench([key(expires: .now.addingTimeInterval(Self.day * 10))])
+        let model = KeysModel(context: bench.context)
+        await model.load()
+        model.beginExtend(model.keys[0])
+        model.extensionChoice = .days(365)
+        bench.calls.fail("change", with: .notPermitted("keys.manage"))
+        await model.extend()
+        #expect(model.sheet == .extend("k1") && model.extensionChoice == .days(365))
+        #expect(model.extendError == "MAPP isn’t allowed to give a key more time.")
+        #expect(bench.refreshed == 1, "the server's answer wins over what MAPP thinks it holds")
+        bench.calls.fail("change", with: .notPermitted(nil))
+        await model.extend()
+        #expect(model.extendError == "Choose a date before MAPP’s sign-in ends.")
+        bench.calls.fail("change", with: .unreachable)
+        await model.extend()
+        #expect(model.extendError == "MAPP can’t reach the server. Nothing was changed.")
+        #expect(model.sheet == .extend("k1"))
+        bench.calls.fail("change", with: nil)
+        await model.extend()
+        #expect(model.sheet == nil && model.extendError == nil)
+    }
+
+    @Test func aKeyRevokedElsewhereWhileExtendingIsToldGone() async {
+        let bench = bench([key(expires: .now.addingTimeInterval(Self.day * 10))])
+        let model = KeysModel(context: bench.context)
+        await model.load()
+        model.beginExtend(model.keys[0])
+        bench.calls.state.withLock { $0.keys = [] }
+        await model.extend()
+        #expect(model.isGone("k1") && model.key("k1") == nil)
+        #expect(model.extendError == "It was removed somewhere else.")
+    }
+
+    @Test func extendingNeedsManageKeys() async {
+        let bench = bench([key(expires: .now.addingTimeInterval(Self.day * 10))])
+        let model = KeysModel(context: bench.context)
+        await model.load()
+        #expect(model.canExtend)
+        bench.grants.remove(.keysManage)
+        #expect(!model.canExtend)
+    }
+
+    @Test func aSheetLeftOpenWhenSettingsClosesHasNothingToKeep() async {
+        let bench = bench([key(expires: .now.addingTimeInterval(Self.day * 10))])
+        let model = KeysModel(context: bench.context)
+        let drafts = OwnerDrafts()
+        drafts.register(model)
+        await model.load()
+        model.beginExtend(model.keys[0])
+        #expect(drafts.takeAll().isEmpty)
+        #expect(model.sheet == nil)
     }
 
     @Test func revokingAsksFirstAndGoesBack() async throws {

@@ -147,12 +147,12 @@ enum SettingsTokens {
         /// padding whatever its shape, as in System Settings' sidebar.
         static let tileRounding: CGFloat = 0.27
         static let tileGlyph: CGFloat = 0.62
+        /// A well's symbol or mark, as a share of its side: 12 points in the 24 point well.
+        static let wellGlyph: CGFloat = 0.5
         static let headTile: CGFloat = 44
         /// A small search field at a list's trailing edge, and the button beside it that changes what it searches by.
         static let searchWidth: CGFloat = 200
         static let searchSpacing: CGFloat = 8
-        /// The width of every pop-up: enough for the longest choice in common use, such as Where I Left Off.
-        static let popUpWidth: CGFloat = 200
         /// The sidebar's tile.
         static let sidebarTile: CGFloat = 20
         /// How far a sidebar section's name is moved in so that it starts where the tiles below it do; the system sets the

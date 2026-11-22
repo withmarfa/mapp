@@ -84,20 +84,30 @@ struct SettingsMoreMenu<Content: View>: View {
     }
 }
 
-/// A pop-up of choices, as the system draws it at its regular size, at the one width every pop-up of Settings has
-/// (`SettingsTokens.Metric.popUpWidth`), so those of a page line up in a column at the rows' trailing edge.
+extension View {
+    /// The system's menu pop-up at Settings' one input size: 200 wide, and 28 tall, which the large control size draws.
+    /// Without the flexible sizing the system pop-up fits its title instead of filling the width.
+    func settingsPopUpSize() -> some View {
+        controlSize(.large)
+            .buttonSizing(.flexible)
+            .frame(width: SettingsTokens.Metric.controlWidth)
+    }
+}
+
+/// A pop-up of choices, as the system draws it, at the one width every pop-up of Settings has, so those of a page line
+/// up in a column at the rows' trailing edge. `isError` puts the red ring round it.
 struct SettingsPopUp<Value: Hashable, Content: View>: View {
     let title: LocalizedStringKey
     @Binding var selection: Value
+    var isError = false
     @ViewBuilder let content: Content
 
     var body: some View {
         Picker(title, selection: $selection) { content }
             .labelsHidden()
             .pickerStyle(.menu)
-            .buttonSizing(.flexible)
-            .controlSize(.large)
-            .frame(width: SettingsTokens.Metric.popUpWidth)
+            .settingsPopUpSize()
+            .settingsErrorRing(isError)
     }
 }
 

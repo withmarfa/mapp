@@ -196,8 +196,7 @@ nonisolated enum MarfaMapping {
             id: TypeID(type.id), label: type.label ?? type.id, plural: type.plural,
             fields: type.fields.map { field($0, statusWords: $0.name == type.statusField ? type.statusWords : []) },
             titleField: type.titleField, bodyField: type.bodyField, parent: type.parent.map { TypeID($0) }, icon: type.icon,
-            description: type.description, version: type.version, roles: type.roles,
-            compatibleWith: type.compatibleWith.map { TypeID($0) }, linkField: type.linkField)
+            description: type.description, version: type.version, roles: type.roles, linkField: type.linkField)
     }
 
     private static func field(_ field: Marfa.TypeField, statusWords: [Marfa.StatusWord] = []) -> ItemTypeInfo.Field {

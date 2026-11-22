@@ -241,7 +241,7 @@ private func catalogue() -> Catalogue {
         fields["isbn"] = Definition(_type: .string, required: true)
         let definition = Components.Schemas.TypeDefinition(
             id: entry.rawValue, label: "Entry", plural: "Entries", description: "A book", parent: media.rawValue,
-            compatibleWith: ["core.media"], roles: [.container],
+            roles: [.container],
             fields: .init(additionalProperties: fields),
             tables: .init(additionalProperties: [:]), version: 7,
             displayHints: .init(titleField: "title", bodyField: "notes", icon: "lucide:book"), linkField: "isbn")
@@ -267,7 +267,6 @@ private func catalogue() -> Catalogue {
         #expect(update.roles == ["container"])
         #expect(update.displayHints?.icon == "lucide:book" && update.displayHints?.bodyField == "notes")
         #expect(update.linkField == "isbn")
-        #expect(update.compatibleWith?.value2 == ["core.media"])
     }
 
     @Test func aFieldTheParentDeclaresIsNeverWrittenIntoTheChild() throws {
@@ -318,7 +317,7 @@ private func catalogue() -> Catalogue {
         var replaced = 0
         let parent = Components.Schemas.TypeDefinition(
             id: media.rawValue, label: "Media", plural: "Media", description: "Media", parent: nil,
-            compatibleWith: [], roles: [],
+            roles: [],
             fields: .init(additionalProperties: ["genre": Definition(_type: .string, label: "Genre")]),
             tables: .init(additionalProperties: [:]), version: 1,
             displayHints: .init(titleField: "title"), linkField: nil)

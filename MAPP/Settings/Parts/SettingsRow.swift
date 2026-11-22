@@ -26,16 +26,18 @@ enum SettingsLead {
     }
 }
 
-/// The hairline tile an app, a source or a connector takes in a row's lead column, around what stands for it.
+/// The hairline tile an app, a source, a connector or a webhook takes around what stands for it: a row's lead column by
+/// default, or a head's large tile at `SettingsTokens.Metric.headTile`.
 struct SettingsWell<Content: View>: View {
+    var size: CGFloat = SettingsTokens.Metric.tile
     @ViewBuilder let content: Content
 
     var body: some View {
         RoundedRectangle(cornerRadius: SettingsTokens.Metric.controlRadius, style: .continuous)
             .fill(SettingsTokens.card)
-            .frame(width: SettingsTokens.Metric.tile, height: SettingsTokens.Metric.tile)
+            .frame(width: size, height: size)
             .overlay { RoundedRectangle(cornerRadius: SettingsTokens.Metric.controlRadius, style: .continuous).strokeBorder(SettingsTokens.hairline, lineWidth: 1) }
-            .overlay { content.font(.system(size: 12)).foregroundStyle(SettingsTokens.secondaryText) }
+            .overlay { content.font(.system(size: size * SettingsTokens.Metric.wellGlyph)).foregroundStyle(SettingsTokens.secondaryText) }
     }
 }
 

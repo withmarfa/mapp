@@ -70,8 +70,14 @@ extension LiveMarfaTests {
                     _ = try await calls.change(made.id, KeyChange(types: ["*": .write]))
                 }
                 let sooner = Date.now.addingTimeInterval(86_400)
-                let expiring = try await calls.change(made.id, KeyChange(expires: sooner))
+                let expiring = try await calls.change(made.id, KeyChange(expires: .on(sooner)))
                 #expect(abs((expiring.expires ?? .distantPast).timeIntervalSince(sooner)) < 1)
+                let later = Date.now.addingTimeInterval(86_400 * 30)
+                let extended = try await calls.change(made.id, KeyChange(expires: .on(later)))
+                #expect(abs((extended.expires ?? .distantPast).timeIntervalSince(later)) < 1, "a later expiry is taken, as the key is not held to narrowing")
+                #expect(extended.types == narrowed.types && extended.permissions == narrowed.permissions, "only the expiry changed")
+                let endless = try await calls.change(made.id, KeyChange(expires: .never))
+                #expect(endless.expires == nil, "null clears the expiry")
             } catch {
                 result = .failure(error)
             }
@@ -94,6 +100,9 @@ extension LiveMarfaTests {
                 #expect(listed.secretTail == made.webhook.secretTail, "a read holds only the last four characters")
                 #expect(listed.typeFilter == "core.note")
                 #expect(listed.maker?.id.isEmpty == false)
+                let identity = try await calls.identity()
+                #expect(identity.keyID != nil, "a key's own read answers the key")
+                #expect(try #require(listed.maker).kind == .key && identity.made(try #require(listed.maker)), "the webhook this key made is its own")
                 let events = try await calls.change(webhook: made.webhook.id, WebhookChange(events: ["item.created"]))
                 #expect(events.events == ["item.created"])
                 #expect(events.url == made.webhook.url, "a change names only what it sends")

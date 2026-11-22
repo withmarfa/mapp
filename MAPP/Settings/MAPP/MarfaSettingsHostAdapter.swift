@@ -101,6 +101,10 @@ enum LibraryDescription {
 
     func markTitle(_ id: String) -> String { IconNameSearch.title(of: id) }
 
+    func typeMark(for pattern: String) -> AnyView {
+        AnyView(TypeMark(icon: libraries.current?.catalogue.itemTypes[TypeID(pattern)]?.icon, size: .side))
+    }
+
     var serverName: String { LibraryDescription.name(libraries) }
     var serverAddress: String? { host.configuredConnection?.address.absoluteString }
 

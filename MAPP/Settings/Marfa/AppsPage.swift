@@ -139,7 +139,7 @@ private struct AppDetail: View {
                     SettingsRow("Reaches No Items", look: .off)
                 }
                 ForEach(parsed.entries) { entry in
-                    SettingsRow(verbatim: AccessScopes.title(of: entry.pattern, names: model.typeNames), lead: .symbol("tray.full")) {
+                    SettingsRow(verbatim: AccessScopes.title(of: entry.pattern, names: model.typeNames), lead: .custom(host.typeMark(for: entry.pattern))) {
                         SettingsPopUp(title: "Access", selection: Binding { entry.level } set: { model.askToNarrow(app, pattern: entry.pattern, to: $0) }) {
                             ForEach(AccessLevel.allCases.filter { $0 <= entry.level }, id: \.self) { Text(verbatim: $0.title).tag($0) }
                         }

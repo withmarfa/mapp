@@ -183,7 +183,7 @@ struct MarfaMappingTests {
                 ItemType(
                     id: "core.contact", label: "Contact", description: "A person.", version: 4,
                     fields: [TypeField(name: "name", type: "string", required: true, description: "Full name", declaredBy: "core.contact")],
-                    roles: ["person"], compatibleWith: ["core.entity"])
+                    roles: ["person"])
             ],
             edgeTypes: [
                 EdgeType(
@@ -195,7 +195,7 @@ struct MarfaMappingTests {
             ])
         let contact = try #require(catalogue.itemTypes[TypeID("core.contact")])
         #expect(contact.description == "A person." && contact.version == 4)
-        #expect(contact.roles == ["person"] && contact.compatibleWith == [TypeID("core.entity")])
+        #expect(contact.roles == ["person"])
         #expect(contact.fields.first?.required == true && contact.fields.first?.description == "Full name")
         let knows = try #require(catalogue.edgeTypes["knows"])
         #expect(knows.description == "Two people know each other.")
