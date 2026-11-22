@@ -16,10 +16,11 @@ struct IndexTabsToolbarItem: CustomizableToolbarContent {
 
 /// What the page's buttons are in the toolbar once the page's title has scrolled away: Edit, Search, Filter and New,
 /// then the page's View Options. Edit is on Items whether or not the page is scrolled, since it has no counterpart
-/// on the page. The rest are absent while the page's own buttons show. Search is the toolbar's field, which takes the
+/// on the page, but only while the page shows its New tiles (Settings > Lists). The rest are absent while the page's own buttons show. Search is the toolbar's field, which takes the
 /// text and the open state of the page's.
 struct IndexToolbarItems: CustomizableToolbarContent {
     @Bindable var browser: Browser
+    @AppStorage(ListKey.showsQuickAdd) private var showsQuickAdd = false
 
     var body: some CustomizableToolbarContent {
         let showsTools = browser.showsIndexTools && browser.indexPlaceHasTools
@@ -27,7 +28,7 @@ struct IndexToolbarItems: CustomizableToolbarContent {
             IndexEditButton(browser: browser)
         }
         .customizationBehavior(.disabled)
-        .hidden(browser.indexPlace != .items)
+        .hidden(browser.indexPlace != .items || !showsQuickAdd)
         ColumnSearch(
             isExpanded: $browser.isSearchExpanded,
             text: $browser.searchText,
@@ -112,6 +113,7 @@ private struct IndexNewButton: View {
 /// tab shown, the filter and the New row's Edit.
 struct IndexPageCommands: View {
     @Bindable var browser: Browser
+    @AppStorage(ListKey.showsQuickAdd) private var showsQuickAdd = false
     let place: IndexPlace
     let shortcuts: ShortcutBindings
     @AppStorage private var stored: IndexTab
@@ -133,7 +135,7 @@ struct IndexPageCommands: View {
             Button(browser.toggleFiltersTitle) { browser.toggleIndexFilter() }
                 .shortcut(.toggleFilters, shortcuts)
         }
-        if place == .items {
+        if place == .items, showsQuickAdd {
             Button("Edit New Row…") { browser.isEditingNewRow = true }
         }
     }
