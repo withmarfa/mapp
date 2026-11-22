@@ -51,6 +51,18 @@ nonisolated struct DateFormat: Hashable, Sendable, RawRepresentable {
         self.time = time
     }
 
+    // RawRepresentable's own `==` and `hash(into:)` would encode the JSON form each time, and every table cell compares
+    // its format whenever the table is drawn.
+    static func == (lhs: DateFormat, rhs: DateFormat) -> Bool {
+        lhs.usesWords == rhs.usesWords && lhs.date == rhs.date && lhs.time == rhs.time
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(usesWords)
+        hasher.combine(date)
+        hasher.combine(time)
+    }
+
     /// The stored form. A field it lacks is the standard's, so a value saved before the field existed still reads.
     private struct Stored: Codable {
         var usesWords: Bool?

@@ -239,4 +239,12 @@ struct DateDisplayTests {
         let format = try #require(DateFormat(rawValue: #"{"date":"long"}"#))
         #expect(format == DateFormat(usesWords: true, date: .long, time: .system))
     }
+
+    @Test func formatsAreEqualByTheirChoicesAndRoundTripThroughTheStoredForm() throws {
+        let format = DateFormat(usesWords: false, date: .numeric, time: .twentyFourHour)
+        #expect(format == DateFormat(usesWords: false, date: .numeric, time: .twentyFourHour))
+        #expect(format != DateFormat(usesWords: false, date: .numeric, time: .twelveHour))
+        #expect(Set([format, DateFormat(usesWords: false, date: .numeric, time: .twentyFourHour)]).count == 1)
+        #expect(try #require(DateFormat(rawValue: format.rawValue)) == format)
+    }
 }

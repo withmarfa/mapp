@@ -21,9 +21,6 @@ struct ItemTable: View {
     @State private var isUnderToolbar = false
     @State private var hover = ItemTableHover()
     @State private var placeTrace = TablePlaceTrace()
-    /// How far the window's sidebar or Edit View covers the pane's trailing edge. The pane runs on under that panel,
-    /// but the table's scroll view does not keep clear of it, so its last columns would sit under the panel out of reach.
-    @State private var trailingCover: CGFloat = 0
 
     /// The inset style's own margin before the first column.
     static let inset: CGFloat = 16
@@ -44,8 +41,6 @@ struct ItemTable: View {
 
         table(columns: content.columns, pages: pages, grouping: content.grouping, collapsed: content.collapsed)
             .padding(.horizontal, Self.margin)
-            .padding(.trailing, trailingCover)
-            .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.trailing } action: { trailingCover = $0 }
             .searchStatus(browser)
             .overlay {
                 if allRows.isEmpty {
