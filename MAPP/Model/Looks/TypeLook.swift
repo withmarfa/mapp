@@ -45,7 +45,7 @@ nonisolated enum LookFact: Hashable, Sendable {
 
 /// How one type looks wherever its items are listed or shown as cards or rows of a table: the date, the line under the
 /// title and the facts on the bottom line. A type with a status field always shows its status first, so the status
-/// is no fact. It is the one look every view reads; a view adds only its layout and density.
+/// is no fact. A view reads it until that view's Properties list changes the facts, the status or the type.
 nonisolated struct TypeLook: Hashable, Sendable {
     var date: LookDate
     /// At most two parts (`maxSecondary`), in order.

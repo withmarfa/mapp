@@ -63,6 +63,34 @@ nonisolated struct ViewProperties: Codable, Hashable, Sendable {
         order = spliced == own ? [] : spliced
     }
 
+    /// The order a table header drag wrote. The header lists only the shown columns, so a hidden one and a stored
+    /// identifier the place lacks keep their places, and the name stays first. A drag that is not those shown columns
+    /// rearranged is ignored, and an order that matches the place's own is stored as none.
+    mutating func adoptHeaderOrder(_ header: [String], in columns: [ItemTableColumn]) {
+        let own = columns.filter { $0.content != .title }.map(\.id)
+        let title = columns.first { $0.content == .title }?.id
+        let shown = Set(shownColumns(columns).map(\.id))
+        var seen = Set<String>()
+        let dragged = header.filter { id in id != title && shown.contains(id) && seen.insert(id).inserted }
+        guard !dragged.isEmpty else { return }
+        var seenAll = Set<String>()
+        var full = order.filter { seenAll.insert($0).inserted }
+        full += own.filter { seenAll.insert($0).inserted }
+        let shownNow = full.filter { shown.contains($0) }
+        guard Set(dragged) == Set(shownNow) else { return }
+        var index = dragged.startIndex
+        var next: [String] = []
+        for id in full {
+            if shown.contains(id) {
+                next.append(dragged[index])
+                index = dragged.index(after: index)
+            } else {
+                next.append(id)
+            }
+        }
+        order = next == own ? [] : next
+    }
+
     /// Use Layouts: the list as each type's look gives it.
     mutating func reset() {
         self = ViewProperties()

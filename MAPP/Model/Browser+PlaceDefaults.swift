@@ -1,8 +1,8 @@
 import Foundation
 
 /// The default view of a place that is not a saved view: what a person changes there is kept on this Mac (`PlaceDefaults`,
-/// with the columns and density the place already keeps), so the place opens as they left it, in every window and every
-/// launch. It cannot be renamed or deleted; Reset View puts it back.
+/// with the Properties list, the column widths and the density the place already keeps), so the place opens as they left
+/// it, in every window and every launch. It cannot be renamed or deleted; Reset View puts it back.
 ///
 /// Two windows on one place both write to the same entry, so the last change wins. A window shows what it holds until it
 /// opens the place again, which reads the entry again, and so picks up the other window's change then.

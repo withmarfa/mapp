@@ -58,6 +58,12 @@ struct ViewLayoutsTests {
         #expect(layouts.settings(for: ItemID("view-c"))?.properties == ViewProperties())
     }
 
+    @Test func aViewsStoredColumnsReadAsItsProperties() throws {
+        let text = #"{"view-old":{"columns":{"order":["created","type"],"shown":{"created":true,"edited":false}}}}"#
+        let settings = try #require(ViewLayouts(rawValue: text)?.settings(for: ItemID("view-old")))
+        #expect(settings.properties == ViewProperties(order: ["created", "type"], shown: ["created": true, "edited": false]))
+    }
+
     @Test func aDeletedViewIsForgotten() {
         let defaults = Self.defaults()
         ViewLayouts.update(in: defaults) {

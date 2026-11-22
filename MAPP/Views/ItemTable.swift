@@ -186,12 +186,10 @@ struct ItemTable: View {
         browser.tableOptions[browser.item, default: .init()].collapsed = next
     }
 
-    /// What the header may not do with a column: the name always shows, and the order is the Properties list's, which
-    /// the header cannot hold. One call sets the whole set, as a second would replace the first.
+    /// What the header may not do with a column. The name always shows and stays first. Any other column can be hidden
+    /// or reordered, and both write the Properties list. One call sets the whole set, as a second would replace the first.
     static func disabledCustomization(of column: ItemTableColumn) -> TableColumnCustomizationBehavior {
-        var disabled: TableColumnCustomizationBehavior = [.reorder]
-        if column.content == .title { disabled.insert(.visibility) }
-        return disabled
+        column.content == .title ? [.visibility, .reorder] : []
     }
 
     /// How many items show, and of how many once a filter hides some.
@@ -219,8 +217,8 @@ struct ItemTable: View {
 
     /// The table's column widths, which a place keeps for itself and a saved view keeps on its own. The table reads and
     /// writes it directly, so a change of place never shows the previous place's columns. The shown columns and their
-    /// order are the Properties list's (`ViewProperties`), so a header that hides one is routed there, and what is
-    /// left for the table to keep is the widths alone.
+    /// order are the Properties list's (`ViewProperties`), so a header that hides or reorders one is routed there, and
+    /// what is left for the table to keep is the widths alone.
     private func customization(_ columns: [ItemTableColumn]) -> Binding<TableColumnCustomization<ItemTableRow>> {
         Binding {
             var widths: TableColumnCustomization<ItemTableRow>
@@ -232,6 +230,9 @@ struct ItemTable: View {
             }
             return Self.widthsOnly(widths, columns)
         } set: { next in
+            if let data = try? JSONEncoder().encode(next), let header = Self.headerOrder(in: data) {
+                browser.changeProperties { $0.adoptHeaderOrder(header, in: columns) }
+            }
             for column in columns where column.content != .title && next[visibility: column.id] == .hidden {
                 browser.setColumn(column, shown: false)
             }
@@ -252,6 +253,19 @@ struct ItemTable: View {
         for column in columns where column.content != .title { widths[visibility: column.id] = .automatic }
         widths.resetOrder()
         return widths
+    }
+
+    /// The column identifiers a header drag wrote, or nil when this customization has no order (a resize or a hide).
+    /// `TableColumnCustomization` keeps the order only in the data it encodes, under `columnOrder`.
+    nonisolated static func headerOrder(in data: Data) -> [String]? {
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let order = object["columnOrder"] else { return nil }
+        let entries = order as? [[String: Any]] ?? []
+        return entries.compactMap { entry in
+            let base = entry["base"] as? [String: Any]
+            let explicit = base?["explicit"] as? [String: Any]
+            return explicit?["_0"] as? String
+        }
     }
 }
 

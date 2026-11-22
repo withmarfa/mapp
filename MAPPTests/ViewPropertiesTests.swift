@@ -139,6 +139,33 @@ struct ViewPropertiesTests {
         #expect(shown.firstIndex(of: "field.priority")! < shown.firstIndex(of: "field.status")!)
     }
 
+    @Test func aHeaderDragReordersTheShownPropertiesAndLeavesAHiddenOneAndAStaleName() throws {
+        let columns: [ItemTableColumn] = [.title, .type, .edited, .created, .tags]
+        var properties = ViewProperties(order: ["gone", "created"], shown: ["created": true])
+        properties.adoptHeaderOrder(["title", "edited", "type", "created"], in: columns)
+        #expect(Self.ids(properties.shownColumns(columns)) == ["title", "edited", "type", "created"])
+        let stored = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(properties)) as? [String: Any])
+        #expect(stored["order"] as? [String] == ["gone", "edited", "type", "created", "tags"])
+    }
+
+    @Test func aHeaderDragBackToThePlacesOrderClearsTheStoredOrder() {
+        let columns: [ItemTableColumn] = [.title, .type, .edited, .created, .tags]
+        var properties = ViewProperties(order: ["edited", "type", "created", "tags"])
+        properties.adoptHeaderOrder(["type", "edited"], in: columns)
+        #expect(properties == ViewProperties())
+    }
+
+    @Test func aHeaderDragThatIsNotTheShownColumnsIsIgnored() {
+        let columns: [ItemTableColumn] = [.title, .type, .edited, .created, .tags]
+        var properties = ViewProperties()
+        properties.adoptHeaderOrder(["edited"], in: columns)
+        properties.adoptHeaderOrder(["title"], in: columns)
+        properties.adoptHeaderOrder(["edited", "edited"], in: columns)
+        #expect(properties == ViewProperties())
+        properties.adoptHeaderOrder(["edited", "type"], in: columns)
+        #expect(Self.ids(properties.shownColumns(columns)) == ["title", "edited", "type"])
+    }
+
     // MARK: What a layout lists
 
     @Test func aTableListsEveryColumnAndAnotherLayoutOnlyWhatAChipCanSay() {
