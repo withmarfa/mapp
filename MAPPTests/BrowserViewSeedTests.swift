@@ -68,12 +68,11 @@ struct BrowserViewSeedTests {
             browser.viewMode = mode
             // The layout alone is a change too; the view is taken to have been saved in it, to see the filter's.
             Self.take(mode, in: browser)
-            browser.tableOptions[browser.item]?.filters = ["field.status": ["todo"]]
+            browser.tableOptions[browser.item]?.filter = FilterState(is: ["field.status": ["todo"]])
             #expect(browser.hasViewChanges, "\(mode) did not count a filter")
-            browser.tableOptions[browser.item]?.negated = ["field.status"]
+            browser.tableOptions[browser.item]?.filter = FilterState(clauses: [FilterClause(field: "field.status", op: .isNot, values: ["todo"])])
             #expect(browser.hasViewChanges)
-            browser.tableOptions[browser.item]?.filters = [:]
-            browser.tableOptions[browser.item]?.negated = []
+            browser.tableOptions[browser.item]?.filter = FilterState()
             #expect(!browser.hasViewChanges, "\(mode) kept a change after the filter went")
         }
     }
@@ -81,16 +80,16 @@ struct BrowserViewSeedTests {
     @Test func isNotIsAChangeFromIs() {
         let (browser, library) = Self.opened(Self.view(filter: #"properties.status eq "todo""#))
         #expect(!browser.hasViewChanges)
-        browser.tableOptions[browser.item]?.negated.insert("field.status")
+        browser.tableOptions[browser.item]?.filter = FilterState(clauses: [FilterClause(field: "field.status", op: .isNot, values: ["todo"])])
         #expect(browser.hasViewChanges)
         browser.revertView(in: library)
-        #expect(browser.tableOptions[browser.item]?.negated == [])
+        #expect(browser.tableOptions[browser.item]?.filter.clauses.first?.op == .is)
         #expect(!browser.hasViewChanges)
     }
 
-    @Test func aStaleNegationWithNoFilterIsNoChange() {
+    @Test func aFilterThatSaysTooLittleIsNoChange() {
         let (browser, _) = Self.opened()
-        browser.tableOptions[browser.item]?.negated.insert("field.status")
+        browser.tableOptions[browser.item]?.filter = FilterState(clauses: [FilterClause(field: "field.status", op: .is)])
         #expect(!browser.hasViewChanges)
     }
 
@@ -135,7 +134,7 @@ struct BrowserViewSeedTests {
         browser.viewMode = .board
         browser.tableOptions[browser.item]?.grouping = .none
         browser.tableOptions[browser.item]?.sort = [ItemTableComparator(column: .title)]
-        browser.tableOptions[browser.item]?.filters = ["field.status": ["todo"]]
+        browser.tableOptions[browser.item]?.filter = FilterState(is: ["field.status": ["todo"]])
         browser.timelineFields[browser.item] = "starts_at"
         #expect(browser.hasViewChanges)
         browser.revertView(in: library)
@@ -148,9 +147,9 @@ struct BrowserViewSeedTests {
         let browser = Browser()
         let library = FakeItemLibrary()
         browser.adopt(library)
-        browser.tableOptions[.allItems] = ItemTableOptions(filters: ["field.status": ["todo"]])
+        browser.tableOptions[.allItems] = ItemTableOptions(filter: FilterState(is: ["field.status": ["todo"]]))
         browser.revertView(in: library)
-        #expect(browser.tableOptions[.allItems]?.filters == ["field.status": ["todo"]])
+        #expect(browser.tableOptions[.allItems]?.filter.valuesByField == ["field.status": ["todo"]])
         #expect(!browser.hasViewChanges)
     }
 
@@ -183,7 +182,7 @@ struct BrowserViewSeedTests {
     @Test func anUpdateNamesOnlyWhatChangedAtTheVersionRead() throws {
         let (browser, library) = Self.opened()
         browser.tableOptions[browser.item]?.grouping = .none
-        let window = ViewDraft.Window(place: browser.item, columns: [], sort: [], grouping: nil, filters: [:])
+        let window = ViewDraft.Window(place: browser.item, columns: [], sort: [], grouping: nil)
         let update = try #require(browser.viewUpdate(window, in: library))
         #expect(update.baseVersion == 1)
         #expect(update.change.group == .clear)

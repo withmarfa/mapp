@@ -9,7 +9,7 @@ extension Browser {
     /// Mac holds for it.
     struct ViewSeed: Hashable {
         let version: Int64
-        let options: ItemTableOptions
+        var options: ItemTableOptions
         let timelineDate: String?
         let types: [String]?
         /// What to read the view's items with while the window's filters differ from these (`previewQuery`); nil where
@@ -111,7 +111,7 @@ extension Browser {
     /// view keeps the query of that version, whatever the view has since become elsewhere, as it keeps its filters.
     var viewPreview: (view: ItemID, query: LibraryViewQuery)? {
         guard case .view(let id) = item, let seed = viewSeeds[id], let query = seed.preview,
-              (tableOptions[item] ?? ItemTableOptions()).filterChoices != seed.options.filterChoices else { return nil }
+              !(tableOptions[item] ?? ItemTableOptions()).filter.isSame(as: seed.options.filter) else { return nil }
         return (id, query)
     }
 

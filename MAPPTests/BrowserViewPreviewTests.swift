@@ -57,8 +57,7 @@ struct BrowserViewPreviewTests {
     @Test func aChipTakenOffBringsItsRowsBackAtOnce() {
         let library = Self.library()
         let browser = Self.window(library)
-        browser.tableOptions[browser.item]?.filters = [:]
-        browser.tableOptions[browser.item]?.negated = []
+        browser.tableOptions[browser.item]?.filter = FilterState()
         #expect(browser.hasViewChanges)
         #expect(titles(browser, library) == ["t0", "t1", "t2", "t3"])
         #expect(library.previewsAsked.last == LibraryViewQuery(types: [Self.task], states: [.active]))
@@ -67,20 +66,18 @@ struct BrowserViewPreviewTests {
     @Test func aChangedChipNarrowsThePreviewLocally() {
         let library = Self.library()
         let browser = Self.window(library)
-        browser.tableOptions[browser.item]?.filters = [Self.status: ["todo"]]
-        browser.tableOptions[browser.item]?.negated = []
+        browser.tableOptions[browser.item]?.filter = FilterState(clauses: [FilterClause(field: Self.status, op: .is, values: ["todo"])])
         #expect(titles(browser, library) == ["t0", "t3"])
         // The chip's other values are still on offer, though no row of the saved view held "done".
         let content = browser.tableContent(in: library)
-        let column = content.columns.first { $0.id == Self.status }
-        #expect(column.map { ItemTableLayout.offered(in: content.allRows, by: $0, keeping: ["todo"]).map(\.id) }?.contains("done") == true)
+        let target = content.filterOffer.targets[Self.status]
+        #expect(target?.declared.contains("done") == true)
     }
 
     @Test func revertingReturnsToTheSavedList() {
         let library = Self.library()
         let browser = Self.window(library)
-        browser.tableOptions[browser.item]?.filters = [:]
-        browser.tableOptions[browser.item]?.negated = []
+        browser.tableOptions[browser.item]?.filter = FilterState()
         #expect(titles(browser, library).count == 4)
         browser.revertView(in: library)
         #expect(browser.viewPreview == nil)
@@ -90,8 +87,7 @@ struct BrowserViewPreviewTests {
     @Test func savingMakesTheChangedFiltersTheViewsOwn() {
         let library = Self.library()
         let browser = Self.window(library)
-        browser.tableOptions[browser.item]?.filters = [Self.status: ["todo"]]
-        browser.tableOptions[browser.item]?.negated = []
+        browser.tableOptions[browser.item]?.filter = FilterState(clauses: [FilterClause(field: Self.status, op: .is, values: ["todo"])])
         #expect(browser.viewPreview != nil)
         let saved = Self.view(version: 2, filter: #"properties.status eq "todo""#)
         browser.seed(saved, catalogue: library.catalogue)
@@ -102,8 +98,7 @@ struct BrowserViewPreviewTests {
     @Test func aChangedPreviewListChangesWhatTheWindowDraws() {
         let library = Self.library()
         let browser = Self.window(library)
-        browser.tableOptions[browser.item]?.filters = [:]
-        browser.tableOptions[browser.item]?.negated = []
+        browser.tableOptions[browser.item]?.filter = FilterState()
         let first = browser.tableContent(in: library)
         #expect(browser.tableContent(in: library) === first)
         // A preview that lands later, with no revision of the library's own to tell the table of it.
@@ -114,20 +109,19 @@ struct BrowserViewPreviewTests {
     }
 
     @Test func aConditionTheChipsCannotShowStaysInThePreview() {
-        let view = Self.view(filter: #"tags contains "x" AND properties.status neq "done""#)
+        let view = Self.view(filter: #"id eq "x" AND properties.status neq "done""#)
         let library = Self.library(view)
         let browser = Self.window(library, view: view)
-        browser.tableOptions[browser.item]?.filters = [:]
-        browser.tableOptions[browser.item]?.negated = []
+        browser.tableOptions[browser.item]?.filter = FilterState()
         _ = browser.tableContent(in: library)
-        #expect(library.previewsAsked.last?.filter == #"tags contains "x""#)
+        #expect(library.previewsAsked.last?.filter == #"id eq "x""#)
     }
 
     @Test func aViewWhoseFilterTheCoreRefusesHasNoPreview() {
         let view = Self.view(filter: "not a filter ((")
         let library = Self.library(view)
         let browser = Self.window(library, view: view)
-        browser.tableOptions[browser.item]?.filters = [Self.status: ["todo"]]
+        browser.tableOptions[browser.item]?.filter = FilterState(is: [Self.status: ["todo"]])
         #expect(browser.hasViewChanges)
         #expect(browser.viewPreview == nil)
         // The view's own list, narrowed by the chip.
@@ -139,8 +133,8 @@ struct BrowserViewPreviewTests {
         let view = Self.view(filter: #"properties.status eq "todo" OR properties.done eq true"#)
         let library = Self.library(view)
         let browser = Self.window(library, view: view)
-        #expect(browser.tableOptions[browser.item]?.filters.isEmpty == true)
-        browser.tableOptions[browser.item]?.filters = [Self.status: ["todo"]]
+        #expect(browser.tableOptions[browser.item]?.filter.isEmpty == true)
+        browser.tableOptions[browser.item]?.filter = FilterState(is: [Self.status: ["todo"]])
         _ = browser.tableContent(in: library)
         #expect(library.previewsAsked.last?.filter == view.query.filter)
     }
@@ -148,8 +142,7 @@ struct BrowserViewPreviewTests {
     @Test func aWindowWithChangesKeepsItsPreviewWhenTheViewChangesElsewhere() {
         let library = Self.library()
         let browser = Self.window(library)
-        browser.tableOptions[browser.item]?.filters = [:]
-        browser.tableOptions[browser.item]?.negated = []
+        browser.tableOptions[browser.item]?.filter = FilterState()
         let before = browser.viewPreview
         let elsewhere = Self.view(version: 2, filter: #"properties.status eq "todo""#)
         library.views = [elsewhere]
@@ -162,8 +155,7 @@ struct BrowserViewPreviewTests {
         let library = Self.library()
         let changed = Self.window(library)
         let plain = Self.window(library)
-        changed.tableOptions[changed.item]?.filters = [:]
-        changed.tableOptions[changed.item]?.negated = []
+        changed.tableOptions[changed.item]?.filter = FilterState()
         #expect(titles(changed, library).count == 4)
         #expect(titles(plain, library) == ["t0", "t2", "t3"])
     }

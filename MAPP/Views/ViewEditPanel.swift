@@ -295,7 +295,7 @@ private struct ViewPanelUnkept: View {
     private static func symbol(of unkept: ViewDraft.Unkept) -> String {
         switch unkept {
         case .search: "magnifyingglass"
-        case .filter, .mixedFilters, .tooManyFilters, .refused: "line.3.horizontal.decrease"
+        case .filter, .mixedFilters, .tooManyFilters, .refused, .relativeFilter: "line.3.horizontal.decrease"
         case .sort: "arrow.up.arrow.down"
         case .group, .groupMode: "rectangle.grid.1x2"
         }

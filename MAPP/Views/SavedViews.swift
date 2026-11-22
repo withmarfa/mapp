@@ -43,7 +43,7 @@ enum SavedViews {
         return ViewDraft.Window(
             place: browser.item, columns: content.columns, sort: layoutShows.sort, grouping: grouping, groupMode: groupMode,
             groupOrder: options.groupOrder, hiddenGroups: options.hiddenGroups,
-            filters: options.filters, negated: options.negated, search: search.isEmpty ? nil : search,
+            filter: options.filter, targets: content.filterOffer.targets, search: search.isEmpty ? nil : search,
             layout: layout(of: browser, in: library, order: nil), timelineDate: browser.timelineFields[browser.item],
             seededTypes: seededTypes, dated: layoutShows.isDated ? ViewDraft.Dated(sort: layoutShows.sort, hasSections: layoutShows.hasDateSections) : nil,
             includesSubtypes: browser.stacksSubtypes(in: library))
@@ -155,6 +155,7 @@ enum SavedViews {
         case .mixedFilters: String(localized: "Filters that would join conditions with both “and” and “or”")
         case .tooManyFilters: String(localized: "More than \(ViewDraft.maxConditions) filter conditions")
         case .refused(let message): String(localized: "A filter Marfa refuses: \(message)")
+        case .relativeFilter(let sentence): sentence
         case .sort(let column): String(localized: "Sorting by \(column)")
         case .group(let column): String(localized: "Grouping by \(column)")
         case .groupMode(let column, let mode): String(localized: "Group by \(column): \(mode)")

@@ -30,7 +30,7 @@ import Testing
     @Test func anEditToOneItemShowsInAGroupedAndFilteredTable() async throws {
         let (library, source) = try await BigLibrary.loaded()
         let browser = browser(showing: tasks)
-        browser.tableOptions[tasks] = ItemTableOptions(grouping: .column("field.status"), filters: ["field.status": ["todo"]])
+        browser.tableOptions[tasks] = ItemTableOptions(grouping: .column("field.status"), filter: FilterState(is: ["field.status": ["todo"]]))
         let before = browser.tableContent(in: library)
         let edited = try #require(before.rows.first)
         // Grouped by its words, every word is a group, and only the filter's holds items.
@@ -81,7 +81,7 @@ import Testing
         let (library, _) = try await BigLibrary.loaded()
         let browser = browser(showing: tasks)
         browser.tableOptions[tasks] = ItemTableOptions(
-            sort: [ItemTableComparator(column: .title, order: .reverse)], filters: ["field.status": ["todo"]])
+            sort: [ItemTableComparator(column: .title, order: .reverse)], filter: FilterState(is: ["field.status": ["todo"]]))
         let content = browser.tableContent(in: library)
         let ids = browser.collectionItemIDs(in: library, order: ItemOrder())
         #expect(!content.rows.isEmpty && content.rows.count < content.allRows.count)

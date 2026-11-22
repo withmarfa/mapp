@@ -69,8 +69,9 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
     var hiddenGroups: [String] = []
     /// Whether a group with no items is left out.
     var hidesEmptyGroups = false
-    var filters: [String: [String]] = [:]
-    var negated: [String] = []
+    /// The filter row's clauses, which may be relative to the day (a view keeps none of those), and whether any one will do.
+    var filter: [FilterClause] = []
+    var matchesAny = false
     /// The date field the timeline places its items on.
     var timelineField: String?
     var compactBoard = false
@@ -90,8 +91,8 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         groupOrder = try container.decodeIfPresent([String].self, forKey: .groupOrder) ?? []
         hiddenGroups = try container.decodeIfPresent([String].self, forKey: .hiddenGroups) ?? []
         hidesEmptyGroups = try container.decodeIfPresent(Bool.self, forKey: .hidesEmptyGroups) ?? false
-        filters = try container.decodeIfPresent([String: [String]].self, forKey: .filters) ?? [:]
-        negated = try container.decodeIfPresent([String].self, forKey: .negated) ?? []
+        filter = try container.decodeIfPresent([FilterClause].self, forKey: .filter) ?? []
+        matchesAny = try container.decodeIfPresent(Bool.self, forKey: .matchesAny) ?? false
         timelineField = try container.decodeIfPresent(String.self, forKey: .timelineField)
         compactBoard = try container.decodeIfPresent(Bool.self, forKey: .compactBoard) ?? false
         cards = try container.decodeIfPresent(ViewCards.self, forKey: .cards) ?? ViewCards()
@@ -122,9 +123,8 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         grouping = held
         groupOrder = options.groupOrder ?? []
         hiddenGroups = (options.hiddenGroups ?? []).sorted()
-        let kept = options.filters.filter { !$0.value.isEmpty }
-        filters = kept.mapValues { $0.sorted() }
-        negated = options.negated.filter { kept[$0] != nil }.sorted()
+        filter = options.filter.complete.clauses
+        matchesAny = options.filter.complete.matchesAny
     }
 
     /// The options a place opens with: those the window holds, with the filters, sort and grouping this keeps. A column
@@ -149,9 +149,7 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
         let keepsGroups = grouping != .automatic
         options.groupOrder = keepsGroups && !groupOrder.isEmpty ? groupOrder : nil
         options.hiddenGroups = keepsGroups && !hiddenGroups.isEmpty ? Set(hiddenGroups) : nil
-        let filters = filters.filter { isKept($0.key) && !$0.value.isEmpty }
-        options.filters = filters.mapValues(Set.init)
-        options.negated = Set(negated.filter { filters[$0] != nil })
+        options.filter = FilterState(clauses: filter.filter { isKept($0.field) }, matchesAny: matchesAny).complete
         return options
     }
 

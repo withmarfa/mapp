@@ -544,7 +544,8 @@ final class Browser {
         let derived = derivedKey(in: library)
         let key = TableKey(
             derived: derived.key, options: keyed, choices: lookChoices, shownRelations: shownRelations, counts: library.counts.revision,
-            hidesEmpty: hidesEmptyGroups)
+            hidesEmpty: hidesEmptyGroups,
+            relativeDay: keyed.filter.relative.isEmpty ? nil : Calendar.current.startOfDay(for: library.now()))
         if let held = tableMemo, held.key == key { return held.content }
         let content = ItemTableContent(browser: self, library: library, items: derived.items ?? items(in: library))
         tableMemo = (key, content)
@@ -602,6 +603,8 @@ final class Browser {
         /// A changed or evicted answer invalidates the cached table rows.
         let counts: Int
         let hidesEmpty: Bool
+        /// The day a filter relative to the day is worked out for, so the table is made again when it changes.
+        let relativeDay: Date?
     }
 
     /// The links the table's shown columns hold, which its rows read besides those the looks and the options name.

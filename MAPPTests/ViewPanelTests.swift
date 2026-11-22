@@ -365,11 +365,11 @@ struct ViewPanelTests {
     // MARK: A condition the row cannot show
 
     @Test func aConditionTheRowCannotShowIsKeptThroughAWrite() async {
-        let (browser, library, _) = Self.opened(filter: #"source eq "mail""#)
-        #expect(!ViewDraft.unshownConditions(of: Self.view(filter: #"source eq "mail""#).query, catalogue: library.catalogue).isEmpty)
+        let (browser, library, _) = Self.opened(filter: #"source_id eq "mail""#)
+        #expect(!ViewDraft.unshownConditions(of: Self.view(filter: #"source_id eq "mail""#).query, catalogue: library.catalogue).isEmpty)
         await Self.change(browser) { browser.setFilter(Self.status, values: ["todo"]) }
         let filter = Self.held(library)?.query.filter ?? ""
-        #expect(filter.contains(#"source eq "mail""#))
+        #expect(filter.contains(#"source_id eq "mail""#))
         #expect(filter.contains("todo"))
     }
 

@@ -194,8 +194,9 @@ nonisolated enum QuickDates {
         let date: Date
     }
 
-    /// Today, tomorrow and the first day of next week, as the person's calendar counts the week.
-    static func entries(now: Date, calendar: Calendar) -> [Entry] {
+    /// Today, tomorrow and the first day of next week, as the person's calendar counts the week; a filter's panel adds the
+    /// first day of the week after.
+    static func entries(now: Date, calendar: Calendar, includingTwoWeeks: Bool = false) -> [Entry] {
         let today = calendar.startOfDay(for: now)
         var entries = [Entry(id: "today", title: String(localized: "Today"), symbol: "sun.max", date: today)]
         if let tomorrow = calendar.date(byAdding: .day, value: 1, to: today) {
@@ -203,6 +204,9 @@ nonisolated enum QuickDates {
         }
         if let week = calendar.nextDate(after: today, matching: DateComponents(weekday: calendar.firstWeekday), matchingPolicy: .nextTime) {
             entries.append(Entry(id: "next-week", title: String(localized: "Next Week"), symbol: "calendar.badge.clock", date: week))
+            if includingTwoWeeks, let later = calendar.date(byAdding: .weekOfYear, value: 1, to: week) {
+                entries.append(Entry(id: "two-weeks", title: String(localized: "In Two Weeks"), symbol: "calendar.badge.plus", date: later))
+            }
         }
         return entries
     }
