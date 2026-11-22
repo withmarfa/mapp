@@ -2,9 +2,10 @@ import Foundation
 
 /// How a link to another item reads in an item's text, as the person chose in Settings. Every look, with its sizes and
 /// colors, is here and nowhere else; the page holds none of them. A link to an item that is missing keeps its dashed
-/// line in every look, and in the mark look a lighter dotted one.
+/// line in every look, and in the mark look a lighter dotted one. Every look shows that a link opens on a Command-click
+/// the same way (`openCue`), since a plain click places the caret.
 nonisolated enum LinkLook: String, CaseIterable, Identifiable, Sendable {
-    /// The linked item's type icon in the type's color, then the title, with a dotted underline and the hand pointer.
+    /// The linked item's type icon in the type's color, then the title, with a dotted underline.
     case mark
     /// The title underlined, with no icon.
     case underline
@@ -65,6 +66,11 @@ nonisolated enum LinkLook: String, CaseIterable, Identifiable, Sendable {
         /// are lighter.
         static let markDots = "color-mix(in srgb, currentcolor 55%, transparent)"
         static let markMissingDots = "color-mix(in srgb, currentcolor 28%, transparent)"
+        /// The fill behind a link under the pointer, and the stronger one while Command is held and a click would open
+        /// it, as a share of the text's own color. It lies over a pill's own fill.
+        static let hoverFill = "color-mix(in srgb, currentcolor 8%, transparent)"
+        static let openFill = "color-mix(in srgb, currentcolor 16%, transparent)"
+        static let webLinkRadius = "0.2em"
     }
 
     /// The neutral fill of a pill, as black over light and white over dark.
@@ -77,7 +83,18 @@ nonisolated enum LinkLook: String, CaseIterable, Identifiable, Sendable {
 
     private static func appearance(_ light: String, _ dark: String) -> String { "light-dark(\(light), \(dark))" }
 
-    /// The look as the page's custom properties: Inkkit's wiki link tokens, and for each tone the colors a link to
+    /// What every look shows of a link under the pointer: a fill, and a stronger one while Command is held. Inkkit adds
+    /// the hand pointer, the underline and its hint for a link a Command-click opens, so the cue is the same in every
+    /// look and never says a plain click opens.
+    private static var openCue: [String: String] {
+        [
+            "--inkkit-link-hover-background": Measure.hoverFill,
+            "--inkkit-link-open-background": Measure.openFill,
+            "--inkkit-link-radius": Measure.webLinkRadius,
+        ]
+    }
+
+    /// The look as the page's custom properties: Inkkit's link and wiki link tokens, and for each tone the colors a link to
     /// an item of a type with that tone takes (`--link-icon-<tone>`, `--link-tint-<tone>`), resolved for light and for
     /// dark at once by `light-dark()` so an appearance change needs no resend. The tint is the tone's chip color
     /// (`TypeTone.cssColors`), the same fill a chip in the item's header has.
@@ -91,6 +108,7 @@ nonisolated enum LinkLook: String, CaseIterable, Identifiable, Sendable {
             all["--link-icon-\(tone.rawValue)"] =
                 colorsIcon ? Self.appearance(light["--tone-ink"]!, dark["--tone-ink"]!) : "currentcolor"
         }
+        all.merge(Self.openCue) { _, new in new }
         let prefix = "--inkkit-wiki-link-"
         if self == .text {
             all[prefix + "icon-display"] = "none"
@@ -118,7 +136,6 @@ nonisolated enum LinkLook: String, CaseIterable, Identifiable, Sendable {
             all[prefix + "underline-offset"] = self == .quiet ? Measure.quietUnderlineOffset : Measure.underlineOffset
             if self == .mark {
                 all[prefix + "underline-style"] = "dotted"
-                all[prefix + "cursor"] = "pointer"
                 all[prefix + "underline-color"] = Measure.markDots
                 all[prefix + "missing-underline-style"] = "dotted"
                 all[prefix + "missing-underline-color"] = Measure.markMissingDots

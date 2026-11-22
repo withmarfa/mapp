@@ -106,6 +106,35 @@ struct ItemOpeningTests {
         #expect(browser.modalItem == ids[1] && browser.selection == [ids[1]])
     }
 
+    @Test(arguments: ItemViewMode.allCases)
+    func aLinkInTheTextOpensAsTheSettingSays(_ mode: ItemViewMode) {
+        let order = ItemOrder()
+        var windows: [Set<ItemID>] = []
+
+        var (browser, library, ids) = browser(mode)
+        browser.windowOpener = { windows.append($0) }
+        browser.follow(link: library.item(ids[0])!, in: library, order: order, defaults: defaults("modal"))
+        #expect(browser.modalItem == ids[0] && browser.selection == [ids[0]])
+
+        (browser, library, ids) = self.browser(mode)
+        browser.follow(link: library.item(ids[1])!, in: library, order: order, defaults: defaults("fullPage"))
+        #expect(browser.isCollectionItemPresented && browser.modalItem == nil && browser.selection == [ids[1]])
+
+        (browser, library, ids) = self.browser(mode)
+        browser.windowOpener = { windows.append($0) }
+        browser.follow(link: library.item(ids[2])!, in: library, order: order, defaults: defaults("newWindow"))
+        #expect(windows == [[ids[2]]] && browser.modalItem == nil && browser.selection == [ids[2]])
+    }
+
+    @Test func aLinkFollowedInAModalStaysInTheModalWhateverTheSettingSays() {
+        let (browser, library, ids) = browser(.table)
+        browser.open([ids[0]], as: .modal)
+        var windows: [Set<ItemID>] = []
+        browser.windowOpener = { windows.append($0) }
+        browser.follow(link: library.item(ids[1])!, in: library, order: ItemOrder(), defaults: defaults("newWindow"))
+        #expect(browser.modalItem == ids[1] && windows.isEmpty)
+    }
+
     // MARK: Up and down
 
     @Test func theNeighboursAreNilAtTheEndsAndWhenTheItemLeft() {

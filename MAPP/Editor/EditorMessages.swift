@@ -85,6 +85,9 @@ nonisolated enum EditorMessage: Sendable {
     case moveRow(ItemID, row: String, order: [String])
     /// A `[[link]]` to an item was command-clicked in the item `item`.
     case openItemLink(ItemID, ItemLink)
+    /// The menu of a link in the item's text was asked for, at `point` in the page's window, whose height is
+    /// `viewportHeight`, under the load `generation`. Inkkit has selected the link.
+    case linkMenu(ItemID, generation: Int, LinkMenuTarget, point: CGPoint, viewportHeight: Double)
     case find(FindState)
     case diagnostic(String)
     /// Text the person typed, pasted or dropped reached a folded section; Inkkit opened it and dropped the input.
@@ -207,6 +210,13 @@ nonisolated enum EditorMessage: Sendable {
         case "openItemLink":
             guard let item = dict["item"] as? String, !item.isEmpty, let link = ItemLink(page: dict) else { return nil }
             self = .openItemLink(ItemID(item), link)
+        case "linkMenu":
+            guard let item = dict["item"] as? String, !item.isEmpty, let generation = dict["generation"] as? Int,
+                  let link = dict["link"] as? [String: Any], let target = LinkMenuTarget(page: link),
+                  let point = dict["point"] as? [Double], point.count == 2,
+                  let viewportHeight = (dict["viewportHeight"] as? NSNumber)?.doubleValue
+            else { return nil }
+            self = .linkMenu(ItemID(item), generation: generation, target, point: CGPoint(x: point[0], y: point[1]), viewportHeight: viewportHeight)
         case "find":
             guard let text = dict["text"] as? String,
                   let selection = dict["selection"] as? [Int], selection.count == 2,
@@ -228,6 +238,27 @@ nonisolated enum EditorMessage: Sendable {
             self = .hiddenText
         case "error":
             self = .error(dict["message"] as? String ?? "")
+        default:
+            return nil
+        }
+    }
+}
+
+/// The link a menu is asked for. A web link says whether its address may be opened, which is the page's answer and
+/// Inkkit's together; an item link carries what the core reads (`ItemLink`) and the text it shows.
+nonisolated enum LinkMenuTarget: Equatable, Sendable {
+    case web(text: String, href: String, openable: Bool)
+    case item(text: String, ItemLink)
+
+    init?(page dict: [String: Any]) {
+        guard let kind = dict["kind"] as? String, let text = dict["text"] as? String else { return nil }
+        switch kind {
+        case "web":
+            guard let href = dict["href"] as? String, let openable = dict["openable"] as? Bool else { return nil }
+            self = .web(text: text, href: href, openable: openable)
+        case "wiki":
+            guard let link = ItemLink(page: dict) else { return nil }
+            self = .item(text: text, link)
         default:
             return nil
         }

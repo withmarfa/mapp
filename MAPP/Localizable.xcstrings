@@ -4,6 +4,9 @@
     "Choose a collection to see what’s in it." : {
 
     },
+    "⌘-click to open" : {
+
+    },
     "Choose a source to see what it sends." : {
 
     },
@@ -4174,6 +4177,9 @@
     "Edit Link" : {
 
     },
+    "Edit Link…" : {
+
+    },
     "Edit Property" : {
       "extractionState" : "manual"
     },
@@ -5231,6 +5237,9 @@
 
     },
     "Open Item" : {
+
+    },
+    "Open Link" : {
 
     },
     "Open Original" : {

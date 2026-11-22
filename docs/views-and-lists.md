@@ -54,6 +54,7 @@ Built, not yet released. The page itself is in [Item page](item-page.md#opened-a
 - A modal and a full page show one item, so Open does nothing for a selection of several. New Window opens a window for each item, and asks first when there are more than 10 (`ItemWindows`).
 - One row menu serves every layout (`ItemRowMenu`, ordered by `RowMenuEntry`). It starts with Open, which follows the setting, then the other two ways (Open as Modal, Open as Full Page or Open in New Window), then Quick Look and Share…, then Add to Favorites, Add Tag, Add to Collection, what the layout adds (a board's Move To), Change Type, Customize Layout and Version History, and Delete last. The menu of items in Recently Deleted holds Recover in their place. It shows no key glyphs for Return and Space.
 - Open, Open as Modal, Open as Full Page, Previous Item, Next Item and Close Modal are menu commands and palette entries. Previous Item and Next Item are Option-Command-Up Arrow and Option-Command-Down Arrow, and work only while a modal is open.
+- A link to an item in an item's text follows the setting too (`Browser.follow(link:in:order:)`): the item is chosen where the window lists it, then opens as Return would, except that an item reached from the modal stays in the modal. Links in the property block and Linked From still show the item in the list.
 - Not built: the modal's up and down arrows in a board, a timeline or a calendar follow the list's sort order, not the layout's own.
 
 ## Making an item

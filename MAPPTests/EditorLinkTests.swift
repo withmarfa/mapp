@@ -236,4 +236,42 @@ extension EditorTests {
         #expect(focused && window.firstResponder === editor.webView, "the caret is in the linked item, so typing goes on there")
         editor.windowWent()
     }
+
+    /// A right-click on the page's `index`th link, which Inkkit answers by selecting it and asking the app for its menu.
+    private func rightClick(_ selector: String, in page: Page) async throws {
+        try await page.run("document.querySelector('\(selector)').dispatchEvent(new MouseEvent('contextmenu', { button: 2, bubbles: true, cancelable: true }))")
+    }
+
+    @Test func removeLinkTakesALinkOffAndKeepsItsWordsWhateverKindItIs() async throws {
+        let page = try await Page()
+        page.library.add("Plan\n")
+        let id = page.library.add("Reader\n\nSee [[Plan|the plan]] and [site](https://example.com).\n").id
+        try await page.show(id)
+        var offered: [[EditorController.LinkChoice]] = []
+        var choose: ((EditorController.LinkChoice) -> Void)?
+        page.editor.onLinkMenu = { entries, pick in
+            offered.append(entries.map(\.choice))
+            choose = pick
+        }
+
+        try await rightClick(".inkkit-wiki-link", in: page)
+        try await page.wait { choose != nil }
+        #expect(offered == [[.open, .copy, .remove]], "a link to an item offers no address")
+        // A menu answered after the page has moved on from its load changes nothing.
+        page.editor.generation += 1
+        choose?(.remove)
+        try await settled(page)
+        #expect(page.changes.isEmpty)
+        page.editor.generation -= 1
+
+        choose?(.remove)
+        try await page.wait { page.changes.last == "Reader\n\nSee the plan and [site](https://example.com).\n" }
+
+        choose = nil
+        try await rightClick("a:not(.inkkit-wiki-link)", in: page)
+        try await page.wait { choose != nil }
+        #expect(offered.last == [.open, .copy, .edit, .remove])
+        choose?(.remove)
+        try await page.wait { page.changes.last == "Reader\n\nSee the plan and site.\n" }
+    }
 }

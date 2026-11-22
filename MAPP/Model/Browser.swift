@@ -306,14 +306,19 @@ final class Browser {
     func reveal(_ item: Item, in library: any ItemLibrary, order: ItemOrder) {
         // An item reached from the modal, by a link or the palette, is shown in the modal.
         let staysInModal = isModalPresented
+        select(item, in: library, order: order)
+        if staysInModal { open([item.id], as: .modal) }
+        else if followsCollection { open([item.id], as: .fullPage) }
+        else { focusRequest = .list }
+    }
+
+    /// Selects `item`, showing the place that lists it when the window's list does not.
+    private func select(_ item: Item, in library: any ItemLibrary, order: ItemOrder) {
         if !items(in: library).contains(where: { $0.id == item.id }) {
             showListing(item, in: library, order: order)
         }
         selection = [item.id]
         if self.item == .allItems { revealOnItems(item) }
-        if staysInModal { open([item.id], as: .modal) }
-        else if followsCollection { open([item.id], as: .fullPage) }
-        else { focusRequest = .list }
     }
 
     /// Shows the item a link in the page names, as choosing it in the list does: the window's place, search, undo
@@ -322,6 +327,15 @@ final class Browser {
     func open(linked item: Item, in library: any ItemLibrary, order: ItemOrder) {
         reveal(item, in: library, order: order)
         if !followsCollection, !showsItemsIndex { focusRequest = .page }
+    }
+
+    /// Opens the item a link in the item's text names the way Settings > General > Open Items says, as Return does in
+    /// the list: the item is selected where the window lists it, then shown in the modal, as a full page or in a
+    /// window. An item reached from the modal stays in the modal, as `reveal` keeps it.
+    func follow(link item: Item, in library: any ItemLibrary, order: ItemOrder, defaults: UserDefaults = .standard) {
+        let staysInModal = isModalPresented
+        select(item, in: library, order: order)
+        open([item.id], as: staysInModal ? .modal : nil, defaults: defaults)
     }
 
     /// Whether an earlier item the window showed can still be shown again.
