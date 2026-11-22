@@ -21,7 +21,7 @@ struct ItemBoard: View {
         let _ = daysSeen
         let items = browser.filteredItems(in: library)
         let fields = browser.boardFieldChoices(in: library)
-        // The lanes are the place's group (`ItemBoardOptions`), so a saved view's group is its lanes.
+        // Lanes follow a value grouping by a field. A date span does not set them.
         let field = ItemBoardLayout.selectedField(browser.boardFieldKey(in: browser.item), available: fields)
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
         VStack(spacing: 0) {

@@ -51,7 +51,7 @@ nonisolated struct LibraryViewSort: Hashable, Sendable {
 /// What a view's items are grouped by: a field as a sort names it, or a link as `edge[<type>]` or
 /// `backref[<type>]`. A date field may be grouped by day, week, month or year. `order` and `hidden` name groups by
 /// their keys as Marfa writes them (a value, a bucket's first day as `YYYY-MM-DD`, or `null`); another app may have
-/// set them, so a write keeps them unless the grouping's field changes (`ViewDraft.kept(_:from:declaredOrder:)`).
+/// set them, so a write keeps them unless the grouping's field changes (`ViewDraft.kept(_:from:)`).
 nonisolated struct LibraryViewGroup: Hashable, Sendable {
     nonisolated enum Bucket: String, Hashable, Sendable, CaseIterable {
         case day, week, month, year

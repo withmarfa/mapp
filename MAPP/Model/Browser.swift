@@ -107,8 +107,8 @@ final class Browser {
         return fields
     }
 
-    /// The field a place's board makes its lanes of: the place's group, where it groups by a field. A board's lanes are
-    /// the group, so a saved view's group and the lanes agree, and the table groups by the same field.
+    /// The field a place's board makes its lanes of, where the place groups by that field's value. A date span does not
+    /// set the lanes.
     func boardFieldKey(in place: SidebarItem) -> String? {
         guard case .column(let id, .value)? = tableOptions[place]?.grouping, id.hasPrefix(Self.fieldColumnPrefix) else { return nil }
         return String(id.dropFirst(Self.fieldColumnPrefix.count))
