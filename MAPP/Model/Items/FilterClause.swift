@@ -139,12 +139,12 @@ nonisolated enum FilterOp: String, Codable, Hashable, Sendable, CaseIterable {
         case .afterToday: String(localized: "is after today")
         case .inLast: String(localized: "is in the last")
         case .inNext: String(localized: "is in the next")
-        case .equal: String(localized: "=")
-        case .notEqual: String(localized: "≠")
-        case .less: String(localized: "<")
-        case .lessOrEqual: String(localized: "≤")
-        case .greater: String(localized: ">")
-        case .greaterOrEqual: String(localized: "≥")
+        case .equal: "="
+        case .notEqual: "≠"
+        case .less: "<"
+        case .lessOrEqual: "≤"
+        case .greater: ">"
+        case .greaterOrEqual: "≥"
         case .contains: String(localized: "contains")
         case .startsWith: String(localized: "starts with")
         }

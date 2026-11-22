@@ -373,6 +373,36 @@ struct ViewPanelTests {
         #expect(filter.contains("todo"))
     }
 
+    @Test func severalWordsBesideAnotherChipAreSavedAsNotTheOthersAndTheViewShowsNoChange() async {
+        let (browser, library, _) = Self.opened()
+        let priority = ViewDraft.columnID(of: "properties.priority") ?? "field.priority"
+        await Self.change(browser) { browser.setFilter(Self.status, values: ["todo", "done"]) }
+        await Self.change(browser) { browser.setFilter(priority, values: ["high"]) }
+        #expect(Self.held(library)?.query.filter == #"properties.status neq "in_progress" AND properties.priority eq "high""#)
+        // The window keeps the chip as the person made it, and nothing is unsaved.
+        #expect(browser.tableOptions[browser.item]?.filter.clauses.first == FilterClause(field: Self.status, op: .is, values: ["done", "todo"]))
+        #expect(!browser.hasViewChanges)
+        #expect(library.notices.waiting.isEmpty, "the rewrite is silent")
+        // Opened again, the view shows what it holds.
+        let again = Browser()
+        again.defaults = Self.defaults()
+        again.adopt(library, undoManager: nil)
+        again.sidebarItem = .view(Self.id)
+        again.followView(in: library)
+        #expect(again.tableOptions[again.item]?.filter.clauses.first == FilterClause(field: Self.status, op: .isNot, values: ["in_progress"]))
+    }
+
+    @Test func aRelativeDateIsKeptInTheWindowAndNeverWrittenToTheView() async {
+        let (browser, library, _) = Self.opened()
+        await Self.change(browser) {
+            browser.tableOptions[browser.item]?.filter.clauses.append(FilterClause(field: "edited", op: .inLast, values: ["7"]))
+        }
+        #expect(Self.held(library)?.version == 1, "nothing was written")
+        #expect(library.notices.waiting.isEmpty, "the row says it at once, so no dialog does")
+        #expect(browser.hasViewChanges)
+        #expect(browser.tableOptions[browser.item]?.filter.relative.count == 1)
+    }
+
     // MARK: Group by, from one place
 
     @Test func aListShowsItsDateSectionsAsItsGrouping() {

@@ -64,7 +64,7 @@ final class FakeItemLibrary: ItemLibrary {
     var lastPropertyWrite: Int? { marksPropertyWrites ? 1 : nil }
     var relationshipWrites: [(item: ItemID, field: String, adding: [ItemID], removing: [ItemID])] = []
     var syncReport = SyncReport(queueRead: true)
-    let now: () -> Date
+    var now: () -> Date
     /// What `attach` answers, which may wait; nil attaches nothing.
     var attaching: (() async -> AttachReport)?
     /// Awaited while a view is being made, before it exists, and while one is being deleted, once it is gone, so a

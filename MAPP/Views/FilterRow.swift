@@ -48,7 +48,9 @@ struct FilterRow: View {
 
     private func chips(of state: FilterState, content: ItemTableContent) -> [FilterChipItem] {
         let targets = content.filterOffer.targets
-        let titles = FilterTitles(content: content)
+        // Only a parent, a collection or a type is held by an identifier that needs naming.
+        let needsTitles = state.clauses.contains { [FilterTarget.parent.id, FilterTarget.collection.id, FilterTarget.type.id].contains($0.field) }
+        let titles = needsTitles ? FilterTitles(content: content) : nil
         var items: [FilterChipItem] = []
         for (index, clause) in state.clauses.enumerated() {
             guard clause.isComplete || openIndex == index else { continue }
@@ -59,7 +61,7 @@ struct FilterRow: View {
                 items.append(FilterChipItem(id: id, field: name, relation: "", values: clause.values.joined(separator: ", ")))
                 continue
             }
-            let parts = FilterWording.parts(of: clause, target: target, calendar: .current, titles: titles.title(of:))
+            let parts = FilterWording.parts(of: clause, target: target, calendar: .current, titles: { titles?.title(of: $0) })
             items.append(FilterChipItem(id: id, field: parts.field, relation: parts.relation, values: parts.values, needsValue: clause.op.takesValue))
         }
         items += lockedChips()

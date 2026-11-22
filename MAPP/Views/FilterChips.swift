@@ -346,10 +346,13 @@ struct FilterSetBody: View {
             }
             Divider().padding(.horizontal, 8 * scale)
             if shown.isEmpty {
-                Text(query.isEmpty ? "No more values" : "No Matching Values").foregroundStyle(.secondary)
-                    .font(.system(size: ValueEditMetrics.textSize * scale))
-                    .padding(.horizontal, 8 * scale)
-                    .frame(height: ValueEditMetrics.rowHeight * scale)
+                Group {
+                    if query.isEmpty { Text("No more values") } else { Text("No Matching Values") }
+                }
+                .foregroundStyle(.secondary)
+                .font(.system(size: ValueEditMetrics.textSize * scale))
+                .padding(.horizontal, 8 * scale)
+                .frame(height: ValueEditMetrics.rowHeight * scale)
             } else {
                 ScrollView {
                     VStack(spacing: 0) {
@@ -440,7 +443,7 @@ struct FilterCountBody: View {
     var body: some View {
         let scale = InterfaceStyle.scale(for: textSize)
         HStack(spacing: 6 * scale) {
-            TextField("7", text: Binding(get: { text }, set: { set($0.filter(\.isNumber)) }))
+            TextField("Days", text: Binding(get: { text }, set: { set($0.filter(\.isNumber)) }), prompt: Text(verbatim: "7"))
                 .textFieldStyle(.plain)
                 .focused($isFocused)
                 .multilineTextAlignment(.trailing)
