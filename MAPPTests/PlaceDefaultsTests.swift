@@ -60,8 +60,8 @@ struct PlaceDefaultsTests {
 
         let second = Self.window(defaults, library: library)
         let options = second.tableOptions[second.item]
-        #expect(options?.filters == [Self.status: ["todo"]])
-        #expect(options?.negated == [Self.status])
+        #expect(options?.filter.valuesByField == [Self.status: ["todo"]])
+        #expect(options?.filter.clauses.first?.op == .isNot)
         #expect(options?.sort?.map(\.column.id) == ["title"])
         #expect(options?.grouping == ItemTableOptions.Grouping.none)
         #expect(second.viewMode == .table)
@@ -105,11 +105,11 @@ struct PlaceDefaultsTests {
         two.sidebarItem = .recents
         two.sidebarItem = Self.tasks
         two.followPlaceDefault(in: library)
-        #expect(two.tableOptions[two.item]?.filters == [Self.status: ["todo"]])
+        #expect(two.tableOptions[two.item]?.filter.valuesByField == [Self.status: ["todo"]])
         two.tableOptions[two.item, default: .init()].grouping = .none
         two.choicesChanged()
         let stored = PlaceDefaults.stored(in: defaults).default(for: Self.tasks)
-        #expect(stored?.filters == [Self.status: ["todo"]])
+        #expect(FilterState(clauses: stored?.filter ?? []).valuesByField == [Self.status: ["todo"]])
         #expect(stored?.grouping == PlaceDefault.Grouping.none)
     }
 
@@ -221,8 +221,8 @@ struct PlaceDefaultsTests {
         undo.endUndoGrouping()
         #expect(PlaceDefaults.stored(in: defaults).default(for: Self.tasks) == nil)
         undo.undo()
-        #expect(browser.tableOptions[browser.item]?.filters == [Self.status: ["todo"]])
-        #expect(PlaceDefaults.stored(in: defaults).default(for: Self.tasks)?.filters == [Self.status: ["todo"]])
+        #expect(browser.tableOptions[browser.item]?.filter.valuesByField == [Self.status: ["todo"]])
+        #expect(FilterState(clauses: PlaceDefaults.stored(in: defaults).default(for: Self.tasks)?.filter ?? []).valuesByField == [Self.status: ["todo"]])
     }
 
     // MARK: Save as View…
@@ -238,7 +238,7 @@ struct PlaceDefaultsTests {
         browser.openNewViewPanel(in: library)
         #expect(browser.viewPanel?.isNew == true)
         let window = SavedViews.window(browser, in: library)
-        #expect(window.filters == [Self.status: ["todo"]])
+        #expect(window.filter.valuesByField == [Self.status: ["todo"]])
         #expect(window.place == Self.tasks)
     }
 
@@ -256,7 +256,7 @@ struct PlaceDefaultsTests {
         #expect(PlaceDefaults.stored(in: defaults).default(for: Self.tasks) == before)
         browser.escapeViewPanel(in: library)
         #expect(PlaceDefaults.stored(in: defaults).default(for: Self.tasks) == before)
-        #expect(browser.tableOptions[browser.item]?.filters == [Self.status: ["todo"]])
+        #expect(browser.tableOptions[browser.item]?.filter.valuesByField == [Self.status: ["todo"]])
     }
 
     // MARK: What can have gone stale
@@ -268,15 +268,16 @@ struct PlaceDefaultsTests {
     @Test func aConditionOnAFieldTheTypeNoLongerDeclaresIsDroppedAndTheRestKept() {
         let defaults = ViewPanelTests.defaults()
         var stored = PlaceDefault()
-        stored.filters = ["field.gone": ["x"], Self.status: ["todo"]]
-        stored.negated = ["field.gone", Self.status]
+        stored.filter = [
+            FilterClause(field: "field.gone", op: .isNot, values: ["x"]), FilterClause(field: Self.status, op: .isNot, values: ["todo"]),
+        ]
         stored.sort = [.init(column: "field.gone", reversed: false), .init(column: "title", reversed: true)]
         stored.grouping = .column("field.gone")
         Self.store(stored, for: Self.tasks, in: defaults)
         let browser = Self.window(defaults, library: Self.library())
         let options = browser.tableOptions[Self.tasks]
-        #expect(options?.filters == [Self.status: ["todo"]])
-        #expect(options?.negated == [Self.status])
+        #expect(options?.filter.valuesByField == [Self.status: ["todo"]])
+        #expect(options?.filter.clauses.map(\.op) == [.isNot])
         #expect(options?.sort?.map(\.column.id) == ["title"])
         #expect(options?.grouping == .automatic)
     }
@@ -284,14 +285,14 @@ struct PlaceDefaultsTests {
     @Test func aTypeThatNoLongerExistsIsIgnored() {
         let defaults = ViewPanelTests.defaults()
         var stored = PlaceDefault()
-        stored.filters = [Self.status: ["todo"], "type": ["test.gone"]]
+        stored.filter = FilterState(is: [Self.status: ["todo"], "type": ["test.gone"]]).clauses
         stored.layout = .board
         Self.store(stored, for: .itemType("test.gone"), in: defaults)
         Self.store(stored, for: .collection(ItemID("gone")), in: defaults)
         let library = Self.library()
         let browser = Self.window(defaults, library: library, place: .itemType("test.gone"))
         // Nothing of the type's fields is declared, so the field condition goes; the built-in column's stays.
-        #expect(browser.tableOptions[browser.item]?.filters == ["type": ["test.gone"]])
+        #expect(browser.tableOptions[browser.item]?.filter.valuesByField == ["type": ["test.gone"]])
         #expect(browser.viewMode != .board)
         // The place a person is in is not touched by another's.
         #expect(Self.window(defaults, library: library).tableOptions[Self.tasks]?.isFiltering != true)
@@ -327,14 +328,14 @@ struct PlaceDefaultsTests {
     }
 
     @Test func aFieldThatIsThereAndCannotBeReadFailsTheEntry() {
-        for text in [#"{"filters":"x"}"#, #"{"sort":"x"}"#, #"{"grouping":7}"#, #"{"layout":3}"#] {
+        for text in [#"{"filter":"x"}"#, #"{"sort":"x"}"#, #"{"grouping":7}"#, #"{"layout":3}"#] {
             #expect(throws: (any Error).self) { try JSONDecoder().decode(PlaceDefault.self, from: Data(text.utf8)) }
         }
     }
 
     @Test func oneUnreadableEntryIsSetAsideAndTheOthersKeepWorking() throws {
         let defaults = ViewPanelTests.defaults()
-        let bad = #"{"filters":"not a table","layout":"table"}"#
+        let bad = #"{"filter":"not a table","layout":"table"}"#
         let good = try String(decoding: JSONEncoder().encode(PlaceDefault(layout: .board)), as: UTF8.self)
         let object: [String: Any] = [
             Self.tasks.storageKey: try JSONSerialization.jsonObject(with: Data(bad.utf8)),
@@ -349,7 +350,7 @@ struct PlaceDefaultsTests {
         #expect(aside.count == 1)
         let kept = try #require(JSONSerialization.jsonObject(with: aside[0]) as? [String: Any])
         #expect(Array(kept.keys) == [Self.tasks.storageKey])
-        #expect((kept[Self.tasks.storageKey] as? [String: Any])?["filters"] as? String == "not a table")
+        #expect((kept[Self.tasks.storageKey] as? [String: Any])?["filter"] as? String == "not a table")
         #expect(PlaceDefaults.stored(in: defaults).default(for: .favorites)?.layout == .board)
         #expect(PlaceDefaults.stored(in: defaults).default(for: .recents)?.layout == .table)
     }

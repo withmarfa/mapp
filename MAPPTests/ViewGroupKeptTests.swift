@@ -24,6 +24,7 @@ struct ViewGroupKeptTests {
     private static let priorityColumn = ItemTableColumn(id: "field.priority", label: "Priority", content: .field(priority), style: .priority)
     private static let dueColumn = ItemTableColumn(id: "field.due_at", label: "Due", content: .field(due), style: .date)
     private static let columns = [ItemTableColumn.title, statusColumn, priorityColumn, dueColumn, .edited, .created, .occurred]
+    private static let targets = FilterOffer.make(columns: columns, types: [task], catalogue: catalogue).targets
 
     /// A view's group with what another app set: groups first, and groups left out.
     private static let otherApps: (order: [JSONValue], hidden: [JSONValue]) = ([.string("2026-11-16"), .null], [.string("2026-11-30")])
@@ -39,8 +40,9 @@ struct ViewGroupKeptTests {
         filters: [String: Set<String>] = [:], layout: ViewDraft.Layout = .table, timelineDate: String? = nil
     ) -> ViewDraft.Window {
         var window = ViewDraft.Window(
-            place: .view(ItemID("view-tasks")), columns: columns, sort: sort, grouping: grouping, filters: filters, layout: layout,
-            timelineDate: timelineDate)
+            place: .view(ItemID("view-tasks")), columns: columns, sort: sort, grouping: grouping,
+            filter: FilterState(clauses: filters.map { FilterClause(field: $0.key, op: .is, values: Array($0.value)) }), targets: targets,
+            layout: layout, timelineDate: timelineDate)
         window.groupMode = mode
         return window
     }
@@ -101,7 +103,7 @@ struct ViewGroupKeptTests {
             }
             #expect(sorted.change == LibraryViewChange(sort: [LibraryViewSort(field: "title", ascending: true)]), "\(group.field)")
             let filtered = Self.change(view, window: Self.window(filters: ["field.priority": ["high"]])) {
-                $0.filters = ["field.priority": ["high"]]
+                $0.filter = FilterState(clauses: [FilterClause(field: "field.priority", op: .is, values: ["high"])])
             }
             #expect(filtered.change.group == nil && filtered.change.query != nil, "\(group.field)")
         }
@@ -309,7 +311,7 @@ struct ViewGroupKeptTests {
         #expect(held.query.filter == filter)
         #expect(browser.tableOptions[browser.item]?.grouping == .column("field.priority"))
         #expect(browser.tableOptions[browser.item]?.sort?.map(\.column.id) == ["title"])
-        #expect(browser.tableOptions[browser.item]?.filters == ["field.priority": ["high"]])
+        #expect(browser.tableOptions[browser.item]?.filter.clauses == [FilterClause(field: "field.priority", op: .is, values: ["high"])])
         #expect(!browser.hasViewChanges)
 
         // A later change writes only itself.

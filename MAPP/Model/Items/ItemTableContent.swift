@@ -17,11 +17,21 @@ final class ItemTableContent {
     /// The calendar dates are grouped on: a saved view's weeks start on Monday, a place's where Settings says.
     let calendar: Calendar
     private let catalogue: Catalogue
+    /// The types the place lists, which its filters' fields come from with the types of its items (`Browser.listedTypes`).
+    private let listedTypes: Set<TypeID>
+    /// When the table was worked out, which a filter relative to the day reads as today.
+    private let now: Date
 
     /// The rows the filters keep, in the order the items came in: what a layout that sorts and groups the items
     /// itself (the list, the board, the timeline) works from.
     lazy var kept: [ItemTableRow] = options.isFiltering
-        ? ItemTableLayout.filter(allRows, by: options.filters, negated: options.negated, columns: columns) : allRows
+        ? FilterMatching.filter(
+            allRows, by: options.filter, targets: filterOffer.targets, catalogue: catalogue, clock: .init(now: now, calendar: .current))
+        : allRows
+
+    /// What Filter By offers for the place: the fields of the types it lists, then what every item has.
+    lazy var filterOffer = FilterOffer.make(
+        columns: columns, types: listedTypes.union(allRows.map(\.item.type)), catalogue: catalogue)
 
     /// The rows the filters keep, in order.
     lazy var rows: [ItemTableRow] = Cost.measure(.tableRows) {
@@ -60,6 +70,8 @@ final class ItemTableContent {
         columns = ItemTableLayout.columns(
             for: allRows, types: browser.listedTypes(in: library), catalogue: library.catalogue, hidden: hidden, looks: looks)
         catalogue = library.catalogue
+        listedTypes = browser.listedTypes(in: library)
+        now = library.now()
         self.options = options
         // Relevance is the order the rows come in, which the sort leaves alone when it is empty.
         sort = browser.ordersByRelevance ? [] : ItemTableLayout.sort(options, columns: columns, keepsGivenOrder: browser.keepsPlaceOrder)
@@ -73,11 +85,5 @@ final class ItemTableContent {
     /// The columns Add Sort offers: those of the types the view shows after its filters, in a sensible order.
     var sortChoices: [ItemTableColumn] {
         ItemTableLayout.sortChoices(from: columns, types: Set(kept.map(\.item.type)), catalogue: catalogue)
-    }
-
-    /// The columns a table can be filtered and grouped by: those with a few values to pick from, where some row
-    /// holds one.
-    var categoricalColumns: [ItemTableColumn] {
-        columns.filter { column in column.isCategorical && allRows.contains { column.category(of: $0) != nil } }
     }
 }

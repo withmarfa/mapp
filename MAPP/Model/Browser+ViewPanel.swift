@@ -160,7 +160,7 @@ extension Browser {
         // The view exists now, so the Mac keeps its settings whatever became of the panel meanwhile.
         ViewLayouts.update(in: defaults) { $0.set(settings, for: view.id) }
         // New View's panel named what the view would not keep (`ViewPanelUnkept`), so it is not told again.
-        toldUnkept[view.id] = Set(draft.unkept.filter { if case .search = $0 { false } else { true } })
+        toldUnkept[view.id] = Set(draft.unkept.filter { if case .search = $0 { false } else if case .relativeFilter = $0 { false } else { true } })
         guard viewPanel === panel else { return }
         viewPanel = nil
         dropUndoSteps(of: panel)

@@ -17,9 +17,9 @@ nonisolated enum ViewDraft {
         var groupOrder: [String]?
         var hiddenGroups: Set<String>?
         /// The filters the window applies, in every layout.
-        var filters: [String: Set<String>] = [:]
-        /// The columns whose filter is Is Not.
-        var negated: Set<String> = []
+        var filter = FilterState()
+        /// The fields the place offers a filter on, by identifier.
+        var targets: [String: FilterTarget] = [:]
         /// The search under way, which a view does not keep.
         var search: String?
         var layout: Layout = .table
@@ -68,6 +68,8 @@ nonisolated enum ViewDraft {
         case tooManyFilters
         /// A filter the core refuses, as it words the refusal.
         case refused(String)
+        /// A filter relative to the day, such as the last 7 days, written as the row reads it: only this Mac keeps it.
+        case relativeFilter(String)
         case sort(column: String)
         case group(column: String)
         /// A way of grouping a view's group cannot hold yet, such as Set or Not Set, named by its field and its way.
@@ -122,11 +124,12 @@ nonisolated enum ViewDraft {
         if case .view = window.place {
             // A view's place shows the view's own filter as the window's filters, so they stand in for it.
             let replaced = replacing(
-                base, with: choices(of: window), columns: window.columns, seededTypes: window.seededTypes, catalogue: catalogue)
+                base, with: window.filter, targets: window.targets, seededTypes: window.seededTypes, catalogue: catalogue)
             filtered = (replaced.query, replaced.unkept)
         } else {
-            filtered = adding(choices(of: window), to: base, columns: window.columns, catalogue: catalogue)
+            filtered = adding(window.filter, to: base, targets: window.targets, catalogue: catalogue)
         }
+        unkept += relativeFilters(of: window)
         let arrangement = arrangement(of: window)
         return Draft(query: filtered.query, sort: arrangement.sort, group: arrangement.group, unkept: unkept + filtered.unkept + arrangement.unkept)
     }
@@ -266,58 +269,11 @@ nonisolated enum ViewDraft {
 
     // MARK: Filters
 
-    private static let typeColumnID = ItemTableColumn.type.id
-
-    /// The window's filters with whether each is Is Not.
-    static func choices(of window: Window) -> [String: FilterChoice] {
-        ItemTableOptions(filters: window.filters, negated: window.negated).filterChoices
-    }
-
-    private static func filtered(
-        _ base: String?, adding choices: [String: FilterChoice], columns: [ItemTableColumn]
-    ) -> (filter: String?, unkept: [Unkept]) {
-        let base = base.flatMap { $0.allSatisfy(\.isWhitespace) ? nil : $0 }
-        let parsed: Parsed
-        do { parsed = try terms(of: base) } catch { return (base, [.refused(message(of: error))]) }
-        return combined(parsed, adding: choices, columns: columns, keeping: base)
-    }
-
-    /// The query with the window's filters added to a place's own (a new view). A Type filter makes the saved query's types the
-    /// window's chosen types, replacing the place's own type terms and types. Marfa takes a type with its subtypes,
-    /// so a chosen type that has any stays a filter, as the exact-type condition the window applied.
-    static func adding(
-        _ choices: [String: FilterChoice], to query: LibraryViewQuery, columns: [ItemTableColumn], catalogue: Catalogue
-    ) -> (query: LibraryViewQuery, unkept: [Unkept]) {
-        var query = query
-        var choices = choices
-        if columns.contains(where: { $0.id == typeColumnID }), let choice = choices[typeColumnID], !choice.isNegated {
-            let chosen = choice.values.subtracting([""])
-            if chosen.isEmpty {
-                choices[typeColumnID] = nil
-            } else if let parsed = try? terms(of: query.filter) {
-                // A place's own exact-type terms, such as a type's own items without its subtypes.
-                let own = parsed.terms.filter { $0.column == typeColumnID && !$0.isNegated && $0.value?.isEmpty == false }
-                let ownTypes = Set(own.compactMap(\.value))
-                if parsed.join != .all && parsed.terms.count > 1 || ownTypes.isEmpty {
-                    let narrowed = narrowing(chosen, listed: query.types, catalogue: catalogue)
-                    if let types = narrowed.types { query.types = types }
-                    if !narrowed.asFilter { choices[typeColumnID] = nil }
-                } else if chosen == ownTypes {
-                    choices[typeColumnID] = nil
-                } else if chosen.isSubset(of: ownTypes) {
-                    // Fewer than the place's own, which stay and are narrowed by the filter.
-                } else {
-                    let rest = parsed.terms.filter { term in !own.contains(term) }
-                    query.filter = rest.isEmpty ? nil : try? FilterExpression(join: parsed.join, conditions: rest.map(\.condition)).encoded()
-                    let narrowed = narrowing(chosen, listed: query.types, catalogue: catalogue)
-                    if let types = narrowed.types { query.types = types }
-                    if !narrowed.asFilter { choices[typeColumnID] = nil }
-                }
-            }
+    /// The filters relative to the day that a view cannot keep, named as the row reads them.
+    static func relativeFilters(of window: Window) -> [Unkept] {
+        window.filter.relative.compactMap { clause in
+            window.targets[clause.field].map { .relativeFilter(FilterWording.sentence(of: clause, target: $0, calendar: .current)) }
         }
-        let result = filtered(query.filter, adding: choices, columns: columns)
-        query.filter = result.filter
-        return (query, result.unkept)
     }
 
     /// How a Type filter of exactly these types is saved beside the types a new view lists: the types the query then
@@ -325,7 +281,7 @@ nonisolated enum ViewDraft {
     /// its subtypes, so a chosen type that has any cannot be said by the types alone and stays an exact-type
     /// condition. The listed types stay only where the chosen ones are within their subtrees and some have subtypes
     /// (the listed types then hold them and the condition narrows); otherwise the chosen types become the listed ones.
-    private static func narrowing(_ chosen: Set<String>, listed: [TypeID], catalogue: Catalogue) -> (types: [TypeID]?, asFilter: Bool) {
+    static func narrowing(_ chosen: Set<String>, listed: [TypeID], catalogue: Catalogue) -> (types: [TypeID]?, asFilter: Bool) {
         let hasSubtypes = chosen.contains { !catalogue.descendants(of: TypeID($0)).isEmpty }
         let sorted = chosen.sorted().map { TypeID($0) }
         let scope = Set(listed).union(listed.flatMap { catalogue.descendants(of: $0) })
@@ -337,7 +293,7 @@ nonisolated enum ViewDraft {
     /// Whether an existing view keeps the types it lists where a Type filter of exactly these types is saved: they lie
     /// within the listed types' subtrees, and are not just those types again with no subtypes (which hides nothing).
     /// The filter is then an exact-type condition beside the view's own types.
-    private static func keepsListedTypes(_ chosen: Set<String>, listed: [TypeID], catalogue: Catalogue) -> Bool {
+    static func keepsListedTypes(_ chosen: Set<String>, listed: [TypeID], catalogue: Catalogue) -> Bool {
         guard !listed.isEmpty else { return false }
         let scope = Set(listed).union(listed.flatMap { catalogue.descendants(of: $0) })
         guard chosen.allSatisfy({ scope.contains(TypeID($0)) }) else { return false }
@@ -350,87 +306,14 @@ nonisolated enum ViewDraft {
     /// on the type shows that condition as its Type filter instead, so its types are not seeded.
     static func seededTypes(of query: LibraryViewQuery, catalogue: Catalogue) -> [String]? {
         guard query.types.count > 1, query.types.allSatisfy({ catalogue.descendants(of: $0).isEmpty }) else { return nil }
-        if let parsed = try? terms(of: query.filter), parsed.terms.contains(where: { $0.column == typeColumnID }) { return nil }
+        if let parsed = try? terms(of: query.filter), parsed.terms.contains(where: { if case .system(.type) = $0.field { true } else { false } }) { return nil }
         return query.types.map(\.rawValue)
-    }
-
-    /// The conditions of `base` with the window's filters added. Where nothing is added, `unchanged` is the filter.
-    private static func combined(
-        _ base: Parsed, adding choices: [String: FilterChoice], columns: [ItemTableColumn], keeping unchanged: String?
-    ) -> (filter: String?, unkept: [Unkept]) {
-        var unkept: [Unkept] = []
-        var groups: [(conditions: [FilterCondition], isNegated: Bool)] = []
-        for column in columns {
-            guard let choice = choices[column.id], !choice.values.isEmpty else { continue }
-            let conditions = choice.values.sorted().map { condition(of: column, value: $0, negated: choice.isNegated) }
-            guard !conditions.contains(nil) else {
-                unkept.append(.filter(column: label(of: column)))
-                continue
-            }
-            groups.append((conditions.compactMap { $0 }, choice.isNegated))
-        }
-        let held = base.terms.map(\.condition)
-        guard !groups.isEmpty else { return (unchanged, unkept) }
-        guard held.count + groups.reduce(0, { $0 + $1.conditions.count }) <= maxConditions else {
-            return (unchanged, unkept + [.tooManyFilters])
-        }
-        // Values of one column join by OR (by AND where they are excluded), columns by AND, and the view's own
-        // filter by AND to what is added.
-        var joins = Set<FilterJoin>()
-        if held.count > 1 { joins.insert(base.join) }
-        for group in groups where group.conditions.count > 1 { joins.insert(group.isNegated ? .all : .any) }
-        if groups.count > 1 || !held.isEmpty { joins.insert(.all) }
-        guard joins.count <= 1 else { return (unchanged, unkept + [.mixedFilters]) }
-        let expression = FilterExpression(join: joins.first ?? .all, conditions: held + groups.flatMap { $0.conditions })
-        do {
-            return (try expression.encoded(), unkept)
-        } catch {
-            return (unchanged, unkept + [.refused(message(of: error))])
-        }
     }
 
     /// The most conditions a Marfa filter holds.
     static let maxConditions = 10
     /// How many sort keys a window keeps, in the panel and in the table's header.
     static let maxSortKeys = 10
-
-    /// The field a table column filters, where a filter can express it.
-    private static func filterField(of column: ItemTableColumn) -> FilterField? {
-        switch column.content {
-        case .type: .system(.type)
-        case .parent: .edge(type: MarfaMapping.parentEdge, direction: .backref)
-        case .field(let field): isPropertyName(field.key) ? .property(field.key) : nil
-        case .title, .children, .collections, .count, .created, .edited, .occurred, .tags, .duration: nil
-        }
-    }
-
-    /// Whether a saved view's query can hold a filter on the column, as the window's filter does, so the row offers only
-    /// filters that can be saved. Today's filterable columns are the categorical ones, which the query holds as a type,
-    /// a parent or a property.
-    static func canFilter(_ column: ItemTableColumn) -> Bool {
-        column.isCategorical && filterField(of: column) != nil
-    }
-
-    /// One table category as a Marfa condition; nil where a filter cannot express it. Is Not is `neq`, and the
-    /// empty cell, which Is Not excludes, is `exists`.
-    private static func condition(of column: ItemTableColumn, value: String, negated: Bool = false) -> FilterCondition? {
-        guard let field = filterField(of: column) else { return nil }
-        if value.isEmpty {
-            // The table's type filter keeps a type, never an empty cell.
-            guard column.content != .type else { return nil }
-            return FilterCondition(field: field, operator: negated ? .exists : .notExists)
-        }
-        let comparison: FilterOperator = negated ? .neq : .eq
-        if case .field = column.content, column.style == .boolean {
-            return value == "true" || value == "false" ? FilterCondition(field: field, operator: comparison, value: .bool(value == "true")) : nil
-        }
-        return FilterCondition(field: field, operator: comparison, value: .text(value))
-    }
-
-    /// The text of one condition on its own, or nil where the core refuses it.
-    private static func text(of condition: FilterCondition) -> String? {
-        try? FilterExpression(conditions: [condition]).encoded()
-    }
 
     /// What the core says of a refusal, which a person is told as it is worded.
     static func message(of error: any Error) -> String {
@@ -463,13 +346,7 @@ nonisolated enum ViewDraft {
         } else {
             options.grouping = .none
         }
-        // A saved filter the core refuses shows no table filters; the refusal is told where the view is saved or changed.
-        let types = seededTypes(of: view.query, catalogue: catalogue)
-        let shown = (try? terms(of: view.query.filter)).map { shownTerms($0).filter { types == nil || $0.column != typeColumnID } } ?? []
-        var choices = shownChoices(shown)
-        if let types { choices[typeColumnID] = FilterChoice(values: Set(types), isNegated: false) }
-        options.filters = choices.mapValues(\.values)
-        options.negated = Set(choices.filter(\.value.isNegated).keys)
+        options.filter = filterState(of: view, catalogue: catalogue)
         return options
     }
 
@@ -485,17 +362,6 @@ nonisolated enum ViewDraft {
             return true
         } }
         return isDate ? .bucket(bucket) : nil
-    }
-
-    /// The conditions of a view's filter the window has no filter for, as Marfa writes them. Saving a change of filters
-    /// leaves them as they are, and the panel lists them so they are not a surprise.
-    static func unshownConditions(of query: LibraryViewQuery, catalogue: Catalogue) -> [String] {
-        guard let parsed = try? terms(of: query.filter) else { return [] }
-        let types = seededTypes(of: query, catalogue: catalogue)
-        let shown = Set(shownTerms(parsed).map(\.condition))
-        return parsed.terms.filter { term in
-            !shown.contains(term.condition) && !(types != nil && term.column == typeColumnID)
-        }.map(\.text)
     }
 
     /// The date field a view's days are grouped by, which a timeline shows its items by.
@@ -518,7 +384,7 @@ nonisolated enum ViewDraft {
     ) -> Bool {
         let options = shown(options ?? ItemTableOptions(), dated: dated)
         let seed = shown(seed, dated: dated)
-        return options.filterChoices != seed.filterChoices || options.grouping != seed.grouping || reorders(options, from: seed)
+        return !options.filter.isSame(as: seed.filter) || options.grouping != seed.grouping || reorders(options, from: seed)
             || sortKeys(options.sort) != sortKeys(seed.sort) || timelineDate != seedTimelineDate
     }
 
@@ -607,208 +473,15 @@ nonisolated enum ViewDraft {
             group.hidden = json((options.hiddenGroups ?? []).sorted(), of: column)
             change.group = .set(group)
         }
-        if options.filterChoices != seed.filterChoices {
+        if !options.filter.savable.isSame(as: seed.filter.savable) {
             let filter = replacing(
-                view.query, with: choices(of: window), columns: window.columns, seededTypes: seededTypes, catalogue: catalogue)
+                view.query, with: window.filter, targets: window.targets, seededTypes: seededTypes, catalogue: catalogue)
             if filter.query != view.query {
                 change.query = filter.query
             }
             unkept += filter.unkept
         }
+        unkept += relativeFilters(of: window)
         return (change, unkept)
-    }
-
-    // MARK: A view's filter as the window's
-
-    /// The query to read a view's items with while the window's filters differ from the view's: the view's own with
-    /// the conditions the window shows as filters taken out, and the types it shows as a Type filter. The window's
-    /// filters then narrow what is read, so a value unchecked in one brings its items back. The conditions the window
-    /// cannot show (those on a field no type declares), the tier and the states stay.
-    /// Nil where the view's filter is one the core refuses, since nothing can be taken out of it.
-    static func previewQuery(of query: LibraryViewQuery, seededTypes: [String]?, catalogue: Catalogue) -> LibraryViewQuery? {
-        let parsed: Parsed
-        do { parsed = try terms(of: query.filter) } catch { return nil }
-        // A condition the window shows as written: a bare bool is a Yes/No column's, and any other is not.
-        let shown = shownTerms(parsed).filter { term in
-            if seededTypes != nil, term.column == typeColumnID { return false }
-            guard let column = term.column, column.hasPrefix("field.") else { return true }
-            let key = column.dropFirst("field.".count)
-            let declared = catalogue.itemTypes.values.flatMap(\.fields).filter { $0.key == key }
-            // A field no type declares has no column to narrow by, so the read keeps its condition.
-            guard !declared.isEmpty else { return false }
-            return declared.contains { $0.kind == .boolean } == term.isBare
-        }
-        let shownConditions = Set(shown.map(\.condition))
-        let kept = parsed.terms.filter { !shownConditions.contains($0.condition) }
-        var result = query
-        if seededTypes != nil { result.types = [] }
-        do {
-            result.filter = kept.isEmpty ? nil : try FilterExpression(join: parsed.join, conditions: kept.map(\.condition)).encoded()
-        } catch {
-            return nil
-        }
-        return result
-    }
-
-    /// One condition of a view's filter, and the window filter it stands for where it is one.
-    struct Term: Hashable {
-        var condition: FilterCondition
-        /// The table column it filters, and the category it keeps (or, where `isNegated`, leaves out).
-        var column: String?
-        var value: String?
-        /// Whether its operand is a bool, as a filter on a Yes or No column is written.
-        var isBare = false
-        /// Whether it excludes the category: `neq`, and `exists` for the empty cell.
-        var isNegated = false
-
-        /// The condition as the core writes it.
-        var text: String { ViewDraft.text(of: condition) ?? "" }
-    }
-
-    /// A filter's conditions, in order, and what joins them.
-    struct Parsed: Hashable {
-        var terms: [Term]
-        var join: FilterJoin
-    }
-
-    /// A filter's conditions as the core reads them; throws what it refuses.
-    static func terms(of filter: String?) throws -> Parsed {
-        guard let filter, !filter.allSatisfy(\.isWhitespace) else { return Parsed(terms: [], join: .all) }
-        let expression = try FilterExpression(decoding: filter)
-        return Parsed(terms: expression.conditions.map(term(of:)), join: expression.join)
-    }
-
-    private static func term(of condition: FilterCondition) -> Term {
-        var term = Term(condition: condition)
-        guard let column = column(of: condition.field) else { return term }
-        switch (condition.operator, condition.value) {
-        case (.notExists, nil):
-            term.column = column
-            term.value = ""
-        case (.exists, nil):
-            term.column = column
-            term.value = ""
-            term.isNegated = true
-        case (.eq, .text(let value)?):
-            term.column = column
-            term.value = value
-        case (.neq, .text(let value)?):
-            term.column = column
-            term.value = value
-            term.isNegated = true
-        case (.eq, .bool(let value)?) where column.hasPrefix("field."):
-            term.column = column
-            term.value = value ? "true" : "false"
-            term.isBare = true
-        case (.neq, .bool(let value)?) where column.hasPrefix("field."):
-            term.column = column
-            term.value = value ? "true" : "false"
-            term.isBare = true
-            term.isNegated = true
-        default:
-            break
-        }
-        // The table's type filter keeps a type, never an empty cell.
-        if column == ItemTableColumn.type.id, term.value?.isEmpty != false { term.column = nil }
-        return term
-    }
-
-    /// The table column whose filter a condition on this field stands for.
-    private static func column(of field: FilterField) -> String? {
-        switch field {
-        case .system(.type): ItemTableColumn.type.id
-        case .edge(MarfaMapping.parentEdge, .backref): ItemTableColumn.parent.id
-        case .property(let key): isPropertyName(key) ? "field." + key : nil
-        default: nil
-        }
-    }
-
-    /// The window filters a filter's conditions stand for. The window joins a column's values by OR, or by AND
-    /// where they are excluded, and its columns by AND, so conditions joined by AND show where each column has one
-    /// or all of its conditions exclude, and conditions joined by OR show only where all of them keep values of
-    /// one column.
-    private static func shownTerms(_ parsed: Parsed) -> [Term] {
-        let mapped = parsed.terms.filter { $0.column != nil }
-        if parsed.join == .any, parsed.terms.count > 1 {
-            let columns = Set(mapped.map(\.column))
-            return mapped.count == parsed.terms.count && columns.count == 1 && mapped.allSatisfy({ !$0.isNegated }) ? mapped : []
-        }
-        let byColumn = Dictionary(grouping: mapped, by: { $0.column! })
-        return mapped.filter { term in
-            let terms = byColumn[term.column!]!
-            return terms.count == 1 || terms.allSatisfy(\.isNegated)
-        }
-    }
-
-    private static func shownChoices(_ terms: [Term]) -> [String: FilterChoice] {
-        terms.reduce(into: [:]) { result, term in
-            var choice = result[term.column!] ?? FilterChoice(values: [], isNegated: term.isNegated)
-            choice.values.insert(term.value!)
-            result[term.column!] = choice
-        }
-    }
-
-    /// Whether this leaves the whole filter unwritable, rather than only one column's part of it.
-    private static func refusesFilter(_ unkept: Unkept) -> Bool {
-        switch unkept {
-        case .mixedFilters, .tooManyFilters, .refused: true
-        default: false
-        }
-    }
-
-    /// The view's query with the window's filters in place of the conditions the window showed: the conditions
-    /// it could not show stay as they are, in order. A Type filter within the view's listed types leaves them as
-    /// they are and is saved as an exact-type condition (`keepsListedTypes`); one outside them replaces them. A window filter the view
-    /// cannot hold leaves the query whole, so a filter is never dropped for one the window could not save.
-    static func replacing(
-        _ query: LibraryViewQuery, with choices: [String: FilterChoice], columns: [ItemTableColumn], seededTypes: [String]?,
-        catalogue: Catalogue
-    ) -> (query: LibraryViewQuery, unkept: [Unkept]) {
-        let parsed: Parsed
-        do { parsed = try terms(of: query.filter) } catch { return (query, [.refused(message(of: error))]) }
-        let filterable = Dictionary(uniqueKeysWithValues: columns.filter(\.isCategorical).map { ($0.id, $0) })
-        // Where the view's types stand for the Type filter, its conditions on the type are not the filter's.
-        let shown = shownTerms(parsed).filter { seededTypes == nil || $0.column != typeColumnID }
-        // A column the window lacks, or one whose filter it writes otherwise, shows none of its conditions.
-        let hiddenColumns = Set(shown.compactMap { term -> String? in
-            guard let column = filterable[term.column!], (column.style == .boolean) == term.isBare else { return term.column }
-            return nil
-        })
-        let owned = shown.filter { !hiddenColumns.contains($0.column!) }
-        var seeded = shownChoices(owned)
-        if let seededTypes, filterable[typeColumnID] != nil {
-            seeded[typeColumnID] = FilterChoice(values: Set(seededTypes), isNegated: false)
-        }
-        var window = choices.filter { filterable[$0.key] != nil && !$0.value.values.isEmpty }
-        guard window != seeded else { return (query, []) }
-
-        var result = query
-        if filterable[typeColumnID] != nil {
-            if let choice = window[typeColumnID], !choice.isNegated {
-                let chosen = choice.values.subtracting([""])
-                if chosen.isEmpty {
-                    window[typeColumnID] = nil
-                } else {
-                    // The view keeps the types it lists where the chosen ones lie within them, and the filter is saved as an
-                    // exact-type condition, a chip the view still shows when reopened. The types are replaced only where a
-                    // chosen type lies outside them, since the two together would list nothing.
-                    if keepsListedTypes(chosen, listed: query.types, catalogue: catalogue) {
-                        // The view's own types stay.
-                    } else {
-                        let narrowed = narrowing(chosen, listed: query.types, catalogue: catalogue)
-                        if let types = narrowed.types { result.types = types }
-                        if !narrowed.asFilter { window[typeColumnID] = nil }
-                    }
-                }
-            } else if seededTypes != nil {
-                result.types = []
-            }
-        }
-        let ownedConditions = Set(owned.map(\.condition))
-        let kept = parsed.terms.filter { !ownedConditions.contains($0.condition) }
-        let combination = combined(Parsed(terms: kept, join: parsed.join), adding: window, columns: columns, keeping: nil)
-        if combination.unkept.contains(where: refusesFilter) { return (query, combination.unkept) }
-        result.filter = combination.filter ?? (kept.isEmpty ? nil : try? FilterExpression(join: parsed.join, conditions: kept.map(\.condition)).encoded())
-        return (result, combination.unkept)
     }
 }
