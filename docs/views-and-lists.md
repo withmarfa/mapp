@@ -369,7 +369,7 @@ Status: Built, not yet released. Settings is a window of its own, not a place in
 
 Where it lives: `SettingsWindowView`, `SettingsSidebar`, `SettingsNavigation`, `SettingsLauncher`, `SettingsTokens`, `SettingsSection`, `SettingsRow`, `SettingsButton`, `SettingsSearchField`, `SettingsHead`, `SettingsProblemRow`, `SettingsPageState`, `SettingsReadOnlyValue`, `SettingsSheet`, `ChoiceTiles`, `SettingsSectionTable` and `SettingsPageTable`, under `MAPP/Settings/`.
 
-The rules every page follows, agreed with August on 19 and 20 November 2026:
+The rules every page follows, agreed with August on 19 and 20 November 2026. The button rule of 22 November 2026 changes the buttons, pop-ups, input widths and numbers below; [Agreed designs](agreed-designs.md#buttons) lists what is not built yet.
 
 - **A window of its own.** One sidebar, the system's sidebar list, lists MAPP's pages, then the Marfa's, in sections with the system's headers and gaps, each page a 28-point row with a 20-point color tile (the system's small row size), and the system's search field at the top finds a page by its name or by the title of a row it holds. A page is listed only once it exists. The content is one column at most 620 points wide, centered, with more room either side as the window widens; the page scrolls as one. The window opens at 1200 by 900 points and remembers the size it was left at.
 - **The toolbar** carries Back, Forward and the page's name. There is no back button beside a title. Back and Forward are also the View menu's ⌘[ and ⌘] while Settings is key. A page inside a page, such as a key's own page, is pushed, so Back returns.
