@@ -50,6 +50,8 @@ nonisolated protocol PreferencesCopy: Sendable {
     func write(_ operations: [RowOperation], to table: PreferencesTable, of item: String) async throws
     /// Moves an item to the bin.
     func remove(_ item: String) async throws
+    /// Sends what the copy has queued and returns once the server has taken it all; throws where it could not.
+    func send() async throws
     /// Each change the copy names: the item it changed, or nil for a refresh such as a fill of tables or an answer.
     func changes() -> AsyncStream<String?>
 }
@@ -171,6 +173,14 @@ nonisolated struct WorkingCopyPreferences: PreferencesCopy {
 
     func remove(_ item: String) async throws {
         _ = try await MarfaEngine.asking { try await copy.items.delete(item) }
+    }
+
+    func send() async throws {
+        let report = try await MarfaEngine.asking { try await copy.queue.drain() }
+        let refused = report.verdicts.contains { if case .refused = $0.verdict { true } else { false } }
+        guard report.undelivered == 0, report.unmade == 0, report.unavailable == nil, report.stopped == nil, !refused else {
+            throw MarfaError.invalid(message: "the server did not take every queued write")
+        }
     }
 
     func changes() -> AsyncStream<String?> {

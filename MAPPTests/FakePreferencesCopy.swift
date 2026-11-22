@@ -19,6 +19,9 @@ actor FakePreferencesCopy: PreferencesCopy {
     private(set) var updates: [[PreferencesField]] = []
     private(set) var batches: [PreferencesTable: Int] = [:]
     private(set) var removed: [String] = []
+    private(set) var sends = 0
+    /// Whether the server takes what is sent; false stands for a server that does not answer.
+    var delivers = true
     private var made = 0
     private nonisolated let stream = AsyncStream<String?>.makeStream()
     /// Runs once, the next time an item's settings are read, as a person's change made while a step reads.
@@ -173,6 +176,13 @@ actor FakePreferencesCopy: PreferencesCopy {
         removed.append(item)
         held[item]?.trashed = true
     }
+
+    func send() async throws {
+        sends += 1
+        guard delivers else { throw MarfaError.invalid(message: "the server did not answer") }
+    }
+
+    func setDelivers(_ delivers: Bool) { self.delivers = delivers }
 
     nonisolated func changes() -> AsyncStream<String?> { stream.stream }
 

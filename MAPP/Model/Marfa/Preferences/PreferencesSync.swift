@@ -134,8 +134,9 @@ final class PreferencesSync {
     // MARK: For Connection's section
 
     /// Moves every settings item of this Marfa to the bin. The settings on this Mac stay as they are, and nothing is
-    /// written to the Marfa until `startAgain()`.
-    func remove() async throws {
+    /// written to the Marfa until `startAgain()`. With `confirmed`, it returns only once the server has taken the
+    /// removal, which a sign-out needs, and throws where it could not.
+    func remove(confirmed: Bool = false) async throws {
         guard let copy else { return }
         for held in try await copy.items() { try await copy.remove(held.id) }
         item = nil
@@ -145,6 +146,7 @@ final class PreferencesSync {
             record.marfas[instance]?.removed = true
             record.save(defaults)
         }
+        if confirmed { try await copy.send() }
     }
 
     /// Keeps this Mac's settings in the Marfa again after they were removed: the next item is made from them, even

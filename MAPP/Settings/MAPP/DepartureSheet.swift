@@ -5,6 +5,7 @@ import SwiftUI
 /// discard it with them. The text of what would be lost is shown, since it is the only copy. It sits in the middle of the
 /// Settings window, as a sheet of the parts does.
 struct DepartureSheet: View {
+    @Environment(Libraries.self) private var libraries
     let model: MarfaSettingsModel
     let departure: MarfaSettingsModel.Departure
 
@@ -51,6 +52,14 @@ struct DepartureSheet: View {
                 .settingsFont(.small)
                 .foregroundStyle(SettingsTokens.secondaryText)
                 .fixedSize(horizontal: false, vertical: true)
+                if isDisconnecting, model.offersSettingsRemoval {
+                    Toggle(
+                        ConnectionSettings(standing: libraries.preferences.standing, name: LibraryDescription.name(libraries)).disconnectChoice,
+                        isOn: Bindable(model).alsoRemovesSettings
+                    )
+                    .toggleStyle(.checkbox)
+                    .accessibilityIdentifier("DepartureRemoveSettings")
+                }
             }
         } buttons: {
             if canDiscard {
