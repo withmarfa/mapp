@@ -111,9 +111,9 @@ nonisolated extension Catalogue {
         type == .file || isSubtype(type, ofAnyOf: [.file])
     }
 
-    /// Whether a new item can be of `type`: any but the file types, which are made by adding a file, and the system's.
+    /// Whether a new item can be of `type`: any but the file types, which are made by adding a file, and the hidden ones.
     func isCreatable(_ type: TypeID) -> Bool {
-        !isFileType(type) && !type.rawValue.hasPrefix("system.")
+        !isFileType(type) && !type.isHidden
     }
 
     /// Whether a name is for one item of a type or for a list of them.

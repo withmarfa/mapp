@@ -415,8 +415,17 @@ final class SidebarLayouts {
     @ObservationIgnored private let defaults: UserDefaults
     private var layouts: [String: SidebarLayout]
 
+    @ObservationIgnored private let reporting: Reporting
+
     init(defaults: UserDefaults = .standard, reporting: Reporting = .shared) {
         self.defaults = defaults
+        self.reporting = reporting
+        layouts = [:]
+        reload()
+    }
+
+    /// Reads the stored value again, as when another Mac's change has reached the defaults (`PreferencesSync`).
+    func reload() {
         guard let saved = defaults.data(forKey: Self.defaultsKey) else {
             layouts = [:]
             return

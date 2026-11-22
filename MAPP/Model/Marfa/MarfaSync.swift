@@ -10,14 +10,16 @@ import os
 actor MarfaSync {
     /// One slice of both tiers, so the Inbox (the feed) and the rest of the library read from one copy, offline too.
     private static let tier = SliceTier.all
-    /// `*` leaves out every `system.*` type, so the saved views are named beside it. The engine keeps them out of
-    /// the items it shows.
+    /// `*` leaves out every hidden type (`system.*` and `app.*`), so the saved views are named beside it. The engine
+    /// keeps them out of the items it shows.
     nonisolated static let slice = ["*", "system.view"]
+    /// The slice with MAPP's own settings, where the sign-in reaches them (`PreferencesReach`).
+    nonisolated static let preferencesSlice = slice + [PreferencesType.id]
     /// Held whole so a view that lists what is `beneath` an item, and the count of an item's children and of a collection's
     /// members, can be answered from the copy, offline too.
     nonisolated static let sliceEdgeTypes = [MarfaMapping.parentEdge, MarfaMapping.collectionEdge]
 
-    nonisolated static func needsFill(_ status: Status) -> Bool {
+    nonisolated static func needsFill(_ status: Status, slice: [String] = slice) -> Bool {
         status.hydration != .complete || status.sliceTier != .all || Set(status.sliceTypes) != Set(slice)
             || Set(status.sliceEdgeTypes) != Set(sliceEdgeTypes)
     }
@@ -57,6 +59,11 @@ actor MarfaSync {
     private var rehydration = Rehydration()
     /// Whether the person has been told of a stop since the copy last followed its server, so a stop is told once.
     private var told = false
+    /// The slice this run fills: `slice`, or `preferencesSlice` where the sign-in reaches MAPP's own settings.
+    private var chosenSlice = MarfaSync.slice
+    /// Set once a hydration that took MAPP's settings was refused, so the run keeps to `slice` until the sign-in changes.
+    private var preferencesRefused = false
+    private var declared = false
 
     /// Rows the copy could not read and the hydration they wait for. A hydration replaces such a row from the server,
     /// but a row that is unreadable again after it would ask again for ever, so each row asks once.
@@ -106,9 +113,26 @@ actor MarfaSync {
     }
 
     private func fillIfSliceChanged() async {
-        guard let status = try? await refreshing.readStatus(), !stopped, !hydrationUnderway, Self.needsFill(status) else { return }
+        guard let status = try? await refreshing.readStatus(), !stopped, !hydrationUnderway else { return }
+        chosenSlice = await choose(for: status)
+        guard Self.needsFill(status, slice: chosenSlice) else { return }
         wantsHydration = true
         work()
+    }
+
+    /// Weighs again whether the slice takes MAPP's settings, as after the copy is given a new sign-in, and fills the copy
+    /// again where that changes it.
+    func reconsiderSlice() async {
+        preferencesRefused = false
+        await fillIfSliceChanged()
+    }
+
+    /// The slice to fill. Where the evidence cannot be read, as offline, the copy keeps what it holds.
+    private func choose(for status: Status) async -> [String] {
+        guard !preferencesRefused else { return Self.slice }
+        let holds = status.hydration == .complete && status.sliceTypes.contains(PreferencesType.id)
+        guard let evidence = await refreshing.preferencesEvidence() else { return holds ? Self.preferencesSlice : Self.slice }
+        return PreferencesReach.includes(evidence, holdsTypeNow: holds) ? Self.preferencesSlice : Self.slice
     }
 
     /// The person asked for a refresh: the copy is caught up, or hydrated where it needs that, and what waits is sent.
@@ -254,7 +278,7 @@ actor MarfaSync {
                 hub.set(.offline(reason: error.message))
             }
         case .stopped(let error):
-            if changed { stop(for: error) }
+            if changed, !isPreferencesRefusal(error) { stop(for: error) }
         case .keyRefused:
             Self.log.error("sync stopped: the server ended the sign-in")
             hub.set(.keyRefused)
@@ -350,7 +374,7 @@ actor MarfaSync {
     /// asks again for what the server alone says.
     func refreshNow(hydrating: Bool = false) async throws {
         let status = try await refreshing.readStatus()
-        if !hydrating, !Self.needsFill(status), !rehydration.wanted {
+        if !hydrating, !Self.needsFill(status, slice: chosenSlice), !rehydration.wanted {
             try await refreshing.catchUp()
         } else {
             try await hydrate()
@@ -364,7 +388,8 @@ actor MarfaSync {
         work()
     }
 
-    /// The stable slice lets the core resume an interrupted fill and includes types registered later.
+    /// The stable slice lets the core resume an interrupted fill and includes types registered later. A hydration that
+    /// took MAPP's settings and was refused for them, before the core changed anything, is made again without them.
     private func hydrate() async throws {
         hydrationUnderway = true
         publishPhase()
@@ -372,16 +397,44 @@ actor MarfaSync {
             hydrationUnderway = false
             publishPhase()
         }
+        if !declared {
+            try await refreshing.declarePreferences()
+            declared = true
+        }
+        if let status = try? await refreshing.readStatus() { chosenSlice = await choose(for: status) }
         #if DEBUG
         hooks.seen.update { $0.hydrations += 1 }
         #endif
-        let hydrated = try await refreshing.hydrate(types: Self.slice, tier: Self.tier, edgeTypes: Self.sliceEdgeTypes)
+        let hydrated: HydrateReport
+        do {
+            hydrated = try await refreshing.hydrate(types: chosenSlice, tier: Self.tier, edgeTypes: Self.sliceEdgeTypes)
+        } catch let error as MarfaError where chosenSlice.contains(PreferencesType.id) && Self.refusesSlice(error) {
+            Self.log.notice("the hydration refused MAPP's settings; filling without them")
+            preferencesRefused = true
+            chosenSlice = Self.slice
+            hydrated = try await refreshing.hydrate(types: chosenSlice, tier: Self.tier, edgeTypes: Self.sliceEdgeTypes)
+        }
         #if DEBUG
         hooks.seen.update { $0.lastHydration = hydrated }
         #else
         _ = hydrated
         #endif
         rehydration.finished()
+    }
+
+    /// A hydration that took MAPP's settings refused for them, which `hydrate` makes again without them: no fault of
+    /// the library's. The slice without them names no type, so it never meets this refusal.
+    private func isPreferencesRefusal(_ error: MarfaError) -> Bool {
+        guard case .forbidden("type_not_permitted", _, _) = error else { return false }
+        return preferencesRefused || chosenSlice.contains(PreferencesType.id)
+    }
+
+    /// An error a hydration answers for a type the sign-in cannot read or the server does not hold.
+    private static func refusesSlice(_ error: MarfaError) -> Bool {
+        switch error {
+        case .forbidden, .unknownType, .validation, .invalid: true
+        default: false
+        }
     }
 
     /// What an app call that failed says of the copy. The package sets the connection for a `MarfaError` itself

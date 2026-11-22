@@ -1,8 +1,8 @@
 import Foundation
 
 /// What a window with nothing to restore shows first, as Settings > General > Opening says: the place the person last
-/// used, or one they chose. A window restored with the app keeps what it showed. A Mac setting, one value in the defaults
-/// (`key`), never written to Marfa.
+/// used, or one they chose. A window restored with the app keeps what it showed. One value in the defaults (`key`),
+/// which syncs through the Marfa (`PreferencesMap`); the place last used stays on this Mac.
 nonisolated enum StartWith: Hashable, Sendable, RawRepresentable {
     case leftOff
     case place(SidebarItem)

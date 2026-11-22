@@ -46,7 +46,7 @@ struct NoHotKeys: HotKeyRegistrar {
 
 /// The shortcuts that work in any app, while MAPP is running. Every one is off until the person sets it, and is registered
 /// with the system only while it is set: setting one registers it, clearing it unregisters it, and none is registered
-/// before `start`. A shortcut needs ⌘ or ⌃ (`Shortcut.anyAppProblem`). They stay on this Mac, in the defaults.
+/// before `start`. A shortcut needs ⌘ or ⌃ (`Shortcut.anyAppProblem`). They are kept in the defaults and sync through the connected Marfa (`PreferencesMap`).
 ///
 /// Stored text that cannot be read is moved aside under a key of its own, kept and never removed, and every shortcut starts
 /// off.
@@ -66,6 +66,22 @@ final class AnyAppShortcuts {
         self.defaults = defaults
         self.registrar = registrar
         self.perform = perform
+        chosen = [:]
+        reload()
+    }
+
+    /// Reads the stored value again, as when another Mac's change has reached the defaults (`PreferencesSync`), and
+    /// registers what changed once the shortcuts have started.
+    func reload() {
+        let before = chosen
+        read()
+        guard isStarted else { return }
+        for (command, shortcut) in before where chosen[command] != shortcut { registrar.unregister(command) }
+        for (command, shortcut) in chosen where before[command] != shortcut { _ = register(shortcut, for: command) }
+    }
+
+    private func read() {
+        unknown = [:]
         guard let saved = defaults.data(forKey: Self.defaultsKey) else {
             chosen = [:]
             return

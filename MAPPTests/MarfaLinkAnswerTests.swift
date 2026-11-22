@@ -28,14 +28,10 @@ struct MarfaLinkAnswerTests {
         // A real copy: the in-memory one does not answer link candidates.
         let store = try TemporaryMarfaCopy()
         let copy = try await store.open()
-        try await copy.declareTypes([[
-            "id": "example.note", "label": "Note", "title_field": "title", "body_field": "body",
-            "fields": ["title": ["type": "string"], "body": ["type": "string"]],
-        ]])
         var ids: [String: ItemID] = [:]
         var all: [ItemID] = []
         for title in titles {
-            let queued = try await copy.items.create(Draft(type: "example.note", properties: ["title": .string(title)]))
+            let queued = try await copy.items.create(Draft(type: "core.note", properties: ["title": .string(title)]))
             let id = ItemID(try #require(queued.itemId))
             ids[title] = id
             all.append(id)

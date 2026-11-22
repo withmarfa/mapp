@@ -163,7 +163,7 @@ import Testing
         }
 
         func note(_ title: String, body: String = "Text") async throws -> String {
-            let made = try await copy.items.create(Draft(type: "example.note", properties: ["title": .string(title), "body": .string(body)]))
+            let made = try await copy.items.create(Draft(type: "core.note", properties: ["title": .string(title), "body": .string(body)]))
             return try #require(made.itemId)
         }
 
@@ -232,11 +232,7 @@ import Testing
     private func makeScene() async throws -> Scene {
         let store = try TemporaryMarfaCopy()
         let copy = try await store.open()
-        try await copy.declareTypes([[
-            "id": "example.note", "label": "Note", "title_field": "title", "body_field": "body",
-            "fields": ["title": ["type": "string"], "body": ["type": "string"]],
-        ]])
-        _ = try await copy.items.create(Draft(type: "example.note", properties: ["title": "First", "body": "Text"]))
+        _ = try await copy.items.create(Draft(type: "core.note", properties: ["title": "First", "body": "Text"]))
         let reads = Watched(copy: copy)
         let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads,
                                   refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()))
@@ -555,14 +551,7 @@ import Testing
     /// the text of an item with no title reads no other item's links.
     @Test func theFirstLineOfAnUntitledItemNamesNothing() async throws {
         let scene = try await makeScene()
-        // Declared with the item, since a declaration replaces the types declared before.
-        try await scene.copy.declareTypes([[
-            "id": "example.note", "label": "Note", "title_field": "title", "body_field": "body",
-            "fields": ["title": ["type": "string"], "body": ["type": "string"]],
-        ], [
-            "id": "example.page", "label": "Page", "body_field": "body", "fields": ["body": ["type": "string"]],
-        ]])
-        let made = try await scene.copy.items.create(Draft(type: "example.page", properties: ["body": "Aaa\nSee [[Nowhere]]"]))
+        let made = try await scene.copy.items.create(Draft(type: "core.note", properties: ["body": "Aaa\nSee [[Nowhere]]"]))
         let page = try #require(made.itemId)
         let host = try await scene.note("Host", body: "See [[Bee]]")
         _ = try await scene.copy.edges.create(from: host, to: page, type: MarfaMapping.bodyLinkEdge)

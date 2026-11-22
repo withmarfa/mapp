@@ -68,9 +68,10 @@ nonisolated enum MarfaMapping {
     /// The `in-collection` property that orders a collection's members.
     static let positionProperty = "position"
 
-    /// Marfa keeps what apps share, such as saved views, as `system.*` rows, which are no items of the library. The
-    /// copy holds `system.view` so the sidebar can list the views (`MarfaSync.slice`), and only that prefix is tested.
-    static func isLibraryItem(_ row: Marfa.Item) -> Bool { !row.type.hasPrefix("system.") }
+    /// Marfa keeps what apps share, such as saved views, as `system.*` rows, and what one app keeps for itself, such as
+    /// MAPP's own settings, as `app.*` rows; neither is an item of the library. The copy holds `system.view` so the
+    /// sidebar can list the views, and `app.mapp.preferences` for `PreferencesSync` (`MarfaSync.slice`).
+    static func isLibraryItem(_ row: Marfa.Item) -> Bool { !TypeID.isHidden(row.type) }
 
     /// A view still in use, as the sidebar lists it.
     static func view(_ view: SavedView) -> LibraryView? {
@@ -187,8 +188,9 @@ nonisolated enum MarfaMapping {
 
     // MARK: Catalogue
 
+    /// An app's own types (`app.*`) are its machinery and never shown, so they are left out.
     static func catalogue(itemTypes: [Marfa.ItemType], edgeTypes: [Marfa.EdgeType]) -> Catalogue {
-        Catalogue(itemTypes: itemTypes.map(itemType), edgeTypes: edgeTypes.map(edgeType))
+        Catalogue(itemTypes: itemTypes.filter { !$0.id.hasPrefix("app.") }.map(itemType), edgeTypes: edgeTypes.map(edgeType))
     }
 
     static func itemType(_ type: Marfa.ItemType) -> ItemTypeInfo {

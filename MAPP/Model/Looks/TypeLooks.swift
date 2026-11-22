@@ -5,9 +5,8 @@ import Observation
 /// (`Libraries.libraryKey`), so two servers that share a type identifier keep separate looks.
 ///
 /// Only what was chosen is stored, place by place, and every look is worked out from the type's preset and its parent each
-/// time it is read (`TypeLookResolver`), so improving a preset improves every look not chosen. Looks stay on this Mac:
-/// they are never written to Marfa. Only Import chooses looks today, and a look it keeps for a type the server lacks waits
-/// for the type.
+/// time it is read (`TypeLookResolver`), so improving a preset improves every look not chosen. The connected server's looks
+/// sync through its Marfa (`PreferencesMap`). A look kept for a type the server lacks waits for the type.
 ///
 /// Stored text that cannot be read, such as a look a later version wrote, is moved aside under a key of its own, kept and
 /// never removed, and reported; what can be read is kept, and the looks of the rest are worked out as if never chosen.
@@ -20,8 +19,17 @@ final class TypeLooks {
     @ObservationIgnored private let defaults: UserDefaults
     private var chosen: [String: [String: TypeLookChoice]]
 
+    @ObservationIgnored private let reporting: Reporting
+
     init(defaults: UserDefaults = .standard, reporting: Reporting = .shared) {
         self.defaults = defaults
+        self.reporting = reporting
+        chosen = [:]
+        reload()
+    }
+
+    /// Reads the stored value again, as when another Mac's change has reached the defaults (`PreferencesSync`).
+    func reload() {
         guard let saved = defaults.data(forKey: Self.defaultsKey) else {
             chosen = [:]
             return

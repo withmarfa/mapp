@@ -55,7 +55,7 @@ extension LiveMarfaTests {
                 #expect(changed.setting(key)?.value?.int == 4)
                 await #expect(throws: OwnerFailure.self) { try await calls.change([key: .set(.int(500))], instanceID: before.instanceID) }
                 #expect(try await calls.storedSettings().setting(key)?.value?.int == 4, "a refused change writes nothing")
-                await #expect(throws: OwnerFailure.conflict) { try await calls.change([key: .set(.int(5))], instanceID: "01900000-0000-7000-8000-000000000000") }
+                await #expect(throws: OwnerFailure.instanceChanged) { try await calls.change([key: .set(.int(5))], instanceID: "01900000-0000-7000-8000-000000000000") }
             } catch {
                 result = .failure(error)
             }

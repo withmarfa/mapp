@@ -2,8 +2,8 @@ import Foundation
 import Observation
 
 /// What each server's person leaves out of search, kept in the defaults. A server is named as a library is
-/// (`Libraries.libraryKey`), so two servers that share a type identifier keep their own. It stays on this Mac and is never
-/// written to Marfa.
+/// (`Libraries.libraryKey`), so two servers that share a type identifier keep their own. The connected server's entry syncs
+/// through its Marfa (`PreferencesMap`).
 ///
 /// Stored text that cannot be read, such as one a later version wrote, is moved aside under a key of its own, kept and
 /// never removed; the servers whose entry can be read keep it, and the rest leave nothing out.
@@ -18,6 +18,12 @@ final class SearchLeaveOuts {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        held = [:]
+        reload()
+    }
+
+    /// Reads the stored value again, as when another Mac's change has reached the defaults (`PreferencesSync`).
+    func reload() {
         guard let saved = defaults.data(forKey: Self.defaultsKey) else {
             held = [:]
             return

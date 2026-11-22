@@ -304,6 +304,7 @@ extension MarfaEngine {
             readFailed(error)
             return
         }
+        queue = await libraryWrites(queue)
         let held = Set(queue.map(\.id)).union(answeredHeld.keys)
         counted.formIntersection(held)
         sentAsRead.formIntersection(held)

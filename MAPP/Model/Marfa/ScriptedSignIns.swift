@@ -52,21 +52,26 @@ nonisolated final class ScriptedSignIns: SignIns {
 
     /// Keeps `key` as a sign-in holding `permissions` and, with `profile`, the read of the owner's name; a sign-in made
     /// before MAPP asked for it is kept with `profile` false.
-    func save(_ key: String, for address: URL, permissions: Set<InstancePermission> = SystemSignIns.askedAtSignIn, profile: Bool = true) {
+    /// `scopes` are kept beside them, as a sign-in the owner approved for MAPP's own settings holds `app.mapp.*:write`.
+    func save(
+        _ key: String, for address: URL, permissions: Set<InstancePermission> = SystemSignIns.askedAtSignIn, profile: Bool = true,
+        scopes: [String] = []
+    ) {
         _ = try? keychain.signIn(
             to: address, service: Self.service, accessToken: key,
-            scopes: permissions.map(\.rawValue).sorted() + (profile ? SystemSignIns.profileScopes : []))
+            scopes: permissions.map(\.rawValue).sorted() + (profile ? SystemSignIns.profileScopes : []) + scopes)
     }
 
     /// Keeps what the key held for `connection` really holds, as the server it is held for says (`GET /keys/current`), in
     /// place of the permissions a sign-in asks for. A test server's key then shows a page its permission lacks as
-    /// Needs a Permission, as the shipping app does. A server that does not answer leaves what was held.
-    func adoptScopes(for connection: MarfaConnection) async {
+    /// Needs a Permission, as the shipping app does. A server that does not answer leaves what was held. A key states no
+    /// OAuth scopes, so `scopes` are kept beside them for what the person running the test knows it may do.
+    func adoptScopes(for connection: MarfaConnection, adding scopes: [String] = []) async {
         guard let server = try? held(connection.address), let token = try? key(for: connection.address) else { return }
         guard let key = try? await Client(server).getCurrentKey().ok.body.json else { return }
         save(
             token, for: connection.address, permissions: Set(key.permissions.compactMap { InstancePermission(rawValue: $0.rawValue) }),
-            profile: (try? readsProfile(for: connection)) ?? false)
+            profile: (try? readsProfile(for: connection)) ?? false, scopes: scopes)
     }
 
     /// The permissions each browser or code sign-in asked for, in order.
@@ -88,6 +93,10 @@ nonisolated final class ScriptedSignIns: SignIns {
     func readsProfile(for connection: MarfaConnection) throws -> Bool? {
         guard let credential = try authorization(for: connection.address).credential() else { return nil }
         return SystemSignIns.readsProfile(credential.scopes)
+    }
+
+    func scopes(for connection: MarfaConnection) throws -> [String]? {
+        try authorization(for: connection.address).credential()?.scopes
     }
 
     func grants(for connection: MarfaConnection) throws -> Set<InstancePermission>? {

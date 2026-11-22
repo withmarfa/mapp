@@ -155,12 +155,8 @@ import Testing
     private func makeScene() async throws -> Scene {
         let store = try TemporaryMarfaCopy()
         let copy = try await store.open()
-        try await copy.declareTypes([[
-            "id": "example.note", "label": "Note", "title_field": "title", "body_field": "body",
-            "fields": ["title": ["type": "string"], "body": ["type": "string"]],
-        ]])
-        let child = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Second", "body": "Text"]))
-        let folder = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Folder"]))
+        let child = try await copy.items.create(Draft(type: "core.note", properties: ["title": "Second", "body": "Text"]))
+        let folder = try await copy.items.create(Draft(type: "core.note", properties: ["title": "Folder"]))
         let folderID = try #require(folder.itemId)
         let childID = try #require(child.itemId)
         _ = try await copy.edges.create(from: folderID, to: childID, type: MarfaMapping.parentEdge)

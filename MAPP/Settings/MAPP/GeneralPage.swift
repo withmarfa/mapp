@@ -28,7 +28,7 @@ struct GeneralPage: View {
             Button("Cancel", role: .cancel) {}
             Button("Reset", role: .destructive) { resetSettings() }
         } message: {
-            Text("Every setting on this Mac starts over. Your items and sign-in stay.")
+            Text(resetMessage)
         }
     }
 
@@ -176,11 +176,20 @@ struct GeneralPage: View {
 
     private var reset: some View {
         SettingsSection("Reset") {
-            SettingsRow("Reset MAPP’s Settings", line: "Every setting on this Mac. Your items stay.") {
+            SettingsRow("Reset MAPP’s Settings", line: libraries.preferences.syncs ? "On every Mac that connects to this Marfa. Your items stay." : "Every setting on this Mac. Your items stay.") {
                 SettingsButton("Reset…", role: .destructive) { isConfirmingReset = true }
                     .accessibilityIdentifier("ResetSettings")
             }
         }
+    }
+
+    /// Where the settings sync, a reset reaches every Mac that connects to the Marfa.
+    private var resetMessage: String {
+        guard libraries.preferences.syncs else { return String(localized: "Every setting on this Mac starts over. Your items and sign-in stay.") }
+        guard let name = libraries.preferences.marfaName else {
+            return String(localized: "MAPP’s settings start over on every Mac that connects to this Marfa. Your items and sign-in stay.")
+        }
+        return String(localized: "MAPP’s settings start over on every Mac that connects to \(name). Your items and sign-in stay.")
     }
 
     private func resetSettings() {

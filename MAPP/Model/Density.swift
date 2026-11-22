@@ -17,8 +17,8 @@ nonisolated enum Density: String, Codable, CaseIterable, Identifiable, Hashable,
     }
 }
 
-/// The density each place that is not a saved view keeps for itself on this Mac, as the table keeps its columns
-/// (`ItemTableColumnLayouts`): one value in the defaults, by place, never written to Marfa. A saved view's density is in
+/// The density each place that is not a saved view keeps for itself: one value in the defaults, by place, which syncs
+/// through the Marfa (`PreferencesMap`). A saved view's density is in
 /// its Mac settings (`ViewMacSettings.density`). A place with no entry follows Settings.
 ///
 /// Stored text that cannot be read, or an entry a later version wrote with a density this one does not know, is moved

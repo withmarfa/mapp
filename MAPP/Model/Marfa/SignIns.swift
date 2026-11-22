@@ -27,6 +27,10 @@ nonisolated protocol SignIns: Sendable {
     /// does not, until the owner allows more or signs in again.
     func readsProfile(for connection: MarfaConnection) throws -> Bool?
 
+    /// The scopes the sign-in kept for `connection` holds, as the owner approved them: nil where none is kept or it has
+    /// ended, and a throw where one is kept and cannot be read.
+    func scopes(for connection: MarfaConnection) throws -> [String]?
+
     /// Starts a device sign-in, for a Mac that cannot use the browser: the person types the code on any device.
     /// `permissions` are asked for as `signInWithBrowser` asks for them.
     func startCodeSignIn(to connection: MarfaConnection, asking permissions: Set<InstancePermission>) async throws -> CodeSignIn
@@ -167,9 +171,12 @@ nonisolated struct SystemSignIns: SignIns {
     /// and attachments), which the server grants apart from items (`edge.*`). With them the three permissions its
     /// features use: Permanently Delete (`items.purge`), This Marfa (`config.manage`) and a type's icon
     /// (`schema.write`), and the read of the owner's own name for Signed In As, which `GET /profile` gives a credential
-    /// only with its profile read scope. That read is no owner permission. The owner may approve less, and what is missing
-    /// is told where it is needed.
-    static let scopes = ["*:read", "*:write", "edge.*:read", "edge.*:write", "items.purge", "config.manage", "schema.write"] + profileScopes
+    /// only with its profile read scope. That read is no owner permission. MAPP's own settings (`PreferencesType`) need
+    /// the scope that names its vendor, which `*:write` never reaches, and registering the type where the Marfa holds
+    /// none (`metadata.types:write`); the server drops the vendor's scope while no type sits under it. The owner may
+    /// approve less, and what is missing is told where it is needed.
+    static let scopes = ["*:read", "*:write", "edge.*:read", "edge.*:write", "items.purge", "config.manage", "schema.write"]
+        + profileScopes + [PreferencesType.vendorScope, PreferencesType.registeringScope]
 
     /// What Signed In As needs: the owner's name (`instance-claim/profile-read`).
     static let profileScopes = ["profile.name:read"]
@@ -214,6 +221,10 @@ nonisolated struct SystemSignIns: SignIns {
     func readsProfile(for connection: MarfaConnection) throws -> Bool? {
         guard let credential = try authorization(for: connection).credential() else { return nil }
         return Self.readsProfile(credential.scopes)
+    }
+
+    func scopes(for connection: MarfaConnection) throws -> [String]? {
+        try authorization(for: connection).credential()?.scopes
     }
 
     func server(for connection: MarfaConnection) throws -> Server? {

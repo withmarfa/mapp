@@ -12,6 +12,9 @@ struct ConnectionPage: View {
     /// The owner's name and the server it was read from, kept while that server does not answer.
     @State private var accountName: String?
     @State private var accountNameServer: MarfaConnection?
+    @State private var isConfirmingRemoval = false
+    @State private var isRemoving = false
+    @State private var settingsProblem: String?
 
     private var host: MarfaHost { libraries.host }
     private var model: MarfaSettingsModel { libraries.marfaSettings }
@@ -23,6 +26,7 @@ struct ConnectionPage: View {
             } else {
                 disconnected
             }
+            if host.configuredConnection != nil { mappSettings }
             codeSection
             noticeSection
             if let connection = host.configuredConnection {
@@ -31,11 +35,26 @@ struct ConnectionPage: View {
             }
         }
         .accessibilityIdentifier("ConnectionPage")
-        .alert("Disconnect from \(LibraryDescription.name(libraries))?", isPresented: Bindable(model).isConfirmingDisconnect) {
+        .onChange(of: model.isConfirmingDisconnect) { _, isAsking in
+            guard isAsking else { return }
+            model.isConfirmingDisconnect = false
+            askToDisconnect()
+        }
+        .alert(Text(verbatim: mappSettingsWords.removeTitle), isPresented: $isConfirmingRemoval) {
             Button("Cancel", role: .cancel) {}
-            Button("Disconnect", role: .destructive) { Task { await model.disconnect() } }
+            Button("Remove", role: .destructive) { removeSettings() }
         } message: {
-            Text("MAPP removes its copy from this Mac and signs out. Webhooks it made are deleted. Your items stay.")
+            Text(mappSettingsWords.removeMessage)
+        }
+        .alert(
+            "Couldn’t Remove MAPP’s Settings",
+            isPresented: Binding { model.settingsRemovalFailure != nil } set: { if !$0 { model.stayConnected() } }
+        ) {
+            Button("Stay Connected", role: .cancel) {}
+            Button("Disconnect Anyway", role: .destructive) { Task { await model.disconnectAnyway() } }
+        } message: {
+            Text(verbatim: model.settingsRemovalFailure?.reason == .discardedChangesWait
+                ? mappSettingsWords.discardedChangesWait : mappSettingsWords.removalNotTaken)
         }
         .task(id: NameRequest(connection: host.configuredConnection, isOnline: host.state == .online, readsProfile: host.readsProfile)) {
             if accountNameServer != host.configuredConnection {
@@ -202,6 +221,90 @@ struct ConnectionPage: View {
                         .accessibilityIdentifier(host.state == .keyRefused ? "MarfaRefusedDisconnect" : "MarfaDisconnect")
                 }
             }
+        }
+    }
+
+    // MARK: MAPP's Settings
+
+    private var mappSettingsWords: ConnectionSettings {
+        ConnectionSettings(standing: libraries.preferences.standing, name: LibraryDescription.name(libraries))
+    }
+
+    @ViewBuilder private var mappSettings: some View {
+        let words = mappSettingsWords
+        if words.isShown {
+            SettingsSection(name: Text("MAPP’s Settings"), footer: Text(ConnectionSettings.footer)) {
+                SettingsRow(
+                    verbatim: words.title, line: words.line, error: settingsProblem
+                ) {
+                    if let title = words.actionTitle {
+                        SettingsButton(
+                            title: Text(verbatim: title), role: words.action == .remove ? .destructive : .normal
+                        ) { act(on: words.action) }
+                        .disabled(isRemoving || settingsHost.isAllowingMore)
+                        .accessibilityIdentifier(identifier(of: words.action))
+                    }
+                }
+                .accessibilityIdentifier("MAPPSettingsRow")
+            }
+            .accessibilityIdentifier("MAPPSettings")
+        }
+    }
+
+    private func identifier(of action: ConnectionSettings.Action) -> String {
+        switch action {
+        case .remove: "RemoveMAPPSettings"
+        case .allowMore: "AllowMoreForMAPPSettings"
+        case .keepAgain: "KeepMAPPSettingsAgain"
+        case .none: ""
+        }
+    }
+
+    private func act(on action: ConnectionSettings.Action) {
+        settingsProblem = nil
+        switch action {
+        case .remove:
+            isConfirmingRemoval = true
+        case .allowMore:
+            // The scopes that keep the settings are asked at every sign-in, so nothing more is named; the copy weighs its
+            // slice again with the new sign-in and the section moves on by itself.
+            Task { _ = await settingsHost.allowMore([]) }
+        case .keepAgain:
+            perform { try await libraries.preferences.startAgain() }
+        case .none:
+            break
+        }
+    }
+
+    private func removeSettings() {
+        perform { try await libraries.preferences.remove() }
+    }
+
+    private func perform(_ step: @escaping () async throws -> Void) {
+        isRemoving = true
+        Task {
+            defer { isRemoving = false }
+            do {
+                try await step()
+            } catch {
+                settingsProblem = String(localized: "That didn’t work. Try again in a moment.")
+            }
+        }
+    }
+
+    /// The question before Disconnect, with the choice to take MAPP's settings out of the Marfa too where they are kept there.
+    private func askToDisconnect() {
+        let name = LibraryDescription.name(libraries)
+        SettingsAlert.confirm(
+            title: String(localized: "Disconnect from \(name)?"),
+            message: String(localized: "MAPP removes its copy from this Mac and signs out. Webhooks it made are deleted. Your items stay."),
+            confirm: String(localized: "Disconnect"),
+            checkbox: model.offersSettingsRemoval ? mappSettingsWords.disconnectChoice : nil,
+            window: NSApp.keyWindow
+        ) { confirmed, checked in
+            guard confirmed else { return }
+            model.alsoRemovesSettings = checked
+            Task { await model.disconnect() }
         }
     }
 

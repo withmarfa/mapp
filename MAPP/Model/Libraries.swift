@@ -49,6 +49,9 @@ import os
     /// The shortcuts that work in any app, off until the person sets one.
     let anyAppShortcuts: AnyAppShortcuts
 
+    /// MAPP's own settings, kept in the connected Marfa so every Mac that connects to it uses them.
+    let preferences: PreferencesSync
+
     /// Asks every open page for its last edit and answers whether they all handed it over. A test gives its own, since
     /// the real one waits on every page in the process, those of tests running beside it too.
     private let handOverPages: (QuitTrace, @escaping (Bool) -> Void) -> Void
@@ -62,7 +65,7 @@ import os
         host: MarfaHost, defaults: UserDefaults = .standard,
         handOverPages: ((@escaping (Bool) -> Void) -> Void)? = nil,
         valuePanels: ValueEditPresenter = .shared, instanceSettings: InstanceSettingsModel? = nil,
-        hotKeys: any HotKeyRegistrar = NoHotKeys()
+        hotKeys: any HotKeyRegistrar = NoHotKeys(), syncsPreferences: Bool = false
     ) {
         self.host = host
         self.defaults = defaults
@@ -74,7 +77,17 @@ import os
         searchLeaveOuts = SearchLeaveOuts(defaults: defaults)
         shortcuts = ShortcutBindings(defaults: defaults)
         anyAppShortcuts = AnyAppShortcuts(defaults: defaults, registrar: hotKeys)
+        preferences = PreferencesSync(
+            defaults: defaults, enabled: syncsPreferences,
+            reload: { [sidebarLayouts, typeLooks, searchLeaveOuts, shortcuts, anyAppShortcuts] in
+                sidebarLayouts.reload()
+                typeLooks.reload()
+                searchLeaveOuts.reload()
+                shortcuts.reload()
+                anyAppShortcuts.reload()
+            })
         marfaSettings = MarfaSettingsModel(host: host)
+        marfaSettings.settingsKept = .over(preferences)
         self.instanceSettings = instanceSettings ?? InstanceSettingsModel(provider: { [host] in host.instanceConfigTarget() })
         self.instanceSettings.onSaved = { [host] answer, settings, address in host.instanceSaved(answer, changing: settings, of: address) }
         isLaunching = host.configuredConnection != nil
@@ -82,15 +95,33 @@ import os
             ownerDrafts.deliver(draft, to: notices, because: String(localized: "You closed Settings before this was saved."))
         }
         host.handOverEdits = { [weak self] in await self?.flushEditors() ?? false }
+        host.libraryChanged = { [weak self] library in self?.follow(library) }
         LaunchTrace.shared.mark(.librariesInit, note: isLaunching ? "server set" : "no server")
     }
 
     /// Puts every setting on this Mac back (`MacSettings`) and the shortcuts already held in memory with it, so the menus
-    /// and the hot keys change at once and nothing writes the old choices back.
+    /// and the hot keys change at once and nothing writes the old choices back. Where the settings sync, the Marfa's are
+    /// put back with them, for every Mac.
     func resetMacSettings() {
         shortcuts.restoreDefaults()
         anyAppShortcuts.clearAll()
         MacSettings.reset(in: defaults)
+        Task { await preferences.flush() }
+    }
+
+    /// Has MAPP's settings follow the library's copy, where it has one of a Marfa server.
+    private func follow(_ library: MarfaLibrary?) {
+        guard let source = library?.source as? MarfaSource else {
+            preferences.detach()
+            return
+        }
+        // The copy's own server, since a switch opens the new copy before the host keeps its address.
+        let connection = source.connection
+        preferences.attach(
+            WorkingCopyPreferences(
+                copy: source.copy, answers: source.preferenceAnswers, sendSoon: { [engine = source.engine] in await engine.sync.drain() }),
+            library: Self.libraryKey(for: connection.address),
+            name: { [host] in host.instanceName(for: connection) })
     }
 
     /// Opens the saved server's copy and paints from it before the network is asked anything.
@@ -126,7 +157,11 @@ import os
 
     /// Names the library the windows read by its server's address, so its sidebar layout and its type looks are its own.
     var libraryKey: String {
-        "marfa:" + (host.configuredConnection?.address.absoluteString ?? "")
+        Self.libraryKey(for: host.configuredConnection?.address)
+    }
+
+    nonisolated static func libraryKey(for address: URL?) -> String {
+        "marfa:" + (address?.absoluteString ?? "")
     }
 
     var sidebarLayout: SidebarLayout { sidebarLayouts.layout(for: libraryKey) }
@@ -150,6 +185,8 @@ import os
         // A value typed in the panel is written, or handed back, before the library is asked to keep its writes.
         valuePanels.handOff()
         guard await flush(tracing: trace) else { return false }
+        // A settings change still coalescing is queued with the rest.
+        await preferences.flush()
         // The library may have closed since the flush began; then it holds nothing to wait for.
         guard let library = host.library else {
             trace.skip(.queue, because: "no library is open")
@@ -256,10 +293,15 @@ import os
                 host.presetTestServer(connection)
                 // The key holds what the server says it holds, so a key without an owner's permissions shows Needs a Permission.
                 Task {
-                    await signIns.adoptScopes(for: connection)
+                    // The test key is MAPP's own, which may write the settings' type, as a sign-in asks (`SystemSignIns`).
+                    await signIns.adoptScopes(for: connection, adding: [PreferencesType.vendorScope])
                     await host.refreshGrants()
                 }
-                return Libraries(host: host, defaults: defaults)
+                // `-MAPPSyncSettings` keeps MAPP's settings in the test server's item, as a real sign-in does. The pages
+                // read the standard defaults, so the sync follows those, which this debug build starts empty.
+                guard ProcessInfo.processInfo.arguments.contains("-MAPPSyncSettings") else { return Libraries(host: host, defaults: defaults) }
+                UserDefaults.standard.removePersistentDomain(forName: Bundle.main.bundleIdentifier ?? "")
+                return Libraries(host: host, defaults: .standard, syncsPreferences: true)
             }
             let sample = SampleLibrary.connection
             let host = MarfaHost(
@@ -272,7 +314,7 @@ import os
         }
         #endif
         let host = MarfaHost(defaults: .standard, signIns: SystemSignIns(), location: location())
-        return Libraries(host: host, hotKeys: SystemHotKeys())
+        return Libraries(host: host, hotKeys: SystemHotKeys(), syncsPreferences: true)
     }
 
     private static func location(root: URL = MarfaStoreLocation.applicationSupport) -> MarfaStoreLocation {

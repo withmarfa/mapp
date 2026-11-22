@@ -104,8 +104,10 @@ actor MarfaEngine {
     let reading: any MarfaReading
     let hub: MarfaHub
     let tell: @Sendable (Event) -> Bool
+    /// Where the answers to writes to hidden items go, for `PreferencesSync`.
+    let preferenceAnswers: PreferenceAnswers
     var catalogue = Catalogue()
-    /// The library's rows: every row the copy holds but the `system.*` ones (`MarfaMapping.isLibraryItem`).
+    /// The library's rows: every row the copy holds but the hidden ones (`MarfaMapping.isLibraryItem`).
     var rows: [String: Marfa.Item] = [:]
     /// The views saved on the server, as the copy last held them.
     var views: [LibraryView] = []
@@ -113,6 +115,8 @@ actor MarfaEngine {
     var bodyLinks: [String: BodyLinks] = [:]
     var edges = MarfaEdgeTable()
     var queue: [Marfa.QueuedWrite] = []
+    /// Whether each item a queued write names that the library does not hold is hidden (`libraryWrites`).
+    var hiddenItems: [String: Bool] = [:]
     var syncStates: [ItemID: SyncState] = [:]
     var changedSync: Set<ItemID> = []
     /// Items whose name and preview the core could not be asked for, asked again with the next change whose own items the core answers for.
@@ -190,9 +194,10 @@ actor MarfaEngine {
     #endif
 
     init(copy: WorkingCopy, hub: MarfaHub, reading: (any MarfaReading)? = nil,
-         refreshing: (any MarfaRefreshing)? = nil,
+         refreshing: (any MarfaRefreshing)? = nil, preferenceAnswers: PreferenceAnswers = PreferenceAnswers(),
          tell: @escaping @Sendable (Event) -> Bool) {
         self.copy = copy
+        self.preferenceAnswers = preferenceAnswers
         self.reading = reading ?? MarfaRead(copy: copy)
         self.hub = hub
         self.tell = tell
@@ -307,10 +312,11 @@ actor MarfaEngine {
     private func unsentWrites() async -> UnsentChanges? {
         await besideTheLaneQueued()
         guard let queue = try? await Self.asking({ try await copy.queue.all() }) else { return nil }
-        let named = Set(queue.compactMap(\.itemId))
+        let shown = await libraryWrites(queue)
+        let named = Set(shown.compactMap(\.itemId))
         let types = Dictionary(uniqueKeysWithValues: named.compactMap { id in rows[id].map { (id, TypeID($0.type)) } })
         return UnsentChanges(
-            ids: MarfaProblems.unsent(queue), texts: MarfaProblems.unsentTexts(queue, catalogue: catalogue, types: types))
+            ids: MarfaProblems.unsent(queue), texts: MarfaProblems.unsentTexts(shown, catalogue: catalogue, types: types))
     }
 
     private func shutDown() async {

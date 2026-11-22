@@ -3,7 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 /// Export Layouts and Import Layouts (the code's Looks), in the File menu and in Settings > Layouts and the command palette: every type's layout on this server, kept in a
-/// file the person names, and back. Looks stay on this Mac and are never written to Marfa.
+/// file the person names, and back, so they can be copied between two Marfas. The file itself is written to no Marfa.
 struct LooksCommands: Commands {
     let libraries: Libraries
 

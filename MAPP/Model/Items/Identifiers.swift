@@ -31,6 +31,12 @@ nonisolated struct TypeID: RawRepresentable, Hashable, Codable, Sendable {
     /// The root of the file types: a file and every kind of file below it, which the sidebar reaches through All
     /// Items and search rather than as a type.
     static let file = TypeID("core.file")
+
+    /// Marfa's bookkeeping (`system.*`) and what apps keep for themselves (`app.*`, MAPP's own settings among them):
+    /// never an item of the library, a type a person makes or picks, or a type in any list.
+    var isHidden: Bool { Self.isHidden(rawValue) }
+
+    static func isHidden(_ type: String) -> Bool { type.hasPrefix("system.") || type.hasPrefix("app.") }
 }
 
 nonisolated struct EdgeID: RawRepresentable, Hashable, Codable, Sendable {
