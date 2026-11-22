@@ -22,6 +22,7 @@ What is agreed and not built yet is in [Agreed designs](agreed-designs.md). This
 | Pin | MAPP | A property shown under an item page's title, at most four per type (`PagePins`). | [Item page](item-page.md) |
 | Place | MAPP | Somewhere the sidebar can open: Inbox, a type, a source, a collection, a saved view (`SidebarItem`). | [Views and lists](views-and-lists.md) |
 | Preset | MAPP | The starting look that a type takes from its fields (`LookPreset`). Built in v0.0.44. | [Presets and densities](presets-and-densities.md) |
+| Properties list | MAPP | The fields a view shows after the title, one list for every layout, falling back to each type's look until changed. Agreed, not built. | [Views and lists](views-and-lists.md#properties) |
 | Property | Marfa and MAPP | A value an item holds, shown as a row on the page. Fields and edges are Marfa's; the row, its icon and its place are MAPP's (`PropertyRow`). | [Item page](item-page.md) |
 | Property block | MAPP | The rows under the pins on an item page. | [Item page](item-page.md) |
 | Right sidebar | MAPP | The panel beside the page that lists every property, links and history sections (`ItemInspector`). | [Item page](item-page.md) |
