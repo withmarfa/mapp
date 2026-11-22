@@ -205,3 +205,22 @@ import Testing
         #expect(outcome.toRemote == [accent])
     }
 }
+
+@Suite(.hangLimit) struct PreferenceAnswersTests {
+    private func write(_ id: String, _ verdict: Marfa.Verdict?) -> Marfa.QueuedWrite {
+        Marfa.QueuedWrite(id: id, kind: .updateItem, itemId: "item", idempotencyKey: id, verdict: verdict, queuedAt: "")
+    }
+
+    /// Each answer is kept for the sync to take once, by the verdict it carries; a write with no answer yet is not.
+    @Test func answersAreKeptByVerdictAndTakenOnce() async {
+        let answers = PreferenceAnswers()
+        var arrivals = answers.arrivals().makeAsyncIterator()
+        answers.receive([
+            write("a", .accepted), write("b", .merged(fields: ["appearance"])),
+            write("c", .conflicted(siblingId: "sibling", fields: ["appearance"])), write("d", .dead), write("e", nil),
+        ])
+        #expect(await arrivals.next() != nil)
+        #expect(answers.take() == ["a": .taken, "b": .taken, "c": .lost, "d": .notTaken])
+        #expect(answers.take().isEmpty)
+    }
+}

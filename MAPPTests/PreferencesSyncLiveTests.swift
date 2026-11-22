@@ -185,7 +185,7 @@ extension LiveMarfaTests {
             create.httpBody = try? JSONSerialization.data(withJSONObject: ["type": PreferencesType.id, "properties": [String: Any]()])
             guard let (data, _) = try? await URLSession.shared.data(for: create),
                   let answer = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let id = ((answer["data"] as? [String: Any]) ?? answer)["id"] as? String
+                  let id = (answer["item"] as? [String: Any])?["id"] as? String
             else { return nil }
             var bin = URLRequest(url: base.appending(path: "items/\(id)"))
             bin.httpMethod = "DELETE"
