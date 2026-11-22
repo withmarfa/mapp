@@ -82,7 +82,11 @@ struct WebPageItemPageTests {
     }
 
     /// The check below can only show an article on the wrong page if an article does show on a page that has one.
+    /// A page opens in Original until the person chooses Reader, and the choice is kept for the next page, so the test
+    /// starts and ends with no choice stored.
     @Test func aPageWithAnArticleOffersTheSwitchToReader() async throws {
+        UserDefaults.standard.removeObject(forKey: SourceViewMode.key)
+        defer { UserDefaults.standard.removeObject(forKey: SourceViewMode.key) }
         let folder = try temporaryFolder()
         defer { try? FileManager.default.removeItem(at: folder) }
         let item = file("A.html")
@@ -93,10 +97,9 @@ struct WebPageItemPageTests {
         let (window, view) = host(visit, in: library)
         defer { window.orderOut(nil); window.contentView = nil; window.close() }
 
-        #expect(try await settled(view) { visit.details.pageLook?.mode == .reader })
-        visit.details.pageLook?.choose(.original)
         #expect(try await settled(view) { visit.details.pageLook?.mode == .original })
         visit.details.pageLook?.choose(.reader)
+        #expect(try await settled(view) { visit.details.pageLook?.mode == .reader })
     }
 
     /// The title's frame. The page's own identifier replaces the title's, so it is found by what it says.
