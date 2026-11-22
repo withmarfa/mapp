@@ -27,6 +27,7 @@ declare global {
       markdown(): string | null
       flush(expected?: number): string | null | { commandError: string; message: string }
       format(command: FormatCommand, arg?: string | number, expected?: number): void
+      unlinkSelected(text: string, expected?: number): boolean
       focus(): void
       focusTitle(item: string): void
       focusText(prefix: string | null): void
@@ -270,6 +271,8 @@ window.editor = {
   flush: (expected) => guardedCommand(() => editor.flush(expected)),
   format: (command, arg, expected) =>
     guardedCommand(() => editor.format(command, arg ?? undefined, expected), { retry: true }),
+  unlinkSelected: (text, expected) =>
+    guardedCommand(() => editor.unlinkSelected(text, expected), { retry: true }) === true,
   focus: () => {
     header.cancelTitleFocus()
     editor.focus()

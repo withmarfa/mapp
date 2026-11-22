@@ -633,7 +633,7 @@ test('the native link shortcut opens a read-only page link without editing', asy
   editor.load('[Link](https://example.com)\r\n', 1)
   try {
     editor.reload('[Link](https://example.com)\r\n', 2, false)
-    editor.setKeymap({ 'Mod-O': ['openLink'] })
+    editor.setKeymap({ 'Shift-Mod-o': ['openLink'] })
     editor.findSelect(0, 4, 2)
     editor.focus()
     const surface = root.querySelector('.ProseMirror')!
@@ -642,6 +642,7 @@ test('the native link shortcut opens a read-only page link without editing', asy
       new KeyboardEvent('keydown', {
         key: 'O',
         code: 'KeyO',
+        keyCode: 79,
         metaKey: true,
         shiftKey: true,
         bubbles: true,

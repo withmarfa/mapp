@@ -642,3 +642,88 @@ test('copying text that holds a link carries the link and not its icon', () =>
     expect(everything).not.toContain('--_inkkit')
     expect(written['text/plain'] ?? '').toContain('Plan')
   }))
+
+const menuOn = (element: Element) =>
+  element.dispatchEvent(
+    new MouseEvent('contextmenu', {
+      button: 2,
+      clientX: 40,
+      clientY: 60,
+      bubbles: true,
+      cancelable: true,
+    }),
+  )
+const menus = () => page.hosted.filter((m) => m.type === 'linkMenu')
+
+test('a right-click on a note link asks the app for its menu with the link as authored', () =>
+  withEditor('See [[Plan#Goals|the plan]]\n', async (_editor, root) => {
+    await settle()
+    page.hosted.length = 0
+    menuOn(links(root)[0]!)
+    expect(menus()).toEqual([
+      {
+        type: 'linkMenu',
+        item: 'note',
+        generation: 1,
+        link: {
+          kind: 'wiki',
+          text: 'the plan',
+          raw: '[[Plan#Goals|the plan]]',
+          target: 'Plan',
+          heading: 'Goals',
+          alias: 'the plan',
+        },
+        point: [40, 60],
+        viewportHeight: window.innerHeight,
+      },
+    ])
+  }))
+
+const weblinks: [string, string, boolean][] = [
+  ['[site](https://example.com/a)', 'https://example.com/a', true],
+  ['[mail](mailto:a@example.com)', 'mailto:a@example.com', true],
+  ['[none]()', '', false],
+  ['[script](javascript:alert(1))', 'javascript:alert(1)', false],
+]
+for (const [source, href, openable] of weblinks) {
+  test(`a right-click on ${source} says whether the address opens`, () =>
+    withEditor(`See ${source}\n`, async (_editor, root) => {
+      await settle()
+      page.hosted.length = 0
+      const anchor = root.querySelector('a') ?? root.querySelector('.ProseMirror')!
+      menuOn(anchor)
+      const [sent] = menus()
+      expect(sent?.type).toBe('linkMenu')
+      if (sent?.type !== 'linkMenu') return
+      expect(sent.link).toMatchObject({ kind: 'web', href, openable })
+    }))
+}
+
+test('a right-click off a link asks the app for nothing', () =>
+  withEditor('See [[Plan]] here\n', async (_editor, root) => {
+    await settle()
+    page.hosted.length = 0
+    menuOn(root.querySelector('.ProseMirror p')!)
+    expect(menus()).toEqual([])
+  }))
+
+test('a read-only page still sends the menu, and the link stays selected without a change', () =>
+  withEditor(
+    'See [[Plan]]\n',
+    async (_editor, root) => {
+      await settle()
+      page.hosted.length = 0
+      menuOn(links(root)[0]!)
+      expect(menus()).toHaveLength(1)
+      expect(page.hosted.filter((m) => m.type === 'changed')).toEqual([])
+    },
+    false,
+  ))
+
+test('removing a note link writes the text it showed where it stood, and nothing else changes', () =>
+  withEditor('One [[Plan|the plan]] and [[Other]]\n', async (editor, root) => {
+    await settle()
+    menuOn(links(root)[0]!)
+    expect(editor.unlinkSelected('the plan')).toBe(true)
+    expect(editor.snapshot().text).toBe('One the plan and [[Other]]\n')
+  }))
