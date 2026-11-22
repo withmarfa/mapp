@@ -61,7 +61,7 @@ struct ViewGroupKeptTests {
     // MARK: Reading and writing every part of a group
 
     @Test func everyBucketAndTheGroupsAnotherAppSetRoundTrip() throws {
-        let buckets: [ViewGrouping.Bucket?] = [nil] + ViewGrouping.Bucket.allCases.map { $0 }
+        let buckets: [ViewGrouping.Bucket?] = [nil, .day, .week, .month, .year, .presence, ViewGrouping.Bucket(rawValue: "fortnight")]
         for bucket in buckets {
             let grouping = ViewGrouping(by: "properties.due_at", bucket: bucket, order: Self.otherApps.order, hidden: Self.otherApps.hidden)
             let saved = SavedView(id: "v", version: 1, settings: ViewSettings(title: "Tasks", group: grouping))
@@ -292,6 +292,44 @@ struct ViewGroupKeptTests {
         browser.setFilter("field.priority", values: ["high"])
         await browser.choicesChanged()?.value
         #expect(library.views.first?.group == cites)
+    }
+
+    /// A bucket the package does not name, such as another release's `fortnight`, is read, shown ungrouped and handed
+    /// back to Marfa as read, with the views beside it unaffected.
+    @Test func aViewGroupedByABucketMappDoesNotKnowIsListedOpensUngroupedAndRenamesWithItsGroupAsRead() async throws {
+        let fortnight = ViewGrouping(
+            by: "properties.due_at", bucket: ViewGrouping.Bucket(rawValue: "fortnight"),
+            order: Self.otherApps.order, hidden: Self.otherApps.hidden)
+        let saved = [
+            SavedView(id: "plain", version: 1, settings: ViewSettings(title: "Plain")),
+            SavedView(id: "view-tasks", version: 3, settings: ViewSettings(title: "Tasks", query: ViewQuery(types: ["core.task"]), group: fortnight)),
+            SavedView(id: "dated", version: 2, settings: ViewSettings(title: "Dated", group: ViewGrouping(by: "properties.due_at", bucket: .week))),
+        ]
+        let views = saved.compactMap(MarfaMapping.view)
+        #expect(views.map(\.id.rawValue) == ["plain", "view-tasks", "dated"], "one view MAPP cannot show does not hide the rest")
+        let read = views[1]
+        #expect(read.group?.bucket == nil && read.group?.otherBucket == "fortnight")
+        #expect(MarfaMapping.viewSettings(read.settings).group == fortnight, "handed back as read")
+        #expect(MarfaMapping.viewChange(LibraryViewChange(group: .set(read.group!))).group == .set(fortnight))
+        #expect(views[2].group?.bucket == .week && views[2].group?.otherBucket == nil)
+
+        let (browser, library) = Self.opened(read)
+        library.views = LibraryView.ordered(views)
+        #expect(library.views.count == 3)
+        #expect(browser.tableOptions[browser.item]?.grouping == ItemTableOptions.Grouping.none)
+        #expect(browser.tableOptions[browser.item]?.groupOrder == nil)
+
+        browser.openViewPanel(in: library)
+        browser.viewPanel?.name = "Renamed"
+        await browser.commitViewName(in: library)
+        let renamed = try #require(library.views.first { $0.id == read.id })
+        #expect(renamed.title == "Renamed")
+        #expect(renamed.group == read.group)
+        #expect(MarfaMapping.viewSettings(renamed.settings).group == fortnight)
+
+        browser.setFilter("field.priority", values: ["high"])
+        await browser.choicesChanged()?.value
+        #expect(library.views.first { $0.id == read.id }?.group == read.group)
     }
 
     /// The person's own grouping is written whatever else changed, and the settings another app changed meanwhile are

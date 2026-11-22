@@ -63,6 +63,10 @@ nonisolated struct LibraryViewGroup: Hashable, Sendable {
     var order: [JSONValue] = []
     /// The groups the view leaves out, whose items it still lists.
     var hidden: [JSONValue] = []
+    /// A bucket Marfa names that MAPP does not show, such as a grouping by presence. Where it is set, `bucket` is nil,
+    /// the window opens ungrouped (`ViewDraft.options(for:catalogue:)`) and a write that leaves the group alone names
+    /// no group, so the view keeps it. `MarfaMapping` hands it back to Marfa as read.
+    var otherBucket: String?
 }
 
 /// Everything a new view is saved with.

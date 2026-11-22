@@ -353,6 +353,7 @@ nonisolated enum ViewDraft {
     /// How the window groups by a view's group, or nil where it cannot: a span needs a date, which an item's own dates
     /// are and a field is where a type declares it one.
     private static func mode(of group: LibraryViewGroup, column id: String, catalogue: Catalogue) -> GroupMode? {
+        guard group.otherBucket == nil else { return nil }
         guard let bucket = group.bucket else { return .value }
         if [ItemTableColumn.created.id, ItemTableColumn.edited.id, ItemTableColumn.occurred.id].contains(id) { return .bucket(bucket) }
         guard id.hasPrefix(Browser.fieldColumnPrefix) else { return nil }
