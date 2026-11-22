@@ -117,7 +117,7 @@ import os
         // The copy's own server, since a switch opens the new copy before the host keeps its address.
         let connection = source.connection
         preferences.attach(
-            WorkingCopyPreferences(copy: source.copy), library: Self.libraryKey(for: connection.address),
+            WorkingCopyPreferences(copy: source.copy, answers: source.preferenceAnswers), library: Self.libraryKey(for: connection.address),
             name: { [host] in host.instanceName(for: connection) })
     }
 

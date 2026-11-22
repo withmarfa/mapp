@@ -34,6 +34,8 @@ extension LiveMarfaTests {
         }
 
         private var macs: [Mac] = []
+        /// Settings items a test binned itself, which the server's list of items leaves out, purged at the end.
+        private var binned: [ItemID] = []
         private let placement = PagePlacements.key
 
         private func mac() async throws -> Mac {
@@ -51,7 +53,7 @@ extension LiveMarfaTests {
         }
 
         private func start(_ mac: Mac) async throws {
-            mac.sync.attach(WorkingCopyPreferences(copy: mac.source.copy), library: "marfa:" + (try LiveMarfa.address()), name: { nil })
+            mac.sync.attach(WorkingCopyPreferences(copy: mac.source.copy, answers: mac.source.preferenceAnswers), library: "marfa:" + (try LiveMarfa.address()), name: { nil })
             mac.source.refresh()
             try #require(await LiveMarfa.until {
                 await mac.sync.flush()
@@ -67,6 +69,8 @@ extension LiveMarfaTests {
                 try? FileManager.default.removeItem(at: mac.root)
             }
             macs = []
+            await LiveMarfa.purge(binned)
+            binned = []
             await Self.purgeSettings()
         }
 
@@ -156,6 +160,40 @@ extension LiveMarfaTests {
                 #expect(two.defaults.string(forKey: placement) == both)
                 #expect(await LiveMarfa.until { one.defaults.string(forKey: self.placement) == both })
             }
+        }
+
+        /// A settings item left in the bin, whose tables the copy never fills, does not hold up the first sync.
+        @Test(.timeLimit(.minutes(3)))
+        func aBinnedSettingsItemDoesNotStopTheSync() async throws {
+            try await run {
+                binned.append(try #require(await Self.binnedSettingsItem(), "could not make a binned settings item"))
+                let one = try await mac()
+                one.defaults.set("dark", forKey: AppearanceKey.theme)
+                try await start(one)
+                await one.send()
+                #expect(await Self.settingsItems().count == 1)
+            }
+        }
+
+        /// Makes a settings item over HTTP and moves it to the bin.
+        private static func binnedSettingsItem() async -> ItemID? {
+            guard let address = try? LiveMarfa.address(), let key = try? LiveMarfa.key(), let base = URL(string: address) else { return nil }
+            var create = URLRequest(url: base.appending(path: "items"))
+            create.httpMethod = "POST"
+            create.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+            create.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            create.httpBody = try? JSONSerialization.data(withJSONObject: ["type": PreferencesType.id, "properties": [String: Any]()])
+            guard let (data, _) = try? await URLSession.shared.data(for: create),
+                  let answer = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let id = ((answer["data"] as? [String: Any]) ?? answer)["id"] as? String
+            else { return nil }
+            var bin = URLRequest(url: base.appending(path: "items/\(id)"))
+            bin.httpMethod = "DELETE"
+            bin.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
+            guard let (_, response) = try? await URLSession.shared.data(for: bin),
+                  let status = (response as? HTTPURLResponse)?.statusCode, (200..<300).contains(status)
+            else { return nil }
+            return ItemID(id)
         }
 
         private static func newestBatch(of item: ItemID, in table: PreferencesTable) async -> String? {

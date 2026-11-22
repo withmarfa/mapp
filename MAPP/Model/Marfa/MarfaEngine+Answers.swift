@@ -28,7 +28,10 @@ extension MarfaEngine {
             // A released write has no verdict, so a later refusal of it is told again.
             told = Set(queued.filter { $0.verdict != nil }.map(\.id))
         }
-        answers = await libraryWrites(answers)
+        let library = await libraryWrites(answers)
+        let shown = Set(library.map(\.id))
+        preferenceAnswers.receive(answers.filter { !shown.contains($0.id) })
+        answers = library
         guard !answers.isEmpty else { return }
         await answer(answers)
     }

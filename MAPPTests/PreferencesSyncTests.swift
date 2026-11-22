@@ -24,6 +24,23 @@ import Testing
         return sync
     }
 
+    /// A sync whose stores read the defaults again as the app's do, setting aside what they cannot read.
+    private func syncWithStores(_ copy: FakePreferencesCopy, library: String = "marfa:https://one") async -> PreferencesSync {
+        let stores = (
+            SidebarLayouts(defaults: defaults), TypeLooks(defaults: defaults), SearchLeaveOuts(defaults: defaults),
+            ShortcutBindings(defaults: defaults), AnyAppShortcuts(defaults: defaults, registrar: NoHotKeys()))
+        let sync = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(50)) {
+            stores.0.reload()
+            stores.1.reload()
+            stores.2.reload()
+            stores.3.reload()
+            stores.4.reload()
+        }
+        sync.attach(copy, library: library, name: { "Demo" })
+        await sync.flush()
+        return sync
+    }
+
     // MARK: The first launch
 
     @Test func aMarfaWithNoSettingsTakesThisMacsAndKeepsACopyFirst() async throws {
@@ -161,11 +178,13 @@ import Testing
         let copy = FakePreferencesCopy()
         let item = await copy.add([theme: #""light""#, accent: #""blue""#])
         let sync = await sync(copy)
+        await copy.holdNextAnswer()
         defaults.set("red", forKey: AppearanceKey.accent)
         await sync.flush()
         // The server kept another Mac's field, which changed the theme, and wrote this Mac's to a conflicted copy.
         await copy.change(item, [theme: #""dark""#, accent: #""blue""#])
         let sibling = await copy.add([theme: #""light""#, accent: #""red""#], conflicted: true)
+        await copy.answer(try #require(await copy.writeIDs.last), .lost)
         await sync.flush()
         #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
         #expect(defaults.string(forKey: AppearanceKey.accent) == "red")
@@ -200,6 +219,192 @@ import Testing
         try await sync.startAgain()
         #expect(sync.standing == .syncing)
         #expect(await copy.creates == 2)
+    }
+
+    // MARK: Review findings
+
+    /// A value a later MAPP wrote, which a store here sets aside, stays in the Marfa for the Macs that read it: the
+    /// store dropping it on this Mac is no change of the person's.
+    @Test(arguments: [
+        PreferenceUnit.row(.types, setting: "look", key: "core.note"),
+        PreferenceUnit.row(.sidebar, setting: "layout", key: "tabs"),
+        PreferenceUnit.member(.search, "searchLeaveOuts"),
+        PreferenceUnit.row(.commands, setting: "shortcut", key: "newItem"),
+        PreferenceUnit.row(.commands, setting: "anyAppShortcut", key: "quickAdd"),
+    ])
+    func aValueAStoreCannotReadIsNeverDeletedFromTheMarfa(unit: PreferenceUnit) async throws {
+        let later = #""a shape a later MAPP writes""#
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([theme: #""light""#])
+        let sync = await syncWithStores(copy)
+        await copy.change(item, [unit: later])
+        await sync.flush()
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[unit] == later)
+        // A change to another setting, here one in the same field as the search member, still writes the member.
+        defaults.set(true, forKey: SearchOptions.keys[0])
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[unit] == later)
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[unit] == later)
+    }
+
+    /// Connecting to another Marfa starts the settings shared by every Marfa from MAPP's defaults, but keeps what this
+    /// Mac already holds for this Marfa alone.
+    @Test func aNewMarfaKeepsItsOwnSettingsOnThisMac() async throws {
+        var record = PreferencesSync.Record()
+        record.marfas["instance-0"] = .init(item: "elsewhere", base: [theme: #""dark""#])
+        record.last = "instance-0"
+        record.save(defaults)
+        defaults.set("dark", forKey: AppearanceKey.theme)
+        let leaveOut = #"{"marfa:https://one":{"sources":[],"types":["core.note"]}}"#
+        defaults.set(Data(leaveOut.utf8), forKey: SearchLeaveOuts.defaultsKey)
+        let copy = FakePreferencesCopy()
+        _ = await sync(copy)
+        #expect(defaults.object(forKey: AppearanceKey.theme) == nil)
+        let stored = try #require(defaults.data(forKey: SearchLeaveOuts.defaultsKey))
+        #expect(String(decoding: stored, as: UTF8.self).contains("core.note"))
+        let item = try #require(await copy.activeIDs.first)
+        #expect(await copy.unitsHeld(item)[.member(.search, SearchLeaveOuts.defaultsKey)] == #"{"sources":[],"types":["core.note"]}"#)
+    }
+
+    /// Another Mac's change arrives late, after the server kept its field and before the conflicted copy reached
+    /// this Mac: the member this Mac wrote is still its later write.
+    @Test func aConflictedCopyThatArrivesLateStillKeepsThisMacsMember() async throws {
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([theme: #""light""#, accent: #""blue""#])
+        let sync = await sync(copy)
+        await copy.holdNextAnswer()
+        defaults.set("red", forKey: AppearanceKey.accent)
+        await sync.flush()
+        let write = try #require(await copy.writeIDs.last)
+        // The item's new value reaches the copy before the answer is taken.
+        await copy.change(item, [theme: #""dark""#, accent: #""blue""#])
+        await sync.flush()
+        #expect(defaults.string(forKey: AppearanceKey.accent) == "red")
+        await copy.answer(write, .lost)
+        await sync.flush()
+        #expect(await copy.unitsHeld(item)[accent] == #""red""#)
+        // The conflicted copy arrives last.
+        let sibling = await copy.add([theme: #""light""#, accent: #""red""#], conflicted: true)
+        await sync.flush()
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
+        #expect(defaults.string(forKey: AppearanceKey.accent) == "red")
+        #expect(await copy.unitsHeld(item)[accent] == #""red""#)
+        #expect(await copy.removed == [sibling])
+    }
+
+    /// A write the item took, then another Mac's later change of the same member: the later change wins here too.
+    @Test func anotherMacsChangeAfterThisMacsWriteWasTakenWins() async throws {
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([accent: #""blue""#])
+        let sync = await sync(copy)
+        await copy.holdNextAnswer()
+        defaults.set("red", forKey: AppearanceKey.accent)
+        await sync.flush()
+        let write = try #require(await copy.writeIDs.last)
+        await copy.answer(write, .taken)
+        await copy.change(item, [accent: #""green""#])
+        await sync.flush()
+        #expect(defaults.string(forKey: AppearanceKey.accent) == "green")
+        #expect(await copy.unitsHeld(item)[accent] == #""green""#)
+    }
+
+    /// A field write answered while MAPP was not running, whose answer no sync took, is judged by its conflicted copy.
+    @Test func aWriteAnsweredBeforeARelaunchIsJudgedByItsConflictedCopy() async throws {
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([theme: #""light""#, accent: #""blue""#])
+        let sync = await sync(copy)
+        await copy.holdNextAnswer()
+        defaults.set("red", forKey: AppearanceKey.accent)
+        await sync.flush()
+        sync.detach()
+        await copy.change(item, [theme: #""dark""#, accent: #""blue""#])
+        let sibling = await copy.add([theme: #""light""#, accent: #""red""#], conflicted: true)
+        await copy.reopen()
+        sync.attach(copy, library: "marfa:https://one", name: { nil })
+        await sync.flush()
+        #expect(defaults.string(forKey: AppearanceKey.accent) == "red")
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
+        #expect(await copy.unitsHeld(item)[accent] == #""red""#)
+        #expect(await copy.removed == [sibling])
+    }
+
+    /// A setting a store dropped is tried again by another MAPP build, which may read it.
+    @Test func aDroppedSettingIsTriedAgainByAnotherBuild() async throws {
+        let look = PreferenceUnit.row(.types, setting: "look", key: "core.note")
+        let copy = FakePreferencesCopy()
+        let item = await copy.add([look: #""later""#])
+        let looks = TypeLooks(defaults: defaults)
+        let first = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(50), build: "1") { looks.reload() }
+        first.attach(copy, library: "marfa:https://one", name: { nil })
+        await first.flush()
+        #expect(defaults.data(forKey: TypeLooks.defaultsKey).map { String(decoding: $0, as: UTF8.self) }?.contains("later") != true)
+        first.detach()
+        // A build whose store reads the value keeps it.
+        let second = PreferencesSync(defaults: defaults, enabled: true, coalescing: .milliseconds(50), build: "2") {}
+        second.attach(copy, library: "marfa:https://one", name: { nil })
+        await second.flush()
+        #expect(defaults.data(forKey: TypeLooks.defaultsKey).map { String(decoding: $0, as: UTF8.self) }?.contains("later") == true)
+        #expect(await copy.unitsHeld(item)[look] == #""later""#)
+    }
+
+    /// A binned settings item's tables, which the copy never fills, and another type's tables, do not keep the
+    /// settings from being judged whole.
+    @Test func onlyTheTablesOfItemsOutsideTheBinCount() {
+        let whole = PreferencesTable.allCases.map { HeldTable(itemId: "kept", table: $0.rawValue, state: .whole, rows: 0) }
+        let binned = PreferencesTable.allCases.map { HeldTable(itemId: "binned", table: $0.rawValue, state: .owed, rows: 0) }
+        let other = HeldTable(itemId: "other-type", table: PreferencesTable.commands.rawValue, state: .filling, rows: 0)
+        #expect(WorkingCopyPreferences.tablesWhole(whole + binned + [other], of: ["kept"]))
+        #expect(!WorkingCopyPreferences.tablesWhole(whole + binned, of: ["kept", "binned"]))
+    }
+
+    /// Start Again after another Marfa was adopted keeps this Mac's settings, as it says.
+    @Test func startingAgainKeepsThisMacsSettings() async throws {
+        var record = PreferencesSync.Record()
+        record.marfas["instance-0"] = .init(item: "elsewhere", base: [:])
+        record.save(defaults)
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        defaults.set("dark", forKey: AppearanceKey.theme)
+        await sync.flush()
+        try await sync.remove()
+        await sync.flush()
+        try await sync.startAgain()
+        #expect(sync.standing == .syncing)
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
+        let made = try #require(await copy.activeIDs.first)
+        #expect(await copy.unitsHeld(made)[theme] == #""dark""#)
+    }
+
+    /// A change the person makes while a step reads the Marfa is not written over by what the step read.
+    @Test func aChangeMadeWhileAStepReadsIsKept() async throws {
+        defaults.set("dark", forKey: AppearanceKey.theme)
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        let item = try #require(await copy.activeIDs.first)
+        await copy.change(item, [theme: #""light""#])
+        await copy.whileReading { [defaults] in defaults.set("green", forKey: AppearanceKey.theme) }
+        await sync.flush()
+        await sync.flush()
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "green")
+        #expect(await copy.unitsHeld(item)[theme] == #""green""#)
+    }
+
+    /// An item that went without passing through the bin, as a discarded offline create or a restored server leaves
+    /// it, is made again from this Mac's settings; only a binned item means the settings were removed.
+    @Test func anItemGoneWithoutTheBinIsMadeAgain() async throws {
+        defaults.set("dark", forKey: AppearanceKey.theme)
+        let copy = FakePreferencesCopy()
+        let sync = await sync(copy)
+        let first = try #require(await copy.activeIDs.first)
+        await copy.forget(first)
+        await sync.flush()
+        #expect(sync.standing == .syncing)
+        #expect(await copy.creates == 2)
+        let made = try #require(await copy.activeIDs.first)
+        #expect(await copy.unitsHeld(made)[theme] == #""dark""#)
+        #expect(defaults.string(forKey: AppearanceKey.theme) == "dark")
     }
 
     @Test func switchingMarfasLoadsEachOnesSettings() async throws {

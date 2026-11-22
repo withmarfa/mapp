@@ -69,6 +69,8 @@ nonisolated final class MarfaSource: ItemSource {
     private let hub = MarfaHub()
     let engine: MarfaEngine
     let events: MarfaEngine.Events
+    /// The answers to MAPP's writes to its settings item, which the engine takes with the rest.
+    let preferenceAnswers = PreferenceAnswers()
     private let counting: MarfaCounts
 
     init(copy: WorkingCopy, connection: MarfaConnection,
@@ -82,7 +84,8 @@ nonisolated final class MarfaSource: ItemSource {
         let events = MarfaEngine.Events(continuation, activity: hub.activity)
         self.events = events
         embeds = MarfaEmbeds(events: events)
-        engine = MarfaEngine(copy: copy, hub: hub, reading: reading, refreshing: refreshing, tell: { event in
+        engine = MarfaEngine(
+            copy: copy, hub: hub, reading: reading, refreshing: refreshing, preferenceAnswers: preferenceAnswers, tell: { event in
             if case .terminated = events.yield(event) { false } else { true }
         })
         Task { [engine] in await engine.run(stream) }

@@ -104,6 +104,8 @@ actor MarfaEngine {
     let reading: any MarfaReading
     let hub: MarfaHub
     let tell: @Sendable (Event) -> Bool
+    /// Where the answers to writes to hidden items go, for `PreferencesSync`.
+    let preferenceAnswers: PreferenceAnswers
     var catalogue = Catalogue()
     /// The library's rows: every row the copy holds but the hidden ones (`MarfaMapping.isLibraryItem`).
     var rows: [String: Marfa.Item] = [:]
@@ -192,9 +194,10 @@ actor MarfaEngine {
     #endif
 
     init(copy: WorkingCopy, hub: MarfaHub, reading: (any MarfaReading)? = nil,
-         refreshing: (any MarfaRefreshing)? = nil,
+         refreshing: (any MarfaRefreshing)? = nil, preferenceAnswers: PreferenceAnswers = PreferenceAnswers(),
          tell: @escaping @Sendable (Event) -> Bool) {
         self.copy = copy
+        self.preferenceAnswers = preferenceAnswers
         self.reading = reading ?? MarfaRead(copy: copy)
         self.hub = hub
         self.tell = tell

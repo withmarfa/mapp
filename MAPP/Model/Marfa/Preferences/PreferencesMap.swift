@@ -44,6 +44,14 @@ nonisolated struct SyncedSetting: Sendable {
         }
     }
 
+    /// Whether the setting is kept for each server, so what this Mac holds of it belongs to the connected Marfa alone.
+    var isPerServer: Bool {
+        switch place {
+        case .serverMember, .serverRows, .sidebar: true
+        case .member, .rows, .set, .placeRows: false
+        }
+    }
+
     /// The defaults keys this setting reads and writes.
     var defaultsKeys: [String] {
         if case .placeRows(_, _, let places) = place { return places.map { "\(key).\($0)" } }

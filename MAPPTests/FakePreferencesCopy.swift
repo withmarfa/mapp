@@ -21,6 +21,41 @@ actor FakePreferencesCopy: PreferencesCopy {
     private(set) var removed: [String] = []
     private var made = 0
     private nonisolated let stream = AsyncStream<String?>.makeStream()
+    /// Runs once, the next time an item's settings are read, as a person's change made while a step reads.
+    private var duringRead: (@MainActor () -> Void)?
+    /// The id of each field write, in the order queued.
+    private(set) var writeIDs: [String] = []
+    /// Whether the next field write is answered as taken the moment it is queued. A test of a conflict answers it itself.
+    private var answersAtOnce = true
+    private var unanswered: Set<String> = []
+    private var answersHeld: [String: PreferenceAnswer] = [:]
+    /// Names this opened copy; `reopen()` names another, as a relaunch does.
+    private(set) nonisolated(unsafe) var runValue = "run-1"
+    nonisolated var run: String { runValue }
+
+    /// Leaves the next field write unanswered until the test answers it.
+    func holdNextAnswer() { answersAtOnce = false }
+
+    /// The server answers a field write, and the copy tells of it.
+    func answer(_ write: String, _ answer: PreferenceAnswer) {
+        unanswered.remove(write)
+        answersHeld[write] = answer
+        stream.continuation.yield(nil)
+    }
+
+    /// The copy is opened again, as after a relaunch: answers not yet taken are gone with the engine that took them,
+    /// and each unanswered write has left the queue.
+    func reopen() {
+        runValue = "run-\(UUID().uuidString)"
+        answersHeld = [:]
+        unanswered = []
+    }
+
+    /// Has `change` run the next time a step reads an item's settings.
+    func whileReading(_ change: @escaping @MainActor () -> Void) { duringRead = change }
+
+    /// The item goes from the copy without passing through the bin, as a discarded create or a restored server leaves it.
+    func forget(_ id: String) { held[id] = nil }
 
     func set(_ readiness: PreferencesReadiness) { readinessValue = readiness }
 
@@ -80,7 +115,26 @@ actor FakePreferencesCopy: PreferencesCopy {
             .sorted { ($0.createdAt, $0.id) < ($1.createdAt, $1.id) }
     }
 
-    func units(of item: String) async throws -> PreferenceUnits { unitsHeld(item) }
+    func isBinned(_ item: String) async throws -> Bool { held[item]?.trashed == true }
+
+    func conflictedCopies(of item: String) async throws -> [PreferencesItem] {
+        try await items().filter(\.isConflictedCopy)
+    }
+
+    func queued() async throws -> Set<String> { unanswered }
+
+    func answers() async -> [String: PreferenceAnswer] {
+        defer { answersHeld = [:] }
+        return answersHeld
+    }
+
+    func units(of item: String) async throws -> PreferenceUnits {
+        if let change = duringRead {
+            duringRead = nil
+            await change()
+        }
+        return unitsHeld(item)
+    }
 
     func create(fields: [PreferencesField: JSONObject]) async throws -> String {
         creates += 1
@@ -92,10 +146,15 @@ actor FakePreferencesCopy: PreferencesCopy {
         return id
     }
 
-    func update(_ item: String, fields: [PreferencesField: JSONObject], readAt version: Int64) async throws {
+    func update(_ item: String, fields: [PreferencesField: JSONObject], readAt version: Int64) async throws -> String {
         updates.append(fields.keys.sorted { $0.rawValue < $1.rawValue })
+        let write = "write-\(writeIDs.count + 1)"
+        writeIDs.append(write)
         for (field, object) in fields { held[item]?.fields[field] = Self.members(object) }
         held[item]?.version += 1
+        if answersAtOnce { answersHeld[write] = .taken } else { unanswered.insert(write) }
+        answersAtOnce = true
+        return write
     }
 
     func write(_ operations: [RowOperation], to table: PreferencesTable, of item: String) async throws {
