@@ -74,7 +74,9 @@ final class FakeItemLibrary: ItemLibrary {
     var inViewChange: (() async -> Void)?
     /// Another app's change to a view, taken by the server just before the next view change arrives, which then names
     /// a version the view no longer holds. As `views/change-stale` and `views/change-conflict` say, the server merges
-    /// it where it changes only settings the other app left alone, and refuses it otherwise.
+    /// it where it changes only settings the other app left alone, and refuses it otherwise. Stricter than the server in
+    /// two cases: naming a setting the other app changed is a conflict even when the value sent equals the new one, and
+    /// clearing a group the named version never held is a conflict where the server leaves it (`views/group-clear`).
     var changedElsewhere: ((inout LibraryView) -> Void)?
 
     init(items: [Item] = [], bodies: [ItemID: String] = [:], now: Date = .now) {

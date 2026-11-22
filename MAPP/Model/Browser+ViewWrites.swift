@@ -50,8 +50,9 @@ struct ViewChoices: Equatable {
 /// the difference to Marfa (`writeChoices`). Undo puts the earlier choices back through the same funnel, so the earlier
 /// value is written back and Redo comes for free.
 ///
-/// - A write Marfa refuses, or that cannot reach it, leaves the window as the person chose and the view as it was: the
-///   next write carries the difference, since every write is the window's choices against the version last read.
+/// - A write that cannot reach Marfa, or that Marfa refuses as invalid, leaves the window as the person chose and the
+///   view as it was: the next write carries the difference. One refused because another app changed the same setting
+///   puts the window back to the view and tells the person to make the change again.
 /// - Undo puts back only the settings the step changed, and only where the window still shows what the step made, so a
 ///   view that changed elsewhere in the meantime is never overwritten without the person being told.
 /// - A setting the window differs in from the view's seed is the person's change and nothing else: a write that returns
