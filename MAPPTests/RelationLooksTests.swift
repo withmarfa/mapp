@@ -238,7 +238,7 @@ struct RelationLooksTests {
         #expect(ItemTableLayout.relations(of: [TypeID("core.note")], looks: looks, options: ItemTableOptions(), shown: []) == [.parent])
         var grouped = ItemTableOptions()
         grouped.grouping = .column("children")
-        grouped.filters["collections"] = ["x"]
+        grouped.filter.clauses = [FilterClause(field: "collections", op: .is, values: ["x"])]
         #expect(ItemTableLayout.relations(of: types, looks: [:], options: grouped, shown: []) == [.parent, .children, .collections])
     }
 

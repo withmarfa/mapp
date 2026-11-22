@@ -16,7 +16,7 @@ A value component is one drawing for one kind of value. The same component appea
 | Linked item | The linked item's type mark and title on the gray of an option chip. The title is underlined under the pointer where a click opens the item (a table cell, a pin), not in a row or a card. |
 | Tag | Gray, after a number sign. |
 | Person | Initials in a pale circle with a fine edge. The page and the right sidebar add the name; a row shows initials only, and a table cell shows the name too. |
-| Filter | Its field in gray, then is or is not, the values and an x. |
+| Filter | Its field in gray, then its operator (is, is not, is before, include), the values and an x. |
 
 Dates, numbers, web addresses and sources are plain text, not chips.
 

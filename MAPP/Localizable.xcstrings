@@ -7,6 +7,36 @@
     "Change Properties" : {
 
     },
+    "%@ and %@" : {
+
+    },
+    "A saved view can’t keep %@" : {
+
+    },
+    "A view can save only filters that all apply, or all of which any one may apply." : {
+
+    },
+    "A view can’t keep the filter on %@." : {
+
+    },
+    "A view keeps up to %lld conditions; this one has %lld" : {
+
+    },
+    "A view keeps up to %lld conditions; this one has %lld." : {
+
+    },
+    "after today" : {
+
+    },
+    "All of these" : {
+
+    },
+    "Any" : {
+
+    },
+    "before today" : {
+
+    },
     "Choose a collection to see what’s in it." : {
 
     },
@@ -22,6 +52,105 @@
     "Hide Property" : {
 
     },
+    "contains" : {
+
+    },
+    "Days" : {
+
+    },
+    "Every Item" : {
+
+    },
+    "has any" : {
+
+    },
+    "has none" : {
+
+    },
+    "has one" : {
+
+    },
+    "in the last %lld days" : {
+
+    },
+    "in the last day" : {
+
+    },
+    "in the next %lld days" : {
+
+    },
+    "in the next day" : {
+
+    },
+    "In Two Weeks" : {
+
+    },
+    "include" : {
+
+    },
+    "is after" : {
+
+    },
+    "is after today" : {
+
+    },
+    "is at least" : {
+
+    },
+    "is at most" : {
+
+    },
+    "is before" : {
+
+    },
+    "is before today" : {
+
+    },
+    "is between" : {
+
+    },
+    "is empty" : {
+
+    },
+    "is equal to" : {
+
+    },
+    "is greater than" : {
+
+    },
+    "is in any" : {
+
+    },
+    "is in none" : {
+
+    },
+    "is in the last" : {
+
+    },
+    "is in the last…" : {
+
+    },
+    "is in the next" : {
+
+    },
+    "is in the next…" : {
+
+    },
+    "is less than" : {
+
+    },
+    "is not equal to" : {
+
+    },
+    "is on" : {
+
+    },
+    "is set" : {
+
+    },
+    "No Matching Values" : {
+
+    },
     "Oiling an oak worktop" : {
 
     },
@@ -32,6 +161,24 @@
 
     },
     "Use Layouts" : {
+
+    },
+    "Operator" : {
+
+    },
+    "Relative to Today" : {
+
+    },
+    "Search People" : {
+
+    },
+    "Search Tags" : {
+
+    },
+    "starts with" : {
+
+    },
+    "This Place" : {
 
     },
     "⌘-click to open" : {

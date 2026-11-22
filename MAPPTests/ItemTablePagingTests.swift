@@ -86,7 +86,7 @@ struct ItemTablePagingTests {
         #expect(base != Self.key(search: "x"))
         #expect(base != Self.key { $0.pageSize = .twoHundred })
         #expect(base != Self.key { $0.grouping = .none })
-        #expect(base != Self.key { $0.filters = ["status": ["done"]] })
+        #expect(base != Self.key { $0.filter = FilterState(is: ["status": ["done"]]) })
         #expect(base != Self.key { $0.sort = [ItemTableComparator(column: .title, order: .reverse)] })
     }
 

@@ -45,7 +45,7 @@ struct BrowserDerivedCacheTests {
         let browser = Browser()
         let before = browser.sections(in: library, order: ItemOrder(), now: date).flatMap { $0.items.map(\.id) }
         #expect(before.count == 5)
-        browser.tableOptions[.allItems] = ItemTableOptions(filters: ["title": ["Note 1"]])
+        browser.tableOptions[.allItems] = ItemTableOptions(filter: FilterState(clauses: [FilterClause(field: "edited", op: .before, values: ["2000-01-01"])]))
         let filtered = browser.sections(in: library, order: ItemOrder(), now: date).flatMap { $0.items.map(\.id) }
         #expect(filtered.count < before.count)
         let reads = library.placeReads
@@ -119,8 +119,8 @@ struct BrowserDerivedCacheTests {
         browser.tableOptions[.allItems] = ItemTableOptions(sort: [ItemTableComparator(column: .title)])
         let table = browser.tableContent(in: library)
         let sections = browser.sections(in: library, order: ItemOrder(), now: date)
-        // Is Not on a column that holds no values changes nothing the rows depend on.
-        browser.tableOptions[.allItems]?.negated = ["field.status"]
+        // A filter that says too little to filter by changes nothing the rows depend on.
+        browser.tableOptions[.allItems]?.filter = FilterState(clauses: [FilterClause(field: "field.status", op: .is)])
         #expect(browser.tableContent(in: library) === table)
         let reads = library.placeReads
         _ = browser.sections(in: library, order: ItemOrder(), now: date)

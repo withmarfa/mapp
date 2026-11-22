@@ -26,7 +26,7 @@ struct ViewChoices: Equatable {
         if mine.grouping != theirs.grouping || ViewDraft.reorders(mine, from: theirs) || timelineDate != other.timelineDate {
             parts.insert(.grouping)
         }
-        if mine.filterChoices != theirs.filterChoices { parts.insert(.filters) }
+        if !mine.filter.isSame(as: theirs.filter) { parts.insert(.filters) }
         return parts
     }
 
@@ -40,8 +40,7 @@ struct ViewChoices: Equatable {
             timelineDate = other.timelineDate
         }
         if parts.contains(.filters) {
-            options.filters = other.options.filters
-            options.negated = other.options.negated
+            options.filter = other.options.filter
         }
     }
 }
@@ -174,8 +173,7 @@ extension Browser {
         options.groupOrder = current.options.groupOrder
         options.hiddenGroups = current.options.hiddenGroups
         options.sort = current.options.sort
-        options.filters = current.options.filters
-        options.negated = current.options.negated
+        options.filter = current.options.filter
         tableOptions[place] = options
         timelineFields[place] = current.timelineDate
     }
@@ -267,9 +265,20 @@ extension Browser {
             if update.change.group != nil, let replaced = update.view.group { replacedGroups[id, default: [:]][replaced.field] = replaced }
             let changedSince = choices(in: place).parts(differingFrom: sent)
             if !changedSince.isEmpty { rewritingViews.insert(id) }
+            let shownFilter = tableOptions[place]?.filter
             // The window takes each setting this write did not send and the person has not changed, so another
             // app's merge is shown and the next write does not send the older value back.
             seed(view, catalogue: library.catalogue, keepingWindow: true, sent: update.change)
+            // The view now holds what the window's filters mean, though perhaps said another way (a chip saved as "is not" the
+            // other words), so the window's own form stands for it, and nothing shows as unsaved. Not where the window has
+            // just taken another app's filters from the view.
+            let keepsFilter = tableOptions[place]?.filter == shownFilter && !update.unkept.contains { unkept in
+                if case .filter = unkept { true } else { ViewDraft.refusesFilter(unkept) }
+            }
+            if keepsFilter, var held = viewSeeds[id] {
+                held.options.filter = sent.options.filter.savable
+                viewSeeds[id] = held
+            }
             if !changedSince.contains(.grouping), let held = viewSeeds[id]?.options, var options = tableOptions[place],
                options.grouping == held.grouping,
                options.groupOrder != held.groupOrder || options.hiddenGroups != held.hiddenGroups {
@@ -300,7 +309,8 @@ extension Browser {
 
     /// Says once what a write left out of the view, as it did in the dialog before a Save.
     func tellUnkept(_ unkept: [ViewDraft.Unkept], of id: ItemID, in library: any ItemLibrary) {
-        let left = unkept.filter { if case .search = $0 { false } else { true } }
+        // The search and a date relative to the day are said where they are made, in the row or the panel.
+        let left = unkept.filter { if case .search = $0 { false } else if case .relativeFilter = $0 { false } else { true } }
         let told = toldUnkept[id] ?? []
         let fresh = left.filter { !told.contains($0) }
         toldUnkept[id] = Set(left)
