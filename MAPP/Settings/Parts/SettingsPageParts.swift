@@ -42,6 +42,13 @@ struct SettingsHead<Trailing: View>: View {
             trailing: trailing)
     }
 
+    /// A head led by a well: the hairline tile of an app, a source or a webhook, at the large tile's size.
+    init(name: Text? = nil, wellSymbol: String, title: Text, line: Text? = nil, @ViewBuilder trailing: () -> Trailing) {
+        self.init(
+            name: name, lead: SettingsWell(size: SettingsTokens.Metric.headTile) { Image(systemName: wellSymbol) }, title: title, line: line,
+            trailing: trailing)
+    }
+
     /// A head whose lead is anything that fits the large tile's place, such as a type's mark.
     init(name: Text? = nil, lead: some View, title: Text, line: Text? = nil, @ViewBuilder trailing: () -> Trailing) {
         self.name = name
@@ -85,6 +92,10 @@ struct SettingsHead<Trailing: View>: View {
 }
 
 extension SettingsHead where Trailing == EmptyView {
+    init(name: Text? = nil, wellSymbol: String, title: Text, line: Text? = nil) {
+        self.init(name: name, wellSymbol: wellSymbol, title: title, line: line, trailing: { EmptyView() })
+    }
+
     init(name: Text? = nil, symbol: String, tone: SettingsTokens.Tone, title: Text, line: Text? = nil) {
         self.init(name: name, symbol: symbol, tone: tone, title: title, line: line, trailing: { EmptyView() })
     }

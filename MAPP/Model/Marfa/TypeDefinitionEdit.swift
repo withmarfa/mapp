@@ -39,7 +39,6 @@ nonisolated enum TypeDefinitionEdit {
         update.plural = own.plural
         update.description = own.description
         update.roles = listed.value2.ownRoles.map(\.rawValue)
-        update.compatibleWith = own.compatibleWith.map { .init(value2: $0) }
         update.displayHints = own.displayHints
         update.linkField = own.linkField
         update.versionPolicy = own.versionPolicy

@@ -119,6 +119,9 @@ struct MarfaMarkSet: Identifiable, Hashable {
     /// The marks in `set` whose names contain every word of `query`, best first; every mark for an empty query.
     func marks(matching query: String, in set: MarfaMarkSet) -> [String]
     func markGlyph(_ id: String) -> AnyView
+    /// The mark an access row leads with for `pattern`: the type's own mark in its tone where the pattern names a type, the
+    /// neutral mark for any other pattern, at the lead column's size.
+    func typeMark(for pattern: String) -> AnyView
     func markTitle(_ id: String) -> String
 
     /// Recently Deleted.
@@ -237,7 +240,7 @@ nonisolated enum MarfaSettingsPage: String, CaseIterable, Hashable, Sendable {
         case .overview: String(localized: "MAPP isn’t allowed to read the server’s health and status.")
         case .account: ""
         case .apps: String(localized: "MAPP isn’t allowed to list, narrow or disconnect apps.")
-        case .keys: String(localized: "MAPP isn’t allowed to list, make or revoke keys.")
+        case .keys: String(localized: "MAPP isn’t allowed to list, make, extend or revoke keys.")
         case .sources: String(localized: "MAPP isn’t allowed to rename, mark or limit sources.")
         case .addresses: String(localized: "MAPP isn’t allowed to see or change the server’s addresses.")
         case .recentlyDeleted: String(localized: "MAPP isn’t allowed to list or permanently delete deleted items.")

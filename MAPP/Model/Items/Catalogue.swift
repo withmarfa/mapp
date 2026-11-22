@@ -58,8 +58,6 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
     var version: Int64?
     /// With the roles it inherits, as Marfa resolves them.
     var roles: [String] = []
-    /// The types this one claims to be a structural superset of.
-    var compatibleWith: [TypeID] = []
     /// The field that holds each item's own identity at the connector that writes the type, such as a GitHub issue's
     /// node ID. It is a fact for the connector, not something to read, so the page leaves it out until asked.
     var linkField: String?
@@ -68,7 +66,7 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
     init(
         id: TypeID, label: String, plural: String? = nil, fields: [Field], titleField: String?, bodyField: String?,
         parent: TypeID?, icon: String? = nil, description: String? = nil, version: Int64? = nil, roles: [String] = [],
-        compatibleWith: [TypeID] = [], linkField: String? = nil
+        linkField: String? = nil
     ) {
         self.id = id
         self.label = label
@@ -81,7 +79,6 @@ nonisolated struct ItemTypeInfo: Identifiable, Hashable, Sendable {
         self.description = description
         self.version = version
         self.roles = roles
-        self.compatibleWith = compatibleWith
         self.linkField = linkField
     }
 

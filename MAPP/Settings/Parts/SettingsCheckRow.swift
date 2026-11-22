@@ -2,8 +2,8 @@ import SwiftUI
 
 /// A row that chooses one of several: a checkbox in the lead column, then the title, with one line under it where it needs
 /// one. The whole row is the control, and the system draws the checkbox. A list of these is how many things are chosen
-/// together, and a first row that stands for all of them is "All Events"-style. It is as tall as any row: 44 points, 56
-/// with a line.
+/// together, and a first row that stands for all of them is "All Events"-style. A row of a title alone is compact, 36
+/// points; with a line it is 56.
 struct SettingsCheckRow: View {
     private let title: Text
     private let line: Text?
@@ -24,7 +24,8 @@ struct SettingsCheckRow: View {
     var body: some View {
         SettingsRow(
             title: title, line: line, error: error,
-            lead: .custom(AnyView(Toggle(isOn: $isOn) { title }.labelsHidden().toggleStyle(.checkbox)))
+            lead: .custom(AnyView(Toggle(isOn: $isOn) { title }.labelsHidden().toggleStyle(.checkbox))),
+            size: line == nil && error == nil ? .compact : .standard
         )
         .contentShape(.rect)
         .onTapGesture { isOn.toggle() }

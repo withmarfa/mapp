@@ -2,8 +2,8 @@ import Foundation
 import Marfa
 import Observation
 
-/// The Keys page: the owner's keys and the keys apps made. A key's access can only be narrowed, a key can be made to expire
-/// sooner, and a new key is shown once. A key revoked elsewhere while its page is open is told as gone.
+/// The Keys page: the owner's keys and the keys apps made. A key's access can only be narrowed, a key can be extended
+/// (its secret stays), and a new key is shown once. A key revoked elsewhere while its page is open is told as gone.
 @Observable @MainActor final class KeysModel: OwnerDraftHolding {
     /// What the New Key sheet holds.
     struct Draft: Equatable {
@@ -33,7 +33,6 @@ import Observation
     struct Question: Identifiable, Equatable {
         enum Action: Equatable {
             case revoke(String)
-            case expire(String, Date)
             case narrow(String, pattern: String, to: AccessLevel)
             case removePermission(String, from: String)
         }
@@ -49,6 +48,22 @@ import Observation
         case new
         case shown
         case rename(String)
+        case extend(String)
+    }
+
+    /// How much longer a key is given: so many days from now, or no end.
+    enum Extension: Hashable, Sendable {
+        case days(Int)
+        case never
+
+        static let steps = [7, 30, 90, 365]
+
+        func date(from now: Date = .now, calendar: Calendar = .current) -> Date? {
+            switch self {
+            case .never: nil
+            case .days(let days): calendar.date(byAdding: .day, value: days, to: now)
+            }
+        }
     }
 
     private let context: OwnerContext
@@ -77,6 +92,14 @@ import Observation
     var renameDraft = ""
     private(set) var renameError: String?
     private(set) var revoked: String?
+    /// Who MAPP is signed in as, which holds a key's extension to its own expiry. Nil until read, and where it can't be: an
+    /// expiry not known is not "no limit", so a key is extended only once this is read.
+    private(set) var identity: OwnIdentity?
+    /// Why who MAPP is signed in as could not be read, while it is not known.
+    private(set) var identityFailure: OwnerFailure?
+    var extensionChoice: Extension = .days(30)
+    private(set) var extendError: String?
+    private(set) var isExtending = false
     /// Set when Settings closed while a key was being made, so the call's end hands over what the sheet held.
     private var closedWhileMaking = false
 
@@ -95,6 +118,23 @@ import Observation
 
     /// Whether MAPP may make a key, which is a different permission from listing and revoking them.
     var canMake: Bool { context.grants().contains(.keysMint) }
+
+    /// Whether MAPP may give a key more time, which `keys.manage` allows for any key.
+    var canExtend: Bool { context.grants().contains(.keysManage) }
+
+    /// What a key can be extended to now: only a later day than it ends on, and none past the day the key MAPP is signed in
+    /// with ends, which the server holds it to. A key that never ends has nothing to extend, and never is offered only where
+    /// MAPP's own sign-in does not end. Nothing is offered while MAPP's own sign-in is not known.
+    func extensions(of key: KeyInfo, now: Date = .now) -> [Extension] {
+        guard let ends = key.expires, let identity else { return [] }
+        let ceiling = identity.expires
+        var choices = Extension.steps.map(Extension.days).filter { choice in
+            guard let date = choice.date(from: now) else { return false }
+            return date > ends && (ceiling.map { date <= $0 } ?? true)
+        }
+        if ceiling == nil { choices.append(.never) }
+        return choices
+    }
 
     /// The permissions MAPP may hand a new key: only what it holds itself.
     var givablePermissions: [String] {
@@ -119,6 +159,12 @@ import Observation
             return
         }
         typeNames = (try? await context.calls.typeNames()) ?? typeNames
+        do {
+            identity = try await context.calls.identity()
+            identityFailure = nil
+        } catch {
+            identityFailure = identity == nil ? error : nil
+        }
     }
 
     // MARK: New key
@@ -194,13 +240,14 @@ import Observation
     }
 
     func closeSheet() {
-        guard !isMaking else { return }
+        guard !isMaking, !isExtending else { return }
         isChoosingPermissions = false
         sheet = nil
         created = nil
         draftError = nil
         sourceError = nil
         renameError = nil
+        extendError = nil
     }
 
     // MARK: A key
@@ -220,6 +267,43 @@ import Observation
             sheet = nil
         } catch {
             renameError = OwnerWording.line(error)
+        }
+    }
+
+    // MARK: Extending
+
+    func beginExtend(_ key: KeyInfo) {
+        guard let first = extensions(of: key).first else { return }
+        extensionChoice = first
+        extendError = nil
+        sheet = .extend(key.id)
+    }
+
+    /// Gives the key a later end, or none, and nothing else: the secret stays, so what uses the key keeps working. The
+    /// sheet keeps the choice when the server refuses.
+    func extend() async {
+        guard case .extend(let id)? = sheet, !isExtending else { return }
+        isExtending = true
+        defer { isExtending = false }
+        extendError = nil
+        let expiry = extensionChoice.date().map(KeyExpiry.on) ?? .never
+        do {
+            try await apply(id, KeyChange(expires: expiry))
+            sheet = nil
+        } catch {
+            extendError = Self.extendLine(error)
+        }
+    }
+
+    /// What a refused extension says. A refusal that names no permission is the server holding the key to the end of the key
+    /// MAPP is signed in with.
+    static let notAllowedToExtend = String(localized: "MAPP isn’t allowed to give a key more time.")
+
+    static func extendLine(_ failure: OwnerFailure) -> String {
+        switch failure {
+        case .notPermitted(nil): String(localized: "Choose a date before MAPP’s sign-in ends.")
+        case .notPermitted(InstancePermission.keysManage.rawValue?): notAllowedToExtend
+        default: OwnerWording.line(failure, on: .keys)
         }
     }
 
@@ -246,14 +330,6 @@ import Observation
             confirm: String(localized: "Remove"))
     }
 
-    func askToExpire(_ key: KeyInfo, on date: Date) {
-        if let expires = key.expires, date >= expires { return }
-        question = Question(
-            action: .expire(key.id, date), title: String(localized: "Make “\(key.label)” expire sooner?"),
-            message: String(localized: "It stops working on \(OwnerWording.day(date)), and anything using it stops with it. Making a key last longer isn’t possible."),
-            confirm: String(localized: "Make It Expire"))
-    }
-
     func askToRevoke(_ key: KeyInfo) {
         question = Question(
             action: .revoke(key.id), title: String(localized: "Revoke “\(key.label)”?"),
@@ -265,8 +341,6 @@ import Observation
     func confirm(_ asked: Question) async {
         question = nil
         switch asked.action {
-        case .expire(let id, let date):
-            await change(id, KeyChange(expires: date))
         case .narrow(let id, let pattern, let level):
             guard let key = key(id), let held = key.types[pattern], level < held else { return }
             var types = key.types
@@ -332,7 +406,7 @@ import Observation
         }
         defer {
             switch sheet {
-            case .new, .shown, .rename: sheet = nil
+            case .new, .shown, .rename, .extend: sheet = nil
             case nil: break
             }
             created = nil
@@ -347,7 +421,7 @@ import Observation
             let name = renameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !name.isEmpty, name != key(id)?.label else { return [] }
             return [.typed(title: String(localized: "Key Not Renamed"), text: name)]
-        case nil:
+        case .extend, nil:
             return []
         }
     }
