@@ -186,7 +186,7 @@ Edit View's sections run Name, Layout, Density (a list), Sort (not on a timeline
 - **The groups**, one row for each in order, with a handle to drag the order and an eye to show or hide it. In a saved view they are Marfa's `group.order` and `group.hidden`, so they sync and other apps honor them. Dragging a board's lanes by their headers to reorder them, which would write the same order, is not built and waits.
 - **Hide Empty Groups**, a switch, with "This Mac" in the section's note style.
 
-MAPP reads and writes all four parts of a view's group (the field, the bucket, the order and the hidden groups) and drops none it did not change; choosing another field starts with no order and no hidden groups.
+MAPP reads and writes all four parts of a view's group (the field, the bucket, the order and the hidden groups) and drops none it did not change, including a field or bucket it cannot read. Choosing another field drops the old field's order and hidden groups, and writes the new field's declared order where it has one (a status's words, a choice's options).
 
 ### One Sort by and Group by for a place
 
