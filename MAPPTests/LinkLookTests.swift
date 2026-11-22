@@ -5,7 +5,7 @@ import Testing
 @Suite(.hangLimit)
 @MainActor struct LinkLookTests {
     /// The names the page accepts from the app (`editor/src/link-style.ts`); it drops any other.
-    private let accepted = /^--(inkkit-wiki-link|link)-[a-z-]+$/
+    private let accepted = /^--(inkkit-link|inkkit-wiki-link|link)-[a-z-]+$/
 
     @Test func everyVariableOfEveryLookIsOneThePageAccepts() {
         for look in LinkLook.allCases {
@@ -58,11 +58,22 @@ import Testing
         #expect(LinkLook.stored(in: defaults) == .tintedPill)
     }
 
-    @Test func aMarkLinkHasADottedUnderlineAndTheHandAndAMissingOneALighterLine() {
+    @Test func everyLookShowsTheSameCueForALinkACommandClickOpens() {
+        let cue = LinkLook.mark.cssVariables().filter { $0.key.hasPrefix("--inkkit-link-") }
+        #expect(cue["--inkkit-link-hover-background"] != nil && cue["--inkkit-link-open-background"] != nil)
+        for look in LinkLook.allCases {
+            let variables = look.cssVariables()
+            #expect(variables.filter { $0.key.hasPrefix("--inkkit-link-") } == cue, "\(look)")
+            // A plain click places the caret, so no look says it opens: the pointer is Inkkit's, with Command held.
+            #expect(variables["--inkkit-wiki-link-cursor"] == nil, "\(look)")
+            #expect(variables["--inkkit-link-open-cursor"] == nil, "\(look)")
+        }
+    }
+
+    @Test func aMarkLinkHasADottedUnderlineAndAMissingOneALighterLine() {
         let mark = LinkLook.mark.cssVariables()
         #expect(mark["--inkkit-wiki-link-underline"] == "underline")
         #expect(mark["--inkkit-wiki-link-underline-style"] == "dotted")
-        #expect(mark["--inkkit-wiki-link-cursor"] == "pointer")
         #expect(mark["--inkkit-wiki-link-missing-underline-style"] == "dotted")
         #expect(mark["--inkkit-wiki-link-missing-underline-color"] != mark["--inkkit-wiki-link-underline-color"])
         #expect(mark["--inkkit-wiki-link-hover-underline"] == nil, "Inkkit keeps the line under the pointer")
