@@ -6,6 +6,7 @@ import Testing
 /// What a saved view's group holds survives MAPP: the order and hidden groups another app set, a grouping MAPP cannot
 /// show, and a date's day, week, month or year, which MAPP reads and groups by.
 @MainActor
+@Suite(.hangLimit)
 struct ViewGroupKeptTests {
     private static let task = TypeID("core.task")
     private static let status = ItemTypeInfo.Field(key: "status", label: "Status", kind: .status([
@@ -215,6 +216,131 @@ struct ViewGroupKeptTests {
         #expect(browser.timelineFields[browser.item] == nil)
         #expect(library.views.first?.group?.field == "properties.priority")
         #expect(!browser.hasViewChanges)
+    }
+
+    // MARK: Another app's change merged into a write
+
+    /// A window showing the view, as it opens.
+    private static func opened(_ view: LibraryView) -> (Browser, FakeItemLibrary) {
+        let library = FakeItemLibrary()
+        library.catalogue = Self.catalogue
+        library.views = [view]
+        // The window's columns are those of the types it lists.
+        library.items.append(Self.row("due-soon", due: "2026-11-24").item)
+        library.viewMembers[view.id] = [ItemID("due-soon")]
+        let browser = Browser()
+        browser.defaults = ViewPanelTests.defaults()
+        browser.adopt(library)
+        browser.sidebarItem = .view(view.id)
+        browser.viewMode = .table
+        browser.followView(in: library)
+        browser.choicesChanged()
+        return (browser, library)
+    }
+
+    /// The status grouping another app sets while a write is under way, with its own order and hidden groups.
+    private static let statusElsewhere = LibraryViewGroup(field: "properties.status", order: [.string("doing")], hidden: [.string("done")])
+
+    @Test func aGroupingAnotherAppSetDuringASortIsShownAndNeverClearedByTheNextWrite() async throws {
+        let (browser, library) = Self.opened(Self.view(LibraryViewGroup(field: "edge[cites]")))
+        library.changedElsewhere = { $0.group = Self.statusElsewhere }
+        browser.tableOptions[browser.item]?.sort = [ItemTableComparator(column: .title)]
+        await browser.choicesChanged()?.value
+        #expect(library.views.first?.group == Self.statusElsewhere)
+        // The window shows what the view now holds, and holds nothing of its own to write.
+        #expect(browser.tableOptions[browser.item]?.grouping == .column("field.status"))
+        #expect(!browser.hasViewChanges)
+
+        browser.setFilter("field.priority", values: ["high"])
+        await browser.choicesChanged()?.value
+        #expect(library.views.first?.query.filter?.contains("high") == true)
+        #expect(library.views.first?.group == Self.statusElsewhere)
+    }
+
+    @Test func aGroupingAnotherAppSetDuringARenameIsShownAndNeverClearedByTheNextWrite() async throws {
+        let (browser, library) = Self.opened(Self.view(LibraryViewGroup(field: "edge[cites]")))
+        browser.openViewPanel(in: library)
+        browser.viewPanel?.name = "Renamed"
+        library.changedElsewhere = { $0.group = Self.statusElsewhere }
+        await browser.commitViewName(in: library)
+        #expect(library.views.first?.title == "Renamed")
+        #expect(library.views.first?.group == Self.statusElsewhere)
+        #expect(browser.tableOptions[browser.item]?.grouping == .column("field.status"))
+        #expect(!browser.hasViewChanges)
+
+        browser.tableOptions[browser.item]?.sort = [ItemTableComparator(column: .title)]
+        await browser.choicesChanged()?.value
+        #expect(library.views.first?.sort == [LibraryViewSort(field: "title", ascending: true)])
+        #expect(library.views.first?.group == Self.statusElsewhere)
+    }
+
+    @Test func aWeekShownInTheWindowIsNeverWrittenOverAGroupingMappCannotShow() async throws {
+        let week = LibraryViewGroup(field: "properties.due_at", bucket: .week)
+        let cites = LibraryViewGroup(field: "edge[cites]", order: [.string("item-1")])
+        let (browser, library) = Self.opened(Self.view(week))
+        #expect(browser.tableOptions[browser.item]?.grouping == .column("field.due_at", by: .bucket(.week)))
+        library.changedElsewhere = { $0.group = cites }
+        browser.tableOptions[browser.item]?.sort = [ItemTableComparator(column: .title)]
+        await browser.choicesChanged()?.value
+        #expect(library.views.first?.group == cites)
+        #expect(browser.tableOptions[browser.item]?.grouping == ItemTableOptions.Grouping.none)
+        #expect(!browser.hasViewChanges)
+
+        browser.setFilter("field.priority", values: ["high"])
+        await browser.choicesChanged()?.value
+        #expect(library.views.first?.group == cites)
+    }
+
+    /// The person's own grouping is written whatever else changed, and the settings another app changed meanwhile are
+    /// shown as the view holds them: the order and the filter, by the same rule as the grouping.
+    @Test func thePersonsGroupingSurvivesAMergeAndTheOtherAppsSortAndFilterAreShown() async throws {
+        let (browser, library) = Self.opened(Self.view(LibraryViewGroup(field: "properties.status")))
+        let filter = #"properties.priority eq "high""#
+        library.changedElsewhere = {
+            $0.sort = [LibraryViewSort(field: "title", ascending: true)]
+            $0.query.filter = filter
+        }
+        browser.tableOptions[browser.item]?.grouping = .column("field.priority")
+        await browser.choicesChanged()?.value
+        let held = try #require(library.views.first)
+        #expect(held.group?.field == "properties.priority")
+        #expect(held.sort == [LibraryViewSort(field: "title", ascending: true)])
+        #expect(held.query.filter == filter)
+        #expect(browser.tableOptions[browser.item]?.grouping == .column("field.priority"))
+        #expect(browser.tableOptions[browser.item]?.sort?.map(\.column.id) == ["title"])
+        #expect(browser.tableOptions[browser.item]?.filters == ["field.priority": ["high"]])
+        #expect(!browser.hasViewChanges)
+
+        // A later change writes only itself.
+        let version = held.version
+        browser.setFilter("field.status", values: ["todo"])
+        await browser.choicesChanged()?.value
+        #expect(library.views.first?.version == version + 1)
+        #expect(library.views.first?.sort == [LibraryViewSort(field: "title", ascending: true)])
+        #expect(library.views.first?.group?.field == "properties.priority")
+    }
+
+    /// What the person changes while a write is under way stays theirs and is written next, though another app changed
+    /// the same setting.
+    @Test func aGroupingChosenDuringAWriteIsWrittenOverAnotherAppsGrouping() async throws {
+        let (browser, library) = Self.opened(Self.view(nil))
+        var release: CheckedContinuation<Void, Never>?
+        var held = false
+        library.inViewChange = {
+            guard !held else { return }
+            held = true
+            await withCheckedContinuation { release = $0 }
+        }
+        library.changedElsewhere = { $0.group = Self.statusElsewhere }
+        browser.tableOptions[browser.item]?.sort = [ItemTableComparator(column: .title)]
+        let write = browser.choicesChanged()
+        #expect(await eventually(within: .seconds(20)) { release != nil })
+        browser.tableOptions[browser.item]?.grouping = .column("field.priority")
+        browser.choicesChanged()
+        release?.resume()
+        await write?.value
+        #expect(await eventually(within: .seconds(20)) { library.views.first?.group?.field == "properties.priority" })
+        #expect(browser.tableOptions[browser.item]?.grouping == .column("field.priority"))
     }
 
     // MARK: Grouping by a date

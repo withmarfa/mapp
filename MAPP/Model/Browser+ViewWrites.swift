@@ -6,8 +6,39 @@ struct ViewChoices: Equatable {
     var options: ItemTableOptions
     var timelineDate: String?
 
+    /// The settings a view write names one by one, which the server merges or refuses one by one. The grouping holds the
+    /// timeline's date, which in a view is a grouping by that date's day.
+    enum Part: CaseIterable {
+        case sort, grouping, filters
+    }
+
     static func == (lhs: ViewChoices, rhs: ViewChoices) -> Bool {
-        !ViewDraft.differs(lhs.options, timelineDate: lhs.timelineDate, from: rhs.options, seedTimelineDate: rhs.timelineDate)
+        lhs.parts(differingFrom: rhs).isEmpty
+    }
+
+    /// The settings in which these choices would be written otherwise than `other`, a list in its own order showing
+    /// `dated` where nothing sorts it.
+    func parts(differingFrom other: ViewChoices, dated: [ItemTableComparator]? = nil) -> Set<Part> {
+        let mine = ViewDraft.shown(options, dated: dated)
+        let theirs = ViewDraft.shown(other.options, dated: dated)
+        var parts = Set<Part>()
+        if ViewDraft.sortKeys(mine.sort) != ViewDraft.sortKeys(theirs.sort) { parts.insert(.sort) }
+        if mine.grouping != theirs.grouping || timelineDate != other.timelineDate { parts.insert(.grouping) }
+        if mine.filterChoices != theirs.filterChoices { parts.insert(.filters) }
+        return parts
+    }
+
+    /// Takes these settings from `other` and keeps the rest.
+    mutating func take(_ parts: Set<Part>, from other: ViewChoices) {
+        if parts.contains(.sort) { options.sort = other.options.sort }
+        if parts.contains(.grouping) {
+            options.grouping = other.options.grouping
+            timelineDate = other.timelineDate
+        }
+        if parts.contains(.filters) {
+            options.filters = other.options.filters
+            options.negated = other.options.negated
+        }
     }
 }
 
@@ -21,8 +52,11 @@ struct ViewChoices: Equatable {
 ///
 /// - A write Marfa refuses, or that cannot reach it, leaves the window as the person chose and the view as it was: the
 ///   next write carries the difference, since every write is the window's choices against the version last read.
-/// - Undo puts a step back only where the window still shows what the step made, so a view that changed elsewhere in
-///   the meantime is never overwritten without the person being told.
+/// - Undo puts back only the settings the step changed, and only where the window still shows what the step made, so a
+///   view that changed elsewhere in the meantime is never overwritten without the person being told.
+/// - A setting the window differs in from the view's seed is the person's change and nothing else: a write that returns
+///   the view with another app's change merged in shows that change in the window wherever the person has none of their
+///   own (`Browser.seed(_:catalogue:keepingWindow:sent:)`), so the next write never sends the window's older value back.
 extension Browser {
     /// What the open place's choices are now.
     var liveChoices: ViewChoices { choices(in: item) }
@@ -98,28 +132,32 @@ extension Browser {
     }
 
     private func registerChoiceUndo(in place: SidebarItem, from before: ViewChoices, to after: ViewChoices) {
+        let parts = after.parts(differingFrom: before)
         registerUndo(String(localized: "Change View")) { browser in
-            guard browser.item == place, browser.liveChoices == after else {
+            guard browser.item == place, browser.liveChoices.parts(differingFrom: after).isDisjoint(with: parts) else {
                 browser.library?.notices.tell(
                     String(localized: "Can’t Undo"),
                     String(localized: "This view has changed since, so that change was left as it is."))
                 return
             }
-            browser.put(before, in: place)
+            browser.put(before, in: place, only: parts)
             browser.choicesChanged()
         }
     }
 
-    /// Puts the order, grouping, filters and timeline date back, and leaves the rest of the place's options.
-    func put(_ choices: ViewChoices, in place: SidebarItem) {
+    /// Puts the order, grouping, filters and timeline date back, or only `parts` of them, and leaves the rest of the
+    /// place's options.
+    func put(_ choices: ViewChoices, in place: SidebarItem, only parts: Set<ViewChoices.Part> = Set(ViewChoices.Part.allCases)) {
+        var current = self.choices(in: place)
+        current.take(parts, from: choices)
         var options = tableOptions[place] ?? ItemTableOptions()
-        if options.grouping != choices.options.grouping { options.collapsed = nil }
-        options.grouping = choices.options.grouping
-        options.sort = choices.options.sort
-        options.filters = choices.options.filters
-        options.negated = choices.options.negated
+        if options.grouping != current.options.grouping { options.collapsed = nil }
+        options.grouping = current.options.grouping
+        options.sort = current.options.sort
+        options.filters = current.options.filters
+        options.negated = current.options.negated
         tableOptions[place] = options
-        timelineFields[place] = choices.timelineDate
+        timelineFields[place] = current.timelineDate
     }
 
     // MARK: Writing a view
@@ -207,9 +245,9 @@ extension Browser {
         switch await library.changeView(id, update.change, baseVersion: update.baseVersion) {
         case .success(let view):
             if update.change.group != nil, let replaced = update.view.group { replacedGroups[id, default: [:]][replaced.field] = replaced }
-            // The window keeps what it shows: the view is the window's only where the view can hold it all.
-            seed(view, catalogue: library.catalogue, keepingWindow: true)
             if choices(in: place) != sent { rewritingViews.insert(id) }
+            // The window keeps what it shows: the view is the window's only where the view can hold it all.
+            seed(view, catalogue: library.catalogue, keepingWindow: true, sent: update.change)
             tellUnkept(update.unkept, of: id, in: library)
         case .failure(let failure):
             // The library has told the person why. A view changed elsewhere shows as it is now; any other refusal

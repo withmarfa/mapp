@@ -516,7 +516,7 @@ nonisolated enum ViewDraft {
         return shown
     }
 
-    private static func sortKeys(_ sort: [ItemTableComparator]?) -> [String]? {
+    static func sortKeys(_ sort: [ItemTableComparator]?) -> [String]? {
         sort?.map { "\($0.column.id) \($0.order == .forward)" }
     }
 
