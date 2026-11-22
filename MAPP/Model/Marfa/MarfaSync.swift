@@ -397,14 +397,14 @@ actor MarfaSync {
             hydrationUnderway = false
             publishPhase()
         }
-        #if DEBUG
-        hooks.seen.update { $0.hydrations += 1 }
-        #endif
         if !declared {
             try await refreshing.declarePreferences()
             declared = true
         }
         if let status = try? await refreshing.readStatus() { chosenSlice = await choose(for: status) }
+        #if DEBUG
+        hooks.seen.update { $0.hydrations += 1 }
+        #endif
         let hydrated: HydrateReport
         do {
             hydrated = try await refreshing.hydrate(types: chosenSlice, tier: Self.tier, edgeTypes: Self.sliceEdgeTypes)

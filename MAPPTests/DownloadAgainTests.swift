@@ -30,13 +30,9 @@ import Testing
 
     @Test func aCompleteCopyIsFilledAgainAndItsQueueIsLeftAlone() async throws {
         let server = Server()
-        let fake = WorkingCopy.fake()
+        let fake = WorkingCopy.fake(itemTypes: [.shippedNote])
         let copy = fake.copy
-        try await copy.declareTypes([[
-            "id": "example.note", "label": "Note", "title_field": "title", "body_field": "body",
-            "fields": ["title": ["type": "string"], "body": ["type": "string"]],
-        ]])
-        _ = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Not yet sent", "body": "Text"]))
+        _ = try await copy.items.create(Draft(type: "core.note", properties: ["title": "Not yet sent", "body": "Text"]))
         await server.use(copy)
         let queued = try await copy.queue.all()
         try #require(queued.count == 1)

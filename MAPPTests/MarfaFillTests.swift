@@ -11,11 +11,7 @@ import Testing
         let store = try TemporaryMarfaCopy()
         defer { store.remove() }
         let copy = try await store.open()
-        try await copy.declareTypes([[
-            "id": "example.note", "label": "Note", "title_field": "title", "body_field": "body",
-            "fields": ["title": ["type": "string"], "body": ["type": "string"]],
-        ]])
-        let write = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Arriving", "body": "First"]))
+        let write = try await copy.items.create(Draft(type: "core.note", properties: ["title": "Arriving", "body": "First"]))
         let reads = FillingReads(copy: copy, completeness: completeness)
         let source = MarfaSource(copy: copy, connection: try MarfaConnection(address: "http://127.0.0.1:9"), reading: reads,
                                   refreshing: ScriptedRefresh(status: ScriptedRefresh.complete()))
@@ -67,18 +63,14 @@ import Testing
     }
 
     @Test func unfinishedRefreshReadsRowsWithoutClearingTheFollowFailure() async throws {
-        let fake = WorkingCopy.fake()
+        let fake = WorkingCopy.fake(itemTypes: [.shippedNote])
         let copy = fake.copy
         let (_, source, log) = try await scriptedSource(fake, refreshing: Whole(copy: copy))
-        try await copy.declareTypes([[
-            "id": "example.note", "label": "Note", "title_field": "title", "body_field": "body",
-            "fields": ["title": ["type": "string"], "body": ["type": "string"]],
-        ]])
         await source.tell(CopyUpdate(reread: .parts(Reread.Parts(catalog: true)), connection: .local))
-        // The declaration reloads the copy. A reload still running would paint the item made next, before the
+        // The catalog's update reloads the copy. A reload still running would paint the item made next, before the
         // changes under test are read.
-        _ = try #require(await log.wait { $0.snapshot?.catalogue.itemTypes[TypeID("example.note")] != nil })
-        let created = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Arrived", "body": "First"]))
+        _ = try #require(await log.wait { $0.snapshot?.catalogue.itemTypes[TypeID("core.note")] != nil })
+        let created = try await copy.items.create(Draft(type: "core.note", properties: ["title": "Arrived", "body": "First"]))
         // A fill that did not finish, with the server unreachable: the rows are read and the unreachable word stays.
         fake.sendUpdate(CopyUpdate(
             reread: .everything, connection: .offline(.network(message: "offline")),
@@ -106,16 +98,12 @@ import Testing
         let log = ChangeLog(source)
         source.events.yield(.paint)
         _ = try #require(await log.wait { $0.snapshot != nil })
-        try await copy.declareTypes([[
-            "id": "example.note", "label": "Note", "title_field": "title", "body_field": "body",
-            "fields": ["title": ["type": "string"], "body": ["type": "string"]],
-        ]])
-        // The declaration reloads the copy. A reload still running would paint the item made next, before the
+        // The first reads hold the shipped types. A reload still running would paint the item made next, before the
         // server's change is read.
-        _ = try #require(await log.wait { $0.snapshot?.catalogue.itemTypes[TypeID("example.note")] != nil })
+        _ = try #require(await log.wait { $0.snapshot?.catalogue.itemTypes[TypeID("core.note")] != nil })
 
         reads.hydrating.withLock { $0 = true }
-        let created = try await copy.items.create(Draft(type: "example.note", properties: ["title": "Arrived", "body": "First"]))
+        let created = try await copy.items.create(Draft(type: "core.note", properties: ["title": "Arrived", "body": "First"]))
         await source.hear(Change(origin: .server(event: "item.created", cursor: "arrived"),
                            itemId: try #require(created.itemId), edgeId: nil))
         _ = try #require(await log.wait { $0.item(titled: "Arrived") != nil })
