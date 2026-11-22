@@ -131,7 +131,7 @@ nonisolated extension ViewDraft {
 
     /// The same chip said as "is not" the other values, where it is a closed field's "is" of several words, or several groups:
     /// Marfa joins "is not" by AND, so the chip then sits beside others in one filter. The two select the same items,
-    /// except one holding a word its type does not declare, which "is not" keeps.
+    /// except one holding a word its type does not declare: "is not" of the other words keeps it, and of the other groups does not.
     static func complement(of clause: FilterClause, target: FilterTarget, catalogue: Catalogue) -> FilterClause? {
         guard clause.op == .is, target.kind.isClosed, clause.values.count > 1 else { return nil }
         let chosen = Set(clause.values)
