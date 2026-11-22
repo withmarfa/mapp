@@ -32,7 +32,7 @@ Agreed on 22 November 2026 and not built yet: the shape rule below replaces the 
 - It leaves on its own after 5 seconds, since the design system gives no time. It waits while the pointer is over it, then starts its time again. It leaves at once when Undo or the close button is used. VoiceOver announces it.
 - Undo runs the undo the action registered with the window's undo manager, once. It is bound to that step, not to its name (`StepUndo`): the move is registered in an undo group of its own, and the toast goes the moment any later step is registered, undone or redone (Edit > Undo or Redo included), so Undo never takes back something else. Where another undo group is already open the move shares it, and the toast offers no Undo. Edit > Undo still works after the toast has gone, and a failed undo is reported as it is without the toast.
 - Items moved to Recently Deleted show it, by every route: the row and item actions, the palette, the Delete key, the menu command, the board and the gallery. One item says "Moved “Kitchen quotes” to Recently Deleted", naming it, or "Moved to Recently Deleted" when it has no name; several say how many. Deleting a collection will use it (Agreed designs).
-- Left to build: the design boards (F11, L5) add a View button. The built toast has none yet, and has no other message than the move to Recently Deleted.
+- Left to build: the design boards (F14, L5) add a View button. The built toast has none yet, and has no other message than the move to Recently Deleted.
 - A question before something that can't be undone is Apple's own alert, as today. MAPP draws none of its own.
 
 ## Related pages
