@@ -1,7 +1,8 @@
 import Foundation
 
 /// The kind a new item takes outside a type's own list, as Settings > General > New Items says: one the person chose, or
-/// the kind last used. A Mac setting, one value in the defaults (`key`), never written to Marfa.
+/// the kind last used. One value in the defaults (`key`), which syncs
+/// through the Marfa (`PreferencesMap`).
 nonisolated enum NewItemType {
     static let key = "newItemType"
 

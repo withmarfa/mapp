@@ -163,6 +163,8 @@ import os
     /// library and again right before it reads or closes a copy, so text typed while a step waited on the network
     /// is in the copy when it closes. Set by the app; tests may set none.
     @ObservationIgnored var handOverEdits: () async -> Bool = { true }
+    /// Told each time the library shown changes, and with nil when none is, after the host holds it.
+    @ObservationIgnored var libraryChanged: (MarfaLibrary?) -> Void = { _ in }
 
     var source: (any ItemSource)? { library?.source }
     var state: MarfaConnectionState { library?.connection ?? standing }
@@ -693,6 +695,7 @@ import os
                 readName(of: connection)
             })
         self.library = library
+        libraryChanged(library)
         if let origin = (try? connection.server(key: ""))?.plainHTTPOrigin, Self.toldPlainHTTP.withLock({ $0.insert(origin).inserted }) {
             notices.tell(Words.plainHTTPTitle, Words.plainHTTP(origin: origin))
         }
@@ -733,7 +736,10 @@ import os
     private func detach() {
         reading?.cancel()
         reading = nil
-        library = nil
+        if library != nil {
+            library = nil
+            libraryChanged(nil)
+        }
         grants = []
         grantsRead = false
         readsProfile = false

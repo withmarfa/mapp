@@ -349,6 +349,8 @@ struct MainView: View {
             }
         }
         .onChange(of: includedSubtypes.types, initial: true) { browser.stackedTypes = includedSubtypes.types }
+        // Another Mac's settings reached the defaults: a list reads its density again.
+        .onReceive(NotificationCenter.default.publisher(for: PreferencesSync.appliedNotification)) { _ in browser.densityRevision += 1 }
         // A window restores what it showed once the library has been read, since before then nothing is there. A
         // window carried to another library starts afresh with it.
         .onChange(of: library.isLoaded, initial: true) {

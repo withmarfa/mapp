@@ -1,6 +1,6 @@
 # MAPP
 
-MAPP is a macOS app for a Marfa server's items, with a sidebar, a list and a page, like Notes and Mail. It works only through the `marfa-swift` package's working copy, names no item type of its own, and holds no power another app lacks. The item editor is a web page built on Inkkit in a `WKWebView`. Concepts and agreed designs are in `docs/`; a directory's rules are in the `AGENTS.md` beside its code.
+MAPP is a macOS app for a Marfa server's items, with a sidebar, a list and a page, like Notes and Mail. It works only through the `marfa-swift` package's working copy, names no item type but its hidden settings (`app.mapp.preferences`), and holds no power another app lacks. The item editor is a web page built on Inkkit in a `WKWebView`. Concepts and agreed designs are in `docs/`; a directory's rules are in the `AGENTS.md` beside its code.
 
 ## Read before you change
 
@@ -41,7 +41,7 @@ MAPP is a macOS app for a Marfa server's items, with a sidebar, a list and a pag
 - Never drop or silently overwrite a person's text. A write that cannot be kept where it was meant to go is kept where the person can get it back (a conflicted copy, the queue, the clipboard) and the person is told.
 - An item's Markdown text is held byte for byte. Opened and left alone, it is never rewritten; an edit keeps the text of every block it did not reach.
 - Views, commands, and the editor reach a library only through `ItemLibrary`, read from the environment's `library` value, and name items by `ItemID`, never by path.
-- Mac settings are never written to Marfa (`docs/settings-storage.md`).
+- MAPP's settings sync through the connected Marfa (`PreferencesSync`), but for what `PreferencesMap.staysOnMac` names.
 
 ## Project layout
 

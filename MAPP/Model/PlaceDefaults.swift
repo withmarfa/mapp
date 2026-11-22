@@ -133,8 +133,8 @@ nonisolated struct PlaceDefault: Codable, Equatable, Sendable {
     }
 }
 
-/// The default view each place that is not a saved view keeps for itself on this Mac: one value in the defaults, by place,
-/// never written to Marfa, since no record of Marfa models a place's default. A place's default cannot be renamed or
+/// The default view each place that is not a saved view keeps for itself: one value in the defaults, by place, which syncs
+/// through the Marfa (`PreferencesMap`) as a row of MAPP's own settings, since no record of Marfa models a place's default. A place's default cannot be renamed or
 /// deleted; Reset View empties it.
 ///
 /// Stored text that cannot be read, or one entry that cannot, is moved aside under a key of its own, kept and never

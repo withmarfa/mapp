@@ -90,6 +90,10 @@ nonisolated final class ScriptedSignIns: SignIns {
         return SystemSignIns.readsProfile(credential.scopes)
     }
 
+    func scopes(for connection: MarfaConnection) throws -> [String]? {
+        try authorization(for: connection.address).credential()?.scopes
+    }
+
     func grants(for connection: MarfaConnection) throws -> Set<InstancePermission>? {
         guard let credential = try authorization(for: connection.address).credential() else { return nil }
         return Set(InstancePermission.allCases.filter(credential.grants))

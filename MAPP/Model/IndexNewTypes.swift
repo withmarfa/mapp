@@ -1,7 +1,7 @@
 import Foundation
 
-/// The types the New row of the Items page offers, and their order. A Mac setting kept as one string of type
-/// identifiers in the defaults (`key`), never written to Marfa. While none is kept the row holds the starting seven the
+/// The types the New row of the Items page offers, and their order, kept as one string of type identifiers in the
+/// defaults (`key`), which syncs through the Marfa (`PreferencesMap`). While none is kept the row holds the starting seven the
 /// library has; a list the person has changed is kept as it is, even when empty. The catalogue offers no "favorite"
 /// types, so the starting seven are named here, the one place that does, and skipped where the library lacks one.
 nonisolated enum NewRowTypes {

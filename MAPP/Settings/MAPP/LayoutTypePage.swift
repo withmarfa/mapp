@@ -2,7 +2,7 @@ import SwiftUI
 
 /// One type's Layouts page: how its items read in a row, which facts follow the status, and what its page pins under the
 /// title. Every change is written to the stores that already hold it, the type's look (`TypeLooks`) and what its page
-/// shows (`PagePlacements`, the same store as Customize Layout on an item), and nothing is written to Marfa.
+/// shows (`PagePlacements`, the same store as Customize Layout on an item), which sync through the Marfa (`PreferencesSync`).
 struct LayoutTypePage: View {
     let type: TypeID
     @Environment(Libraries.self) private var libraries

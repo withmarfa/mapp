@@ -1,8 +1,8 @@
 import Foundation
 
-/// What MAPP keeps on this Mac about each saved view, which Marfa does not keep: the layout it opens in, the
-/// table's columns, whether the board hides empty groups, and what the gallery's cards show. One value in the defaults, by view identifier, never
-/// written to Marfa. A view's name, query, sort and group are Marfa's (`ViewDraft`).
+/// What MAPP keeps about each saved view that the view itself does not hold: the layout it opens in, the table's columns,
+/// whether the board hides empty groups, and what the gallery's cards show. One value in the defaults, by view identifier,
+/// which syncs through the Marfa (`PreferencesMap`) without the table's widths, which stay on this Mac. A view's name, query, sort and group are Marfa's (`ViewDraft`).
 nonisolated struct ViewLayouts: Equatable, Sendable {
     static let key = "viewLayouts"
     /// Each entry is stored text that could not be read, in the order it was found.

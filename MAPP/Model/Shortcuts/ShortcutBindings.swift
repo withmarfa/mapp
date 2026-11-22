@@ -2,8 +2,8 @@ import Foundation
 import Observation
 
 /// The shortcut each menu command has: the one the person chose, or its default. Only what was chosen is stored, so a
-/// better default reaches every command nobody changed; a command the person cleared is stored as cleared. Shortcuts stay on
-/// this Mac and are never written to Marfa.
+/// better default reaches every command nobody changed; a command the person cleared is stored as cleared. Shortcuts sync
+/// through the connected Marfa (`PreferencesMap`).
 ///
 /// A stored command that MAPP no longer has is ignored and kept, in case it returns. Stored text that cannot be read is
 /// moved aside under a key of its own, kept and never removed, and the commands start from their defaults.
@@ -39,6 +39,12 @@ final class ShortcutBindings {
     init(defaults: UserDefaults = .standard, commands: [ShortcutCommand] = ShortcutCommand.all) {
         self.defaults = defaults
         self.commands = commands
+        chosen = [:]
+        reload()
+    }
+
+    /// Reads the stored value again, as when another Mac's change has reached the defaults (`PreferencesSync`).
+    func reload() {
         guard let saved = defaults.data(forKey: Self.defaultsKey) else {
             chosen = [:]
             return

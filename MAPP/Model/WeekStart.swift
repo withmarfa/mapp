@@ -1,7 +1,7 @@
 import Foundation
 
 /// The day a week starts on in every calendar and date panel MAPP draws, as Settings > General > Dates and Times says. A
-/// Mac setting, one value in the defaults (`key`), never written to Marfa.
+/// setting kept as one value in the defaults (`key`), which syncs through the Marfa (`PreferencesMap`).
 nonisolated enum WeekStart {
     static let key = "weekStart"
 
