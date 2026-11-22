@@ -18,7 +18,7 @@ struct ViewOptionCommandTests {
     }
 
     private static func titles(_ browser: Browser, _ library: FakeItemLibrary) -> [String] {
-        ViewOptionCommand.commands(for: browser, in: library, storedColumns: .constant(Data())).map(\.title)
+        ViewOptionCommand.commands(for: browser, in: library).map(\.title)
     }
 
     @Test func theBoardOffersTheOtherGroupingsAndTheOtherDensity() throws {
@@ -32,7 +32,7 @@ struct ViewOptionCommandTests {
         #expect(titles.contains("Compact Cards"))
 
         let compact = try #require(
-            ViewOptionCommand.commands(for: browser, in: library, storedColumns: .constant(Data()))
+            ViewOptionCommand.commands(for: browser, in: library)
                 .first { $0.title == "Compact Cards" })
         compact.action()
         #expect(browser.compactBoards[browser.item] == true)
@@ -43,13 +43,13 @@ struct ViewOptionCommandTests {
         let clock = Date(timeIntervalSinceReferenceDate: 800_000_000)
         let library = FakeItemLibrary(items: [Self.task("A", status: "todo")], now: clock)
         let browser = Self.browser(.calendar, in: library)
-        let commands = ViewOptionCommand.commands(for: browser, in: library, storedColumns: .constant(Data()))
+        let commands = ViewOptionCommand.commands(for: browser, in: library)
         let next = try #require(commands.first { $0.title == "Next Week" })
         next.action()
         let thisWeek = CalendarLayout.firstDay(ofWeekHolding: clock, calendar: .mapp)
         let expected = try #require(Calendar.mapp.date(byAdding: .day, value: 7, to: thisWeek))
         #expect(browser.calendarDay == expected, "a week on from the clock's, not from the wall clock")
-        let today = try #require(ViewOptionCommand.commands(for: browser, in: library, storedColumns: .constant(Data())).first { $0.title == "Today" })
+        let today = try #require(ViewOptionCommand.commands(for: browser, in: library).first { $0.title == "Today" })
         today.action()
         #expect(browser.calendarDay == nil)
     }

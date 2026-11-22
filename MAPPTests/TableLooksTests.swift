@@ -78,7 +78,7 @@ struct TableLooksTests {
     @Test func aSavedViewsChosenColumnsWinOverTheLook() {
         let rows = [Self.row("core.task", ["status": "todo", "priority": "high", "completed_at": "2026-11-01"])]
         let columns = Self.columns(rows, ["core.task": Self.taskLook])
-        var chosen = ViewColumns()
+        var chosen = ViewProperties()
         for column in columns where column.id == "field.priority" || column.id == "field.completed_at" {
             chosen.setShown(column, !column.isShownByDefault)
         }

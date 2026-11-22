@@ -78,24 +78,15 @@ enum SavedViews {
         }
     }
 
-    /// This Mac's settings for a view made of what the window shows: its layout, the columns it shows, its cards and its density.
+    /// This Mac's settings for a view made of what the window shows: its layout, its Properties, its cards and its density.
     static func newViewSettings(_ browser: Browser, in library: any ItemLibrary) -> ViewMacSettings {
         var settings = ViewMacSettings(layout: browser.viewMode)
         settings.cards = browser.cards
         settings.density = browser.density
         if browser.viewMode == .calendar { settings.calendarScale = browser.calendarScale }
         settings.hidesEmptyGroups = browser.hidesEmptyGroups
-        if case .view(let id) = browser.item {
-            let held = browser.macSettings(for: id)
-            settings.columns = held.columns
-            settings.calendarScale = held.calendarScale
-        } else {
-            let stored = browser.defaults.data(forKey: ItemTableColumnLayouts.key) ?? Data()
-            let layout = ItemTableColumnLayouts.layout(for: browser.item, in: stored)
-            for column in browser.tableContent(in: library).columns where column.content != .title {
-                settings.columns.setShown(column, layout.shows(column))
-            }
-        }
+        settings.properties = browser.properties
+        if case .view(let id) = browser.item { settings.calendarScale = browser.macSettings(for: id).calendarScale }
         return settings
     }
 

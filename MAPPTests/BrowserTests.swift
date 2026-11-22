@@ -48,7 +48,7 @@ struct BrowserTests {
         browser.show(.inbox, in: library, order: ItemOrder())
         browser.selection = [newer.id]
         var asked: [SettingsPage?] = []
-        browser.openSettings = { asked.append($0) }
+        browser.openSettings = { page, _ in asked.append(page) }
         browser.showSettings(.connection)
         browser.showSettings()
         #expect(asked == [.connection, nil], "no page leaves the window where it was")

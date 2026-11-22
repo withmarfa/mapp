@@ -159,7 +159,7 @@ struct CurrentViewOptions: View {
             }
             // Every place's list and gallery take the place's own sort and group, as the table does.
             if let browser {
-                ItemTableViewOptions(browser: browser, columns: false)
+                ItemTableViewOptions(browser: browser, table: false)
                 Divider()
                 IncludeSubtypesOption(browser: browser)
             }
@@ -174,6 +174,7 @@ struct ItemBoardOptions: View {
 
     var body: some View {
         GroupByMenu(browser: browser)
+        PropertiesMenu(browser: browser)
         Picker("Card Density", systemImage: "rectangle.compress.vertical", selection: Binding {
             browser.compactBoards[browser.item, default: false]
         } set: { browser.setCompactBoard($0, in: browser.item) }) {
@@ -209,6 +210,7 @@ struct ItemTimelineOptions: View {
         .pickerStyle(.menu)
         .disabled(fields.isEmpty)
         .accessibilityIdentifier("TimelineDateField")
+        PropertiesMenu(browser: browser)
     }
 }
 

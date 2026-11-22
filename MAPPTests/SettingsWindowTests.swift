@@ -73,7 +73,7 @@ struct SettingsWindowTests {
         var opened = 0
         launcher.open = { opened += 1 }
         let browser = Browser()
-        browser.openSettings = { launcher.show($0) }
+        browser.openSettings = { launcher.show($0, subpage: $1) }
         browser.showSettings(.recentlyDeleted)
         #expect(launcher.navigation.page == .recentlyDeleted)
         #expect(opened == 1)

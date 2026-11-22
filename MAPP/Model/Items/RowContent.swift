@@ -255,9 +255,9 @@ nonisolated struct RowContent: Hashable, Sendable {
         // MARK: Bottom line
 
         func addBottomLine(of look: TypeLook, to content: inout RowContent) {
-            if list.mixesTypes { content.chips.append(.type(icon: content.typeIcon, label: content.typeLabel)) }
+            if list.mixesTypes, look.showsType { content.chips.append(.type(icon: content.typeIcon, label: content.typeLabel)) }
             let status = info?.statusField
-            if let status, let word = statusWord(of: status) {
+            if look.showsStatus, let status, let word = statusWord(of: status) {
                 content.chips.append(.status(StatusSymbol(group: status.statusGroup(of: word)), label: ItemTypeInfo.Field.label(ofOption: word)))
             }
             var facts = 0

@@ -22,7 +22,8 @@ struct ItemTimeline: View {
             for: items, field: field, looks: looks, catalogue: library.catalogue, today: now)
         let list = RowList(
             mixesTypes: Set(items.map(\.type)).count > 1, date: .look, format: dateFormat, datesApart: true, placedField: field, day: Calendar.current.startOfDay(for: now))
-        let contents = rowContents.contents(of: items, in: library, looks: looks, list: list, shape: CardShape())
+        let contents = rowContents.contents(
+            of: items, in: library, looks: browser.propertyLooks(in: library), list: list, shape: CardShape(leaving: field))
         let title = browser.isSearching ? String(localized: "Search") : library.name(of: browser.item)
 
         timeline(groups, contents: contents, now: now)
@@ -106,7 +107,7 @@ struct ItemTimeline: View {
                                     .frame(width: 148, alignment: .leading)
                                 timeColumn(row)
                                     .frame(width: 112, alignment: .leading)
-                                ItemRow(content: content)
+                                TimelineRowView(content: content)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             .tag(row.id)

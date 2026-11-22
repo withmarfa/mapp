@@ -135,6 +135,49 @@ struct PlaceDefaultsTests {
         #expect(Self.window(defaults, library: library).tableOptions[Self.tasks]?.isFiltering != true)
     }
 
+    @Test func aPlacesPropertiesAreKeptInItsDefaultViewAndResetViewPutsTheLooksBack() {
+        let defaults = ViewPanelTests.defaults()
+        let library = Self.library()
+        let browser = Self.window(defaults, library: library)
+        let created = ItemTableColumn.created
+        #expect(!browser.properties.isChanged)
+        browser.changeProperties { $0.setShown(created, true) }
+        #expect(browser.properties.isShown(created))
+        #expect(browser.isDefaultViewChanged)
+        #expect(PlaceDefaults.stored(in: defaults).default(for: Self.tasks)?.properties.isChanged == true)
+        // Another window opens the place with them, and they are the same for every layout.
+        let other = Self.window(defaults, library: library)
+        other.followPlaceDefault(in: library)
+        #expect(other.properties.isShown(created))
+
+        browser.resetView(in: library)
+        #expect(!browser.properties.isChanged)
+        #expect(!browser.isDefaultViewChanged)
+        #expect(PlaceDefaults.stored(in: defaults).default(for: Self.tasks) == nil)
+    }
+
+    @Test func useLayoutsAndUndoGivePropertiesBack() {
+        let defaults = ViewPanelTests.defaults()
+        let library = Self.library()
+        let undo = UndoManager()
+        undo.groupsByEvent = false
+        let browser = Browser()
+        browser.defaults = defaults
+        browser.adopt(library, undoManager: undo)
+        browser.sidebarItem = Self.tasks
+        browser.followPlaceDefault(in: library)
+        undo.beginUndoGrouping()
+        browser.changeProperties { $0.setShown(.created, true) }
+        undo.endUndoGrouping()
+        undo.beginUndoGrouping()
+        browser.useLayouts()
+        undo.endUndoGrouping()
+        #expect(!browser.properties.isChanged)
+        undo.undo()
+        #expect(browser.properties.isShown(.created))
+        #expect(PlaceDefaults.stored(in: defaults).default(for: Self.tasks)?.properties.isChanged == true)
+    }
+
     @Test func resetViewLeavesNoEmptyFilterRowOpen() {
         let defaults = ViewPanelTests.defaults()
         let library = Self.library()

@@ -1,38 +1,25 @@
 import SwiftUI
 
-/// The panel's Columns, for the table: the name stays and is first, the others are shown or hidden with the eye and
-/// dragged into order. A saved view's choices are stored for this Mac as made, and a place's own apply at once and keep their
-/// order, which only a view arranges.
-struct ViewPanelColumns: View {
-    @Environment(\.interfaceTextSize) private var textSize
+/// The panel's Properties (boards N3 and N6): what shows after the title in every layout but the calendar. A table's
+/// are its columns, the name locked first; any other layout lists what a chip can say. Each row has its symbol, name, a
+/// handle to drag it into order and an eye. Until the list is changed it reads "As in Layouts", each item showing its own
+/// type's look; once changed it reads "This Mac", and Use Layouts at the foot puts the fallback back. The Secondary line and
+/// the date stay the type's. Edit Layouts… opens Settings > Layouts at a type's page.
+struct ViewPanelProperties: View {
+    @CurrentLibrary private var library
     let browser: Browser
-    let panel: ViewPanel
-    let content: ItemTableContent
-    @AppStorage(ItemTableColumnLayouts.key) private var stored = Data()
     @State private var showsHidden = false
 
-    private var viewID: ItemID? {
-        if case .view(let id) = browser.item { id } else { nil }
-    }
-
     var body: some View {
-        let arranged = viewID.map { browser.macSettings(for: $0).columns.arranged(content.columns) } ?? content.columns
-        let shown = arranged.filter { browser.showsColumn($0, stored: stored) }
-        let hidden = arranged.filter { !browser.showsColumn($0, stored: stored) }
-        VStack(alignment: .leading, spacing: InspectorMetrics.headingGap) {
-            HStack(spacing: 6) {
-                Text("Columns").interfaceFont(.body.weight(.semibold))
-                Text(shown.count, format: .number).interfaceFont(.callout).foregroundStyle(.secondary)
-                Spacer(minLength: 0)
-                if panel.purpose != .place {
-                    Text("This Mac").interfaceFont(.callout).foregroundStyle(.secondary)
-                }
-            }
-            .padding(.horizontal, InspectorMetrics.headingInset)
-            .accessibilityAddTraits(.isHeader)
+        let properties = browser.properties
+        let listed = properties.arranged(browser.offeredProperties(in: library))
+        let shown = listed.filter { properties.isShown($0) }
+        let hidden = listed.filter { !properties.isShown($0) }
+        let all = browser.tableContent(in: library).columns
+        ViewPanelSection(title: "Properties", note: properties.isChanged ? "This Mac" : "As in Layouts") {
             InspectorBox {
                 ForEach(shown) { column in
-                    ColumnRow(browser: browser, content: content, column: column, isShown: true, canArrange: viewID != nil, stored: $stored)
+                    PropertyRowView(browser: browser, columns: all, column: column, isShown: true)
                 }
                 if !hidden.isEmpty {
                     Button {
@@ -42,26 +29,39 @@ struct ViewPanelColumns: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("ViewPanelShowMoreColumns")
+                    .accessibilityIdentifier("ViewPanelShowMoreProperties")
                     if showsHidden {
                         ForEach(hidden) { column in
-                            ColumnRow(browser: browser, content: content, column: column, isShown: false, canArrange: viewID != nil, stored: $stored)
+                            PropertyRowView(browser: browser, columns: all, column: column, isShown: false)
                         }
                     }
                 }
+                if properties.isChanged {
+                    Button { browser.useLayouts() } label: {
+                        Label("Use Layouts", systemImage: "arrow.uturn.backward")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("ViewPanelUseLayouts")
+                }
+                EditLayoutsCommand(types: browser.layoutTypes(in: library)) { browser.showLayouts(of: $0) }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .menuStyle(.button)
+                    .menuIndicator(.hidden)
             }
         }
+        .accessibilityIdentifier("ViewPanelProperties")
     }
 }
 
-private struct ColumnRow: View {
+private struct PropertyRowView: View {
     @Environment(\.interfaceTextSize) private var textSize
     let browser: Browser
-    let content: ItemTableContent
+    /// Every column of the place, which a move is spliced into.
+    let columns: [ItemTableColumn]
     let column: ItemTableColumn
     let isShown: Bool
-    let canArrange: Bool
-    @Binding var stored: Data
 
     private static let prefix = "column:"
 
@@ -72,7 +72,10 @@ private struct ColumnRow: View {
             Image(systemName: "line.3.horizontal")
                 .font(.system(size: 11 * scale))
                 .foregroundStyle(.tertiary)
-                .opacity(canArrange && !isName ? 1 : 0)
+                .opacity(isName ? 0 : 1)
+                .accessibilityHidden(true)
+            Image(systemName: column.symbol)
+                .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
             Text(verbatim: column.label)
                 .lineLimit(1)
@@ -86,7 +89,7 @@ private struct ColumnRow: View {
                     .accessibilityLabel("Always shown")
             } else {
                 Button {
-                    browser.setColumn(column, shown: !isShown, stored: $stored)
+                    browser.setColumn(column, shown: !isShown)
                 } label: {
                     Image(systemName: isShown ? "eye" : "eye.slash")
                         .foregroundStyle(isShown ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tertiary))
@@ -94,23 +97,23 @@ private struct ColumnRow: View {
                         .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .help(isShown ? "Hide Column" : "Show Column")
-                .accessibilityLabel(isShown ? "Hide Column" : "Show Column")
-                .accessibilityIdentifier("ViewPanelColumnEye.\(column.id)")
+                .help(isShown ? "Hide Property" : "Show Property")
+                .accessibilityLabel(isShown ? "Hide Property" : "Show Property")
+                .accessibilityIdentifier("ViewPanelPropertyEye.\(column.id)")
             }
         }
         .interfaceFont(.body)
         .contentShape(.rect)
-        .modifier(Arrangeable(isOn: canArrange && !isName, id: Self.prefix + column.id, move: move))
+        .modifier(Arrangeable(isOn: !isName, id: Self.prefix + column.id, move: move))
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("ViewPanelColumn.\(column.id)")
+        .accessibilityIdentifier("ViewPanelProperty.\(column.id)")
     }
 
     private func move(_ dragged: String) -> Bool {
-        guard dragged.hasPrefix(Self.prefix), case .view(let id) = browser.item else { return false }
+        guard dragged.hasPrefix(Self.prefix) else { return false }
         let moved = String(dragged.dropFirst(Self.prefix.count))
         guard moved != column.id else { return false }
-        browser.changeViewSettings(id) { $0.columns.move(moved, before: column.id, in: content.columns) }
+        browser.changeProperties { $0.move(moved, before: column.id, in: columns) }
         return true
     }
 }

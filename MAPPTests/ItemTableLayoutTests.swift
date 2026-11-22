@@ -57,14 +57,21 @@ struct ItemTableLayoutTests {
     // MARK: What the header may change
 
     @MainActor
-    @Test func theNameCanNeverBeHiddenAndAViewsOrderIsNotTheHeadersToChange() {
-        let name = ItemTableColumn.title
-        let other = ItemTableColumn.edited
-        #expect(ItemTable.disabledCustomization(of: name, inView: false) == .visibility)
-        #expect(ItemTable.disabledCustomization(of: other, inView: false) == [])
-        #expect(ItemTable.disabledCustomization(of: other, inView: true) == .reorder)
-        // In a view the name keeps both, since one call sets the whole set.
-        #expect(ItemTable.disabledCustomization(of: name, inView: true) == [.visibility, .reorder])
+    @Test func theNameCanNeverBeHiddenOrMovedAndAnyOtherColumnCan() {
+        #expect(ItemTable.disabledCustomization(of: .edited) == [])
+        // The name keeps both, since one call sets the whole set.
+        #expect(ItemTable.disabledCustomization(of: .title) == [.visibility, .reorder])
+    }
+
+    @Test func aHeaderDragReadsTheColumnOrderAndAResizeDoesNot() throws {
+        let dragged = Data(
+            #"{"perColumnState":[],"columnOrder":[{"base":{"explicit":{"_0":"edited"}}},{"base":{"explicit":{"_0":"type"}}}]}"#
+                .utf8)
+        let customization = try JSONDecoder().decode(TableColumnCustomization<ItemTableRow>.self, from: dragged)
+        #expect(ItemTable.headerOrder(in: try JSONEncoder().encode(customization)) == ["edited", "type"])
+        let resized = try JSONDecoder().decode(
+            TableColumnCustomization<ItemTableRow>.self, from: Data(#"{"perColumnState":[]}"#.utf8))
+        #expect(ItemTable.headerOrder(in: try JSONEncoder().encode(resized)) == nil)
     }
 
     // MARK: Statuses

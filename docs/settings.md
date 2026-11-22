@@ -60,7 +60,7 @@ A type's page is pushed on the list and Back returns to it. It has:
 - **Page.** What the item's page pins under its title (at most four), in order, the same choice as Customize Layout on an item of the type (`PagePlacements`). The last row pins another property.
 - **Restore Defaults** takes back that type's choices, for its look and for its page, and no other type's.
 
-Agreed, not built: Edit Layouts… in the window (View Options > Properties, Edit View's Properties section and the row menu) opens this page at a type.
+Edit Layouts… in the window (View Options > Properties, Edit View's Properties section and the row menu) opens this page at a type. Built, not yet released.
 
 Every change is written to the store that already holds it (`TypeLooks` for the row, `PagePlacements` for the page), so a list, a card, a table and an item's page see it at once. Only what differs from what the type's preset gives is kept, as an import keeps it, so a better preset still reaches every place nobody chose. Nothing is written to Marfa.
 

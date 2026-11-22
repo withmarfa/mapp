@@ -14,7 +14,7 @@ struct RootView: View {
     init(settingsLauncher: SettingsLauncher, libraries: Libraries) {
         self.settingsLauncher = settingsLauncher
         let browser = Browser()
-        browser.openSettings = { [settingsLauncher] in settingsLauncher.show($0) }
+        browser.openSettings = { [settingsLauncher] in settingsLauncher.show($0, subpage: $1) }
         browser.lookChoices = libraries.typeLooks.choices(for: libraries.libraryKey)
         _browser = State(initialValue: browser)
     }

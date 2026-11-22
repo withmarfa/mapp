@@ -17,7 +17,6 @@ struct CommandPalette: View {
     @Environment(MarfaHost.self) private var host: MarfaHost?
     @Environment(Libraries.self) private var libraries: Libraries?
     @StoredOrder private var order
-    @AppStorage(ItemTableColumnLayouts.key) private var storedColumns = Data()
     @AppStorage(PageKey.fullWidth) private var fullWidth = PageStyle().fullWidth
     @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
     @AppStorage(DateFormat.key) private var dateFormat = DateFormat.standard
@@ -849,8 +848,13 @@ struct CommandPalette: View {
         }
 
         if library.isLoaded {
-            for command in ViewOptionCommand.commands(for: browser, in: library, storedColumns: $storedColumns) {
+            for command in ViewOptionCommand.commands(for: browser, in: library) {
                 add(command.title, command.systemImage, keys(command.key), in: command.group, action: command.action)
+            }
+            for type in browser.layoutTypes(in: library) {
+                add(String(localized: "Edit Layout of \(type.plural)…"), "slider.horizontal.3", in: .view, id: "command:editLayout:\(type.id)") {
+                    browser.showLayouts(of: type)
+                }
             }
             for command in SavedViewCommand.commands(for: browser, in: library, order: order) {
                 add(command.title, command.systemImage, in: .view, action: command.action)

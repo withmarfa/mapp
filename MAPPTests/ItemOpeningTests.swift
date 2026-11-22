@@ -224,7 +224,7 @@ struct ItemOpeningTests {
         #expect(RowMenuEntry.entries(opening: .modal, inBin: false) == [
             .open, .openAs(.fullPage), .openAs(.newWindow),
             .divider, .quickLook, .share,
-            .divider, .favorite, .tag, .collection, .layoutActions, .changeType, .customizeLayout, .versionHistory,
+            .divider, .favorite, .tag, .collection, .layoutActions, .changeType, .customizeLayout, .editLayouts, .versionHistory,
             .divider, .delete,
         ])
         #expect(RowMenuEntry.entries(opening: .newWindow, inBin: false).prefix(3) == [.open, .openAs(.modal), .openAs(.fullPage)])

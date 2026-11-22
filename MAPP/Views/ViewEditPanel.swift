@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The right sidebar while a view is edited (`ViewPanel`): its name, how it is shown, sort, group, and the table's
-/// columns or the gallery's cards. Each change shows at once in the window beside it and, in a saved view, is written
+/// The right sidebar while a view is edited (`ViewPanel`): its name, how it is shown, sort, group, its Properties
+/// and the gallery's cards. Each change shows at once in the window beside it and, in a saved view, is written
 /// as it is made; Done closes the panel (`ViewPanelToolbar`). Filters are not here: they live in the row above the list
 /// (`FilterChips`). A type's list and the other places that can become a view get the same panel without a name, and
 /// offer Save as View. A list also gets Density, which a view or a place may set apart from Settings.
@@ -39,9 +39,10 @@ struct ViewEditPanel: View {
                 if browser.viewMode != .calendar {
                     ViewPanelGroup(browser: browser)
                 }
-                if browser.viewMode == .table {
-                    ViewPanelColumns(browser: browser, panel: panel, content: content)
-                } else if browser.viewMode == .gallery {
+                if browser.viewMode != .calendar {
+                    ViewPanelProperties(browser: browser)
+                }
+                if browser.viewMode == .gallery {
                     ViewPanelCards(browser: browser, panel: panel)
                 }
                 if panel.isNew {

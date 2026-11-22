@@ -34,7 +34,7 @@ struct ItemList: View, Equatable {
         let _ = placeDensities
         let density = browser.density ?? settingsDensity
         let list = browser.rowList(of: items, in: library, order: order, now: now, format: dateFormat, density: density)
-        let contents = browser.rowContents.contents(of: lines.compactMap(\.entry), in: library, looks: browser.looks(in: library), list: list)
+        let contents = browser.rowContents.contents(of: lines.compactMap(\.entry), in: library, looks: browser.propertyLooks(in: library), list: list)
         let results = browser.searchResults(in: library)
         let excerpts = results?.excerpts ?? [:]
         let isPending = results?.isPending == true
