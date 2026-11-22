@@ -100,6 +100,12 @@ extension Browser {
         return tableContent(in: library).hidesEveryGroup
     }
 
+    /// Whether the list beside the page draws no item, so the page column says why: the place lists none after its
+    /// filters, or every group holding items is hidden.
+    func listDrawsNoItem(in library: any ItemLibrary) -> Bool {
+        filteredItems(in: library).isEmpty || listHidesEveryGroup(in: library)
+    }
+
     func expandAllGroups() {
         tableOptions[item, default: .init()].collapsed = []
     }
@@ -111,13 +117,14 @@ extension Browser {
         return tableContent(in: library).allGroups.map { ($0.id, $0.title) }
     }
 
-    /// Moves a group to sit before another, or last: Marfa's `group.order` in a saved view, the place's own otherwise.
-    func moveGroup(_ key: String, before other: String?, in library: any ItemLibrary) {
+    /// Moves a group to where another stands, as a drag onto its row (`Reordering.moving(_:onto:in:)`): Marfa's
+    /// `group.order` in a saved view, the place's own otherwise.
+    func moveGroup(_ key: String, onto other: String, in library: any ItemLibrary) {
         adoptBoardGrouping(in: library)
-        var order = groupRows(in: library).map(\.key).filter { $0 != GroupKey.notApplicable && $0 != key }
-        let index = other.flatMap { order.firstIndex(of: $0) } ?? order.endIndex
-        order.insert(key, at: index)
-        tableOptions[item, default: .init()].groupOrder = order
+        let order = groupRows(in: library).map(\.key).filter { $0 != GroupKey.notApplicable }
+        let moved = Reordering.moving(key, onto: other, in: order)
+        guard moved != order else { return }
+        tableOptions[item, default: .init()].groupOrder = moved
     }
 
     /// Shows or hides one group. Its items stay in the place and count in it (`device/view-group-hidden`).

@@ -226,7 +226,7 @@ struct GroupByTests {
         let browser = Self.window(library, place: .itemType(Self.task.rawValue), layout: .table)
         browser.chooseGrouping(.column("field.status"))
         browser.setGroup("done", hidden: true, in: library)
-        browser.moveGroup("done", before: "todo", in: library)
+        browser.moveGroup("done", onto: "todo", in: library)
         let content = browser.tableContent(in: library)
         #expect(content.allGroups.map(\.id) == ["done", "todo", "doing"])
         #expect(content.groups.map(\.id) == ["todo", "doing"])
@@ -257,6 +257,57 @@ struct GroupByTests {
         #expect(browser.listHidesEveryGroup(in: library), "the gallery says its groups are hidden, not that the place is empty")
         #expect(browser.listedCount(in: library) == 2)
         #expect(Set(browser.collectionItemIDs(in: library, order: ItemOrder()).map(\.rawValue)) == ["a", "b"])
+    }
+
+    @Test func aGroupDroppedOnAnotherTakesItsPlaceEitherWay() {
+        let items = [Self.item("a", Self.task, ["status": .string("todo")]), Self.item("b", Self.task, ["status": .string("done")])]
+        let library = Self.library(items)
+        let browser = Self.window(library, place: .itemType(Self.task.rawValue), layout: .list)
+        browser.chooseGrouping(.column("field.status"))
+        #expect(browser.groupRows(in: library).map(\.key) == ["todo", "doing", "done"])
+        browser.moveGroup("todo", onto: "doing", in: library)
+        #expect(browser.groupRows(in: library).map(\.key) == ["doing", "todo", "done"], "dragged down, it lands after the row")
+        browser.moveGroup("todo", onto: "done", in: library)
+        #expect(browser.groupRows(in: library).map(\.key) == ["doing", "done", "todo"], "and can reach the last place")
+        browser.moveGroup("todo", onto: "doing", in: library)
+        #expect(browser.groupRows(in: library).map(\.key) == ["todo", "doing", "done"], "dragged up, it lands before the row")
+    }
+
+    @Test func hideEmptyGroupsRedrawsTheListBothWays() {
+        let items = [Self.item("a", Self.task, ["status": .string("todo")]), Self.item("b", Self.task, ["status": .string("done")])]
+        let library = Self.library(items)
+        let browser = Self.window(library, place: .itemType(Self.task.rawValue), layout: .list)
+        browser.chooseGrouping(.column("field.status"))
+        func drawn() -> [String] {
+            browser.sections(in: library, order: browser.storedOrder, now: library.now()).compactMap { $0.group?.key }
+        }
+        let all = drawn()
+        #expect(all.count == 3, "the empty group is drawn")
+        browser.setHidesEmptyGroups(true)
+        #expect(drawn().count == 2, "and leaves the list at once")
+        browser.setHidesEmptyGroups(false)
+        #expect(drawn() == all, "and comes back at once")
+    }
+
+    @Test func aListWithEveryGroupHiddenSaysSoInThePageColumn() {
+        let items = [Self.item("a", Self.task, ["status": .string("todo")]), Self.item("b", Self.task, ["status": .string("done")])]
+        let library = Self.library(items)
+        let browser = Self.window(library, place: .itemType(Self.task.rawValue), layout: .list)
+        browser.chooseGrouping(.column("field.status"))
+        browser.setGroup("todo", hidden: true, in: library)
+        #expect(!browser.listDrawsNoItem(in: library))
+        browser.setGroup("done", hidden: true, in: library)
+        #expect(!browser.filteredItems(in: library).isEmpty, "the place still holds its items")
+        #expect(browser.listDrawsNoItem(in: library), "so the page column says the groups are hidden")
+    }
+
+    @Test func byListsEachWayOnceWithTheDividerBetweenRunsNeverInsideOne() throws {
+        let library = Self.library(Self.events)
+        let browser = Self.window(library, place: .itemType(Self.event.rawValue), layout: .list)
+        let entry = try #require(browser.groupOffer(in: library).entries.first { $0.id == "field.starts_at" })
+        #expect(entry.runs.map { $0.map(\.label) } == [["Day", "Week", "Month", "Year"], ["Set or Not Set"]])
+        #expect(entry.runs.flatMap { $0 } == entry.choices)
+        #expect(entry.runs.dropFirst().allSatisfy { $0.first?.startsSection == true })
     }
 
     @Test func aPlacesListKeepsItsOwnSortAndGroupInItsDefaultView() {

@@ -722,14 +722,14 @@ struct FilterClauseTests {
         let browser = Browser()
         let index = browser.addFilter(on: Self.targets["field.due_at"]!)
         let held = { browser.tableOptions[browser.item]?.filter ?? FilterState() }
-        #expect(held().clauses == [Self.clause("field.due_at", .before)])
+        #expect(held().clauses == [Self.clause("field.due_at", .on)], "a date starts at is on")
         #expect(browser.showsFilterRow)
         #expect(browser.tableOptions[browser.item]?.isFiltering == false, "it hides nothing until it has a day")
         browser.changeFilter(at: index) { $0.values = ["2026-01-01"] }
         #expect(browser.tableOptions[browser.item]?.isFiltering == true)
         browser.addFilter(on: Self.targets["field.priority"]!)
         browser.dropUnfinishedFilters()
-        #expect(held().clauses == [Self.clause("field.due_at", .before, ["2026-01-01"])])
+        #expect(held().clauses == [Self.clause("field.due_at", .on, ["2026-01-01"])])
         // A second condition on a field already filtered is another chip.
         browser.addFilter(on: Self.targets["field.due_at"]!)
         #expect(held().clauses.count == 2)

@@ -35,7 +35,7 @@ nonisolated enum FilterKind: Hashable, Sendable {
     var startingOperator: FilterOp {
         switch self {
         case .status, .choice, .boolean, .parent, .collection, .type, .source: .is
-        case .date, .moment: .before
+        case .date, .moment: .on
         case .number: .equal
         case .text: .contains
         case .people, .tags: .includes

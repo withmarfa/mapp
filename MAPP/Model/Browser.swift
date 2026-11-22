@@ -431,12 +431,14 @@ final class Browser {
     /// item is one, nor in search results. A place that keeps its own order, and a search ordered by relevance, are
     /// one section, in the order given. The filters apply, and a sort or group the person set, or a saved view
     /// has, orders and groups the items in place of the list's own order. The window's views ask for them as often
-    /// as they are drawn, so the last answer stands until the items, the order, the filters, the day or the place
-    /// change.
+    /// as they are drawn, so the last answer stands until the items, the order, the filters, Hide Empty Groups, the day
+    /// or the place change.
     func sections(in library: any ItemLibrary, order: ItemOrder, now: Date) -> [ItemSection] {
         let derived = derivedKey(in: library)
         let shape = listShape
-        let key = SectionsKey(derived: derived.key, order: order, day: Calendar.current.startOfDay(for: now), shape: shape)
+        let key = SectionsKey(
+            derived: derived.key, order: order, day: Calendar.current.startOfDay(for: now), shape: shape,
+            hidesEmpty: shape != nil && hidesEmptyGroups)
         if let held = sectionsMemo, held.key == key { return held.sections }
         let sections = Cost.measure(.sections) {
             if let shape { return shapedSections(shape, in: library, order: order, now: now) }
@@ -593,6 +595,8 @@ final class Browser {
         let order: ItemOrder
         let day: Date
         let shape: ListShape?
+        /// Hide Empty Groups, which only an arranged list's groups read and which is kept apart from the place's options.
+        let hidesEmpty: Bool
     }
 
     private struct TableKey: Equatable {

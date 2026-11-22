@@ -167,9 +167,11 @@ private struct ViewPanelGroup: View {
                             Picker("By", selection: Binding { shown } set: { grouping in
                                 if found.entry.choices.first(where: { $0.grouping == grouping })?.isKept == true { browser.chooseGrouping(grouping) }
                             }) {
-                                ForEach(found.entry.choices) { choice in
-                                    if choice.startsSection { Divider() }
-                                    Text(verbatim: choice.isKept ? choice.label : String(localized: "\(choice.label) (Not Kept)")).tag(choice.grouping)
+                                ForEach(Array(found.entry.runs.enumerated()), id: \.offset) { index, run in
+                                    if index > 0 { Divider() }
+                                    ForEach(run) { choice in
+                                        Text(verbatim: choice.isKept ? choice.label : String(localized: "\(choice.label) (Not Kept)")).tag(choice.grouping)
+                                    }
                                 }
                             }
                             .labelsHidden()
@@ -265,7 +267,7 @@ private struct GroupRow: View {
         guard dragged.hasPrefix(Self.prefix) else { return false }
         let moved = String(dragged.dropFirst(Self.prefix.count))
         guard moved != key else { return false }
-        browser.moveGroup(moved, before: key, in: library)
+        browser.moveGroup(moved, onto: key, in: library)
         return true
     }
 }

@@ -31,7 +31,7 @@ struct ItemDetail: View {
             }
         } else {
             Group {
-                if browser.filteredItems(in: library).isEmpty {
+                if browser.listDrawsNoItem(in: library) {
                     ListEmptyState(browser: browser)
                 } else {
                     EmptyState("No Item Selected")
