@@ -25,7 +25,7 @@ The defaults on this Mac stay the store MAPP's code reads, so a launch reads not
 | `appearance` field | `theme`, `accentColor`, `highlightColor`, `textFont`, `codeFont`, `interfaceTextSize`, `valuePanelStyle`, `paletteMaterial`, `showsScrolledTitle`, `showsPageToolbarBackground`, `toolbarLabelStyle`, `sidebarSubtypeIcons` |
 | `general` field | `dateFormat`, `weekStart`, `startWith`, `newItemType`, `openItemsIn`, `remotePictures` |
 | `editor` field | every `PageKey`, and `sourceViewMode` |
-| `lists` field | `listDensity`, `calendarHourHeight`, `indexNewTypes`, `noteSort`, `groupsByDate` |
+| `lists` field | `listDensity`, `showsQuickAddOptions`, `calendarHourHeight`, `indexNewTypes`, `noteSort`, `groupsByDate` |
 | `search` field | `searchIncludesArchived`, `searchIncludesInbox`, `searchOrder`, `searchShowsSnippets`, and this server's entry of `searchLeaveOuts` |
 | `commands` table | `keyboardShortcuts` (one row per command), `anyAppShortcuts` |
 | `types` table | `pagePlacements`, this server's `typeLooks`, `includedSubtypes` |

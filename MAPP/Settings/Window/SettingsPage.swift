@@ -116,7 +116,10 @@ nonisolated enum SettingsPage: Hashable, Sendable {
                 String(localized: "Restore Defaults"), String(localized: "In Any App"),
             ] + AnyAppCommand.allCases.map(\.title) + ShortcutCommand.all.map(\.title)
         case .lists:
-            [String(localized: "Density"), String(localized: "Sort By"), String(localized: "Group By"), String(localized: "Order")]
+            [
+                String(localized: "Density"), String(localized: "Sort By"), String(localized: "Group By"), String(localized: "Order"),
+                String(localized: "Items Page"), String(localized: "Show Quick Add Options"),
+            ]
         case .editor:
             [
                 String(localized: "Text Size"), String(localized: "Line Spacing"), String(localized: "Paragraph Spacing"),

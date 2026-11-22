@@ -52,6 +52,23 @@ import Testing
         #expect(NewRowTypes.moved(row, from: IndexSet(integer: 2), to: 0) == "core.event,core.note,core.task")
     }
 
+    @Test func theQuickAddTilesAreOffUntilTheSettingIsTurnedOn() throws {
+        let suite = "IndexPageTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        #expect(!defaults.bool(forKey: ListKey.showsQuickAdd))
+        defaults.set(true, forKey: ListKey.showsQuickAdd)
+        #expect(defaults.bool(forKey: ListKey.showsQuickAdd))
+        MacSettings.reset(in: defaults)
+        #expect(!defaults.bool(forKey: ListKey.showsQuickAdd))
+    }
+
+    @Test func theQuickAddSettingSyncsWithTheListsField() {
+        #expect(PreferencesMap.syncedKeys.contains(ListKey.showsQuickAdd))
+        #expect(!PreferencesMap.staysOnMac.contains(ListKey.showsQuickAdd))
+        #expect(MacSettings.keys.contains(ListKey.showsQuickAdd))
+    }
+
     // MARK: Tools and filters
 
     @Test func theItemsPageHasTheNewRowUntilAFilterTakesItsPlace() {

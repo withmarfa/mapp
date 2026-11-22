@@ -91,7 +91,7 @@ extension ViewOptionCommand {
                 })
             }
         }
-        if place == .items {
+        if place == .items, browser.defaults.bool(forKey: ListKey.showsQuickAdd) {
             commands.append(ViewOptionCommand(title: String(localized: "Edit New Row…"), systemImage: "square.grid.2x2") {
                 browser.isEditingNewRow = true
             })

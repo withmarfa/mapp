@@ -12,6 +12,7 @@ import SwiftUI
 struct ItemsIndex: View {
     @CurrentLibrary private var library
     @AppStorage(QuickAdd.lastTypeKey) private var lastType = ""
+    @AppStorage(ListKey.showsQuickAdd) private var showsQuickAdd = false
     let browser: Browser
     var pane: FocusState<Browser.Pane?>.Binding
     @AppStorage private var storedTab: IndexTab
@@ -69,8 +70,9 @@ struct ItemsIndex: View {
                     tab: Binding { tab } set: { storedTab = $0 },
                     new: { browser.openQuickAddFromIndex(remembered: lastType, in: library) })
             } extra: {
-                // The filter row takes the New row's place while a filter is on.
-                if browser.showsNewRow {
+                // The tiles show only where Settings > Lists asks for them, and the filter row takes their place while a
+                // filter is on.
+                if showsQuickAdd, browser.showsNewRow {
                     NewTiles(browser: browser)
                 } else if browser.showsFilterRow {
                     FilterRow(browser: browser, leadingInset: IndexMetrics.side)
